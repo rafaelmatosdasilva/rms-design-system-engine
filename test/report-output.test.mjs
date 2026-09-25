@@ -40,6 +40,8 @@ test('findings: failing gates, warning lines and listed advisory items; never ze
   ]);
   assert.equal(ZERO_FAIL.test('❌ MISSING  0  propertyMap selectors'), true);
   assert.equal(ZERO_FAIL.test('❌ FAIL  3 field(s)'), false);
+  assert.equal(ZERO_FAIL.test('❌ FAIL      0/140  (missing per-mode override, or CSS ≠ Figma in a mode)'), true);
+  assert.equal(ZERO_FAIL.test('❌ FAIL      2/140  (missing per-mode override)'), false);
 });
 
 test('since the last run: new, gone, and a count that moved is one changed finding', () => {
