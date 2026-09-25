@@ -12,7 +12,7 @@ import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, ENGINE, DEMO } from './lib.mjs';
+import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, ENGINE, DEMO } from './lib.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
 import { HELDOUT } from './heldout.mjs';
@@ -57,7 +57,7 @@ async function one({ t, run }) {
   const ctx = context(events, dir);
   const taskChecks = error ? [{ name: 'the run finished', ok: false, detail: error }] : t.score(ctx);
   const rules = globalChecks(ctx, t);
-  const row = { ...meta, task: t.id, set: t.set, run, pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, changed: ctx.changed, at: new Date().toISOString() };
+  const row = { ...meta, task: t.id, set: t.set, run, pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-figma-code-parity'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, at: new Date().toISOString() };
   writeFileSync(join(out, 'transcripts', `${V}.${MODEL}.${t.id}.${run}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   appendFileSync(join(out, `${V}.${MODEL}.jsonl`), JSON.stringify(row) + '\n');
   cleanup(dir, home);

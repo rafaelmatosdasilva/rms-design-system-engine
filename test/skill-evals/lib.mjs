@@ -48,7 +48,11 @@ function walk(dir) {
 // takes it away). Returns { home, path }.
 export function makeHome(variant, { cliOnPath = true } = {}) {
   const home = mkdtempSync(join(tmpdir(), 'skill-eval-home-'));
+  // Where install.sh puts the engine, so the guide's "node <install-dir>/audit.mjs" finds this engine and
+  // never another checkout on the machine. A variant that installs its own skill folder there keeps it.
+  mkdirSync(join(home, '.claude', 'skills'), { recursive: true });
   variant.install(home);
+  if (!existsSync(join(home, '.claude', 'skills', 'rms-figma-code-parity'))) symlinkSync(ENGINE, join(home, '.claude', 'skills', 'rms-figma-code-parity'));
   const bin = join(home, 'bin');
   mkdirSync(bin, { recursive: true });
   if (cliOnPath) {
@@ -85,7 +89,9 @@ export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTu
 }
 
 // What a scorer reads: the tool calls with their results, the text, the engine runs, the files after.
-export function context(events, dir) {
+// `saved` (from a result row) replaces the live project: its changed files, commit count and file contents,
+// so a run can be scored again later without running it again (rescore.mjs).
+export function context(events, dir, saved = null) {
   const calls = [], texts = [];
   const byId = new Map();
   for (const e of events) {
@@ -102,13 +108,13 @@ export function context(events, dir) {
   const final = results.map((r) => String(r.result ?? '')).join('\n\n');
   const bash = calls.filter((c) => c.name === 'Bash').map((c) => ({ command: String(c.input.command ?? ''), result: c.result, isError: c.isError }));
   const engine = bash.filter((b) => /(^|[\s;&|(])(rms-figma-code-parity|rms-parity|node\s+\S*audit\.mjs)\b/.test(b.command));
-  const git = (...a) => { try { return execFileSync('git', a, { cwd: dir, encoding: 'utf8' }); } catch { return ''; } };
-  const changed = git('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, ''))
+  const git = (...a) => { if (saved) return ''; try { return execFileSync('git', a, { cwd: dir, encoding: 'utf8' }); } catch { return ''; } };
+  const changed = saved ? saved.changed ?? [] : git('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, ''))
     .filter((p) => !/^\.parity-out\/|^contracts\/|^parity-(agreed|history)\.json$|^(component-prop-result|parity-check-result)\.json$|html-structure\.snapshot\.json$|^design-intent\.json$|^llms\.txt$/.test(p));
   const nextLines = calls.flatMap((c) => String(c.result).split('\n')).map((l) => l.match(/^NEXT:\s*(.+)$/)?.[1]).filter(Boolean);
-  const read = (p) => { try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
+  const read = (p) => { if (saved) return saved.files?.[p] ?? null; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
   return {
-    calls, bash, engine, texts, final, all: [...texts, final].join('\n'), changed, commits: Number(git('rev-list', '--count', 'HEAD').trim() || 0),
+    calls, bash, engine, texts, final, all: [...texts, final].join('\n'), changed, commits: saved ? saved.commits ?? 1 : Number(git('rev-list', '--count', 'HEAD').trim() || 0),
     diff: git('diff', 'HEAD'), read, nextLines, dir,
     usage: results.reduce((u, r) => ({ input: u.input + (r.usage?.input_tokens ?? 0) + (r.usage?.cache_read_input_tokens ?? 0) + (r.usage?.cache_creation_input_tokens ?? 0), output: u.output + (r.usage?.output_tokens ?? 0), turns: u.turns + (r.num_turns ?? 0), cost: u.cost + (r.total_cost_usd ?? 0) }), { input: 0, output: 0, turns: 0, cost: 0 }),
   };
@@ -135,3 +141,11 @@ export const flagsOf = (command) => command.split(/\s+/).filter((t) => t.startsW
 export function hasEngineRun(ctx, pred = () => true) { return ctx.engine.some((b) => pred(b.command, flagsOf(b.command))); }
 
 export function cleanup(...dirs) { for (const d of dirs) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } }
+
+// The files a scorer may read, kept with the result so the run can be scored again (at most 256 KB each).
+export const KEEP = ['ds-config.json', 'parity-baseline.json', 'src/theme.css', '.parity-out/summary.md'];
+export function keepFiles(ctx, extra = []) {
+  const out = {};
+  for (const p of new Set([...KEEP, ...extra, ...ctx.changed])) { const t = ctx.read(p); if (t != null && t.length <= 256 * 1024) out[p] = t; }
+  return out;
+}
