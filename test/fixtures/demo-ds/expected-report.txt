@@ -249,3 +249,22 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 
 📉 Burndown, open findings per component: button 5 · chip 3 · 14 not tied to a component
    next up: button. Run with --component button, fix, run again.
+
+─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
+
+# Parity result
+
+**Not in parity.** 1 of 25 gates fail.
+
+- **Token values** fails:
+  - [sizing/-] radii/chip → --radii-chip
+    - Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px
+
+**Measured differences** (rendered in the browser, advisory): 2
+- button hover while disabled (Disabled=True): Figma no change, rendered changes background  (.tp-button:hover · src/theme.css:44)  [read from one source]
+- chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip.tp-chip--l.tp-chip--icon · src/theme.css:60)  → set 32px
+
+Burndown, open findings per component: button 5 · chip 3 · 14 not tied to a component
+
+NEXT: fix the ❌ lines under "Token values", then run rms-figma-code-parity. To accept a known one instead: rms-figma-code-parity --baseline --findings (only when the user says so).
+
