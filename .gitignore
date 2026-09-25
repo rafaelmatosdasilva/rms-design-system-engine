@@ -19,3 +19,6 @@ plans/
 # Local choice of guide and its extracted copy (--guide classic).
 .guide-choice
 .classic-guide.md
+
+# Skill evaluation transcripts (large; the result rows are kept).
+test/skill-evals/results/transcripts/

@@ -1,0 +1,137 @@
+// test/skill-evals/lib.mjs - the skill evaluation's plumbing (idea I55): isolated projects, one headless
+// Claude Code run per task, and the context a scorer reads. Not part of `node --test` (it spends model
+// tokens); run it with test/skill-evals/run.mjs.
+//
+// Every run is isolated: a fresh copy of the project (its snapshots dated today, one git commit, the
+// project's hooks installed), a fresh HOME holding only the variant's guide, the same engine for every
+// variant, a fixed tool list, a turn limit and a dollar budget. Only the guide differs between variants.
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
+import { join, dirname, basename } from 'node:path';
+import { tmpdir } from 'node:os';
+import { spawn, execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { findChrome } from '../../cdp.mjs';
+
+export const ENGINE = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+export const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
+export const TOOLS = 'Bash,Read,Edit,Write,Glob,Grep,Skill';
+const GIT_ENV = { GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.com', GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' };
+
+// A fresh project from `source`, prepared by the task's setup, committed once, hooks installed.
+export function makeProject(source, setup) {
+  const dir = mkdtempSync(join(tmpdir(), 'skill-eval-'));
+  cpSync(source, dir, { recursive: true, filter: (p) => !/expected-report|\/\.parity-out(\/|$)|\/\.git(\/|$)|node_modules/.test(p) });
+  const today = new Date().toISOString();
+  for (const f of walk(dir).filter((p) => /\.snapshot\.json$/.test(p))) {
+    writeFileSync(f, readFileSync(f, 'utf8').replace(/"_updated": "[^"]*"/, `"_updated": "${today}"`));
+  }
+  setup?.(dir);
+  const env = { ...process.env, ...GIT_ENV };
+  execFileSync('git', ['init', '-q'], { cwd: dir, env });
+  if (existsSync(join(dir, 'ds-config.json'))) execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--install-hooks'], { cwd: dir, stdio: 'ignore' });
+  execFileSync('git', ['add', '-A'], { cwd: dir, env });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: dir, env });
+  return dir;
+}
+
+function walk(dir) {
+  const out = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === '.git' || e.name === 'node_modules') continue;
+    const p = join(dir, e.name);
+    if (e.isDirectory()) out.push(...walk(p)); else out.push(p);
+  }
+  return out;
+}
+
+// A HOME with only the variant installed, and a bin folder with the terminal command (unless the task
+// takes it away). Returns { home, path }.
+export function makeHome(variant, { cliOnPath = true } = {}) {
+  const home = mkdtempSync(join(tmpdir(), 'skill-eval-home-'));
+  variant.install(home);
+  const bin = join(home, 'bin');
+  mkdirSync(bin, { recursive: true });
+  if (cliOnPath) {
+    for (const name of ['rms-figma-code-parity', 'rms-parity']) {
+      writeFileSync(join(bin, name), `#!/usr/bin/env bash\nexec node "${join(ENGINE, 'audit.mjs')}" "$@"\n`);
+      chmodSync(join(bin, name), 0o755);
+    }
+  }
+  const path = [bin, ...String(process.env.PATH).split(':').filter((p) => !/\.local\/bin/.test(p))].join(':');
+  return { home, path };
+}
+
+// One headless turn. Resolves { events, sessionId, cost, error }.
+export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTurns = 40, budget = 3, timeoutMs = 15 * 60 * 1000 }) {
+  const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--model', model, '--max-turns', String(maxTurns),
+    '--max-budget-usd', String(budget), '--tools', TOOLS, '--allowedTools', TOOLS.split(',').join(' '),
+    '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', ...(resume ? ['--resume', resume] : [])];
+  return new Promise((resolve) => {
+    // Real users have Chrome: the audit's browser reading and accessibility check run in every variant.
+    const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
+    const child = spawn('claude', args, { cwd, env: { ...process.env, HOME: home, PATH: path, CHROME_PATH: chrome }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '', err = '', timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    child.on('close', () => {
+      clearTimeout(timer);
+      const events = out.split('\n').filter((l) => l.trim().startsWith('{')).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      const result = events.filter((e) => e.type === 'result').at(-1);
+      const error = timedOut ? `timed out after ${timeoutMs / 60000} min` : !result ? `no result (${err.slice(-300)})` : null;
+      resolve({ events, sessionId: result?.session_id ?? events.find((e) => e.session_id)?.session_id ?? null, cost: result?.total_cost_usd ?? 0, error, stderr: err.slice(-2000) });
+    });
+  });
+}
+
+// What a scorer reads: the tool calls with their results, the text, the engine runs, the files after.
+export function context(events, dir) {
+  const calls = [], texts = [];
+  const byId = new Map();
+  for (const e of events) {
+    for (const c of e.message?.content ?? []) {
+      if (e.type === 'assistant' && c.type === 'text') texts.push(c.text);
+      if (e.type === 'assistant' && c.type === 'tool_use') { const call = { id: c.id, name: c.name, input: c.input ?? {}, result: '', isError: false }; calls.push(call); byId.set(c.id, call); }
+      if (e.type === 'user' && c.type === 'tool_result') {
+        const call = byId.get(c.tool_use_id);
+        if (call) { call.result = Array.isArray(c.content) ? c.content.map((x) => x.text ?? '').join('\n') : String(c.content ?? ''); call.isError = !!c.is_error; }
+      }
+    }
+  }
+  const results = events.filter((e) => e.type === 'result');
+  const final = results.map((r) => String(r.result ?? '')).join('\n\n');
+  const bash = calls.filter((c) => c.name === 'Bash').map((c) => ({ command: String(c.input.command ?? ''), result: c.result, isError: c.isError }));
+  const engine = bash.filter((b) => /(^|[\s;&|(])(rms-figma-code-parity|rms-parity|node\s+\S*audit\.mjs)\b/.test(b.command));
+  const git = (...a) => { try { return execFileSync('git', a, { cwd: dir, encoding: 'utf8' }); } catch { return ''; } };
+  const changed = git('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, ''))
+    .filter((p) => !/^\.parity-out\/|^contracts\/|^parity-(agreed|history)\.json$|^(component-prop-result|parity-check-result)\.json$|html-structure\.snapshot\.json$|^design-intent\.json$|^llms\.txt$/.test(p));
+  const nextLines = calls.flatMap((c) => String(c.result).split('\n')).map((l) => l.match(/^NEXT:\s*(.+)$/)?.[1]).filter(Boolean);
+  const read = (p) => { try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
+  return {
+    calls, bash, engine, texts, final, all: [...texts, final].join('\n'), changed, commits: Number(git('rev-list', '--count', 'HEAD').trim() || 0),
+    diff: git('diff', 'HEAD'), read, nextLines, dir,
+    usage: results.reduce((u, r) => ({ input: u.input + (r.usage?.input_tokens ?? 0) + (r.usage?.cache_read_input_tokens ?? 0) + (r.usage?.cache_creation_input_tokens ?? 0), output: u.output + (r.usage?.output_tokens ?? 0), turns: u.turns + (r.num_turns ?? 0), cost: u.cost + (r.total_cost_usd ?? 0) }), { input: 0, output: 0, turns: 0, cost: 0 }),
+  };
+}
+
+// Tool calls the agent chose that no NEXT line gave (a lower number means less left to the agent).
+// A call counts as guided only when a NEXT line printed before it named its command.
+export function decisionPoints(ctx) {
+  const seen = [];
+  let decided = 0;
+  for (const c of ctx.calls) {
+    const cmd = String(c.input?.command ?? '');
+    const guided = c.name === 'Bash' && seen.some((g) => g && cmd.includes(g));
+    if (!guided) decided++;
+    for (const l of String(c.result ?? '').split('\n')) {
+      const m = l.match(/^NEXT:\s*(.+)$/);
+      if (m) seen.push(m[1].replace(/\s+\(.*$/, '').replace(/^.*?(rms-figma-code-parity|git apply)/, '$1').replace(/[.;,]\s.*$/, '').trim());
+    }
+  }
+  return decided;
+}
+
+export const flagsOf = (command) => command.split(/\s+/).filter((t) => t.startsWith('--'));
+export function hasEngineRun(ctx, pred = () => true) { return ctx.engine.some((b) => pred(b.command, flagsOf(b.command))); }
+
+export function cleanup(...dirs) { for (const d of dirs) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } }
