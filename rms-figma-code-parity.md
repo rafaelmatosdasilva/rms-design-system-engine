@@ -50,7 +50,9 @@ this skill emits (the contract and `llms.txt`), so what it builds is grounded, n
 console; relay those results to the user directly in the conversation, in plain language -
 which gates passed, which failed, and what each failure means. The parity output is
 **always the conversation** - the skill never produces a file, document, or HTML report as
-its result. Fix anything red before declaring parity.
+its result. Never declare parity while anything is red. **An audit request is a request to report, not to
+fix:** report what is red and what the fix is, and change code, config or snapshots only when the person asks
+for that fix.
 
 ## How to run this skill (read first)
 

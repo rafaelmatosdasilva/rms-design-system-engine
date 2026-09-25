@@ -8,7 +8,7 @@ const tokens = gate('Token values  (color · sizing)', false, ['✅ PASS  25', '
 const structure = gate('Structure', true, ['⚠️  MEASURED 1  (rendered in the browser)', '⚠️  chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip · src/theme.css:60)  → set 32px']);
 
 test('NEXT: failing gates first, then the hand-back, then the burndown, else nothing to do', () => {
-  assert.match(nextStep({ failing: [tokens] }), /^NEXT: fix the ❌ lines under "Token values", then run rms-figma-code-parity\./);
+  assert.match(nextStep({ failing: [tokens] }), /^NEXT: tell the user what fails under "Token values" and the fix it names\. Change the code only when they ask for that fix, then run rms-figma-code-parity\./);
   assert.match(nextStep({ failing: [tokens], scope: ['chip'] }), /then run rms-figma-code-parity --component chip\./);
   assert.match(nextStep({ handback: { code: '.parity-out/handback/code-changes.diff' } }), /apply it only when they ask \(git apply/);
   assert.equal(nextStep({ burndownNext: 'chip' }), 'NEXT: rms-figma-code-parity --component chip');
