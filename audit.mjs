@@ -24,6 +24,7 @@ import { existsSync, readdirSync, readFileSync, statSync,
          writeFileSync, copyFileSync, mkdirSync,
          symlinkSync, unlinkSync }                               from 'fs';
 import { join, dirname, resolve, relative }                     from 'path';
+import { printDoc, doctor, classicGuide, writeClassicGuide }   from './skill-files.mjs';
 import { fileURLToPath }                                        from 'url';
 import { makeFigmaFetch }                                       from './figma-fetch.mjs';
 import { collectRawValues, COLLECT_NODE_BUDGET }                from './collect-raw-values.mjs';
@@ -99,7 +100,13 @@ const INIT_NONINTERACTIVE = INIT_FIGMA_URL != null;
 // and refreshes the link. Works whether the folder is a sibling clone or a submodule.
 const HOME = process.env.HOME || process.env.USERPROFILE || '';
 function linkCommand() {
-  const src = join(SCRIPT_DIR, 'rms-figma-code-parity.md');
+  // A person who chose the classic guide (--guide classic) keeps it across updates.
+  let src = join(SCRIPT_DIR, 'rms-figma-code-parity.md');
+  if (existsSync(join(SCRIPT_DIR, '.guide-choice')) && readFileSync(join(SCRIPT_DIR, '.guide-choice'), 'utf8').trim() === 'classic') {
+    const classic = writeClassicGuide(SCRIPT_DIR);
+    if (classic) src = classic;
+    else console.log('⚠️  The classic guide is not in this copy of the skill (no guide-monolith tag); linking the current guide.');
+  }
   const cmdDir = join(HOME, '.claude', 'commands');
   const link = join(cmdDir, 'rms-figma-code-parity.md');
   try {
@@ -162,6 +169,35 @@ function checkForUpdate({ quiet } = {}) {
   return { behind, local, remote };
 }
 if (process.argv.includes('--update'))                                      { updateSkill(); process.exit(0); }
+// ── --recipe / --reference: the guide's recipes and reference, printed from the engine (I55) ──
+for (const kind of ['recipe', 'reference']) {
+  const at = process.argv.indexOf(`--${kind}`);
+  if (at === -1) continue;
+  const name = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  process.exit(printDoc(SCRIPT_DIR, kind, name));
+}
+// ── --guide classic|current: which guide the command loads (I55 rollback) ──
+if (process.argv.includes('--guide')) {
+  const which = process.argv[process.argv.indexOf('--guide') + 1];
+  if (which === 'classic') {
+    if (!classicGuide(SCRIPT_DIR)) { console.log('❌ The classic guide is not in this copy of the skill (no guide-monolith tag). Run rms-figma-code-parity --update, then try again.'); process.exit(1); }
+    writeFileSync(join(SCRIPT_DIR, '.guide-choice'), 'classic\n');
+  } else if (which === 'current') { try { unlinkSync(join(SCRIPT_DIR, '.guide-choice')); } catch { /* already current */ } }
+  else { console.log('Use --guide classic (the guide as one file, as before the split) or --guide current.'); process.exit(2); }
+  const ok = linkCommand();
+  console.log(ok ? `NEXT: open a new Claude Code session so /rms-figma-code-parity loads the ${which} guide` : 'NEXT: link the command by hand with the line above');
+  process.exit(ok ? 0 : 1);
+}
+// ── --doctor: is the skill installed right? One fix per problem (I55) ──
+if (process.argv.includes('--doctor')) {
+  const { hooksStatus } = await import('./hooks-install.mjs');
+  const { findChrome } = await import('./cdp.mjs');
+  const rows = doctor({ engineDir: SCRIPT_DIR, projectDir: ROOT, findChrome: () => findChrome({ playwright: true }), hooksStatus });
+  for (const r of rows) console.log(`${r.ok ? '✅' : '⚠️ '} ${r.what}${r.fix ? `\n   fix: ${r.fix}` : ''}`);
+  const bad = rows.filter((r) => !r.ok);
+  console.log(bad.length ? `NEXT: ${bad[0].fix}` : 'NEXT: rms-figma-code-parity');
+  process.exit(bad.length ? 1 : 0);
+}
 if (process.argv.includes('--link-command'))                                { process.exit(linkCommand() ? 0 : 1); }
 
 // ── --install-hooks / --remove-hooks: the never-rules as Claude Code hooks in this project (I55) ──

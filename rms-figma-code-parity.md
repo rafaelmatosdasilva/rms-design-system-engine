@@ -260,6 +260,10 @@ rms-figma-code-parity --baseline --findings           # the same, each failing â
 rms-figma-code-parity --no-baseline                   # ignore any parity-baseline.json this run (enforce every gate)
 rms-figma-code-parity --summary                       # print the plain result of the last run again (relay it as is)
 rms-figma-code-parity --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
+rms-figma-code-parity --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
+rms-figma-code-parity --recipe [name]                 # print a task recipe from the skill's cookbook (no name lists them)
+rms-figma-code-parity --reference [name]              # print a reference file from the skill (no name lists them)
+rms-figma-code-parity --guide classic|current         # link the command to the guide as one file (as before the split), or back
 node ~/.claude/skills/rms-figma-code-parity/parity-check.mjs --fix                   # auto-fix sizing/typography divergences in theme.css
 node ~/.claude/skills/rms-figma-code-parity/setup-webhook.mjs --list                 # list registered Figma webhooks for this file
 ```

@@ -15,3 +15,7 @@ plans/
 !test/fixtures/demo-ds/ds-config.json
 !test/fixtures/demo-ds/structure-contract.mjs
 !test/fixtures/demo-ds/.parity-refs/
+
+# Local choice of guide and its extracted copy (--guide classic).
+.guide-choice
+.classic-guide.md
