@@ -163,7 +163,30 @@ function checkForUpdate({ quiet } = {}) {
 }
 if (process.argv.includes('--update'))                                      { updateSkill(); process.exit(0); }
 if (process.argv.includes('--link-command'))                                { process.exit(linkCommand() ? 0 : 1); }
+
+// ── --install-hooks / --remove-hooks: the never-rules as Claude Code hooks in this project (I55) ──
+if (process.argv.includes('--install-hooks') || process.argv.includes('--remove-hooks')) {
+  const { installHooks } = await import('./hooks-install.mjs');
+  const remove = process.argv.includes('--remove-hooks');
+  try {
+    const r = installHooks(ROOT, { remove });
+    console.log(remove ? `✅ Hooks removed from ${relative(ROOT, r.file)}` : `✅ Hooks ${r.changed ? 'installed' : 'already installed'} in ${relative(ROOT, r.file)}: a Figma snapshot is never edited by hand, and ds-config.json edits, commits, pushes and applying the hand-back ask you first.`);
+    if (r.gitignored) console.log('   Added .claude/settings.local.json to .gitignore (it holds this machine\'s engine path).');
+    if (!remove) console.log('   Turn them off with rms-figma-code-parity --remove-hooks, or "hooks": false in ds-config.json.');
+    console.log('NEXT: rms-figma-code-parity');
+    process.exit(0);
+  } catch (e) { console.log(`❌ ${e.message}`); process.exit(1); }
+}
 if (process.argv.includes('--version') || process.argv.includes('--check-update')) { process.exit(checkForUpdate({ quiet: false }) === null ? 1 : 0); }
+
+// ── --summary: the plain result of the last run, to relay in the chat as is (I55) ──
+if (process.argv.includes('--summary')) {
+  const f = join(process.cwd(), '.parity-out', 'summary.md');
+  if (existsSync(f)) { process.stdout.write(readFileSync(f, 'utf8')); process.exit(0); }
+  console.log('No summary yet: run the audit first (rms-figma-code-parity, or --component <name>).');
+  console.log('NEXT: rms-figma-code-parity');
+  process.exit(2);
+}
 
 // Set when Figma rejects the credential itself (expired/revoked token), as opposed to
 // the plan or scope gating an endpoint. Kept separate so the audit prescribes the right
@@ -323,6 +346,7 @@ if (process.argv.includes('--guidelines') || process.argv.some((a) => a.startsWi
       }
     }
   }
+  console.log(failed ? `\nNEXT: make the fix named above, then run rms-figma-code-parity --guidelines ${links.join(' ')} again` : '\nNEXT: rms-figma-code-parity   (every run refreshes these pages and folds them into the design intent)');
   process.exit(failed ? 1 : 0);
 }
 
@@ -1080,6 +1104,15 @@ async function bootstrapConfig() {
   console.log(C.dim('  Advanced (optional): a FIGMA_TOKEN in .env auto-refreshes the data each run'));
   console.log(C.dim('  and enables the screenshot gate. Never required - parity runs without it.'));
   console.log('─'.repeat(WIDTH) + '\n');
+  // The never-rules as hooks in this project (I55), unless --no-hooks.
+  if (!process.argv.includes('--no-hooks')) {
+    try {
+      const { installHooks } = await import('./hooks-install.mjs');
+      const r = installHooks(ROOT);
+      console.log(C.green(`✅ Hooks installed in ${relative(ROOT, r.file)}`) + C.dim(' (never edit a Figma snapshot by hand; ask before commit, push, applying the hand-back or editing ds-config.json). Off: --remove-hooks.'));
+    } catch (e) { console.log(C.yellow(`⚠️  Hooks not installed: ${e.message}`)); }
+  }
+  console.log('NEXT: rms-figma-code-parity   (the first run: it refreshes the Figma data when it can, then audits)\n');
 
   return generated;
 }
@@ -3533,6 +3566,7 @@ function reportFull(label, items, shown) {
   // ── Since the last run ───────────────────────────────────────────────────────
   // The findings this run printed, against the ones the last run with the same scope printed.
   console.log = _log;
+  let _burndownLines = [], _burndownNext = null;
   try {
     const { collectFindings, diffFindings, diffReport, burndown, burndownLines } = await import('./run-diff.mjs');
     const ledgerPath = join(ROOT, '.parity-out', 'last-findings.json');
@@ -3561,13 +3595,32 @@ function reportFull(label, items, shown) {
     try {
       const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
       const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_') && n.length > 2);
-      const lines = burndownLines(burndown(now, names, prev?.findings ?? null), { scoped: _scopeNames.length > 0 });
+      const bd = burndown(now, names, prev?.findings ?? null);
+      const lines = burndownLines(bd, { scoped: _scopeNames.length > 0 });
+      _burndownLines = lines; _burndownNext = bd.rows[0]?.name ?? null;
       if (lines.length) console.log(`\n📉 ${lines.join('\n')}`);
     } catch { /* a convenience */ }
     ledger.scopes = { ...(ledger.scopes ?? {}), [scopeKey]: { at: new Date().toISOString(), findings: now } };
     mkdirSync(dirname(ledgerPath), { recursive: true });
     writeFileSync(ledgerPath, JSON.stringify(ledger, null, 1) + '\n');
   } catch { /* the comparison is a convenience: it never breaks the run */ }
+
+  // ── What to say, and what to do next (I55) ─────────────────────────────────────
+  // The plain result to relay in the chat as is, and one NEXT line with the exact command, so an agent
+  // relays the engine's words instead of its own reading. Also kept for `--summary`.
+  try {
+    const { nextStep, buildSummary } = await import('./next-step.mjs');
+    const outDir = dirname(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json');
+    const hb = (f) => (existsSync(join(ROOT, outDir, 'handback', f)) ? join(outDir, 'handback', f) : null);
+    const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
+    const written = baselineInfo?.mode === 'write' ? { count: baselineInfo.written.length, file: relative(ROOT, baselineInfo.path) || 'parity-baseline.json' } : null;
+    const next = nextStep({ failing, baselineWritten: written, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext });
+    const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
+    const summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length });
+    mkdirSync(join(ROOT, '.parity-out'), { recursive: true });
+    writeFileSync(join(ROOT, '.parity-out', 'summary.md'), summary);
+    console.log(`\n${C.bold('─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───')}\n\n${summary}`);
+  } catch { /* the full report above still stands */ }
 
   // Passive, throttled "you're behind" nudge - at most once/day, best-effort, never
   // blocks or errors a run. Explicit checks: `node scripts/audit.mjs --version`.

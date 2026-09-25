@@ -63,6 +63,19 @@ rules-heavy, step-by-step prompt, briefly tell the user those steps are not need
 skill handles setup/scope/run/report) and proceed from the intent instead of executing the
 listed steps.**
 
+**Relay the engine's words, and follow its NEXT line.** Every audit ends with a `SUMMARY` block (also written
+to `.parity-out/summary.md`; `rms-figma-code-parity --summary` prints the last one again) and one `NEXT:` line.
+Relay the summary in the chat as it is, without rewording its facts, then take the `NEXT:` line as the next
+step. `--init`, `--guidelines`, `--baseline` and `--install-hooks` end with a `NEXT:` line too. When a `NEXT:`
+line says to do something only when the person asks (commit, apply the hand-back), ask them; never do it on
+your own.
+
+**The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
+`--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
+refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.json` edit, a commit, a push,
+or applying the hand-back. When a hook refuses or asks, that is the answer: do not work around it (no other
+tool, no shell edit); tell the person what it said.
+
 **When someone pastes a GitLab or Notion link to their written guidelines into the chat**, run
 `rms-figma-code-parity --guidelines <link>` (several links can be passed at once). Do not edit
 `ds-config.json` by hand and do not fetch the page yourself: the command records the link, reads the page
@@ -245,6 +258,8 @@ rms-figma-code-parity --no-contracts                  # skip the standard contra
 rms-figma-code-parity --baseline                      # capture today's failing gates as accepted adoption debt (commit parity-baseline.json)
 rms-figma-code-parity --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-figma-code-parity --no-baseline                   # ignore any parity-baseline.json this run (enforce every gate)
+rms-figma-code-parity --summary                       # print the plain result of the last run again (relay it as is)
+rms-figma-code-parity --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
 node ~/.claude/skills/rms-figma-code-parity/parity-check.mjs --fix                   # auto-fix sizing/typography divergences in theme.css
 node ~/.claude/skills/rms-figma-code-parity/setup-webhook.mjs --list                 # list registered Figma webhooks for this file
 ```
@@ -885,6 +900,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 - `pluginDirs` - `{ "<app>": "path/from/root" }` when an app does not live in `apps/<app>`.
 - `scopeMaxNestPerFile` (default 8) - how many nested selectors per file the token-scope check reads.
 - `states` - which Figma prop and value is each interaction concept, when the names do not say it: `{ "hover": { "prop": "State", "value": "Hover" }, "active": { "prop": "State", "value": "Pressed" }, "disabled": { "prop": "isDisabled" } }` (a prop without a value is a boolean, true meaning the state). Used for the disabled exemption in contrast checks, to find the disabled state for the disabled-wins check, and by the props check (a declared axis with a value, such as `State`, is a state axis and not a missing code prop). An undeclared concept is read from the names (a boolean only when true).
+- `hooks: false` - the project's Claude Code hooks (see *The project's hooks*) pass everything.
 - `rtl: true` - lists the declarations that would not mirror in a right-to-left language (one-sided or asymmetric `padding-left`, `margin-right`, `border-left`, `left`/`right` offsets, `text-align` and `float` left or right), each with its file and line and the logical property to use. Symmetric values are not listed.
 - `renderedParityStrict: true` - the measured differences (Gate [13] `MEASURED`) fail the gate instead of being advisory.
 
