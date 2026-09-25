@@ -30,7 +30,7 @@ export function nextStep({ failing = [], scope = [], handback = {}, burndownNext
   if (baselineWritten) return `NEXT: tell the user ${baselineWritten.file} now holds the accepted debt; commit it only when they ask.`;
   if (failing.length) {
     const g = failing[0];
-    return `NEXT: fix the ❌ lines under "${gateName(g.label)}"${failing.length > 1 ? ` (and ${failing.length - 1} more failing gate${failing.length > 2 ? 's' : ''})` : ''}, then run ${rerun}. To accept a known one instead: ${cmd} --baseline --findings (only when the user says so).`;
+    return `NEXT: tell the user what fails under "${gateName(g.label)}"${failing.length > 1 ? ` (and ${failing.length - 1} more failing gate${failing.length > 2 ? 's' : ''})` : ''} and the fix it names. Change the code only when they ask for that fix, then run ${rerun}. To accept a known difference instead: ${cmd} --baseline --findings (only when they ask).`;
   }
   if (handback.code) return `NEXT: show the user ${handback.code}; apply it only when they ask (git apply ${handback.code}), then run ${rerun}.`;
   if (handback.figma) return `NEXT: show the user ${handback.figma}, the changes to make in Figma. Nothing is changed in Figma by the skill.`;

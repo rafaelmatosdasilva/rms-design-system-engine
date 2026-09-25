@@ -198,7 +198,7 @@
 
 ────────────────────────────────────────────────────────────
 
-  AUDIT FAILED - fix all ❌ above before declaring parity
+  AUDIT FAILED - not in parity: see the ❌ lines above (fix them only when the person asks)
 
 ────────────────────────────────────────────────────────────
 
@@ -265,5 +265,5 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 
 Burndown, open findings per component: button 5 · chip 3 · 13 not tied to a component
 
-NEXT: fix the ❌ lines under "Token values", then run rms-figma-code-parity. To accept a known one instead: rms-figma-code-parity --baseline --findings (only when the user says so).
+NEXT: tell the user what fails under "Token values" and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 

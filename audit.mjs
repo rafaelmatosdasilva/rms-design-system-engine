@@ -2840,7 +2840,7 @@ function reportFull(label, items, shown) {
 
   console.log('─'.repeat(WIDTH));
   if (anyFail) {
-    console.log(C.bold(C.red('\n  AUDIT FAILED - fix all ❌ above before declaring parity\n')));
+    console.log(C.bold(C.red('\n  AUDIT FAILED - not in parity: see the ❌ lines above (fix them only when the person asks)\n')));
   } else if (baselineInfo?.mode === 'enforce' && baselineInfo.debt.length) {
     console.log(C.bold(C.yellow('\n  NO REGRESSIONS ✅  (adoption debt remains - see baseline above)\n')));
   } else {

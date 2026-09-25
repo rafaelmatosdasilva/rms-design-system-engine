@@ -18,7 +18,7 @@ const report = (extra = []) => [
   '       bound-tokens.json ✓ (updated today)',
   '  GATE SUMMARY',
   '  ❌  [16]   Sub-components match Figma     Fail',
-  '  AUDIT FAILED - fix all ❌ above before declaring parity',
+  '  AUDIT FAILED - not in parity: see the ❌ lines above (fix them only when the person asks)',
   '⚠️  State contrast: 3 component state(s) below WCAG AA (30 checked).',
   '     chip [default · light]: 3.11:1 (needs 4.5:1)',
   '   Advisory: pairs are derived …',
