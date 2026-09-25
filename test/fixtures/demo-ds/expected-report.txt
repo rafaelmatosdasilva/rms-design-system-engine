@@ -27,7 +27,6 @@
 
 ✅  [5] Every mode is covered  (tokens adapt across light/dark and all configured modes)
        ✅ OK        9/9  (adapts across modes, and matches Figma per mode where value-checked)
-       ❌ FAIL      0/9  (missing per-mode override, or CSS ≠ Figma in a mode)
        ⏭  SKIPPED   0  (no CSS var, documented)
 
 ✅  [6] Exception lists are valid  (no stale or overly broad entries)
@@ -247,7 +246,7 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: button 5 · chip 3 · 14 not tied to a component
+📉 Burndown, open findings per component: button 5 · chip 3 · 13 not tied to a component
    next up: button. Run with --component button, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -264,7 +263,7 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 - button hover while disabled (Disabled=True): Figma no change, rendered changes background  (.tp-button:hover · src/theme.css:44)  [read from one source]
 - chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip.tp-chip--l.tp-chip--icon · src/theme.css:60)  → set 32px
 
-Burndown, open findings per component: button 5 · chip 3 · 14 not tied to a component
+Burndown, open findings per component: button 5 · chip 3 · 13 not tied to a component
 
 NEXT: fix the ❌ lines under "Token values", then run rms-figma-code-parity. To accept a known one instead: rms-figma-code-parity --baseline --findings (only when the user says so).
 

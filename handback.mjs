@@ -60,7 +60,8 @@ export function codePatch(root, diffs) {
   for (const d of diffs) {
     const m = String(d.at ?? '').match(/^(.+):(\d+)$/);
     const want = wantOf(d);
-    if (!m || !want) { manual.push(d); continue; }
+    // A global reset (*, html, body, :root) is never patched: the fix belongs on the component's own rule.
+    if (!m || !want || /^(html|body|:root|\*)(\s*,\s*(html|body|:root|\*))*$/i.test(String(d.rule ?? '').trim())) { manual.push(d); continue; }
     let text;
     try { text = readFileSync(resolve(root, m[1]), 'utf8'); } catch { manual.push(d); continue; }
     const lines = text.split('\n'), n = Number(m[2]);

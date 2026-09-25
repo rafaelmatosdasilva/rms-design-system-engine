@@ -27,7 +27,6 @@
 
 ✅  [5] Every mode is covered  (tokens adapt across light/dark and all configured modes)
        ✅ OK        9/9  (adapts across modes, and matches Figma per mode where value-checked)
-       ❌ FAIL      0/9  (missing per-mode override, or CSS ≠ Figma in a mode)
        ⏭  SKIPPED   0  (no CSS var, documented)
 
 ✅  [6] Exception lists are valid  (no stale or overly broad entries)
@@ -199,7 +198,7 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: chip 2 · 8 not tied to a component
+📉 Burndown, open findings per component: chip 2 · 7 not tied to a component
    next up: chip. Run with --component chip, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -212,7 +211,7 @@
   - [sizing/-] radii/chip → --radii-chip
     - Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px
 
-Burndown, open findings per component: chip 2 · 8 not tied to a component
+Burndown, open findings per component: chip 2 · 7 not tied to a component
 
 NEXT: fix the ❌ lines under "Token values", then run rms-figma-code-parity. To accept a known one instead: rms-figma-code-parity --baseline --findings (only when the user says so).
 
