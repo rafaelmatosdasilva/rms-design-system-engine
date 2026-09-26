@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadModes, loadCollections, allModes, buildResolver } from '../mode-resolver.mjs';
+import { loadModes, loadCollections, allModes, buildResolver, detectModes } from '../mode-resolver.mjs';
 
 // ── loadModes / loadCollections / allModes ───────────────────────────────────
 test('loadModes falls back to light/dark when nothing configured', () => {
@@ -71,4 +71,22 @@ test('resolveRaw returns string literals, resolve() returns null for non-hex', (
   const { resolve, resolveRaw } = buildResolver(SIZE_CSS, BP);
   assert.equal(resolveRaw('--font', 'phone'), 'Inter');
   assert.equal(resolve('--gap-m', 'phone'), null); // scalar is not a hex
+});
+
+// ── detectModes: --init reads where the theme CSS puts each mode ─────────────
+test('detectModes maps each Figma mode to the override block the theme CSS really has', () => {
+  const sel = (css, keys) => detectModes(css, keys).modes.map((m) => m.cssSelector);
+  assert.deepEqual(sel(':root{--a:1} :root[data-theme="dark"]{--a:2}'), ['root', 'data:theme=dark']);
+  assert.deepEqual(sel(':root{--a:1} @media (prefers-color-scheme: dark){:root{--a:2}}'), ['root', 'dark-media']);
+  assert.deepEqual(sel(':root{--a:1} .theme-dark{--a:2}'), ['root', 'class:theme-dark']);
+  assert.deepEqual(sel(':root{--a:1} [data-mode=night]{--a:2}', ['day', 'night']), ['root', 'data:mode=night']);
+  // Each mode to its own block, whatever the order in the file.
+  assert.deepEqual(sel(':root{--a:1} [data-theme=contrast]{--a:3} [data-theme=dark]{--a:2}', ['light', 'dark', 'contrast']), ['root', 'data:theme=dark', 'data:theme=contrast']);
+  // A block without custom properties is not a mode.
+  assert.deepEqual(detectModes(':root{--a:1} [data-theme=dark] .x{color:red} .dark{color:red}').unsure, ['dark']);
+  // Nothing found: the old default, and the setup says which mode to check.
+  const none = detectModes(':root{--a:1}');
+  assert.deepEqual(none.modes.map((m) => m.cssSelector), ['root', 'dark-media']);
+  assert.deepEqual(none.unsure, ['dark']);
+  assert.deepEqual(detectModes(':root{--a:1}', ['Light', 'Dark']).modes.map((m) => [m.name, m.snapshotKey]), [['Light', 'light'], ['Dark', 'dark']]);
 });

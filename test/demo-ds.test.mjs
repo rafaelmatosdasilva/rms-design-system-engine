@@ -175,3 +175,13 @@ test('Figma prop types: tsc accepts matching props and rejects drifted ones', { 
   assert.notEqual(drift.status, 0);
   assert.match(drift.stdout, /size/);
 });
+
+test('--init on the demo writes the modes its theme CSS really uses (a data attribute, not a media query)', () => {
+  const dir = project();
+  const want = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).figma.modes;
+  execFileSync('git', ['rm', '-q', 'ds-config.json'], { cwd: dir });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', "--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool", '--theme-css=src/theme.css', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /Mode Dark: :root\[data-theme="dark"\] in src\/theme\.css/);
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).figma.modes, want);
+});

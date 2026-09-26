@@ -130,3 +130,45 @@ export function buildResolver(rawCss, MODES, prims = {}) {
   }
   return { resolve, resolveRaw, rootVars, modeBlocks };
 }
+
+// detectModes(cssText, modeKeys) → the colour modes for a new ds-config.json (--init), read from where the
+// theme CSS really puts each mode's overrides, instead of assuming a prefers-color-scheme media query.
+// `modeKeys` are the Figma snapshot's colour modes (["light", "dark"]; the first is the base). Returns
+// { modes: [{ name, snapshotKey, cssSelector }], found: [{ key, selector, how }], unsure: [key] }: a mode
+// with no override block of its own falls back to the old default and is listed in `unsure`, so the setup
+// says which one to check.
+export function detectModes(cssText, modeKeys = ['light', 'dark']) {
+  const css = blankComments(String(cssText ?? ''));
+  const overrides = [];   // { selector, words, how }
+  const hasVars = (body) => /--[a-zA-Z]/.test(body);
+  for (const m of css.matchAll(/@media\s*([^{]+)\{((?:[^{}]|\{[^{}]*\})*)\}/g)) {
+    if (!hasVars(m[2])) continue;
+    const cond = m[1].trim().replace(/\s+/g, ' ');
+    if (/prefers-color-scheme:\s*dark/.test(cond)) overrides.push({ selector: 'dark-media', words: ['dark'], how: '@media (prefers-color-scheme: dark)' });
+    else if (/prefers-contrast:\s*more/.test(cond)) overrides.push({ selector: 'high-contrast-media', words: ['high-contrast', 'contrast'], how: '@media (prefers-contrast: more)' });
+  }
+  for (const m of stripAtRules(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!hasVars(m[2])) continue;
+    for (const sel of m[1].split(',').map((s) => s.trim())) {
+      const data = sel.match(/^(?::root|html)?\[data-([\w-]+)=["']?([\w-]+)["']?\](?:\s+:root)?$/);
+      const cls = sel.match(/^(?::root|html)?\.([\w-]+)(?:\s+:root)?$/);
+      if (data) overrides.push({ selector: `data:${data[1]}=${data[2]}`, words: [data[2]], how: `:root[data-${data[1]}="${data[2]}"]` });
+      else if (cls) overrides.push({ selector: `class:${cls[1]}`, words: cls[1].split(/[-_]/).concat(cls[1]), how: `:root.${cls[1]}` });
+    }
+  }
+  const norm = (s) => String(s).toLowerCase().replace(/[\s_]+/g, '-');
+  const title = (k) => String(k).replace(/(^|[-_\s])(\w)/g, (_, p, c) => (p ? ' ' : '') + c.toUpperCase());
+  const found = [], unsure = [];
+  const used = new Set();
+  const modes = modeKeys.map((key, i) => {
+    const snapshotKey = norm(key);
+    if (i === 0) return { name: title(key), snapshotKey, cssSelector: 'root' };
+    let hit = overrides.find((o) => !used.has(o.selector) && o.words.some((w) => norm(w) === snapshotKey));
+    if (!hit) hit = overrides.find((o) => !used.has(o.selector) && o.words.some((w) => snapshotKey.includes(norm(w)) || norm(w).includes(snapshotKey)));
+    if (!hit && modeKeys.length === 2) { const left = overrides.filter((o) => !used.has(o.selector)); if (left.length === 1) hit = left[0]; }
+    if (hit) { used.add(hit.selector); found.push({ key, selector: hit.selector, how: hit.how }); return { name: title(key), snapshotKey, cssSelector: hit.selector }; }
+    unsure.push(key);
+    return { name: title(key), snapshotKey, cssSelector: snapshotKey === 'dark' ? 'dark-media' : `class:${snapshotKey}` };
+  });
+  return { modes, found, unsure };
+}
