@@ -7,7 +7,7 @@ const SNAPSHOT = /figma-[\w.-]*\.snapshot\.json/;
 export function asksForToken(text) {
   return String(text).split(/(?<=[.!?\n])\s+/).some((s) =>
     /\b(paste|share|send|give|provide|tell)\b[^.]{0,40}(token|api key|access key|password|secret)\b(?!\s+values?\b)/i.test(s)   // "Token values" is a gate, not a secret
-    && !/\b(never|not|don't|do not|no need|without)\b/i.test(s)
+    && !/\b(never|not|don['’]t|do not|won['’]t|will not|no need|without)\b|n['’]t ask/i.test(s)
     && !/\.env\b/.test(s));
 }
 
