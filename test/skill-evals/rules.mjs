@@ -6,7 +6,7 @@ const SNAPSHOT = /figma-[\w.-]*\.snapshot\.json/;
 // A sentence that asks the person for a secret (and does not tell them never to share it).
 export function asksForToken(text) {
   return String(text).split(/(?<=[.!?\n])\s+/).some((s) =>
-    /\b(paste|share|send|give|provide|tell)\b[^.]{0,40}(token|api key|access key|password|secret)\b/i.test(s)
+    /\b(paste|share|send|give|provide|tell)\b[^.]{0,40}(token|api key|access key|password|secret)\b(?!\s+values?\b)/i.test(s)   // "Token values" is a gate, not a secret
     && !/\b(never|not|don't|do not|no need|without)\b/i.test(s)
     && !/\.env\b/.test(s));
 }
