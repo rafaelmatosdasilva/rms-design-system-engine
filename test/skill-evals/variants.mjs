@@ -3,11 +3,13 @@
 // differs.
 //   baseline  the guide as one file, from a git ref (default: the guide-monolith tag, else HEAD)
 //   cookbook  the guide in this checkout (main file + cookbook/ + reference/, read with --recipe/--reference)
-//   skill     the same content as a native Claude Code Skill (SKILL.md), its recipes and reference as files
-import { mkdirSync, writeFileSync, readFileSync, cpSync, existsSync } from 'node:fs';
+//   skill     the same content as a native Claude Code Skill (SKILL.md built from the main file), its recipes
+//             and reference as files beside it
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ENGINE } from './lib.mjs';
+import { skillMd } from '../../skill-files.mjs';
 
 const GUIDE = 'rms-figma-code-parity.md';
 const git = (...a) => execFileSync('git', a, { cwd: ENGINE, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -25,14 +27,14 @@ export function variant(name, { ref = defaultBaselineRef() } = {}) {
     return { name, ref: 'working tree', text, install: (home) => { mkdirSync(join(home, '.claude', 'commands'), { recursive: true }); writeFileSync(join(home, '.claude', 'commands', GUIDE), text); } };
   }
   if (name === 'skill') {
-    const skill = join(ENGINE, 'skill', 'SKILL.md');
-    if (!existsSync(skill)) throw new Error('skill/SKILL.md is not in this checkout yet');
-    const text = readFileSync(skill, 'utf8');
+    // The skill folder is where install.sh puts the engine: every engine file is linked into it, so
+    // "node <install-dir>/audit.mjs" and the recipes' paths work, and SKILL.md is the only file of its own.
+    const text = skillMd(readFileSync(join(ENGINE, GUIDE), 'utf8'));
     return { name, ref: 'working tree', text, install: (home) => {
       const dir = join(home, '.claude', 'skills', 'rms-figma-code-parity');
       mkdirSync(dir, { recursive: true });
+      for (const f of readdirSync(ENGINE)) if (!['.git', 'test', GUIDE, 'SKILL.md'].includes(f)) symlinkSync(join(ENGINE, f), join(dir, f));
       writeFileSync(join(dir, 'SKILL.md'), text);
-      for (const sub of ['cookbook', 'reference']) if (existsSync(join(ENGINE, sub))) cpSync(join(ENGINE, sub), join(dir, sub), { recursive: true });
     } };
   }
   throw new Error(`unknown variant ${name}`);
