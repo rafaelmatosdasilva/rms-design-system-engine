@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // test/skill-evals/report.mjs - the evaluation's tables and the adoption decision (idea I55).
 //
-//   node test/skill-evals/report.mjs --a baseline --b cookbook --model claude-sonnet-5 [--model claude-haiku-4-5-20251001]
+//   node test/skill-evals/report.mjs --a baseline --b cookbook --model claude-sonnet-5 --runs 5 [--model claude-haiku-4-5-20251001 --runs 3]
 //
 // Adopt B over A only if, on the held-out set, for every model:
 //   • no task's pass rate is lower (a lower task is re-run before it counts: see --rerun below),
@@ -9,6 +9,8 @@
 //   • the total pass rate is equal or higher,
 //   • input tokens are lower;
 // and the development set shows no lower task either. The rule is applied here, not by reading the table.
+// A partial measurement is never decided: every task of both sets must be in both variants with the same
+// number of runs, at least --runs of them (a limit that stopped the run leaves it short; resume it first).
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +54,18 @@ export function decide(A, B) {
   return { adopt: !reasons.length, reasons, lower };
 }
 
+// What keeps a measurement from being decided: a task missing from a variant, fewer runs than asked, or a
+// different number of runs on each side.
+export function incomplete(A, B, ids, minRuns) {
+  const out = [];
+  for (const id of ids) {
+    const a = A[id]?.runs ?? 0, b = B[id]?.runs ?? 0;
+    if (a < minRuns || b < minRuns) out.push(`${id}: ${a} and ${b} runs, ${minRuns} asked`);
+    else if (a !== b) out.push(`${id}: ${a} runs against ${b}`);
+  }
+  return out;
+}
+
 const pct = (x) => `${Math.round(x * 100)}%`;
 
 export function table(A, B, nameA, nameB) {
@@ -68,12 +82,19 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const get = (k) => args.flatMap((a, i) => (a === `--${k}` ? [args[i + 1]] : []));
   const [nameA = 'baseline'] = get('a'), [nameB = 'cookbook'] = get('b');
+  const { DEV } = await import('./tasks.mjs'), { HELDOUT } = await import('./heldout.mjs');
+  const minRuns = get('runs').map(Number);
+  const ids = [...DEV, ...HELDOUT].map((t) => t.id);
   const dirs = [join(HERE, 'results'), ...(process.env.PARITY_EVAL_PRIVATE_OUT ? [process.env.PARITY_EVAL_PRIVATE_OUT] : [])];
   let all = true;
-  for (const model of get('model')) {
+  for (const [i, model] of get('model').entries()) {
     const A = byTask(load(nameA, model, dirs)), B = byTask(load(nameB, model, dirs));
+    const need = minRuns[i] ?? minRuns[0] ?? 1;
+    const privateIds = Object.keys(A).filter((id) => !ids.includes(id));
+    const gaps = incomplete(A, B, [...ids, ...privateIds], need);
     console.log(`\n## ${model}: ${nameA} vs ${nameB}\n\n${table(A, B, nameA, nameB)}\n`);
     for (const set of ['dev', 'heldout']) { const a = total(A, set), b = total(B, set); console.log(`${set}: ${nameA} ${pct(a.rate)} of ${a.runs} runs, ${nameB} ${pct(b.rate)} of ${b.runs}; violations ${a.violations} vs ${b.violations}`); }
+    if (gaps.length) { console.log(`\n⏸ not decided for ${model}: the measurement is incomplete\n${gaps.map((g) => `   - ${g}`).join('\n')}`); all = false; continue; }
     const d = decide(A, B);
     console.log(d.adopt ? `\n✅ adopt ${nameB} for ${model}` : `\n❌ do not adopt ${nameB} for ${model}:\n${d.reasons.map((r) => `   - ${r}`).join('\n')}`);
     if (d.lower.length) console.log(`   re-run before deciding: ${d.lower.map((id) => `--only ${id}`).join(' ')} with --runs 10 on both variants`);

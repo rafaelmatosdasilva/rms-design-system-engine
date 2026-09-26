@@ -108,6 +108,33 @@ test('report: the adoption rule, applied by code', async () => {
   assert.match(decide(A, byTask([row('a', 'heldout', true, 200)])).reasons.join(' '), /not run on B: b/);
 });
 
+test('report: a partial measurement is never decided', async () => {
+  const { byTask, incomplete } = await import('./skill-evals/report.mjs');
+  const row = (task, set) => ({ task, set, pass: true, usage: { input: 1, turns: 1, cost: 0 }, rules: [] });
+  const two = byTask([row('a', 'dev'), row('a', 'dev'), row('b', 'dev'), row('b', 'dev')]);
+  assert.deepEqual(incomplete(two, two, ['a', 'b'], 2), []);
+  assert.match(incomplete(two, byTask([row('a', 'dev'), row('a', 'dev'), row('b', 'dev')]), ['a', 'b'], 2).join(), /b: 2 and 1 runs, 2 asked/);
+  assert.match(incomplete(two, two, ['a', 'b', 'c'], 2).join(), /c: 0 and 0 runs/);
+  assert.match(incomplete(byTask([...Array(3)].map(() => row('a', 'dev'))), two, ['a'], 2).join(), /a: 3 runs against 2/);
+});
+
+test('a run the API refused is not a result', async () => {
+  const { infraFailure } = await import('./skill-evals/lib.mjs');
+  const limit = [{ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash' }] } }, { type: 'result', is_error: true, api_error_status: 429, terminal_reason: 'api_error', total_cost_usd: 0.44, result: "You've hit your session limit · resets 12:20am (UTC)" }];
+  assert.match(infraFailure(limit), /429.*session limit/);
+  assert.match(infraFailure([{ type: 'result', is_error: true, total_cost_usd: 0, result: 'API Error: overloaded' }]), /overloaded/);
+  assert.match(infraFailure([{ type: 'result', total_cost_usd: 0, result: '' }]), /nothing spent/);
+  const real = [{ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash' }] } }, { type: 'result', is_error: false, total_cost_usd: 0.5, result: 'The chip is 32px in Figma, 28px in code.' }];
+  assert.equal(infraFailure(real), null);
+  assert.equal(infraFailure([{ type: 'result', is_error: true, subtype: 'error_max_turns', total_cost_usd: 1.2 }]), null);   // the agent's own failure is scored
+});
+
+test('a run starts as a fresh user, not a child of the evaluating session', async () => {
+  const { childEnv } = await import('./skill-evals/lib.mjs');
+  const env = childEnv({ PATH: '/bin', ANTHROPIC_BASE_URL: 'x', CLAUDE_CODE_SESSION_ID: 's', CLAUDECODE: '1', CLAUDE_EFFORT: 'high', MAX_THINKING_TOKENS: '9', GH_TOKEN: 't', FIGMA_TOKEN: 'f', PARITY_EVAL_PRIVATE_OUT: '/p' }, { HOME: '/h' });
+  assert.deepEqual(env, { PATH: '/bin', ANTHROPIC_BASE_URL: 'x', HOME: '/h' });
+});
+
 test('no CLI on PATH: a run by path that ends "not in parity" (exit 1) still counts as run', () => {
   const ctx = fakeCtx({ calls: [{ name: 'Bash', input: { command: 'node ~/.claude/skills/rms-figma-code-parity/audit.mjs --component button' }, result: 'PARITY AUDIT ... hover while disabled', isError: true }], final: 'The button changes on hover while disabled (theme.css:44).' });
   assert.equal(passes('no-cli-on-path', ctx), true);
