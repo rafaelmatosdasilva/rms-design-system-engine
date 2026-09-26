@@ -25,6 +25,7 @@ import { existsSync, readdirSync, readFileSync, statSync,
          symlinkSync, unlinkSync }                               from 'fs';
 import { join, dirname, resolve, relative }                     from 'path';
 import { printDoc, doctor, classicGuide, writeClassicGuide }   from './skill-files.mjs';
+import { detectModes }                                          from './mode-resolver.mjs';
 import { fileURLToPath }                                        from 'url';
 import { makeFigmaFetch }                                       from './figma-fetch.mjs';
 import { collectRawValues, COLLECT_NODE_BUDGET }                from './collect-raw-values.mjs';
@@ -1069,16 +1070,30 @@ async function bootstrapConfig() {
   const snapshotVars      = join(cssDir, 'figma-vars.snapshot.json').replace(/\\/g, '/');
   const snapshotStructure = join(cssDir, 'figma-structure.snapshot.json').replace(/\\/g, '/');
 
+  // Colour modes: the Figma snapshot's modes when there is one, each mapped to where the theme CSS puts its
+  // overrides (a data attribute, a class or a media query), never assumed.
+  let modeKeys = ['light', 'dark'];
+  try {
+    const color = JSON.parse(readFileSync(join(ROOT, snapshotVars), 'utf8')).color;
+    const keys = color && typeof color === 'object' ? Object.keys(color).filter((k) => !k.startsWith('_') && color[k] && typeof color[k] === 'object') : [];
+    if (keys.length) modeKeys = keys;
+  } catch { /* no snapshot yet: light and dark */ }
+  const themeText = [themeCSS].flat().map((f) => { try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; } }).join('\n');
+  const detected = detectModes(themeText, modeKeys);
+  for (const m of detected.modes) {
+    const f = detected.found.find((x) => x.key.toLowerCase() === m.snapshotKey);
+    if (m.cssSelector === 'root') console.log(C.green(`  ✅ Mode ${m.name}: the base :root`));
+    else if (f) console.log(C.green(`  ✅ Mode ${m.name}: ${f.how} in ${[themeCSS].flat().join(', ')}`));
+  }
+  if (detected.unsure.length) console.log(C.yellow(`  ⚠️  No override block found for ${detected.unsure.join(', ')} in the theme CSS: set its cssSelector in ds-config.json → figma.modes (it defaulted to ${detected.modes.filter((m) => detected.unsure.includes(m.snapshotKey) || detected.unsure.includes(m.name)).map((m) => m.cssSelector).join(', ')}).`));
+
   const generated = {
     figmaFileKey:  figmaFileKey || '',
     ...(figmaSourceKey ? { figmaSourceKey } : {}),
     frames: [],
     figma: {
       ...figmaCfg,
-      modes: [
-        { name: 'Light', snapshotKey: 'light', cssSelector: 'root' },
-        { name: 'Dark',  snapshotKey: 'dark',  cssSelector: 'dark-media' },
-      ],
+      modes: detected.modes,
     },
     paths: { themeCSS, snapshotVars, snapshotStructure, pluginCSS, plugins },
     visualRefs: '.parity-refs',
