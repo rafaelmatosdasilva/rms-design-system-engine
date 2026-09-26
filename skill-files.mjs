@@ -15,6 +15,13 @@ export const KINDS = { recipe: 'cookbook', reference: 'reference' };
 export const GUIDE = 'rms-figma-code-parity.md';
 export const CLASSIC_TAG = 'guide-monolith';
 
+// The same guide as a native Claude Code Skill: the main file under a frontmatter, with the recipes and the
+// reference beside it as files. Built from the main file, never kept as a second copy.
+export const SKILL_DESCRIPTION = 'Checks a design system\'s code against its Figma file (tokens, structure, states, variants, accessibility) and reports what is not in parity, with the file and line to change. Use when the user asks for a parity audit, to compare code with Figma, to check a component against its design, or runs /rms-figma-code-parity.';
+export function skillMd(guideText) {
+  return `---\nname: rms-figma-code-parity\ndescription: ${JSON.stringify(SKILL_DESCRIPTION)}\n---\n\n${guideText}`;
+}
+
 // Each file with its first "Use when" line (recipes) or first heading (reference).
 export function listDocs(engineDir, kind) {
   const dir = join(engineDir, KINDS[kind]);
