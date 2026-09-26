@@ -2,7 +2,11 @@
 // test/skill-evals/run.mjs - run the skill evaluation (idea I55). Spends model tokens; not in `node --test`.
 //
 //   node test/skill-evals/run.mjs --variant baseline|cookbook|skill --model <id> --runs 5 --set dev|heldout|all
-//        [--only <task-id>] [--jobs 3] [--budget 3] [--ref <git ref for baseline>] [--dry]
+//        [--only <task-id>] [--jobs 2] [--budget 3] [--ref <git ref for baseline>] [--resume] [--dry]
+//
+// A run the API refused (a usage limit, a 429) is not a result: nothing is written for it, the pool stops, and
+// the same command with --resume carries on, skipping each (task, run) already in the results file. Without
+// --resume, a results file that already has rows is refused, so two measurements never mix.
 //
 // Results: one JSON line per run in test/skill-evals/results/<variant>.<model>.jsonl (demo tasks), and the
 // transcripts beside them (not committed). Private tasks (PARITY_EVAL_PRIVATE_TASKS) write only under
@@ -21,7 +25,7 @@ import { variant } from './variants.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i === -1 ? d : process.argv[i + 1]; };
 const V = arg('variant', 'baseline'), MODEL = arg('model', 'claude-sonnet-5'), RUNS = Number(arg('runs', 1)), SET = arg('set', 'dev');
-const ONLY = arg('only', null), JOBS = Number(arg('jobs', 3)), BUDGET = Number(arg('budget', 3)), DRY = process.argv.includes('--dry');
+const ONLY = arg('only', null), JOBS = Number(arg('jobs', 2)), BUDGET = Number(arg('budget', 3)), DRY = process.argv.includes('--dry'), RESUME = process.argv.includes('--resume');
 
 let privateTasks = [];
 if (process.env.PARITY_EVAL_PRIVATE_TASKS && (SET === 'heldout' || SET === 'all' || SET === 'private')) {
@@ -38,7 +42,23 @@ console.log(`${V} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes)
 if (DRY) { for (const t of tasks) console.log(`  ${t.set.padEnd(8)} ${t.id}`); process.exit(0); }
 
 const outFor = (t) => (t.private ? process.env.PARITY_EVAL_PRIVATE_OUT : join(HERE, 'results'));
-const jobs = tasks.flatMap((t) => Array.from({ length: RUNS }, (_, run) => ({ t, run })));
+const resultsFile = (t) => join(outFor(t), `${V}.${MODEL}.jsonl`);
+
+// What is already measured, per results file. Rows from another guide or engine never mix with this one.
+const done = new Set();
+for (const f of new Set(tasks.filter((t) => outFor(t)).map(resultsFile))) {
+  if (!existsSync(f)) continue;
+  const rows = readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  if (!rows.length) continue;
+  if (!RESUME) { console.log(`✗ ${f} already has ${rows.length} rows: add --resume to carry on, or move it away to start again`); process.exit(2); }
+  const other = rows.find((r) => r.guideHash !== meta.guideHash || r.engineHash !== meta.engineHash);
+  if (other) { console.log(`✗ ${f} has rows from guide ${other.guideHash} / engine ${other.engineHash}, not ${meta.guideHash} / ${engineHash}: move it away to start again`); process.exit(2); }
+  for (const r of rows) done.add(`${r.task}#${r.run}`);
+}
+const jobs = tasks.flatMap((t) => Array.from({ length: RUNS }, (_, run) => ({ t, run }))).filter((j) => !done.has(`${j.t.id}#${j.run}`));
+if (done.size) console.log(`resuming: ${done.size} runs already measured, ${jobs.length} to go`);
+
+class Refused extends Error {}
 
 async function one({ t, run }) {
   const out = outFor(t);
@@ -52,6 +72,11 @@ async function one({ t, run }) {
     const r = await runClaude({ cwd: dir, home, path, prompt: `/rms-figma-code-parity ${prompt}`, model: MODEL, resume: sessionId, budget: BUDGET });
     events.push(...r.events);
     sessionId = r.sessionId ?? sessionId;
+    if (r.infra) {
+      writeFileSync(join(out, 'transcripts', `${V}.${MODEL}.${t.id}.${run}.refused.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
+      cleanup(dir, home);
+      throw new Refused(r.infra);
+    }
     if (r.error) { error = r.error; break; }
   }
   const ctx = context(events, dir);
@@ -59,17 +84,26 @@ async function one({ t, run }) {
   const rules = globalChecks(ctx, t);
   const row = { ...meta, task: t.id, set: t.set, run, pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-figma-code-parity'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, at: new Date().toISOString() };
   writeFileSync(join(out, 'transcripts', `${V}.${MODEL}.${t.id}.${run}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
-  appendFileSync(join(out, `${V}.${MODEL}.jsonl`), JSON.stringify(row) + '\n');
+  appendFileSync(resultsFile(t), JSON.stringify(row) + '\n');
   cleanup(dir, home);
   console.log(`  ${row.pass ? '✓' : '✗'} ${t.id} #${run}  $${ctx.usage.cost.toFixed(2)}  ${ctx.usage.turns} turns${row.pass ? '' : `  (${[...taskChecks, ...rules].filter((c) => !c.ok).map((c) => c.name).join('; ')})`}`);
   return row;
 }
 
-// A small pool: each run starts a Claude session and, through the audit, a Chrome.
+// A small pool: each run starts a Claude session and, through the audit, a Chrome. A refused run stops it.
 const rows = [];
-let next = 0;
+let next = 0, refused = null;
 await Promise.all(Array.from({ length: Math.max(1, JOBS) }, async () => {
-  while (next < jobs.length) { const j = jobs[next++]; try { rows.push(await one(j)); } catch (e) { console.log(`  ✗ ${j.t.id} #${j.run}  harness error: ${e.message}`); } }
+  while (!refused && next < jobs.length) {
+    const j = jobs[next++];
+    try { rows.push(await one(j)); } catch (e) {
+      if (e instanceof Refused) { refused ??= e.message; console.log(`  ⏸ ${j.t.id} #${j.run}  not run: ${e.message}`); } else console.log(`  ✗ ${j.t.id} #${j.run}  harness error: ${e.message}`);
+    }
+  }
 }));
 const cost = rows.reduce((k, r) => k + r.usage.cost, 0);
 console.log(`\n${rows.filter((r) => r.pass).length}/${rows.length} passed · $${cost.toFixed(2)}`);
+const left = jobs.length - rows.length;
+if (refused) console.log(`⏸ stopped: the API refused a run (${refused}). ${left} runs not measured; run the same command with --resume after the limit resets.`);
+else if (left) console.log(`⚠ ${left} runs failed in the harness; run the same command with --resume to retry them.`);
+process.exit(refused || left ? 3 : 0);

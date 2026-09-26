@@ -65,7 +65,29 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
   return { home, path };
 }
 
-// One headless turn. Resolves { events, sessionId, cost, error }.
+// The environment of a run: a fresh user's, not a child of the session that started the evaluation. Every
+// CLAUDE* variable goes (the parent's session id, effort, extra directories, messaging), and so do tokens a
+// user would not hand the agent (GitHub, cloud, Figma, GitLab) and the evaluation's own settings. The
+// model's credentials stay.
+const DROP = [/^CLAUDE/, /^MAX_THINKING_TOKENS$/, /^(GH|GITHUB)_TOKEN$/, /^CLOUDSDK_/, /^SESSION_INGRESS/, /^FIGMA_/, /^GITLAB_/, /^PARITY_EVAL/];
+export function childEnv(env, extra = {}) {
+  return { ...Object.fromEntries(Object.entries(env).filter(([k]) => !DROP.some((re) => re.test(k)))), ...extra };
+}
+
+// A run that did not run: the API refused it (a usage limit, a 429, an overload) or it spent nothing and
+// called nothing. It says nothing about the guide, so it is never scored; the evaluation stops and resumes.
+export function infraFailure(events) {
+  const result = events.filter((e) => e.type === 'result').at(-1);
+  if (!result) return null;
+  const text = typeof result.result === 'string' ? result.result : '';
+  if (result.api_error_status || result.terminal_reason === 'api_error') return `API error ${result.api_error_status ?? ''}: ${text.slice(0, 200)}`.replace(/\s+:/, ':');
+  if (/hit your (session|usage|weekly) limit|rate.?limit|overloaded/i.test(text) && result.is_error) return text.slice(0, 200);
+  const toolCalls = events.some((e) => e.type === 'assistant' && (e.message?.content ?? []).some((c) => c.type === 'tool_use'));
+  if (!result.total_cost_usd && !toolCalls) return `nothing spent and nothing called: ${text.slice(0, 200)}`;
+  return null;
+}
+
+// One headless turn. Resolves { events, sessionId, cost, error, infra }.
 export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTurns = 40, budget = 3, timeoutMs = 15 * 60 * 1000 }) {
   const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--model', model, '--max-turns', String(maxTurns),
     '--max-budget-usd', String(budget), '--tools', TOOLS, '--allowedTools', TOOLS.split(',').join(' '),
@@ -73,7 +95,7 @@ export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTu
   return new Promise((resolve) => {
     // Real users have Chrome: the audit's browser reading and accessibility check run in every variant.
     const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
-    const child = spawn('claude', args, { cwd, env: { ...process.env, HOME: home, PATH: path, CHROME_PATH: chrome }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('claude', args, { cwd, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: chrome }), stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '', err = '', timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
     child.stdout.on('data', (d) => { out += d; });
@@ -83,7 +105,7 @@ export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTu
       const events = out.split('\n').filter((l) => l.trim().startsWith('{')).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
       const result = events.filter((e) => e.type === 'result').at(-1);
       const error = timedOut ? `timed out after ${timeoutMs / 60000} min` : !result ? `no result (${err.slice(-300)})` : null;
-      resolve({ events, sessionId: result?.session_id ?? events.find((e) => e.session_id)?.session_id ?? null, cost: result?.total_cost_usd ?? 0, error, stderr: err.slice(-2000) });
+      resolve({ events, sessionId: result?.session_id ?? events.find((e) => e.session_id)?.session_id ?? null, cost: result?.total_cost_usd ?? 0, error, infra: timedOut ? null : infraFailure(events), stderr: err.slice(-2000) });
     });
   });
 }
