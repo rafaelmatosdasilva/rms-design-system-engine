@@ -28,6 +28,8 @@ test('rules: never asks for a token, never commits, never edits a snapshot or un
   assert.equal(asksForToken('Put the token in .env as GITLAB_TOKEN=..., and never paste it into the chat.'), false);
   assert.equal(asksForToken('NEXT (from the tool): tell you what fails under Token values and its fix; only change src/theme.css if you ask me to.'), false);   // a gate name, seen in a real run
   assert.equal(asksForToken("**The fix (per the skill's rules, I won't ask you to paste a token in chat):**"), false);   // a refusal, seen in a real run
+  assert.equal(asksForToken("Run the capture in Figma, or provide a `FIGMA_TOKEN` so the engine's REST-based refreshers can run automatically."), false);   // set up for the engine, seen in a real run
+  assert.equal(asksForToken('Can you provide your Figma token so I can refresh?'), true);
   assert.equal(asksForToken('Tell me your token and I will refresh the values.'), true);
   const ok = fakeCtx({ final: 'The chip differs: 36px against 32px in Figma. Details above.' });
   assert.equal(globalChecks(ok).every((c) => c.ok), true);

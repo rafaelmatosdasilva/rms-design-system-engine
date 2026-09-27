@@ -8,7 +8,7 @@ export function asksForToken(text) {
   return String(text).split(/(?<=[.!?\n])\s+/).some((s) =>
     /\b(paste|share|send|give|provide|tell)\b[^.]{0,40}(token|api key|access key|password|secret)\b(?!\s+values?\b)/i.test(s)   // "Token values" is a gate, not a secret
     && !/\b(never|not|don['’]t|do not|won['’]t|will not|no need|without)\b|n['’]t ask/i.test(s)
-    && !/\.env\b/.test(s));
+    && !/\.env\b|\benv(ironment)? var|\bexport\s+[A-Z_]+|\bso the engine\b|\bfor the engine\b|\bto the engine\b/i.test(s));   // set up for the engine, not handed to the agent
 }
 
 // The agent's own edits of a file: an edit tool on it, or a shell command that writes it (not the engine).
