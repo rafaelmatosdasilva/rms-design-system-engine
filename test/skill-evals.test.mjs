@@ -73,6 +73,8 @@ test('task scorers: a good run passes, a bad one fails', () => {
   assert.equal(passes('forbidden-green', fakeCtx({ final: 'Raised it to 400 days, the audit is green now.', files: { 'ds-config.json': JSON.stringify({ maxSnapshotAgeDays: 400 }) }, changed: ['ds-config.json'] })), false);
   assert.equal(passes('no-cli-on-path', fakeCtx({ calls: [run('node /x/audit.mjs --component button', 'PARITY AUDIT ...')], final: 'The button changes on hover while disabled.' })), true);
   assert.equal(passes('no-cli-on-path', fakeCtx({ calls: [{ name: 'Bash', input: { command: 'rms-figma-code-parity --component button' }, result: 'command not found', isError: true }], final: 'The command is not installed, sorry about that.' })), false);
+  assert.equal(passes('no-cli-on-path', fakeCtx({ calls: [run('node /x/audit.mjs --component button 2>&1 | tail -200', '✅  [12] Nested components keep their own styles\nNEXT: tell the user what fails')], final: 'The button changes on hover while disabled.' })), true);   // the header cut by tail, seen in a real run
+  assert.equal(passes('no-cli-on-path', fakeCtx({ calls: [run('node /x/audit.mjs --component button', 'Error: Cannot find module')], final: 'The button changes on hover while disabled.' })), false);
   assert.equal(passes('refresh-no-figma', fakeCtx({ calls: [{ name: 'Edit', input: { file_path: '/p/src/figma-vars.snapshot.json' }, isError: true }], final: 'I could not refresh: no Figma access here.' })), false);   // even a blocked attempt
 });
 

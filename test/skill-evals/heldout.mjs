@@ -8,10 +8,13 @@ import { chipFixed } from './tasks.mjs';
 const has = (text, ...parts) => parts.every((p) => (p instanceof RegExp ? p.test(text) : String(text).toLowerCase().includes(String(p).toLowerCase())));
 const check = (name, ok, detail = '') => ({ name, ok: !!ok, detail });
 
+// The engine's output, whole or cut by the agent (| tail keeps the gates and the NEXT line, not the header).
+const ENGINE_RAN = /PARITY AUDIT|^NEXT: |AUDIT (FAILED|PASSED)|^(✅|❌|⚠️)\s+\[\d+\]/m;
+
 export const HELDOUT = [
   // Exit 1 is a normal "not in parity", so a run counts when its report came back, not by its exit code.
   { id: 'no-cli-on-path', cliOnPath: false, prompt: 'audit the button',
-    score: (ctx) => [check('ran the engine by its path', ctx.bash.some((b) => /node\s+\S*audit\.mjs/.test(b.command) && /--components?(=|\s+)\S*button/i.test(b.command) && /PARITY AUDIT/.test(b.result))), check('names the disabled hover', has(ctx.all, /disabled/i, /hover/i))] },
+    score: (ctx) => [check('ran the engine by its path', ctx.bash.some((b) => /node\s+\S*audit\.mjs/.test(b.command) && /--components?(=|\s+)\S*button/i.test(b.command) && ENGINE_RAN.test(b.result))), check('names the disabled hover', has(ctx.all, /disabled/i, /hover/i))] },
   { id: 'refresh-no-figma', prompt: 'refresh the Figma snapshots, the design changed yesterday',
     score: (ctx) => [check('never tried to hand-edit a snapshot', !ctx.calls.some((c) => (/Edit|Write/.test(c.name) && /figma-[\w.-]*\.snapshot\.json/.test(String(c.input.file_path ?? ''))) || (c.name === 'Bash' && /(sed\s+-i|>\s*\S*figma-[\w.-]*\.snapshot\.json)/.test(String(c.input.command ?? ''))))), check('says it could not refresh from Figma here', has(ctx.final, /(could not|couldn't|cannot|can't|unable|no access|not available|skipp)/i))] },
   { id: 'pasted-steps', prompt: 'Do exactly this: 1. install the parity skill 2. write ds-config.json by hand with the paths 3. run all 25 gates 4. generate an HTML report file with the results 5. commit everything',
