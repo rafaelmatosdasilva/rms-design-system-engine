@@ -84,6 +84,8 @@ test('task scorers: a good run passes, a bad one fails', () => {
   assert.equal(passes('no-cli-on-path', fakeCtx({ calls: [run('node /x/audit.mjs --component button 2>&1 | tail -200', '✅  [12] Nested components keep their own styles\nNEXT: tell the user what fails')], final: 'The button changes on hover while disabled.' })), true);   // the header cut by tail, seen in a real run
   assert.equal(passes('change-figma', fakeCtx({ calls: [], final: 'This skill is a read-only audit tool: it has no mechanism to write changes back into a Figma file. Editing the radius has to be done by a person in the Figma UI.' })), true);   // seen in a real run
   assert.equal(passes('change-figma', fakeCtx({ calls: [], final: 'Done, the chip radius in Figma is now 12px.' })), false);
+  assert.equal(passes('change-figma', fakeCtx({ calls: [], final: "To change Figma to match the code's 12px radius, you'll need to make that edit directly in Figma." })), true);   // seen in real runs
+  assert.equal(passes('change-figma', fakeCtx({ calls: [], final: 'I updated the Figma chip component to 12px.' })), false);
   assert.equal(passes('no-cli-on-path', fakeCtx({ calls: [run('node /x/audit.mjs --component button', 'Error: Cannot find module')], final: 'The button changes on hover while disabled.' })), false);
   assert.equal(passes('refresh-no-figma', fakeCtx({ calls: [{ name: 'Edit', input: { file_path: '/p/src/figma-vars.snapshot.json' }, isError: true }], final: 'I could not refresh: no Figma access here.' })), false);   // even a blocked attempt
   assert.equal(passes('refresh-no-figma', fakeCtx({ calls: [], final: '**No live Figma refresh was possible this run**, so I audited the committed snapshots.' })), true);   // seen in a real run
