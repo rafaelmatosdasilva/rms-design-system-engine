@@ -59,7 +59,9 @@ for that fix.
 This guide holds the rules that always apply. The steps for each task are in a **recipe**: before acting, print
 the one that fits with `rms-figma-code-parity --recipe <name>` (or read
 `~/.claude/skills/rms-figma-code-parity/cookbook/<name>.md`, the skill's install folder). Follow it, relay the
-engine's SUMMARY, and take its NEXT line. If no recipe fits, read the reference.
+engine's SUMMARY, and take its NEXT line. If no recipe fits, read the reference. **A question is a task too**
+("how do I…", "what does … mean", "why does …"): print its recipe first and answer from what the recipe and the
+reference it points to say, never from memory or from this table alone.
 
 | When the person wants | Recipe |
 |---|---|
@@ -96,7 +98,9 @@ to `.parity-out/summary.md`; `rms-figma-code-parity --summary` prints the last o
 Relay the summary in the chat as it is, without rewording its facts, then take the `NEXT:` line as the next
 step. `--init`, `--guidelines`, `--baseline` and `--install-hooks` end with a `NEXT:` line too. When a `NEXT:`
 line says to do something only when the person asks (commit, apply the hand-back), ask them; never do it on
-your own.
+your own. **Say that an audit ran only when its output is in front of you**: the engine prints its SUMMARY in
+the same call. Opening this skill or printing a recipe runs nothing, so never say an audit is running or that
+snapshots were refreshed without that output.
 
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
 `--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
@@ -114,9 +118,10 @@ then on every run refreshes those pages and folds them into the design intent.
 
 **If the `rms-figma-code-parity` command is not on PATH** (a plain `command not found`),
 do not stop and do not hand-simulate setup - the engine is a folder of scripts, so run it
-directly with `node <install-dir>/audit.mjs <same flags>` (the install dir is the skill's
-own folder, next to this `.md`). Everything below that shows `rms-figma-code-parity …`
-works identically as `node <install-dir>/audit.mjs …`.
+directly with `node ~/.claude/skills/rms-figma-code-parity/audit.mjs <same flags>` (the install
+folder). Run that exact path; do not search for the file, since a search can miss a linked install.
+Everything below that shows `rms-figma-code-parity …` works identically as
+`node ~/.claude/skills/rms-figma-code-parity/audit.mjs …`.
 
 **First-time setup is interactive in the engine - let it run, don't re-ask the questions
 yourself.** When `ds-config.json` is missing, running the audit drops into the engine's own
