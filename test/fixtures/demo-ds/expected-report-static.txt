@@ -207,6 +207,8 @@
 
 **Not in parity.** 1 of 25 gates fail.
 
+**Figma data was not refreshed in this run.** The audit used the committed snapshots (the oldest, src/figma-vars.snapshot.json, updated today). To refresh them: rms-figma-code-parity --recipe refresh-figma.
+
 - **Token values** fails:
   - [sizing/-] radii/chip → --radii-chip
     - Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px

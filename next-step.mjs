@@ -39,7 +39,21 @@ export function nextStep({ failing = [], scope = [], handback = {}, burndownNext
 }
 
 // The plain summary. verdict: 'failed' | 'debt' | 'pass' | 'baseline' (the run wrote the baseline).
-export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null } = {}) {
+// The state of the Figma data, said once, so no one has to infer it (idea I56): whether this run refreshed anything
+// from the Figma API, and how old the committed snapshots it used are. An agent relays it; it never claims a
+// refresh the engine did not make. snapshots: [{ file, ageHours }] (ageHours null when unreadable).
+export function dataStateLine({ refreshedFromApi = false, snapshots = [], cmd = 'rms-figma-code-parity' } = {}) {
+  const known = snapshots.filter((s) => Number.isFinite(s.ageHours));
+  const age = (h) => (h < 24 ? 'updated today' : `${Math.floor(h / 24)} day${Math.floor(h / 24) === 1 ? '' : 's'} old`);
+  const oldest = known.length ? known.reduce((a, b) => (b.ageHours > a.ageHours ? b : a)) : null;
+  const missing = snapshots.filter((s) => !Number.isFinite(s.ageHours)).map((s) => s.file);
+  const used = oldest ? `the committed snapshots (the oldest, ${oldest.file}, ${age(oldest.ageHours)})` : 'no readable snapshot';
+  const gap = missing.length ? ` Not readable: ${missing.join(', ')}.` : '';
+  if (refreshedFromApi) return `**Figma data.** Component properties and values were refreshed from the Figma API in this run; variables and structure come from ${used}.${gap}`;
+  return `**Figma data was not refreshed in this run.** The audit used ${used}.${gap} To refresh them: ${cmd} --recipe refresh-figma.`;
+}
+
+export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null } = {}) {
   const lines = [];
   const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
   const debt = gates.filter((g) => g.baselined);
@@ -48,6 +62,7 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
     : verdict === 'failed' ? `**Not in parity.** ${failing.length} of ${gates.length} gates fail.`
     : verdict === 'debt' ? `**No regressions.** ${debt.length} gate${debt.length === 1 ? '' : 's'} carry accepted debt.`
       : `**In parity.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}.`);
+  if (data) lines.push('', data);
   for (const g of verdict === 'baseline' ? [] : failing) {
     const f = failLines(g);
     lines.push('', `- **${gateName(g.label)}** fails:`);

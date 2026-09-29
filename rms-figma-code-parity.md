@@ -100,7 +100,8 @@ step. `--init`, `--guidelines`, `--baseline` and `--install-hooks` end with a `N
 line says to do something only when the person asks (commit, apply the hand-back), ask them; never do it on
 your own. **Say that an audit ran only when its output is in front of you**: the engine prints its SUMMARY in
 the same call. Opening this skill or printing a recipe runs nothing, so never say an audit is running or that
-snapshots were refreshed without that output.
+snapshots were refreshed without that output. The SUMMARY's **Figma data** line says whether this run
+refreshed anything and how old the snapshots are: repeat it as it is.
 
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
 `--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They

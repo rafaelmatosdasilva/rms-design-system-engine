@@ -1,7 +1,7 @@
 // I55: one next step and one plain summary per run, so an agent relays the engine's words.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextStep, buildSummary, failLines, measuredLines } from '../next-step.mjs';
+import { nextStep, buildSummary, failLines, measuredLines, dataStateLine } from '../next-step.mjs';
 
 const gate = (label, pass, lines = [], extra = {}) => ({ label, pass, lines, ...extra });
 const tokens = gate('Token values  (color · sizing)', false, ['✅ PASS  25', '❌ FAIL  1', '❌ [sizing/-] radii/chip → --radii-chip', 'Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px']);
@@ -34,4 +34,22 @@ test('a run that writes the baseline says so, and never reads as in parity', () 
   const s = buildSummary({ verdict: 'baseline', gates: [tokens], baselineWritten: written });
   assert.match(s, /\*\*Baseline written\.\*\* 2 failing items recorded/);
   assert.doesNotMatch(s, /In parity|fails:/);
+});
+
+test('the summary says whether the Figma data was refreshed, so no one has to infer it (I56)', () => {
+  const snaps = [{ file: 'src/figma-vars.snapshot.json', ageHours: 5 }, { file: 'src/figma-structure.snapshot.json', ageHours: 75 }];
+  const not = dataStateLine({ snapshots: snaps });
+  assert.match(not, /^\*\*Figma data was not refreshed in this run\.\*\*/);
+  assert.match(not, /the oldest, src\/figma-structure\.snapshot\.json, 3 days old/);
+  assert.match(not, /rms-figma-code-parity --recipe refresh-figma/);
+  assert.match(dataStateLine({ snapshots: [{ file: 'a.json', ageHours: 2 }] }), /a\.json, updated today/);
+  assert.match(dataStateLine({ snapshots: [{ file: 'a.json', ageHours: 30 }] }), /1 day old/);
+  const api = dataStateLine({ refreshedFromApi: true, snapshots: snaps });
+  assert.match(api, /refreshed from the Figma API in this run/);
+  assert.doesNotMatch(api, /not refreshed/);
+  assert.match(dataStateLine({ snapshots: [{ file: 'gone.json', ageHours: null }] }), /no readable snapshot\. Not readable: gone\.json\./);
+  // It sits right under the verdict, and a summary without it stays as it was.
+  const s = buildSummary({ verdict: 'pass', gates: [], data: not });
+  assert.ok(s.indexOf('**In parity.**') < s.indexOf('**Figma data was not refreshed'));
+  assert.doesNotMatch(buildSummary({ verdict: 'pass', gates: [] }), /Figma data/);
 });

@@ -3667,7 +3667,10 @@ function reportFull(label, items, shown) {
     const written = baselineInfo?.mode === 'write' ? { count: baselineInfo.written.length, file: relative(ROOT, baselineInfo.path) || 'parity-baseline.json' } : null;
     const next = nextStep({ failing, baselineWritten: written, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext });
     const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
-    const summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length });
+    const { dataStateLine } = await import('./next-step.mjs');
+    const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
+    const data = dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
+    const summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data });
     mkdirSync(join(ROOT, '.parity-out'), { recursive: true });
     writeFileSync(join(ROOT, '.parity-out', 'summary.md'), summary);
     console.log(`\n${C.bold('─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───')}\n\n${summary}`);
