@@ -24,7 +24,9 @@ curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-figma-code-p
 rms-figma-code-parity --update
 ```
 
-`rms-figma-code-parity --version` tells you if you are behind, and every run gives a quiet once-a-day heads-up when a new version is out. You never re-download.
+The skill updates itself: once a day, before an audit, it pulls the latest version and says so in one line. It only does this when the install is on `main` with no local changes, never on CI, and `PARITY_NO_AUTO_UPDATE=1` turns it off. `rms-figma-code-parity --update` updates it by hand, and `--version` tells you if you are behind. You never re-download.
+
+Keep a single copy: link anything that needs the skill's files to `~/.claude/skills/rms-figma-code-parity`, the folder that updates itself, instead of keeping a clone of your own.
 
 ## Run it
 

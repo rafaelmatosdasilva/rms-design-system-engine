@@ -1184,6 +1184,17 @@ async function bootstrapConfig() {
 // ── Main ─────────────────────────────────────────────────────────────────────
 (async () => {
   // ── Load or generate config ─────────────────────────────────────────────────
+  // The installed skill keeps itself current (once a day, clean main only), then restarts on the new code.
+  try {
+    const { autoUpdate, updatedLine } = await import('./self-update.mjs');
+    const up = autoUpdate(SCRIPT_DIR);
+    if (up.updated) {
+      console.log(updatedLine(up, describeHead() ?? ''));
+      const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'audit.mjs'), ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, PARITY_NO_AUTO_UPDATE: '1' } });
+      process.exit(r.status ?? 1);
+    }
+  } catch { /* an update must never stop an audit */ }
+
   let cfg = {};
   if (INIT_ONLY) {
     await bootstrapConfig();
@@ -3706,7 +3717,7 @@ function reportFull(label, items, shown) {
       const res = checkForUpdate({ quiet: true });
       try { mkdirSync(dirname(stamp), { recursive: true }); writeFileSync(stamp, String(now)); } catch { /* cache is optional */ }
       if (res?.behind) {
-        console.log(C.yellow('\n⚠️  A newer version of the parity skill is available - run: rms-figma-code-parity --update'));
+        console.log(C.yellow('\n⚠️  A newer version of the parity skill is available - run: rms-figma-code-parity --update (it did not update itself: local changes, another branch, or PARITY_NO_AUTO_UPDATE=1)'));
       }
     }
   } catch { /* a version nudge must never break the audit */ }
