@@ -56,6 +56,12 @@ for that fix.
 
 ## Recipes and reference (read the one that fits before acting)
 
+**Start every request with the router**, passing the request exactly as the person wrote it:
+`rms-figma-code-parity --route "<the request>"` (not on PATH: `node ~/.claude/skills/rms-figma-code-parity/audit.mjs
+--route "<the request>"`). It prints the recipe that fits, the exact command to run (`RUN:`), any rule that applies
+(`NOTE:`), one `NEXT:` line, and the recipe itself. Do what it prints: run the `RUN:` command and relay its SUMMARY,
+or, when it says to run nothing, answer from the recipe it printed. Do not pick a recipe or a command yourself.
+
 This guide holds the rules that always apply. The steps for each task are in a **recipe**: before acting, print
 the one that fits with `rms-figma-code-parity --recipe <name>` (or read
 `~/.claude/skills/rms-figma-code-parity/cookbook/<name>.md`, the skill's install folder). Follow it, relay the

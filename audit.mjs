@@ -24,7 +24,7 @@ import { existsSync, readdirSync, readFileSync, statSync,
          writeFileSync, copyFileSync, mkdirSync,
          symlinkSync, unlinkSync }                               from 'fs';
 import { join, dirname, resolve, relative }                     from 'path';
-import { printDoc, doctor, classicGuide, writeClassicGuide }   from './skill-files.mjs';
+import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide } from './skill-files.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
 import { fileURLToPath }                                        from 'url';
 import { makeFigmaFetch }                                       from './figma-fetch.mjs';
@@ -176,6 +176,24 @@ for (const kind of ['recipe', 'reference']) {
   if (at === -1) continue;
   const name = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
   process.exit(printDoc(SCRIPT_DIR, kind, name));
+}
+// ── --route "<request>": the request routed by the engine to a recipe and the exact command (I56) ──
+if (process.argv.includes('--route')) {
+  const { route, routeText } = await import('./route.mjs');
+  const text = process.argv.slice(process.argv.indexOf('--route') + 1).join(' ');
+  const onPath = String(process.env.PATH ?? '').split(':').some((d) => d && existsSync(join(d, 'rms-figma-code-parity')));
+  const cmd = onPath ? 'rms-figma-code-parity' : `node ${join(SCRIPT_DIR, 'audit.mjs')}`;
+  let components = [];
+  const hasConfig = existsSync(join(ROOT, 'ds-config.json'));
+  try {
+    const conf = hasConfig ? JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')) : {};
+    const snap = JSON.parse(readFileSync(join(ROOT, conf.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8'));
+    components = Object.keys(snap.components ?? {});
+  } catch { /* no snapshot yet: nothing to scope to */ }
+  if (!text.trim()) { console.log('Give the request as the person wrote it: rms-figma-code-parity --route "<request>"'); process.exit(2); }
+  const r = route(text, { hasConfig, components, cmd });
+  console.log(routeText(r, readDoc(SCRIPT_DIR, 'recipe', r.recipe), cmd));
+  process.exit(0);
 }
 // ── --guide classic|current: which guide the command loads (I55 rollback) ──
 if (process.argv.includes('--guide')) {
