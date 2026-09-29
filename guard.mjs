@@ -5,7 +5,9 @@
 // Installed per project by `rms-figma-code-parity --install-hooks` (and by --init), in
 // .claude/settings.local.json. It reads the tool call Claude Code is about to make (JSON on stdin) and:
 //   • denies editing a Figma snapshot by hand: they come from the capture, never from a hand edit;
-//   • asks the person before editing ds-config.json, committing, pushing, or applying the hand-back patch.
+//   • asks the person before editing ds-config.json, committing, pushing, or applying the hand-back patch;
+//   • reads the person's latest message (the hook's transcript_path, idea I56): a code edit or the hand-back
+//     apply passes when that message asks for a change, and asks first when it does not.
 // Anything else, or any project without a ds-config.json, or one with "hooks": false, passes untouched.
 // The engine's own writes (node … audit.mjs, rms-figma-code-parity) are never blocked.
 import { readFileSync, existsSync } from 'node:fs';
@@ -14,8 +16,33 @@ import { join, basename, resolve } from 'node:path';
 const SNAPSHOT = /figma-[\w.-]*\.snapshot\.json/;
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 
-// { decision: 'deny' | 'ask', reason } or null to pass.
-export function judge(event, { cfg = {} } = {}) {
+const CODE = /\.(css|scss|sass|less|js|jsx|mjs|cjs|ts|tsx|vue|svelte|html?)$/i;
+// A message that asks for a change: a change verb, and not a how/why question about one.
+const CHANGE = /\b(fix|correct|change|update|apply|edit|set|repair|rename|replace|remove|add|make|corrig|conserta|muda|altera|aplica|atualiza|repara|substitu|remove|acrescenta|p[oõ]e|coloca)\w*/i;
+const ASKING_HOW = /^\s*(how|why|what|where|which|can i|should i|como|porqu|o que|onde|qual|posso)\b/i;
+export function asksForChange(text) {
+  const t = String(text ?? '').trim();
+  return CHANGE.test(t) && !ASKING_HOW.test(t);
+}
+
+// The person's latest message in a Claude Code transcript (JSONL): the last user entry with text, not a tool
+// result. null when there is no transcript to read (then the message-based rules do not apply).
+export function lastUserText(transcriptPath) {
+  if (!transcriptPath || !existsSync(transcriptPath)) return null;
+  let last = null;
+  for (const line of readFileSync(transcriptPath, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    let e; try { e = JSON.parse(line); } catch { continue; }
+    if (e.type !== 'user' || e.message?.role !== 'user') continue;
+    const c = e.message.content;
+    const text = typeof c === 'string' ? c : Array.isArray(c) ? c.filter((x) => x?.type === 'text').map((x) => x.text).join('\n') : '';
+    if (text.trim()) last = text;
+  }
+  return last;
+}
+
+// { decision: 'deny' | 'ask', reason } or null to pass. userText: the person's latest message, or null.
+export function judge(event, { cfg = {}, userText = null } = {}) {
   if (cfg.hooks === false) return null;
   const tool = event?.tool_name, input = event?.tool_input ?? {};
   const snapshotPaths = new Set(Object.entries(cfg.paths ?? {}).filter(([k, v]) => /^snapshot|Snapshot$/.test(k) && typeof v === 'string').map(([, v]) => basename(v)));
@@ -24,6 +51,7 @@ export function judge(event, { cfg = {} } = {}) {
     const file = input.file_path ?? input.notebook_path ?? input.path;
     if (isSnapshot(file)) return { decision: 'deny', reason: `${basename(file)} is written by the Figma capture, never by hand (a hand edit fakes a refresh). Refresh it with the capture (rms-figma-code-parity --recipe refresh-figma), or leave it stale and say so.` };
     if (basename(String(file ?? '')) === 'ds-config.json') return { decision: 'ask', reason: 'ds-config.json is the project\'s parity setup. Confirm this edit is what you asked for (guidelines links go through rms-figma-code-parity --guidelines, never a hand edit).' };
+    if (userText !== null && CODE.test(String(file ?? '')) && !asksForChange(userText)) return { decision: 'ask', reason: `The person's last message does not ask for a change to ${basename(file)}. Report the fix the audit names instead of making it, or confirm they asked for it.` };
     return null;
   }
   if (tool === 'Bash') {
@@ -34,7 +62,7 @@ export function judge(event, { cfg = {} } = {}) {
     }
     if (/\bgit\b[^|;&\n]*\spush\b/.test(cmd)) return { decision: 'ask', reason: 'Pushing sends the work to the remote. Confirm the person asked for a push.' };
     if (/\bgit\b[^|;&\n]*\scommit\b/.test(cmd)) return { decision: 'ask', reason: 'Committing records the change. Confirm the person asked for a commit.' };
-    if (/\bgit\b[^|;&\n]*\sapply\b/.test(cmd) && /handback|code-changes\.diff/.test(cmd)) return { decision: 'ask', reason: 'The hand-back patch is only applied when the person asks. Confirm they did.' };
+    if (/\bgit\b[^|;&\n]*\sapply\b/.test(cmd) && /handback|code-changes\.diff/.test(cmd) && !(userText !== null && asksForChange(userText))) return { decision: 'ask', reason: 'The hand-back patch is only applied when the person asks. Confirm they did.' };
   }
   return null;
 }
@@ -55,7 +83,7 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     if (existsSync(cfgPath)) {
       let cfg = {};
       try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* a broken config still gets the default rules */ }
-      const out = hookOutput(judge(event, { cfg }));
+      const out = hookOutput(judge(event, { cfg, userText: lastUserText(event.transcript_path) }));
       if (out) process.stdout.write(out);
     }
   } catch { /* pass */ }
