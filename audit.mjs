@@ -2665,7 +2665,7 @@ function reportFull(label, items, shown) {
   let baselineInfo = null;
   if (!BASELINE_OFF && process.argv.includes('--baseline')) {
     const perFinding = process.argv.includes('--findings');
-    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding });
+    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0 });
     baselineInfo = { mode: 'write', written, path: BASELINE_PATH, perFinding };
     anyFail = false;   // capturing the baseline is not a failing run
   } else if (!BASELINE_OFF) {

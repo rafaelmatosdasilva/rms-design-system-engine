@@ -42,7 +42,9 @@ test('a question about a named component\'s states runs its scoped audit for the
 test('fixes, debt and priorities', () => {
   assert.deepEqual([r('the chip is 36px high when large with an icon, but Figma says 32px. Fix it in the code.').recipe, r('the chip is 36px high when large with an icon, but Figma says 32px. Fix it in the code.').run], ['fix-a-difference', ['rms-figma-code-parity --component chip']]);
   assert.equal(r('agora corrige a altura no código').recipe, 'fix-a-difference');
-  assert.deepEqual(r('accept the chip radius as known debt').run, ['rms-figma-code-parity --baseline --findings']);
+  assert.deepEqual(r('accept the chip radius as known debt').run, ['rms-figma-code-parity --component chip --baseline --findings']);
+  assert.deepEqual(r('audit the chip, then accept whatever is failing for it as known debt').run, ['rms-figma-code-parity --component chip --baseline --findings']);
+  assert.deepEqual(r('accept every current failure as known debt').run, ['rms-figma-code-parity --baseline --findings']);
   assert.equal(r('aceita a diferença do raio como dívida').recipe, 'accept-debt');
   assert.deepEqual([r('which component should I fix first?').recipe, r('which component should I fix first?').run], ['burndown', ['rms-figma-code-parity']]);
   assert.equal(r('o que corrijo primeiro?').recipe, 'burndown');
