@@ -24,7 +24,7 @@ import { existsSync, readdirSync, readFileSync, statSync,
          writeFileSync, copyFileSync, mkdirSync,
          symlinkSync, unlinkSync }                               from 'fs';
 import { join, dirname, resolve, relative }                     from 'path';
-import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, logUsage } from './skill-files.mjs';
+import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
 import { fileURLToPath }                                        from 'url';
 import { makeFigmaFetch }                                       from './figma-fetch.mjs';
@@ -194,7 +194,7 @@ if (process.argv.includes('--route')) {
 if (process.argv.includes('--guide')) {
   const which = process.argv[process.argv.indexOf('--guide') + 1];
   if (which === 'classic') {
-    if (!classicGuide(SCRIPT_DIR)) { console.log('❌ The classic guide is not in this copy of the skill (no guide-monolith tag). Run rms-figma-code-parity --update, then try again.'); process.exit(1); }
+    if (!fetchClassic(SCRIPT_DIR)) { console.log('❌ The classic guide is not in this copy of the skill (no guide-monolith tag here, and it could not be fetched from the remote). Check the connection, then try again.'); process.exit(1); }
     writeFileSync(join(SCRIPT_DIR, '.guide-choice'), 'classic\n');
   } else if (which === 'current') { try { unlinkSync(join(SCRIPT_DIR, '.guide-choice')); } catch { /* already current */ } }
   else { console.log('Use --guide classic (the guide as one file, as before the split) or --guide current.'); process.exit(2); }

@@ -5,7 +5,7 @@ import { writeFileSync, mkdirSync, symlinkSync, readFileSync, existsSync } from 
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { listDocs, readDoc, printDoc, doctor, classicGuide, writeClassicGuide, GUIDE, logUsage } from '../skill-files.mjs';
+import { listDocs, readDoc, printDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, GUIDE, logUsage } from '../skill-files.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -63,6 +63,12 @@ test('classic guide: the monolith from its git tag, for rollback', () => {
   writeFileSync(join(dir, GUIDE), 'the short guide\n'); git('commit', '-qam', 'split');
   assert.equal(classicGuide(dir), 'the one big guide\n');
   assert.equal(readFileSync(writeClassicGuide(dir), 'utf8'), 'the one big guide\n');
+  // A real install is a shallow clone without the tag: it is fetched from the remote when asked for.
+  const install = join(makeFixture({}), 'skill');
+  execFileSync('git', ['clone', '-q', '--depth', '1', `file://${dir}`, install]);
+  assert.equal(classicGuide(install), null);
+  assert.equal(fetchClassic(install), true);
+  assert.equal(classicGuide(install), 'the one big guide\n');
 });
 
 test('the usage log: off unless PARITY_USAGE_LOG=1, local, keeps the route and never the request text', () => {

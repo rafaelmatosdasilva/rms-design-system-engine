@@ -97,8 +97,14 @@ export function classicGuide(engineDir, tag = CLASSIC_TAG) {
 }
 
 // Writes it beside the engine (never tracked) and returns its path, or null when the tag is not there.
+// An install is a shallow clone (install.sh uses --depth 1), so the tag is usually not there: fetch just it.
+export function fetchClassic(engineDir, tag = CLASSIC_TAG) {
+  if (classicGuide(engineDir, tag) != null) return true;
+  try { execFileSync('git', ['fetch', '--depth', '1', 'origin', 'tag', tag, '--no-tags'], { cwd: engineDir, stdio: 'ignore', timeout: 30000 }); } catch { return false; }
+  return classicGuide(engineDir, tag) != null;
+}
 export function writeClassicGuide(engineDir, tag = CLASSIC_TAG) {
-  const text = classicGuide(engineDir, tag);
+  const text = fetchClassic(engineDir, tag) ? classicGuide(engineDir, tag) : null;
   if (text == null) return null;
   const file = join(engineDir, '.classic-guide.md');
   writeFileSync(file, text);
