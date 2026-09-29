@@ -572,6 +572,23 @@ export function annotationMismatches(f, got) {
   if (f.level && got.level != null && Number(got.level) !== f.level) out.push(`Figma says heading level ${f.level}, it renders as level ${got.level}`);
   return out;
 }
+// One deeper check at a time. A check that throws (the browser slow to answer, a page that changed under it)
+// is tried once more with its partial findings removed; if it fails again it is listed in `unfinished` and
+// reported as not checked, never silently clean.
+export function makeStep(findings, unfinished, label) {
+  let n = 0;
+  return async (fn) => {
+    const no = ++n;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const before = findings.length;
+      try { await fn(); return; } catch (e) {
+        findings.length = before;
+        if (attempt === 1) unfinished.push(`${label}: deeper check ${no} (${String(e?.message ?? e).slice(0, 80)})`);
+      }
+    }
+  };
+}
+
 // Chrome's accessibility tree names a few roles differently from ARIA.
 export const sameRole = (got, want) => got === want || (want === 'img' && got === 'image') || (want === 'textbox' && got === 'searchbox');
 
@@ -931,7 +948,7 @@ async function main() {
     if (!axeSource) console.log('ℹ️  [a11y] --axe: could not load axe-core (offline or blocked) — the broader scan was skipped; the core checks still ran.');
   }
 
-  const unrendered = [], unread = [];
+  const unrendered = [], unread = [], unfinished = [];
   for (const target of targets) {
     const label = target.label;
     const { targetId, sessionId } = await openPage(send, target.url);
@@ -1033,14 +1050,14 @@ async function main() {
           if (!restKey.has(f.desc + '|' + f.text)) findings.push({ kind: 'hovercontrast', plugin: label, theme: f.theme, desc: f.desc, text: f.text, ratio: f.ratio, threshold: f.threshold });
         }
         for (const id of ids) { try { await send('CSS.forcePseudoState', { nodeId: id, forcedPseudoClasses: [] }, sessionId); } catch {} }
-      } catch { /* CSS/DOM domain unavailable — skip the hover pass, not a fail */ }
+      } catch (e) { unfinished.push(`${label}: hover contrast (${String(e?.message ?? e).slice(0, 80)})`); }   // missing, never clean
     }
     // ── Deeper checks (WCAG 2.2): target size, a real Tab walk, dialogs and Escape, reduced motion,
     //    forced colours, text spacing, reflow (opt-in a11y.reflow), and semantics against the contract.
     //    Each one is isolated: a failure in one never stops the others or the check as a whole.
     const evalv = async (expr) => (await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
     const media0 = modes[0].sw.media;
-    const step = async (fn) => { try { await fn(); } catch { /* this check is skipped on this page, never a failure */ } };
+    const step = makeStep(findings, unfinished, label);
     await step(async () => {
       for (const x of (await evalv(deepSweepExpression(roots, 'targets'))) ?? []) findings.push({ kind: 'target', plugin: label, ...x });
     });
@@ -1204,6 +1221,7 @@ async function main() {
   if (!sweptPlugins) skip(unrendered.length ? `nothing rendered to check — ${unrendered.join(', ')} showed none of the design system's components within 10s` : 'nothing rendered to check — a --url/dev-server page did not load, or the plugin UIs are not built');
   if (unrendered.length) console.log(`⚠️  [a11y] not checked: ${unrendered.join(', ')} showed none of the design system's components within 10s`);
   if (unread.length) console.log(`⚠️  [a11y] partly not checked: the page could not be read in ${unread.join(', ')}; those results are missing, not clean`);
+  if (unfinished.length) console.log(`⚠️  [a11y] partly not checked: ${unfinished.join('; ')}; those results are missing, not clean`);
 
   // ── Report ────────────────────────────────────────────────────────────────────
   const contrast = groupSame(findings.filter((f) => f.kind === 'contrast' && !f.cannotCompute));
@@ -1251,7 +1269,7 @@ async function main() {
 
   // ── Human lane (default): plain language, no jargon ──
   console.log(`\n─── Accessibility check ${STRICT ? '(must pass)' : '(advisory — never blocks the build)'} ───\n`);
-  if (!total && (unread.length || unrendered.length)) {
+  if (!total && (unread.length || unrendered.length || unfinished.length)) {
     console.log(`Nothing found in what could be read${inThemes}, but part of it was not checked (see ⚠️ above): not a clean result.`);
   } else if (!total) {
     console.log(`Good news: nothing to fix here${inThemes}.`);
