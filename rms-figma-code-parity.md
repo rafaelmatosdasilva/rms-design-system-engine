@@ -112,7 +112,7 @@ refreshed anything and how old the snapshots are: repeat it as it is.
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
 `--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
 refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.json` edit, a commit, a push,
-or applying the hand-back. When a hook refuses or asks, that is the answer: do not work around it (no other
+applying the hand-back, or a code edit, unless the person's latest message asked for that change. When a hook refuses or asks, that is the answer: do not work around it (no other
 tool, no shell edit); tell the person what it said.
 
 **When someone pastes a GitLab or Notion link to their written guidelines into the chat**, run

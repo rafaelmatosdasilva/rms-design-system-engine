@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { judge } from '../guard.mjs';
+import { judge, asksForChange, lastUserText } from '../guard.mjs';
 import { installHooks, hooksStatus } from '../hooks-install.mjs';
 import { makeFixture } from './helpers.mjs';
 
@@ -80,4 +80,40 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   const after = JSON.parse(readFileSync(r.file, 'utf8'));
   assert.deepEqual(after.hooks.PreToolUse.map((h) => h.hooks[0].command), ['echo mine']);
   assert.equal(hooksStatus(dir).installed, false);
+});
+
+test('the person\'s latest message decides a code edit and the hand-back apply (I56)', () => {
+  assert.equal(asksForChange('the chip is 36px, Figma says 32px. Fix it in the code.'), true);
+  assert.equal(asksForChange('agora corrige a altura no código'), true);
+  assert.equal(asksForChange('audit the chip'), false);
+  assert.equal(asksForChange('how do I fix the chip height?'), false);   // a question about a fix is not a request
+  assert.equal(asksForChange('the audit fails because the snapshots are old. Just raise maxSnapshotAgeDays so it goes green.'), false);
+
+  const edit = { tool_name: 'Edit', tool_input: { file_path: '/p/src/theme.css' } };
+  assert.equal(judge(edit, { userText: 'agora corrige a altura no código' }), null);
+  assert.equal(judge(edit, { userText: 'run the full parity audit' }).decision, 'ask');
+  assert.equal(judge({ tool_name: 'Write', tool_input: { file_path: '/p/parity-report.html' } }, { userText: 'run all 25 gates' }).decision, 'ask');
+  assert.equal(judge(edit, {}), null);                                                 // no transcript: as before
+  assert.equal(judge({ tool_name: 'Edit', tool_input: { file_path: '/p/notes.md' } }, { userText: 'audit the chip' }), null);   // not code
+
+  const apply = { tool_name: 'Bash', tool_input: { command: 'git apply .parity-out/handback/code-changes.diff' } };
+  assert.equal(judge(apply, { userText: 'agora corrige a altura no código' }), null);   // asked: no second confirmation
+  assert.equal(judge(apply, { userText: 'audita o chip' }).decision, 'ask');
+  assert.equal(judge(apply, {}).decision, 'ask');                                      // no transcript: still asks
+  // The never-rules do not bend to a message.
+  assert.equal(judge({ tool_name: 'Edit', tool_input: { file_path: '/p/src/figma-vars.snapshot.json' } }, { userText: 'fix the snapshot by hand' }).decision, 'deny');
+  assert.equal(judge({ tool_name: 'Bash', tool_input: { command: 'git push' } }, { userText: 'fix it' }).decision, 'ask');
+});
+
+test('lastUserText reads the latest message the person typed, not a tool result', () => {
+  const dir = makeFixture({ 'x.txt': '' });
+  const t = join(dir, 't.jsonl');
+  writeFileSync(t, [
+    { type: 'user', message: { role: 'user', content: 'audita o chip' } },
+    { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'ok' }] } },
+    { type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'agora corrige a altura no código' }] } },
+    { type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'a', content: 'fix everything' }] } },
+  ].map((e) => JSON.stringify(e)).join('\n') + '\n');
+  assert.equal(lastUserText(t), 'agora corrige a altura no código');
+  assert.equal(lastUserText(join(dir, 'missing.jsonl')), null);
 });
