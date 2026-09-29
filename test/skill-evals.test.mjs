@@ -2,7 +2,8 @@
 // rule gets a known-good and a known-bad run; a scorer that passes a bad run fails here. No model tokens.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { context, decisionPoints } from './skill-evals/lib.mjs';
@@ -169,4 +170,16 @@ test('a run starts as a fresh user, not a child of the evaluating session', asyn
 test('no CLI on PATH: a run by path that ends "not in parity" (exit 1) still counts as run', () => {
   const ctx = fakeCtx({ calls: [{ name: 'Bash', input: { command: 'node ~/.claude/skills/rms-figma-code-parity/audit.mjs --component button' }, result: 'PARITY AUDIT ... hover while disabled', isError: true }], final: 'The button changes on hover while disabled (theme.css:44).' });
   assert.equal(passes('no-cli-on-path', ctx), true);
+});
+
+// Continuous evaluation (I55): the guide set the agent reads (main file, recipes, reference) is the one the
+// latest evaluation measured. A change to any of them needs a fresh run (reference/maintainers.md, Skill
+// evaluation), then the new hash in RESULTS.md.
+test('RESULTS.md records the guide set that is in the repository', async () => {
+  const { guideSetHash } = await import('../skill-files.mjs');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const results = readFileSync(join(root, 'test', 'skill-evals', 'RESULTS.md'), 'utf8');
+  const measured = [...results.matchAll(/Guide set measured: `([0-9a-f]{12})`/g)].map((m) => m[1]);
+  const now = guideSetHash(root);
+  assert.ok(measured.includes(now), `the guide, a recipe or a reference file changed since the last evaluation (RESULTS.md has ${measured.join(', ') || 'none'}, the repository has ${now}): run the skill evaluation and record the results with "Guide set measured: \`${now}\`"`);
 });
