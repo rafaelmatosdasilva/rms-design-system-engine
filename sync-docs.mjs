@@ -6,13 +6,13 @@
 //
 // What it does:
 //   1. Parses audit.mjs to extract the authoritative gate list (labels + scripts).
-//   2. Checks README.md and rms-figma-code-parity.md for stale gate counts.
+//   2. Checks README.md and the guide (rms-figma-code-parity.md, reference/, cookbook/) for stale gate counts.
 //   3. Auto-patches all "N automated gates" / "Run all N audit gates" / trend bar
 //      references to match the real count.
 //   4. Checks that each gate label (or a keyword form of it) appears in the doc.
 //   5. Prints a diff summary. Exits 1 if --check and anything was stale.
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname }                           from 'path';
 import { fileURLToPath }                           from 'url';
 
@@ -131,9 +131,13 @@ for (const g of gates) {
 console.log('');
 
 // ── 2. Doc files to check ─────────────────────────────────────────────────────
+// The guide is the main file plus its reference/ and cookbook/ files: counts are patched in each file, and
+// every gate label must appear somewhere in the guide as a whole (the gate table is in a recipe).
+const GUIDE_FILES = ['rms-figma-code-parity.md', ...['reference', 'cookbook'].flatMap((d) => (existsSync(join(DIR, d)) ? readdirSync(join(DIR, d)).filter((f) => f.endsWith('.md')).sort().map((f) => `${d}/${f}`) : []))];
+const guideText = GUIDE_FILES.map((f) => readFileSync(join(DIR, f), 'utf8')).join('\n');
 const DOCS = [
   { path: join(DIR, 'README.md'),                        label: 'README.md'       },
-  { path: join(DIR, 'rms-figma-code-parity.md'),         label: 'rms-figma-code-parity.md' },
+  ...GUIDE_FILES.map((f, i) => ({ path: join(DIR, f), label: f, labelsIn: i === 0 ? guideText : null })),
   { path: join(DIR, '.claude/commands/rms-figma-code-parity.md'), label: 'rms-figma-code-parity.md (commands)' },
 ];
 
@@ -226,14 +230,15 @@ for (const doc of DOCS) {
   // ── Check: each gate's label keyword appears in the doc.
   // Checks both the technical label and the plain-English GATE_PLAIN name so docs
   // can use either form without false positives.
-  const missingLabels = gates
+  const labelText = doc.labelsIn === undefined ? original : doc.labelsIn;
+  const missingLabels = labelText === null ? [] : gates
     .map((g, i) => {
       const anchor      = labelKeyword(g.label);
       const plainAnchor = gatePlain[i] ? labelKeyword(gatePlain[i]) : null;
       return { g, anchor, plainAnchor };
     })
     .filter(({ anchor, plainAnchor }) =>
-      !original.includes(anchor) && (!plainAnchor || !original.includes(plainAnchor))
+      !labelText.includes(anchor) && (!plainAnchor || !labelText.includes(plainAnchor))
     )
     .map(({ g, anchor, plainAnchor }) => `[${g.n}] ${g.label}  (looking for: "${anchor}"${plainAnchor ? ` or "${plainAnchor}"` : ''})`);
 
