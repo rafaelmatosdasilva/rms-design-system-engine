@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { judge, asksForChange, lastUserText, routePrompt, MAX_RECIPE } from '../guard.mjs';
-import { installHooks, hooksStatus } from '../hooks-install.mjs';
+import { installHooks, hooksStatus, upgradeHooks } from '../hooks-install.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -146,4 +146,19 @@ test('the router as a hook: a request made with the command arrives already rout
   const o = JSON.parse(out.stdout).hookSpecificOutput;
   assert.equal(o.hookEventName, 'UserPromptSubmit');
   assert.match(o.additionalContext, /ROUTE: audit-component/);
+});
+
+test('a project with the older hooks gets the router on its next run; nothing is added where there were none', () => {
+  const guard = `node "${join(ENGINE, 'guard.mjs')}"`;
+  const old = makeFixture({ '.claude/settings.local.json': { hooks: { PreToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash', hooks: [{ type: 'command', command: guard }] }] } } });
+  assert.equal(hooksStatus(old).partial, true);
+  assert.equal(upgradeHooks(old, {}, { engineDir: ENGINE, env: {} }), true);
+  assert.equal(hooksStatus(old).installed, true);
+  assert.equal(JSON.parse(readFileSync(join(old, '.claude', 'settings.local.json'), 'utf8')).hooks.PreToolUse.length, 1);
+  assert.equal(upgradeHooks(old, {}, { engineDir: ENGINE, env: {} }), false);   // already current
+  const none = makeFixture({});
+  assert.equal(upgradeHooks(none, {}, { engineDir: ENGINE, env: {} }), false);
+  const optedOut = makeFixture({ '.claude/settings.local.json': { hooks: { PreToolUse: [{ hooks: [{ type: 'command', command: guard }] }] } } });
+  assert.equal(upgradeHooks(optedOut, { hooks: false }, { engineDir: ENGINE, env: {} }), false);
+  assert.equal(upgradeHooks(optedOut, {}, { engineDir: ENGINE, env: { CI: '1' } }), false);
 });

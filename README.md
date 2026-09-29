@@ -82,6 +82,16 @@ It also does an **accessibility** check: it flags anything that would make the d
 
 Everything is advice with a clear fix. It points at the problem, it does not silently change your code.
 
+## Inside Claude Code
+
+The engine makes the decisions, not the AI model, so it behaves the same on a small model as on a large one:
+
+- **Every request is routed by the engine.** `--init` adds project hooks (`.claude/settings.local.json`, never committed). With them, each `/rms-figma-code-parity` request arrives already matched to the right recipe and the exact command to run, with the words to use for what the tool cannot do (it never changes Figma, and never fakes a Figma refresh).
+- **The hooks also keep the rules.** A Figma snapshot is never edited by hand, and the AI asks you before a commit, a push, a `ds-config.json` edit, or a code change you did not ask for.
+- **Short guide, recipes on demand.** The AI reads a short guide, then only the recipe the task needs (`rms-figma-code-parity --recipe` lists them). The same results come with far fewer tokens.
+- `rms-figma-code-parity --doctor` checks the install. `--remove-hooks` (or `"hooks": false` in `ds-config.json`) turns the hooks off. Projects set up before the router existed get it on their next run.
+- Optional and local only: `PARITY_USAGE_LOG=1` records which recipes and commands ran in `.parity-out/skill-usage.json`. Nothing is ever sent anywhere.
+
 ## That's it
 
 Commit the files it creates so your whole team and CI check against the same design. The deeper setup and every option live in the full guide.

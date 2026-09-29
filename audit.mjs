@@ -24,7 +24,7 @@ import { existsSync, readdirSync, readFileSync, statSync,
          writeFileSync, copyFileSync, mkdirSync,
          symlinkSync, unlinkSync }                               from 'fs';
 import { join, dirname, resolve, relative }                     from 'path';
-import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide } from './skill-files.mjs';
+import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, logUsage } from './skill-files.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
 import { fileURLToPath }                                        from 'url';
 import { makeFigmaFetch }                                       from './figma-fetch.mjs';
@@ -175,6 +175,7 @@ for (const kind of ['recipe', 'reference']) {
   const at = process.argv.indexOf(`--${kind}`);
   if (at === -1) continue;
   const name = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  if (name) logUsage(ROOT, { kind, name });
   process.exit(printDoc(SCRIPT_DIR, kind, name));
 }
 // ── --route "<request>": the request routed by the engine to a recipe and the exact command (I56) ──
@@ -185,6 +186,7 @@ if (process.argv.includes('--route')) {
   const state = projectState(ROOT, { engineDir: SCRIPT_DIR });
   const cmd = state.cmd;
   const r = route(text, state);
+  logUsage(ROOT, { kind: 'route', recipe: r.recipe, run: r.run });
   console.log(routeText(r, readDoc(SCRIPT_DIR, 'recipe', r.recipe), cmd));
   process.exit(0);
 }
@@ -1196,6 +1198,12 @@ async function bootstrapConfig() {
     }
     cfg = await bootstrapConfig();
   }
+  logUsage(ROOT, { kind: 'run', args: process.argv.slice(2).filter((a) => a.startsWith('--') || !a.includes('/')) });
+  // Hooks installed before the router existed get it now (I56): the update reaches every opted-in project.
+  try {
+    const { upgradeHooks } = await import('./hooks-install.mjs');
+    if (upgradeHooks(ROOT, cfg)) console.log(C.dim('ℹ️  Hooks updated: each /rms-figma-code-parity request is now routed by the engine (.claude/settings.local.json). Off: --remove-hooks.'));
+  } catch { /* never blocks a run */ }
 
   // THEMES: always an array - supports single string or array of paths
   const THEMES      = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();
