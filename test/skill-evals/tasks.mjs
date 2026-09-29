@@ -37,7 +37,7 @@ export const DEV = [
   { id: 'audit-chip', prompt: 'audit the chip',
     score: (ctx) => [check('scoped to the chip', scoped(ctx, 'chip')), check('names the 36 vs 32 combination', COMBO.test(ctx.all))] },
   { id: 'audit-all', prompt: 'run the full parity audit on this design system',
-    score: (ctx) => [check('a full run', unscoped(ctx)), check('names the failing radius token', has(ctx.all, /radii\/chip|chip radius|radius/i)), check('names a measured difference', has(ctx.all, /while disabled|disabled.{0,40}hover|hover.{0,40}disabled/i) || COMBO.test(ctx.all))] },
+    score: (ctx) => [check('a full run', unscoped(ctx)), check('names the failing radius token', has(ctx.all, /radii[\/-]chip|chip radius|radius/i)), check('names a measured difference', has(ctx.all, /while disabled|disabled.{0,40}hover|hover.{0,40}disabled/i) || COMBO.test(ctx.all))] },
   { id: 'first-setup', setup: (dir) => rmSync(join(dir, 'ds-config.json')), createsConfig: true, mayChange: ['parity-map.mjs', 'structure-contract.mjs'],   // --init scaffolds them
     prompt: 'set up the parity for this project. Our Figma file is https://www.figma.com/design/AbCdEf123456XyZ/Tidepool and the tokens are in src/theme.css',
     score: (ctx) => [check('uses --init with the Figma link', hasEngineRun(ctx, (c) => /--init/.test(c) && /figma/.test(c))), check('ds-config.json exists after', ctx.read('ds-config.json') != null), check('did not write the config by hand', !ctx.calls.some((c) => /Edit|Write/.test(c.name) && /ds-config\.json$/.test(String(c.input.file_path ?? ''))))] },
