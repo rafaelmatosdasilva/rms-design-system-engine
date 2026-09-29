@@ -106,3 +106,17 @@ test('history: bouncing facts are churn; who moved first, per area', async () =>
   assert.deepEqual(leaders(a, { now: Date.parse('2026-12-01T00:00:00Z') }), {});   // older than 30 days
   assert.deepEqual(['token x [dark]', 'chip · background (State=Hover)', 'chip · font size', 'chip · layer "Icon"', 'chip · radius'].map(areaOf), ['tokens', 'states and variants', 'typography', 'layers', 'size and shape']);
 });
+
+test('a value set only by a global reset: the fix goes on the component, never on the reset', async () => {
+  const { measuredLine, pageLevelRule } = await import('../capture-compare.mjs');
+  const { codePatch } = await import('../handback.mjs');
+  assert.equal(pageLevelRule('*'), true);
+  assert.equal(pageLevelRule('html, body'), true);
+  assert.equal(pageLevelRule('.panel'), false);
+  const d = { component: 'panel', field: 'padding (left/right)', figma: 'padding/l', figmaValue: '16px', code: '0px', expectedVar: '--padding-l', rule: '*', at: 'theme.css:1' };
+  assert.equal(measuredLine(d), "panel padding (left/right): Figma padding/l (16px), rendered 0px  (only the global reset * sets it · theme.css:1)  → give panel's own rule var(--padding-l) (not the reset)");
+  const dir = makeFixture({ 'theme.css': '* { padding-left: 0; }\n' });
+  const p = codePatch(dir, [{ ...d, field: 'padding left' }]);
+  assert.equal(p.patched, 0);
+  assert.equal(p.manual.length, 1);
+});

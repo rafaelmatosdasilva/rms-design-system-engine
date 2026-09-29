@@ -18,7 +18,7 @@ const report = (extra = []) => [
   '       bound-tokens.json ✓ (updated today)',
   '  GATE SUMMARY',
   '  ❌  [16]   Sub-components match Figma     Fail',
-  '  AUDIT FAILED - fix all ❌ above before declaring parity',
+  '  AUDIT FAILED - not in parity: see the ❌ lines above (fix them only when the person asks)',
   '⚠️  State contrast: 3 component state(s) below WCAG AA (30 checked).',
   '     chip [default · light]: 3.11:1 (needs 4.5:1)',
   '   Advisory: pairs are derived …',
@@ -40,6 +40,8 @@ test('findings: failing gates, warning lines and listed advisory items; never ze
   ]);
   assert.equal(ZERO_FAIL.test('❌ MISSING  0  propertyMap selectors'), true);
   assert.equal(ZERO_FAIL.test('❌ FAIL  3 field(s)'), false);
+  assert.equal(ZERO_FAIL.test('❌ FAIL      0/140  (missing per-mode override, or CSS ≠ Figma in a mode)'), true);
+  assert.equal(ZERO_FAIL.test('❌ FAIL      2/140  (missing per-mode override)'), false);
 });
 
 test('since the last run: new, gone, and a count that moved is one changed finding', () => {

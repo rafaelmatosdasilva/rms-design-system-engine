@@ -1,0 +1,123 @@
+#!/usr/bin/env node
+// guard.mjs - the skill's never-rules as a Claude Code PreToolUse hook (idea I55), so they hold every time
+// instead of depending on an agent remembering a paragraph.
+//
+// Installed per project by `rms-figma-code-parity --install-hooks` (and by --init), in
+// .claude/settings.local.json. It reads the tool call Claude Code is about to make (JSON on stdin) and:
+//   • denies editing a Figma snapshot by hand: they come from the capture, never from a hand edit;
+//   • asks the person before editing ds-config.json, committing, pushing, or applying the hand-back patch;
+//   • reads the person's latest message (the hook's transcript_path, idea I56): a code edit or the hand-back
+//     apply passes when that message asks for a change, and asks first when it does not.
+// As a UserPromptSubmit hook (I56), a request made with /rms-figma-code-parity is routed by the engine before
+// the agent reads it: the route, the exact command and the sentences to say arrive with the request, so
+// picking them is never the agent's decision, even when it skips the router.
+// Anything else, or any project without a ds-config.json, or one with "hooks": false, passes untouched.
+// The engine's own writes (node … audit.mjs, rms-figma-code-parity) are never blocked.
+import { readFileSync, existsSync } from 'node:fs';
+import { join, basename, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { route, routeText, projectState } from './route.mjs';
+import { readDoc } from './skill-files.mjs';
+
+const ENGINE = dirname(fileURLToPath(import.meta.url));
+
+const SNAPSHOT = /figma-[\w.-]*\.snapshot\.json/;
+const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
+
+const CODE = /\.(css|scss|sass|less|js|jsx|mjs|cjs|ts|tsx|vue|svelte|html?)$/i;
+// A message that asks for a change: a change verb, and not a how/why question about one.
+const CHANGE = /\b(fix|correct|change|update|apply|edit|set|repair|rename|replace|remove|add|make|corrig|conserta|muda|altera|aplica|atualiza|repara|substitu|remove|acrescenta|p[oõ]e|coloca)\w*/i;
+const ASKING_HOW = /^\s*(how|why|what|where|which|can i|should i|como|porqu|o que|onde|qual|posso)\b/i;
+export function asksForChange(text) {
+  const t = String(text ?? '').trim();
+  return CHANGE.test(t) && !ASKING_HOW.test(t);
+}
+
+// The person's latest message in a Claude Code transcript (JSONL): the last user entry with text, not a tool
+// result. null when there is no transcript to read (then the message-based rules do not apply).
+export function lastUserText(transcriptPath) {
+  if (!transcriptPath || !existsSync(transcriptPath)) return null;
+  let last = null;
+  for (const line of readFileSync(transcriptPath, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    let e; try { e = JSON.parse(line); } catch { continue; }
+    if (e.type !== 'user' || e.message?.role !== 'user') continue;
+    const c = e.message.content;
+    const text = typeof c === 'string' ? c : Array.isArray(c) ? c.filter((x) => x?.type === 'text').map((x) => x.text).join('\n') : '';
+    if (text.trim()) last = text;
+  }
+  return last;
+}
+
+// { decision: 'deny' | 'ask', reason } or null to pass. userText: the person's latest message, or null.
+export function judge(event, { cfg = {}, userText = null } = {}) {
+  if (cfg.hooks === false) return null;
+  const tool = event?.tool_name, input = event?.tool_input ?? {};
+  const snapshotPaths = new Set(Object.entries(cfg.paths ?? {}).filter(([k, v]) => /^snapshot|Snapshot$/.test(k) && typeof v === 'string').map(([, v]) => basename(v)));
+  const isSnapshot = (p) => SNAPSHOT.test(basename(String(p ?? ''))) || snapshotPaths.has(basename(String(p ?? '')));
+  if (EDIT_TOOLS.has(tool)) {
+    const file = input.file_path ?? input.notebook_path ?? input.path;
+    if (isSnapshot(file)) return { decision: 'deny', reason: `${basename(file)} is written by the Figma capture, never by hand (a hand edit fakes a refresh). Refresh it with the capture (rms-figma-code-parity --recipe refresh-figma), or leave it stale and say so.` };
+    if (basename(String(file ?? '')) === 'ds-config.json') return { decision: 'ask', reason: 'ds-config.json is the project\'s parity setup. Confirm this edit is what you asked for (guidelines links go through rms-figma-code-parity --guidelines, never a hand edit).' };
+    if (userText !== null && CODE.test(String(file ?? '')) && !asksForChange(userText)) return { decision: 'ask', reason: `The person's last message does not ask for a change to ${basename(file)}. Report the fix the audit names instead of making it, or confirm they asked for it.` };
+    return null;
+  }
+  if (tool === 'Bash') {
+    const cmd = String(input.command ?? '');
+    const engine = /^\s*(node\s+\S*audit\.mjs|rms-figma-code-parity|rms-parity)\b/.test(cmd);
+    if (!engine && SNAPSHOT.test(cmd) && (/(>|>>)\s*\S*figma-[\w.-]*\.snapshot\.json/.test(cmd) || /\b(sed\s+(-[a-zA-Z]*i|--in-place)|perl\s+-[a-zA-Z]*i|tee)\b/.test(cmd) || /\b(cp|mv)\s+\S+\s+\S*figma-[\w.-]*\.snapshot\.json/.test(cmd))) {
+      return { decision: 'deny', reason: 'Figma snapshots are written by the capture, never by a shell edit. Refresh them with the capture (rms-figma-code-parity --recipe refresh-figma).' };
+    }
+    if (/\bgit\b[^|;&\n]*\spush\b/.test(cmd)) return { decision: 'ask', reason: 'Pushing sends the work to the remote. Confirm the person asked for a push.' };
+    if (/\bgit\b[^|;&\n]*\scommit\b/.test(cmd)) return { decision: 'ask', reason: 'Committing records the change. Confirm the person asked for a commit.' };
+    if (/\bgit\b[^|;&\n]*\sapply\b/.test(cmd) && /handback|code-changes\.diff/.test(cmd) && !(userText !== null && asksForChange(userText))) return { decision: 'ask', reason: 'The hand-back patch is only applied when the person asks. Confirm they did.' };
+  }
+  return null;
+}
+
+// The route for a request made with the skill's command, as context for the agent; null for any other prompt.
+const COMMAND = /^\s*\/rms-figma-code-parity\b[ \t]*([\s\S]*)$/;
+export const MAX_RECIPE = 6000;
+export function routePrompt(event, { root, engineDir = ENGINE, cfg = {}, env = process.env } = {}) {
+  if (cfg.hooks === false) return null;
+  const text = String(event?.prompt ?? '').match(COMMAND)?.[1]?.trim();
+  if (!text) return null;
+  const state = projectState(root, { engineDir, env });
+  const r = route(text, state);
+  let recipe = '';
+  try { recipe = readDoc(engineDir, 'recipe', r.recipe) ?? ''; } catch { /* the pointer line still names it */ }
+  return `The engine already routed this request (rms-figma-code-parity's project hook); follow it and do not run --route again.\n${routeText(r, recipe, state.cmd, { maxRecipe: MAX_RECIPE })}`;
+}
+
+export function promptOutput(context) {
+  if (!context) return '';
+  return JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: context } });
+}
+
+export function hookOutput(verdict) {
+  if (!verdict) return '';
+  return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: verdict.decision, permissionDecisionReason: `rms-figma-code-parity: ${verdict.reason}` } });
+}
+
+// As a hook: stdin → stdout, always exit 0 (a broken guard must never block work; --doctor reports it).
+if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('guard.mjs')) {
+  let raw = '';
+  try { raw = readFileSync(0, 'utf8'); } catch { /* no input */ }
+  try {
+    const event = JSON.parse(raw || '{}');
+    const root = resolve(event.cwd ?? process.cwd());
+    const cfgPath = join(root, 'ds-config.json');
+    if (event.hook_event_name === 'UserPromptSubmit') {
+      let cfg = {};
+      try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* no or broken config: route it anyway (setup) */ }
+      const out = promptOutput(routePrompt(event, { root, cfg }));
+      if (out) process.stdout.write(out);
+    } else if (existsSync(cfgPath)) {
+      let cfg = {};
+      try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* a broken config still gets the default rules */ }
+      const out = hookOutput(judge(event, { cfg, userText: lastUserText(event.transcript_path) }));
+      if (out) process.stdout.write(out);
+    }
+  } catch { /* pass */ }
+  process.exit(0);
+}

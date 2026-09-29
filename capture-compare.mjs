@@ -222,7 +222,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       : (f.fontSizeVar ? ty(f.fontSizeVar)?.lh : null);
     // A line height inherited from a page-level rule (html, body, :root, *) is the page's, not the
     // component's, so it is not compared.
-    const pageLevel = (r) => /^(html|body|:root|\*)(\s*,\s*(html|body|:root|\*))*$/i.test(String(r ?? '').trim());
+    const pageLevel = pageLevelRule;
     if (lhFig && fp?.lineHeight && fp.lineHeight.confidence !== 'default' && !(fp.lineHeight.inherited && pageLevel(fp.lineHeight.rule))) {
       const lh = fp.lineHeight, fs = toNum(fp.fontSize?.value);
       const px = /^[\d.]+$/.test(String(lh.value).trim()) && fs ? `${toNum(lh.value) * fs}px` : lh.value;
@@ -510,16 +510,22 @@ export async function compareCapture(ROOT, cfg, code, { readJSON }) {
 
 // One line a person can act on: which value to write, and where. A reading from one source only
 // (the browser or the stylesheet, not both) says so, since it has not been confirmed.
+// A global rule (html, body, :root, *): the value is the page's reset, not the component's own. The fix
+// is a declaration on the component's own rule, never an edit of the reset (it would change every element).
+export const pageLevelRule = (r) => /^(html|body|:root|\*)(\s*,\s*(html|body|:root|\*))*$/i.test(String(r ?? '').trim());
+
 export function measuredLine(d, moved = null) {
   const plain = typeof d.figma === 'number' ? `${d.figma}px` : /^-?[\d.]+(px|%)?$/.test(String(d.figma)) ? String(d.figma) : null;
   const want = d.expectedVar ? `var(${d.expectedVar})` : d.suggestVar ? `var(${d.suggestVar})` : (d.figmaValue ?? plain);
-  const where = d.at ? `${d.rule ? `${d.rule} · ` : ''}${d.at}` : null;
+  const reset = pageLevelRule(d.rule);
+  const where = d.at ? `${reset ? `only the global reset ${d.rule} sets it · ` : d.rule ? `${d.rule} · ` : ''}${d.at}` : null;
   const figma = `${d.figma}${d.figmaValue ? ` (${d.figmaValue})` : ''}`;
   return `${d.component} ${d.field}: Figma ${figma}, rendered ${d.code}${d.codeVar ? ` via ${d.codeVar}` : ''}`
     + (where ? `  (${where})` : '')
     + (d.confidence === 'single-source' ? '  [read from one source]' : '')
     + (moved === 'code-moved' ? `  → in Figma, set it to ${d.codeVar ? `the token behind ${d.codeVar}` : d.code}`
       : moved === 'both-moved' ? '  → decide which value wins'
+      : reset && want ? `  → give ${d.component}'s own rule ${want} (not the reset)`
       : where && want ? `  → set ${want}` : '');
 }
 

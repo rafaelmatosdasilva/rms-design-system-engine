@@ -87,4 +87,10 @@ test('findings: a gate is debt only when every ❌ line is accepted; fixed lines
   assert.deepEqual(loadBaselineFindings(path), ['Structure :: ❌ chip: padding 8px, code 6px', 'Tokens :: ❌ --ink differs', 'Tokens :: ❌ --brand differs']);
   const again = classifyBaseline([A, B, gate('Coverage', ['2 components not reached'])], loadBaselineLabels(path), loadBaselineFindings(path));
   assert.equal(again.gateFail, false);
+  // A scoped run (--component chip) adds its findings and keeps every other component's accepted debt (I56).
+  writeBaseline(path, [gate('Structure', ['❌ chip: radius 16px, code 12px'])], { findings: true, merge: true });
+  assert.deepEqual(loadBaselineFindings(path), ['Structure :: ❌ chip: padding 8px, code 6px', 'Tokens :: ❌ --ink differs', 'Tokens :: ❌ --brand differs', 'Structure :: ❌ chip: radius 16px, code 12px']);
+  assert.deepEqual(loadBaselineLabels(path), ['Coverage']);
+  writeBaseline(path, [gate('Structure', ['❌ chip: radius 16px, code 12px'])], { findings: true });   // unscoped: a rewrite
+  assert.deepEqual(loadBaselineFindings(path), ['Structure :: ❌ chip: radius 16px, code 12px']);
 });

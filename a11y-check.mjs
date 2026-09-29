@@ -501,7 +501,7 @@ function sweepExpression(roots, doFocus, stateMap) {
         }
       }
     }
-    return { textEls, noFocus, faintFocus, thinFocus, ariaState, notKeyboard };
+    return { textEls, noFocus, faintFocus, thinFocus, ariaState, notKeyboard, scanned: rootEls.length };
   })()`;
 }
 
@@ -572,6 +572,23 @@ export function annotationMismatches(f, got) {
   if (f.level && got.level != null && Number(got.level) !== f.level) out.push(`Figma says heading level ${f.level}, it renders as level ${got.level}`);
   return out;
 }
+// One deeper check at a time. A check that throws (the browser slow to answer, a page that changed under it)
+// is tried once more with its partial findings removed; if it fails again it is listed in `unfinished` and
+// reported as not checked, never silently clean.
+export function makeStep(findings, unfinished, label) {
+  let n = 0;
+  return async (fn) => {
+    const no = ++n;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const before = findings.length;
+      try { await fn(); return; } catch (e) {
+        findings.length = before;
+        if (attempt === 1) unfinished.push(`${label}: deeper check ${no} (${String(e?.message ?? e).slice(0, 80)})`);
+      }
+    }
+  };
+}
+
 // Chrome's accessibility tree names a few roles differently from ARIA.
 export const sameRole = (got, want) => got === want || (want === 'img' && got === 'image') || (want === 'textbox' && got === 'searchbox');
 
@@ -931,6 +948,7 @@ async function main() {
     if (!axeSource) console.log('ℹ️  [a11y] --axe: could not load axe-core (offline or blocked) — the broader scan was skipped; the core checks still ran.');
   }
 
+  const unrendered = [], unread = [], unfinished = [];
   for (const target of targets) {
     const label = target.label;
     const { targetId, sessionId } = await openPage(send, target.url);
@@ -939,6 +957,13 @@ async function main() {
     const loaded = await waitForTrue(send, sessionId, loadedExpr, { attempts: 200, intervalMs: 50, tolerateErrors: true });
     if (!loaded) { await send('Target.closeTarget', { targetId }); continue; }
     await new Promise((res) => setTimeout(res, 300));   // settle — let an SPA finish its first render
+    // Something to check must be on the page: a page that shows none of the design system's components
+    // (still rendering, or blank) is not a clean page. Wait for it, up to ~10s, then say it was not checked,
+    // never "nothing to fix".
+    const shows = async () => ((await send('Runtime.evaluate', { expression: `(${JSON.stringify(roots)} ?? ['body']).some((s) => { try { return !!document.querySelector(s); } catch { return false; } })`, returnByValue: true }, sessionId)).result?.value) === true;
+    let shown = await shows();
+    for (let i = 0; !shown && i < 20; i++) { await new Promise((res) => setTimeout(res, 500)); shown = await shows(); }
+    if (!shown) { unrendered.push(label); await send('Target.closeTarget', { targetId }); continue; }
     sweptPlugins++;
 
     // 2. Name/role — accessibility tree (theme-independent), run once per target.
@@ -985,7 +1010,8 @@ async function main() {
       await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
       if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
       const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, true, STATE_MAP), returnByValue: true }, sessionId);
-      const { textEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [] } = r.result.value || {};
+      if (!r.result?.value) { unread.push(`${label} (${mode.name})`); if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); first = false; continue; }
+      const { textEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [] } = r.result.value;
       for (const t of thinFocus) note('focusthin', t.desc, mode.name, { px: t.px });
       for (const f of contrastFindings(textEls, mode.name)) findings.push({ plugin: label, ...f });
       for (const desc of noFocus) note('focus', desc, mode.name);
@@ -1024,14 +1050,14 @@ async function main() {
           if (!restKey.has(f.desc + '|' + f.text)) findings.push({ kind: 'hovercontrast', plugin: label, theme: f.theme, desc: f.desc, text: f.text, ratio: f.ratio, threshold: f.threshold });
         }
         for (const id of ids) { try { await send('CSS.forcePseudoState', { nodeId: id, forcedPseudoClasses: [] }, sessionId); } catch {} }
-      } catch { /* CSS/DOM domain unavailable — skip the hover pass, not a fail */ }
+      } catch (e) { unfinished.push(`${label}: hover contrast (${String(e?.message ?? e).slice(0, 80)})`); }   // missing, never clean
     }
     // ── Deeper checks (WCAG 2.2): target size, a real Tab walk, dialogs and Escape, reduced motion,
     //    forced colours, text spacing, reflow (opt-in a11y.reflow), and semantics against the contract.
     //    Each one is isolated: a failure in one never stops the others or the check as a whole.
     const evalv = async (expr) => (await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
     const media0 = modes[0].sw.media;
-    const step = async (fn) => { try { await fn(); } catch { /* this check is skipped on this page, never a failure */ } };
+    const step = makeStep(findings, unfinished, label);
     await step(async () => {
       for (const x of (await evalv(deepSweepExpression(roots, 'targets'))) ?? []) findings.push({ kind: 'target', plugin: label, ...x });
     });
@@ -1192,7 +1218,10 @@ async function main() {
 
   closeCDP(); cleanup(); clearTimeout(killTimer);
 
-  if (!sweptPlugins) skip('nothing rendered to check — a --url/dev-server page did not load, or the plugin UIs are not built');
+  if (!sweptPlugins) skip(unrendered.length ? `nothing rendered to check — ${unrendered.join(', ')} showed none of the design system's components within 10s` : 'nothing rendered to check — a --url/dev-server page did not load, or the plugin UIs are not built');
+  if (unrendered.length) console.log(`⚠️  [a11y] not checked: ${unrendered.join(', ')} showed none of the design system's components within 10s`);
+  if (unread.length) console.log(`⚠️  [a11y] partly not checked: the page could not be read in ${unread.join(', ')}; those results are missing, not clean`);
+  if (unfinished.length) console.log(`⚠️  [a11y] partly not checked: ${unfinished.join('; ')}; those results are missing, not clean`);
 
   // ── Report ────────────────────────────────────────────────────────────────────
   const contrast = groupSame(findings.filter((f) => f.kind === 'contrast' && !f.cannotCompute));
@@ -1240,7 +1269,9 @@ async function main() {
 
   // ── Human lane (default): plain language, no jargon ──
   console.log(`\n─── Accessibility check ${STRICT ? '(must pass)' : '(advisory — never blocks the build)'} ───\n`);
-  if (!total) {
+  if (!total && (unread.length || unrendered.length || unfinished.length)) {
+    console.log(`Nothing found in what could be read${inThemes}, but part of it was not checked (see ⚠️ above): not a clean result.`);
+  } else if (!total) {
     console.log(`Good news: nothing to fix here${inThemes}.`);
   } else {
     console.log(`Found ${plural(total, 'thing', 'things')} that would make this hard to use for some people${inThemes}:\n`);
