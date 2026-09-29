@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, runGate } from './helpers.mjs';
-import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine } from '../a11y-check.mjs';
+import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine, makeStep } from '../a11y-check.mjs';
 import { stateContrastFindings, tokenContrastFindings } from '../contrast-check.mjs';
 import { deriveContrastPairs } from '../pair-derive.mjs';
 import { findChrome } from '../cdp.mjs';
@@ -228,4 +228,17 @@ test('role contracts: what each role requires, on the rendered component', { ski
     'star (toggle button): is a toggle button without aria-pressed',
     'tab (tab): the selected tab has no aria-selected="true"',
   ], out);
+});
+
+test('a deeper check that fails is tried again, and reported as not checked when it fails twice (never silently clean)', async () => {
+  const findings = [], unfinished = [];
+  const step = makeStep(findings, unfinished, 'demo');
+  let calls = 0;
+  await step(async () => { calls++; findings.push({ kind: 'target' }); if (calls === 1) throw new Error('Runtime.evaluate: no answer within 30s'); });
+  assert.deepEqual([calls, findings.length, unfinished], [2, 1, []]);   // a slow browser once: retried, no duplicate
+  await step(async () => { findings.push({ kind: 'role' }); throw new Error('Runtime.evaluate: no answer within 30s'); });
+  assert.equal(findings.length, 1);                                     // the partial finding is not kept
+  assert.deepEqual(unfinished, ['demo: deeper check 2 (Runtime.evaluate: no answer within 30s)']);
+  await step(async () => { findings.push({ kind: 'keys' }); });
+  assert.equal(findings.length, 2);
 });
