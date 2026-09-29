@@ -73,7 +73,7 @@ reference it points to say, never from memory or from this table alone.
 | a difference fixed (in code, or what to change in Figma) | `fix-a-difference` |
 | known differences accepted as debt | `accept-debt` |
 | states, variants or combinations mapped or explained | `states-and-variants` |
-| accessibility notes in Figma, or an accessibility finding explained | `a11y-notes` |
+| a note in Figma about what a component is or does (a toggle, a button, a heading, its label), accessibility notes, or an accessibility finding explained | `a11y-notes` |
 | components compared with their Figma images | `visual-diff` |
 | to know what to fix first, or to work a library down | `burndown` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
