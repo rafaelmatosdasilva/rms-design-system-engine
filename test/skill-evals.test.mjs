@@ -68,6 +68,8 @@ test('task scorers: a good run passes, a bad one fails', () => {
   assert.equal(passes('audit-chip', fakeCtx({ calls: [run('rms-figma-code-parity --component chip')], final: sayChip })), true);
   assert.equal(passes('audit-chip', fakeCtx({ calls: [run('rms-figma-code-parity')], final: sayChip })), false);   // not scoped
   assert.equal(passes('audit-chip', fakeCtx({ calls: [run('rms-figma-code-parity --component chip')], final: '36 components were checked.\nAll 32 passing gates look fine for now.' })), false);   // loose numbers
+  assert.equal(passes('audit-all', fakeCtx({ calls: [run('rms-figma-code-parity')], final: '`--radii-chip` has value 12px but Figma expects 16px. The button changes on hover while disabled.' })), true);   // the CSS variable name, seen in real runs
+  assert.equal(passes('audit-all', fakeCtx({ calls: [run('rms-figma-code-parity')], final: 'The button changes on hover while disabled.' })), false);   // the token not named
   // A real reply (pilot run): the selector's dots must not hide the pair.
   assert.equal(passes('audit-chip', fakeCtx({ calls: [run('rms-figma-code-parity --component chip')], final: '- `chip height (Size=L, Icon=True)`: Figma is 32px, the rendered `.tp-chip.tp-chip--l.tp-chip--icon` is 36px (`src/theme.css:60`)' })), true);
   assert.equal(passes('fix-chip-height', fakeCtx({ final: 'Fixed the chip combination height to 32px in src/theme.css.', files: { 'src/theme.css': CSS_FIXED }, changed: ['src/theme.css'] })), true);
