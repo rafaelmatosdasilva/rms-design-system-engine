@@ -87,3 +87,40 @@ only those two assertions fail. The lesson: when the risk is a cascade/nesting
 outcome, the guard belongs in Gate [16] (rendered), not in a static selector scan.
 The isolation-fix override rules themselves are then documented in `ALLOWED_BROAD_RULES`
 as `ISOLATION FIX`.
+
+## Skill evaluation - a guide change is measured before it ships
+
+The guide is instructions for an agent, so a change to it (the main file, a recipe or a reference file) can
+make the skill worse in ways no unit test sees. `test/skill-evals/` runs the real skill headless
+(`claude -p "/rms-figma-code-parity <task>"`) on fixed tasks and scores each run by code: what the agent ran,
+the files after, and the rules it must never break (asking for a token in the chat, committing, pushing,
+hand-editing a snapshot or `ds-config.json`, applying the hand-back unasked). It spends model tokens, so it is
+not part of `node --test`.
+
+```bash
+node test/skill-evals/run.mjs --variant cookbook --model claude-sonnet-5 --runs 5 --set all --jobs 1 --resume
+node test/skill-evals/run.mjs --variant cookbook --model claude-haiku-4-5-20251001 --runs 3 --set all --jobs 1 --resume
+node test/skill-evals/report.mjs --a baseline --b cookbook --model claude-sonnet-5 --runs 5 --model claude-haiku-4-5-20251001 --runs 3
+```
+
+- **Variants.** `baseline` is the guide at a git ref (`--ref`, default the `guide-monolith` tag), `cookbook`
+  the guide in the checkout, `skill` the same as a native Claude Code Skill (`SKILL.md` built from the main
+  file). Every variant runs on the same engine; only the guide differs.
+- **Isolation.** Each run gets a fresh copy of the demo design system and a fresh `HOME` holding only the
+  variant, no MCP servers, a fixed tool list, a turn limit and a budget, and none of the evaluating session's
+  environment.
+- **Tasks.** `tasks.mjs` is the development set, used while writing recipes; `heldout.mjs` is the held-out
+  set, not looked at while writing them. Adoption is decided on the held-out set. Private tasks
+  (`PARITY_EVAL_PRIVATE_TASKS`) write only under `PARITY_EVAL_PRIVATE_OUT`, never in the repository.
+- **A run the API refused is not a result.** A usage limit or a 429 stops the pool without writing a row;
+  the same command with `--resume` carries on. A results file from another guide or engine is refused.
+- **Adoption rule** (`report.mjs`, applied by code, per model): no held-out task with a lower pass rate (a
+  lower task is re-run 10 more times on both variants before it counts), no new rule violation, a total pass
+  rate equal or higher, and fewer input tokens; the development set shows no lower task either. The report
+  refuses to decide on a partial measurement.
+- **Scorers are code, and they are tested** (`test/skill-evals.test.mjs`). When a transcript read by hand
+  disagrees with its score, the scorer is fixed, and `rescore.mjs` scores the saved runs again.
+
+Any change to the guide files needs a fresh evaluation run before it is merged. `test/guide-structure.test.mjs`
+keeps the split whole (index, recipe template, a 30 KB cap on the main file, no paragraph in two files, every
+pointer resolves, every recipe-check command runs on the demo).
