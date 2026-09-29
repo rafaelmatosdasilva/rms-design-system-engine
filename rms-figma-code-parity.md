@@ -56,11 +56,14 @@ for that fix.
 
 ## Recipes and reference (read the one that fits before acting)
 
-**Start every request with the router**, passing the request exactly as the person wrote it:
+**Start every request with the router.** When the request already came with a `ROUTE:` block (the project's
+hook routed it), follow that block. Otherwise run the router, passing the request exactly as the person wrote it:
 `rms-figma-code-parity --route "<the request>"` (not on PATH: `node ~/.claude/skills/rms-figma-code-parity/audit.mjs
 --route "<the request>"`). It prints the recipe that fits, the exact command to run (`RUN:`), any rule that applies
-(`NOTE:`), one `NEXT:` line, and the recipe itself. Do what it prints: run the `RUN:` command and relay its SUMMARY,
-or, when it says to run nothing, answer from the recipe it printed. Do not pick a recipe or a command yourself.
+(`NOTE:`), the sentences to say (`SAY:`), one `NEXT:` line, and the recipe itself. Do what it prints: run the `RUN:`
+command and relay its SUMMARY, or, when it says to run nothing, answer from the recipe it printed. Put each `SAY:`
+line in your reply word for word (when it names a condition, only when that condition holds). Do not pick a
+recipe or a command yourself.
 
 This guide holds the rules that always apply. The steps for each task are in a **recipe**: before acting, print
 the one that fits with `rms-figma-code-parity --recipe <name>` (or read
@@ -112,7 +115,8 @@ refreshed anything and how old the snapshots are: repeat it as it is.
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
 `--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
 refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.json` edit, a commit, a push,
-applying the hand-back, or a code edit, unless the person's latest message asked for that change. When a hook refuses or asks, that is the answer: do not work around it (no other
+applying the hand-back, or a code edit, unless the person's latest message asked for that change. A request made
+with `/rms-figma-code-parity` arrives already routed (the `ROUTE:` block above). When a hook refuses or asks, that is the answer: do not work around it (no other
 tool, no shell edit); tell the person what it said.
 
 **When someone pastes a GitLab or Notion link to their written guidelines into the chat**, run

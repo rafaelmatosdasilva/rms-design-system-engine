@@ -53,9 +53,11 @@ test('Figma is never changed, and going green by config is refused', () => {
   assert.equal(f.recipe, 'fix-a-difference');
   assert.match(f.notes.join(' '), /Nothing is ever changed in Figma/);
   assert.equal(r('muda o raio do chip no Figma para 12px').recipe, 'fix-a-difference');
+  assert.deepEqual(f.say, ["I can't change Figma: this skill only reads it. A person makes that change in the Figma editor; the audit below shows the Figma value and the code value."]);
   const g = r('the audit fails because the snapshots are old. Just raise maxSnapshotAgeDays in ds-config.json so it goes green.');
   assert.equal(g.recipe, 'refresh-figma');
   assert.match(g.notes.join(' '), /Do not raise maxSnapshotAgeDays/);
+  assert.deepEqual(g.say, []);   // forbidden-green is not a refresh request
 });
 
 test('a pasted step list: only the intent, and no report file or commit', () => {
@@ -72,7 +74,11 @@ test('guidelines links, setup and refresh', () => {
   const noUrl = r('audit the chip', { hasConfig: false, components: [] });
   assert.equal(noUrl.recipe, 'first-setup');   // no config yet: setup comes first, whatever was asked
   assert.match(noUrl.notes.join(' '), /Ask the person for the Figma file URL/);
-  assert.equal(r('refresh the Figma snapshots, the design changed yesterday').recipe, 'refresh-figma');
+  const refresh = route('refresh the Figma snapshots, the design changed yesterday', { ...P, snapshotDate: '2026-03-02' });
+  assert.equal(refresh.recipe, 'refresh-figma');
+  assert.equal(refresh.sayIf, 'when there is no Figma tool in this session');
+  assert.match(refresh.say[0], /^I couldn't refresh the Figma snapshots here: there is no Figma tool in this session\. The audit below uses the committed snapshots \(captured 2026-03-02\)/);
+  assert.match(refresh.notes.join(' '), /Without it, do not offer a refresh and never edit a snapshot/);
   assert.equal(r('o design mudou, atualiza os dados do Figma').recipe, 'refresh-figma');
 });
 
@@ -83,6 +89,9 @@ test('what --route prints: the route, the commands, one NEXT line, and the recip
   const ask = routeText(r('how do I turn on the visual comparison?'), '# Compare\n');
   assert.match(ask, /NEXT: answer from the recipe below .* run nothing\./);
   assert.doesNotMatch(ask, /^RUN:/m);
+  const say = routeText(r('change the chip radius in Figma to 12px'), '');
+  assert.match(say, /\nSAY: I can't change Figma[^\n]*\nNEXT: run the command above, relay its SUMMARY as it is, and follow its NEXT line\. Put the SAY line in your reply word for word\./);
+  assert.match(routeText(r('how do I turn on the visual comparison?'), 'x'.repeat(50), 'c', { maxRecipe: 10 }), /--- recipe visual-diff: read it with c --recipe visual-diff before you follow a step it has ---$/);
   // Not on PATH: every command uses the engine's own path.
   assert.match(routeText(route('audit the chip', { ...P, cmd: 'node /x/audit.mjs' }), '', 'node /x/audit.mjs'), /RUN: node \/x\/audit\.mjs --component chip/);
 });

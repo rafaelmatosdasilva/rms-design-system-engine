@@ -27,12 +27,15 @@ export function installHooks(ROOT, { engineDir = ENGINE, remove = false } = {}) 
   const file = join(ROOT, '.claude', 'settings.local.json');
   const settings = readSettings(file);
   const before = JSON.stringify(settings);
-  const pre = Array.isArray(settings.hooks?.PreToolUse) ? settings.hooks.PreToolUse : [];
-  const others = pre.filter((h) => !(h?.hooks ?? []).some((x) => String(x?.command ?? '').includes(MARK)));
-  const next = remove ? others : [...others, { matcher: MATCHER, hooks: [{ type: 'command', command: guardCommand(engineDir) }] }];
-  settings.hooks = { ...(settings.hooks ?? {}), PreToolUse: next };
-  if (!next.length) delete settings.hooks.PreToolUse;
-  if (settings.hooks && !Object.keys(settings.hooks).length) delete settings.hooks;
+  settings.hooks = { ...(settings.hooks ?? {}) };
+  // PreToolUse holds the never-rules; UserPromptSubmit routes a request made with the command (I56).
+  for (const [event, entry] of [['PreToolUse', { matcher: MATCHER }], ['UserPromptSubmit', {}]]) {
+    const list = Array.isArray(settings.hooks[event]) ? settings.hooks[event] : [];
+    const others = list.filter((h) => !(h?.hooks ?? []).some((x) => String(x?.command ?? '').includes(MARK)));
+    const next = remove ? others : [...others, { ...entry, hooks: [{ type: 'command', command: guardCommand(engineDir) }] }];
+    if (next.length) settings.hooks[event] = next; else delete settings.hooks[event];
+  }
+  if (!Object.keys(settings.hooks).length) delete settings.hooks;
   const changed = JSON.stringify(settings) !== before;
   if (changed) { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, JSON.stringify(settings, null, 2) + '\n'); }
   let gitignored = false;
@@ -54,8 +57,9 @@ export function hooksStatus(ROOT) {
   const file = join(ROOT, '.claude', 'settings.local.json');
   let s = {};
   try { s = JSON.parse(readFileSync(file, 'utf8')); } catch { return { installed: false, file }; }
-  const cmd = (s.hooks?.PreToolUse ?? []).flatMap((h) => h?.hooks ?? []).map((x) => String(x?.command ?? '')).find((c) => c.includes(MARK));
-  if (!cmd) return { installed: false, file };
+  const find = (event) => (s.hooks?.[event] ?? []).flatMap((h) => h?.hooks ?? []).map((x) => String(x?.command ?? '')).find((c) => c.includes(MARK));
+  const cmd = find('PreToolUse');
+  if (!cmd || !find('UserPromptSubmit')) return { installed: false, file };
   const path = cmd.match(/"([^"]+guard\.mjs)"/)?.[1];
   return { installed: true, file, command: cmd, exists: !!path && existsSync(path) };
 }

@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { judge, asksForChange, lastUserText } from '../guard.mjs';
+import { judge, asksForChange, lastUserText, routePrompt, MAX_RECIPE } from '../guard.mjs';
 import { installHooks, hooksStatus } from '../hooks-install.mjs';
 import { makeFixture } from './helpers.mjs';
 
@@ -72,6 +72,7 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   const s = JSON.parse(readFileSync(r.file, 'utf8'));
   assert.deepEqual(s.permissions, { allow: ['Bash(ls)'] });
   assert.equal(s.hooks.PreToolUse.length, 2);
+  assert.deepEqual(s.hooks.UserPromptSubmit, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the router (I56)
   assert.equal(installHooks(dir, { engineDir: ENGINE }).changed, false);
   assert.equal(JSON.parse(readFileSync(r.file, 'utf8')).hooks.PreToolUse.length, 2);
   assert.deepEqual(hooksStatus(dir), { installed: true, file: r.file, command: `node "${join(ENGINE, 'guard.mjs')}"`, exists: true });
@@ -79,6 +80,7 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   installHooks(dir, { remove: true });
   const after = JSON.parse(readFileSync(r.file, 'utf8'));
   assert.deepEqual(after.hooks.PreToolUse.map((h) => h.hooks[0].command), ['echo mine']);
+  assert.equal(after.hooks.UserPromptSubmit, undefined);
   assert.equal(hooksStatus(dir).installed, false);
 });
 
@@ -116,4 +118,32 @@ test('lastUserText reads the latest message the person typed, not a tool result'
   ].map((e) => JSON.stringify(e)).join('\n') + '\n');
   assert.equal(lastUserText(t), 'agora corrige a altura no código');
   assert.equal(lastUserText(join(dir, 'missing.jsonl')), null);
+});
+
+test('the router as a hook: a request made with the command arrives already routed (I56)', () => {
+  const dir = makeFixture({
+    'ds-config.json': { paths: {} },
+    'src/figma-structure.snapshot.json': { _updated: '2026-03-02T10:00:00.000Z', components: { chip: {}, button: {} } },
+    'src/figma-vars.snapshot.json': { _updated: '2026-03-04T10:00:00.000Z' },
+  });
+  const env = { PATH: '' };
+  const ctx = (prompt, cfg = {}) => routePrompt({ prompt }, { root: dir, engineDir: ENGINE, cfg, env });
+  const chip = ctx('/rms-figma-code-parity audit the chip');
+  assert.match(chip, /^The engine already routed this request/);
+  assert.match(chip, new RegExp(`\\nROUTE: audit-component\\nRUN: node ${join(ENGINE, 'audit.mjs').replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} --component chip\\n`));
+  const figma = ctx('/rms-figma-code-parity change the chip radius in Figma to 12px so it matches the code');
+  assert.match(figma, /\nSAY: I can't change Figma: this skill only reads it\./);
+  const refresh = ctx('/rms-figma-code-parity refresh the Figma snapshots, the design changed yesterday');
+  assert.match(refresh, /SAY \(when there is no Figma tool in this session\): I couldn't refresh the Figma snapshots here: .* \(captured 2026-03-02\)/);
+  assert.match(refresh, /--- recipe refresh-figma: read it with node \S+ --recipe refresh-figma before you follow a step it has ---$/);   // too long to inline
+  assert.ok(refresh.length < MAX_RECIPE);
+  assert.equal(ctx('audit the chip'), null);                           // not the command: no opinion
+  assert.equal(ctx('/rms-figma-code-parity'), null);                   // the command alone: nothing to route
+  assert.equal(ctx('/rms-figma-code-parity audit the chip', { hooks: false }), null);   // opt-out
+
+  const out = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ cwd: dir, hook_event_name: 'UserPromptSubmit', prompt: '/rms-figma-code-parity audit the chip' }), encoding: 'utf8' });
+  assert.equal(out.status, 0);
+  const o = JSON.parse(out.stdout).hookSpecificOutput;
+  assert.equal(o.hookEventName, 'UserPromptSubmit');
+  assert.match(o.additionalContext, /ROUTE: audit-component/);
 });
