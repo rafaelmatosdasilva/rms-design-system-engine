@@ -82,10 +82,19 @@ export function classifyBaseline(gates, baselineLabels, acceptedFindings = null)
 // Capture the current failing gates as the new baseline and write it. Returns the labels written.
 // With { findings: true }, each failing gate's ❌ lines are recorded instead of the gate; a failing gate
 // with no ❌ line to accept is still recorded as a gate.
-export function writeBaseline(path, gates, { findings = false } = {}) {
+// merge: a scoped run (--component) sees only its components' findings, so it adds to the file instead of
+// replacing it; the debt of every other component stays accepted (I56). An unscoped run rewrites it.
+export function writeBaseline(path, gates, { findings = false, merge = false } = {}) {
   const failing = (gates || []).filter((g) => !g.pass && !g.planLimited);
-  const lines = findings ? failing.flatMap(findingKeys) : [];
-  const labels = findings ? failing.filter((g) => !findingKeys(g).length).map((g) => g.label) : currentFailingLabels(gates);
+  let lines = findings ? failing.flatMap(findingKeys) : [];
+  let labels = findings ? failing.filter((g) => !findingKeys(g).length).map((g) => g.label) : currentFailingLabels(gates);
+  if (merge && existsSync(path)) {
+    let old = {};
+    try { old = JSON.parse(readFileSync(path, 'utf8')); } catch { /* unreadable: nothing to keep */ }
+    labels = [...new Set([...(Array.isArray(old.gates) ? old.gates : []), ...labels])];
+    lines = [...new Set([...(Array.isArray(old.findings) ? old.findings : []), ...lines])];
+    if (!findings && Array.isArray(old.findings)) findings = old.findings.length > 0;
+  }
   const doc = {
     $note: findings
       ? 'rms-parity adoption baseline (finding-level accepted debt). Each listed finding is a known ❌ line, accepted as debt; a failing gate whose ❌ lines are all listed does not fail the run. Any other ❌ line, including a listed one whose value changed, is a regression. A listed finding that is fixed is reported so you can re-run --baseline --findings to drop it. COMMIT this file.'

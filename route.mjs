@@ -112,7 +112,7 @@ function routeOnly(text, { hasConfig, components, cmd }) {
       notes.push('Do not raise maxSnapshotAgeDays or edit ds-config.json to go green: that hides drift. Say so, and run the audit to show what really fails.');
       return { recipe, question: false, run: [cmd], notes, kind };
     }
-    if (recipe === 'accept-debt') return { recipe, question, run: question ? [] : [`${cmd} --baseline --findings`], notes };
+    if (recipe === 'accept-debt') return { recipe, question, run: question ? [] : [`${scoped} --baseline --findings`], notes };
     if (recipe === 'fix-a-difference') {
       notes.push('Fix exactly what was asked, in the code, at the file and line the audit names; then run the same audit again.');
       return { recipe, question, run: [scoped], notes };
