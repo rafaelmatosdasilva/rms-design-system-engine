@@ -50,7 +50,7 @@ rms-figma-code-parity --no-baseline                   # ignore any parity-baseli
 rms-figma-code-parity --summary                       # print the plain result of the last run again (relay it as is)
 rms-figma-code-parity --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
 rms-figma-code-parity --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
-rms-figma-code-parity --route "<request>"             # the first step for any request: the recipe, the exact command and NEXT
+rms-figma-code-parity --route "<request>"             # the first step for any request: the recipe, the exact command, SAY and NEXT (the project's hook runs it for /rms-figma-code-parity requests)
 rms-figma-code-parity --recipe [name]                 # print a task recipe from the skill's cookbook (no name lists them)
 rms-figma-code-parity --reference [name]              # print a reference file from the skill (no name lists them)
 rms-figma-code-parity --guide classic|current         # link the command to the guide as one file (as before the split), or back

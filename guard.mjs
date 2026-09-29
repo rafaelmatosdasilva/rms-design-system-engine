@@ -8,10 +8,18 @@
 //   • asks the person before editing ds-config.json, committing, pushing, or applying the hand-back patch;
 //   • reads the person's latest message (the hook's transcript_path, idea I56): a code edit or the hand-back
 //     apply passes when that message asks for a change, and asks first when it does not.
+// As a UserPromptSubmit hook (I56), a request made with /rms-figma-code-parity is routed by the engine before
+// the agent reads it: the route, the exact command and the sentences to say arrive with the request, so
+// picking them is never the agent's decision, even when it skips the router.
 // Anything else, or any project without a ds-config.json, or one with "hooks": false, passes untouched.
 // The engine's own writes (node … audit.mjs, rms-figma-code-parity) are never blocked.
 import { readFileSync, existsSync } from 'node:fs';
-import { join, basename, resolve } from 'node:path';
+import { join, basename, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { route, routeText, projectState } from './route.mjs';
+import { readDoc } from './skill-files.mjs';
+
+const ENGINE = dirname(fileURLToPath(import.meta.url));
 
 const SNAPSHOT = /figma-[\w.-]*\.snapshot\.json/;
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
@@ -67,6 +75,25 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
   return null;
 }
 
+// The route for a request made with the skill's command, as context for the agent; null for any other prompt.
+const COMMAND = /^\s*\/rms-figma-code-parity\b[ \t]*([\s\S]*)$/;
+export const MAX_RECIPE = 6000;
+export function routePrompt(event, { root, engineDir = ENGINE, cfg = {}, env = process.env } = {}) {
+  if (cfg.hooks === false) return null;
+  const text = String(event?.prompt ?? '').match(COMMAND)?.[1]?.trim();
+  if (!text) return null;
+  const state = projectState(root, { engineDir, env });
+  const r = route(text, state);
+  let recipe = '';
+  try { recipe = readDoc(engineDir, 'recipe', r.recipe) ?? ''; } catch { /* the pointer line still names it */ }
+  return `The engine already routed this request (rms-figma-code-parity's project hook); follow it and do not run --route again.\n${routeText(r, recipe, state.cmd, { maxRecipe: MAX_RECIPE })}`;
+}
+
+export function promptOutput(context) {
+  if (!context) return '';
+  return JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: context } });
+}
+
 export function hookOutput(verdict) {
   if (!verdict) return '';
   return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: verdict.decision, permissionDecisionReason: `rms-figma-code-parity: ${verdict.reason}` } });
@@ -80,7 +107,12 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     const event = JSON.parse(raw || '{}');
     const root = resolve(event.cwd ?? process.cwd());
     const cfgPath = join(root, 'ds-config.json');
-    if (existsSync(cfgPath)) {
+    if (event.hook_event_name === 'UserPromptSubmit') {
+      let cfg = {};
+      try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* no or broken config: route it anyway (setup) */ }
+      const out = promptOutput(routePrompt(event, { root, cfg }));
+      if (out) process.stdout.write(out);
+    } else if (existsSync(cfgPath)) {
       let cfg = {};
       try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* a broken config still gets the default rules */ }
       const out = hookOutput(judge(event, { cfg, userText: lastUserText(event.transcript_path) }));

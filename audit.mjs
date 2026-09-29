@@ -179,19 +179,12 @@ for (const kind of ['recipe', 'reference']) {
 }
 // ── --route "<request>": the request routed by the engine to a recipe and the exact command (I56) ──
 if (process.argv.includes('--route')) {
-  const { route, routeText } = await import('./route.mjs');
+  const { route, routeText, projectState } = await import('./route.mjs');
   const text = process.argv.slice(process.argv.indexOf('--route') + 1).join(' ');
-  const onPath = String(process.env.PATH ?? '').split(':').some((d) => d && existsSync(join(d, 'rms-figma-code-parity')));
-  const cmd = onPath ? 'rms-figma-code-parity' : `node ${join(SCRIPT_DIR, 'audit.mjs')}`;
-  let components = [];
-  const hasConfig = existsSync(join(ROOT, 'ds-config.json'));
-  try {
-    const conf = hasConfig ? JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')) : {};
-    const snap = JSON.parse(readFileSync(join(ROOT, conf.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8'));
-    components = Object.keys(snap.components ?? {});
-  } catch { /* no snapshot yet: nothing to scope to */ }
   if (!text.trim()) { console.log('Give the request as the person wrote it: rms-figma-code-parity --route "<request>"'); process.exit(2); }
-  const r = route(text, { hasConfig, components, cmd });
+  const state = projectState(ROOT, { engineDir: SCRIPT_DIR });
+  const cmd = state.cmd;
+  const r = route(text, state);
   console.log(routeText(r, readDoc(SCRIPT_DIR, 'recipe', r.recipe), cmd));
   process.exit(0);
 }
@@ -225,7 +218,7 @@ if (process.argv.includes('--install-hooks') || process.argv.includes('--remove-
   const remove = process.argv.includes('--remove-hooks');
   try {
     const r = installHooks(ROOT, { remove });
-    console.log(remove ? `✅ Hooks removed from ${relative(ROOT, r.file)}` : `✅ Hooks ${r.changed ? 'installed' : 'already installed'} in ${relative(ROOT, r.file)}: a Figma snapshot is never edited by hand, and ds-config.json edits, commits, pushes and applying the hand-back ask you first.`);
+    console.log(remove ? `✅ Hooks removed from ${relative(ROOT, r.file)}` : `✅ Hooks ${r.changed ? 'installed' : 'already installed'} in ${relative(ROOT, r.file)}: a Figma snapshot is never edited by hand, ds-config.json edits, commits, pushes and applying the hand-back ask you first, and each /rms-figma-code-parity request is routed by the engine.`);
     if (r.gitignored) console.log('   Added .claude/settings.local.json to .gitignore (it holds this machine\'s engine path).');
     if (!remove) console.log('   Turn them off with rms-figma-code-parity --remove-hooks, or "hooks": false in ds-config.json.');
     console.log('NEXT: rms-figma-code-parity');
@@ -1178,7 +1171,7 @@ async function bootstrapConfig() {
     try {
       const { installHooks } = await import('./hooks-install.mjs');
       const r = installHooks(ROOT);
-      console.log(C.green(`✅ Hooks installed in ${relative(ROOT, r.file)}`) + C.dim(' (never edit a Figma snapshot by hand; ask before commit, push, applying the hand-back or editing ds-config.json). Off: --remove-hooks.'));
+      console.log(C.green(`✅ Hooks installed in ${relative(ROOT, r.file)}`) + C.dim(' (never edit a Figma snapshot by hand; ask before commit, push, applying the hand-back or editing ds-config.json; route each /rms-figma-code-parity request). Off: --remove-hooks.'));
     } catch (e) { console.log(C.yellow(`⚠️  Hooks not installed: ${e.message}`)); }
   }
   console.log('NEXT: rms-figma-code-parity   (the first run: it refreshes the Figma data when it can, then audits)\n');
