@@ -90,7 +90,7 @@ test('what --route prints: the route, the commands, one NEXT line, and the recip
   assert.match(ask, /NEXT: answer from the recipe below .* run nothing\./);
   assert.doesNotMatch(ask, /^RUN:/m);
   const say = routeText(r('change the chip radius in Figma to 12px'), '');
-  assert.match(say, /\nSAY: I can't change Figma[^\n]*\nNEXT: run the command above, relay its SUMMARY as it is, and follow its NEXT line\. Put the SAY line in your reply word for word\./);
+  assert.match(say, /\nSAY: I can't change Figma[^\n]*\nNEXT: run the command above, relay its SUMMARY as it is, and follow its NEXT line\. Put the SAY line in your final reply, word for word\./);
   assert.match(routeText(r('how do I turn on the visual comparison?'), 'x'.repeat(50), 'c', { maxRecipe: 10 }), /--- recipe visual-diff: read it with c --recipe visual-diff before you follow a step it has ---$/);
   // Not on PATH: every command uses the engine's own path.
   assert.match(routeText(route('audit the chip', { ...P, cmd: 'node /x/audit.mjs' }), '', 'node /x/audit.mjs'), /RUN: node \/x\/audit\.mjs --component chip/);

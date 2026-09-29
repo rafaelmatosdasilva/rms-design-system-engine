@@ -141,7 +141,7 @@ export function routeText(r, recipeText, cmd = 'rms-figma-code-parity', { maxRec
   for (const c of r.run) lines.push(`RUN: ${c}`);
   for (const n of r.notes) lines.push(`NOTE: ${n}`);
   for (const s of r.say ?? []) lines.push(`SAY${r.sayIf ? ` (${r.sayIf})` : ''}: ${s}`);
-  const say = r.say?.length ? ` Put the SAY line${r.say.length > 1 ? 's' : ''} in your reply word for word${r.sayIf ? ` ${r.sayIf}` : ''}.` : '';
+  const say = r.say?.length ? ` Put the SAY line${r.say.length > 1 ? 's' : ''} in your final reply, word for word${r.sayIf ? `, ${r.sayIf}` : ''}.` : '';
   lines.push(r.run.length
     ? `NEXT: run ${r.run.length > 1 ? 'these commands' : 'the command'} above, relay its SUMMARY as it is, and follow its NEXT line.${say}`
     : `NEXT: answer from the recipe below (and the reference it points to), quoting its exact words for settings and formats; run nothing.${say}`);
