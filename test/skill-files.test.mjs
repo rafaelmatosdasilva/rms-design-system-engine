@@ -1,11 +1,11 @@
 // I55: recipes and reference printed by the engine, the install doctor, and the classic guide for rollback.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, symlinkSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, symlinkSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { listDocs, readDoc, printDoc, doctor, classicGuide, writeClassicGuide, GUIDE } from '../skill-files.mjs';
+import { listDocs, readDoc, printDoc, doctor, classicGuide, writeClassicGuide, GUIDE, logUsage } from '../skill-files.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -63,4 +63,18 @@ test('classic guide: the monolith from its git tag, for rollback', () => {
   writeFileSync(join(dir, GUIDE), 'the short guide\n'); git('commit', '-qam', 'split');
   assert.equal(classicGuide(dir), 'the one big guide\n');
   assert.equal(readFileSync(writeClassicGuide(dir), 'utf8'), 'the one big guide\n');
+});
+
+test('the usage log: off unless PARITY_USAGE_LOG=1, local, keeps the route and never the request text', () => {
+  const dir = makeFixture({});
+  const file = join(dir, '.parity-out', 'skill-usage.json');
+  assert.equal(logUsage(dir, { kind: 'route', recipe: 'audit-component' }, { env: {} }), false);
+  assert.equal(existsSync(file), false);
+  const now = () => new Date('2026-03-01T10:00:00Z');
+  assert.equal(logUsage(dir, { kind: 'route', recipe: 'audit-component', run: ['rms-figma-code-parity --component chip'] }, { env: { PARITY_USAGE_LOG: '1' }, now }), true);
+  logUsage(dir, { kind: 'recipe', name: 'fix-a-difference' }, { env: { PARITY_USAGE_LOG: '1' }, now });
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), [
+    { at: '2026-03-01T10:00:00.000Z', kind: 'route', recipe: 'audit-component', run: ['rms-figma-code-parity --component chip'] },
+    { at: '2026-03-01T10:00:00.000Z', kind: 'recipe', name: 'fix-a-difference' },
+  ]);
 });

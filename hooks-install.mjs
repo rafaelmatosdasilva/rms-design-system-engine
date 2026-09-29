@@ -59,7 +59,16 @@ export function hooksStatus(ROOT) {
   try { s = JSON.parse(readFileSync(file, 'utf8')); } catch { return { installed: false, file }; }
   const find = (event) => (s.hooks?.[event] ?? []).flatMap((h) => h?.hooks ?? []).map((x) => String(x?.command ?? '')).find((c) => c.includes(MARK));
   const cmd = find('PreToolUse');
-  if (!cmd || !find('UserPromptSubmit')) return { installed: false, file };
+  if (!cmd || !find('UserPromptSubmit')) return { installed: false, file, ...(cmd ? { partial: true } : {}) };
   const path = cmd.match(/"([^"]+guard\.mjs)"/)?.[1];
   return { installed: true, file, command: cmd, exists: !!path && existsSync(path) };
+}
+
+// A project that installed the hooks before the router existed (only PreToolUse) gets the router on its next
+// run, so an update reaches every project that opted in. Never installs hooks where there were none, never on
+// CI, never with "hooks": false. Returns true when it upgraded.
+export function upgradeHooks(ROOT, cfg = {}, { engineDir = ENGINE, env = process.env } = {}) {
+  if (cfg.hooks === false || env.CI) return false;
+  if (!hooksStatus(ROOT).partial) return false;
+  try { installHooks(ROOT, { engineDir }); return true; } catch { return false; }
 }

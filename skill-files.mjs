@@ -7,9 +7,10 @@
 //   rms-figma-code-parity --reference [name]   a reference file (reference/<name>.md); no name lists them
 //   rms-figma-code-parity --doctor             checks the install, with the one fix for each problem
 //   rms-figma-code-parity --guide classic      links the command to the guide as it was before the split
-import { readFileSync, existsSync, readdirSync, lstatSync, readlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, lstatSync, readlinkSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 export const KINDS = { recipe: 'cookbook', reference: 'reference' };
 export const GUIDE = 'rms-figma-code-parity.md';
@@ -102,4 +103,31 @@ export function writeClassicGuide(engineDir, tag = CLASSIC_TAG) {
   const file = join(engineDir, '.classic-guide.md');
   writeFileSync(file, text);
   return file;
+}
+
+// Opt-in, local only (I55): with PARITY_USAGE_LOG=1, each route, recipe, reference and run is appended to
+// <project>/.parity-out/skill-usage.json, to see which recipes real requests use. Never sent anywhere; the
+// request text is not kept, only the route it got. Returns true when it wrote.
+export function logUsage(projectDir, entry, { env = process.env, now = () => new Date() } = {}) {
+  if (env.PARITY_USAGE_LOG !== '1') return false;
+  try {
+    const dir = join(projectDir, '.parity-out');
+    const file = join(dir, 'skill-usage.json');
+    let list = [];
+    try { list = JSON.parse(readFileSync(file, 'utf8')); } catch { /* first entry */ }
+    if (!Array.isArray(list)) list = [];
+    list.push({ at: now().toISOString(), ...entry });
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file, JSON.stringify(list.slice(-1000), null, 2) + '\n');
+    return true;
+  } catch { return false; }
+}
+
+// The guide set an evaluation measures: the main file, every recipe and every reference file (I55). A change
+// to any of them needs a fresh evaluation; test/skill-evals.test.mjs holds RESULTS.md to this hash.
+export function guideSetHash(engineDir) {
+  const files = [GUIDE, ...['recipe', 'reference'].flatMap((k) => listDocs(engineDir, k).map((d) => join(KINDS[k], `${d.name}.md`)))];
+  const h = createHash('sha256');
+  for (const f of files.sort()) h.update(`${f}\n`).update(readFileSync(join(engineDir, f), 'utf8'));
+  return h.digest('hex').slice(0, 12);
 }
