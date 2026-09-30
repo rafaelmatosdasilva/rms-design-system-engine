@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, runGate } from './helpers.mjs';
-import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine, makeStep } from '../a11y-check.mjs';
+import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine, makeStep, pageLoadedExpression } from '../a11y-check.mjs';
 import { stateContrastFindings, tokenContrastFindings } from '../contrast-check.mjs';
 import { deriveContrastPairs } from '../pair-derive.mjs';
 import { findChrome } from '../cdp.mjs';
@@ -241,4 +241,13 @@ test('a deeper check that fails is tried again, and reported as not checked when
   assert.deepEqual(unfinished, ['demo: deeper check 2 (Runtime.evaluate: no answer within 30s)']);
   await step(async () => { findings.push({ kind: 'keys' }); });
   assert.equal(findings.length, 2);
+});
+
+test('a page counts as loaded only once it is no longer the about:blank a new tab starts on', () => {
+  const loaded = (href, readyState, found = true) => new Function('location', 'document', `return ${pageLoadedExpression('.tp-chip')}`)({ href }, { readyState, querySelector: () => (found ? {} : null) });
+  assert.equal(loaded('about:blank', 'complete'), false);   // the race: blank already says "complete"
+  assert.equal(loaded('file:///p/ui.html', 'loading'), false);
+  assert.equal(loaded('file:///p/ui.html', 'complete', false), false);
+  assert.equal(loaded('file:///p/ui.html', 'complete'), true);
+  assert.equal(new Function('location', 'document', `return ${pageLoadedExpression()}`)({ href: 'http://localhost:6006/' }, { readyState: 'complete' }), true);
 });
