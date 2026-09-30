@@ -3571,6 +3571,26 @@ function reportFull(label, items, shown) {
     }
   }
 
+  // ── Accessibility from the code, no browser (I34, advisory) ──────────────────
+  // Always runs, with or without a page to open: names, focus styles, keyboard and aria mistakes read from the
+  // markup and the CSS. The browser check below deepens it when it can run. Off with ds-config "a11yStatic": false.
+  if (cfg.a11yStatic !== false) {
+    try {
+      const { staticA11y } = await import('./a11y-static.mjs');
+      const { findings, files } = staticA11y(ROOT);
+      if (findings.length) {
+        const count = (k) => findings.filter((f) => f.kind === k).length;
+        const parts = [['name', 'with no accessible name'], ['focus', 'focus outline removed and not put back'], ['keyboard', 'keyboard'], ['aria', 'aria']].filter(([k]) => count(k)).map(([k, w]) => `${count(k)} ${w}`);
+        console.log(C.yellow(`\n♿ Accessibility from the code (no browser needed): ${findings.length} finding${findings.length === 1 ? '' : 's'} in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'} (${parts.join(' · ')}). Advisory.`));
+        const all = process.argv.includes('--a11y');
+        for (const f of findings.slice(0, all ? findings.length : 15)) console.log(C.yellow(`     ${f.file}:${f.line}  ${f.desc}`));
+        if (!all && findings.length > 15) console.log(`     and ${findings.length - 15} more; run with --a11y to list them all.`);
+      } else if (files.markup || files.styles) {
+        console.log(C.green(`\n♿ Accessibility from the code (no browser needed): nothing found in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'}.`));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Accessibility from the code not checked: ${e.message}`)); }
+  }
+
   // ── Agent instruction files tell the truth (I57, advisory) ──────────────────
   // AGENTS.md, CLAUDE.md, DESIGN.md, Cursor/Copilot rules and skills state design-system names from memory;
   // a wrong one makes every agent that reads it build the wrong thing. Each name they state is checked against

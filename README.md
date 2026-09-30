@@ -81,7 +81,7 @@ Every run compares your code against Figma and reports it in plain words:
 - **What this audit** covered: so you can see nothing slipped through.
 - **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist. A wrong name there makes every agent that reads it build the wrong thing. Advisory; `"steering": false` in `ds-config.json` turns it off.
 
-It also does an **accessibility** check: it flags anything that would make the design hard to use (text that is hard to read, a button with no label, something you cannot reach with the keyboard) and tells you, in plain words, how to fix it.
+It also does an **accessibility** check: it flags anything that would make the design hard to use (text that is hard to read, a button with no label, something you cannot reach with the keyboard) and tells you, in plain words, how to fix it. Part of it always runs straight from the code and the CSS, with no browser and no page to open (a button with only an icon and no label, a removed focus outline, a mouse-only control, a misspelled `aria-*`); when a page can be opened, the browser check goes deeper. `"a11yStatic": false` in `ds-config.json` turns the code part off.
 
 Everything is advice with a clear fix. It points at the problem, it does not silently change your code.
 
