@@ -168,16 +168,18 @@ export function extractOptions(text) {
 }
 // A Figma INSTANCE_SWAP property is a SLOT, not a value prop - it maps to a code slot (Vue
 // <slot>, React children/ReactNode). Best-effort detection of the code's slots.
+// Slot names are kept as written (a name's parity is its exact spelling), one per normalised name.
 export function extractSlots(text) {
-  const named = new Set();
+  const byKey = new Map();
+  const named = { add: (n) => { if (!byKey.has(norm(n))) byKey.set(norm(n), n); } };
   let hasDefault = false;
-  for (const m of text.matchAll(/<slot\b[^>]*\bname\s*=\s*['"`]([\w-]+)['"`]/g)) named.add(norm(m[1]));  // Vue named
+  for (const m of text.matchAll(/<slot\b[^>]*\bname\s*=\s*['"`]([\w-]+)['"`]/g)) named.add(m[1]);  // Vue named
   if (/<slot(\s|\/|>)/.test(text) && !/<slot\b[^>]*\bname\s*=/.test(text)) hasDefault = true;            // Vue default
   for (const m of text.matchAll(/defineSlots\s*<\s*\{([\s\S]*?)\}/g))
-    for (const p of m[1].matchAll(/([A-Za-z_$][\w$]*)\s*[?:]/g)) named.add(norm(p[1]));                  // Vue defineSlots
+    for (const p of m[1].matchAll(/([A-Za-z_$][\w$]*)\s*[?:]/g)) named.add(p[1]);                        // Vue defineSlots
   if (/\bchildren\b/.test(text)) hasDefault = true;                                                      // React children
-  for (const m of text.matchAll(/([A-Za-z_$][\w$]*)\s*\??\s*:\s*React\.?ReactNode/g)) named.add(norm(m[1])); // React ReactNode props as slots
-  return { named, hasDefault };
+  for (const m of text.matchAll(/([A-Za-z_$][\w$]*)\s*\??\s*:\s*React\.?ReactNode/g)) named.add(m[1]);     // React ReactNode props as slots
+  return { named: new Set(byKey.values()), hasDefault };
 }
 
 // The text reading of one component file, in the shape component-api.mjs merges.

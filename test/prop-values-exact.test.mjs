@@ -45,6 +45,19 @@ test('a prop name that differs only in letter case fails, and the finding shows 
   assert.match(two.out, /Tag\/Is Open: the code names it "isOpen" \(letter case I → i; spaces or separators\)/);
 });
 
+test('a Figma instance swap realized as a code slot follows the same rule: the slot name as written', () => {
+  const slotProject = (figmaProp, slotName) => ({
+    'ds-config.json': { paths: { snapshotVars: 'figma-vars.snapshot.json' }, componentSrcDirs: ['src'] },
+    'figma-component-props.snapshot.json': { Tag: { properties: { [`${figmaProp}#1:2`]: { type: 'INSTANCE_SWAP', defaultValue: '9:9' } } } },
+    'src/Tag.vue': `<template><span class="tag"><slot name="${slotName}" /></span></template>\n`,
+  });
+  const exact = runGate(GATE, slotProject('leadingIcon', 'leadingIcon'));
+  assert.equal(exact.code, 0, exact.out);
+  const differs = runGate(GATE, slotProject('Leading Icon', 'leadingIcon'));
+  assert.equal(differs.code, 1, differs.out);
+  assert.match(differs.out, /Tag\/Leading Icon: the code names its slot "leadingIcon" \(letter case L → l; spaces or separators\)/);
+});
+
 test('the vocabulary: counterparts by meaning, never for the same name; rejected names never include a right one', () => {
   assert.equal(counterpart('L', ['small', 'large']), 'large');
   assert.equal(counterpart('Error', ['danger', 'info']), 'danger');
