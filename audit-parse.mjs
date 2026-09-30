@@ -22,7 +22,8 @@ export function parseGateOutput(r, summaryRe, { maxDetails = 20 } = {}) {
   const seen = new Set();
   const keep = (l) => { const k = l.trim(); if (!k || seen.has(k)) return false; seen.add(k); return true; };
   const rows = out.split('\n');
-  const summary = rows.filter((l) => l.trim() && (summaryRe.test(l) || SKIP_RE.test(l))).filter(keep).map((l) => l.trim());
+  // A divider ("─── Values not verified ──") heads a list in the script's own output; it is never a result line.
+  const summary = rows.filter((l) => l.trim() && !/^\s*─/.test(l) && (summaryRe.test(l) || SKIP_RE.test(l))).filter(keep).map((l) => l.trim());
   const failDetails = pass ? [] : rows.filter((l) => /🚨|❌/.test(l)).filter(keep).map((l) => '  ' + l.trim()).slice(0, maxDetails);
   if (pass && !summary.length) summary.push('⚠️  this gate printed no result line, so its outcome is not visible here');
   if (!pass && !summary.length && !failDetails.length) {

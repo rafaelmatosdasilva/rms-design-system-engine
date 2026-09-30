@@ -2575,10 +2575,13 @@ function reportFull(label, items, shown) {
   // the report numbers its gates 1 to 25, so a line never carries another number.
   const legacyFree = (l) => (typeof l !== 'string' ? l : l
     .replace(/Gate \[\d+[a-z]?\] skipped/g, 'skipped')
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*)⏭\s+⏭/u, '$1⏭')                      // one skip mark, not two
     .replace(/^((?:\s|\x1b\[[0-9;]*m)*(?:✅|❌|⚠️|ℹ️|⏭|🚧)\s+)\[\d+[a-z]?\]\s+/u, '$1'));
+  // A warning or failure count of zero ("⚠️  NEW SKIP  0", "❌ FAIL  0") says nothing: it is left out.
+  const zeroCount = (l) => typeof l === 'string' && /^(?:\s|\x1b\[[0-9;]*m)*(?:⚠️|❌)\s+[A-Z][A-Z ?-]*?\s+0(?:\/0)?(?:\s|\x1b|$)/u.test(l);
   function addGate(label, result) {
     const r = scopeFilter(result);
-    if (Array.isArray(r.lines)) r.lines = r.lines.map(legacyFree);
+    if (Array.isArray(r.lines)) r.lines = r.lines.map(legacyFree).filter((l) => !zeroCount(l));
     // planLimited gates are neutral - they don't block the audit
     if (!r.pass && !r.planLimited) anyFail = true;
     gates.push({ label, ...r });
