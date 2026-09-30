@@ -1,0 +1,27 @@
+{
+  "_updated": "2026-01-01T00:00:00.000Z",
+  "_note": "Fictional Figma variables for the Harbor design system.",
+  "color": {
+    "light": {
+      "surface/base/color": "#ffffff",
+      "text/default/color": "#15202b",
+      "action/primary/color": "#0a6c74",
+      "action/primary/text/color": "#ffffff",
+      "status/neutral/color": "#5b6470",
+      "status/success/color": "#1f7a3a",
+      "status/danger/color": "#b42318"
+    },
+    "dark": {
+      "surface/base/color": "#0e141a",
+      "text/default/color": "#e7edf3",
+      "action/primary/color": "#3fb3bc",
+      "action/primary/text/color": "#0e141a",
+      "status/neutral/color": "#9aa3ad",
+      "status/success/color": "#5fd08a",
+      "status/danger/color": "#ff8a7f"
+    }
+  },
+  "sizing": { "radius/control": "6px", "space/2": "8px", "space/3": "12px", "stroke/default": "1px" },
+  "typography": { "body": { "size": "14px", "weight": "400", "lh": "20px" }, "label": { "size": "12px", "weight": "600", "lh": "16px" } },
+  "aliases": {}, "breakpoints": {}, "strings": {}, "booleans": {}, "animation": {}, "primitives": {}
+}

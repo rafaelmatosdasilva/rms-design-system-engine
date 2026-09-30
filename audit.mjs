@@ -1420,7 +1420,7 @@ function reportFull(label, items, shown) {
       return { pass: false, lines: [C.yellow('🚧 STRUCTURE cannot verify - no compiled component CSS.'), ...guidance] };
     }
     const pass = r.status === 0;
-    const summary    = out.split('\n').filter(l => /✅|❌|⚠️  MEASURED|⚠️  VARIANTS|⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🔗 .* in Figma: |↳ |📋 census: |least checked: |🖼  /.test(l) && l.trim()).map(l => l.trim());
+    const summary    = out.split('\n').filter(l => /✅|❌|⚠️  MEASURED|⚠️  VARIANTS|⚠️  NO-SHRINK|⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🔗 .* in Figma: |↳ |📋 census: |least checked: |🖼  /.test(l) && l.trim()).map(l => l.trim());
     const failDetails = pass ? [] : out.split('\n')
       .filter(l => l.trim().startsWith('❌') && !l.includes('FAIL  0'))
       .map(l => '  ' + l.trim()).slice(0, 20);
@@ -1947,6 +1947,45 @@ function reportFull(label, items, shown) {
       return marks.has(lineNo);
     }
 
+    // ── Focus rings ─────────────────────────────────────────────────────────────
+    // An outline drawn in a :focus rule is a focus ring: code draws it, and Figma has no
+    // outline to compare it with. Its lengths (outline: 2px, outline-offset: 2px) are
+    // compared with Figma like any literal; the ones with no match are listed apart,
+    // not counted as drift. A colour in the ring (a hex) is still checked, so such a line
+    // is never set apart. The rule's selector is read from the line itself (a one-line
+    // rule) or from the file, the nearest open { above the line.
+    const _fileText = new Map();
+    const fileText = (file) => {
+      if (!_fileText.has(file)) { let t = ''; try { t = readFileSync(file, 'utf8'); } catch { /* unreadable */ } _fileText.set(file, t); }
+      return _fileText.get(file);
+    };
+    function enclosingSelector(file, lineNo) {
+      const src = fileText(file).replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+      const lines = src.split('\n');
+      const upTo = lines.slice(0, lineNo - 1).join('\n');
+      let depth = 0;
+      for (let i = upTo.length - 1; i >= 0; i--) {
+        if (upTo[i] === '}') depth++;
+        else if (upTo[i] === '{') {
+          if (depth === 0) { const head = upTo.slice(0, i); const from = Math.max(head.lastIndexOf('}'), head.lastIndexOf('{'), head.lastIndexOf(';')); return head.slice(from + 1).trim(); }
+          depth--;
+        }
+      }
+      return '';
+    }
+    function isFocusRing(hitLine) {
+      const m = /^(.+?):(\d+):(.*)$/.exec(hitLine);
+      if (!m) return false;
+      const code = m[3].replace(/\/\*[^*]*\*\//g, '');
+      if (/#[0-9a-fA-F]{3,8}\b/.test(code)) return false;
+      const brace = code.lastIndexOf('{');
+      const selector = brace >= 0 ? code.slice(0, brace) : enclosingSelector(m[1], Number(m[2]));
+      if (!/:focus(-visible|-within)?\b/.test(selector)) return false;
+      const decls = (brace >= 0 ? code.slice(brace + 1) : code).split(';').map((d) => d.replace(/[{}]/g, '').trim()).filter(Boolean);
+      const withLength = decls.filter((d) => /\d(px|rem|em)\b/.test(d));
+      return withLength.length > 0 && withLength.every((d) => /^outline(-offset|-width)?\s*:/i.test(d));
+    }
+
     // Shared legitimacy filter
     function isLegitimate(line) {
       // A literal written INSIDE a /* … */ block is prose, not a declaration. The
@@ -2209,9 +2248,10 @@ function reportFull(label, items, shown) {
       return literals.every(l => matchesFigmaValue(l, nums, colors));
     };
     const _alwaysKeep = new Set(vwHits);   // 100vw anti-pattern is a rendering bug, never value-parity
-    const divergent = [], matchedFigma = [];
+    const divergent = [], matchedFigma = [], focusRings = [];
     for (const h of hits) {
       if (!_alwaysKeep.has(h) && hitMatchesFigma(h)) matchedFigma.push(h);
+      else if (!_alwaysKeep.has(h) && isFocusRing(h)) focusRings.push(h);
       else divergent.push(h);
     }
 
@@ -2322,6 +2362,10 @@ function reportFull(label, items, shown) {
       matchNotes.push(C.dim(`ℹ️  ${matchedFigma.length} hardcoded literal(s) match the Figma value - parity OK, not failed (${mode}):`));
       for (const h of matchedFigma.slice(0, 20)) matchNotes.push(C.dim(`     [${scopedSets(h).scope}] ${h}`));
       matchNotes.push(...reportFull('hardcoded-matches-figma', matchedFigma, 20));
+    }
+    if (focusRings.length) {
+      matchNotes.push(C.dim(`ℹ️  ${focusRings.length} focus ring literal(s) set apart - an outline in a :focus rule has no Figma value to compare with, not failed:`));
+      for (const h of focusRings.slice(0, 20)) matchNotes.push(C.dim(`     ${h}`));
     }
 
     const pass  = divergent.length === 0;

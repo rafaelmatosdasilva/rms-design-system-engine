@@ -11,7 +11,7 @@
 
 const ANSI = /\x1b\[[0-9;]*m/g;
 const GATE = /^(✅|❌|⚠️|⏭)\s+\[(\d+)\]\s+(.+?)(?:\s{2}\(.*)?$/;
-const HEADING = /^(⚠️|ℹ️|❌|✅|📌)\s+(?:\[[^\]]+\]\s+)?([^:]+?)(?::|$)/;
+const HEADING = /^(⚠️|ℹ️|❌|✅|📌|♿|🧭)\s+(?:\[[^\]]+\]\s+)?([^:]+?)(?::|$)/;
 // A zero count on a fail line is not a finding: "❌ FAIL  0", "❌ MISSING  0 selectors", "❌ FAIL  0/140 (…)".
 export const ZERO_FAIL = /^❌\s+[A-Z][A-Z ?]*?\s+0(\/\d+)?(\s|$)/;
 
@@ -81,23 +81,26 @@ export function diffReport(d, { max = 15 } = {}) {
 // text (buttonPrimary before button; "button-primary" and "radii/chip" count). A gate's own "gate fails"
 // line is not a finding of any component. `prev` (the last run's findings for the same scope) gives the
 // count each component had then.
-const words = (name) => [name, name.replace(/([a-z0-9])([A-Z])/g, '$1-$2')].map((x) => x.toLowerCase());
+const kebab = (x) => x.replace(/([a-z0-9])([A-Z])/g, '$1-$2');
+const words = (name) => [name, kebab(name)].map((x) => x.toLowerCase());
 export function componentOf(finding, names) {
-  const text = String(finding).toLowerCase();
-  let best = null;
-  for (const n of names) {
-    const hit = words(n).some((w) => new RegExp(`(^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`).test(text));
-    if (hit && (!best || n.length > best.length)) best = n;
-  }
-  return best;
+  // The text as written, and with its PascalCase split, so HbIconButton.vue names iconButton.
+  const texts = [String(finding).toLowerCase(), kebab(String(finding)).toLowerCase()];
+  const hits = names.filter((n) => words(n).some((w) => { const re = new RegExp(`(^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`); return texts.some((t) => re.test(t)); }));
+  const best = hits.reduce((a, n) => (!a || n.length > a.length ? n : a), null);
+  // A line that names two components apart (button, badge) is no one component's.
+  return best && hits.every((n) => best.toLowerCase().includes(n.toLowerCase())) ? best : null;
 }
+// Lines that are not a finding of anything: a count ("❌ FAIL  1", "⚠️  NEW SKIP  0"), the fix under a
+// finding, a gate that printed no result line.
+const NOT_A_FINDING = / :: ((❌|⚠️)\s+[A-Z][A-Z ?]*\s+\d|Fix:|⚠️\s+this gate printed no result line)/;
 
 export function burndown(findings, names, prev = null) {
   const count = (list) => {
     const by = new Map();
     let loose = 0;
     for (const f of list ?? []) {
-      if (/ :: gate fails$/.test(f) || / :: (🔗|↳)/.test(f)) continue;   // a gate's own verdict, a link or a note
+      if (/ :: gate fails$/.test(f) || / :: (🔗|↳)/.test(f) || NOT_A_FINDING.test(f)) continue;   // a gate's own verdict, a link, a note or a count
       const c = componentOf(f, names);
       if (c) by.set(c, (by.get(c) ?? 0) + 1); else loose++;
     }

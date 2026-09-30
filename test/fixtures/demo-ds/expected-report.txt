@@ -249,7 +249,7 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: button 5 · chip 3 · field 1 · 13 not tied to a component
+📉 Burndown, open findings per component: button 3 · chip 2 · field 1 · 9 not tied to a component
    next up: button. Run with --component button, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -268,7 +268,7 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 - button hover while disabled (Disabled=True): Figma no change, rendered changes background  (.tp-button:hover · src/theme.css:44)  [read from one source]
 - chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip.tp-chip--l.tp-chip--icon · src/theme.css:60)  → set 32px
 
-Burndown, open findings per component: button 5 · chip 3 · field 1 · 13 not tied to a component
+Burndown, open findings per component: button 3 · chip 2 · field 1 · 9 not tied to a component
 
 NEXT: tell the user what fails under "Token values" and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 

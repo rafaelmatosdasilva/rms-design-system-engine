@@ -794,8 +794,8 @@ if (themeCSS && Object.keys(COMPONENT_CSS_SELECTORS).length) {
 // Uses snapshot.strokeOnAnyState (walk all COMPONENT_SET children) when present;
 // falls back to strokeOnDefault (default-variant only) when the field is absent.
 //
-// Exceptions: add selector strings to ds-config.json → knownPhantomBorderExceptions.
-// Example: [".badge:focus-visible"] to allow focus rings.
+// Focus rules (:focus, :focus-visible, :focus-within) are never flagged: their outline or border is the focus
+// indicator. Other exceptions: add selector strings to ds-config.json → knownPhantomBorderExceptions.
 const PHANTOM_FAIL = [], PHANTOM_PASS = [];
 const PHANTOM_SKIP = new Set(cfg.knownPhantomBorderExceptions ?? []);
 
@@ -829,6 +829,9 @@ if (Object.keys(COMPONENT_CSS_SELECTORS).length && Object.keys(components).lengt
       if (!new RegExp(baseClass.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])').test(sel)) continue;   // .badge, not .badge-wrapper
       // Skip known exceptions.
       if (PHANTOM_SKIP.has(sel)) { PHANTOM_PASS.push(`${comp}: "${sel}" (exempted)`); continue; }
+      // A border or outline in a focus rule is the focus indicator a keyboard user needs, not a stroke of the
+      // design: Figma rarely draws focus, and removing it is an accessibility failure (I34).
+      if (/:focus(-visible|-within)?\b/.test(sel)) continue;
 
       // Inspect EVERY border/outline declaration in the rule, not just the first: a rule
       // may null one border (`border-color: transparent`) yet still set a visible one on a
@@ -987,8 +990,10 @@ for (const [comp, snapComp] of Object.entries(components)) {
 // flex child with `height:Npx` but no `flex-shrink:0` compresses below Npx when the
 // container runs short (the menuList shrinking-rows bug 2026-07-12). So any component
 // whose snapshot height is a fixed number and whose base rule pins that height via
-// `height`/`min-height` MUST also declare `flex-shrink:0` (harmless when it's never a
-// flex child, so it's required defensively). Exempt via ds-config → knownShrinkExceptions.
+// `height`/`min-height` should also declare `flex-shrink:0` (harmless when it's never a
+// flex child). Advisory: it is a risk in how the component is placed, not a difference from
+// Figma, and a library whose fixed-height components never sit in a flex column would fail on
+// every one of them. Exempt via ds-config → knownShrinkExceptions.
 const SHRINK_FAIL = [], SHRINK_PASS = [];
 const SHRINK_SKIP = new Set(cfg.knownShrinkExceptions ?? []);
 if (themeCSS && Object.keys(COMPONENT_CSS_SELECTORS).length && Object.keys(components).length) {
@@ -1529,13 +1534,14 @@ if (Object.keys(COMPONENT_CSS_SELECTORS).length) {
 
   if (SHRINK_PASS.length || SHRINK_FAIL.length) {
     const sTotal = SHRINK_PASS.length + SHRINK_FAIL.length;
-    console.log(`\n✅ PASS  ${SHRINK_PASS.length}/${sTotal} fixed-height no-shrink checks`);
-    console.log(`❌ FAIL  ${SHRINK_FAIL.length}`);
+    if (!SHRINK_FAIL.length) console.log(`\n✅ PASS  ${SHRINK_PASS.length}/${sTotal} fixed-height no-shrink checks`);
+    else console.log(`\n⚠️  NO-SHRINK ${SHRINK_FAIL.length}/${sTotal} fixed-height component(s) with no flex-shrink:0 (${SHRINK_FAIL.map((f) => f.split(':')[0]).join(', ')}) - advisory, a risk in a flex column, not a difference from Figma`);
     if (SHRINK_FAIL.length) {
-      console.log('\n─── Gate [3m] - fixed-height component can shrink as a flex child ──');
-      for (const f of SHRINK_FAIL) console.log(`  ❌ ${f}`);
-      console.log('   Fix: add flex-shrink:0 to the base rule (harmless off-flex).');
-      console.log('   Exempt a genuinely-never-flex component via ds-config.json → knownShrinkExceptions.');
+      console.log('\n─── Gate [3m] - fixed-height component can shrink as a flex child (advisory) ──');
+      for (const f of SHRINK_FAIL) console.log(`  ⚠️  ${f}`);
+      console.log('   A risk, not a difference from Figma: it never fails the gate. Where the component sits in a');
+      console.log('   flex column, add flex-shrink:0 to the base rule; exempt one that never does via');
+      console.log('   ds-config.json → knownShrinkExceptions.');
     }
   }
 
@@ -1815,7 +1821,7 @@ const anyFail = FAIL.length > 0 || MISSING.length > 0 || UNCONTRACTED.length > 0
              || CPROP_FAIL.length > 0 || CANN_FAIL.length > 0 || SURF_FAIL.length > 0
              || BCLASS_FAIL.length > 0 || STATE_GEOM_FAIL.length > 0
              || STROKE_WIDTH_FAIL.length > 0 || RESTING_FAIL.length > 0
-             || SHRINK_FAIL.length > 0 || MIXED_FAIL.length > 0 || VHEIGHT_FAIL.length > 0;
+             || MIXED_FAIL.length > 0 || VHEIGHT_FAIL.length > 0;   // [3m] no-shrink is advisory
 
 let measuredFail = false;
 // ── Measured check (code capture) ─────────────────────────────────────────────
