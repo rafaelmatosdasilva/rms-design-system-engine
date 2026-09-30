@@ -10,11 +10,10 @@
        ⏭ No plugins configured in ds-config.json - skipped
 
 ✅  [2] Figma frame unchanged  (live frame vs saved reference screenshot)
-       ⏭ ⏭ No frames configured in ds-config.json - visual regression skipped
+       ⏭ No frames configured in ds-config.json - visual regression skipped
 
 ❌  [3] Token values  (color · sizing · typography · breakpoints · text)
        ✅ PASS  17   (color · radius · gap · padding · stroke · typography)
-       ⚠️  NEW SKIP  0
        ❌ FAIL  1
        ❌ [sizing/-] radius/control → --hb-radius-control
          Fix:  styles/tokens.css:10 - change --hb-radius-control: 4px → 6px
