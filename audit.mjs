@@ -3731,7 +3731,7 @@ function reportFull(label, items, shown) {
   // the catalog, the code API, the declared CSS variables and the tokens. Off with ds-config "steering": false.
   if (cfg.steering !== false) {
     try {
-      const { findSteeringFiles, steeringTruth, steeringFindings, steeringLine } = await import('./steering-check.mjs');
+      const { findSteeringFiles, steeringTruth, steeringFindings, steeringLine, mandateOf } = await import('./steering-check.mjs');
       const contractsDir = cfg.contracts?.out ?? 'contracts';
       const files = findSteeringFiles(ROOT, { skip: [contractsDir, 'node_modules', '.parity-out'] });
       if (files.length) {
@@ -3755,6 +3755,9 @@ function reportFull(label, items, shown) {
         } else {
           console.log(C.green(`\n🧭 Agent instruction files (${names}): every design-system name they state exists.`));
         }
+        // I63: a file about the design system that only says what not to use.
+        const forbidOnly = files.filter((f) => mandateOf(f.text, truth.components).onlyForbids).map((f) => f.file);
+        if (forbidOnly.length) console.log(C.yellow(`     ${forbidOnly.join(', ')} ${forbidOnly.length === 1 ? 'says' : 'say'} what not to use, never what to use. One sentence saying the design system is installed and its components are the ones to use moved most generations onto it in a public benchmark (16 of 57 → 43 of 55): add it, or point the file at ${contractsDir}/llms.txt. Advisory.`));
       }
     } catch (e) { console.log(C.dim(`ℹ️  Agent instruction files not checked: ${e.message}`)); }
   }
