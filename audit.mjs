@@ -3658,7 +3658,8 @@ function reportFull(label, items, shown) {
       const { findings, files } = staticA11y(ROOT);
       if (findings.length) {
         const count = (k) => findings.filter((f) => f.kind === k).length;
-        const parts = [['name', 'with no accessible name'], ['focus', 'focus outline removed and not put back'], ['keyboard', 'keyboard'], ['aria', 'aria']].filter(([k]) => count(k)).map(([k, w]) => `${count(k)} ${w}`);
+        const parts = [['name', 'with no accessible name'], ['focus', 'focus outline removed and not put back'], ['keyboard', 'keyboard'], ['aria', 'aria'],
+          ['language', 'page with no language'], ['zoom', 'zoom blocked'], ['motion', 'animation with no reduced-motion alternative']].filter(([k]) => count(k)).map(([k, w]) => `${count(k)} ${w}`);
         console.log(C.yellow(`\n♿ Accessibility from the code (no browser needed): ${findings.length} finding${findings.length === 1 ? '' : 's'} in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'} (${parts.join(' · ')}). Advisory.`));
         const all = process.argv.includes('--a11y');
         for (const f of findings.slice(0, all ? findings.length : 15)) console.log(C.yellow(`     ${f.file}:${f.line}  ${f.desc}`));
