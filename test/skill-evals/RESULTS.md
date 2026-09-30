@@ -1,5 +1,24 @@
 # Skill evaluation results
 
+## 2026-09: a bare guide, the engine's router and nothing else (idea I61)
+
+The `bare` variant (`variants.mjs`, 449 bytes) only says to run `--route` and do what it prints. Same tasks, runs and
+engine as the adopted I56 measurement (158802e; the harness file carrying the variant marks it +dirty).
+
+| | Adopted guide (I56) | Bare |
+|---|---|---|
+| Sonnet, all 20 tasks | 100/100 | 100/100 |
+| Sonnet, mean cost / input per request | $0.130 / 121k | $0.118 / 122k |
+| Haiku, all 20 tasks | 60/60 | 59/60 |
+| Haiku, mean cost / input per request | $0.047 / 65k | $0.046 / 76k |
+| Rule violations | 0 | 1 |
+
+**Decision.** Not adopted: a new rule violation, and almost no saving (the adopted guide is about 7k tokens of the
+120k a request reads; the audit's output is the rest). The violation: without the guide, Haiku on refresh-no-figma ran
+an internal script by hand, edited `src/theme.css` unasked and tried to commit (the hook refused the commit). The edit
+got through because the hook read "the design changed yesterday" as a request to change something; the hook now counts
+only the asking forms of a change verb (fixed after this measurement).
+
 ## 2026-09: deterministic core, thin agent layer (idea I56)
 
 Same harness, tasks and scorers as the cookbook measurement below; every saved run of all variants scored again with

@@ -90,6 +90,13 @@ test('the person\'s latest message decides a code edit and the hand-back apply (
   assert.equal(asksForChange('audit the chip'), false);
   assert.equal(asksForChange('how do I fix the chip height?'), false);   // a question about a fix is not a request
   assert.equal(asksForChange('the audit fails because the snapshots are old. Just raise maxSnapshotAgeDays so it goes green.'), false);
+  // Describing a change is not asking for one (a real run edited the theme on this request).
+  assert.equal(asksForChange('refresh the Figma snapshots, the design changed yesterday'), false);
+  assert.equal(asksForChange('the tokens were updated and the chip was fixed last week'), false);
+  assert.equal(asksForChange('o design mudou, atualiza os dados do Figma'), true);   // atualiza asks (for data; the edit is still checked by file)
+  assert.equal(asksForChange('o design mudou ontem'), false);
+  assert.equal(asksForChange('please change the chip height in the code'), true);
+  assert.equal(asksForChange('corrija o raio do chip'), true);
 
   const edit = { tool_name: 'Edit', tool_input: { file_path: '/p/src/theme.css' } };
   assert.equal(judge(edit, { userText: 'agora corrige a altura no código' }), null);
