@@ -546,13 +546,14 @@ with the other sides at 0 means `border-bottom` only. Park a not-yet-verified st
 in `ds-config.json → knownUndeclaredStrokeSides` (tech-debt, not an exemption: declare the real
 sides and remove it as each is checked).
 
-**Gate [3m] - fixed-height components must not shrink.** A component whose snapshot `h`
+**Gate [3m] - fixed-height components that can shrink (advisory).** A component whose snapshot `h`
 is a fixed number renders that exact height in Figma, but in code it's often a flex-column
 child (a list row); a flex child with `height:Npx` and no `flex-shrink:0` compresses when
 the container runs short (the menuList/node/toast/moreMenu shrinking bug). Gate [3m]
-requires any fixed-height component whose base rule pins the height to also declare
-`flex-shrink:0` (harmless off-flex, so required defensively). Exempt a genuinely-never-flex
-component via `ds-config.json → knownShrinkExceptions`.
+warns when a fixed-height component whose base rule pins the height has no
+`flex-shrink:0`. It is a risk in how the component is placed, not a difference from Figma,
+so it never fails the gate. Exempt a genuinely-never-flex component via
+`ds-config.json → knownShrinkExceptions`.
 
 **Icon-size capture (Gate [16] `iconSizeOf`).** In Step 1c, also record each component's
 primary icon box as `iconSize` (the DS uses one icon size, typically 16px). A rendered

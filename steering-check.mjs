@@ -8,10 +8,13 @@
 //   • a CSS variable in var(--x), or written like one of the design system's own, that is declared nowhere;
 //   • a token path (radii/chip, surface/page/color) that is not a token;
 //   • a component tag (<Chip>) that is not in the catalog, in a file that is about this design system;
-//   • a prop value that neither Figma nor the code allows (tone="error"), with the one that exists.
+//   • a prop value that neither Figma nor the code names exactly (tone="error", size="md" for M), with the
+//     value it corresponds to. A different name for the same value is still a different name;
+//   • a prop name written in code (Tone="danger") other than the way the code writes it (tone).
 // Advisory, never fails. The parity's own generated files (contracts, llms.txt) are never read.
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { norm, sizeGroup, counterpart } from './prop-vocabulary.mjs';
 
 // Where agent instructions live. Files at these paths, and every .md / .mdc / .txt under the folders.
 export const STEERING_FILES = ['AGENTS.md', 'CLAUDE.md', 'DESIGN.md', 'GEMINI.md', '.cursorrules', '.windsurfrules', '.github/copilot-instructions.md', 'llms.txt'];
@@ -41,7 +44,6 @@ export function findSteeringFiles(ROOT, { skip = [] } = {}) {
   return out;
 }
 
-const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 function distance(a, b) {
   const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
   for (let j = 1; j <= n; j++) d[0][j] = j;
@@ -54,32 +56,25 @@ const closest = (word, list, max = 2) => {
   return best;
 };
 
-// Words that mean the same value in different libraries: the first one the component really has is offered.
-const SYNONYMS = [
-  ['danger', 'error', 'critical', 'negative', 'destructive'], ['warning', 'caution', 'warn'], ['success', 'positive', 'ok'],
-  ['info', 'informative', 'information'], ['neutral', 'default', 'subtle'], ['primary', 'brand', 'main'],
-];
-const SIZES = [['xs', 'xsmall', 'extrasmall'], ['s', 'sm', 'small'], ['m', 'md', 'medium'], ['l', 'lg', 'large'], ['xl', 'xlarge', 'extralarge']];
-const sizeGroup = (v) => SIZES.find((g) => g.includes(norm(v)));
-
 // The truth the parity already has, in the shape this check needs.
 // catalog: contracts/catalog.json; api: the code capture's api ({ comp: { props: { name: { options } } } });
 // cssVars: declared custom properties; tokenNames: token paths (surface/page/color, radii/chip).
 export function steeringTruth({ catalog = {}, api = {}, cssVars = [], tokenNames = [] } = {}) {
   const components = Object.keys(catalog.components ?? {});
-  const props = new Map();   // prop name (normalized) → { names:Set, code:Set, figma:Set }
+  const props = new Map();   // prop name (normalized) → { names:Set, code:Set, figma:Set, codeNames:Set }
   const add = (name, values, side) => {
     if (!name || !values?.length) return;
     if (values.every((v) => /^(true|false)$/i.test(String(v)))) return;   // booleans are never a vocabulary problem
     const k = norm(name);
-    const e = props.get(k) ?? { names: new Set(), code: new Set(), figma: new Set() };
+    const e = props.get(k) ?? { names: new Set(), code: new Set(), figma: new Set(), codeNames: new Set() };
     e.names.add(name.toLowerCase()); for (const v of values) e[side].add(String(v));
+    if (side === 'code') e.codeNames.add(name);
     props.set(k, e);
   };
   for (const c of Object.values(catalog.components ?? {})) {
     for (const [fig, p] of Object.entries(c.props ?? {})) {
       if (p.type !== 'enum') continue;
-      add(fig, p.values, 'figma'); if (p.codeName) add(p.codeName, p.values, 'figma');
+      add(fig, p.values, 'figma'); if (p.codeName) { add(p.codeName, p.values, 'figma'); props.get(norm(p.codeName))?.codeNames.add(p.codeName); }
     }
   }
   for (const c of Object.values(api ?? {})) for (const [name, p] of Object.entries(c?.props ?? {})) if (Array.isArray(p.options)) add(name, p.options, 'code');
@@ -132,19 +127,27 @@ export function steeringFindings(text, truth) {
     for (const p of truth.props.values()) {
       // The code's own values first: an agent writes code, so the suggestion is what the code accepts.
       const valid = [...new Set([...p.code, ...[...p.figma].filter((f) => ![...p.code].some((c) => norm(c) === norm(f)))])];
-      const ok = (v) => valid.some((x) => norm(x) === norm(v)) || (sizeGroup(v) && valid.some((x) => sizeGroup(x) === sizeGroup(v)));
+      // Only the exact name is right (letter case aside): md where the system says M is a naming difference,
+      // reported with the value it corresponds to, never accepted.
+      const ok = (v) => valid.some((x) => norm(x) === norm(v));
+      const counterpartIn = (v) => counterpart(v, valid);
       const names = [...p.names].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
       const flag = (name, v) => {
         if (ok(v) || /^(true|false|null|undefined)$/i.test(v)) return;
-        const syn = SYNONYMS.find((g) => g.includes(norm(v)));
-        const want = (syn && valid.find((x) => syn.includes(norm(x)))) || (sizeGroup(v) ? null : closest(v, valid, 2));   // xl is not a typo of L
-        push({ line, kind: 'prop value', found: `${name}="${v}"`, want: want ? `${name}="${want}"` : null, valid });
+        const want = counterpartIn(v) || (sizeGroup(v) ? null : closest(v, valid, 2));   // xl is not a typo of L
+        const as = [...p.codeNames].includes(name) || !p.codeNames.size ? name : [...p.codeNames][0];   // the suggestion uses the code's name
+        push({ line, kind: 'prop value', found: `${name}="${v}"`, want: want ? `${as}="${want}"` : null, valid });
       };
-      for (const m of l.matchAll(new RegExp(`(?<![\\w-])(${names})\\s*=\\s*\\{?\\s*["'\`]([\\w-]+)["'\`]`, 'gi'))) flag(m[1], m[2]);
+      for (const m of l.matchAll(new RegExp(`(?<![\\w-])(${names})\\s*=\\s*\\{?\\s*["'\`]([\\w-]+)["'\`]`, 'gi'))) {
+        // The prop's own name, as code writes it: Tone="danger" where the code has tone is a wrong name.
+        const right = [...p.codeNames];
+        if (right.length && !right.includes(m[1])) push({ line, kind: 'prop name', found: m[1], want: right[0] });
+        flag(m[1], m[2]);
+      }
       const list = l.match(new RegExp(`(?<![\\w-])\`?(${names})\`?\\s*[:=]\\s*([^.;()]+)`, 'i'));
       if (list && !/^\s*\{?\s*["'`]/.test(list[2])) {
         const items = list[2].split(/\s*(?:\||,|\/|\bor\b)\s*/).map((x) => x.trim().replace(/^[`"']|[`"']$/g, '')).filter((x) => /^[\w-]+$/.test(x)).slice(0, 12);
-        if (items.length >= 2 && items.some(ok)) for (const v of items) flag(list[1], v);
+        if (items.length >= 2 && items.some((v) => ok(v) || counterpartIn(v))) for (const v of items) flag(list[1], v);
       }
     }
   });
@@ -153,6 +156,6 @@ export function steeringFindings(text, truth) {
 
 export function steeringLine(file, f) {
   const want = f.want ? `; the system has ${f.want}` : f.valid?.length ? `; the system has ${f.valid.join(', ')}` : '';
-  const what = { variable: 'is not a declared CSS variable', token: 'is not a token', component: 'is not a component in the catalog', 'prop value': 'is not a value this prop takes' }[f.kind];
+  const what = { variable: 'is not a declared CSS variable', token: 'is not a token', component: 'is not a component in the catalog', 'prop value': 'is not a value this prop takes', 'prop name': 'is not the prop\'s name as the code writes it' }[f.kind];
   return `${file}:${f.line}  ${f.found} ${what}${want}`;
 }

@@ -27,6 +27,7 @@ import { pruneCandidates } from './prune-check.mjs';
 import { resolveStatus, parseStatusTags, lintStatusFields, statusFindings, statusLine } from './decision-status.mjs';
 import { buildCatalog, catalogTable } from './ui-catalog.mjs';
 import { loadLocator } from './component-locator.mjs';
+import { readableOn } from './token-pairs.mjs';
 
 function readJSON(p) { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } }
 function ensureDir(p) { try { mkdirSync(p, { recursive: true }); } catch { /* best-effort */ } }
@@ -101,11 +102,13 @@ function buildTokens(vars, modes) {
   // color — resolved per mode; base $value is the first mode, other modes under $extensions.
   const cLight = vars.color?.[lightKey] || {};
   const cDark  = darkKey ? (vars.color?.[darkKey] || {}) : null;
+  const readable = readableOn(vars.color);   // I14: the surfaces each text colour meets 4.5:1 on, in every mode
   for (const name of Object.keys(cLight)) {
     const leaf = { $type: 'color', $value: cLight[name], $deprecated: false };
     if (cDark && cDark[name] !== undefined && cDark[name] !== cLight[name]) {
       leaf.$extensions = { 'com.rms.parity': { modes: { [lightKey]: cLight[name], [darkKey]: cDark[name] } } };
     }
+    if (readable[name]) (leaf.$extensions ??= { 'com.rms.parity': {} })['com.rms.parity'].readableOn = readable[name];
     place(name, tokenPath(name), applyMeta(leaf, name));
   }
   // sizing — mode-agnostic dimensions (px).

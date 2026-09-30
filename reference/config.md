@@ -123,6 +123,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 - `hooks: false` - the project's Claude Code hooks (see *The project's hooks* in the main guide) pass everything.
 - `rtl: true` - lists the declarations that would not mirror in a right-to-left language (one-sided or asymmetric `padding-left`, `margin-right`, `border-left`, `left`/`right` offsets, `text-align` and `float` left or right), each with its file and line and the logical property to use. Symmetric values are not listed.
 - `renderedParityStrict: true` - the measured differences (Gate [13] `MEASURED`) fail the gate instead of being advisory.
+- `figmaHygiene: false` - turns off the `🎨 Figma file hygiene` block (values with no variable or style, detached instances, variants with no auto layout, components with no description, read from `component-values.snapshot.json`). `--hygiene` lists every finding.
 
 ## Key Architecture Assumptions
 
@@ -146,6 +147,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 |---|---|---|
 | `figma-vars.snapshot.json` | color (all modes), sizing, typography, `modeVariants` (per-collection, per-mode non-colour maps) | `paths.snapshotVars` |
 | `figma-structure.snapshot.json` | per-component State=Default structure | `paths.snapshotStructure` |
+| `component-values.snapshot.json` | per component: every raw number and colour its nodes use (scopes the literal check), and its Figma file hygiene | project root |
 
 Both are machine-generated - never hand-edit. `component-state-tokens.json` and `bound-tokens.json` are produced by the Phase 1 Plugin API walks (which work on any plan) and **committed** - each carries an `_updated` stamp, Gate [1] tracks their freshness, and the consuming gates ([4], [10]) always run at full strength against the committed data.
 
@@ -214,8 +216,9 @@ are kept in `.parity-out/last-findings.json`. A long report still says at a glan
 
 **Burndown.** One `📉` line then counts the open findings per component, most first, each with what the last
 run with the same scope had (`chip 2 (was 3)`), plus the components cleared since then and a `next up` line.
-A finding belongs to the most specific component its text names. Work the library down one component at a
-time: `--component <name>`, fix, run again.
+A finding belongs to the most specific component its text names (a file name counts: `HbIconButton.vue` names
+`iconButton`). A count (`❌ FAIL  1`), the fix printed under a finding, and a line that names several components
+apart belong to none. Work the library down one component at a time: `--component <name>`, fix, run again.
 
 **Reading a finding.** A measured difference names the component and field, the Figma value, the
 rendered value and its token, the winning rule with its `file:line`, and what to write there

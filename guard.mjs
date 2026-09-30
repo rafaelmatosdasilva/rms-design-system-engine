@@ -26,7 +26,8 @@ const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 
 const CODE = /\.(css|scss|sass|less|js|jsx|mjs|cjs|ts|tsx|vue|svelte|html?)$/i;
 // A message that asks for a change: a change verb, and not a how/why question about one.
-const CHANGE = /\b(fix|correct|change|update|apply|edit|set|repair|rename|replace|remove|add|make|corrig|conserta|muda|altera|aplica|atualiza|repara|substitu|remove|acrescenta|p[oõ]e|coloca)\w*/i;
+// Only the form that asks: "the design changed" or "o design mudou" describes, it does not ask for a change.
+const CHANGE = /\b(fix|correct|change|update|apply|edit|set|repair|rename|replace|remove|add|make|corrig(e|ir|a)|corrij(a|am)|consert(a|ar|e)|mud(a|ar|e)|alter(a|ar|e)|aplic(a|ar|que)|atualiz(a|ar|e)|repar(a|ar|e)|substitu(i|ir|a)|remov(e|er|a)|acrescent(a|ar|e)|p[oõ]e|p[oô]r|coloc(a|ar|que))\b/i;
 const ASKING_HOW = /^\s*(how|why|what|where|which|can i|should i|como|porqu|o que|onde|qual|posso)\b/i;
 export function asksForChange(text) {
   const t = String(text ?? '').trim();

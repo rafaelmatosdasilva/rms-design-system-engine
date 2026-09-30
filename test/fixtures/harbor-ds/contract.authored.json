@@ -1,0 +1,8 @@
+{
+  "$note": "Harbor, a fictional design system: the authored part of each component's contract.",
+  "components": {
+    "button": { "semantics": { "element": "button" } },
+    "badge": { "semantics": { "element": "span" } },
+    "iconButton": { "semantics": { "element": "button" } }
+  }
+}
