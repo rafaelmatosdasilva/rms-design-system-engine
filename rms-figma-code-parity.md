@@ -85,6 +85,7 @@ reference it points to say, never from memory or from this table alone.
 | a note in Figma about what a component is or does (a toggle, a button, a heading, its label), accessibility notes, or an accessibility finding explained | `a11y-notes` |
 | components compared with their Figma images | `visual-diff` |
 | to know what to fix first, or to work a library down | `burndown` |
+| a component's props and values, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
 
 Reference (`rms-figma-code-parity --reference <name>`): `usage` (every command, option and output), `config`

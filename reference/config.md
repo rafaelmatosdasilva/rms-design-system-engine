@@ -123,6 +123,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 - `hooks: false` - the project's Claude Code hooks (see *The project's hooks* in the main guide) pass everything.
 - `rtl: true` - lists the declarations that would not mirror in a right-to-left language (one-sided or asymmetric `padding-left`, `margin-right`, `border-left`, `left`/`right` offsets, `text-align` and `float` left or right), each with its file and line and the logical property to use. Symmetric values are not listed.
 - `renderedParityStrict: true` - the measured differences (Gate [13] `MEASURED`) fail the gate instead of being advisory.
+- `workarounds: false` - turns off the `🧩 Built around a component` block (a screen's own control laid over a design-system component or a text field, reported to the design-system side as a missing slot or prop).
 - `figmaHygiene: false` - turns off the `🎨 Figma file hygiene` block (values with no variable or style, detached instances, variants with no auto layout, components with no description, read from `component-values.snapshot.json`). `--hygiene` lists every finding.
 
 ## Key Architecture Assumptions

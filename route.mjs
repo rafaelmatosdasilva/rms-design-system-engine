@@ -55,6 +55,8 @@ const RULES = [
   ['guidelines-links', (t) => LINK.test(t)],
   ['fix-a-difference', (t) => /\b(change|set|make|update|muda|mudar|altera|alterar|p[oõ]e|coloca)\w*\b[\s\S]{0,60}\b(in|no|na)\s+figma\b|\bfigma\b[\s\S]{0,30}\b(to|para)\s+\d/i.test(t), 'figma'],
   ['refresh-figma', (t) => /maxSnapshotAgeDays|go(es)? green|fica(r)? verde|raise the (age|limit)/i.test(t), 'forbidden-green'],
+  // Before accept-debt: "que valores aceita o size" asks what a prop accepts, it accepts no debt.
+  ['ask-the-system', (t) => QUESTION.test(t) && /\b(props?|propriedades?|values?|valores?|tokens?|variables?|vari[aá]ve(l|is)|names?|nomes?)\b/i.test(t) && !/debt|d[ií]vida|baseline/i.test(t)],
   ['accept-debt', (t) => /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit/i.test(t)],
   ['fix-a-difference', (t) => /\b(fix|correct|repair|corrig|conserta|repara|resolve)\w*/i.test(t) && !QUESTION.test(t)],
   ['a11y-notes', (t) => /\bnotes?\b|\bnotas?\b|annotat|anota|toggle|\brole\b|\baria\b|accessib|acessib|alt text|screen reader|leitor de ecr/i.test(t)],
@@ -118,6 +120,11 @@ function routeOnly(text, { hasConfig, components, cmd }) {
       return { recipe, question, run: [scoped], notes };
     }
     if (recipe === 'burndown') return { recipe, question, run: [cmd], notes };
+    if (recipe === 'ask-the-system') {
+      const terms = [...named, ...(t.match(/(?:--[a-z][\w-]*|\b[a-z][\w-]*(?:\/[\w-]+)+)/gi) ?? [])];
+      if (!terms.length) notes.push('Ask which component or token, then run the query with it.');
+      return { recipe, question, run: terms.length ? [`${cmd} --query ${terms.join(' ')}`] : [], notes };
+    }
     if (recipe === 'first-setup') return { recipe, question, run: question ? [] : [`${cmd} --doctor`], notes };
     if (recipe === 'ci-and-hooks') return { recipe, question: true, run: [], notes };
     // A how-to question is answered from the recipe; a question about a named component's states needs the
@@ -143,7 +150,9 @@ export function routeText(r, recipeText, cmd = 'rms-figma-code-parity', { maxRec
   for (const s of r.say ?? []) lines.push(`SAY${r.sayIf ? ` (${r.sayIf})` : ''}: ${s}`);
   const say = r.say?.length ? ` Put the SAY line${r.say.length > 1 ? 's' : ''} in your final reply, word for word${r.sayIf ? `, ${r.sayIf}` : ''}.` : '';
   lines.push(r.run.length
-    ? `NEXT: run ${r.run.length > 1 ? 'these commands' : 'the command'} above, relay its SUMMARY as it is, and follow its NEXT line.${say}`
+    ? r.recipe === 'ask-the-system'
+      ? `NEXT: run the command above and answer from what it prints, with the names exactly as written there.${say}`
+      : `NEXT: run ${r.run.length > 1 ? 'these commands' : 'the command'} above, relay its SUMMARY as it is, and follow its NEXT line.${say}`
     : `NEXT: answer from the recipe below (and the reference it points to), quoting its exact words for settings and formats; run nothing.${say}`);
   const recipe = (recipeText ?? '').trimEnd();
   if (maxRecipe != null && recipe.length > maxRecipe) lines.push('', `--- recipe ${r.recipe}: read it with ${cmd} --recipe ${r.recipe} before you follow a step it has ---`);
