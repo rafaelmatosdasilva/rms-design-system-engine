@@ -45,3 +45,9 @@ body { margin: 0; background: var(--hb-surface-base); color: var(--hb-text-defau
   display: inline-flex; align-items: center; justify-content: center; height: 36px; width: 36px; box-sizing: border-box;
   padding: var(--hb-space-2); border: 0; border-radius: var(--hb-radius-control); background: transparent; outline: none;
 }
+
+/* The page's own controls laid over a component and a field: the badge has no remove action, the field no clear action. */
+.hb-badge-remove { position: absolute; top: 0; right: 0; border: 0; background: transparent; }
+.hb-search { position: relative; display: inline-flex; }
+.hb-search-input { padding: var(--hb-space-2); border: var(--hb-stroke-default) solid var(--hb-text-default); }
+.hb-search-clear { position: absolute; top: var(--hb-space-2); right: var(--hb-space-2); border: 0; background: transparent; }

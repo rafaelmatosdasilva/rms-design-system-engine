@@ -231,6 +231,9 @@ test('emits an llms.txt AI index listing components and the token dictionary', a
   assert.match(llms, /# Design system/);
   assert.match(llms, /buttonPrimary\]\(\.\/buttonPrimary\.contract\.json\)/);
   assert.match(llms, /tokens\.json/);
+  // I63: the index says to use the components, not only which exist.
+  assert.match(llms, /\*\*Use these components\.\*\* This design system is part of this project: build nothing by hand/);
+  assert.match(llms, /--query <name>/);
 });
 
 test('a token whose path collides with another is surfaced in droppedTokens, not silently lost', async () => {
@@ -294,4 +297,17 @@ test('a slot takes Figma\'s preferred components, and a boolean names the layers
   const c = JSON.parse(readFileSync(join(r.outDir, 'buttonPrimary.contract.json'), 'utf8'));
   assert.deepEqual(c.slots.find((s) => s.name === 'icon-swap').accepts, ['IconChevron', 'IconPlus']);
   assert.deepEqual(c.props.find((p) => p.name === 'show-icon').toggles, ['Icon']);
+});
+
+test('llms.txt stays small enough for an agent to read whole: past the limit the catalog table stays in catalog.json', async () => {
+  const { buildLlms, LLMS_MAX_BYTES } = await import('../contract-gen.mjs');
+  const built = Array.from({ length: 400 }, (_, i) => ({ name: `component${i}`, contract: { description: 'A component with a long enough description to take some room in the index.', props: [{ name: 'size' }, { name: 'tone' }] } }));
+  const catalog = { rules: ['Use only these components.'], components: Object.fromEntries(built.map((b) => [b.name, { selector: `.${b.name}`, props: { Size: { type: 'enum', values: ['S', 'M', 'L'] }, Tone: { type: 'enum', values: ['neutral', 'danger'] } } }])) };
+  const text = buildLlms(built, {}, 0, catalog);
+  assert.match(text, /The full table \(400 components\) is too long to read at once: ask for one component with `rms-figma-code-parity --query <name>`/);
+  assert.ok(Buffer.byteLength(text) < Buffer.byteLength(buildLlms(built, {}, 0, catalog, { maxBytes: Infinity })));
+  assert.equal(LLMS_MAX_BYTES, 65536);
+  // A small system keeps its table.
+  const few = built.slice(0, 3);
+  assert.doesNotMatch(buildLlms(few, {}, 0, { rules: [], components: Object.fromEntries(few.map((b) => [b.name, { props: {} }])) }), /too long/);
 });

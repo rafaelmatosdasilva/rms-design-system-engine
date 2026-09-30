@@ -73,6 +73,7 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   assert.deepEqual(s.permissions, { allow: ['Bash(ls)'] });
   assert.equal(s.hooks.PreToolUse.length, 2);
   assert.deepEqual(s.hooks.UserPromptSubmit, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the router (I56)
+  assert.deepEqual(s.hooks.PostToolUse, [{ matcher: 'Edit|Write|MultiEdit', hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the edit check (I62)
   assert.equal(installHooks(dir, { engineDir: ENGINE }).changed, false);
   assert.equal(JSON.parse(readFileSync(r.file, 'utf8')).hooks.PreToolUse.length, 2);
   assert.deepEqual(hooksStatus(dir), { installed: true, file: r.file, command: `node "${join(ENGINE, 'guard.mjs')}"`, exists: true });
@@ -81,6 +82,7 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   const after = JSON.parse(readFileSync(r.file, 'utf8'));
   assert.deepEqual(after.hooks.PreToolUse.map((h) => h.hooks[0].command), ['echo mine']);
   assert.equal(after.hooks.UserPromptSubmit, undefined);
+  assert.equal(after.hooks.PostToolUse, undefined);
   assert.equal(hooksStatus(dir).installed, false);
 });
 
@@ -163,6 +165,11 @@ test('a project with the older hooks gets the router on its next run; nothing is
   assert.equal(hooksStatus(old).installed, true);
   assert.equal(JSON.parse(readFileSync(join(old, '.claude', 'settings.local.json'), 'utf8')).hooks.PreToolUse.length, 1);
   assert.equal(upgradeHooks(old, {}, { engineDir: ENGINE, env: {} }), false);   // already current
+  // One with the router but not the edit check (before I62) gets the edit check.
+  const router = makeFixture({ '.claude/settings.local.json': { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: guard }] }], UserPromptSubmit: [{ hooks: [{ type: 'command', command: guard }] }] } } });
+  assert.equal(hooksStatus(router).partial, true);
+  assert.equal(upgradeHooks(router, {}, { engineDir: ENGINE, env: {} }), true);
+  assert.equal(JSON.parse(readFileSync(join(router, '.claude', 'settings.local.json'), 'utf8')).hooks.PostToolUse.length, 1);
   const none = makeFixture({});
   assert.equal(upgradeHooks(none, {}, { engineDir: ENGINE, env: {} }), false);
   const optedOut = makeFixture({ '.claude/settings.local.json': { hooks: { PreToolUse: [{ hooks: [{ type: 'command', command: guard }] }] } } });

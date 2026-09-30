@@ -1,0 +1,24 @@
+/* Lagoon, a fictional Tailwind v4 design system. The theme is Tailwind's @theme; dark mode is a class. */
+@import "tailwindcss";
+@theme {
+  --color-surface-base: #ffffff;
+  --color-text-default: #15202b;
+  --color-action-primary: #0a6c74;
+  --color-action-primary-text: #ffffff;
+  --color-status-neutral: #5b6470;
+  --color-status-success: #1f7a3a;
+  --color-status-danger: #b42318;
+  --radius-control: 6px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+}
+@variant dark (&:where(.dark, .dark *));
+.dark {
+  --color-surface-base: #0e141a;
+  --color-text-default: #e7edf3;
+  --color-action-primary: #3fb3bc;
+  --color-action-primary-text: #0e141a;
+  --color-status-neutral: #9aa3ad;
+  --color-status-success: #5fd08a;
+  --color-status-danger: #ff8a7f;
+}

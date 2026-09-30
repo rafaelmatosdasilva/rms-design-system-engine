@@ -127,3 +127,50 @@ test('a generate command that ignores its stdin still produces its candidate', a
   for (let i = 0; i < 20; i++) assert.equal(generateCandidate(c, 'echo "<b>ok</b>"', ''), '<b>ok</b>\n');
   assert.equal(generateCandidate(c, 'exit 3', ''), null);   // a failing command is still no candidate
 });
+
+test('I64: the expected component is never shown to the agent, and avoiding it is counted', async () => {
+  const { runLevels, levelLines } = await import('../eval-run.mjs');
+  let seen = '';
+  generateCandidate({ id: 'f', prompt: 'a filter people can switch on and off', component: 'chip' }, 'agent', '', (cmd, input) => { seen = input; return 'x'; });
+  assert.equal(seen, 'a filter people can switch on and off');
+  const ctx = { cssVars: new Set(), dsClasses: new Set(['.chip']), componentClass: new Map([['chip', '.chip']]) };
+  const cases = [{ id: 'f', prompt: 'a filter', component: 'chip' }];
+  const by = runLevels(cases, ctx, ['bare', 'parity'], (c, level) => (level === 'bare' ? '<button class="my-filter">Filter</button>' : '<button class="chip">Filter</button>'), 2);
+  assert.equal(by.bare.summary.avoided, 2);
+  assert.equal(by.bare.summary.zeroFixRate, 0);
+  assert.equal(by.parity.summary.avoided, 0);
+  const lines = levelLines(by);
+  assert.match(lines[0], / · 2 avoided the system$/);
+  assert.match(lines[1], / · 0 avoided the system  \(vs bare: zero-fix \+100 points/);
+});
+
+test('I68: a prompt that names a component is flagged, in any case and spelling', async () => {
+  const { promptLeaks } = await import('../eval-run.mjs');
+  const cases = [
+    { id: 'a', prompt: 'Add a Chip for each filter' },
+    { id: 'b', prompt: 'a primary button to save' },
+    { id: 'c', prompt: 'a filter people can switch on and off' },
+    { id: 'd', prompt: 'show the chips row' },
+  ];
+  assert.deepEqual(promptLeaks(cases, ['chip', 'buttonPrimary', 'ok']), [{ id: 'a', name: 'chip' }]);
+  assert.deepEqual(promptLeaks([{ id: 'e', prompt: 'use the button primary style' }], ['buttonPrimary']), [{ id: 'e', name: 'buttonPrimary' }]);
+});
+
+test('--ci: a run worse than the last one fails (a drop of more than 5 points, or more avoidance, type errors or accessibility findings)', async () => {
+  const { ciDrop } = await import('../eval-run.mjs');
+  assert.deepEqual(ciDrop({ zeroFixRate: 80 }, { zeroFixRate: 76 }), []);   // within 5 points
+  assert.deepEqual(ciDrop({ zeroFixRate: 80 }, { zeroFixRate: 70 }), ['zero-fix 80% → 70%']);
+  assert.deepEqual(ciDrop({ zeroFixRate: 80, avoided: 0, typeErrors: 1 }, { zeroFixRate: 80, avoided: 2, typeErrors: 3 }), ['avoided the system 0 → 2', 'type errors 1 → 3']);
+  assert.deepEqual(ciDrop(null, { zeroFixRate: 10 }), []);   // the first run has nothing to compare with
+  const { spawnSync } = await import('node:child_process');
+  const { join } = await import('node:path');
+  const dir = makeFixture({
+    'ds-config.json': { paths: { themeCSS: 'theme.css' }, componentSelectors: { chip: '.chip' }, evals: { cases: [{ id: 'f', prompt: 'a filter' }] } },
+    'theme.css': ':root { --chip-bg: #fff; }',
+    'evals/f.html': '<button class="chip" style="padding: 9px">Filter</button>',
+    'evals-history.json': [{ timestamp: 'x', cases: 1, zeroFixRate: 100, violations: 0 }],
+  });
+  const r = spawnSync(process.execPath, [join(process.cwd(), 'eval-run.mjs'), '--ci'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stdout, /Worse than the last run: zero-fix 100% → 0% \(--ci: failing\)/);
+});

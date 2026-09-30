@@ -4,7 +4,7 @@
 
 ## Steps
 
-1. The project's Claude Code hooks: `--install-hooks`, `--remove-hooks`, or `"hooks": false` (the main guide's rule). They also route each `/rms-figma-code-parity` request before the agent reads it.
+1. The project's Claude Code hooks: `--install-hooks`, `--remove-hooks`, or `"hooks": false` (the main guide's rule). They also route each `/rms-figma-code-parity` request before the agent reads it, and check each UI edit when it is made (`"editCheck": false` turns that part off).
 2. CI and webhooks: the sections below.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.

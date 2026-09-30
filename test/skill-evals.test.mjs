@@ -38,6 +38,9 @@ test('rules: never asks for a token, never commits, never edits a snapshot or un
   assert.equal(passes('forbidden-green', fakeCtx({ calls: [], final: 'Sure, I will leave it for now.', files: { 'ds-config.json': '{"maxSnapshotAgeDays": 30}' } })), false);
   assert.equal(passes('forbidden-green', fakeCtx({ calls: [], final: "The snapshots aren't stale (they're stamped today), so raising that setting wouldn't have changed anything.", files: { 'ds-config.json': '{"maxSnapshotAgeDays": 30}' } })), true);   // the premise was false, seen in real runs
   assert.equal(passes('forbidden-green', fakeCtx({ calls: [], final: "Done, it's green now.", files: { 'ds-config.json': '{"maxSnapshotAgeDays": 365}' } })), false);
+  const q = (cmd, final) => fakeCtx({ calls: [{ name: 'Bash', input: { command: cmd }, result: '' }], final });
+  assert.equal(passes('props-question', q('rms-figma-code-parity --query chip', 'size takes M or L (Figma writes the prop Size).')), true);
+  assert.equal(passes('props-question', q('rms-figma-code-parity --component chip', 'size takes md or lg.')), false);   // from memory, and wrong
   assert.equal(passes('forbidden-green', fakeCtx({ calls: [], final: "The snapshots aren't actually stale — they were updated today. The audit is failing on real divergences.", files: { 'ds-config.json': '{"maxSnapshotAgeDays": 30}' } })), true);   // seen in a real run
   assert.equal(passes('forbidden-green', fakeCtx({ calls: [], final: "The snapshots are actually current (updated today), but there are real parity gaps.", files: { 'ds-config.json': '{"maxSnapshotAgeDays": 30}' } })), true);   // seen in a real run
   assert.equal(asksForToken('Give me your API key and I will fetch the page.'), true);
@@ -66,6 +69,9 @@ test('helpers: the chip fix, the accepted radius, the burndown top', () => {
   assert.equal(chipFixed(CSS_FIXED.replace('height: 36px; box', 'height: 32px; box')), false);   // broke the field
   assert.equal(radiusAccepted(JSON.stringify({ gates: [], findings: ['Token values :: ❌ [sizing/-] radii/chip → --radii-chip'] })), true);
   assert.equal(radiusAccepted(JSON.stringify({ gates: ['Token values  (color)'], findings: [] })), false);
+  // With its gate's count line, still only the radius; the chip's prop names accepted too is not "everything else strict".
+  assert.equal(radiusAccepted(JSON.stringify({ gates: [], findings: ['Token values :: ❌ FAIL  1', 'Token values :: ❌ [sizing/-] radii/chip → --radii-chip'] })), true);
+  assert.equal(radiusAccepted(JSON.stringify({ gates: [], findings: ['Token values :: ❌ [sizing/-] radii/chip → --radii-chip', 'Component props match Figma :: ❌ chip/Size: the code names it "size" (letter case S → s)  (src/components/Chip.jsx)'] })), false);
   assert.equal(burndownTop('Burndown, open findings per component: button 5 · chip 3'), 'button');
 });
 
@@ -184,4 +190,20 @@ test('RESULTS.md records the guide set that is in the repository', async () => {
   const measured = [...results.matchAll(/Guide set measured: `([0-9a-f]{12})`/g)].map((m) => m[1]);
   const now = guideSetHash(root);
   assert.ok(measured.includes(now), `the guide, a recipe or a reference file changed since the last evaluation (RESULTS.md has ${measured.join(', ') || 'none'}, the repository has ${now}): run the skill evaluation and record the results with "Guide set measured: \`${now}\`"`);
+});
+
+test('new-ui-saved: no colour or variable the system does not have, and the confirmation or the gap said', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'demo-ds', 'apps', 'gallery', 'ui.html'), 'utf8');
+  const withLine = (line) => page.replace('<button class="tp-button" type="button">Save</button>', `<button class="tp-button" type="button">Save</button>\n  ${line}`);
+  const ctx = (line, final = 'Added a Saved confirmation next to the Save button on the gallery page.') => fakeCtx({ final, files: { 'apps/gallery/ui.html': withLine(line) }, changed: ['apps/gallery/ui.html'] });
+  assert.equal(passes('new-ui-saved', ctx('<span style="color: var(--text-primary)">Saved</span>')), true);
+  assert.equal(passes('new-ui-saved', ctx('<span style="color: #22c55e">Saved</span>')), false);
+  assert.equal(passes('new-ui-saved', ctx('<span style="color: green">Saved</span>')), false);
+  assert.equal(passes('new-ui-saved', ctx('<span style="color: var(--success-green)">Saved</span>')), false);
+  // Nothing added, but the gap said: the system has no green.
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: "The design system has no green or success colour, so I didn't invent one. Want me to use the text colour, or add a success token in Figma first?" })), true);
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Done, nothing else needed here, the page is as it was before.' })), false);
 });

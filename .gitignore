@@ -15,6 +15,10 @@ plans/
 !test/fixtures/demo-ds/ds-config.json
 !test/fixtures/demo-ds/structure-contract.mjs
 !test/fixtures/demo-ds/.parity-refs/
+# Harbor and Lagoon, the other fictional design systems (test/harbor-ds.test.mjs, test/lagoon-tw.test.mjs).
+!test/fixtures/harbor-ds/ds-config.json
+!test/fixtures/harbor-ds/structure-contract.mjs
+!test/fixtures/lagoon-tw/ds-config.json
 
 # Local choice of guide and its extracted copy (--guide classic).
 .guide-choice

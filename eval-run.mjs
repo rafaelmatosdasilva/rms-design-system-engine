@@ -12,6 +12,11 @@
 //     "strict": false,              // true → exit 1 when any candidate has violations
 //     "levels": ["bare", "steering", "parity"]   // I60: the same cases per kind of guidance (or --levels)
 //   }
+//
+// A case's "component" is what it expects, and the agent never sees it: the prompt says the intent ("a filter
+// people can switch on and off"), the score says whether the agent found the component. A candidate that does
+// not use it avoided the system and fails (I64). A prompt that names a component is flagged before the run
+// (I68): its score would measure reading the prompt, not finding the component.
 
 import './stdio-sync.mjs';   // the whole report reaches a pipe before process.exit
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -22,6 +27,7 @@ import { evalConformance } from './eval-check.mjs';
 import { createLocator, loadLocator } from './component-locator.mjs';
 import { markupFindings } from './a11y-static.mjs';
 import { findSteeringFiles } from './steering-check.mjs';
+import { typeErrors, typeErrorLine, compileTarget, findTsc } from './compile-check.mjs';
 
 const CANDIDATE_EXTS = ['html', 'htm', 'jsx', 'tsx', 'vue', 'svelte', 'js', 'ts', 'md', 'txt'];
 
@@ -36,14 +42,18 @@ export function loadContext(ROOT, cfg, { locator = createLocator(cfg) } = {}) {
     let css; try { css = readFileSync(abs, 'utf8'); } catch { continue; }
     for (const m of css.matchAll(/(--[a-zA-Z][\w-]*)\s*:/g)) cssVars.add(m[1]);
   }
-  const dsClasses = new Set();
-  for (const sel of Object.values(cfg.componentSelectors || {})) {
+  const dsClasses = new Set(), componentClass = new Map();
+  for (const [name, sel] of Object.entries(cfg.componentSelectors || {})) {
     const cls = String(sel).match(/[.#][\w-]+/)?.[0];
-    if (cls) dsClasses.add(cls);
+    if (cls) { dsClasses.add(cls); componentClass.set(name, cls); }
   }
   const struct = (() => { try { return JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotStructure || 'figma-structure.snapshot.json'), 'utf8')); } catch { return null; } })();
-  for (const name of Object.keys(struct?.components || {})) dsClasses.add(locator.classFor(name));   // the one shared component finder
-  return { cssVars, dsClasses };
+  for (const name of Object.keys(struct?.components || {})) {   // the one shared component finder
+    const cls = locator.classFor(name);
+    dsClasses.add(cls);
+    if (!componentClass.has(name)) componentClass.set(name, cls);
+  }
+  return { cssVars, dsClasses, componentClass };
 }
 
 // A configurable command adapter, so ANY agent/CLI can plug in (no provider lock-in). The command
@@ -62,11 +72,27 @@ const defaultRun = (cmd, input, env) => {
 // The candidate is the command's stdout. Returns null on any failure (degrade-safe).
 export function generateCandidate(c, cmd, ctxPath, run = defaultRun, env = {}) {
   if (!cmd) return null;
-  const prompt = `${c.prompt || ''}${c.component ? `\n\nUse the design system component: ${c.component}.` : ''}`;
+  const prompt = c.prompt || '';   // the expected component stays hidden: finding it is part of the task (I64)
   try {
     const out = run(cmd, prompt, { EVAL_CONTEXT: ctxPath || '', EVAL_ID: c.id || '', EVAL_COMPONENT: c.component || '', ...env });
     return out && out.trim() ? out : null;
   } catch { return null; }
+}
+
+// Prompts that name a design-system component (whole word, any case, camelCase split too): the case then
+// measures whether the agent read the prompt, not whether it found the component. → [{ id, name }]
+export function promptLeaks(cases, names) {
+  const forms = (n) => [...new Set([n, String(n).replace(/([a-z0-9])([A-Z])/g, '$1 $2'), String(n).replace(/[-_]+/g, ' ')])]
+    .filter((f) => f.length >= 3);
+  const out = [];
+  for (const c of cases) {
+    const p = String(c.prompt ?? '');
+    for (const n of names) {
+      const hit = forms(n).some((f) => new RegExp(`(^|[^\\w-])${f.replace(/[.*+?^${}()|[\]\\]/g, '\\// LLM-JUDGE adapter').replace(/ /g, '[\\s-]+')}(?![\\w-])`, 'i').test(p));
+      if (hit) { out.push({ id: c.id, name: n }); break; }
+    }
+  }
+  return out;
 }
 
 // LLM-JUDGE adapter (I7, advisory): run `cmd` with a JSON payload on stdin ({id,prompt,component,
@@ -93,6 +119,7 @@ export function summarize(results) {
   const n = results.length;
   const runsOf = (r) => r.runs || 1;
   const cleanRunsOf = (r) => (r.cleanRuns != null ? r.cleanRuns : (r.metrics.clean ? 1 : 0));
+  const avoidedRunsOf = (r) => (r.avoidedRuns != null ? r.avoidedRuns : (r.metrics.avoided ? 1 : 0));
   const totalRuns = results.reduce((s, r) => s + runsOf(r), 0);
   const totalClean = results.reduce((s, r) => s + cleanRunsOf(r), 0);
   return {
@@ -103,7 +130,21 @@ export function summarize(results) {
     violations: results.reduce((s, r) => s + r.violations.length, 0),
     inlineStyles: results.reduce((s, r) => s + (r.metrics.inlineStyles || 0), 0),
     runsPerCase: results[0] ? runsOf(results[0]) : 1,
+    expecting: results.filter((r) => r.component).length,   // cases that name the component they expect
+    avoided: results.reduce((s, r) => s + avoidedRunsOf(r), 0),   // runs that did not use it (I64)
+    typeErrors: results.reduce((s, r) => s + (r.metrics.typeErrors || 0), 0),   // I66, when candidates were compiled
   };
+}
+
+// One candidate's score: the DS-conformance core, and, when ctx.compile is set (a .tsx or .jsx candidate and a
+// compiler), a type check against the catalog's props (I66): each type error is a violation.
+export function score(code, ctx, c = {}) {
+  const chk = evalConformance(code, ctx, { component: c.component });
+  if (!ctx.compile || !String(code ?? '').trim()) return chk;
+  const tc = typeErrors(code, ctx.compile.catalog, { ROOT: ctx.compile.ROOT, id: c.id ?? 'candidate', tsc: ctx.compile.tsc, ext: ctx.compile.ext, ...(ctx.compile.dir ? { dir: ctx.compile.dir } : {}) });
+  if (!tc.ran) return chk;
+  const violations = [...chk.violations, ...tc.errors.map((e) => ({ type: 'type-error', value: typeErrorLine(e) }))];
+  return { violations, metrics: { ...chk.metrics, typeErrors: tc.errors.length, clean: chk.metrics.clean && !tc.errors.length } };
 }
 
 // Pure orchestration: run each case's candidate through the conformance core. `loadCandidate(case)`
@@ -112,7 +153,7 @@ export function runEvals(cases, ctx, loadCandidate) {
   const results = [];
   for (const c of cases) {
     const code = loadCandidate(c) || '';
-    const { violations, metrics } = evalConformance(code, ctx);
+    const { violations, metrics } = score(code, ctx, c);
     results.push({ id: c.id, prompt: c.prompt || '', component: c.component ?? null, code, metrics, violations, runs: 1, cleanRuns: metrics.clean ? 1 : 0 });
   }
   return { results, summary: summarize(results) };
@@ -168,17 +209,18 @@ export function runLevels(cases, ctx, levels, generate, runs = 1) {
   const out = {};
   for (const level of levels) {
     const results = cases.map((c) => {
-      let cleanRuns = 0, a11y = 0, rep = null, inline = 0;
+      let cleanRuns = 0, a11y = 0, rep = null, inline = 0, avoidedRuns = 0;
       const violations = [];
       for (let k = 0; k < runs; k++) {
         const code = generate(c, level) || '';
-        const chk = evalConformance(code, ctx);
+        const chk = score(code, ctx, c);
         const found = code ? markupFindings(code).length : 0;
         if (chk.metrics.clean && !found) cleanRuns++;
+        if (chk.metrics.avoided) avoidedRuns++;
         a11y += found; violations.push(...chk.violations); inline += chk.metrics.inlineStyles || 0;
         if (!rep || (chk.metrics.produced && !rep.metrics.produced)) rep = { code, ...chk };
       }
-      return { id: c.id, component: c.component ?? null, code: rep.code, metrics: { ...rep.metrics, inlineStyles: inline }, violations, runs, cleanRuns, a11y };
+      return { id: c.id, component: c.component ?? null, code: rep.code, metrics: { ...rep.metrics, inlineStyles: inline }, violations, runs, cleanRuns, avoidedRuns, a11y };
     });
     const summary = summarize(results);
     summary.a11y = results.reduce((k, r) => k + r.a11y, 0);
@@ -195,10 +237,22 @@ export function levelLines(byLevel, notRun = {}) {
   for (const [level, { summary: s }] of Object.entries(byLevel)) {
     const vs = base && level !== 'bare'
       ? `  (vs bare: zero-fix ${signed(s.zeroFixRate - base.zeroFixRate)} points, violations ${signed(s.violations - base.violations)}, accessibility ${signed(s.a11y - base.a11y)})` : '';
-    lines.push(`  ${level.padEnd(9)} ${s.produced}/${s.cases} produced · ${s.zeroFixRate}% zero-fix · ${s.violations} violation(s) · ${s.inlineStyles} inline style(s) · ${s.a11y} accessibility finding(s)${vs}`);
+    const avoided = s.expecting ? ` · ${s.avoided} avoided the system` : '';
+    lines.push(`  ${level.padEnd(9)} ${s.produced}/${s.cases} produced · ${s.zeroFixRate}% zero-fix · ${s.violations} violation(s) · ${s.inlineStyles} inline style(s) · ${s.a11y} accessibility finding(s)${avoided}${vs}`);
   }
   for (const [level, why] of Object.entries(notRun)) lines.push(`  ${level.padEnd(9)} not run: ${why}`);
   return lines;
+}
+
+// A worse run than the last one (S29's ci: a drop of more than 5 points fails). → [reason] (empty when not worse).
+export function ciDrop(prev, cur, { points = 5 } = {}) {
+  if (!prev || !cur) return [];
+  const out = [];
+  if (prev.zeroFixRate != null && cur.zeroFixRate != null && prev.zeroFixRate - cur.zeroFixRate > points) out.push(`zero-fix ${prev.zeroFixRate}% → ${cur.zeroFixRate}%`);
+  if ((cur.avoided ?? 0) > (prev.avoided ?? 0)) out.push(`avoided the system ${prev.avoided ?? 0} → ${cur.avoided}`);
+  if ((cur.typeErrors ?? 0) > (prev.typeErrors ?? 0)) out.push(`type errors ${prev.typeErrors ?? 0} → ${cur.typeErrors}`);
+  if ((cur.a11y ?? 0) > (prev.a11y ?? 0)) out.push(`accessibility findings ${prev.a11y ?? 0} → ${cur.a11y}`);
+  return out;
 }
 
 function fileLoader(ROOT, outDir) {
@@ -225,6 +279,17 @@ async function main() {
   const outDir = cfg.evals?.outDir || 'evals';
   const ext = cfg.evals?.ext || 'html';
   const ctx = loadContext(ROOT, cfg, { locator: await loadLocator(ROOT, cfg) });
+  // I66: .tsx/.jsx candidates are type-checked against the catalog's props (evals.compile: false turns it off).
+  if (compileTarget(ext) && cfg.evals?.compile !== false) {
+    let catalog = {};
+    try { catalog = JSON.parse(readFileSync(resolve(ROOT, cfg.contracts?.out ?? 'contracts', 'catalog.json'), 'utf8')); } catch { /* no catalog yet */ }
+    const tsc = findTsc(ROOT);
+    if (!tsc) console.log('ℹ️  compile not checked: no TypeScript compiler (install typescript in the project, or tsc on the PATH).');
+    else if (!Object.keys(catalog.components ?? {}).length) console.log('ℹ️  compile not checked: no contracts/catalog.json yet (run the audit once to write it).');
+    else ctx.compile = { catalog, tsc, ROOT, ext };
+  }
+  const leaks = promptLeaks(cases, [...ctx.componentClass.keys()]);
+  for (const l of leaks) console.log(`⚠️  case "${l.id}": the prompt names the component "${l.name}", so its score measures reading the prompt, not finding the component. Say the intent and put the component in the case's "component" field.`);
 
   // GENERATION (optional): when evals.generate.cmd is set, produce the candidate from the prompt.
   const genCmd = cfg.evals?.generate?.cmd;
@@ -252,8 +317,12 @@ async function main() {
     try {
       const hp = join(ROOT, 'evals-history.json');
       let hist = []; try { hist = JSON.parse(readFileSync(hp, 'utf8')); } catch { /* first run */ }
+      const last = [...hist].reverse().find((h) => h.levels);
+      const worse = Object.entries(byLevel).flatMap(([l, v]) => ciDrop(last?.levels?.[l], v.summary).map((r) => `${l}: ${r}`));
+      if (worse.length) console.log(`   Worse than the last run: ${worse.join(' · ')}${process.argv.includes('--ci') ? ' (--ci: failing)' : ''}\n`);
       hist.push({ timestamp: new Date().toISOString(), levels: Object.fromEntries(Object.entries(byLevel).map(([l, v]) => [l, v.summary])) });
       writeFileSync(hp, JSON.stringify(hist.slice(-100), null, 2) + '\n');
+      if (worse.length && process.argv.includes('--ci')) process.exit(1);
     } catch { /* optional */ }
     process.exit(0);
   }
@@ -261,18 +330,19 @@ async function main() {
   let results, summary;
   if (runs > 1) {
     results = cases.map((c) => {
-      let cleanRuns = 0, totalMs = 0, rep = null;
+      let cleanRuns = 0, totalMs = 0, rep = null, avoidedRuns = 0;
       for (let k = 0; k < runs; k++) {
         const t0 = Date.now();
         const code = generateCandidate(c, genCmd, ctxArg()) || '';
         totalMs += Date.now() - t0;
-        const chk = evalConformance(code, ctx);
+        const chk = score(code, ctx, c);
         if (chk.metrics.clean) cleanRuns++;
+        if (chk.metrics.avoided) avoidedRuns++;
         if (!rep) rep = { code, ...chk };
       }
       genTimes[c.id] = Math.round(totalMs / runs);
       try { const target = resolve(ROOT, outDir, `${c.id}.${ext}`); mkdirSync(dirname(target), { recursive: true }); if (rep.code) writeFileSync(target, rep.code); } catch { /* optional */ }
-      return { id: c.id, prompt: c.prompt || '', component: c.component ?? null, code: rep.code, metrics: rep.metrics, violations: rep.violations, runs, cleanRuns };
+      return { id: c.id, prompt: c.prompt || '', component: c.component ?? null, code: rep.code, metrics: rep.metrics, violations: rep.violations, runs, cleanRuns, avoidedRuns };
     });
     summary = summarize(results);
     console.log(`   ↻ generated ${cases.length} case(s) × ${runs} run(s) via evals.generate.cmd`);
@@ -319,20 +389,23 @@ async function main() {
     const judge = r.judge ? `   ${r.judge.ok ? '⚖️ ok' : '⚖️ review'}${r.judge.notes ? ` — ${r.judge.notes}` : ''}` : '';
     console.log(`  ${icon} ${r.id}${r.component ? ` [${r.component}]` : ''} — ${base}${runNote}${judge}`);
   }
-  console.log(`\n   ${summary.produced}/${summary.cases} produced · ${summary.clean}/${summary.cases} zero-fix (${summary.zeroFixRate}%) · ${summary.violations} violation(s) · ${summary.inlineStyles} inline-style(s)${judged ? ` · judge ${judgePass}/${judged} ok` : ''}${avgGenMs != null ? ` · avg gen ${avgGenMs}ms` : ''}`);
+  console.log(`\n   ${summary.produced}/${summary.cases} produced · ${summary.clean}/${summary.cases} zero-fix (${summary.zeroFixRate}%) · ${summary.violations} violation(s) · ${summary.inlineStyles} inline-style(s)${summary.expecting ? ` · ${summary.avoided} avoided the system` : ''}${ctx.compile ? ` · ${summary.typeErrors} type error(s)` : ''}${judged ? ` · judge ${judgePass}/${judged} ok` : ''}${avgGenMs != null ? ` · avg gen ${avgGenMs}ms` : ''}`);
   console.log(`   Advisory: evals measure agent output, they never gate the repo.\n`);
 
-  // History (best-effort; capped)
+  // History (best-effort; capped). With --ci, a run worse than the last one fails (I60, S29).
+  let worse = [];
   try {
     const hp = join(ROOT, 'evals-history.json');
     let hist = []; try { hist = JSON.parse(readFileSync(hp, 'utf8')); } catch { /* first run */ }
+    worse = ciDrop([...hist].reverse().find((h) => h.zeroFixRate != null && !h.levels), summary);
+    if (worse.length) console.log(`   Worse than the last run: ${worse.join(' · ')}${process.argv.includes('--ci') ? ' (--ci: failing)' : ''}\n`);
     hist.push({ timestamp: new Date().toISOString(), ...summary, judged, judgePass, avgGenMs });
     if (hist.length > 100) hist = hist.slice(-100);
     writeFileSync(hp, JSON.stringify(hist, null, 2) + '\n');
   } catch { /* optional */ }
 
   const strict = cfg.evals?.strict === true;
-  process.exit(strict && summary.violations > 0 ? 1 : 0);
+  process.exit((strict && summary.violations > 0) || (worse.length && process.argv.includes('--ci')) ? 1 : 0);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

@@ -159,3 +159,19 @@ export function steeringLine(file, f) {
   const what = { variable: 'is not a declared CSS variable', token: 'is not a token', component: 'is not a component in the catalog', 'prop value': 'is not a value this prop takes', 'prop name': 'is not the prop\'s name as the code writes it' }[f.kind];
   return `${file}:${f.line}  ${f.found} ${what}${want}`;
 }
+
+// Says what to use, not only what not to use (idea I63). A public benchmark (S29) measured it: an AGENTS.md that
+// listed what to avoid put 16 of 57 generations on the design system; one added sentence saying the package is
+// installed and is the one to use, 43 of 55. A file about this design system that only forbids is noted.
+const POSITIVE = /\b(use|uses|using|prefer|build (it |them )?with|import (it |them )?from|is installed|are installed|always use|usa|use-se|utiliza|usar|está instalad[oa]|estão instalad[oa]s|prefere)\b/i;
+const NEGATIVE = /\b(don'?t|do not|never|avoid|no longer|não uses?|não utilize|nunca|evita|evitar)\b/i;
+export function mandateOf(text, components = []) {
+  const names = components.map((c) => String(c).toLowerCase()).filter((c) => c.length >= 3);
+  const sentences = String(text ?? '').split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+  const about = (s) => /design[- ]system|component library|biblioteca de componentes|sistema de design/i.test(s)
+    || names.some((n) => new RegExp(`(?<![\\w-])<?${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?\\b`, 'i').test(s));
+  const relevant = sentences.filter(about);
+  const negative = relevant.filter((s) => NEGATIVE.test(s)).length;
+  const positive = relevant.filter((s) => POSITIVE.test(s) && !NEGATIVE.test(s)).length;
+  return { about: relevant.length > 0, positive, negative, onlyForbids: negative > 0 && positive === 0 };
+}

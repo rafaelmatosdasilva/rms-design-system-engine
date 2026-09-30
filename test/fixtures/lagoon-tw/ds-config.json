@@ -1,0 +1,36 @@
+{
+  "_note": "Lagoon, a fictional Tailwind v4 design system for the end-to-end test (test/lagoon-tw.test.mjs). Every name is invented.",
+  "maxSnapshotAgeDays": 30,
+  "figma": {
+    "modes": [
+      {
+        "name": "Light",
+        "snapshotKey": "light",
+        "cssSelector": "root"
+      },
+      {
+        "name": "Dark",
+        "snapshotKey": "dark",
+        "cssSelector": "class:dark"
+      }
+    ],
+    "namingConvention": {
+      "preset": "tailwind",
+      "dropSegments": [
+        "color"
+      ]
+    }
+  },
+  "paths": {
+    "themeCSS": "src/app.css",
+    "snapshotVars": "figma/vars.snapshot.json",
+    "snapshotStructure": "figma/structure.snapshot.json",
+    "compPropsSnapshot": "figma/props.snapshot.json",
+    "plugins": [],
+    "pluginCSS": []
+  },
+  "componentFiles": {
+    "button": "src/components/Button.tsx",
+    "badge": "src/components/Badge.tsx"
+  }
+}
