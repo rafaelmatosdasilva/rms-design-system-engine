@@ -282,7 +282,7 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     return { status: 'match', codeValue: codeDefault != null ? `default ${codeDefault}` : '(present)' };
   };
 
-  const codeSlots = { named: new Set(api.slots.named), hasDefault: api.slots.default };
+  const codeSlots = { named: new Map(api.slots.named.map((n) => [norm(n), n])), hasDefault: api.slots.default };   // norm → as written
   const matchedCode = new Set();
   const missingHere = [];
   for (const fp of figNames) {
@@ -304,7 +304,11 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
       }
       const aliasTo0 = aliases[fp] && norm(aliases[fp]);
       if (aliasTo0 && codeNorm.has(aliasTo0)) { matchedCode.add(aliasTo0); OK.push(`${figmaName}/${fp} → ${aliases[fp]} (prop, alias)`); pushRow(aliases[fp], 'prop', 'match'); continue; }
-      if (codeSlots.named.has(fn)) { OK.push(`${figmaName}/${fp} (slot)`); pushRow(fp, 'slot', 'match'); continue; }
+      if (codeSlots.named.has(fn)) {
+        const cs = codeSlots.named.get(fn);
+        if (cs !== fp) { NAME_FAIL.push(`${figmaName}/${fp}: the code names its slot "${cs}" (${nameDiff(fp, cs)})  (${rel})`); pushRow(cs, 'slot', 'name'); continue; }
+        OK.push(`${figmaName}/${fp} (slot)`); pushRow(cs, 'slot', 'match'); continue;
+      }
       if (codeSlots.hasDefault)   { OK.push(`${figmaName}/${fp} (default slot)`); pushRow('(default slot)', 'slot', 'match'); continue; }
       // A contract-authored slot binding resolves a slot whose code NAME differs from the Figma prop.
       const sb = cbind.slot[fp];

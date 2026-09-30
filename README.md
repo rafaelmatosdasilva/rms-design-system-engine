@@ -68,7 +68,7 @@ Every run compares your code against Figma and reports it in plain words:
 - **Nested components keep** their own styles: one component's look does not leak into another.
 - **Structure:** the right height, spacing and corners, from the design.
 - **All states are** built: hover, disabled, selected and the rest, each with the right values.
-- **Component props match** Figma: the same names, defaults and choices, spelled exactly the same. `Size` and `size` are two prop names, and the finding shows the letters that differ (`letter case S → s`). `L` and `large`, or `Large` and `large`, are two values; the finding says which code value it most likely is. The catalog tells AI tools the right name for each wrong one they are likely to guess (`error` → `danger`).
+- **Component props match** Figma: the same names, defaults and choices, spelled exactly the same. `Size` and `size` are two prop names (a slot's name too), and the finding shows the letters that differ (`letter case S → s`). `L` and `large`, or `Large` and `large`, are two values; the finding says which code value it most likely is. The catalog tells AI tools the right name for each wrong one they are likely to guess (`error` → `danger`).
 - **Sub-components match Figma:** the parts Figma nests are the ones the code uses.
 - **Templates compose the** right components: each page uses the components Figma composes.
 - **Markup:** ids, classes and icons match, and every control the design shows is built.
