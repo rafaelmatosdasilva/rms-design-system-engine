@@ -8,7 +8,9 @@
 //   • var(--x) that is declared nowhere (not in the theme, not in the file itself);
 //   • a colour written as a literal: the token that has that value when one does, or "not a design-system colour";
 //   • on a design-system component's tag, a prop value it does not take or a prop name written another way
-//     (the catalog and the code API, exactly as the steering check reads them).
+//     (the catalog and the code API, exactly as the steering check reads them);
+//   • in a Tailwind project, a class with a value in brackets (rounded-[4px]): the theme's utility when a theme
+//     value is the same, or that it is not a design-system value (tailwind-check.mjs).
 // Silent when the edit added none of these. Precise before complete: component tags the catalog does not know
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
@@ -16,6 +18,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, relative, resolve, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { steeringTruth, steeringFindings } from './steering-check.mjs';
+import { usesTailwind, themeValues, arbitraryFindings } from './tailwind-check.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
 const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.parity-out|\.parity-refs)\//;
@@ -84,12 +87,13 @@ export function editTruth(ROOT, cfg = {}) {
   const catalog = json(join(contracts, 'catalog.json'));
   const api = json(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json').api ?? {};
   const truth = steeringTruth({ catalog, api, cssVars });
-  return { truth, tokenByValue, themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  const tailwind = cfg.tailwind !== false && usesTailwind(theme, ROOT) ? themeValues(theme) : null;
+  return { truth, tokenByValue, tailwind, themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue }, { isTheme = false, sheet = false } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, tailwind = null }, { isTheme = false, sheet = false } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -106,11 +110,13 @@ export function editFindings(added, fullText, { truth, tokenByValue }, { isTheme
           : `${f.found} is not a value this prop takes${f.want ? `; write ${f.want}` : f.valid?.length ? `; it takes ${f.valid.join(', ')}` : ''}`);
       }
     }
+    if (tailwind) for (const f of arbitraryFindings(l, tailwind)) push(line, `${f.cls} is outside the theme; ${f.fix ? `write ${f.fix}` : `${f.value} is not a design-system value`}`);
     if (isTheme || /^\s*--[\w-]+\s*:/.test(l) || COMMENT.test(l)) continue;   // a token being defined, the theme's own values, a comment
     // A custom-property declaration anywhere on the line (a minified :root{--x: #fff;…}) defines a token.
     const scan = l.replace(/--[\w-]+\s*:[^;}]*/g, ' ').replace(/var\([^)]*\)/g, ' ').replace(/&#x?[0-9a-fA-F]+;/g, ' ');
     for (const m of scan.matchAll(HEX)) {
       if (NOT_COLOUR.test(scan.slice(Math.max(0, m.index - 14), m.index))) continue;
+      if (tailwind && scan[m.index - 1] === '[') continue;   // a Tailwind arbitrary value, reported above
       if (!sheet && !STYLE_PROP.test(scan.slice(0, m.index))) continue;
       if (/\.(fill|stroke|shadow)(Style|Color)\s*=\s*[^;]*$/.test(scan.slice(0, m.index))) continue;   // a canvas being painted, not the page
       const tokens = tokenByValue.get(normHex(m[0])) ?? [];

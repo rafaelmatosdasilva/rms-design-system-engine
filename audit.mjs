@@ -3786,6 +3786,26 @@ function reportFull(label, items, shown) {
     } catch (e) { console.log(C.dim(`ℹ️  Workarounds around components not checked: ${e.message}`)); }
   }
 
+  // ── Tailwind arbitrary values (I65, advisory) ────────────────────────────────
+  // rounded-[4px], bg-[#ff00aa]: a literal written into a class name, where no CSS rule and no literal check
+  // sees it. Each is compared with the project's own @theme: the utility to write when a theme value is the
+  // same, or "not a design-system value". Only in a project that uses Tailwind. Off with "tailwind": false.
+  if (cfg.tailwind !== false) {
+    try {
+      const { projectArbitrary, arbitraryLine } = await import('./tailwind-check.mjs');
+      const { tailwind, findings } = projectArbitrary(ROOT, readThemeCSS());
+      if (tailwind && findings.length) {
+        const fixable = findings.filter((f) => f.fix).length;
+        console.log(C.yellow(`\n🎯 Tailwind arbitrary values: ${findings.length} class${findings.length === 1 ? '' : 'es'} with a value in brackets, outside the theme (${fixable} the theme already has: write its utility). Advisory.`));
+        const all = process.argv.includes('--tailwind');
+        for (const f of findings.slice(0, all ? findings.length : 15)) console.log(C.yellow(`     ${arbitraryLine(f.file, f)}`));
+        if (!all && findings.length > 15) console.log(`     and ${findings.length - 15} more; run with --tailwind to list them all.`);
+      } else if (tailwind) {
+        console.log(C.green('\n🎯 Tailwind arbitrary values: none; every class uses the theme.'));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Tailwind arbitrary values not checked: ${e.message}`)); }
+  }
+
   // ── AI-readiness scorecard (I12, advisory, never a gate) ────────────────────
   // A running R/Y/G measure across a few axes, aggregated from signals this run already produced.
   // Not a grade and it never blocks - a trend you watch move over time.
