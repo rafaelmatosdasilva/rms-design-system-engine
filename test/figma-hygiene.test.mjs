@@ -124,3 +124,23 @@ test('the burndown leaves Figma file work out', () => {
   assert.deepEqual(b.rows.map((r) => [r.name, r.open]), [['chip', 1]]);
   assert.equal(b.loose, 0);
 });
+
+test('I69: an instance whose layer spells its component\'s name another way', () => {
+  const row = (children) => ({ type: 'COMPONENT', name: 'toolbar', layoutMode: 'HORIZONTAL', children });
+  // REST: the component is named by id; a plugin node carries mainComponent (its set, for a variant).
+  const rest = row([
+    { type: 'INSTANCE', name: 'Button Tertiary', componentId: '9:1' },
+    { type: 'INSTANCE', name: 'Save', componentId: '9:1' },            // renamed to its role: a choice
+    { type: 'INSTANCE', name: 'buttonTertiary', componentId: '9:1' },  // the component's own name
+  ]);
+  const h = hygieneOf(rest, 'A toolbar.', { n: Infinity }, { '9:1': 'buttonTertiary' });
+  assert.deepEqual(h.renamed, [{ at: 'toolbar/Button Tertiary', layer: 'Button Tertiary', component: 'buttonTertiary' }]);
+  const plugin = row([{ type: 'INSTANCE', name: 'Chip', mainComponent: { name: 'Size=M', parent: { type: 'COMPONENT_SET', name: 'chip' } } }]);
+  assert.deepEqual(hygieneOf(plugin, 'x').renamed, [{ at: 'toolbar/Chip', layer: 'Chip', component: 'chip' }]);
+  // A main component the plugin cannot read (a dynamic page) is not a finding.
+  const locked = row([{ type: 'INSTANCE', name: 'Chip', get mainComponent() { throw new Error('use getMainComponentAsync'); } }]);
+  assert.equal(hygieneOf(locked, 'x').renamed, undefined);
+  const found = hygieneFindings({ toolbar: { hygiene: h } });
+  assert.deepEqual(found.map((f) => f.text), ['toolbar/Button Tertiary is an instance of buttonTertiary named "Button Tertiary": an agent reading the file writes "Button Tertiary"; name the layer buttonTertiary, or after its role']);
+  assert.match(hygieneBlock({ toolbar: { hygiene: h } })[0], /1 instance named unlike its component/);
+});
