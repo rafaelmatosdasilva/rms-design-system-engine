@@ -5,6 +5,7 @@
 //   cookbook  the guide in this checkout (main file + cookbook/ + reference/, read with --recipe/--reference)
 //   skill     the same content as a native Claude Code Skill (SKILL.md built from the main file), its recipes
 //             and reference as files beside it
+//   bare      a few lines that hand every request to the engine's router (idea I61): how much guide is still needed
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -13,6 +14,19 @@ import { skillMd } from '../../skill-files.mjs';
 
 const GUIDE = 'rms-figma-code-parity.md';
 const git = (...a) => execFileSync('git', a, { cwd: ENGINE, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+
+// I61: the whole guide as the engine's router and nothing else.
+export const BARE = `# /rms-figma-code-parity - Figma-to-Code Parity
+
+Checks that the code matches the team's Figma design system.
+
+Run the engine's router with the request exactly as the person wrote it, then do what it prints:
+
+    rms-figma-code-parity --route "<the request>"
+
+Not on PATH: \`node ~/.claude/skills/rms-figma-code-parity/audit.mjs --route "<the request>"\`.
+If the request already came with a ROUTE block, follow that block instead. Report in the chat.
+`;
 
 export function guideAt(ref) { return git('show', `${ref}:${GUIDE}`); }
 export function defaultBaselineRef() { try { git('rev-parse', '--verify', '-q', 'guide-monolith'); return 'guide-monolith'; } catch { return 'HEAD'; } }
@@ -36,6 +50,10 @@ export function variant(name, { ref = defaultBaselineRef() } = {}) {
       for (const f of readdirSync(ENGINE)) if (!['.git', 'test', GUIDE, 'SKILL.md'].includes(f)) symlinkSync(join(ENGINE, f), join(dir, f));
       writeFileSync(join(dir, 'SKILL.md'), text);
     } };
+  }
+  if (name === 'bare') {
+    const text = BARE;
+    return { name, ref: 'built in', text, install: (home) => { mkdirSync(join(home, '.claude', 'commands'), { recursive: true }); writeFileSync(join(home, '.claude', 'commands', GUIDE), text); } };
   }
   throw new Error(`unknown variant ${name}`);
 }
