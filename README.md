@@ -48,6 +48,7 @@ Or from the terminal:
 rms-figma-code-parity                       # the whole design system
 rms-figma-code-parity --component input     # one component (or a few: input,button)
 rms-figma-code-parity --check-ui ui.json     # check a UI an AI tool generated against your components
+rms-figma-code-parity --query badge          # one component or token, with its names written exactly (several at once: badge --hb-radius-control)
 ```
 
 ## What it checks
