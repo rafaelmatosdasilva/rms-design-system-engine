@@ -56,6 +56,7 @@ test('Harbor design system, without Chrome: every deliberate difference is found
   assert.match(r.out, /⚠️  NO-SHRINK 3\/3 .* advisory/);
   assert.match(r.out, /✅  \[13\]/);
   assert.match(r.out, /\*\*Not in parity\.\*\* 2 of 25 gates fail\./);
+  assert.doesNotMatch(r.out, /printed no result line/);   // every gate shows its outcome
   golden(FIXTURE, 'expected-report-static.txt', r.out);
 });
 

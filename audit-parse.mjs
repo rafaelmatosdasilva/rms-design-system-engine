@@ -12,7 +12,7 @@
 //     ⏭ not verified with the gate's own reason. It never fails the run and is never a pass: the
 //     verdict counts it separately.
 
-export const SKIP_RE = /^\s*⏭|\bskipped\b|\bnot verified\b|\bnot run\b/i;
+export const SKIP_RE = /^\s*⏭|\bskipped\b|\bskipping\b|\bnot verified\b|\bnot run\b/i;
 
 export function parseGateOutput(r, summaryRe, { maxDetails = 20 } = {}) {
   if (r.status === null) return { pass: true, lines: ['⏭ script not found - skipped'] };
@@ -53,8 +53,8 @@ export const GATE_SUMMARY = {
   'icon-slot-check.mjs': /✅|❌/,
   'component-slot-check.mjs': /✅|❌/,
   'form-control-check.mjs': /✅|❌/,
-  'pseudo-element-check.mjs': /DOCUMENTED|UNDOCUMENTED/,
-  'icon-check.mjs': /DOCUMENTED|UNDOCUMENTED/,
+  'pseudo-element-check.mjs': /DOCUMENTED|UNDOCUMENTED|✅|❌/,
+  'icon-check.mjs': /DOCUMENTED|UNDOCUMENTED|✅|❌/,
   'icon-freshness-check.mjs': /MATCH|CHANGED/,
   'icon-inventory-check.mjs': /IN CODE|MISSING/,
   'transition-check.mjs': /✅|❌/,

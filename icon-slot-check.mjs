@@ -25,7 +25,7 @@ try {
 } catch { /* optional - skip if not present */ }
 
 if (!ICON_USAGES.length) {
-  console.log('⚠️  ICON_USAGES not found in structure-contract.mjs - skipping Gate [13]');
+  console.log('⏭  no ICON_USAGES in structure-contract.mjs - icon slots not checked (skipped)');
   process.exit(0);
 }
 
