@@ -17,7 +17,6 @@
        ⚠️  NEW SKIP  0
        ❌ FAIL  1
        ❌ [sizing/-] radius/control → --hb-radius-control
-       ⚠️  parity-map.mjs not found - running with empty token maps.
          Fix:  styles/tokens.css:10 - change --hb-radius-control: 4px → 6px
 
 ✅  [4] Tokens used in screens exist in CSS  (every token bound in a DS screen has a CSS variable)
@@ -209,7 +208,7 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: badge 3 · iconButton 2 · 6 not tied to a component
+📉 Burndown, open findings per component: badge 3 · iconButton 2 · 5 not tied to a component
    next up: badge. Run with --component badge, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -229,7 +228,7 @@
   - badge/Tone: default differs - Figma "Neutral" vs code "tone=neutral" (the code writes it "neutral")  (components/HbBadge.vue)
   - badge/Tone: code prop "tone" is missing Figma variant option(s) "Neutral" (the code writes it "neutral"), "Success" (the code writes it "success"), "Danger" (the code writes it "danger")  (components/HbBadge.vue)
 
-Burndown, open findings per component: badge 3 · iconButton 2 · 6 not tied to a component
+Burndown, open findings per component: badge 3 · iconButton 2 · 5 not tied to a component
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 
