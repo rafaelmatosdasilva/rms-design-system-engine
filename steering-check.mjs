@@ -8,10 +8,12 @@
 //   • a CSS variable in var(--x), or written like one of the design system's own, that is declared nowhere;
 //   • a token path (radii/chip, surface/page/color) that is not a token;
 //   • a component tag (<Chip>) that is not in the catalog, in a file that is about this design system;
-//   • a prop value that neither Figma nor the code allows (tone="error"), with the one that exists.
+//   • a prop value that neither Figma nor the code names exactly (tone="error", size="md" for M), with the
+//     value it corresponds to. A different name for the same value is still a different name.
 // Advisory, never fails. The parity's own generated files (contracts, llms.txt) are never read.
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { norm, sizeGroup, counterpart } from './prop-vocabulary.mjs';
 
 // Where agent instructions live. Files at these paths, and every .md / .mdc / .txt under the folders.
 export const STEERING_FILES = ['AGENTS.md', 'CLAUDE.md', 'DESIGN.md', 'GEMINI.md', '.cursorrules', '.windsurfrules', '.github/copilot-instructions.md', 'llms.txt'];
@@ -41,7 +43,6 @@ export function findSteeringFiles(ROOT, { skip = [] } = {}) {
   return out;
 }
 
-const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 function distance(a, b) {
   const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
   for (let j = 1; j <= n; j++) d[0][j] = j;
@@ -53,14 +54,6 @@ const closest = (word, list, max = 2) => {
   for (const c of list) { const x = distance(word.toLowerCase(), c.toLowerCase()); if (x < bd) { bd = x; best = c; } }
   return best;
 };
-
-// Words that mean the same value in different libraries: the first one the component really has is offered.
-const SYNONYMS = [
-  ['danger', 'error', 'critical', 'negative', 'destructive'], ['warning', 'caution', 'warn'], ['success', 'positive', 'ok'],
-  ['info', 'informative', 'information'], ['neutral', 'default', 'subtle'], ['primary', 'brand', 'main'],
-];
-const SIZES = [['xs', 'xsmall', 'extrasmall'], ['s', 'sm', 'small'], ['m', 'md', 'medium'], ['l', 'lg', 'large'], ['xl', 'xlarge', 'extralarge']];
-const sizeGroup = (v) => SIZES.find((g) => g.includes(norm(v)));
 
 // The truth the parity already has, in the shape this check needs.
 // catalog: contracts/catalog.json; api: the code capture's api ({ comp: { props: { name: { options } } } });
@@ -132,19 +125,21 @@ export function steeringFindings(text, truth) {
     for (const p of truth.props.values()) {
       // The code's own values first: an agent writes code, so the suggestion is what the code accepts.
       const valid = [...new Set([...p.code, ...[...p.figma].filter((f) => ![...p.code].some((c) => norm(c) === norm(f)))])];
-      const ok = (v) => valid.some((x) => norm(x) === norm(v)) || (sizeGroup(v) && valid.some((x) => sizeGroup(x) === sizeGroup(v)));
+      // Only the exact name is right (letter case aside): md where the system says M is a naming difference,
+      // reported with the value it corresponds to, never accepted.
+      const ok = (v) => valid.some((x) => norm(x) === norm(v));
+      const counterpartIn = (v) => counterpart(v, valid);
       const names = [...p.names].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
       const flag = (name, v) => {
         if (ok(v) || /^(true|false|null|undefined)$/i.test(v)) return;
-        const syn = SYNONYMS.find((g) => g.includes(norm(v)));
-        const want = (syn && valid.find((x) => syn.includes(norm(x)))) || (sizeGroup(v) ? null : closest(v, valid, 2));   // xl is not a typo of L
+        const want = counterpartIn(v) || (sizeGroup(v) ? null : closest(v, valid, 2));   // xl is not a typo of L
         push({ line, kind: 'prop value', found: `${name}="${v}"`, want: want ? `${name}="${want}"` : null, valid });
       };
       for (const m of l.matchAll(new RegExp(`(?<![\\w-])(${names})\\s*=\\s*\\{?\\s*["'\`]([\\w-]+)["'\`]`, 'gi'))) flag(m[1], m[2]);
       const list = l.match(new RegExp(`(?<![\\w-])\`?(${names})\`?\\s*[:=]\\s*([^.;()]+)`, 'i'));
       if (list && !/^\s*\{?\s*["'`]/.test(list[2])) {
         const items = list[2].split(/\s*(?:\||,|\/|\bor\b)\s*/).map((x) => x.trim().replace(/^[`"']|[`"']$/g, '')).filter((x) => /^[\w-]+$/.test(x)).slice(0, 12);
-        if (items.length >= 2 && items.some(ok)) for (const v of items) flag(list[1], v);
+        if (items.length >= 2 && items.some((v) => ok(v) || counterpartIn(v))) for (const v of items) flag(list[1], v);
       }
     }
   });
