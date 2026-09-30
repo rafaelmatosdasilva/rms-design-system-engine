@@ -3740,6 +3740,27 @@ function reportFull(label, items, shown) {
     } catch { /* no component-values.snapshot.json: nothing to read */ }
   }
 
+  // ── A workaround built around a component is a missing API (I59, advisory) ────
+  // A screen's own control laid over a design-system component (a clear button over a field, actions over a
+  // row) is reported to the design-system side: the component is missing a slot or prop, the screen is not
+  // wrong. Off with "workarounds": false.
+  if (cfg.workarounds !== false) {
+    try {
+      const { projectWorkarounds, workaroundLines } = await import('./workaround-check.mjs');
+      const { loadLocator } = await import('./component-locator.mjs');
+      const loc = await loadLocator(ROOT, cfg);
+      const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+      const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(cfg.componentSelectors ?? {})])];
+      let found = projectWorkarounds(ROOT, { names, classFor: loc.classFor, componentFiles: cfg.componentFiles ?? {}, excludeDirs: cfg.scanExcludeDirs ?? [], excludeFiles: cfg.scanExcludeFilenames ?? [] });
+      if (_scopeNames.length) found = found.filter((f) => f.host.kind !== 'component' || _scopeNames.includes(f.host.name));
+      const lines = workaroundLines(found);
+      if (lines.length) {
+        console.log(C.yellow(`\n🧩 Built around a component: ${lines.length} place${lines.length === 1 ? '' : 's'} where a screen lays its own control over a component. The component may be missing a slot or prop: send it to the design system, the screen is not wrong. Advisory.`));
+        for (const l of lines) console.log(C.yellow(`     ${l}`));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Workarounds around components not checked: ${e.message}`)); }
+  }
+
   // ── AI-readiness scorecard (I12, advisory, never a gate) ────────────────────
   // A running R/Y/G measure across a few axes, aggregated from signals this run already produced.
   // Not a grade and it never blocks - a trend you watch move over time.

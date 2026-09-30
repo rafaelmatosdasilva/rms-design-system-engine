@@ -11,7 +11,7 @@
 
 const ANSI = /\x1b\[[0-9;]*m/g;
 const GATE = /^(✅|❌|⚠️|⏭)\s+\[(\d+)\]\s+(.+?)(?:\s{2}\(.*)?$/;
-const HEADING = /^(⚠️|ℹ️|❌|✅|📌|♿|🧭|🎨)\s+(?:\[[^\]]+\]\s+)?([^:]+?)(?::|$)/;
+const HEADING = /^(⚠️|ℹ️|❌|✅|📌|♿|🧭|🎨|🧩)\s+(?:\[[^\]]+\]\s+)?([^:]+?)(?::|$)/;
 // A zero count on a fail line is not a finding: "❌ FAIL  0", "❌ MISSING  0 selectors", "❌ FAIL  0/140 (…)".
 export const ZERO_FAIL = /^❌\s+[A-Z][A-Z ?]*?\s+0(\/\d+)?(\s|$)/;
 
