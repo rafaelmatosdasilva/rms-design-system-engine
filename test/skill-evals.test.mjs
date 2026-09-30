@@ -69,6 +69,9 @@ test('helpers: the chip fix, the accepted radius, the burndown top', () => {
   assert.equal(chipFixed(CSS_FIXED.replace('height: 36px; box', 'height: 32px; box')), false);   // broke the field
   assert.equal(radiusAccepted(JSON.stringify({ gates: [], findings: ['Token values :: ❌ [sizing/-] radii/chip → --radii-chip'] })), true);
   assert.equal(radiusAccepted(JSON.stringify({ gates: ['Token values  (color)'], findings: [] })), false);
+  // With its gate's count line, still only the radius; the chip's prop names accepted too is not "everything else strict".
+  assert.equal(radiusAccepted(JSON.stringify({ gates: [], findings: ['Token values :: ❌ FAIL  1', 'Token values :: ❌ [sizing/-] radii/chip → --radii-chip'] })), true);
+  assert.equal(radiusAccepted(JSON.stringify({ gates: [], findings: ['Token values :: ❌ [sizing/-] radii/chip → --radii-chip', 'Component props match Figma :: ❌ chip/Size: the code names it "size" (letter case S → s)  (src/components/Chip.jsx)'] })), false);
   assert.equal(burndownTop('Burndown, open findings per component: button 5 · chip 3'), 'button');
 });
 

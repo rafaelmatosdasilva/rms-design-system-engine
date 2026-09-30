@@ -24,10 +24,13 @@ export function chipFixed(css) {
   return fieldKept && (!rule || /height:\s*32px/.test(rule[1]) || !/height/.test(rule[1]));
 }
 
-// The accepted findings in the baseline: the chip radius line, and no whole gate.
+// The accepted findings in the baseline: the chip radius line (and its gate's count line), no whole gate, and
+// nothing else: "keep everything else strict" means the chip's other differences still fail.
 export function radiusAccepted(json) {
   let b; try { b = JSON.parse(json ?? ''); } catch { return false; }
-  return Array.isArray(b.findings) && b.findings.some((f) => /radii\/chip/.test(f)) && !(b.gates ?? []).some((g) => /Token values/.test(g));
+  if (!Array.isArray(b.findings) || !b.findings.some((f) => /radii\/chip/.test(f))) return false;
+  const other = b.findings.filter((f) => !/radii\/chip/.test(f) && !/^Token values :: ❌\s+[A-Z][A-Z ?]*?\s+\d+/.test(f));
+  return !other.length && !(b.gates ?? []).length;
 }
 
 // The first component the burndown names in the run's own summary.
