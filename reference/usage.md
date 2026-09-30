@@ -206,7 +206,8 @@ with `ds-config.json → contracts.auto: false`. It splits captured from authore
   `@since <x>`, `@why <text>`; the convention is read, never imposed, and no tags + nothing authored = no
   field. A deprecated **token** whose Figma description names its replacement or reason gets that
   explanation as its DTCG `$deprecated` string (`"Use radii/button instead. too sharp"`) instead of a bare `true`),
-  `contract.schema.json`, and an `llms.txt` AI index (which also lists each component's guidance and
+  `contract.schema.json`, and an `llms.txt` AI index (which opens by telling an agent to use these components,
+  build nothing by hand that one covers and ask `--query` before guessing a name; it also lists each component's guidance and
   composition, tags a non-current component `[deprecated]`/`[experimental]`, and gives it a
   `status: deprecated · use X instead · since 2.0 · why: …` line). They carry the DS's real values, so a single
   `.gitignore` keeps them local. When these are present, a token divergence also **cites its source**:
@@ -577,7 +578,11 @@ non-deterministic. **Advisory** (exit 0 unless `evals.strict`), and it **never g
 **Generation and the judge are pluggable commands** (any agent/CLI, no provider lock-in):
 - `evals.generate.cmd` — run with `--generate` (or when a candidate is missing): the prompt is piped on
   stdin, the DS context (`llms.txt`) path is in `$EVAL_CONTEXT`, `$EVAL_ID`/`$EVAL_COMPONENT` are set, and
-  the command's **stdout** becomes the candidate (written to `evals/<id>.<ext>`).
+  the command's **stdout** becomes the candidate (written to `evals/<id>.<ext>`). The prompt is the case's
+  `prompt` alone: the expected `component` is for the scoring, so do not pass `$EVAL_COMPONENT` to the agent.
+- A case's `component` is what it expects: a candidate that does not use it (its class, or a tag of its name)
+  avoided the system and fails (`avoided-component`), and the summary counts `N avoided the system`. A prompt
+  that names a component is flagged before the run, since its score would measure reading the prompt.
 - `evals.judge.cmd` — advisory only: gets `{id,prompt,component,guidance,candidate}` as JSON on stdin (where
   `guidance` is the component's own description + whenNotToUse/useInstead from its contract, so the judge
   assesses "right component / correct usage" against the DS's rules, not blind) and must print
