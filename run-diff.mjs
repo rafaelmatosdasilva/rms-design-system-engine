@@ -29,7 +29,7 @@ export function collectFindings(lines) {
       if (phase === 'gates') {
         const g = line.match(GATE);
         if (g) { section = g[3].trim(); sectionBad = g[1] === '❌'; if (sectionBad) out.add(`${section} :: gate fails`); continue; }
-        if (!section || ZERO_FAIL.test(t)) continue;
+        if (!section || ZERO_FAIL.test(t) || /^─/.test(t)) continue;   // a divider inside a gate's output is no finding
         if (/^(❌|⚠️|✗)/.test(t) || (sectionBad && !/✓|^(✅|ℹ️|➡️)/.test(t))) out.add(`${section} :: ${t}`);
       } else if (phase === 'advisory') {
         if (/^─/.test(t)) { section = t.includes('Accessibility') ? 'Accessibility' : section; continue; }

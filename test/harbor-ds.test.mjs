@@ -7,7 +7,8 @@
 // Deliberate differences:
 //   • a token value (radius/control is 6px in Figma, 4px in code)
 //   • prop values named differently (Figma Tone=Neutral, the code tone="neutral"): the same meaning, not the
-//     same name, so not in parity; the button's values are written exactly as Figma's and pass
+//     same name, so not in parity; and the prop's own name (Figma Tone, code tone). The button's props and
+//     values are written exactly as Figma's and pass
 //   • an icon-only button with no accessible name, and an outline removed with no focus style back
 //   • an AGENTS.md that states tone="error" (the system says danger) and a variable that does not exist
 //   • the Figma file's own hygiene (component-values.snapshot.json): a raw fill, a detached instance, a variant
@@ -34,8 +35,9 @@ test('Harbor design system, without Chrome: every deliberate difference is found
   // Prop values: only the exact name is parity; the hint names the code's spelling.
   assert.match(r.out, /badge\/Tone: default differs - Figma "Neutral" vs code "tone=neutral" \(the code writes it "neutral"\)/);
   assert.match(r.out, /badge\/Tone: code prop "tone" is missing Figma variant option\(s\) "Neutral" \(the code writes it "neutral"\), "Success" \(the code writes it "success"\), "Danger" \(the code writes it "danger"\)/);
-  assert.match(r.out, /button\/Variant\s+Primary · Secondary\s+variant\s+Primary · Secondary\s+✓/);
-  assert.match(r.out, /button\/Size\s+Small · Large\s+size\s+Small · Large\s+✓/);
+  assert.match(r.out, /badge\/Tone: the code names it "tone" \(letter case T → t\)/);
+  assert.match(r.out, /button\/variant\s+Primary · Secondary\s+variant\s+Primary · Secondary\s+✓/);
+  assert.match(r.out, /button\/size\s+Small · Large\s+size\s+Small · Large\s+✓/);
   // Accessibility from the code.
   assert.match(r.out, /components\/HbIconButton\.vue:3  a button with only an icon inside/);
   assert.match(r.out, /styles\/tokens\.css:\d+  \.hb-icon-button removes the focus outline/);
@@ -61,7 +63,7 @@ test('Harbor, scoped to one component: a page showing several components and a n
   const r = auditFixture(FIXTURE, bareEnv(), 'harbor-ds-', ['--component', 'badge']);
   assert.match(r.out, /SCOPED TO: badge/);
   assert.doesNotMatch(r.out, /nested components pulled in/);
-  assert.match(r.out, /📉 Burndown, open findings per component: badge 2 · /);
+  assert.match(r.out, /📉 Burndown, open findings per component: badge 3 · /);
   assert.match(r.out, /🎨 Figma file hygiene: 1 of 1 component \(1 value with no variable or style\)/);
   assert.doesNotMatch(r.out, /iconButton: /);
 });
