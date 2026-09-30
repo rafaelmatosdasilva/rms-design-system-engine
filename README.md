@@ -49,6 +49,7 @@ rms-figma-code-parity                       # the whole design system
 rms-figma-code-parity --component input     # one component (or a few: input,button)
 rms-figma-code-parity --check-ui ui.json     # check a UI an AI tool generated against your components
 rms-figma-code-parity --query badge          # one component or token, names written exactly; a text colour also lists the surfaces it can be read on
+rms-figma-code-parity --component chip --baseline --findings --match radi   # accept one known difference (the chip's radius) as debt; everything else keeps failing
 ```
 
 ## What it checks
@@ -84,7 +85,7 @@ Every run compares your code against Figma and reports it in plain words:
 
 It also spots **workarounds around a component**: a screen that lays its own control over a component (a clear button over a text field, actions over a list row) is doing what the component cannot, so it is reported to the design system as a missing slot or prop, not as the screen's mistake. `"workarounds": false` in `ds-config.json` turns it off.
 
-In a **Tailwind** project it reads the classes with a value in brackets (`rounded-[4px]`, `bg-[#b42318]`), which step outside the theme where no CSS rule is written: when your `@theme` has the same value it names the utility to write (`rounded-control`, `bg-status-danger`), otherwise it says the value is not in the design system. `"tailwind": false` in `ds-config.json` turns it off. Your theme's own variable names (`--color-…`, `--spacing-…`) are not yet matched to Figma's token names.
+In a **Tailwind** project it reads the classes with a value in brackets (`rounded-[4px]`, `bg-[#b42318]`), which step outside the theme where no CSS rule is written: when your `@theme` has the same value it names the utility to write (`rounded-control`, `bg-status-danger`), otherwise it says the value is not in the design system. `"tailwind": false` in `ds-config.json` turns it off. With `"namingConvention": { "preset": "tailwind" }` under `figma` in `ds-config.json`, Figma's token names are matched to the theme's own (`surface/base/color` to `--color-surface-base`, `space/2` to `--spacing-2`), and a theme variable used through its utility (`bg-action-primary`) counts as used.
 
 It also checks the **Figma file itself**, for whoever keeps it: a colour, radius, padding, gap or text with no variable or style, an instance detached from its component, a variant with no auto layout, a component with no description. Code can only match what Figma states. Advice only; the parity never changes Figma. `"figmaHygiene": false` in `ds-config.json` turns it off.
 

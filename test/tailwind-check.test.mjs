@@ -50,3 +50,30 @@ test('the project, and the edit hook, only where Tailwind is used', () => {
   assert.doesNotMatch(out, /#b42318 is written by hand/);   // reported once, as the class
   assert.equal(editCheck(edit, { root: dir, cfg: { paths: { themeCSS: 'src/app.css' }, tailwind: false } }), null);
 });
+
+test('I65 part two: the Tailwind preset names tokens the way @theme does', async () => {
+  const { resolveNamingSpec, tokenToVar } = await import('../naming-convention.mjs');
+  const spec = resolveNamingSpec({ figma: { namingConvention: { preset: 'tailwind', dropSegments: ['color'] } } });
+  assert.equal(tokenToVar('surface/base/color', spec), '--color-surface-base');
+  assert.equal(tokenToVar('action/primary/text/color', spec), '--color-action-primary-text');
+  assert.equal(tokenToVar('radius/control', spec, { raw: true }), '--radius-control');
+  assert.equal(tokenToVar('space/2', spec, { raw: true }), '--spacing-2');
+  assert.equal(tokenToVar('radii/chip', spec, { raw: true }), '--radius-chip');
+  // Declared by hand, the same: a namespace and first-segment renames of one's own.
+  const own = resolveNamingSpec({ figma: { namingConvention: { colorNamespace: 'c', namespaces: { gap: 'space' } } } });
+  assert.equal(tokenToVar('surface/page/color', own), '--c-surface-page');
+  assert.equal(tokenToVar('gap/m', own, { raw: true }), '--space-m');
+  // Without either, nothing changes.
+  assert.equal(tokenToVar('surface/page/color', resolveNamingSpec({})), '--surface-page');
+});
+
+test('a theme variable is used through its utility', async () => {
+  const { usedByUtility } = await import('../tailwind-check.mjs');
+  const src = '<b className="hover:bg-action-primary/50 rounded-control p-2 md:flex">x</b>';
+  assert.equal(usedByUtility('--color-action-primary', src), true);
+  assert.equal(usedByUtility('--radius-control', src), true);
+  assert.equal(usedByUtility('--spacing-2', src), true);
+  assert.equal(usedByUtility('--breakpoint-md', src), true);
+  assert.equal(usedByUtility('--color-surface-base', src), false);
+  assert.equal(usedByUtility('--my-own-var', src), false);   // not a namespace Tailwind makes utilities from
+});

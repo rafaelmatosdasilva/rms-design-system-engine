@@ -77,6 +77,18 @@ export function arbitraryLine(file, f) {
   return `${file}:${f.line}  ${f.cls}  ${f.fix ? `the theme has this value: write ${f.fix}` : `${f.value} is not a design-system value${f.colour ? ' (a colour the theme does not have)' : ''}`}`;
 }
 
+// A theme variable is used through a utility: --color-action-primary by bg-action-primary (or text-, border-, …),
+// --radius-control by rounded-control, --spacing-2 by p-2, --breakpoint-md by md:. Only a namespace Tailwind makes
+// utilities from; any other variable is used only through var().
+const UTILITY_NS = new Set(['color', 'spacing', 'radius', 'text', 'font', 'font-weight', 'leading', 'tracking', 'shadow', 'inset-shadow', 'drop-shadow', 'blur', 'perspective', 'aspect', 'ease', 'animate', 'container', 'breakpoint']);
+export function usedByUtility(cssVar, src) {
+  const m = /^--(font-weight|inset-shadow|drop-shadow|[a-z]+)-([\w-]+)$/.exec(String(cssVar));
+  if (!m || !UTILITY_NS.has(m[1])) return false;
+  const name = m[2].replace(/[.*+?^${}()|[\]\\]/g, '\\function walk(ROOT, limit = 4000) {');
+  if (m[1] === 'breakpoint' || m[1] === 'container') return new RegExp(`(?<![\\w-])@?${name}:`).test(src);
+  return new RegExp(`(?<![\\w-])(?:[\\w-]+:)*-?[a-z]+(?:-[a-z]+)*-${name}(?:\\/\\d+)?(?![\\w-])`).test(src);
+}
+
 function walk(ROOT, limit = 4000) {
   const files = [];
   const go = (dir, depth) => {

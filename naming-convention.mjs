@@ -13,6 +13,9 @@
 //     dropSegments?: ["color", "default"], // trailing path segments dropped before mapping
 //     aliases?:      { iconText: "text" }, // per-segment renames (Figma segment → CSS segment)
 //     iconTextAlias?: true,                // legacy shorthand: false removes the iconText→text alias
+//     colorNamespace?: "color",            // colour tokens get this first segment (Tailwind v4: --color-surface-base)
+//     namespaces?:   { space: "spacing" }, // the first segment renamed, colour and sizing alike (--spacing-2)
+//     preset?:       "tailwind",           // colorNamespace "color" and namespaces space→spacing, radii→radius
 //     case?:         "preserve"            // per-segment case: "preserve" | "kebab"
 //                                          //   "kebab" splits camelCase (selectedHover → selected-hover),
 //                                          //   so a DS that flattens combined states in code can match.
@@ -30,8 +33,10 @@ export const DEFAULT_NAMING = {
 };
 
 // Build the effective spec from ds-config, honouring the legacy `iconTextAlias` boolean.
+export const PRESETS = { tailwind: { colorNamespace: 'color', namespaces: { space: 'spacing', spaces: 'spacing', radii: 'radius', rounded: 'radius' } } };
 export function resolveNamingSpec(cfg = {}) {
   const nc = (cfg && cfg.figma && cfg.figma.namingConvention) || {};
+  const preset = PRESETS[nc.preset] ?? {};
   const aliases = { ...(nc.aliases ?? DEFAULT_NAMING.aliases) };
   if (nc.iconTextAlias === false) delete aliases.iconText;
   return {
@@ -40,6 +45,8 @@ export function resolveNamingSpec(cfg = {}) {
     dropSegments: nc.dropSegments ?? DEFAULT_NAMING.dropSegments,
     aliases,
     case:         nc.case         ?? DEFAULT_NAMING.case,
+    colorNamespace: nc.colorNamespace ?? preset.colorNamespace ?? null,
+    namespaces:   { ...(preset.namespaces ?? {}), ...(nc.namespaces ?? {}) },
   };
 }
 
@@ -53,6 +60,8 @@ function applyCase(seg, mode, sep) {
 // Map a Figma token PATH ("node/border/selected/color") to a CSS var ("--node-border-selected").
 // `raw:true` skips dropSegments + aliases + case — the purely structural form (effect/motion style
 // names): just prefix + segments joined by the separator.
+// A namespace (Tailwind v4's --color-…, --spacing-…) is part of the name in both forms: `namespaces` renames the
+// first segment, and a colour token (the non-raw form) is put under `colorNamespace`.
 export function tokenToVar(token, spec = DEFAULT_NAMING, { raw = false } = {}) {
   let segs = String(token).split('/');
   if (!raw) {
@@ -60,6 +69,8 @@ export function tokenToVar(token, spec = DEFAULT_NAMING, { raw = false } = {}) {
     segs = segs.map((s) => spec.aliases[s] ?? s);
     segs = segs.map((s) => applyCase(s, spec.case, spec.separator));
   }
+  if (spec.namespaces && spec.namespaces[segs[0]]) segs[0] = spec.namespaces[segs[0]];
+  if (!raw && spec.colorNamespace && segs[0] !== spec.colorNamespace) segs.unshift(spec.colorNamespace);
   return spec.prefix + segs.join(spec.separator);
 }
 
