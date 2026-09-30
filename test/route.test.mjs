@@ -98,3 +98,15 @@ test('what --route prints: the route, the commands, one NEXT line, and the recip
   // Not on PATH: every command uses the engine's own path.
   assert.match(routeText(route('audit the chip', { ...P, cmd: 'node /x/audit.mjs' }), '', 'node /x/audit.mjs'), /RUN: node \/x\/audit\.mjs --component chip/);
 });
+
+test('a question about a component\'s props or a token routes to the query, with the names it asks about', async () => {
+  const { route } = await import('../route.mjs');
+  const P = { components: ['chip', 'badge'] };
+  assert.deepEqual([route('what props does the chip take?', P).recipe, route('what props does the chip take?', P).run], ['ask-the-system', ['rms-figma-code-parity --query chip']]);
+  assert.deepEqual(route('que valores aceita o size do badge?', P).run, ['rms-figma-code-parity --query badge']);
+  assert.deepEqual(route('which variable is radius/control?', P).run, ['rms-figma-code-parity --query radius/control']);
+  const none = route('what are the token names?', P);
+  assert.deepEqual([none.recipe, none.run], ['ask-the-system', []]);
+  assert.match(none.notes.join(' '), /Ask which component or token/);
+  assert.equal(route('audit the chip props', P).recipe, 'audit-component');   // not a question: the audit
+});

@@ -57,6 +57,8 @@ export const DEV = [
     score: (ctx) => [check('points at the rule', has(ctx.all, /theme\.css:44|theme\.css.{0,40}\b44\b|\.tp-button:hover/)), check('names the guard', has(ctx.all, /:not\(:disabled\)|not\(\[disabled\]\)|:enabled/))] },
   { id: 'accept-radius-pt', prompt: 'aceita a diferença do raio do chip como dívida conhecida, mas mantém o resto estrito',
     score: (ctx) => [check('only that finding accepted', radiusAccepted(ctx.read('parity-baseline.json')))] },
+  { id: 'props-question', prompt: 'what props does the chip take, and which values does its size accept?',
+    score: (ctx) => [check('asks the engine, not its memory', hasEngineRun(ctx, (c) => /--query/.test(c) && /chip/.test(c))), check('the size values as written', has(ctx.final, /\bM\b/, /\bL\b/)), check('no files changed', !ctx.changed.length, ctx.changed.join(', '))] },
   { id: 'audit-then-accept', prompt: 'audit the chip, then accept whatever is failing for it as known debt',
     score: (ctx) => [check('scoped to the chip', scoped(ctx, 'chip')), check('baseline written per finding', /"findings"/.test(ctx.read('parity-baseline.json') ?? ''))] },
 ];

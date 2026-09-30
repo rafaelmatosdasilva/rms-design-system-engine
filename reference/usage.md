@@ -44,6 +44,7 @@ rms-figma-code-parity --trend                         # show last 20 audit runs 
 rms-figma-code-parity --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
 rms-figma-code-parity --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
 rms-figma-code-parity --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
+rms-figma-code-parity --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) or a token's variable, values per mode and, for a text colour, the surfaces it reads on
 rms-figma-code-parity --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description (the first 15 show on every run)
 rms-figma-code-parity --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-figma-code-parity --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
@@ -581,5 +582,11 @@ non-deterministic. **Advisory** (exit 0 unless `evals.strict`), and it **never g
   `guidance` is the component's own description + whenNotToUse/useInstead from its contract, so the judge
   assesses "right component / correct usage" against the DS's rules, not blind) and must print
   a JSON verdict `{ok, notes}` (right component for the intent, empty/error states). It never gates.
+- `evals.levels` (or `--levels bare,steering,parity`) — does the team's guidance help? The same cases run per
+  level: `bare` (no context), `steering` (the project's own instruction files, AGENTS.md, CLAUDE.md, rules,
+  joined into `evals/.context/steering.md`) and `parity` (`contracts/llms.txt`). The command gets the level in
+  `$EVAL_LEVEL` and the file in `$EVAL_CONTEXT`. Each level is scored by the same checks, the accessibility read
+  from the code included (a clean case has no violation and no accessibility finding), and compared with bare.
+  A level with nothing to give says why and is not run. A command that does not read its stdin is fine.
 Both **degrade safely** (a missing/failing command just leaves the committed candidates and skips the judge).
 Spec: `plans/PARITY-evals-spec.md`.
