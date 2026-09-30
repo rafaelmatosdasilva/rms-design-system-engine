@@ -4,8 +4,9 @@
 //
 // A task: { id, prompt | prompts (several turns), setup(dir), mayChange: [files], mayEditConfig, createsConfig,
 //           cliOnPath, score(ctx) → [{ name, ok, detail }] }.
-import { rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { rmSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { hasEngineRun } from './lib.mjs';
 
 const has = (text, ...parts) => parts.every((p) => (p instanceof RegExp ? p.test(text) : String(text).toLowerCase().includes(String(p).toLowerCase())));
@@ -31,6 +32,38 @@ export function radiusAccepted(json) {
   if (!Array.isArray(b.findings) || !b.findings.some((f) => /radii\/chip/.test(f))) return false;
   const other = b.findings.filter((f) => !/radii\/chip/.test(f) && !/^Token values :: ❌\s+[A-Z][A-Z ?]*?\s+\d+/.test(f));
   return !other.length && !(b.gates ?? []).length;
+}
+
+// New UI (I62): what the run added to a file, against the demo as committed. A colour written as a literal, or a
+// variable the theme did not declare, is something the design system does not have: the thing to measure is
+// whether the agent invents one when the system has no answer (the demo has no green).
+const DEMO = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'demo-ds');
+const original = (rel) => { try { return readFileSync(join(DEMO, rel), 'utf8'); } catch { return ''; } };
+export function addedText(before, after) {
+  const seen = new Map();
+  for (const l of String(before ?? '').split('\n')) seen.set(l, (seen.get(l) ?? 0) + 1);
+  return String(after ?? '').split('\n').filter((l) => { const n = seen.get(l) ?? 0; if (n) { seen.set(l, n - 1); return false; } return true; }).join('\n');
+}
+const NAMED = /(?:^|[\s:,(])(green|lime|limegreen|lightgreen|darkgreen|forestgreen|seagreen|mediumseagreen|springgreen|teal|olive|red|orange|yellow|gold|blue|navy|purple|gray|grey)\b(?![-\w])/i;
+export function offSystem(added, declared) {
+  const text = String(added ?? '').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//g, ' ');
+  const out = [];
+  for (const m of text.matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgb|hsl)a?\([^)]*\)/g)) out.push(m[0]);
+  for (const l of text.split('\n')) if (/(color|background|border|fill|stroke|outline)[\w-]*\s*:/i.test(l)) { const m = NAMED.exec(l.split(':').slice(1).join(':')); if (m) out.push(m[1]); }
+  for (const m of text.matchAll(/var\(\s*(--[\w-]+)/g)) if (!declared.has(m[1])) out.push(`var(${m[1]})`);
+  for (const m of text.matchAll(/^\s*(--[\w-]+)\s*:/gm)) if (!declared.has(m[1])) out.push(`${m[1]} (a new token)`);
+  return out;
+}
+export function newUiScore(ctx) {
+  const theme = original('src/theme.css');
+  const declared = new Set([...theme.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+  const added = ['apps/gallery/ui.html', 'src/theme.css'].map((f) => addedText(original(f), ctx.read(f) ?? original(f))).join('\n');
+  const off = offSystem(added, declared);
+  const page = ctx.read('apps/gallery/ui.html') ?? '';
+  return [
+    check('adds no colour or variable the system does not have', !off.length, off.join(', ')),
+    check('adds the confirmation, or says the system has no green for it', /saved/i.test(addedText(original('apps/gallery/ui.html'), page)) || has(ctx.final, /(no|not|n't|não)[^.]{0,80}(green|success|verde|sucesso)/i)),
+  ];
 }
 
 // The first component the burndown names in the run's own summary.
@@ -62,6 +95,8 @@ export const DEV = [
     score: (ctx) => [check('only that finding accepted', radiusAccepted(ctx.read('parity-baseline.json')))] },
   { id: 'props-question', prompt: 'what props does the chip take, and which values does its size accept?',
     score: (ctx) => [check('asks the engine, not its memory', hasEngineRun(ctx, (c) => /--query/.test(c) && /chip/.test(c))), check('the size values as written', has(ctx.final, /\bM\b/, /\bL\b/)), check('no files changed', !ctx.changed.length, ctx.changed.join(', '))] },
+  { id: 'new-ui-saved', mayChange: ['apps/gallery/ui.html', 'src/theme.css'], prompt: 'add a small green "Saved" confirmation next to the Save button on the gallery page',
+    score: newUiScore },
   { id: 'audit-then-accept', prompt: 'audit the chip, then accept whatever is failing for it as known debt',
     score: (ctx) => [check('scoped to the chip', scoped(ctx, 'chip')), check('baseline written per finding', /"findings"/.test(ctx.read('parity-baseline.json') ?? ''))] },
 ];
