@@ -239,3 +239,21 @@ test('[regression effect] an exactly-matching shadow passes (exit 0)', () => {
   assert.match(out, /MATCH\s+1\b/, out);
   assert.match(out, /All declared effect styles match/, out);
 });
+
+test('parity map: optional and silent when every token is found; a file that does not load fails the gate', async () => {
+  const { runGate } = await import('./helpers.mjs');
+  const files = (extra = {}) => ({
+    'ds-config.json': { paths: { themeCSS: 'theme.css', snapshotVars: 'vars.json' }, figma: { modes: [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }] } },
+    'vars.json': { color: { light: { 'text/color': '#111111' } }, sizing: { 'radius/m': '8px' } },
+    'theme.css': ':root { --text: #111111; --radius-m: 8px; }',
+    ...extra,
+  });
+  const clean = runGate('parity-check.mjs', files());
+  assert.equal(clean.code, 0, clean.out);
+  assert.doesNotMatch(clean.out, /parity-map|PARITY MAP/);
+  const missing = runGate('parity-check.mjs', files({ 'vars.json': { color: { light: { 'text/color': '#111111' } }, sizing: { 'radius/m': '8px', 'gap/s': '4px' } } }));
+  assert.match(missing.out, /NO PARITY MAP  1 token\(s\) not found under the naming convention/);
+  const broken = runGate('parity-check.mjs', files({ 'parity-map.mjs': 'export const X = ;' }));
+  assert.equal(broken.code, 1, broken.out);
+  assert.match(broken.out, /❌ parity-map\.mjs could not be loaded/);
+});

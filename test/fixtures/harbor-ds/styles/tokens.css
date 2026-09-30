@@ -1,0 +1,47 @@
+/* Harbor, a fictional design system. The dark theme is a class on the root, and every variable has a prefix. */
+:root {
+  --hb-surface-base: #ffffff;
+  --hb-text-default: #15202b;
+  --hb-action-primary: #0a6c74;
+  --hb-action-primary-text: #ffffff;
+  --hb-status-neutral: #5b6470;
+  --hb-status-success: #1f7a3a;
+  --hb-status-danger: #b42318;
+  --hb-radius-control: 4px;
+  --hb-space-2: 8px;
+  --hb-space-3: 12px;
+  --hb-stroke-default: 1px;
+}
+:root.theme-dark {
+  --hb-surface-base: #0e141a;
+  --hb-text-default: #e7edf3;
+  --hb-action-primary: #3fb3bc;
+  --hb-action-primary-text: #0e141a;
+  --hb-status-neutral: #9aa3ad;
+  --hb-status-success: #5fd08a;
+  --hb-status-danger: #ff8a7f;
+}
+
+body { margin: 0; background: var(--hb-surface-base); color: var(--hb-text-default); font-family: sans-serif; }
+
+.hb-button {
+  display: inline-flex; align-items: center; height: 36px; box-sizing: border-box;
+  padding: var(--hb-space-2) var(--hb-space-3); border: 0; border-radius: var(--hb-radius-control);
+  background: var(--hb-action-primary); color: var(--hb-action-primary-text);
+  font-size: 14px; font-weight: 400; line-height: 20px;
+}
+.hb-button--secondary { background: transparent; color: var(--hb-action-primary); border: var(--hb-stroke-default) solid var(--hb-action-primary); }
+.hb-button:focus-visible { outline: 2px solid var(--hb-action-primary); outline-offset: 2px; }
+
+.hb-badge {
+  display: inline-flex; align-items: center; height: 20px; box-sizing: border-box;
+  padding: var(--hb-space-2); border-radius: var(--hb-radius-control);
+  color: var(--hb-status-neutral); font-size: 12px; font-weight: 600; line-height: 16px;
+}
+.hb-badge--success { color: var(--hb-status-success); }
+.hb-badge--danger { color: var(--hb-status-danger); }
+
+.hb-icon-button {
+  display: inline-flex; align-items: center; justify-content: center; height: 36px; width: 36px; box-sizing: border-box;
+  padding: var(--hb-space-2); border: 0; border-radius: var(--hb-radius-control); background: transparent; outline: none;
+}

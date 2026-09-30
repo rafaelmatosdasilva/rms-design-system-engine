@@ -52,6 +52,15 @@ name, with the snapshot's captured `name` as the authority so a Figma rename sho
 on the next refresh rather than whenever someone rereads the prose. Orphaned DS entries
 now fail too - a rename leaves debris at both ends, and only one end was visible.
 
+**Two fictional libraries keep the engine general.** `test/fixtures/demo-ds` (Tidepool) and
+`test/fixtures/harbor-ds` (Harbor) are audited end to end and compared with committed reports
+(`test/demo-ds.test.mjs`, `test/harbor-ds.test.mjs`). Their conventions differ on purpose: React and a
+data-attribute theme in one, Vue, a class theme, a variable prefix and snapshot files under their own names in
+the other. Each plants known differences, and the test checks each one is found and nothing else fails. A
+check built around one library's habits shows up as a false failure in the other: Harbor exposed prop values
+read in lowercase, a focus ring counted as a border and as a literal with no Figma value, and a flex-shrink rule
+that failed every fixed-height control. A new check runs on both before it ships.
+
 **The test for a good engine fix:** it must be expressible without naming the
 project that surfaced it. If the fix needs a hardcoded component, token or path,
 it belongs in that project's `structure-contract.mjs`, not here.

@@ -1,0 +1,13 @@
+{
+  "_updated": "2026-01-01T00:00:00.000Z",
+  "button": { "nodeId": "1:1", "properties": {
+    "variant": { "type": "VARIANT", "defaultValue": "Primary", "variantOptions": ["Primary", "Secondary"] },
+    "size": { "type": "VARIANT", "defaultValue": "Small", "variantOptions": ["Small", "Large"] },
+    "label#1:0": { "type": "TEXT", "defaultValue": "Continue" }
+  }, "annotations": [] },
+  "badge": { "nodeId": "2:1", "properties": {
+    "Tone": { "type": "VARIANT", "defaultValue": "Neutral", "variantOptions": ["Neutral", "Success", "Danger"] },
+    "label#2:0": { "type": "TEXT", "defaultValue": "Draft" }
+  }, "annotations": [] },
+  "iconButton": { "nodeId": "3:1", "properties": {}, "annotations": [{ "label": "Role: button" }] }
+}

@@ -48,6 +48,7 @@ Or from the terminal:
 rms-figma-code-parity                       # the whole design system
 rms-figma-code-parity --component input     # one component (or a few: input,button)
 rms-figma-code-parity --check-ui ui.json     # check a UI an AI tool generated against your components
+rms-figma-code-parity --query badge          # one component or token, names written exactly; a text colour also lists the surfaces it can be read on
 ```
 
 ## What it checks
@@ -64,11 +65,11 @@ Every run compares your code against Figma and reports it in plain words:
 - **Docs tell the** truth: they mention only things that actually exist.
 - **No invented text** casing: no forced UPPERCASE the design never asked for.
 - **No hand-built DS** components: a screen uses the real component, not a hand-styled copy.
-- **Clean CSS:** nothing unused, nothing that contradicts Figma.
+- **Clean CSS:** nothing unused, nothing that contradicts Figma. A focus ring's outline, which Figma has no value for, is listed apart, not failed.
 - **Nested components keep** their own styles: one component's look does not leak into another.
 - **Structure:** the right height, spacing and corners, from the design.
 - **All states are** built: hover, disabled, selected and the rest, each with the right values.
-- **Component props match** Figma: the same names, defaults and choices.
+- **Component props match** Figma: the same names, defaults and choices, spelled exactly the same. `Size` and `size` are two prop names (a slot's name too), and the finding shows the letters that differ (`letter case S → s`). `L` and `large`, or `Large` and `large`, are two values; the finding says which code value it most likely is. The catalog tells AI tools the right name for each wrong one they are likely to guess (`error` → `danger`).
 - **Sub-components match Figma:** the parts Figma nests are the ones the code uses.
 - **Templates compose the** right components: each page uses the components Figma composes.
 - **Markup:** ids, classes and icons match, and every control the design shows is built.
@@ -79,9 +80,13 @@ Every run compares your code against Figma and reports it in plain words:
 - **Shadows and blurs:** match Figma, when your design defines them.
 - **Renders correctly in** a browser: checked on the real result, not just the code on paper.
 - **What this audit** covered: so you can see nothing slipped through.
-- **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist. A wrong name there makes every agent that reads it build the wrong thing. Advisory; `"steering": false` in `ds-config.json` turns it off.
+- **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing. Advisory; `"steering": false` in `ds-config.json` turns it off.
 
-It also does an **accessibility** check: it flags anything that would make the design hard to use (text that is hard to read, a button with no label, something you cannot reach with the keyboard) and tells you, in plain words, how to fix it.
+It also checks the **Figma file itself**, for whoever keeps it: a colour, radius, padding, gap or text with no variable or style, an instance detached from its component, a variant with no auto layout, a component with no description. Code can only match what Figma states. Advice only; the parity never changes Figma. `"figmaHygiene": false` in `ds-config.json` turns it off.
+
+It also does an **accessibility** check: it flags anything that would make the design hard to use (text that is hard to read, a button with no label, something you cannot reach with the keyboard) and tells you, in plain words, how to fix it. Part of it always runs straight from the code and the CSS, with no browser and no page to open (a button or link with only an icon and no label, an image whose alt is a file name, a removed focus outline, a mouse-only control, a hidden element that still takes focus, a misspelled `aria-*`, a page with no language, zoom blocked, animations with no reduced-motion option); when a page can be opened, the browser check goes deeper. `"a11yStatic": false` in `ds-config.json` turns the code part off.
+
+Does your guidance help your AI tools? `node eval-run.mjs --levels bare,steering,parity` runs the same generation tasks three ways: with the prompt alone, with your own instruction files (`AGENTS.md`, `CLAUDE.md`, rules), and with what this skill writes for agents (`contracts/llms.txt`). It scores each by the same checks (design-system tokens and classes, accessibility) and says what each kind of guidance adds or costs against the prompt alone. It needs your own generate command in `ds-config.json` (`evals.generate.cmd`), spends your model tokens, and never gates anything.
 
 Everything is advice with a clear fix. It points at the problem, it does not silently change your code.
 

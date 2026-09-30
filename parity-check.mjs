@@ -92,6 +92,7 @@ let EXPLICIT = {}, NULL_TOKENS = new Set(), SKIP_TOKENS = new Set(),
     BOOLEAN_SKIP = new Set(),
     EFFECTS = [], SCOPE_RULES = [], FOCUS_CONTRACT = [];
 let NEUTRAL_VAR_RE = /^--neutral-(\d+)$/;
+let noParityMap = false, parityMapBroken = false;
 // neutralMaps[i] = { key: '#hex' } for mode i - keys match NEUTRAL_VAR_RE capture group
 let neutralMaps = MODES.map(() => ({}));
 
@@ -121,10 +122,11 @@ try {
     if (map.NEUTRAL_LIGHT) neutralMaps[0] = map.NEUTRAL_LIGHT;
     if (map.NEUTRAL_DARK && neutralMaps.length > 1) neutralMaps[1] = map.NEUTRAL_DARK;
   }
-} catch {
-  console.warn('⚠️  parity-map.mjs not found - running with empty token maps.');
-  console.warn('   All non-standard token names will appear as FAIL or NEW SKIP.');
-  console.warn('   Copy parity-map.example.mjs → parity-map.mjs to configure.\n');
+} catch (e) {
+  // Optional: the naming convention maps most tokens on its own. Said only when it matters, after the counts.
+  // A parity-map.mjs that exists and does not load is always said: its maps are silently missing otherwise.
+  if (existsSync(join(ROOT, 'parity-map.mjs'))) parityMapBroken = true, console.log(`❌ parity-map.mjs could not be loaded - running with empty token maps: ${String(e?.message ?? e).split('\n')[0]}`);
+  else noParityMap = true;
 }
 
 // ── Parse token CSS (all configured files merged) ─────────────────────────────
@@ -828,6 +830,10 @@ console.log(`\n✅ PASS  ${PASS.length}   (${_passLabel})`);
 console.log(`⏭  SKIP  ${SKIP.length}`);
 console.log(`⚠️  NEW SKIP  ${NEW_SKIP.length}`);
 console.log(`❌ FAIL  ${FAIL.length}`);
+// Without parity-map.mjs a token is found only by the naming convention: say so when a token was not found.
+const unnamed = FAIL.filter((f) => /not declared|missing in @media/.test(f.issue ?? '')).length + NEW_SKIP.length;
+if (noParityMap && unnamed)
+  console.log(`⚠️  NO PARITY MAP  ${unnamed} token(s) not found under the naming convention and no parity-map.mjs to map them - if the CSS names them another way, copy parity-map.example.mjs to parity-map.mjs and map them`);
 if (NEVER_APPLIED.length) {
   console.log(`⚠️  NEVER APPLIED ${NEVER_APPLIED.length}  (token block under an ancestor of :root - a browser never uses it)`);
   for (const n of NEVER_APPLIED.slice(0, 10)) console.log(`     ℹ️  ${n.file}:${n.line}  ${n.selector}${n.suggest ? `  → write ${n.suggest}` : ''}`);
@@ -922,7 +928,7 @@ if (JSON_MODE) {
   }, null, 2));
 }
 
-if (FAIL.length === 0 && NEW_SKIP.length === 0 && ALIAS_FAIL.length === 0 && EFFECTS_FAIL.length === 0 && SCOPE_FAIL.length === 0) {
+if (!parityMapBroken && FAIL.length === 0 && NEW_SKIP.length === 0 && ALIAS_FAIL.length === 0 && EFFECTS_FAIL.length === 0 && SCOPE_FAIL.length === 0) {
   console.log('\nAll resolved CSS values match Figma snapshot. ✓\n');
   process.exit(0);
 } else { console.log(''); process.exit(1); }

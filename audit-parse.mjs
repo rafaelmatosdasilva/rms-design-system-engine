@@ -12,7 +12,7 @@
 //     ⏭ not verified with the gate's own reason. It never fails the run and is never a pass: the
 //     verdict counts it separately.
 
-export const SKIP_RE = /^\s*⏭|\bskipped\b|\bnot verified\b|\bnot run\b/i;
+export const SKIP_RE = /^\s*⏭|\bskipped\b|\bskipping\b|\bnot verified\b|\bnot run\b/i;
 
 export function parseGateOutput(r, summaryRe, { maxDetails = 20 } = {}) {
   if (r.status === null) return { pass: true, lines: ['⏭ script not found - skipped'] };
@@ -22,7 +22,8 @@ export function parseGateOutput(r, summaryRe, { maxDetails = 20 } = {}) {
   const seen = new Set();
   const keep = (l) => { const k = l.trim(); if (!k || seen.has(k)) return false; seen.add(k); return true; };
   const rows = out.split('\n');
-  const summary = rows.filter((l) => l.trim() && (summaryRe.test(l) || SKIP_RE.test(l))).filter(keep).map((l) => l.trim());
+  // A divider ("─── Values not verified ──") heads a list in the script's own output; it is never a result line.
+  const summary = rows.filter((l) => l.trim() && !/^\s*─/.test(l) && (summaryRe.test(l) || SKIP_RE.test(l))).filter(keep).map((l) => l.trim());
   const failDetails = pass ? [] : rows.filter((l) => /🚨|❌/.test(l)).filter(keep).map((l) => '  ' + l.trim()).slice(0, maxDetails);
   if (pass && !summary.length) summary.push('⚠️  this gate printed no result line, so its outcome is not visible here');
   if (!pass && !summary.length && !failDetails.length) {
@@ -45,7 +46,7 @@ export const GATE_SUMMARY = {
   'state-check.mjs': /COVERED|UNCOVERED|⚠️|⏭ HIDDEN/,
   'state-binding-check.mjs': /COVERED|MISSING/,
   'state-opacity-check.mjs': /CORRECT|MISMATCH/,
-  'component-prop-check.mjs': /OK|MISSING|VALUE|SLOT|NO FILE|EXTRA|RENAME\?|REALIZED|UNREALIZED|UNMAPPED|VIA STATE/,
+  'component-prop-check.mjs': /OK|MISSING|NAME|VALUE|SLOT|NO FILE|EXTRA|RENAME\?|REALIZED|UNREALIZED|UNMAPPED|VIA STATE/,
   'component-composition-check.mjs': /OK|MISSING|NO FILE|EXTRA|SKIP/,
   'template-composition-check.mjs': /USES|MISSING|NO FILE|ORDER|skipped/,
   'html-structure-check.mjs': /✅|❌|ℹ️  \[15\]/,
@@ -53,8 +54,8 @@ export const GATE_SUMMARY = {
   'icon-slot-check.mjs': /✅|❌/,
   'component-slot-check.mjs': /✅|❌/,
   'form-control-check.mjs': /✅|❌/,
-  'pseudo-element-check.mjs': /DOCUMENTED|UNDOCUMENTED/,
-  'icon-check.mjs': /DOCUMENTED|UNDOCUMENTED/,
+  'pseudo-element-check.mjs': /DOCUMENTED|UNDOCUMENTED|✅|❌/,
+  'icon-check.mjs': /DOCUMENTED|UNDOCUMENTED|✅|❌/,
   'icon-freshness-check.mjs': /MATCH|CHANGED/,
   'icon-inventory-check.mjs': /IN CODE|MISSING/,
   'transition-check.mjs': /✅|❌/,

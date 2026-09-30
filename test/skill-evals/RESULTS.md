@@ -1,5 +1,66 @@
 # Skill evaluation results
 
+## 2026-09: the guide after I57, I58, I34, I23, I44 and exact prop names (continuous evaluation)
+
+A fresh run of the adopted guide (the `cookbook` variant, the checkout) after guide changes: the flex-shrink
+rule made advisory, the focus-ring note on literals, the Figma hygiene record in the value sweep, and the
+props gate's NAME difference. Same tasks, runs and scorers as I56; engine c3fd998. Compared with the adopted
+I56 measurement, its first runs of each task up to the same count.
+
+Guide set measured: `8fe89ab23319`
+
+| | I56 (adopted) | This guide |
+|---|---|---|
+| Sonnet, all 20 tasks (5 runs each) | 100/100 | 100/100 |
+| Sonnet, mean cost / input per request | $0.130 / 121k | $0.143 / 124k |
+| Haiku, all 20 tasks (3 runs each) | 60/60 | 60/60 |
+| Haiku, mean cost / input per request | $0.047 / 65k | $0.055 / 75k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 1.3 | 1.6 |
+
+**Reading.** Every task passes on both models and no rule is broken. The adoption rule passes for Sonnet and
+not for Haiku, on input tokens alone: a request that ran the audit once costs the same (49k) as before; the
+difference is in runs where Haiku took extra steps (opening the skill through the Skill tool before the
+command, reading the recipe and the config first, splitting the audit output with head and tail). Three runs
+per task cannot tell that from noise, so the six tasks whose input grew were run to 13 runs on both versions,
+the protocol I56 used for a lower pass rate:
+
+| Haiku, 13 runs each | I56 (adopted) | This guide |
+|---|---|---|
+| forbidden-green, pasted-steps, fix-first, first-setup, refresh-no-figma, audit-all | 76/78 | 78/78 |
+| Mean input / cost per request on these six | 71k / $0.048 | 74k / $0.052 |
+
+With 13 runs the difference is about 4% more input per request, not 21%: mostly noise, the rest the longer
+report (the new checks print more). The two I56 misses, read by hand: on refresh-no-figma the reply called
+the snapshots current and never said the refresh had not happened (one only implied it). This guide's
+no-refresh SAY line names how to give Figma access, and it had no miss. Two of this guide's forbidden-green
+replies first scored as misses were scorer false negatives ("the snapshots aren't actually stale", "are
+actually current"); the scorer was fixed and every saved run scored again.
+
+**Found by this evaluation and fixed.** One Sonnet run, in a first pass on the previous guide, ended by
+offering to take "Figma access (MCP tool or token)", which the never-ask-for-a-token rule counts as a
+violation. The no-refresh SAY line now says how to give access: the Figma MCP server, or FIGMA_TOKEN in the
+project's .env file, never in the chat. No violation in this run.
+
+## 2026-09: a bare guide, the engine's router and nothing else (idea I61)
+
+The `bare` variant (`variants.mjs`, 449 bytes) only says to run `--route` and do what it prints. Same tasks, runs and
+engine as the adopted I56 measurement (158802e; the harness file carrying the variant marks it +dirty).
+
+| | Adopted guide (I56) | Bare |
+|---|---|---|
+| Sonnet, all 20 tasks | 100/100 | 100/100 |
+| Sonnet, mean cost / input per request | $0.130 / 121k | $0.118 / 122k |
+| Haiku, all 20 tasks | 60/60 | 59/60 |
+| Haiku, mean cost / input per request | $0.047 / 65k | $0.046 / 76k |
+| Rule violations | 0 | 1 |
+
+**Decision.** Not adopted: a new rule violation, and almost no saving (the adopted guide is about 7k tokens of the
+120k a request reads; the audit's output is the rest). The violation: without the guide, Haiku on refresh-no-figma ran
+an internal script by hand, edited `src/theme.css` unasked and tried to commit (the hook refused the commit). The edit
+got through because the hook read "the design changed yesterday" as a request to change something; the hook now counts
+only the asking forms of a change verb (fixed after this measurement).
+
 ## 2026-09: deterministic core, thin agent layer (idea I56)
 
 Same harness, tasks and scorers as the cookbook measurement below; every saved run of all variants scored again with

@@ -88,8 +88,11 @@ test('burndown: open findings per component, most specific name, with what the l
   assert.equal(componentOf('Structure :: ⚠️  button-primary radius', names), 'buttonPrimary');
   assert.equal(componentOf('Token values :: ❌ [sizing/-] radii/chip → --radii-chip', names), 'chip');
   assert.equal(componentOf('Token values :: ❌ FAIL  1', names), null);
+  assert.equal(componentOf('Accessibility from the code :: components/HbIconButton.vue:3  a button with only an icon inside', ['button', 'iconButton']), 'iconButton');
+  assert.equal(componentOf('Structure :: ⚠️  NO-SHRINK 2/2 fixed-height component(s) with no flex-shrink:0 (button, badge)', ['button', 'badge']), null);
   const now = ['Token values :: ❌ [sizing/-] radii/chip → --radii-chip', 'Structure :: ⚠️  chip height (Size=L): x', 'Structure :: ⚠️  button-primary radius',
-    'Structure :: gate fails', 'Structure :: 🔗 chip in Figma: https://example.com', 'Accessibility :: focus .tp-field', 'Token values :: ❌ FAIL  1'];
+    'Structure :: gate fails', 'Structure :: 🔗 chip in Figma: https://example.com', 'Accessibility :: focus .tp-field', 'Token values :: ❌ FAIL  1',
+    'Token values :: ⚠️  NEW SKIP  0', 'Token values :: Fix:  src/theme.css:10 - change 4px → 6px', 'Icons :: ⚠️  this gate printed no result line, so its outcome is not visible here', 'Token values :: ⚠️  a note on no component'];
   const b = burndown(now, names, ['Structure :: ⚠️  chip a', 'Structure :: ⚠️  chip b', 'Structure :: ⚠️  chip c', 'Structure :: ⚠️  button x']);
   assert.deepEqual(burndownLines(b), [
     'Burndown, open findings per component: chip 2 (was 3) · buttonPrimary 1 (was 0) · field 1 (was 0) · 1 not tied to a component',

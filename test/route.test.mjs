@@ -80,6 +80,7 @@ test('guidelines links, setup and refresh', () => {
   assert.equal(refresh.recipe, 'refresh-figma');
   assert.equal(refresh.sayIf, 'when there is no Figma tool in this session');
   assert.match(refresh.say[0], /^I couldn't refresh the Figma snapshots here: there is no Figma tool in this session\. The audit below uses the committed snapshots \(captured 2026-03-02\)/);
+  assert.match(refresh.say[0], /set FIGMA_TOKEN in the project's \.env file; never paste a token in the chat\.$/);   // how to give access, so the agent never improvises "share a token"
   assert.match(refresh.notes.join(' '), /Without it, do not offer a refresh and never edit a snapshot/);
   assert.equal(r('o design mudou, atualiza os dados do Figma').recipe, 'refresh-figma');
 });

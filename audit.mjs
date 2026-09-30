@@ -18,6 +18,7 @@
 // Performance: the subprocess-based gates all run in parallel via Promise.all; the inline
 //              gates (freshness, CSS hygiene) are computed on the main thread.
 
+import './stdio-sync.mjs';   // first: a report read through a pipe is never cut off at exit
 import readline                                                  from 'readline';
 import { spawn, spawnSync }                                      from 'child_process';
 import { existsSync, readdirSync, readFileSync, statSync,
@@ -26,9 +27,10 @@ import { existsSync, readdirSync, readFileSync, statSync,
 import { join, dirname, resolve, relative }                     from 'path';
 import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
-import { fileURLToPath }                                        from 'url';
-import { makeFigmaFetch }                                       from './figma-fetch.mjs';
+import { fileURLToPath, pathToFileURL }                         from 'url';
+import { makeFigmaFetch, byNodeId }                             from './figma-fetch.mjs';
 import { collectRawValues, COLLECT_NODE_BUDGET }                from './collect-raw-values.mjs';
+import { hygieneOf }                                            from './figma-hygiene.mjs';
 import { extractDynamicClassPrefixes }                          from './dynamic-class-prefixes.mjs';
 import { frameworkGateSkipReason }                              from './component-framework-gate.mjs';
 import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-parse.mjs';
@@ -406,6 +408,13 @@ if (process.argv.includes('--capture-code')) {
   process.exit(r.status ?? 1);
 }
 
+// ── --query <term> …: a component or token, names exactly as written (query.mjs) ──
+if (process.argv.includes('--query')) {
+  const passthrough = process.argv.slice(2).filter((a) => a !== '--query');
+  const r = spawnSync(process.execPath, ['--import', pathToFileURL(join(SCRIPT_DIR, 'stdio-sync.mjs')).href, join(SCRIPT_DIR, 'query.mjs'), ...passthrough], { cwd: ROOT, stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
+
 // ── --check-ui <file>: check a generated UI against the component catalog (ui-check.mjs) ──
 if (process.argv.includes('--check-ui')) {
   const passthrough = process.argv.slice(2).filter((a) => a !== '--check-ui');
@@ -496,14 +505,14 @@ async function refreshComponentProps(fileKey, token, outPath) {
       return false;
     }
     const { meta: csMeta } = await csRes.json();
-    const sets  = Object.entries(csMeta?.component_sets ?? {});
+    const sets  = Object.entries(byNodeId(csMeta?.component_sets));
     const ids   = sets.map(([id]) => id);
     const names = Object.fromEntries(sets.map(([id, s]) => [id, s.name]));
 
     // ② Standalone COMPONENTS (single components not in a variant set)
     const compRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/components`, { headers: h });
     const { meta: compMeta } = compRes.ok ? await compRes.json() : { meta: {} };
-    const standaloneEntries = Object.entries(compMeta?.components ?? {})
+    const standaloneEntries = Object.entries(byNodeId(compMeta?.components))
       .filter(([, c]) => !c.containing_frame?.containingStateGroup);
     for (const [nodeId, c] of standaloneEntries) {
       if (!names[nodeId]) { ids.push(nodeId); names[nodeId] = c.name; }
@@ -801,7 +810,8 @@ function collectBindingsFromNode(node, idToName, result, maxDepth = 1, depth = 0
 // and collects the raw geometry numbers and colours those nodes actually use - NOT
 // tokens, the literal values. This is what lets the hardcoded-value gate answer
 // "is this 24px the same 24px Figma uses on THIS component?" per component instead
-// of globally. Written as component-values.snapshot.json: { "Comp": { nums, colors } }.
+// of globally. Written as component-values.snapshot.json: { "Comp": { nums, colors, hygiene } },
+// where hygiene is the Figma file's own readiness for that component (I23, figma-hygiene.mjs).
 // collectRawValues + its node-visit budget live in a module so the runaway-tree guard is unit-
 // tested. See collect-raw-values.mjs for why the budget exists (a synchronous walk of a giant
 // instance-expanded tree spins the CPU and hangs the whole audit).
@@ -843,12 +853,13 @@ async function refreshComponentValues(fileKey, token, outPath) {
     });
     if (!csRes.ok) return false;
     const { meta: csMeta } = await csRes.json();
-    const sets   = csMeta?.component_sets ?? {};
+    const sets   = byNodeId(csMeta?.component_sets);
     const setIds = Object.keys(sets);
     if (!setIds.length) return false;
     const result = {};
     const BATCH  = 50;
     const budget = { n: COLLECT_NODE_BUDGET };   // shared across the whole sweep — bounds total CPU
+    const hygieneBudget = { n: COLLECT_NODE_BUDGET };   // the Figma file hygiene record (I23), same bound
     for (let i = 0; i < setIds.length; i += BATCH) {
       const batch = setIds.slice(i, i + BATCH);
       const nRes  = await figmaFetch(
@@ -861,7 +872,7 @@ async function refreshComponentValues(fileKey, token, outPath) {
         const name = sets[setId]?.name ?? data?.document?.name ?? setId;
         const nums = new Set(), colors = new Set();
         collectRawValues(data?.document, nums, colors, budget);
-        result[name] = { nums: [...nums].sort((a, b) => a - b), colors: [...colors].sort() };
+        result[name] = { nums: [...nums].sort((a, b) => a - b), colors: [...colors].sort(), hygiene: hygieneOf(data?.document, sets[setId]?.description ?? data?.componentSets?.[setId]?.description, hygieneBudget) };
       }
       if (budget.n <= 0) break;   // hit the node budget — stop rather than spin on a pathological tree
     }
@@ -1359,7 +1370,7 @@ function reportFull(label, items, shown) {
         res({ status: why ? 1 : status, stdout, stderr, ...(why ? { stopped: why } : {}) });
       };
       let child;
-      try { child = spawn(process.execPath, [abs, ...args], { cwd: ROOT, env: process.env }); }
+      try { child = spawn(process.execPath, ['--import', pathToFileURL(join(SCRIPT_DIR, 'stdio-sync.mjs')).href, abs, ...args], { cwd: ROOT, env: process.env }); }
       catch (e) { return finish(1, `could not start (${e.message})`); }
       const timer = setTimeout(() => { timedOut = true; try { child.kill('SIGKILL'); } catch { /* already gone */ } }, GATE_TIMEOUT_MS);
       child.stdout.on('data', d => { stdout += d; });
@@ -1419,7 +1430,10 @@ function reportFull(label, items, shown) {
       return { pass: false, lines: [C.yellow('🚧 STRUCTURE cannot verify - no compiled component CSS.'), ...guidance] };
     }
     const pass = r.status === 0;
-    const summary    = out.split('\n').filter(l => /✅|❌|⚠️  MEASURED|⚠️  VARIANTS|⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🔗 .* in Figma: |↳ |📋 census: |least checked: |🖼  /.test(l) && l.trim()).map(l => l.trim());
+    // A measured, variant or visual item about a component outside a scoped run is left out, like any other gate's.
+    const perComponent = (l) => /⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🖼  (⚠️|✓) /.test(l);
+    const summary    = out.split('\n').filter(l => /✅|❌|⚠️  MEASURED|⚠️  VARIANTS|⚠️  NO-SHRINK|⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🔗 .* in Figma: |↳ |📋 census: |least checked: |🖼  /.test(l) && l.trim())
+      .filter(l => !_scopeForms.length || !perComponent(l) || _lineInScope(l)).map(l => l.trim());
     const failDetails = pass ? [] : out.split('\n')
       .filter(l => l.trim().startsWith('❌') && !l.includes('FAIL  0'))
       .map(l => '  ' + l.trim()).slice(0, 20);
@@ -1946,6 +1960,45 @@ function reportFull(label, items, shown) {
       return marks.has(lineNo);
     }
 
+    // ── Focus rings ─────────────────────────────────────────────────────────────
+    // An outline drawn in a :focus rule is a focus ring: code draws it, and Figma has no
+    // outline to compare it with. Its lengths (outline: 2px, outline-offset: 2px) are
+    // compared with Figma like any literal; the ones with no match are listed apart,
+    // not counted as drift. A colour in the ring (a hex) is still checked, so such a line
+    // is never set apart. The rule's selector is read from the line itself (a one-line
+    // rule) or from the file, the nearest open { above the line.
+    const _fileText = new Map();
+    const fileText = (file) => {
+      if (!_fileText.has(file)) { let t = ''; try { t = readFileSync(file, 'utf8'); } catch { /* unreadable */ } _fileText.set(file, t); }
+      return _fileText.get(file);
+    };
+    function enclosingSelector(file, lineNo) {
+      const src = fileText(file).replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+      const lines = src.split('\n');
+      const upTo = lines.slice(0, lineNo - 1).join('\n');
+      let depth = 0;
+      for (let i = upTo.length - 1; i >= 0; i--) {
+        if (upTo[i] === '}') depth++;
+        else if (upTo[i] === '{') {
+          if (depth === 0) { const head = upTo.slice(0, i); const from = Math.max(head.lastIndexOf('}'), head.lastIndexOf('{'), head.lastIndexOf(';')); return head.slice(from + 1).trim(); }
+          depth--;
+        }
+      }
+      return '';
+    }
+    function isFocusRing(hitLine) {
+      const m = /^(.+?):(\d+):(.*)$/.exec(hitLine);
+      if (!m) return false;
+      const code = m[3].replace(/\/\*[^*]*\*\//g, '');
+      if (/#[0-9a-fA-F]{3,8}\b/.test(code)) return false;
+      const brace = code.lastIndexOf('{');
+      const selector = brace >= 0 ? code.slice(0, brace) : enclosingSelector(m[1], Number(m[2]));
+      if (!/:focus(-visible|-within)?\b/.test(selector)) return false;
+      const decls = (brace >= 0 ? code.slice(brace + 1) : code).split(';').map((d) => d.replace(/[{}]/g, '').trim()).filter(Boolean);
+      const withLength = decls.filter((d) => /\d(px|rem|em)\b/.test(d));
+      return withLength.length > 0 && withLength.every((d) => /^outline(-offset|-width)?\s*:/i.test(d));
+    }
+
     // Shared legitimacy filter
     function isLegitimate(line) {
       // A literal written INSIDE a /* … */ block is prose, not a declaration. The
@@ -2208,9 +2261,10 @@ function reportFull(label, items, shown) {
       return literals.every(l => matchesFigmaValue(l, nums, colors));
     };
     const _alwaysKeep = new Set(vwHits);   // 100vw anti-pattern is a rendering bug, never value-parity
-    const divergent = [], matchedFigma = [];
+    const divergent = [], matchedFigma = [], focusRings = [];
     for (const h of hits) {
       if (!_alwaysKeep.has(h) && hitMatchesFigma(h)) matchedFigma.push(h);
+      else if (!_alwaysKeep.has(h) && isFocusRing(h)) focusRings.push(h);
       else divergent.push(h);
     }
 
@@ -2322,6 +2376,10 @@ function reportFull(label, items, shown) {
       for (const h of matchedFigma.slice(0, 20)) matchNotes.push(C.dim(`     [${scopedSets(h).scope}] ${h}`));
       matchNotes.push(...reportFull('hardcoded-matches-figma', matchedFigma, 20));
     }
+    if (focusRings.length) {
+      matchNotes.push(C.dim(`ℹ️  ${focusRings.length} focus ring literal(s) set apart - an outline in a :focus rule has no Figma value to compare with, not failed:`));
+      for (const h of focusRings.slice(0, 20)) matchNotes.push(C.dim(`     ${h}`));
+    }
 
     const pass  = divergent.length === 0;
     return {
@@ -2408,38 +2466,64 @@ function reportFull(label, items, shown) {
 
   // A component contains other DS components (a button may hold an icon, a card a badge),
   // and those must be verified too - auditing the parent without its children is a false
-  // pass. So expand the chosen set transitively: pull in every DS component whose base
-  // selector co-occurs, in a per-component source file, with a component already in scope.
-  // Aggregate files (the central theme CSS, or any file mentioning many components) are
-  // skipped so scope cannot explode to the whole DS through a shared stylesheet.
+  // pass. So expand the chosen set transitively, in one direction: a component in scope pulls
+  // in the components ITS OWN source file uses. A file is a component's source when
+  // ds-config.json → componentFiles says so, or when its name ends with the component's name
+  // (HbIconButton.vue → iconButton, the longest name; Chip/index.tsx → chip). A page that shows
+  // several components, the central theme CSS, or any file mentioning many components is no
+  // component's source, so it never joins them. A name inside a longer one (button inside
+  // iconButton) is not a mention of it.
   const _autoAdded = [];
   const _scopeNames = [..._chosenNames];
+  let _mentionsIn = null;   // text → the component names it mentions, longest first; set when scoped
   if (_chosenNames.length) {
     let universe = [];
     try { universe.push(...Object.keys(JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8')).components ?? {})); } catch { /* no struct snapshot */ }
     universe.push(...Object.keys(cfg.componentSelectors ?? {}));
     if (_liveComponentNames) universe.push(..._liveComponentNames);
+    universe.push(..._chosenNames);
     universe = [...new Set(universe)];
-    const uForms = universe.map(n => ({ name: n, nameNorm: _norm(n), selNorm: _norm(_selOf(n)) }));
-    const mentions = (form, t) => (form.nameNorm && t.includes(form.nameNorm)) || (form.selNorm.length >= 4 && t.includes(form.selNorm));
+    const uForms = universe.map(n => ({ name: n, nameNorm: _norm(n), selNorm: _norm(_selOf(n)) }))
+      .sort((a, b) => b.nameNorm.length - a.nameNorm.length);
+    _mentionsIn = (text) => {
+      let t = _norm(text);
+      const out = [];
+      for (const fm of uForms) {
+        const keys = [fm.nameNorm, fm.selNorm.length >= 4 ? fm.selNorm : ''].filter(Boolean).sort((a, b) => b.length - a.length);
+        if (!keys.some(k => t.includes(k))) continue;
+        out.push(fm.name);
+        for (const k of keys) t = t.split(k).join('#');
+      }
+      return out;
+    };
     const themeSet = new Set([cfg.paths?.themeCSS].flat().filter(Boolean).map(p => join(ROOT, p)));
     const maxNest  = cfg.scopeMaxNestPerFile ?? 8;
-    // Precompute, per per-component source file, which universe components it mentions.
-    const fileComps = [];
+    const declared = new Map();
+    for (const [name, p] of Object.entries(cfg.componentFiles ?? {})) for (const f of [p].flat()) declared.set(join(ROOT, f), name);
+    const ownerOf = (f) => {
+      if (declared.has(f)) return declared.get(f);
+      const parts = relative(ROOT, f).replace(/\\/g, '/').split('/');
+      let base = parts.at(-1).replace(/\.[^.]+$/, '');
+      if (/^index$/i.test(base) && parts.length > 1) base = parts.at(-2);
+      const b = _norm(base);
+      return uForms.find(fm => fm.nameNorm.length >= 3 && b.endsWith(fm.nameNorm))?.name ?? null;
+    };
+    // Per component, the components its own source files use.
+    const children = new Map();
     for (const f of allSourceFiles()) {
       if (themeSet.has(f)) continue;                       // central token file → not component-specific
-      let t = ''; try { t = readFileSync(f, 'utf8').toLowerCase().replace(/[^a-z0-9]/g, ''); } catch { continue; }
-      const comps = uForms.filter(fm => mentions(fm, t)).map(fm => fm.name);
-      if (comps.length && comps.length <= maxNest) fileComps.push(comps);   // skip aggregates
+      const owner = ownerOf(f);
+      if (!owner) continue;                                // a page or a shared file joins nothing
+      let t = ''; try { t = readFileSync(f, 'utf8'); } catch { continue; }
+      // A native element (<button>, type="button") is not the DS component of that name.
+      t = t.replace(/<\/?[a-z]+(?![\w-])/g, ' ').replace(/\btype\s*=\s*["'][a-z]+["']/g, ' ');
+      const used = _mentionsIn(t).filter(c => c !== owner);
+      if (!used.length || used.length > maxNest) continue;   // skip aggregates
+      children.set(owner, new Set([...(children.get(owner) ?? []), ...used]));
     }
     const inScope = new Set(_chosenNames);
-    for (let changed = true; changed; ) {
-      changed = false;
-      for (const comps of fileComps) {
-        if (comps.some(c => inScope.has(c))) {
-          for (const c of comps) if (!inScope.has(c)) { inScope.add(c); _autoAdded.push(c); changed = true; }
-        }
-      }
+    for (const queue = [..._chosenNames]; queue.length; ) {
+      for (const c of children.get(queue.shift()) ?? []) if (!inScope.has(c)) { inScope.add(c); _autoAdded.push(c); queue.push(c); }
     }
     _scopeNames.length = 0; _scopeNames.push(...inScope);
   }
@@ -2460,8 +2544,10 @@ function reportFull(label, items, shown) {
   const _ANSI    = /\x1b\[[0-9;]*m/g;
   const _FILE_RE = /([\w./-]+\.(?:vue|css|scss|less|ts|tsx|js|jsx|html))(?::\d+)?/i;
   function _lineInScope(plain) {
-    const n = _norm(plain);
-    if (_scopeForms.some(f => (f.nameNorm && n.includes(f.nameNorm)) || (f.selNorm.length >= 4 && n.includes(f.selNorm)))) return true;
+    // A line that names components belongs to them; one that names none (a token, a shared rule) belongs
+    // to the scope when the file it points at mentions a component in scope.
+    const named = _mentionsIn(plain);
+    if (named.length) return named.some(c => _scopeNames.includes(c));
     const fm = _FILE_RE.exec(plain);
     if (fm) { const f = fm[1]; if (_fileHasScope(join(ROOT, f)) || _fileHasScope(f)) return true; }
     return false;
@@ -2492,8 +2578,18 @@ function reportFull(label, items, shown) {
     return { ...result, pass, lines };
   }
 
+  // The gate scripts tag their lines with their own old numbers ("[15] No snapshot found", "Gate [17] skipped");
+  // the report numbers its gates 1 to 25, so a line never carries another number.
+  const legacyFree = (l) => (typeof l !== 'string' ? l : l
+    .replace(/Gate \[\d+[a-z]?\] skipped/g, 'skipped')
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*)⏭\s+⏭/u, '$1⏭')                      // one skip mark, not two
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*(?:✅|❌|⚠️|ℹ️|⏭|🚧)\s+)\[(?:\d+[a-z]?|[a-z][a-z-]*)\]\s+/u, '$1')   // a script's own tag: [15], [docs-truth]
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*)✅(\s+.*\bskipped\b)/u, '$1⏭$2'));                         // skipped is not a pass
+  // A warning or failure count of zero ("⚠️  NEW SKIP  0", "❌ FAIL  0") says nothing: it is left out.
+  const zeroCount = (l) => typeof l === 'string' && /^(?:\s|\x1b\[[0-9;]*m)*(?:⚠️|❌)\s+[A-Z][A-Z ?-]*?\s+0(?:\/0)?(?:\s|\x1b|$)/u.test(l);
   function addGate(label, result) {
     const r = scopeFilter(result);
+    if (Array.isArray(r.lines)) r.lines = r.lines.map(legacyFree).filter((l) => !zeroCount(l));
     // planLimited gates are neutral - they don't block the audit
     if (!r.pass && !r.planLimited) anyFail = true;
     gates.push({ label, ...r });
@@ -2637,7 +2733,7 @@ function reportFull(label, items, shown) {
   addGate('Component props match Figma  (names, defaults, variant options & slots vs code)',
     (cfg.frameworkComponents === false && cfg.htmlRealization)
       ? parseGeneric(rCompProp, /REALIZED|UNREALIZED|UNMAPPED|VIA STATE/)
-      : parseComponentFrameworkGate(rCompProp, /OK|MISSING|VALUE|SLOT|NO FILE|RENAME/));
+      : parseComponentFrameworkGate(rCompProp, /OK|MISSING|NAME|VALUE|SLOT|NO FILE|RENAME/));
   addGate('Sub-components match Figma  (the sub-components Figma nests are the ones the code uses)',
     (cfg.frameworkComponents === false && cfg.htmlRealization)
       ? parseGeneric(rCompose, /OK|MISSING|SKIP/)
@@ -3570,6 +3666,27 @@ function reportFull(label, items, shown) {
     }
   }
 
+  // ── Accessibility from the code, no browser (I34, advisory) ──────────────────
+  // Always runs, with or without a page to open: names, focus styles, keyboard and aria mistakes read from the
+  // markup and the CSS. The browser check below deepens it when it can run. Off with ds-config "a11yStatic": false.
+  if (cfg.a11yStatic !== false) {
+    try {
+      const { staticA11y } = await import('./a11y-static.mjs');
+      const { findings, files } = staticA11y(ROOT);
+      if (findings.length) {
+        const count = (k) => findings.filter((f) => f.kind === k).length;
+        const parts = [['name', 'with no accessible name'], ['focus', 'focus outline removed and not put back'], ['keyboard', 'keyboard'], ['aria', 'aria'],
+          ['language', 'page with no language'], ['zoom', 'zoom blocked'], ['motion', 'animation with no reduced-motion alternative']].filter(([k]) => count(k)).map(([k, w]) => `${count(k)} ${w}`);
+        console.log(C.yellow(`\n♿ Accessibility from the code (no browser needed): ${findings.length} finding${findings.length === 1 ? '' : 's'} in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'} (${parts.join(' · ')}). Advisory.`));
+        const all = process.argv.includes('--a11y');
+        for (const f of findings.slice(0, all ? findings.length : 15)) console.log(C.yellow(`     ${f.file}:${f.line}  ${f.desc}`));
+        if (!all && findings.length > 15) console.log(`     and ${findings.length - 15} more; run with --a11y to list them all.`);
+      } else if (files.markup || files.styles) {
+        console.log(C.green(`\n♿ Accessibility from the code (no browser needed): nothing found in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'}.`));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Accessibility from the code not checked: ${e.message}`)); }
+  }
+
   // ── Agent instruction files tell the truth (I57, advisory) ──────────────────
   // AGENTS.md, CLAUDE.md, DESIGN.md, Cursor/Copilot rules and skills state design-system names from memory;
   // a wrong one makes every agent that reads it build the wrong thing. Each name they state is checked against
@@ -3604,6 +3721,25 @@ function reportFull(label, items, shown) {
     } catch (e) { console.log(C.dim(`ℹ️  Agent instruction files not checked: ${e.message}`)); }
   }
 
+  // ── The Figma file's own hygiene (I23, advisory) ──────────────────────────────
+  // Values with no variable or style, detached instances, variants with no auto layout, components with no
+  // description: read from the hygiene record the component-values sweep writes. For whoever keeps the Figma
+  // file; the parity never changes Figma. Silent until the sweep carries the record. Off with "figmaHygiene": false.
+  if (cfg.figmaHygiene !== false) {
+    try {
+      const { hygieneBlock, hygieneScore, hygieneFindings } = await import('./figma-hygiene.mjs');
+      const values = JSON.parse(readFileSync(join(ROOT, 'component-values.snapshot.json'), 'utf8'));
+      const only = _scopeNames.length ? _scopeNames : null;
+      const lines = hygieneBlock(values, { only, all: process.argv.includes('--hygiene') });
+      if (lines.length) {
+        const clean = !hygieneFindings(values, { only }).length;
+        console.log((clean ? C.green : C.yellow)(`\n${lines[0]}`));
+        for (const l of lines.slice(1)) console.log(C.yellow(l));
+        _sc.hygiene = hygieneScore(values, { only });
+      }
+    } catch { /* no component-values.snapshot.json: nothing to read */ }
+  }
+
   // ── AI-readiness scorecard (I12, advisory, never a gate) ────────────────────
   // A running R/Y/G measure across a few axes, aggregated from signals this run already produced.
   // Not a grade and it never blocks - a trend you watch move over time.
@@ -3630,6 +3766,11 @@ function reportFull(label, items, shown) {
       const gp = Math.round((c.withGuid / c.n) * 100);
       rows.push([band(dp, 90, 60), 'Documentation', `${c.withDesc}/${c.n} contracts have a description (${dp}%)`]);
       rows.push([band(gp, 60, 20), 'AI guidance', `${c.withGuid}/${c.n} carry whenNotToUse/useInstead (${gp}%)`]);
+    }
+
+    if (_sc.hygiene?.n) {
+      const h = _sc.hygiene, hp = Math.round((h.clean / h.n) * 100);
+      rows.push([band(hp, 90, 60), 'Figma hygiene', `${h.clean}/${h.n} components with every value bound, auto layout and a description (${hp}%)`]);
     }
 
     console.log('\n' + C.bold('  AI-READINESS SCORECARD') + C.dim('  (advisory - a running measure, never blocks)'));
@@ -3689,7 +3830,7 @@ function reportFull(label, items, shown) {
   console.log = _log;
   let _burndownLines = [], _burndownNext = null;
   try {
-    const { collectFindings, diffFindings, diffReport, burndown, burndownLines } = await import('./run-diff.mjs');
+    const { collectFindings, diffFindings, diffReport, burndown, burndownLines, componentOf } = await import('./run-diff.mjs');
     const ledgerPath = join(ROOT, '.parity-out', 'last-findings.json');
     let ledger = {};
     try { ledger = JSON.parse(readFileSync(ledgerPath, 'utf8')); } catch { /* first run */ }
@@ -3716,7 +3857,9 @@ function reportFull(label, items, shown) {
     try {
       const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
       const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_') && n.length > 2);
-      const bd = burndown(now, names, prev?.findings ?? null);
+      // A scoped run counts only its own components (an advisory block about another one is not its work).
+      const mine = (list) => (list && _scopeNames.length ? list.filter((f) => { const c = componentOf(f, names); return !c || _scopeNames.includes(c); }) : list);
+      const bd = burndown(mine(now), names, mine(prev?.findings ?? null));
       const lines = burndownLines(bd, { scoped: _scopeNames.length > 0 });
       _burndownLines = lines; _burndownNext = bd.rows[0]?.name ?? null;
       if (lines.length) console.log(`\n📉 ${lines.join('\n')}`);

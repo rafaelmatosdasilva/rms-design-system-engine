@@ -20,12 +20,19 @@ test('a wrong prop value, in code or in a listed set, with the value the system 
   assert.deepEqual(find('Status tones: `tone`: success | warning | error'), [[1, 'prop value', 'tone="error"', 'tone="danger"']]);
   assert.deepEqual(find('<Badge tone="error">Failed</Badge>'), [[1, 'prop value', 'tone="error"', 'tone="danger"']]);
   assert.deepEqual(find('<Badge tone="danger" />, tone: neutral | success | warning | danger'), []);
-  assert.deepEqual(find('<Chip size="md">'), []);                     // md is M
+  assert.deepEqual(find('<Chip size="md">'), [[1, 'prop value', 'size="md"', 'size="M"']]);   // md means M, but the name is not M
   assert.deepEqual(find('<Chip size="xl">'), [[1, 'prop value', 'size="xl"', null]]);
   assert.match(steeringLine('AGENTS.md', steeringFindings('<Chip size="xl">', truth)[0]), /^AGENTS\.md:1  size="xl" is not a value this prop takes; the system has M, L$/);
   assert.deepEqual(find('<Chip icon="yes">'), []);                    // booleans are not a vocabulary
-  assert.deepEqual(find('Pick a size: small or large.'), [[1, 'prop value', 'size="small"', null]]);   // large is L; the chip has no small
+  assert.deepEqual(find('Pick a size: small or large.'), [[1, 'prop value', 'size="small"', null], [1, 'prop value', 'size="large"', 'size="L"']]);   // no small; large is named L
   assert.deepEqual(find('The size: keep it readable, and the state of the art moves fast.'), []);   // prose, no value of the prop
+});
+
+test('a prop name written in code other than the way the code writes it', () => {
+  assert.deepEqual(find('<Badge Tone="danger">'), [[1, 'prop name', 'Tone', 'tone']]);
+  assert.deepEqual(find('<Badge TONE="error">'), [[1, 'prop name', 'TONE', 'tone'], [1, 'prop value', 'TONE="error"', 'tone="danger"']]);
+  assert.deepEqual(find('The Tone: neutral or danger. Size matters.'), []);   // prose is not code
+  assert.match(steeringLine('AGENTS.md', steeringFindings('<Badge Tone="danger">', truth)[0]), /^AGENTS\.md:1  Tone is not the prop's name as the code writes it; the system has tone$/);
 });
 
 test('ghost variables and tokens; command flags, URLs and file paths are left alone', () => {
@@ -77,7 +84,8 @@ test('in a real run on the demo design system: wrong names are listed, a correct
     return r.stdout + r.stderr;
   };
   const bad = run({ 'AGENTS.md': 'Use <Chip size="XL"> next to <Button />.\nRound it with var(--radii-chipp).\nThe radius token is radii/chipz.\nRun rms-figma-code-parity --component chip.\n' });
-  assert.match(bad, /🧭 Agent instruction files: 3 design-system names that do not exist \(AGENTS\.md\)/);
+  const saved = join(tmpdir(), `steer-run-${process.pid}.txt`); writeFileSync(saved, bad);
+  assert.match(bad, /🧭 Agent instruction files: 3 design-system names that do not exist \(AGENTS\.md\)/, `full output in ${saved}`);
   assert.match(bad, /AGENTS\.md:1  size="XL" is not a value this prop takes; the system has M, L/);
   assert.match(bad, /AGENTS\.md:2  --radii-chipp is not a declared CSS variable; the system has --radii-chip/);
   assert.match(bad, /AGENTS\.md:3  radii\/chipz is not a token; the system has radii\/chip/);

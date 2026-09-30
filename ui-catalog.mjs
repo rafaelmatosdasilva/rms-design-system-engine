@@ -5,7 +5,7 @@
 // design-system UI if it is told exactly what exists, and its output is checked every time.
 //   • buildCatalog()  - one entry per component, from the contracts (Figma) and, when fresh, the
 //                       code snapshot: its props with their allowed values and defaults, the code
-//                       prop names, which components it may contain, what never goes with it, its
+//                       prop names (and the code's own values, with the wrong names an agent will guess), which components it may contain, what never goes with it, its
 //                       status, and what the code renders (size, target size, per-state values). Written as contracts/catalog.json, and as an aligned table in
 //                       llms.txt (small models read aligned tables far better than JSON Schema).
 //   • checkUi()       - a deterministic, prompt-blind checker for a generated UI. It applies one
@@ -13,6 +13,8 @@
 //                       and reports every finding by name. The count is the quality score.
 //
 // Pure: no I/O. contract-gen.mjs writes the catalog; ui-check.mjs is the command.
+
+import { rejectedNames, rightFor } from './prop-vocabulary.mjs';
 
 const STATE_PROP = /^(state|states|interaction)$/i;
 const TYPE = { enum: 'enum', boolean: 'boolean', text: 'text', instance: 'slot' };
@@ -35,6 +37,14 @@ export function buildCatalog(built, { code = null, selectorFor = null } = {}) {
       const bound = p.bindings?.code?.attribute;
       const codeName = typeof bound === 'string' ? bound : (api?.codeConnect?.[p.name] ?? codeNames.get(p.name.toLowerCase().replace(/[^a-z0-9]/g, '')));
       if (codeName) e.codeName = codeName;
+      // I58: the code's own values when it names them differently (a parity difference the props gate reports),
+      // and the wrong names an agent will guess, each with the right one.
+      if (e.type === 'enum' && e.values) {
+        const codeValues = codeName && Array.isArray(api?.props?.[codeName]?.options) ? api.props[codeName].options.map(String) : [];
+        if (codeValues.length && (codeValues.length !== e.values.length || codeValues.some((v, i) => v !== String(e.values[i])))) e.codeValues = codeValues;
+        const rejected = rejectedNames({ figma: e.values.map(String), code: codeValues });
+        if (Object.keys(rejected).length) e.rejected = rejected;
+      }
       props[p.name] = e;
     }
     const rel = c.relationships ?? {};
@@ -157,7 +167,11 @@ export function checkUi(ui, catalog) {
       for (const [k, v] of Object.entries(props)) {
         const p = def.props?.[k] ?? Object.entries(def.props ?? {}).find(([, e]) => e.codeName === k)?.[1];
         if (!p) { add(2, 'error', node.id, `${node.component} has no prop "${k}"`); continue; }
-        if (p.type === 'enum' && p.values && !p.values.includes(v)) add(2, 'error', node.id, `${node.component}.${k} = ${JSON.stringify(v)} is not one of ${p.values.join(', ')}`);
+        const allowed = k === p.codeName && p.codeValues ? p.codeValues : p.values;   // code props take the code's own names
+        if (p.type === 'enum' && allowed && !allowed.includes(v)) {
+          const right = rightFor(p.rejected, v);
+          add(2, 'error', node.id, `${node.component}.${k} = ${JSON.stringify(v)} is not one of ${allowed.join(', ')}${right ? `: use ${JSON.stringify(right)}` : ''}`);
+        }
         if (p.type === 'boolean' && typeof v !== 'boolean') add(3, 'error', node.id, `${node.component}.${k} must be true or false, not ${JSON.stringify(v)}`);
       }
     }

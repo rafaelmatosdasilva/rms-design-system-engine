@@ -51,7 +51,7 @@ export function cemComponents(manifest, ROOT = '') {
         names: [d.name, d.tagName].filter(Boolean),
         file: mod.path ? resolve(ROOT, mod.path) : null,
         props,
-        slots: { named: (d.slots ?? []).map((s) => s.name).filter(Boolean).map(norm), default: (d.slots ?? []).some((s) => !s.name) },
+        slots: { named: (d.slots ?? []).map((s) => s.name).filter(Boolean), default: (d.slots ?? []).some((s) => !s.name) },
       });
     }
   }
@@ -92,7 +92,7 @@ export function docgenComponents(doc, ROOT = '') {
       names: [d.displayName, d.exportName].filter(Boolean),
       file: file ? resolve(ROOT, file) : null,
       props,
-      slots: { named: slotList.map((s) => s.name).filter((n) => n && n !== 'default').map(norm), default: slotList.some((s) => !s.name || s.name === 'default') },
+      slots: { named: slotList.map((s) => s.name).filter((n) => n && n !== 'default'), default: slotList.some((s) => !s.name || s.name === 'default') },
     };
   });
 }
@@ -252,15 +252,15 @@ export function mergeApiReadings(readings) {
     } else fact.confidence = seen.length >= 2 ? 'verified' : 'single-source';
     props[name] = fact;
   }
-  const named = new Set(), sources = [];
+  const named = new Map(), sources = [];   // norm(name) → the name as the best source writes it
   let hasDefault = false;
   for (const r of readings) {
     if (!r.slots) continue;
-    for (const n of r.slots.named ?? []) named.add(norm(n));
+    for (const n of r.slots.named ?? []) if (!named.has(norm(n))) named.set(norm(n), n);
     if (r.slots.default) hasDefault = true;
   }
   for (const r of readings) sources.push(r.source);
-  return { props, slots: { named: [...named], default: hasDefault }, readBy: sources };
+  return { props, slots: { named: [...named.values()], default: hasDefault }, readBy: sources };
 }
 
 // ── The whole reading, for a list of component names ──────────────────────────

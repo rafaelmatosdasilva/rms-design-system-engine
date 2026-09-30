@@ -4,11 +4,12 @@
 // working directory. runGate() builds a throwaway project from a { path: content } map and
 // runs the gate against it (cwd = fixture), returning { code, out, dir }. `content` is written
 // verbatim when it is a string, otherwise as pretty JSON.
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readdirSync, readFileSync, statSync, symlinkSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import assert from 'node:assert/strict';
 
 const SCRIPTS_DIR = fileURLToPath(new URL('..', import.meta.url));
 
@@ -41,4 +42,65 @@ export const EMPTY_PARITY_MAP =
 // "array config must not crash" test asserts against.
 export function crashed(out) {
   return /TypeError|ERR_INVALID_ARG_TYPE|\bat \S+ \(/.test(out);
+}
+
+// ── A fixture design system audited end to end (demo-ds, harbor-ds) ─────────────────────────
+// A fresh copy of the fixture, every snapshot dated today, committed once so git blame has a commit to name.
+export function fixtureProject(fixture, prefix = 'ds-') {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  cpSync(fixture, dir, { recursive: true, filter: (p) => !/expected-report/.test(p) });
+  const today = new Date().toISOString();
+  const walk = (d) => {
+    for (const n of readdirSync(d)) {
+      const p = join(d, n);
+      if (statSync(p).isDirectory()) { if (n !== '.git') walk(p); }
+      else if (n.endsWith('.json')) writeFileSync(p, readFileSync(p, 'utf8').replace(/"_updated": "[^"]*"/, `"_updated": "${today}"`));
+    }
+  };
+  walk(dir);
+  const env = { ...process.env, GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.com', GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' };
+  for (const args of [['init', '-q'], ['add', '-A'], ['commit', '-qm', 'init']]) execFileSync('git', args, { cwd: dir, env });
+  return dir;
+}
+
+// A PATH with only git and which, so a run meant to be without Chrome cannot find one.
+export function bareEnv() {
+  const bin = mkdtempSync(join(tmpdir(), 'demo-bin-'));
+  for (const name of ['git', 'which']) {
+    const p = spawnSync('which', [name], { encoding: 'utf8' }).stdout.trim();
+    if (p) symlinkSync(p, join(bin, name));
+  }
+  const { CHROME_PATH, ...rest } = process.env;
+  return { ...rest, PATH: bin, PLAYWRIGHT_BROWSERS_PATH: join(bin, 'none') };
+}
+
+// Dates, durations, ages, commit hashes and the temporary directory change from run to run.
+export function normalise(text, dir) {
+  return text.split(dir).join('<DIR>')
+    .replace(/\x1b\[[0-9;]*m/g, '')
+    .replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, '<TS>')
+    .replace(/PARITY AUDIT {2}· {2}[\d-]+/, 'PARITY AUDIT  ·  <DATE>')
+    .replace(/\b\d+(\.\d+)?m?s\b/g, '<DUR>')
+    .replace(/\(([0-9a-f]{7})\)/g, '(<HASH>)')
+    .replace(/\d+h (old|ago)/g, '<AGE>h $1')
+    .replace(/\d+ ?(day|days|hour|hours) ago/g, '<AGE> ago')
+    .replace(/^.*newer version of the parity skill.*\n/gm, '');
+}
+
+// The whole audit on a fresh copy, its output normalised.
+export function auditFixture(fixture, env, prefix, args = []) {
+  const dir = fixtureProject(fixture, prefix);
+  const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...env, NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 300000 });
+  return { dir, code: r.status, out: normalise((r.stdout ?? '') + (r.stderr ?? ''), dir) };
+}
+
+// The report compared with a committed golden. UPDATE_GOLDEN=1 rewrites it.
+export function golden(fixture, name, out) {
+  const p = join(fixture, name);
+  if (process.env.UPDATE_GOLDEN === '1' || !existsSync(p)) { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, out); return; }
+  const want = readFileSync(p, 'utf8');
+  if (out === want) return;
+  const actual = join(mkdtempSync(join(tmpdir(), 'ds-actual-')), name);
+  writeFileSync(actual, out);
+  assert.fail(`the report differs from ${name} (this run: ${actual}); if the change is intended, rerun with UPDATE_GOLDEN=1 and review the diff`);
 }

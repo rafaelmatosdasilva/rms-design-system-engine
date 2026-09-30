@@ -1,0 +1,24 @@
+{
+  "_note": "Harbor, a second fictional design system for the end-to-end golden test (test/harbor-ds.test.mjs). Every name is invented. Its conventions differ from the demo on purpose: Vue components, a class dark mode, a CSS variable prefix, snapshot files under their own names, and one component whose prop values the code writes in lowercase.",
+  "maxSnapshotAgeDays": 30,
+  "figma": {
+    "modes": [
+      { "name": "Light", "snapshotKey": "light", "cssSelector": "root" },
+      { "name": "Dark", "snapshotKey": "dark", "cssSelector": "class:theme-dark" }
+    ],
+    "namingConvention": { "prefix": "--hb-", "dropSegments": ["color"] }
+  },
+  "paths": {
+    "themeCSS": "styles/tokens.css",
+    "snapshotVars": "figma/vars.snapshot.json",
+    "snapshotStructure": "figma/structure.snapshot.json",
+    "compPropsSnapshot": "figma/props.snapshot.json",
+    "plugins": [],
+    "pluginCSS": []
+  },
+  "componentFiles": {
+    "button": "components/HbButton.vue",
+    "badge": "components/HbBadge.vue",
+    "iconButton": "components/HbIconButton.vue"
+  }
+}
