@@ -25,6 +25,25 @@ test('keyboard and aria mistakes', () => {
   assert.deepEqual(kinds(markupFindings('<span aria-lable="x" aria-label="y" aria-pressed="false"></span>')), [[1, 'aria']]);
 });
 
+test('links, image alts, hidden focusable elements, the page language and zoom', () => {
+  assert.deepEqual(kinds(markupFindings('<a href="/x"><svg/></a>\n<a href="/y">Home</a>\n<a href="/z"><img alt="Home" src="h.png"></a>\n<a name="top"></a>')), [[1, 'name']]);
+  assert.deepEqual(kinds(markupFindings('<a href="/x" aria-label="Close"><svg/></a>\n<a :href="u">{{ label }}</a>')), []);
+  assert.deepEqual(kinds(markupFindings('<button><img src="x.svg" alt="Close"></button>\n<button><svg><title>Close</title></svg></button>')), []);   // named inside
+  assert.deepEqual(kinds(markupFindings('<img src="a.png" alt="hero-banner.png">\n<img src="b.png" alt="A harbour at dawn">')), [[1, 'name']]);
+  assert.deepEqual(kinds(markupFindings('<button aria-hidden="true">x</button>\n<span aria-hidden="true">x</span>\n<a href="#" aria-hidden="true" tabindex="-1">x</a>\n<div aria-hidden={true} tabIndex={0}>x</div>')), [[1, 'aria'], [4, 'aria']]);
+  assert.deepEqual(kinds(markupFindings('<!doctype html>\n<html>\n<p>set it on <html> in prose</p>')), [[2, 'language']]);
+  assert.deepEqual(kinds(markupFindings('<!doctype html><html lang="en">\n<p>a <html> in prose is not a page</p>')), []);
+  assert.deepEqual(kinds(markupFindings('<meta name="viewport" content="width=device-width, user-scalable=no">\n<meta name="viewport" content="width=device-width, maximum-scale=5">')), [[1, 'zoom']]);
+});
+
+test('an animation needs a reduced-motion alternative somewhere in the project', () => {
+  const run = (files) => staticA11y(makeFixture(files)).findings.filter((f) => f.kind === 'motion').map((f) => `${f.file}:${f.line}`);
+  assert.deepEqual(run({ 'a.css': '.x { animation: none; }\n.m {\n  animation: pop 0.2s both;\n}' }), ['a.css:3']);
+  assert.deepEqual(run({ 'a.css': '.m { animation: pop 0.2s; }', 'b.css': '@media (prefers-reduced-motion: reduce) { .m { animation: none; } }' }), []);
+  assert.deepEqual(run({ 'a.css': '.m { animation: pop 0.2s; }', 'm.js': "matchMedia('(prefers-reduced-motion: reduce)')" }), []);
+  assert.deepEqual(run({ 'a.css': '.m { transition: opacity 0.2s; }' }), []);   // a transition is not an animation
+});
+
 test('a removed focus outline must be put back somewhere', () => {
   assert.deepEqual(kinds(cssFindings('.btn { outline: none; }')), [[1, 'focus']]);
   assert.deepEqual(kinds(cssFindings('.btn { outline: none; }\n.btn:focus-visible { box-shadow: 0 0 0 2px blue; }')), []);

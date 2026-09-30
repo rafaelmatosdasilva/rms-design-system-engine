@@ -9,7 +9,11 @@
 //   • CSS that removes the focus outline and never puts a focus style back;
 //   • a positive tabindex (it breaks the reading order);
 //   • a click handler on a div or span with no role and no tabindex (a mouse-only control);
-//   • an aria-* attribute that does not exist.
+//   • an aria-* attribute that does not exist;
+//   • a link with no accessible name, an image whose alt is a file name;
+//   • aria-hidden="true" on an element that takes focus (a keyboard reaches what a screen reader cannot see);
+//   • a page with no lang, a viewport that blocks zoom (user-scalable=no, maximum-scale=1);
+//   • animations with no prefers-reduced-motion alternative anywhere in the project.
 // An element whose attributes are spread ({...props}, v-bind="$attrs") can receive them from outside: it is
 // never reported.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -27,6 +31,9 @@ const ARIA = new Set(('activedescendant atomic autocomplete braillelabel braille
   'valuetext').split(' '));
 
 const lineAt = (text, i) => text.slice(0, i).split('\n').length;
+// A name given inside the element: an image's alt, an svg <title>, an aria-label on a child.
+const innerName = (inner) => /<img\b[^>]*\balt\s*=\s*["'][^"']*\w[^"']*["']/i.test(inner) || /<title>\s*[^<\s][^<]*<\/title>/i.test(inner) || /\baria-label\s*=\s*["'][^"']*\w/i.test(inner);
+const visibleText = (inner) => inner.replace(/<[^>]*aria-hidden\s*=\s*["']?true["']?[^>]*>[\s\S]*?<\/[^>]+>/gi, '').replace(/<[^>]+>/g, '').trim();
 const spread = (attrs) => /\{\s*\.\.\.|v-bind\s*=\s*["']\$attrs|v-bind\s*=\s*["']\$props|\{\.\.\./.test(attrs);
 const has = (attrs, name) => new RegExp(`(?:^|\\s|:|v-bind:)${name}\\s*=`, 'i').test(attrs) || new RegExp(`(?:^|\\s):${name}\\b`, 'i').test(attrs);
 
@@ -39,12 +46,20 @@ export function markupFindings(text) {
     if (spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'title')) continue;
     if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
     if (/<\w+\b[^>]*\bid\s*=\s*["'][^"']+["'][^>]*>\s*<\//.test(inner)) continue;   // an empty element with an id: a script fills it
-    const visible = inner.replace(/<[^>]*aria-hidden\s*=\s*["']?true["']?[^>]*>[\s\S]*?<\/[^>]+>/gi, '').replace(/<[^>]+>/g, '').trim();
-    if (!visible) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside and no aria-label, aria-labelledby or title' });
+    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside and no aria-label, aria-labelledby or title' });
+  }
+  for (const m of src.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const [, attrs, inner] = m;
+    if (!has(attrs, 'href') || spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'title')) continue;
+    if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
+    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside and no aria-label, aria-labelledby or title' });
   }
   for (const m of src.matchAll(/<img\b([^>]*)>/gi)) {
     if (!spread(m[1]) && !has(m[1], 'alt') && !has(m[1], 'aria-label') && !has(m[1], 'aria-labelledby') && !/role\s*=\s*["']presentation|role\s*=\s*["']none/i.test(m[1]))
       out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'an image with no alt (use alt="" when it is decorative)' });
+    const alt = /\balt\s*=\s*["']([^"']+)["']/i.exec(m[1])?.[1];
+    if (alt && /^[\w./-]+\.(png|jpe?g|gif|svg|webp|avif)$/i.test(alt.trim()))
+      out.push({ line: lineAt(src, m.index), kind: 'name', desc: `an image whose alt is a file name ("${alt.trim()}"): describe the image, or use alt="" when it is decorative` });
   }
   for (const m of src.matchAll(/<input\b([^>]*)>/gi)) {
     const attrs = m[1];
@@ -61,6 +76,22 @@ export function markupFindings(text) {
     if (!/(?:^|\s)(onClick|@click|v-on:click|on:click)\b/.test(attrs) || spread(attrs)) continue;
     if (has(attrs, 'role') && /tab[iI]ndex/.test(attrs)) continue;
     out.push({ line: lineAt(src, m.index), kind: 'keyboard', desc: `a clickable <${m[1]}> with no ${has(attrs, 'role') ? 'tabindex' : 'role and no tabindex'}: a keyboard cannot reach it (use a <button>)` });
+  }
+  for (const m of src.matchAll(/<(button|a|input|select|textarea|summary|[a-z][\w-]*)\b([^>]*)>/gi)) {
+    const [, tag, attrs] = m;
+    if (!/(?:^|\s)aria-hidden\s*=\s*(\{\s*true\s*\}|["']true["'])/.test(attrs)) continue;
+    const focusable = /^(button|input|select|textarea|summary)$/i.test(tag) || (/^a$/i.test(tag) && has(attrs, 'href')) || /\btab[iI]ndex\s*=\s*\{?\s*["']?(0|[1-9]\d*)\b/.test(attrs);
+    if (focusable && !/\btab[iI]ndex\s*=\s*\{?\s*["']?-1\b/.test(attrs) && !/\bdisabled\b/.test(attrs))
+      out.push({ line: lineAt(src, m.index), kind: 'aria', desc: `aria-hidden="true" on a <${tag}> that takes focus: a keyboard reaches what a screen reader cannot see` });
+  }
+  // Only a page's own root: the document starts with <!doctype html> or <html> (an <html> in prose or a comment is not one).
+  const root = /^\s*(?:<!doctype html[^>]*>\s*)?(<html\b([^>]*)>)/i.exec(src);
+  if (root && !has(root[2], 'lang') && !spread(root[2]))
+    out.push({ line: lineAt(src, root.index + root[0].indexOf(root[1])), kind: 'language', desc: 'a page with no lang: a screen reader cannot pick the voice (add lang="en", or the page\'s language)' });
+  for (const m of src.matchAll(/<meta\b[^>]*name\s*=\s*["']viewport["'][^>]*>/gi)) {
+    const content = /content\s*=\s*["']([^"']*)["']/i.exec(m[0])?.[1] ?? '';
+    if (/user-scalable\s*=\s*(no|0)\b|maximum-scale\s*=\s*1(\.0+)?\b(?!\.\d*[1-9])/i.test(content))
+      out.push({ line: lineAt(src, m.index), kind: 'zoom', desc: `the viewport blocks zoom (${content.trim()}): people who need larger text cannot zoom in` });
   }
   for (const m of src.matchAll(/\baria-([a-z]+)\s*=/g))
     if (!ARIA.has(m[1])) out.push({ line: lineAt(src, m.index), kind: 'aria', desc: `aria-${m[1]} is not an ARIA attribute` });
@@ -149,5 +180,15 @@ export function staticA11y(ROOT) {
   const styleText = new Map(styles.map((f) => [f, ['.vue', '.svelte'].includes(extname(f)) ? styleOnly(read(f)) : read(f)]));
   const all = [...styleText.values()].join('\n');
   for (const [f, text] of styleText) for (const x of cssFindings(text, all)) findings.push({ file: relative(ROOT, f), ...x });
+  // Animations with no reduced-motion alternative anywhere: reported once, at the first animation.
+  const scripts = walk(ROOT, new Set(['.js', '.mjs', '.ts']));
+  const reduced = /prefers-reduced-motion/.test(all) || markup.some((f) => /prefers-reduced-motion/.test(read(f))) || scripts.some((f) => /prefers-reduced-motion/.test(read(f)));
+  if (!reduced) {
+    for (const [f, text] of styleText) {
+      const css = text.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+      const a = /(?:^|[;{\s])animation(?:-name)?\s*:(?!\s*(?:none|initial|inherit|unset)\s*[;}])\s*[^;}\s][^;}]*/.exec(css);
+      if (a) { findings.push({ file: relative(ROOT, f), line: lineAt(css, a.index + (a[0].match(/^\s*[;{]?\s*/)?.[0].length ?? 0)), kind: 'motion', desc: 'an animation, and no prefers-reduced-motion alternative anywhere in the project: people who get sick from motion cannot turn it off' }); break; }
+    }
+  }
   return { findings, files: { markup: markup.length, styles: styles.length } };
 }
