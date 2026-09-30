@@ -18,6 +18,7 @@
 // Performance: the subprocess-based gates all run in parallel via Promise.all; the inline
 //              gates (freshness, CSS hygiene) are computed on the main thread.
 
+import './stdio-sync.mjs';   // first: a report read through a pipe is never cut off at exit
 import readline                                                  from 'readline';
 import { spawn, spawnSync }                                      from 'child_process';
 import { existsSync, readdirSync, readFileSync, statSync,
@@ -26,7 +27,7 @@ import { existsSync, readdirSync, readFileSync, statSync,
 import { join, dirname, resolve, relative }                     from 'path';
 import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
-import { fileURLToPath }                                        from 'url';
+import { fileURLToPath, pathToFileURL }                         from 'url';
 import { makeFigmaFetch }                                       from './figma-fetch.mjs';
 import { collectRawValues, COLLECT_NODE_BUDGET }                from './collect-raw-values.mjs';
 import { extractDynamicClassPrefixes }                          from './dynamic-class-prefixes.mjs';
@@ -1359,7 +1360,7 @@ function reportFull(label, items, shown) {
         res({ status: why ? 1 : status, stdout, stderr, ...(why ? { stopped: why } : {}) });
       };
       let child;
-      try { child = spawn(process.execPath, [abs, ...args], { cwd: ROOT, env: process.env }); }
+      try { child = spawn(process.execPath, ['--import', pathToFileURL(join(SCRIPT_DIR, 'stdio-sync.mjs')).href, abs, ...args], { cwd: ROOT, env: process.env }); }
       catch (e) { return finish(1, `could not start (${e.message})`); }
       const timer = setTimeout(() => { timedOut = true; try { child.kill('SIGKILL'); } catch { /* already gone */ } }, GATE_TIMEOUT_MS);
       child.stdout.on('data', d => { stdout += d; });

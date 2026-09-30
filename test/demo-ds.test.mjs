@@ -92,7 +92,8 @@ test('demo design system, with Chrome: every deliberate difference is found, and
   assert.match(r.out, /❌ \[sizing\/-\] radii\/chip → --radii-chip/);
   assert.match(r.out, /button hover while disabled \(Disabled=True\): Figma no change, rendered changes background/);
   assert.match(r.out, /chip height \(Size=L, Icon=True\): Figma 32, rendered 36px/);
-  assert.match(r.out, /chip \(toggle button\)|component does not expose what its role requires/);
+  const saved = join(tmpdir(), `demo-run-${process.pid}.txt`); writeFileSync(saved, r.out);
+  assert.match(r.out, /chip \(toggle button\)|component does not expose what its role requires/, `full output in ${saved}`);
   assert.doesNotMatch(r.out, /chip height \(Icon=True\)/);   // a single axis is never compared with a combination
   assert.match(r.out, /🖼  ⚠️  button: [\d.]+% of pixels differ outside text/);   // a border only the Figma image has
   assert.match(r.out, /🖼  ✓  chip: 0% of pixels differ outside text/);
