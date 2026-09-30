@@ -236,6 +236,9 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 ℹ️  Decision status: 1 experimental  (llms.txt tells agents which one won and why)
 ℹ️  Contract completeness: 4/4 have a description · 4/4 have semantics · 0/4 carry whenNotToUse/useInstead guidance. Advisory only.
 
+♿ Accessibility from the code (no browser needed): 1 finding in 3 markup and 1 style file (1 focus outline removed and not put back). Advisory.
+     src/theme.css:70  .tp-field__input removes the focus outline and no focus style puts one back
+
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
   ● Gate health      23/25 gates pass
   ● Coverage         3/3 components modelled (100%)  ·  exemption debt 0
@@ -246,7 +249,7 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: button 5 · chip 3 · 13 not tied to a component
+📉 Burndown, open findings per component: button 5 · chip 3 · field 1 · 13 not tied to a component
    next up: button. Run with --component button, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -265,7 +268,7 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 - button hover while disabled (Disabled=True): Figma no change, rendered changes background  (.tp-button:hover · src/theme.css:44)  [read from one source]
 - chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip.tp-chip--l.tp-chip--icon · src/theme.css:60)  → set 32px
 
-Burndown, open findings per component: button 5 · chip 3 · 13 not tied to a component
+Burndown, open findings per component: button 5 · chip 3 · field 1 · 13 not tied to a component
 
 NEXT: tell the user what fails under "Token values" and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 

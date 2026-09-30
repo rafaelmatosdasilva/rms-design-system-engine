@@ -188,6 +188,9 @@
 ℹ️  Decision status: 1 experimental  (llms.txt tells agents which one won and why)
 ℹ️  Contract completeness: 4/4 have a description · 4/4 have semantics · 0/4 carry whenNotToUse/useInstead guidance. Advisory only.
 
+♿ Accessibility from the code (no browser needed): 1 finding in 3 markup and 1 style file (1 focus outline removed and not put back). Advisory.
+     src/theme.css:70  .tp-field__input removes the focus outline and no focus style puts one back
+
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
   ● Gate health      23/25 gates pass
   ● Coverage         3/3 components modelled (100%)  ·  exemption debt 0
@@ -198,7 +201,7 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: chip 2 · 7 not tied to a component
+📉 Burndown, open findings per component: chip 2 · field 1 · 7 not tied to a component
    next up: chip. Run with --component chip, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -213,7 +216,7 @@
   - [sizing/-] radii/chip → --radii-chip
     - Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px
 
-Burndown, open findings per component: chip 2 · 7 not tied to a component
+Burndown, open findings per component: chip 2 · field 1 · 7 not tied to a component
 
 NEXT: tell the user what fails under "Token values" and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 
