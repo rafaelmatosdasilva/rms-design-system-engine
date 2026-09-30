@@ -121,6 +121,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 - `scopeMaxNestPerFile` (default 8) - how many nested selectors per file the token-scope check reads.
 - `states` - which Figma prop and value is each interaction concept, when the names do not say it: `{ "hover": { "prop": "State", "value": "Hover" }, "active": { "prop": "State", "value": "Pressed" }, "disabled": { "prop": "isDisabled" } }` (a prop without a value is a boolean, true meaning the state). Used for the disabled exemption in contrast checks, to find the disabled state for the disabled-wins check, and by the props check (a declared axis with a value, such as `State`, is a state axis and not a missing code prop). An undeclared concept is read from the names (a boolean only when true).
 - `hooks: false` - the project's Claude Code hooks (see *The project's hooks* in the main guide) pass everything.
+- `editCheck: false` - turns off the check after each UI edit (the PostToolUse hook in `edit-check.mjs`): after an Edit, MultiEdit or Write on a style, markup or component file it reads only what the edit added and hands back a colour written by hand (with the token that has that value), a CSS variable declared nowhere, and a prop value or prop name a design-system component tag does not take. Token definitions, the theme file, comments, link fragments, data tables, canvas painting, the HTML element's own attributes and files built from a `.src` beside them are never flagged.
 - `rtl: true` - lists the declarations that would not mirror in a right-to-left language (one-sided or asymmetric `padding-left`, `margin-right`, `border-left`, `left`/`right` offsets, `text-align` and `float` left or right), each with its file and line and the logical property to use. Symmetric values are not listed.
 - `renderedParityStrict: true` - the measured differences (Gate [13] `MEASURED`) fail the gate instead of being advisory.
 - `workarounds: false` - turns off the `🧩 Built around a component` block (a screen's own control laid over a design-system component or a text field, reported to the design-system side as a missing slot or prop).
@@ -169,6 +170,14 @@ through `figmaFetch` (`figma-fetch.mjs`), which aborts after `FIGMA_FETCH_TIMEOU
 committed snapshot, so a slow API degrades to "refresh skipped, using cache" instead of a hang. If
 Phase 1 warns `Figma API did not respond within Ns`, the audit still runs at full strength against
 the committed snapshots — re-run later (or raise `FIGMA_FETCH_TIMEOUT_MS` for a genuinely large file).
+
+**A Figma call budget.** A seat has a daily or monthly quota of API calls, so a refresh spends as few as it
+can and says how many: the same request is asked once per run, the refresh prints `Figma refresh: N API calls`,
+and it is skipped (one call, for the file's version) when the file's version, the config and the engine are the
+same as at the last complete refresh and its snapshots are all there (`.parity-out/figma-refresh.json`;
+`FIGMA_REFRESH=force` refreshes anyway). A 429 whose `Retry-After` is longer than `FIGMA_LONG_LIMIT_S`
+(default 120) is a daily or monthly limit: the refresh stops at once, names the plan and the wait Figma gives,
+and keeps the snapshots as they were, instead of spending more calls on retries.
 
 **The component-values sweep is CPU-bounded too.** A network timeout can't rescue a *synchronous*
 runaway: Figma's `/nodes` endpoint expands instance subtrees inline, so a component set with nested

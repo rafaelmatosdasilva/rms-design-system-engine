@@ -116,7 +116,7 @@ function routeOnly(text, { hasConfig, components, cmd }) {
     }
     if (recipe === 'accept-debt') return { recipe, question, run: question ? [] : [`${scoped} --baseline --findings`], notes };
     if (recipe === 'fix-a-difference') {
-      notes.push('Fix exactly what was asked, in the code, at the file and line the audit names; then run the same audit again.');
+      notes.push('Fix exactly what was asked, in the code, at the file and line the audit names, and nothing else: list the other differences the audit shows and leave them as they are; then run the same audit again.');
       return { recipe, question, run: [scoped], notes };
     }
     if (recipe === 'burndown') return { recipe, question, run: [cmd], notes };
