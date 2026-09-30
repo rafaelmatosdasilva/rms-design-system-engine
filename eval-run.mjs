@@ -9,15 +9,19 @@
 //   "evals": {
 //     "cases": [ { "id": "login", "prompt": "build a login screen with the DS", "component": "input" } ],
 //     "outDir": "evals",            // where <id>.<ext> candidates live (default: "evals")
-//     "strict": false               // true → exit 1 when any candidate has violations
+//     "strict": false,              // true → exit 1 when any candidate has violations
+//     "levels": ["bare", "steering", "parity"]   // I60: the same cases per kind of guidance (or --levels)
 //   }
 
+import './stdio-sync.mjs';   // the whole report reaches a pipe before process.exit
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { evalConformance } from './eval-check.mjs';
 import { createLocator, loadLocator } from './component-locator.mjs';
+import { markupFindings } from './a11y-static.mjs';
+import { findSteeringFiles } from './steering-check.mjs';
 
 const CANDIDATE_EXTS = ['html', 'htm', 'jsx', 'tsx', 'vue', 'svelte', 'js', 'ts', 'md', 'txt'];
 
@@ -44,18 +48,23 @@ export function loadContext(ROOT, cfg, { locator = createLocator(cfg) } = {}) {
 
 // A configurable command adapter, so ANY agent/CLI can plug in (no provider lock-in). The command
 // runs via the shell; the caller decides what it reads/writes. Injectable `run` for tests.
-const defaultRun = (cmd, input, env) => execFileSync('/bin/sh', ['-c', cmd], {
-  input: input ?? '', env: { ...process.env, ...env }, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 180000,
-});
+// A command that does not read its stdin can exit before the prompt is written: that EPIPE is not a
+// failure, its output is whole (it made a candidate from $EVAL_CONTEXT or its own prompt). A non-zero exit is.
+const defaultRun = (cmd, input, env) => {
+  const r = spawnSync('/bin/sh', ['-c', cmd], { input: input ?? '', env: { ...process.env, ...env }, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 180000 });
+  if (r.error && r.error.code !== 'EPIPE') throw r.error;
+  if (r.status !== 0) throw new Error(`exit ${r.status}: ${String(r.stderr ?? '').slice(0, 200)}`);
+  return r.stdout;
+};
 
 // GENERATION adapter (I7): run `cmd` to produce a candidate from the prompt. The prompt is piped on
 // stdin; the DS context path (llms.txt) is in $EVAL_CONTEXT, and $EVAL_ID / $EVAL_COMPONENT are set.
 // The candidate is the command's stdout. Returns null on any failure (degrade-safe).
-export function generateCandidate(c, cmd, ctxPath, run = defaultRun) {
+export function generateCandidate(c, cmd, ctxPath, run = defaultRun, env = {}) {
   if (!cmd) return null;
   const prompt = `${c.prompt || ''}${c.component ? `\n\nUse the design system component: ${c.component}.` : ''}`;
   try {
-    const out = run(cmd, prompt, { EVAL_CONTEXT: ctxPath || '', EVAL_ID: c.id || '', EVAL_COMPONENT: c.component || '' });
+    const out = run(cmd, prompt, { EVAL_CONTEXT: ctxPath || '', EVAL_ID: c.id || '', EVAL_COMPONENT: c.component || '', ...env });
     return out && out.trim() ? out : null;
   } catch { return null; }
 }
@@ -124,6 +133,74 @@ export function loadGuidance(ROOT, cfg, component) {
   } catch { return null; }
 }
 
+// ── Guidance levels (I60) ─────────────────────────────────────────────────────
+// Does a team's guidance help its agents? The same cases run with each kind of context, so the report
+// says what each one adds or costs (both S27 and S28 saw bare agents beat guided ones on mechanical
+// checks):
+//   bare      the prompt alone;
+//   steering  the project's own instruction files (AGENTS.md, CLAUDE.md, Cursor and Copilot rules, skills), joined;
+//   parity    what the parity writes for agents (contracts/llms.txt).
+// The generate command gets the level in $EVAL_LEVEL and the context file in $EVAL_CONTEXT (empty for bare).
+// Scored by the same mechanical checks: DS conformance and the accessibility read from the code.
+export const LEVELS = ['bare', 'steering', 'parity'];
+
+// The context file for a level, or '' (bare, or nothing to give). `why` says why a level has nothing.
+export function levelContext(ROOT, cfg, level, { outDir = 'evals', llmsPath = null } = {}) {
+  if (level === 'bare') return { path: '' };
+  if (level === 'parity') {
+    const p = llmsPath ?? resolve(ROOT, cfg.contracts?.llmsOut || join(cfg.contracts?.out || 'contracts', 'llms.txt'));
+    return existsSync(p) ? { path: p } : { path: '', why: `no ${p.replace(ROOT + '/', '')} yet (run the audit once to write it)` };
+  }
+  if (level === 'steering') {
+    const files = findSteeringFiles(ROOT, { skip: [cfg.contracts?.out || 'contracts', 'node_modules', '.parity-out', outDir] });
+    if (!files.length) return { path: '', why: 'no instruction files found (AGENTS.md, CLAUDE.md, rules)' };
+    const p = resolve(ROOT, outDir, '.context', 'steering.md');
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, files.map((f) => `# ${f.file}\n\n${f.text.trim()}\n`).join('\n'));
+    return { path: p, files: files.map((f) => f.file) };
+  }
+  return { path: '', why: `unknown level "${level}"` };
+}
+
+// Every case at every level, `runs` times. `generate(case, level)` returns the candidate code (or '').
+// → { [level]: { results, summary } }, each result with its accessibility count too.
+export function runLevels(cases, ctx, levels, generate, runs = 1) {
+  const out = {};
+  for (const level of levels) {
+    const results = cases.map((c) => {
+      let cleanRuns = 0, a11y = 0, rep = null, inline = 0;
+      const violations = [];
+      for (let k = 0; k < runs; k++) {
+        const code = generate(c, level) || '';
+        const chk = evalConformance(code, ctx);
+        const found = code ? markupFindings(code).length : 0;
+        if (chk.metrics.clean && !found) cleanRuns++;
+        a11y += found; violations.push(...chk.violations); inline += chk.metrics.inlineStyles || 0;
+        if (!rep || (chk.metrics.produced && !rep.metrics.produced)) rep = { code, ...chk };
+      }
+      return { id: c.id, component: c.component ?? null, code: rep.code, metrics: { ...rep.metrics, inlineStyles: inline }, violations, runs, cleanRuns, a11y };
+    });
+    const summary = summarize(results);
+    summary.a11y = results.reduce((k, r) => k + r.a11y, 0);
+    out[level] = { results, summary };
+  }
+  return out;
+}
+
+// The comparison, one line per level, each against bare when bare ran.
+export function levelLines(byLevel, notRun = {}) {
+  const lines = [];
+  const base = byLevel.bare?.summary;
+  const signed = (n) => (n > 0 ? `+${n}` : String(n));
+  for (const [level, { summary: s }] of Object.entries(byLevel)) {
+    const vs = base && level !== 'bare'
+      ? `  (vs bare: zero-fix ${signed(s.zeroFixRate - base.zeroFixRate)} points, violations ${signed(s.violations - base.violations)}, accessibility ${signed(s.a11y - base.a11y)})` : '';
+    lines.push(`  ${level.padEnd(9)} ${s.produced}/${s.cases} produced · ${s.zeroFixRate}% zero-fix · ${s.violations} violation(s) · ${s.inlineStyles} inline style(s) · ${s.a11y} accessibility finding(s)${vs}`);
+  }
+  for (const [level, why] of Object.entries(notRun)) lines.push(`  ${level.padEnd(9)} not run: ${why}`);
+  return lines;
+}
+
 function fileLoader(ROOT, outDir) {
   return (c) => {
     for (const ext of CANDIDATE_EXTS) {
@@ -159,6 +236,27 @@ async function main() {
   // reliably it comes out clean. Only meaningful with a generate.cmd (a static file is identical every
   // time). Clamped; 3–5 gives signal, 10+ is definitive.
   const runs = (genCmd && Number.isInteger(cfg.evals?.runs) && cfg.evals.runs > 1) ? Math.min(cfg.evals.runs, 20) : 1;
+
+  // GUIDANCE LEVELS (I60): the same cases per kind of context, compared with bare.
+  const levelArg = process.argv.find((a) => a.startsWith('--levels'));
+  const levels = levelArg ? (levelArg.split('=')[1] ?? process.argv[process.argv.indexOf(levelArg) + 1] ?? LEVELS.join(',')).split(',').map((x) => x.trim()).filter(Boolean)
+    : Array.isArray(cfg.evals?.levels) ? cfg.evals.levels : null;
+  if (levels?.length) {
+    if (!genCmd) { console.log('\n⏭  evals: guidance levels need evals.generate.cmd (the command that generates a candidate). Nothing to run.\n'); process.exit(0); }
+    const ctxOf = {}, notRun = {};
+    for (const l of levels) { const c = levelContext(ROOT, cfg, l, { outDir }); if (l !== 'bare' && !c.path) notRun[l] = c.why; else ctxOf[l] = c.path; }
+    const byLevel = runLevels(cases, ctx, Object.keys(ctxOf), (c, level) => generateCandidate(c, genCmd, ctxOf[level], undefined, { EVAL_LEVEL: level }), runs);
+    console.log(`\n─── Guidance levels: the same ${cases.length} case(s), ${runs} run(s) each ───────────────────`);
+    for (const l of levelLines(byLevel, notRun)) console.log(l);
+    console.log('   A case is clean when it has no DS violation and no accessibility finding. Advisory: it never gates the repo.\n');
+    try {
+      const hp = join(ROOT, 'evals-history.json');
+      let hist = []; try { hist = JSON.parse(readFileSync(hp, 'utf8')); } catch { /* first run */ }
+      hist.push({ timestamp: new Date().toISOString(), levels: Object.fromEntries(Object.entries(byLevel).map(([l, v]) => [l, v.summary])) });
+      writeFileSync(hp, JSON.stringify(hist.slice(-100), null, 2) + '\n');
+    } catch { /* optional */ }
+    process.exit(0);
+  }
 
   let results, summary;
   if (runs > 1) {

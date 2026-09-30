@@ -57,6 +57,7 @@
 //   - Reading order, skip links, landmark completeness — and anything the render cannot reveal:
 //     only when the project declares it in ds-config.json, never imposed (No-imposed-structure).
 
+import './stdio-sync.mjs';   // the whole report reaches a pipe before process.exit
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
