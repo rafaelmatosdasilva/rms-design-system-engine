@@ -99,7 +99,7 @@ function main() {
   else {
     console.log('');
     for (const a of answers) { for (const l of answerLines(a)) console.log(l); console.log(''); }
-    if (answers.some((a) => a.kind === 'component')) console.log('NEXT: write the UI with these names, then check it with rms-figma-code-parity --check-ui <file>\n');
+    if (answers.some((a) => a.kind === 'component')) console.log('NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-figma-code-parity --check-ui <file>\n');
   }
   process.exit(answers.every((a) => a.kind !== 'none') ? 0 : 1);
 }

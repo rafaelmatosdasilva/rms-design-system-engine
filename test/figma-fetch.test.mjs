@@ -88,8 +88,56 @@ test('a non-retryable status (403) returns immediately', async () => {
 
 test('clamps a large Retry-After to the backoff cap (bounded wait invariant)', async () => {
   let calls = 0; const slept = [];
-  const fetchImpl = async () => (++calls === 1 ? { status: 429, headers: headers({ 'retry-after': '3600' }) } : { ok: true, status: 200 });
+  const fetchImpl = async () => (++calls === 1 ? { status: 429, headers: headers({ 'retry-after': '60' }) } : { ok: true, status: 200 });
   const figmaFetch = makeFigmaFetch(fetchImpl, 1000, { backoffCapMs: 5000, sleep: async (ms) => { slept.push(ms); } });
   await figmaFetch('https://api.figma.com/x');
-  assert.deepEqual(slept, [5000]);   // 3600s requested, clamped to the 5s cap
+  assert.deepEqual(slept, [5000]);   // 60s requested, clamped to the 5s cap
+});
+
+// ── I67: a daily or monthly limit is not waited out: the run stops asking at once.
+test('a long limit stops at once, and later calls never reach the network', async () => {
+  let calls = 0; const slept = [];
+  const fetchImpl = async () => { calls++; return { status: 429, headers: headers({ 'retry-after': '43200', 'x-figma-plan-tier': 'pro', 'x-figma-rate-limit-type': 'low' }) }; };
+  const figmaFetch = makeFigmaFetch(fetchImpl, 1000, { sleep: async (ms) => { slept.push(ms); } });
+  assert.equal((await figmaFetch('https://api.figma.com/a')).status, 429);
+  assert.equal((await figmaFetch('https://api.figma.com/b')).status, 429);
+  assert.equal(calls, 1);
+  assert.deepEqual(slept, []);
+  assert.deepEqual(figmaFetch.stats, { calls: 1, failed: 2, limit: { retryAfterS: 43200, tier: 'pro', type: 'low' } });
+});
+
+test('the budget line: calls spent, a skip, or the limit in words', async () => {
+  const { budgetLine, waitWords, unchangedSince } = await import('../figma-fetch.mjs');
+  assert.equal(budgetLine({ calls: 14, failed: 0, limit: null }), 'Figma refresh: 14 API calls.');
+  assert.equal(budgetLine({ calls: 1, failed: 0, limit: null }, { skipped: { version: '42', at: '2026-09-30' } }),
+    'Figma file unchanged since the last refresh (version 42, 2026-09-30): refresh skipped, 1 API call used. FIGMA_REFRESH=force refreshes anyway.');
+  assert.match(budgetLine({ calls: 3, failed: 2, limit: { retryAfterS: 43200, tier: 'pro', type: 'low' } }),
+    /^Figma rate limit reached \(plan pro, low rate limit\): Figma asks to wait about 12 hours\. The refresh stopped at once instead of retrying, after 3 API calls/);
+  assert.equal(waitWords(3 * 86400), 'about 3 days');
+  assert.equal(waitWords(59), 'about 59 seconds');
+  const stamp = { version: '42', key: 'k', at: 'x', files: ['a.json'] };
+  assert.equal(unchangedSince(stamp, '42', 'k'), true);
+  assert.equal(unchangedSince(stamp, '43', 'k'), false);          // the designer changed the file
+  assert.equal(unchangedSince(stamp, '42', 'k2'), false);         // what the refresh reads changed (config, engine)
+  assert.equal(unchangedSince(stamp, '42', 'k', () => false), false);   // a snapshot was deleted
+  assert.equal(unchangedSince(null, '42', 'k'), false);
+  assert.equal(unchangedSince(stamp, null, 'k'), false);          // version unknown: never skip
+});
+
+test('the same GET is asked once per run, and every caller gets the whole answer', async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls++; return { ok: true, status: 200, headers: headers({}), text: async () => '{"meta":{"components":[1,2]}}' }; };
+  const figmaFetch = makeFigmaFetch(fetchImpl, 1000);
+  const [a, b] = await Promise.all([figmaFetch('https://api.figma.com/c'), figmaFetch('https://api.figma.com/c')]);
+  assert.deepEqual(await a.json(), { meta: { components: [1, 2] } });
+  assert.deepEqual(await b.json(), { meta: { components: [1, 2] } });
+  assert.equal(await (await figmaFetch('https://api.figma.com/c')).text(), '{"meta":{"components":[1,2]}}');
+  assert.equal(calls, 1);
+  assert.equal(figmaFetch.stats.calls, 1);
+  // A failure is never replayed.
+  let n = 0;
+  const flaky = makeFigmaFetch(async () => (++n === 1 ? { ok: false, status: 404, headers: headers({}) } : { ok: true, status: 200, headers: headers({}), text: async () => '{}' }), 1000);
+  assert.equal((await flaky('https://api.figma.com/d')).status, 404);
+  assert.equal((await flaky('https://api.figma.com/d')).status, 200);
+  assert.equal(n, 2);
 });

@@ -28,7 +28,8 @@ import { join, dirname, resolve, relative }                     from 'path';
 import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
 import { fileURLToPath, pathToFileURL }                         from 'url';
-import { makeFigmaFetch, byNodeId }                             from './figma-fetch.mjs';
+import { makeFigmaFetch, byNodeId, budgetLine, unchangedSince }  from './figma-fetch.mjs';
+import { createHash }                                           from 'crypto';
 import { collectRawValues, COLLECT_NODE_BUDGET }                from './collect-raw-values.mjs';
 import { hygieneOf }                                            from './figma-hygiene.mjs';
 import { extractDynamicClassPrefixes }                          from './dynamic-class-prefixes.mjs';
@@ -2434,22 +2435,46 @@ function reportFull(label, items, shown) {
     // concurrency (not all-at-once Promise.all): capping the peak in-flight count keeps Phase 1
     // from bursting the Figma API into a 429 storm. Tune with FIGMA_REFRESH_CONCURRENCY.
     const FIGMA_REFRESH_CONCURRENCY = Math.max(1, parseInt(process.env.FIGMA_REFRESH_CONCURRENCY, 10) || 3);
+    // A call budget (idea I67): a Figma seat has a daily or monthly quota. The file's version is read first
+    // (one call); when it and what the refresh reads (the config, the engine) are the same as at the last
+    // complete refresh, and its snapshots are all still there, the rest is skipped.
+    await fetchFigmaFileVersion(figmaFileKey, figmaToken);
+    const iconFile = (cfg.iconLibraryFileKey || cfg.icons?.libraryFileKey)
+      ? (cfg.paths?.snapshotIcons && resolve(ROOT, cfg.paths.snapshotIcons) === join(ROOT, 'figma-icons.snapshot.json') ? 'figma-icon-inventory.snapshot.json' : 'figma-icons.snapshot.json') : null;
+    const refreshFiles = [SNAP_COMP_PROPS, 'component-values.snapshot.json', iconFile, SNAP_FRAME_GEOM, 'figma-screens.snapshot.json', 'figma-templates.snapshot.json'].filter(Boolean);
+    const stampPath = join(ROOT, '.parity-out', 'figma-refresh.json');
+    let engineHash = ''; try { engineHash = createHash('sha1').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex'); } catch { /* keyed on the config alone */ }
+    const refreshKey = createHash('sha1').update(JSON.stringify([figmaFileKey, cfg.figma?.componentsPage ?? cfg.componentsPage, cfg.iconLibraryFileKey, cfg.icons, cfg.frames, cfg.screens, cfg.templates, cfg.paths, engineHash])).digest('hex');
+    let stamp = null; try { stamp = JSON.parse(readFileSync(stampPath, 'utf8')); } catch { /* first refresh */ }
+    const forced = process.env.FIGMA_REFRESH === 'force';
+    if (!forced && unchangedSince(stamp, _figmaFileVersion, refreshKey, (f) => existsSync(join(ROOT, f)))) {
+      _figmaReason = stamp.reason ?? null;
+      if (Array.isArray(stamp.inventory)) _liveComponentNames = new Set(stamp.inventory);
+      console.log(`ℹ️  ${budgetLine(figmaFetch.stats, { skipped: { version: stamp.version, at: stamp.at } })}`);
+    } else {
     await runPool([
-      () => fetchFigmaFileVersion(figmaFileKey, figmaToken),
-      async () => { const { figmaReason } = await import('./change-reason.mjs'); _figmaReason = await figmaReason(figmaFileKey, figmaToken); },
+      async () => { const { figmaReason } = await import('./change-reason.mjs'); _figmaReason = await figmaReason(figmaFileKey, figmaToken, { fetchImpl: figmaFetch }); },
       () => fetchComponentInventory(figmaFileKey, figmaToken, cfg.figma?.componentsPage ?? cfg.componentsPage),
       () => refreshComponentProps(figmaFileKey, figmaToken, join(ROOT, SNAP_COMP_PROPS)),
       () => refreshComponentValues(figmaFileKey, figmaToken, join(ROOT, 'component-values.snapshot.json')),
-      () => (cfg.iconLibraryFileKey || cfg.icons?.libraryFileKey)
-        // The inventory (a list of names) never overwrites the icon path data the icon gate reads:
-        // when paths.snapshotIcons is this same file, the inventory gets its own file.
-        ? refreshIcons(cfg.iconLibraryFileKey ?? cfg.icons.libraryFileKey, figmaToken,
-            join(ROOT, cfg.paths?.snapshotIcons && resolve(ROOT, cfg.paths.snapshotIcons) === join(ROOT, 'figma-icons.snapshot.json') ? 'figma-icon-inventory.snapshot.json' : 'figma-icons.snapshot.json'), cfg.icons ?? {})
-        : Promise.resolve(),
+      // The inventory (a list of names) never overwrites the icon path data the icon gate reads:
+      // when paths.snapshotIcons is this same file, the inventory gets its own file (iconFile).
+      () => iconFile ? refreshIcons(cfg.iconLibraryFileKey ?? cfg.icons.libraryFileKey, figmaToken, join(ROOT, iconFile), cfg.icons ?? {}) : Promise.resolve(),
       () => SNAP_FRAME_GEOM ? refreshFrameGeometry(figmaFileKey, cfg.frames ?? [], figmaToken, join(ROOT, SNAP_FRAME_GEOM)) : Promise.resolve(),
       () => refreshScreenElements(figmaFileKey, cfg.screens ?? cfg.frames ?? [], figmaToken, join(ROOT, 'figma-screens.snapshot.json')),
       () => refreshTemplateComposition(figmaFileKey, cfg.templates ?? [], figmaToken, join(ROOT, 'figma-templates.snapshot.json')),
     ], FIGMA_REFRESH_CONCURRENCY);
+    const st = figmaFetch.stats;
+    console.log(st.limit ? C.yellow(`⏸  ${budgetLine(st)}`) : `ℹ️  ${budgetLine(st)}`);
+    // Only a complete refresh is remembered: one failed call and the next run refreshes again.
+    if (!st.failed && !st.limit && _figmaFileVersion) {
+      try {
+        mkdirSync(dirname(stampPath), { recursive: true });
+        writeFileSync(stampPath, JSON.stringify({ version: _figmaFileVersion, key: refreshKey, at: new Date().toISOString().slice(0, 10),
+          files: refreshFiles.filter((f) => existsSync(join(ROOT, f))), reason: _figmaReason, inventory: _liveComponentNames ? [..._liveComponentNames] : null }, null, 2) + '\n');
+      } catch { /* best-effort: the next run refreshes */ }
+    }
+    }
   }
 
   // ── Run gates ─────────────────────────────────────────────────────────────────

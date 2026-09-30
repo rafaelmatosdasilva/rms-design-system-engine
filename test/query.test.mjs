@@ -43,7 +43,7 @@ test('the command: several terms in one call, exit 1 when one is not found, 2 be
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   assert.match(ok.stdout, /tone: neutral \| danger/);
   assert.match(ok.stdout, /radius\/control  →  var\(--hb-radius-control\)  6px/);
-  assert.match(ok.stdout, /NEXT: write the UI with these names, then check it with rms-figma-code-parity --check-ui <file>/);
+  assert.match(ok.stdout, /NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-figma-code-parity --check-ui <file>/);
   assert.equal(run('badge', 'nothing').status, 1);
   assert.equal(JSON.parse(run('badge', '--json').stdout)[0].kind, 'component');
   const empty = spawnSync(process.execPath, [join(process.cwd(), 'query.mjs'), 'badge'], { cwd: makeFixture({ 'ds-config.json': {} }), encoding: 'utf8' });
