@@ -196,6 +196,10 @@
      iconButton: Default has no auto layout
      iconButton: no description
 
+🧩 Built around a component: 2 places where a screen lays its own control over a component. The component may be missing a slot or prop: send it to the design system, the screen is not wrong. Advisory.
+     badge: .hb-badge-remove laid over it (pages/index.html:7). The component may be missing a slot or prop for this action.
+     a text field (.hb-search-input): .hb-search-clear laid over it (pages/index.html:10). The design system's field may be missing this action.
+
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
   ● Gate health      22/25 gates pass
   ● Coverage         3/3 components modelled (100%)  ·  exemption debt 0
@@ -207,7 +211,7 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: badge 3 · iconButton 2 · 5 not tied to a component
+📉 Burndown, open findings per component: badge 4 · iconButton 2 · 6 not tied to a component
    next up: badge. Run with --component badge, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -227,7 +231,7 @@
   - badge/Tone: default differs - Figma "Neutral" vs code "tone=neutral" (the code writes it "neutral")  (components/HbBadge.vue)
   - badge/Tone: code prop "tone" is missing Figma variant option(s) "Neutral" (the code writes it "neutral"), "Success" (the code writes it "success"), "Danger" (the code writes it "danger")  (components/HbBadge.vue)
 
-Burndown, open findings per component: badge 3 · iconButton 2 · 5 not tied to a component
+Burndown, open findings per component: badge 4 · iconButton 2 · 6 not tied to a component
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 
