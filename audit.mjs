@@ -2583,7 +2583,8 @@ function reportFull(label, items, shown) {
   const legacyFree = (l) => (typeof l !== 'string' ? l : l
     .replace(/Gate \[\d+[a-z]?\] skipped/g, 'skipped')
     .replace(/^((?:\s|\x1b\[[0-9;]*m)*)⏭\s+⏭/u, '$1⏭')                      // one skip mark, not two
-    .replace(/^((?:\s|\x1b\[[0-9;]*m)*(?:✅|❌|⚠️|ℹ️|⏭|🚧)\s+)\[\d+[a-z]?\]\s+/u, '$1'));
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*(?:✅|❌|⚠️|ℹ️|⏭|🚧)\s+)\[(?:\d+[a-z]?|[a-z][a-z-]*)\]\s+/u, '$1')   // a script's own tag: [15], [docs-truth]
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*)✅(\s+.*\bskipped\b)/u, '$1⏭$2'));                         // skipped is not a pass
   // A warning or failure count of zero ("⚠️  NEW SKIP  0", "❌ FAIL  0") says nothing: it is left out.
   const zeroCount = (l) => typeof l === 'string' && /^(?:\s|\x1b\[[0-9;]*m)*(?:⚠️|❌)\s+[A-Z][A-Z ?-]*?\s+0(?:\/0)?(?:\s|\x1b|$)/u.test(l);
   function addGate(label, result) {

@@ -34,20 +34,20 @@
        ✅ TRACEABLE    11  (maps back to a Figma token or SYSTEM_VARS)
 
 ✅  [8] Docs tell the truth  (a style guide / DS doc references only tokens & vars that exist)
-       ✅ [docs-truth] no documentation surfaces configured — skipped
+       ⏭ no documentation surfaces configured — skipped
 
 ✅  [9] No invented text casing  (no text-transform the DS/Figma does not define)
-       ✅ [text-case] no text-transform the DS doesn't define
+       ✅ no text-transform the DS doesn't define
 
 ✅  [10] No hand-built DS components  (screens use the DS component, not a local look-alike)
-       ✅ [reimplementation] no reimplementationSurfaces configured — skipped
+       ⏭ no reimplementationSurfaces configured — skipped
 
 ✅  [11] Clean CSS  (no unused variables · no values that contradict Figma · safe containment)
        ✅ 0 unused vars  (scanned 5 files; 0 known-unused exempted)
        ✅ 0 undeclared vars  (every fallback-less var() resolves to a declaration)
        ✅ 0 dead CSS classes  (every rule matches something in the markup)
        ✅ Clean - no literal diverges from Figma
-       ✅ [css] 0 container-type declaration(s) safe (definite width or block-level); 0 exempt
+       ✅ 0 container-type declaration(s) safe (definite width or block-level); 0 exempt
 
 ✅  [12] Nested components keep their own styles  (no parent rule overrides a child component)
        ✅ No new undocumented broad element selectors with visual properties.
@@ -81,7 +81,7 @@
        ⏭ SKIPPED - snapshot not captured (opt-in). Run the Plugin API capture and commit it to enable.
 
 ✅  [17] Templates compose the right components  (each template/page uses the components Figma composes)
-       ✅ [template-composition] no templates[] configured — skipped
+       ⏭ no templates[] configured — skipped
 
 ✅  [18] Markup  (ids · component classes · icon references · every DS screen control is built)
        ℹ️  htmlStructureClasses not set in ds-config.json - DS component classes are not part of the fingerprint (ids and icon references still are).
