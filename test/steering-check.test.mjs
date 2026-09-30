@@ -28,6 +28,13 @@ test('a wrong prop value, in code or in a listed set, with the value the system 
   assert.deepEqual(find('The size: keep it readable, and the state of the art moves fast.'), []);   // prose, no value of the prop
 });
 
+test('a prop name written in code other than the way the code writes it', () => {
+  assert.deepEqual(find('<Badge Tone="danger">'), [[1, 'prop name', 'Tone', 'tone']]);
+  assert.deepEqual(find('<Badge TONE="error">'), [[1, 'prop name', 'TONE', 'tone'], [1, 'prop value', 'TONE="error"', 'tone="danger"']]);
+  assert.deepEqual(find('The Tone: neutral or danger. Size matters.'), []);   // prose is not code
+  assert.match(steeringLine('AGENTS.md', steeringFindings('<Badge Tone="danger">', truth)[0]), /^AGENTS\.md:1  Tone is not the prop's name as the code writes it; the system has tone$/);
+});
+
 test('ghost variables and tokens; command flags, URLs and file paths are left alone', () => {
   assert.deepEqual(find('Round it with var(--radii-chipp).'), [[1, 'variable', '--radii-chipp', '--radii-chip']]);
   assert.deepEqual(find('Use `--radii-pill` for pills.'), [[1, 'variable', '--radii-pill', null]]);   // too far from any real one to guess
