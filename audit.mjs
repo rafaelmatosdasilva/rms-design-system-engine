@@ -408,6 +408,13 @@ if (process.argv.includes('--capture-code')) {
   process.exit(r.status ?? 1);
 }
 
+// ── --query <term> …: a component or token, names exactly as written (query.mjs) ──
+if (process.argv.includes('--query')) {
+  const passthrough = process.argv.slice(2).filter((a) => a !== '--query');
+  const r = spawnSync(process.execPath, ['--import', pathToFileURL(join(SCRIPT_DIR, 'stdio-sync.mjs')).href, join(SCRIPT_DIR, 'query.mjs'), ...passthrough], { cwd: ROOT, stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
+
 // ── --check-ui <file>: check a generated UI against the component catalog (ui-check.mjs) ──
 if (process.argv.includes('--check-ui')) {
   const passthrough = process.argv.slice(2).filter((a) => a !== '--check-ui');

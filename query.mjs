@@ -1,0 +1,106 @@
+// query.mjs - ask the design system a question from the terminal (idea I22).
+// Run from project root:  rms-figma-code-parity --query <term> [<term> …] [--json]
+//
+// An agent about to write UI asks for one component or token instead of reading the whole catalog, and
+// gets the names exactly as they are written: a guessed name is the most common way generated code
+// drifts. Read-only, over what every audit run already writes (contracts/catalog.json, contracts/tokens.json):
+//   • a component: its selector and code file, each prop with its values and default as the code writes
+//     them, Figma's own names where they differ (that is a parity difference), the names an agent is
+//     likely to guess wrong, slots, what it must never contain, when not to use it and what to use instead;
+//   • a token: its CSS variable and its value in each mode;
+//   • anything else: the closest component and token names.
+// Several terms answer in one call. Exit 0 when every term was found, 1 when one was not, 2 with no catalog.
+import './stdio-sync.mjs';   // the whole answer reaches a pipe before process.exit
+import { readFileSync, existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
+
+const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// DTCG tokens → [{ path: 'surface/base/color', value, modes }]
+export function flattenTokens(tree, prefix = []) {
+  const out = [];
+  for (const [k, v] of Object.entries(tree ?? {})) {
+    if (k.startsWith('$') || !v || typeof v !== 'object') continue;
+    if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: v.$extensions?.['com.rms.parity']?.modes ?? null, deprecated: v.$deprecated === true });
+    else out.push(...flattenTokens(v, [...prefix, k]));
+  }
+  return out;
+}
+
+// One term → { kind: 'component', name, entry } | { kind: 'token', token, cssVar } | { kind: 'none', term, near }
+export function answer(term, { catalog = {}, tokens = [], varOf = (p) => null } = {}) {
+  const t = norm(term);
+  const comps = Object.entries(catalog.components ?? {});
+  const comp = comps.find(([n]) => norm(n) === t) ?? comps.find(([, e]) => norm(e.selector) === t);
+  if (comp) return { kind: 'component', name: comp[0], entry: comp[1] };
+  const tok = tokens.find((x) => norm(x.path) === t || norm(varOf(x.path)) === t || norm(x.path.replace(/\/(color|default)$/, '')) === t);
+  if (tok) return { kind: 'token', token: tok, cssVar: varOf(tok.path) };
+  const near = [...comps.map(([n]) => n), ...tokens.map((x) => x.path)].filter((n) => t && (norm(n).includes(t) || t.includes(norm(n)))).slice(0, 8);
+  return { kind: 'none', term, near };
+}
+
+export function answerLines(a) {
+  if (a.kind === 'none') return [`${a.term}: no component or token of that name${a.near.length ? `. Closest: ${a.near.join(', ')}` : ''}`];
+  if (a.kind === 'token') {
+    const { token: x, cssVar } = a;
+    const modes = x.modes ? Object.entries(x.modes).map(([m, v]) => `${m} ${v}`).join(' · ') : String(x.value);
+    return [`${x.path}${cssVar ? `  →  var(${cssVar})` : ''}  ${modes}${x.deprecated ? '  [deprecated]' : ''}`];
+  }
+  const { name, entry: e } = a;
+  const lines = [`${name}${e.selector ? `  (${e.selector})` : ''}${e.status ? `  [${e.status}]` : ''}`];
+  if (e.description && !/captured from Figma by rms-parity/.test(e.description)) lines.push(`  ${e.description}`);
+  const props = Object.entries(e.props ?? {});
+  if (props.length) lines.push('  props, written exactly like this:');
+  for (const [figma, p] of props) {
+    const code = p.codeName ?? figma;
+    const values = p.codeValues ?? p.values;
+    const what = p.type === 'enum' ? values.map(String).join(' | ') : p.type;
+    const def = p.default != null && p.default !== '' ? `default ${p.default}` : '';
+    const differs = code !== figma || !!p.codeValues;
+    // The catalog's default is Figma's: beside the code's own names only when both sides write them the same.
+    const figmaSide = differs ? `   Figma: ${figma}${p.values ? ` = ${p.values.join(' | ')}` : ''}${def ? `, ${def}` : ''} (not in parity with the code)` : '';
+    lines.push(`    ${code}: ${what}${!differs && def ? `   ${def}` : ''}${figmaSide}`);
+    const wrong = Object.entries(p.rejected ?? {});
+    if (wrong.length) lines.push(`      not: ${wrong.slice(0, 6).map(([w, r]) => `${w} (use ${r})`).join(', ')}`);
+  }
+  if (e.slots?.length) lines.push(`  slots: ${e.slots.map((s) => (typeof s === 'string' ? s : s.name)).join(', ')}`);
+  if (e.neverCombineWith?.length) lines.push(`  never contains: ${e.neverCombineWith.join(', ')}`);
+  if (e.whenNotToUse) lines.push(`  when not to use: ${e.whenNotToUse}`);
+  if (e.useInstead?.length) lines.push(`  use instead: ${e.useInstead.join(', ')}`);
+  return lines;
+}
+
+function main() {
+  const ROOT = process.cwd();
+  const args = process.argv.slice(2).filter((a) => a !== '--query');
+  const json = args.includes('--json');
+  const terms = args.filter((a) => a !== '--json');   // a CSS variable (--x) is a term, not an option
+  let cfg = {};
+  try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* defaults */ }
+  const dir = resolve(ROOT, cfg.contracts?.out ?? 'contracts');
+  if (!existsSync(join(dir, 'catalog.json'))) {
+    console.log(`\n⏭  no ${join(cfg.contracts?.out ?? 'contracts', 'catalog.json')} yet: run rms-figma-code-parity once to write it, then ask again.\n`);
+    process.exit(2);
+  }
+  if (!terms.length) {
+    console.log('\nUsage: rms-figma-code-parity --query <component or token> [more …] [--json]\n');
+    process.exit(2);
+  }
+  const catalog = JSON.parse(readFileSync(join(dir, 'catalog.json'), 'utf8'));
+  let tokens = [];
+  try { tokens = flattenTokens(JSON.parse(readFileSync(join(dir, 'tokens.json'), 'utf8'))); } catch { /* components only */ }
+  const spec = resolveNamingSpec(cfg);
+  const varOf = (p) => { try { return tokenToVar(p, spec); } catch { return null; } };
+  const answers = terms.map((t) => answer(t, { catalog, tokens, varOf }));
+  if (json) console.log(JSON.stringify(answers, null, 2));
+  else {
+    console.log('');
+    for (const a of answers) { for (const l of answerLines(a)) console.log(l); console.log(''); }
+    if (answers.some((a) => a.kind === 'component')) console.log('NEXT: write the UI with these names, then check it with rms-figma-code-parity --check-ui <file>\n');
+  }
+  process.exit(answers.every((a) => a.kind !== 'none') ? 0 : 1);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
