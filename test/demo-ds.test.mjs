@@ -36,6 +36,7 @@ test('demo design system, without Chrome: the static report matches its golden',
   assert.match(r.out, /❌ \[sizing\/-\] radii\/chip → --radii-chip/);
   assert.doesNotMatch(r.out, /printed no result line/);   // every gate shows its outcome
   assert.doesNotMatch(r.out, /^ {7}\S+\s+(Gate )?\[\d+[a-z]?\]\s/m);   // a line never carries a script's old gate number
+  assert.doesNotMatch(r.out, /^ {7}✅.*\bskipped\b/m);   // a skipped check is never shown as a pass
   golden('expected-report-static.txt', r.out);
 });
 
