@@ -78,6 +78,7 @@ Once `ds-config.json` exists, extract:
 - `figma.componentsPage` *(optional)* - node id of the DS components page (e.g. `"1:439"`). Enables Gate [1]'s **component inventory** check: the live component list on that page is diffed against the structure snapshot so an added/removed DS component always surfaces by name. Without it, the check is skipped (a new component can slip through unaudited).
 - `figma.namingConvention` *(optional)* - overrides for how Figma token paths are converted to CSS var names:
   - `dropSegments` - array of path segments to strip from the end of a token path before deriving the var name. Default: `["color", "default"]`. Set to `[]` to preserve all segments (e.g. when CSS vars end in `-color`).
+  - `preset: "tailwind"` - Tailwind v4 `@theme` names: colour tokens under `--color-` (`surface/base/color` → `--color-surface-base`) and the first segment renamed `space` → `spacing`, `radii` → `radius` (`space/2` → `--spacing-2`). A theme variable used through its utility (`bg-action-primary`, `rounded-control`, `p-2`) counts as used. The same by hand: `colorNamespace` (the segment colour tokens go under) and `namespaces` (`{ "space": "spacing" }`, first segment renames for every token).
   - `iconTextAlias` - when `true` (default), `/iconText/` in a token path is normalised to `/text/`. Set to `false` when the codebase keeps `iconText` as-is.
   - `aliases` - per-segment renames (`{ figmaSegment: cssSegment }`). `iconTextAlias` is shorthand for `{ iconText: "text" }`; use `aliases` for any other rename the DS needs.
   - `separator` - what joins the path segments in the CSS var. Default `"-"` (e.g. `--node-border-selected`); set to `"_"` if the DS uses underscores.
@@ -125,6 +126,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 - `rtl: true` - lists the declarations that would not mirror in a right-to-left language (one-sided or asymmetric `padding-left`, `margin-right`, `border-left`, `left`/`right` offsets, `text-align` and `float` left or right), each with its file and line and the logical property to use. Symmetric values are not listed.
 - `renderedParityStrict: true` - the measured differences (Gate [13] `MEASURED`) fail the gate instead of being advisory.
 - `workarounds: false` - turns off the `🧩 Built around a component` block (a screen's own control laid over a design-system component or a text field, reported to the design-system side as a missing slot or prop).
+- `tailwind: false` - turns off the `🎯 Tailwind arbitrary values` block and its part of the edit check (a class with a value in brackets, `rounded-[4px]`, compared with the project's `@theme`: the utility to write when a theme value is the same, or "not a design-system value"). `--tailwind` lists every one.
 - `figmaHygiene: false` - turns off the `🎨 Figma file hygiene` block (values with no variable or style, detached instances, variants with no auto layout, components with no description, read from `component-values.snapshot.json`). `--hygiene` lists every finding.
 
 ## Key Architecture Assumptions

@@ -114,7 +114,11 @@ function routeOnly(text, { hasConfig, components, cmd }) {
       notes.push('Do not raise maxSnapshotAgeDays or edit ds-config.json to go green: that hides drift. Say so, and run the audit to show what really fails.');
       return { recipe, question: false, run: [cmd], notes, kind };
     }
-    if (recipe === 'accept-debt') return { recipe, question, run: question ? [] : [`${scoped} --baseline --findings`], notes };
+    if (recipe === 'accept-debt') {
+      // The difference the person named (the radius, not the rest): only the findings that name it are accepted.
+      const match = debtWords(t);
+      return { recipe, question, run: question ? [] : [`${scoped} --baseline --findings${match.length ? ` --match ${match.join(',')}` : ''}`], notes };
+    }
     if (recipe === 'fix-a-difference') {
       notes.push('Fix exactly what was asked, in the code, at the file and line the audit names, and nothing else: list the other differences the audit shows and leave them as they are; then run the same audit again.');
       return { recipe, question, run: [scoped], notes };
@@ -140,6 +144,21 @@ function setupRun(t, cmd, notes) {
   const css = t.match(/[\w./-]+\.css\b/)?.[0];
   if (!figma) notes.push('Ask the person for the Figma file URL (and the token CSS file if the setup cannot find it), then run the command with it.');
   return [`${cmd} --init --figma-url='${figma ?? '<Figma file URL>'}'${css ? ` --theme-css='${css}'` : ''}`];
+}
+
+// Words a person uses for a kind of difference → what the audit's lines say for it. Only these, so the engine,
+// not the agent, decides what one named difference covers.
+const DEBT_WORDS = [
+  [/\b(radius|radii|corner|rounded|raio|cantos?|arredondad\w*)\b/i, 'radi'],
+  [/\b(height|altura)\b/i, 'height'],
+  [/\b(width|largura)\b/i, 'width'],
+  [/\b(padding|preenchimento)\b/i, 'padding'],
+  [/\b(gap|spacing|espa[cç]amento)\b/i, 'gap'],
+  [/\b(colou?rs?|cor(es)?)\b/i, 'color'],
+  [/\b(props?|propriedades?|prop names?)\b/i, 'props match'],
+];
+export function debtWords(text) {
+  return DEBT_WORDS.filter(([re]) => re.test(String(text ?? ''))).map(([, w]) => w);
 }
 
 // What --route prints: the route, the commands, the notes, one NEXT line, and the recipe itself.

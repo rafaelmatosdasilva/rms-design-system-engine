@@ -32,6 +32,7 @@ import { makeFigmaFetch, byNodeId, budgetLine, unchangedSince }  from './figma-f
 import { createHash }                                           from 'crypto';
 import { collectRawValues, COLLECT_NODE_BUDGET }                from './collect-raw-values.mjs';
 import { hygieneOf }                                            from './figma-hygiene.mjs';
+import { usesTailwind, usedByUtility }                          from './tailwind-check.mjs';
 import { extractDynamicClassPrefixes }                          from './dynamic-class-prefixes.mjs';
 import { frameworkGateSkipReason }                              from './component-framework-gate.mjs';
 import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-parse.mjs';
@@ -1771,7 +1772,9 @@ function reportFull(label, items, shown) {
     // substring check for `var(--x)` misses the whitespace and fallback forms and would
     // report a used token as unused.
     const usedInVar = (v) => new RegExp(`var\\(\\s*${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[,)]`).test(allSrc);
-    const unused = declared.filter(v => !KNOWN_UNUSED.has(v) && !usedInVar(v));
+    // In a Tailwind project a theme variable is used through its utility too (bg-action-primary, rounded-control).
+    const tw = cfg.tailwind !== false && usesTailwind(themeText, ROOT);
+    const unused = declared.filter(v => !KNOWN_UNUSED.has(v) && !usedInVar(v) && !(tw && usedByUtility(v, allSrc)));
 
     // Undeclared vars: every fallback-less var(--x) used anywhere must be declared somewhere -
     // theme.css, a plugin <style> block, or JS setProperty. A var() referencing a renamed or
@@ -2804,8 +2807,11 @@ function reportFull(label, items, shown) {
   const BASELINE_PATH = join(ROOT, cfg.baseline?.path ?? 'parity-baseline.json');
   let baselineInfo = null;
   if (!BASELINE_OFF && process.argv.includes('--baseline')) {
-    const perFinding = process.argv.includes('--findings');
-    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0 });
+    // --match <words>: only the findings that name them (the radius, not the rest), added to the file (I54).
+    const mi = process.argv.indexOf('--match');
+    const match = mi > -1 ? process.argv.slice(mi + 1).filter((x, i, all) => !x.startsWith('--') && all.slice(0, i).every((y) => !y.startsWith('--'))).flatMap((x) => x.split(',')).map((x) => x.trim()).filter(Boolean) : null;
+    const perFinding = process.argv.includes('--findings') || !!match?.length;
+    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0, match });
     baselineInfo = { mode: 'write', written, path: BASELINE_PATH, perFinding };
     anyFail = false;   // capturing the baseline is not a failing run
   } else if (!BASELINE_OFF) {

@@ -54,6 +54,7 @@ rms-figma-code-parity --docs                          # ALSO build the styleguid
 rms-figma-code-parity --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-figma-code-parity --baseline                      # capture today's failing gates as accepted adoption debt (commit parity-baseline.json)
 rms-figma-code-parity --baseline --findings           # the same, each failing ❌ line accepted on its own
+rms-figma-code-parity --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
 rms-figma-code-parity --no-baseline                   # ignore any parity-baseline.json this run (enforce every gate)
 rms-figma-code-parity --summary                       # print the plain result of the last run again (relay it as is)
 rms-figma-code-parity --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
@@ -407,6 +408,10 @@ known difference can be accepted while everything else in the same gate keeps bl
 `❌` lines are all accepted is debt; any other `❌` line is a regression, including an accepted one whose value
 changed (it is new text). The run lists the new lines, and the accepted lines that no longer appear as fixed,
 to drop with the next `--baseline --findings`. A failing gate with no `❌` line to accept is recorded as a gate.
+`--match <words>` (comma-separated) accepts only the lines that contain one of them, with their gate's count
+line, and adds them to the file (nothing accepted before is dropped): `--component chip --baseline --findings
+--match radi` accepts the chip's radius and keeps its prop names failing. The router adds it when the person
+names the kind of difference (radius, height, width, padding, gap, colour, props).
 
 #### Accessibility check (I18, advisory, from the render)
 

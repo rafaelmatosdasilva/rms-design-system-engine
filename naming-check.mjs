@@ -72,6 +72,8 @@ for (const token of figmaTokens) {
   if (Object.prototype.hasOwnProperty.call(EXPLICIT, token) || Object.prototype.hasOwnProperty.call(EXPLICIT_SIZING, token)) continue;
   if (SIZING_SKIP.has(token)) continue;
   knownCSSVars.add(conventionVar(token));
+  // A sizing token is written in its raw form; under a colour namespace (Tailwind) that differs from the colour form.
+  if (NAMING.colorNamespace && Object.prototype.hasOwnProperty.call(snap.sizing ?? {}, token)) knownCSSVars.add(tokenToVar(token, NAMING, { raw: true }));
   knownCSSVars.add(conventionVar(token.replace(/\/color$/, '')));
 }
 
