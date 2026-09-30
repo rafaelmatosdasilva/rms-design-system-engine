@@ -50,3 +50,22 @@ test('the command: several terms in one call, exit 1 when one is not found, 2 be
   assert.equal(empty.status, 2);
   assert.match(empty.stdout, /no contracts\/catalog\.json yet/);
 });
+
+test('no catalog yet: --query runs the audit once to write it, then answers (never hands that step to the agent)', { timeout: 300000 }, async () => {
+  const { fixtureProject } = await import('./helpers.mjs');
+  const { spawnSync } = await import('node:child_process');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const { rmSync, existsSync } = await import('node:fs');
+  const here = dirname(fileURLToPath(import.meta.url));
+  const dir = fixtureProject(join(here, 'fixtures', 'demo-ds'), 'query-first-');
+  rmSync(join(dir, 'contracts'), { recursive: true, force: true });
+  const r = spawnSync(process.execPath, [join(here, '..', 'query.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /No catalog yet: ran the audit once to write it/);
+  assert.match(r.stdout, /size: M \| L/);
+  assert.ok(existsSync(join(dir, 'contracts', 'catalog.json')));
+  // Only once: the next question answers from the catalog.
+  const again = spawnSync(process.execPath, [join(here, '..', 'query.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8' });
+  assert.doesNotMatch(again.stdout, /No catalog yet/);
+});

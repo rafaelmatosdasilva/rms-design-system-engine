@@ -9,11 +9,13 @@
 //     likely to guess wrong, slots, what it must never contain, when not to use it and what to use instead;
 //   • a token: its CSS variable, its value in each mode, and for a text colour the surfaces it can be read on;
 //   • anything else: the closest component and token names.
-// Several terms answer in one call. Exit 0 when every term was found, 1 when one was not, 2 with no catalog.
+// Several terms answer in one call. With no catalog yet it runs the audit once to write it. Exit 0 when every term
+// was found, 1 when one was not, 2 with no catalog (no ds-config.json to build one from).
 import './stdio-sync.mjs';   // the whole answer reaches a pipe before process.exit
 import { readFileSync, existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { join, resolve, dirname } from 'node:path';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -81,6 +83,13 @@ function main() {
   let cfg = {};
   try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* defaults */ }
   const dir = resolve(ROOT, cfg.contracts?.out ?? 'contracts');
+  // No catalog yet: the audit writes it, so run it once, quietly, instead of handing that step to the agent
+  // (an agent asked to answer a question stops and asks whether it may run the audit first).
+  if (!existsSync(join(dir, 'catalog.json')) && existsSync(join(ROOT, 'ds-config.json')) && terms.length && process.env.PARITY_QUERY_NO_AUDIT !== '1') {
+    const t0 = Date.now();
+    spawnSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'audit.mjs')], { cwd: ROOT, stdio: 'ignore', timeout: 600000, env: { ...process.env, PARITY_QUERY_NO_AUDIT: '1' } });
+    if (existsSync(join(dir, 'catalog.json')) && !json) console.log(`\nℹ️  No catalog yet: ran the audit once to write it (${Math.round((Date.now() - t0) / 1000)}s). Later questions answer at once.`);
+  }
   if (!existsSync(join(dir, 'catalog.json'))) {
     console.log(`\n⏭  no ${join(cfg.contracts?.out ?? 'contracts', 'catalog.json')} yet: run rms-figma-code-parity once to write it, then ask again.\n`);
     process.exit(2);
