@@ -28,9 +28,11 @@ import { join, dirname, resolve, relative }                     from 'path';
 import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
 import { fileURLToPath, pathToFileURL }                         from 'url';
-import { makeFigmaFetch, byNodeId }                             from './figma-fetch.mjs';
+import { makeFigmaFetch, byNodeId, budgetLine, unchangedSince }  from './figma-fetch.mjs';
+import { createHash }                                           from 'crypto';
 import { collectRawValues, COLLECT_NODE_BUDGET }                from './collect-raw-values.mjs';
 import { hygieneOf }                                            from './figma-hygiene.mjs';
+import { usesTailwind, usedByUtility }                          from './tailwind-check.mjs';
 import { extractDynamicClassPrefixes }                          from './dynamic-class-prefixes.mjs';
 import { frameworkGateSkipReason }                              from './component-framework-gate.mjs';
 import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-parse.mjs';
@@ -1111,6 +1113,13 @@ async function bootstrapConfig() {
   }
   if (detected.unsure.length) console.log(C.yellow(`  ⚠️  No override block found for ${detected.unsure.join(', ')} in the theme CSS: set its cssSelector in ds-config.json → figma.modes (it defaulted to ${detected.modes.filter((m) => detected.unsure.includes(m.snapshotKey) || detected.unsure.includes(m.name)).map((m) => m.cssSelector).join(', ')}).`));
 
+  // A Tailwind v4 theme names its tokens under namespaces (--color-…, --spacing-…): the preset matches them (I65).
+  let twThemeText = '';
+  for (const p of [themeCSS].flat()) { try { twThemeText += readFileSync(resolve(ROOT, p), 'utf8'); } catch { /* not readable yet */ } }
+  if (usesTailwind(twThemeText, ROOT) && !figmaCfg.namingConvention?.preset) {
+    figmaCfg.namingConvention = { ...(figmaCfg.namingConvention ?? {}), preset: 'tailwind' };
+    console.log(C.green('  ✓ Tailwind theme found: token names are matched as Tailwind writes them (figma.namingConvention.preset "tailwind").'));
+  }
   const generated = {
     figmaFileKey:  figmaFileKey || '',
     ...(figmaSourceKey ? { figmaSourceKey } : {}),
@@ -1770,7 +1779,9 @@ function reportFull(label, items, shown) {
     // substring check for `var(--x)` misses the whitespace and fallback forms and would
     // report a used token as unused.
     const usedInVar = (v) => new RegExp(`var\\(\\s*${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[,)]`).test(allSrc);
-    const unused = declared.filter(v => !KNOWN_UNUSED.has(v) && !usedInVar(v));
+    // In a Tailwind project a theme variable is used through its utility too (bg-action-primary, rounded-control).
+    const tw = cfg.tailwind !== false && usesTailwind(themeText, ROOT);
+    const unused = declared.filter(v => !KNOWN_UNUSED.has(v) && !usedInVar(v) && !(tw && usedByUtility(v, allSrc)));
 
     // Undeclared vars: every fallback-less var(--x) used anywhere must be declared somewhere -
     // theme.css, a plugin <style> block, or JS setProperty. A var() referencing a renamed or
@@ -2434,22 +2445,46 @@ function reportFull(label, items, shown) {
     // concurrency (not all-at-once Promise.all): capping the peak in-flight count keeps Phase 1
     // from bursting the Figma API into a 429 storm. Tune with FIGMA_REFRESH_CONCURRENCY.
     const FIGMA_REFRESH_CONCURRENCY = Math.max(1, parseInt(process.env.FIGMA_REFRESH_CONCURRENCY, 10) || 3);
+    // A call budget (idea I67): a Figma seat has a daily or monthly quota. The file's version is read first
+    // (one call); when it and what the refresh reads (the config, the engine) are the same as at the last
+    // complete refresh, and its snapshots are all still there, the rest is skipped.
+    await fetchFigmaFileVersion(figmaFileKey, figmaToken);
+    const iconFile = (cfg.iconLibraryFileKey || cfg.icons?.libraryFileKey)
+      ? (cfg.paths?.snapshotIcons && resolve(ROOT, cfg.paths.snapshotIcons) === join(ROOT, 'figma-icons.snapshot.json') ? 'figma-icon-inventory.snapshot.json' : 'figma-icons.snapshot.json') : null;
+    const refreshFiles = [SNAP_COMP_PROPS, 'component-values.snapshot.json', iconFile, SNAP_FRAME_GEOM, 'figma-screens.snapshot.json', 'figma-templates.snapshot.json'].filter(Boolean);
+    const stampPath = join(ROOT, '.parity-out', 'figma-refresh.json');
+    let engineHash = ''; try { engineHash = createHash('sha1').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex'); } catch { /* keyed on the config alone */ }
+    const refreshKey = createHash('sha1').update(JSON.stringify([figmaFileKey, cfg.figma?.componentsPage ?? cfg.componentsPage, cfg.iconLibraryFileKey, cfg.icons, cfg.frames, cfg.screens, cfg.templates, cfg.paths, engineHash])).digest('hex');
+    let stamp = null; try { stamp = JSON.parse(readFileSync(stampPath, 'utf8')); } catch { /* first refresh */ }
+    const forced = process.env.FIGMA_REFRESH === 'force';
+    if (!forced && unchangedSince(stamp, _figmaFileVersion, refreshKey, (f) => existsSync(join(ROOT, f)))) {
+      _figmaReason = stamp.reason ?? null;
+      if (Array.isArray(stamp.inventory)) _liveComponentNames = new Set(stamp.inventory);
+      console.log(`ℹ️  ${budgetLine(figmaFetch.stats, { skipped: { version: stamp.version, at: stamp.at } })}`);
+    } else {
     await runPool([
-      () => fetchFigmaFileVersion(figmaFileKey, figmaToken),
-      async () => { const { figmaReason } = await import('./change-reason.mjs'); _figmaReason = await figmaReason(figmaFileKey, figmaToken); },
+      async () => { const { figmaReason } = await import('./change-reason.mjs'); _figmaReason = await figmaReason(figmaFileKey, figmaToken, { fetchImpl: figmaFetch }); },
       () => fetchComponentInventory(figmaFileKey, figmaToken, cfg.figma?.componentsPage ?? cfg.componentsPage),
       () => refreshComponentProps(figmaFileKey, figmaToken, join(ROOT, SNAP_COMP_PROPS)),
       () => refreshComponentValues(figmaFileKey, figmaToken, join(ROOT, 'component-values.snapshot.json')),
-      () => (cfg.iconLibraryFileKey || cfg.icons?.libraryFileKey)
-        // The inventory (a list of names) never overwrites the icon path data the icon gate reads:
-        // when paths.snapshotIcons is this same file, the inventory gets its own file.
-        ? refreshIcons(cfg.iconLibraryFileKey ?? cfg.icons.libraryFileKey, figmaToken,
-            join(ROOT, cfg.paths?.snapshotIcons && resolve(ROOT, cfg.paths.snapshotIcons) === join(ROOT, 'figma-icons.snapshot.json') ? 'figma-icon-inventory.snapshot.json' : 'figma-icons.snapshot.json'), cfg.icons ?? {})
-        : Promise.resolve(),
+      // The inventory (a list of names) never overwrites the icon path data the icon gate reads:
+      // when paths.snapshotIcons is this same file, the inventory gets its own file (iconFile).
+      () => iconFile ? refreshIcons(cfg.iconLibraryFileKey ?? cfg.icons.libraryFileKey, figmaToken, join(ROOT, iconFile), cfg.icons ?? {}) : Promise.resolve(),
       () => SNAP_FRAME_GEOM ? refreshFrameGeometry(figmaFileKey, cfg.frames ?? [], figmaToken, join(ROOT, SNAP_FRAME_GEOM)) : Promise.resolve(),
       () => refreshScreenElements(figmaFileKey, cfg.screens ?? cfg.frames ?? [], figmaToken, join(ROOT, 'figma-screens.snapshot.json')),
       () => refreshTemplateComposition(figmaFileKey, cfg.templates ?? [], figmaToken, join(ROOT, 'figma-templates.snapshot.json')),
     ], FIGMA_REFRESH_CONCURRENCY);
+    const st = figmaFetch.stats;
+    console.log(st.limit ? C.yellow(`⏸  ${budgetLine(st)}`) : `ℹ️  ${budgetLine(st)}`);
+    // Only a complete refresh is remembered: one failed call and the next run refreshes again.
+    if (!st.failed && !st.limit && _figmaFileVersion) {
+      try {
+        mkdirSync(dirname(stampPath), { recursive: true });
+        writeFileSync(stampPath, JSON.stringify({ version: _figmaFileVersion, key: refreshKey, at: new Date().toISOString().slice(0, 10),
+          files: refreshFiles.filter((f) => existsSync(join(ROOT, f))), reason: _figmaReason, inventory: _liveComponentNames ? [..._liveComponentNames] : null }, null, 2) + '\n');
+      } catch { /* best-effort: the next run refreshes */ }
+    }
+    }
   }
 
   // ── Run gates ─────────────────────────────────────────────────────────────────
@@ -2779,8 +2814,11 @@ function reportFull(label, items, shown) {
   const BASELINE_PATH = join(ROOT, cfg.baseline?.path ?? 'parity-baseline.json');
   let baselineInfo = null;
   if (!BASELINE_OFF && process.argv.includes('--baseline')) {
-    const perFinding = process.argv.includes('--findings');
-    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0 });
+    // --match <words>: only the findings that name them (the radius, not the rest), added to the file (I54).
+    const mi = process.argv.indexOf('--match');
+    const match = mi > -1 ? process.argv.slice(mi + 1).filter((x, i, all) => !x.startsWith('--') && all.slice(0, i).every((y) => !y.startsWith('--'))).flatMap((x) => x.split(',')).map((x) => x.trim()).filter(Boolean) : null;
+    const perFinding = process.argv.includes('--findings') || !!match?.length;
+    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0, match });
     baselineInfo = { mode: 'write', written, path: BASELINE_PATH, perFinding };
     anyFail = false;   // capturing the baseline is not a failing run
   } else if (!BASELINE_OFF) {
@@ -3693,7 +3731,7 @@ function reportFull(label, items, shown) {
   // the catalog, the code API, the declared CSS variables and the tokens. Off with ds-config "steering": false.
   if (cfg.steering !== false) {
     try {
-      const { findSteeringFiles, steeringTruth, steeringFindings, steeringLine } = await import('./steering-check.mjs');
+      const { findSteeringFiles, steeringTruth, steeringFindings, steeringLine, mandateOf } = await import('./steering-check.mjs');
       const contractsDir = cfg.contracts?.out ?? 'contracts';
       const files = findSteeringFiles(ROOT, { skip: [contractsDir, 'node_modules', '.parity-out'] });
       if (files.length) {
@@ -3717,6 +3755,9 @@ function reportFull(label, items, shown) {
         } else {
           console.log(C.green(`\n🧭 Agent instruction files (${names}): every design-system name they state exists.`));
         }
+        // I63: a file about the design system that only says what not to use.
+        const forbidOnly = files.filter((f) => mandateOf(f.text, truth.components).onlyForbids).map((f) => f.file);
+        if (forbidOnly.length) console.log(C.yellow(`     ${forbidOnly.join(', ')} ${forbidOnly.length === 1 ? 'says' : 'say'} what not to use, never what to use. One sentence saying the design system is installed and its components are the ones to use moved most generations onto it in a public benchmark (16 of 57 → 43 of 55): add it, or point the file at ${contractsDir}/llms.txt. Advisory.`));
       }
     } catch (e) { console.log(C.dim(`ℹ️  Agent instruction files not checked: ${e.message}`)); }
   }
@@ -3738,6 +3779,68 @@ function reportFull(label, items, shown) {
         _sc.hygiene = hygieneScore(values, { only });
       }
     } catch { /* no component-values.snapshot.json: nothing to read */ }
+  }
+
+  // ── A workaround built around a component is a missing API (I59, advisory) ────
+  // A screen's own control laid over a design-system component (a clear button over a field, actions over a
+  // row) is reported to the design-system side: the component is missing a slot or prop, the screen is not
+  // wrong. Off with "workarounds": false.
+  if (cfg.workarounds !== false) {
+    try {
+      const { projectWorkarounds, workaroundLines } = await import('./workaround-check.mjs');
+      const { loadLocator } = await import('./component-locator.mjs');
+      const loc = await loadLocator(ROOT, cfg);
+      const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+      const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(cfg.componentSelectors ?? {})])];
+      let found = projectWorkarounds(ROOT, { names, classFor: loc.classFor, componentFiles: cfg.componentFiles ?? {}, excludeDirs: cfg.scanExcludeDirs ?? [], excludeFiles: cfg.scanExcludeFilenames ?? [] });
+      if (_scopeNames.length) found = found.filter((f) => f.host.kind !== 'component' || _scopeNames.includes(f.host.name));
+      const lines = workaroundLines(found);
+      if (lines.length) {
+        console.log(C.yellow(`\n🧩 Built around a component: ${lines.length} place${lines.length === 1 ? '' : 's'} where a screen lays its own control over a component. The component may be missing a slot or prop: send it to the design system, the screen is not wrong. Advisory.`));
+        for (const l of lines) console.log(C.yellow(`     ${l}`));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Workarounds around components not checked: ${e.message}`)); }
+  }
+
+  // ── Tailwind arbitrary values (I65, advisory) ────────────────────────────────
+  // rounded-[4px], bg-[#ff00aa]: a literal written into a class name, where no CSS rule and no literal check
+  // sees it. Each is compared with the project's own @theme: the utility to write when a theme value is the
+  // same, or "not a design-system value". Only in a project that uses Tailwind. Off with "tailwind": false.
+  if (cfg.tailwind !== false) {
+    try {
+      const { projectArbitrary, arbitraryLine } = await import('./tailwind-check.mjs');
+      const { tailwind, findings } = projectArbitrary(ROOT, readThemeCSS());
+      // Each component's own classes against what Figma states for it: height, padding, corner, colours.
+      if (tailwind) {
+        const { utilityFindings, utilityLine, themeValues, spacingBase } = await import('./tailwind-check.mjs');
+        const { resolveNamingSpec, tokenToVar } = await import('./naming-convention.mjs');
+        const spec = resolveNamingSpec(cfg);
+        const themeCss = readThemeCSS();
+        let structure = {}, sizing = {};
+        try { structure = JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8')).components ?? {}; } catch { /* no structure snapshot */ }
+        try { sizing = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8')).sizing ?? {}; } catch { /* no sizing */ }
+        if (_scopeNames.length) structure = Object.fromEntries(Object.entries(structure).filter(([n]) => _scopeNames.includes(n)));
+        const files = {};
+        for (const [n, p] of Object.entries(cfg.componentFiles ?? {})) for (const f of [p].flat()) { try { files[n] = (files[n] ?? '') + readFileSync(join(ROOT, f), 'utf8'); } catch { /* missing file */ } }
+        const diffs = utilityFindings({ structure, files, theme: themeValues(themeCss), base: spacingBase(themeCss), varOf: (tok, raw) => tokenToVar(tok, spec, { raw }), sizing });
+        const read = Object.keys(structure).filter((n) => files[n]).length;
+        if (diffs.length) {
+          console.log(C.yellow(`\n🎯 Tailwind classes against Figma: ${diffs.length} measure${diffs.length === 1 ? '' : 's'} in ${read} component${read === 1 ? '' : 's'} ${diffs.length === 1 ? 'differs' : 'differ'} from what Figma states. Advisory.`));
+          for (const d of diffs) console.log(C.yellow(`     ${utilityLine(d)}`));
+        } else if (read) {
+          console.log(C.green(`\n🎯 Tailwind classes against Figma: height, padding, corner and colours match in ${read} component${read === 1 ? '' : 's'}.`));
+        }
+      }
+      if (tailwind && findings.length) {
+        const fixable = findings.filter((f) => f.fix).length;
+        console.log(C.yellow(`\n🎯 Tailwind arbitrary values: ${findings.length} class${findings.length === 1 ? '' : 'es'} with a value in brackets, outside the theme (${fixable} the theme already has: write its utility). Advisory.`));
+        const all = process.argv.includes('--tailwind');
+        for (const f of findings.slice(0, all ? findings.length : 15)) console.log(C.yellow(`     ${arbitraryLine(f.file, f)}`));
+        if (!all && findings.length > 15) console.log(`     and ${findings.length - 15} more; run with --tailwind to list them all.`);
+      } else if (tailwind) {
+        console.log(C.green('\n🎯 Tailwind arbitrary values: none; every class uses the theme.'));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Tailwind arbitrary values not checked: ${e.message}`)); }
   }
 
   // ── AI-readiness scorecard (I12, advisory, never a gate) ────────────────────

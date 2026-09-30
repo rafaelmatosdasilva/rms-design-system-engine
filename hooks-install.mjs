@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 const MARK = 'guard.mjs';
 const MATCHER = 'Edit|Write|MultiEdit|NotebookEdit|Bash';
+const EDIT_MATCHER = 'Edit|Write|MultiEdit';
 
 export function guardCommand(engineDir = ENGINE) {
   return `node "${join(engineDir, 'guard.mjs')}"`;
@@ -28,8 +29,9 @@ export function installHooks(ROOT, { engineDir = ENGINE, remove = false } = {}) 
   const settings = readSettings(file);
   const before = JSON.stringify(settings);
   settings.hooks = { ...(settings.hooks ?? {}) };
-  // PreToolUse holds the never-rules; UserPromptSubmit routes a request made with the command (I56).
-  for (const [event, entry] of [['PreToolUse', { matcher: MATCHER }], ['UserPromptSubmit', {}]]) {
+  // PreToolUse holds the never-rules; UserPromptSubmit routes a request made with the command (I56);
+  // PostToolUse checks each UI edit when it is made (I62).
+  for (const [event, entry] of [['PreToolUse', { matcher: MATCHER }], ['UserPromptSubmit', {}], ['PostToolUse', { matcher: EDIT_MATCHER }]]) {
     const list = Array.isArray(settings.hooks[event]) ? settings.hooks[event] : [];
     const others = list.filter((h) => !(h?.hooks ?? []).some((x) => String(x?.command ?? '').includes(MARK)));
     const next = remove ? others : [...others, { ...entry, hooks: [{ type: 'command', command: guardCommand(engineDir) }] }];
@@ -59,13 +61,13 @@ export function hooksStatus(ROOT) {
   try { s = JSON.parse(readFileSync(file, 'utf8')); } catch { return { installed: false, file }; }
   const find = (event) => (s.hooks?.[event] ?? []).flatMap((h) => h?.hooks ?? []).map((x) => String(x?.command ?? '')).find((c) => c.includes(MARK));
   const cmd = find('PreToolUse');
-  if (!cmd || !find('UserPromptSubmit')) return { installed: false, file, ...(cmd ? { partial: true } : {}) };
+  if (!cmd || !find('UserPromptSubmit') || !find('PostToolUse')) return { installed: false, file, ...(cmd ? { partial: true } : {}) };
   const path = cmd.match(/"([^"]+guard\.mjs)"/)?.[1];
   return { installed: true, file, command: cmd, exists: !!path && existsSync(path) };
 }
 
-// A project that installed the hooks before the router existed (only PreToolUse) gets the router on its next
-// run, so an update reaches every project that opted in. Never installs hooks where there were none, never on
+// A project that installed the hooks before the router or the edit check existed gets them on its next run, so
+// an update reaches every project that opted in. Never installs hooks where there were none, never on
 // CI, never with "hooks": false. Returns true when it upgraded.
 export function upgradeHooks(ROOT, cfg = {}, { engineDir = ENGINE, env = process.env } = {}) {
   if (cfg.hooks === false || env.CI) return false;

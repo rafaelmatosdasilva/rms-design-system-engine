@@ -13,10 +13,11 @@
        ⏭ No frames configured in ds-config.json - visual regression skipped
 
 ❌  [3] Token values  (color · sizing · typography · breakpoints · text)
-       ✅ PASS  17   (color · radius · gap · padding · stroke · typography)
+       ✅ PASS  7   (color · radius · gap · padding · stroke · typography)
        ❌ FAIL  1
-       ❌ [sizing/-] radius/control → --hb-radius-control
-         Fix:  styles/tokens.css:10 - change --hb-radius-control: 4px → 6px
+       ⚠️  NO PARITY MAP  1 token(s) not found under the naming convention and no parity-map.mjs to map them - if the CSS names them another way, copy parity-map.example.mjs to parity-map.mjs and map them
+       ❌ [sizing/-] stroke/default → --stroke-default: CSS var not declared
+         Fix:  Add --stroke-default: 1px to src/app.css
 
 ✅  [4] Tokens used in screens exist in CSS  (every token bound in a DS screen has a CSS variable)
        ⏭ SKIPPED - no frames[] configured in ds-config.json.
@@ -31,7 +32,7 @@
        ⏭  no parity-map.mjs - no exception list to check.
 
 ✅  [7] No invented CSS variables  (every CSS variable traces back to a Figma token)
-       ✅ TRACEABLE    11  (maps back to a Figma token or SYSTEM_VARS)
+       ✅ TRACEABLE    10  (maps back to a Figma token or SYSTEM_VARS)
 
 ✅  [8] Docs tell the truth  (a style guide / DS doc references only tokens & vars that exist)
        ⏭ no documentation surfaces configured — skipped
@@ -43,7 +44,7 @@
        ⏭ no reimplementationSurfaces configured — skipped
 
 ✅  [11] Clean CSS  (no unused variables · no values that contradict Figma · safe containment)
-       ✅ 0 unused vars  (scanned 5 files; 0 known-unused exempted)
+       ✅ 0 unused vars  (scanned 4 files; 0 known-unused exempted)
        ✅ 0 undeclared vars  (every fallback-less var() resolves to a declaration)
        ✅ 0 dead CSS classes  (every rule matches something in the markup)
        ✅ Clean - no literal diverges from Figma
@@ -53,29 +54,18 @@
        ✅ No new undocumented broad element selectors with visual properties.
 
 ✅  [13] Structure  (height · spacing · base-rule variable bindings)
-       ✅ PASS  3/3 components (structure)
-       ✅ PASS  0/0 CSS height rules
-       ✅ PASS  0/0 CSS base-rule var bindings  (0 manual)
-       ✅ PASS  0/0 CSS property bindings
-       ✅ PASS  3 component(s) - no phantom CSS borders
-       ⚠️  NO-SHRINK 3/3 fixed-height component(s) with no flex-shrink:0 (button, badge, iconButton) - advisory, a risk in a flex column, not a difference from Figma
-       ✅ PASS  0/0 component property implementations
-       ✅ PASS  1/1 Figma annotation acknowledgments
 
 ✅  [14] All states are built  (each state implemented · correct selector · variable in the right rule)
        ⏭ not verified - component-state-tokens.json not found at project root.
           Run Phase 2 COMPONENT_SET state walk in Figma and save output here.
-       ✅ COVERED  0  propertyMap selectors present in CSS
+       ⏭ structure-contract.mjs not found - skipped
        ✅ CORRECT   0  state-var usages in matching state selectors
        ✅ CORRECT   0
 
 ❌  [15] Component props match Figma  (names, defaults, variant options & slots vs code)
        ✅ OK        4
        ❌ NAME      1   (the code names a Figma property differently: letter case, spaces)
-       ❌ VALUE     2   (wrong default, or a Figma variant the code doesn't accept)
-         ❌ badge/Tone: the code names it "tone" (letter case T → t)  (components/HbBadge.vue)
-         ❌ badge/Tone: default differs - Figma "Neutral" vs code "tone=neutral" (the code writes it "neutral")  (components/HbBadge.vue)
-         ❌ badge/Tone: code prop "tone" is missing Figma variant option(s) "Neutral" (the code writes it "neutral"), "Success" (the code writes it "success"), "Danger" (the code writes it "danger")  (components/HbBadge.vue)
+         ❌ badge/Tone: the code names it "tone" (letter case T → t)  (src/components/Badge.tsx)
 
 ⏭   [16] Sub-components match Figma  (the sub-components Figma nests are the ones the code uses)
        ⏭ SKIPPED - snapshot not captured (opt-in). Run the Plugin API capture and commit it to enable.
@@ -112,12 +102,13 @@
        ⏭  rendered parity skipped - RENDERED_ASSERTIONS empty (set ds-config.json → rendered.auto to generate height checks automatically)
 
 ✅  [25] What this audit actually checked  (which DS components & states are covered)
-       ✅ MODELLED   3/3 DS components have at least one check
-       ℹ️  NO RENDERED 3  (geometry/color only checked statically - no browser assertion)
-       ℹ️  SINGLE-VARIANT 3  (no per-variant capture - sibling states invisible to the audit)
-       ℹ️  CODE CAPTURE tokens 11 (0 verified · 0 uncertain) · components 3/3 measured · props 5 on 3 component(s) (0 uncertain) · icons 0 · nesting 1 (source only)  - read by static CSS only
+       ✅ MODELLED   0/3 DS components have at least one check
+       ℹ️  NO RENDERED 0  (geometry/color only checked statically - no browser assertion)
+       ℹ️  SINGLE-VARIANT 0  (no per-variant capture - sibling states invisible to the audit)
+       ℹ️  CODE CAPTURE tokens 7 (0 verified · 0 uncertain) · components 0/3 measured · props 5 on 2 component(s) (0 uncertain) · icons 0 · nesting 0 (source only)  - read by static CSS only
        ⚠️  CODE CAPTURE no styleguide configured (ds-config.json → styleguide.template)
        ✅ MODE COVERAGE  every mode-pinned rendered assertion covers all 2 modes (light/dark)
+       ⚠️  UNCHECKED (3) - DS component modelled by NOTHING (no contract, selector, or assertion):
 
 ────────────────────────────────────────────────────────────
   PARITY  ·  Figma ↔ code
@@ -128,14 +119,14 @@
   button/variant  Primary · Secondary         variant    Primary · Secondary         ✓
   button/size     Small · Large               size       Small · Large               ✓
   button/label    text                        label      default Continue            ✓
-  badge/Tone      Neutral · Success · Danger  tone       neutral · success · danger  ✗
+  badge/Tone      Neutral · Success · Danger  tone       Neutral · Success · Danger  ✗
   badge/label     text                        label      default Draft               ✓
   ✓ 4 match   ✗ 1 diverge
 
   VARIABLES  (design tokens)
-  VARIABLE        MODE  FIGMA  CODE
-  radius/control  -     6px    4px   ✗
-  ✓ 17 match   ✗ 1 diverge
+  VARIABLE        MODE  FIGMA    CODE       
+  stroke/default  -     (bound)  not in code  ✗
+  ✓ 7 match   ✗ 1 diverge
 
 ────────────────────────────────────────────────────────────
   GATE SUMMARY
@@ -167,7 +158,7 @@
   ✅  [24]  Renders correctly in a browser                      Pass
   ✅  [25]  What this audit actually checked                    Pass
 
-  [verified] the 25 gates above are mechanically checked against Figma; checked 3 of 3 DS components (see gate 25).
+  [verified] the 25 gates above are mechanically checked against Figma; checked 0 of 3 DS components (see gate 25).
   [reported] the advisory notes below (exemption debt, code drift, accessibility, layering) are signals, not pass/fail.
 
 ────────────────────────────────────────────────────────────
@@ -182,36 +173,27 @@
 ℹ️  Figma prop types → contracts/figma-props.d.ts: type a component's props with its <Name>FigmaProps so tsc shows prop drift.
 ℹ️  Contract completeness: 3/3 have a description · 3/3 have semantics · 0/3 carry whenNotToUse/useInstead guidance. Advisory only.
 
-♿ Accessibility from the code (no browser needed): 2 findings in 4 markup and 4 style files (1 with no accessible name · 1 focus outline removed and not put back). Advisory.
-     components/HbIconButton.vue:3  a button with only an icon inside and no aria-label, aria-labelledby or title
-     styles/tokens.css:44  .hb-icon-button removes the focus outline and no focus style puts one back
+♿ Accessibility from the code (no browser needed): nothing found in 3 markup and 1 style file.
 
-🧭 Agent instruction files: 2 design-system names that do not exist (AGENTS.md). An agent that reads them builds the wrong thing: fix the line, or point the file at contracts/llms.txt instead of restating names. Advisory.
-     AGENTS.md:3  tone="error" is not a value this prop takes; the system has tone="danger"
-     AGENTS.md:4  --hb-radius-pill is not a declared CSS variable
+🎯 Tailwind classes against Figma: 1 measure in 2 components differs from what Figma states. Advisory.
+     badge: corner, Figma radius/control (6px), the code writes rounded-[4px]; write rounded-control
 
-🎨 Figma file hygiene: 2 of 3 components (1 value with no variable or style · 1 detached instance · 1 variant with no auto layout · 1 with no description). For whoever keeps the Figma file: code can only match what Figma states. The parity never changes Figma. Advisory.
-     badge: fill #b42318 on Tone=Danger/Label has no variable or style
-     iconButton: Default/Glyph is detached from its instance
-     iconButton: Default has no auto layout
-     iconButton: no description
-
-🧩 Built around a component: 2 places where a screen lays its own control over a component. The component may be missing a slot or prop: send it to the design system, the screen is not wrong. Advisory.
-     badge: .hb-badge-remove laid over it (pages/index.html:7). The component may be missing a slot or prop for this action.
-     a text field (.hb-search-input): .hb-search-clear laid over it (pages/index.html:10). The design system's field may be missing this action.
+🎯 Tailwind arbitrary values: 3 classes with a value in brackets, outside the theme (2 the theme already has: write its utility). Advisory.
+     src/components/Badge.tsx:5  rounded-[4px]  4px is not a design-system value
+     src/pages/Settings.tsx:6  p-[12px]  the theme has this value: write p-3
+     src/pages/Settings.tsx:8  bg-[#1f7a3a]/10  the theme has this value: write bg-status-success/10
 
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
   ● Gate health      22/25 gates pass
-  ● Coverage         3/3 components modelled (100%)  ·  exemption debt 0
+  ● Coverage         0/3 components modelled (0%)  ·  exemption debt 0
   ● Documentation    3/3 contracts have a description (100%)
   ● AI guidance      0/3 carry whenNotToUse/useInstead (0%)
-  ● Figma hygiene    1/3 components with every value bound, auto layout and a description (33%)
 
-ℹ️  Agreed values: 17 of 18 compared facts agree (recorded in parity-agreed.json, updated). Of the 1 that differ: 0 Figma moved · 0 code moved · 0 both moved · 1 with no earlier agreement.
+ℹ️  Agreed values: 7 of 7 compared facts agree (recorded in parity-agreed.json, updated).
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: badge 4 · iconButton 2 · 6 not tied to a component
+📉 Burndown, open findings per component: badge 3 · 5 not tied to a component
    next up: badge. Run with --component badge, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -223,15 +205,13 @@
 **Figma data was not refreshed in this run.** The audit used the committed snapshots (the oldest, figma/vars.snapshot.json, updated today). To refresh them: rms-figma-code-parity --recipe refresh-figma.
 
 - **Token values** fails:
-  - [sizing/-] radius/control → --hb-radius-control
-    - Fix:  styles/tokens.css:10 - change --hb-radius-control: 4px → 6px
+  - [sizing/-] stroke/default → --stroke-default: CSS var not declared
+    - Fix:  Add --stroke-default: 1px to src/app.css
 
 - **Component props match Figma** fails:
-  - badge/Tone: the code names it "tone" (letter case T → t)  (components/HbBadge.vue)
-  - badge/Tone: default differs - Figma "Neutral" vs code "tone=neutral" (the code writes it "neutral")  (components/HbBadge.vue)
-  - badge/Tone: code prop "tone" is missing Figma variant option(s) "Neutral" (the code writes it "neutral"), "Success" (the code writes it "success"), "Danger" (the code writes it "danger")  (components/HbBadge.vue)
+  - badge/Tone: the code names it "tone" (letter case T → t)  (src/components/Badge.tsx)
 
-Burndown, open findings per component: badge 4 · iconButton 2 · 6 not tied to a component
+Burndown, open findings per component: badge 3 · 5 not tied to a component
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 

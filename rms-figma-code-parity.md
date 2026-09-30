@@ -85,6 +85,7 @@ reference it points to say, never from memory or from this table alone.
 | a note in Figma about what a component is or does (a toggle, a button, a heading, its label), accessibility notes, or an accessibility finding explained | `a11y-notes` |
 | components compared with their Figma images | `visual-diff` |
 | to know what to fix first, or to work a library down | `burndown` |
+| a component's props and values, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
 
 Reference (`rms-figma-code-parity --reference <name>`): `usage` (every command, option and output), `config`
@@ -115,7 +116,9 @@ refreshed anything and how old the snapshots are: repeat it as it is.
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
 `--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
 refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.json` edit, a commit, a push,
-applying the hand-back, or a code edit, unless the person's latest message asked for that change. A request made
+applying the hand-back, or a code edit, unless the person's latest message asked for that change. After a UI edit
+they hand back what it added that the design system does not have (a colour written by hand, a variable declared
+nowhere, a prop value a component does not take): fix it in that file before going on. A request made
 with `/rms-figma-code-parity` arrives already routed (the `ROUTE:` block above). When a hook refuses or asks, that is the answer: do not work around it (no other
 tool, no shell edit); tell the person what it said.
 
@@ -282,6 +285,8 @@ Full parity workflow in one command: Phase 1 (live Figma refresh) runs before Ph
 
 ## Audit Rules
 
+- Change only what the person asked for. Asked to fix one difference (the chip's height), fix that one; list
+  the other differences the audit shows and leave them as they are until the person asks.
 - Never change source files to *hide* a divergence - report it.
 - Always compare **all** configured modes.
 - Naming violations are flagged regardless of whether the value is correct.

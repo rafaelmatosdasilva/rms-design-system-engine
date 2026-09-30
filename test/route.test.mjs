@@ -42,7 +42,7 @@ test('a question about a named component\'s states runs its scoped audit for the
 test('fixes, debt and priorities', () => {
   assert.deepEqual([r('the chip is 36px high when large with an icon, but Figma says 32px. Fix it in the code.').recipe, r('the chip is 36px high when large with an icon, but Figma says 32px. Fix it in the code.').run], ['fix-a-difference', ['rms-figma-code-parity --component chip']]);
   assert.equal(r('agora corrige a altura no código').recipe, 'fix-a-difference');
-  assert.deepEqual(r('accept the chip radius as known debt').run, ['rms-figma-code-parity --component chip --baseline --findings']);
+  assert.deepEqual(r('accept the chip radius as known debt').run, ['rms-figma-code-parity --component chip --baseline --findings --match radi']);
   assert.deepEqual(r('audit the chip, then accept whatever is failing for it as known debt').run, ['rms-figma-code-parity --component chip --baseline --findings']);
   assert.deepEqual(r('accept every current failure as known debt').run, ['rms-figma-code-parity --baseline --findings']);
   assert.equal(r('aceita a diferença do raio como dívida').recipe, 'accept-debt');
@@ -97,4 +97,29 @@ test('what --route prints: the route, the commands, one NEXT line, and the recip
   assert.match(routeText(r('how do I turn on the visual comparison?'), 'x'.repeat(50), 'c', { maxRecipe: 10 }), /--- recipe visual-diff: read it with c --recipe visual-diff before you follow a step it has ---$/);
   // Not on PATH: every command uses the engine's own path.
   assert.match(routeText(route('audit the chip', { ...P, cmd: 'node /x/audit.mjs' }), '', 'node /x/audit.mjs'), /RUN: node \/x\/audit\.mjs --component chip/);
+});
+
+test('a question about a component\'s props or a token routes to the query, with the names it asks about', async () => {
+  const { route } = await import('../route.mjs');
+  const P = { components: ['chip', 'badge'] };
+  assert.deepEqual([route('what props does the chip take?', P).recipe, route('what props does the chip take?', P).run], ['ask-the-system', ['rms-figma-code-parity --query chip']]);
+  assert.deepEqual(route('que valores aceita o size do badge?', P).run, ['rms-figma-code-parity --query badge']);
+  assert.deepEqual(route('which variable is radius/control?', P).run, ['rms-figma-code-parity --query radius/control']);
+  const none = route('what are the token names?', P);
+  assert.deepEqual([none.recipe, none.run], ['ask-the-system', []]);
+  assert.match(none.notes.join(' '), /Ask which component or token/);
+  assert.equal(route('audit the chip props', P).recipe, 'audit-component');   // not a question: the audit
+});
+
+test('a request for new UI asks the system for the names and builds with them (I62)', () => {
+  const b = r('add a small green "Saved" confirmation next to the Save button on the gallery page');
+  assert.deepEqual([b.recipe, b.run], ['ask-the-system', ['rms-figma-code-parity --query button']]);
+  assert.match(b.notes.join(' '), /build it, in the file they name, with the design system's own components/);
+  assert.match(b.notes.join(' '), /never invent one/);
+  assert.equal(r('acrescenta um botão de cancelar ao formulário').recipe, 'ask-the-system');
+  // Not new UI: a note in Figma, debt, a change in Figma, an audit.
+  assert.equal(r('how do I write a note in Figma saying the chip is a toggle, so the parity checks it?').recipe, 'a11y-notes');
+  assert.equal(r('add the chip radius to the baseline as debt').recipe, 'accept-debt');
+  assert.equal(r('make the button 32px in Figma').recipe, 'fix-a-difference');
+  assert.equal(r('run the parity on the button').recipe, 'audit-component');
 });

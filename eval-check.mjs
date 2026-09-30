@@ -5,7 +5,10 @@
 // GENERATED output instead of the repo:
 //   • raw color / dimension literals that should be a DS token/var,
 //   • var(--x) where --x is not a known DS var (invented),
-//   • (metric) how many DS component classes the candidate actually used.
+//   • (metric) how many DS component classes the candidate actually used;
+//   • when the case names the component it expects (hidden from the agent), a candidate that does not use it
+//     avoided the system: a failure, never clean (idea I64). A hand-built screen has nothing to get wrong on the
+//     token and API checks, so without this it would read as the best result.
 // Pure, framework-light and deterministic, so it is unit-testable without a network or a live agent.
 // The eval runner and the live-agent generation adapter build on top of this (see the evals spec).
 //
@@ -20,13 +23,29 @@ const INLINE_STYLE = /\bstyle\s*=\s*["'{]/gi;   // style="…" (HTML) or style={
 
 // Zero-length dimensions are fine unitless, and a bare "0px" carries no design decision.
 const isBenignDim = (d) => /^0(?:px|rem|em)$/.test(d);
+const normName = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// Does the candidate use this component: its class as a whole word, or a tag of its name (<Chip>, <ds-chip>)?
+export function usesComponent(src, name, cls = null) {
+  const c = String(cls ?? '').replace(/^\./, '');
+  if (c) {
+    const esc = c.replace(/[.*+?^${}()|[\]\\]/g, '\\const isBenignDim = (d) => /^0(?:px|rem|em)$/.test(d);');
+    if (new RegExp(`(?:^|[^\\w-])${esc}(?![\\w-])`).test(src)) return true;
+  }
+  const want = normName(name);
+  return !!want && [...String(src).matchAll(/<([A-Za-z][\w.-]*)/g)].some((m) => {
+    const tag = normName(m[1]);
+    return tag === want || tag.endsWith(want) && /^[a-z]{1,4}$/.test(tag.slice(0, -want.length));   // <ds-chip>, <hb-chip>
+  });
+}
 
 /**
  * @param {string} code   candidate output (html/jsx/vue/css blob)
- * @param {{cssVars?: Set<string>|string[], dsClasses?: Set<string>|string[]}} ctx
+ * @param {{cssVars?: Set<string>|string[], dsClasses?: Set<string>|string[], componentClass?: Map<string,string>}} ctx
+ * @param {{component?: string}} [expect]   the component the case expects, never shown to the agent
  * @returns {{violations: Array<{type:string,value:string}>, metrics: object}}
  */
-export function evalConformance(code, ctx = {}) {
+export function evalConformance(code, ctx = {}, { component = null } = {}) {
   const src = String(code || '');
   const cssVars = ctx.cssVars instanceof Set ? ctx.cssVars : new Set(ctx.cssVars || []);
   const dsClasses = ctx.dsClasses instanceof Set ? ctx.dsClasses : new Set(ctx.dsClasses || []);
@@ -53,6 +72,9 @@ export function evalConformance(code, ctx = {}) {
   for (const c of rawColors) violations.push({ type: 'raw-color', value: c });
   for (const d of rawDims) violations.push({ type: 'raw-dimension', value: d });
   for (const v of inventedVars) violations.push({ type: 'invented-var', value: v });
+  const cls = component ? (ctx.componentClass?.get?.(component) ?? null) : null;
+  const avoided = !!component && src.trim().length > 0 && !usesComponent(src, component, cls);
+  if (avoided) violations.push({ type: 'avoided-component', value: component });
 
   return {
     violations,
@@ -63,6 +85,7 @@ export function evalConformance(code, ctx = {}) {
       rawDimensions: rawDims.length,
       inventedVars: inventedVars.length,
       dsClassesUsed: usedDsClasses.length,
+      avoided,   // the expected component was not used: the system was avoided
       inlineStyles: (src.match(INLINE_STYLE) || []).length,   // metric (S16): fewer is better
     },
   };

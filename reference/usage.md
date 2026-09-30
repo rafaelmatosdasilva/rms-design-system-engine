@@ -44,6 +44,7 @@ rms-figma-code-parity --trend                         # show last 20 audit runs 
 rms-figma-code-parity --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
 rms-figma-code-parity --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
 rms-figma-code-parity --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
+rms-figma-code-parity --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) or a token's variable, values per mode and, for a text colour, the surfaces it reads on
 rms-figma-code-parity --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description (the first 15 show on every run)
 rms-figma-code-parity --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-figma-code-parity --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
@@ -53,6 +54,7 @@ rms-figma-code-parity --docs                          # ALSO build the styleguid
 rms-figma-code-parity --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-figma-code-parity --baseline                      # capture today's failing gates as accepted adoption debt (commit parity-baseline.json)
 rms-figma-code-parity --baseline --findings           # the same, each failing ❌ line accepted on its own
+rms-figma-code-parity --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
 rms-figma-code-parity --no-baseline                   # ignore any parity-baseline.json this run (enforce every gate)
 rms-figma-code-parity --summary                       # print the plain result of the last run again (relay it as is)
 rms-figma-code-parity --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
@@ -205,7 +207,8 @@ with `ds-config.json → contracts.auto: false`. It splits captured from authore
   `@since <x>`, `@why <text>`; the convention is read, never imposed, and no tags + nothing authored = no
   field. A deprecated **token** whose Figma description names its replacement or reason gets that
   explanation as its DTCG `$deprecated` string (`"Use radii/button instead. too sharp"`) instead of a bare `true`),
-  `contract.schema.json`, and an `llms.txt` AI index (which also lists each component's guidance and
+  `contract.schema.json`, and an `llms.txt` AI index (which opens by telling an agent to use these components,
+  build nothing by hand that one covers and ask `--query` before guessing a name; it also lists each component's guidance and
   composition, tags a non-current component `[deprecated]`/`[experimental]`, and gives it a
   `status: deprecated · use X instead · since 2.0 · why: …` line). They carry the DS's real values, so a single
   `.gitignore` keeps them local. When these are present, a token divergence also **cites its source**:
@@ -405,6 +408,10 @@ known difference can be accepted while everything else in the same gate keeps bl
 `❌` lines are all accepted is debt; any other `❌` line is a regression, including an accepted one whose value
 changed (it is new text). The run lists the new lines, and the accepted lines that no longer appear as fixed,
 to drop with the next `--baseline --findings`. A failing gate with no `❌` line to accept is recorded as a gate.
+`--match <words>` (comma-separated) accepts only the lines that contain one of them, with their gate's count
+line, and adds them to the file (nothing accepted before is dropped): `--component chip --baseline --findings
+--match radi` accepts the chip's radius and keeps its prop names failing. The router adds it when the person
+names the kind of difference (radius, height, width, padding, gap, colour, props).
 
 #### Accessibility check (I18, advisory, from the render)
 
@@ -576,10 +583,20 @@ non-deterministic. **Advisory** (exit 0 unless `evals.strict`), and it **never g
 **Generation and the judge are pluggable commands** (any agent/CLI, no provider lock-in):
 - `evals.generate.cmd` — run with `--generate` (or when a candidate is missing): the prompt is piped on
   stdin, the DS context (`llms.txt`) path is in `$EVAL_CONTEXT`, `$EVAL_ID`/`$EVAL_COMPONENT` are set, and
-  the command's **stdout** becomes the candidate (written to `evals/<id>.<ext>`).
+  the command's **stdout** becomes the candidate (written to `evals/<id>.<ext>`). The prompt is the case's
+  `prompt` alone: the expected `component` is for the scoring, so do not pass `$EVAL_COMPONENT` to the agent.
+- A case's `component` is what it expects: a candidate that does not use it (its class, or a tag of its name)
+  avoided the system and fails (`avoided-component`), and the summary counts `N avoided the system`. A prompt
+  that names a component is flagged before the run, since its score would measure reading the prompt.
 - `evals.judge.cmd` — advisory only: gets `{id,prompt,component,guidance,candidate}` as JSON on stdin (where
   `guidance` is the component's own description + whenNotToUse/useInstead from its contract, so the judge
   assesses "right component / correct usage" against the DS's rules, not blind) and must print
   a JSON verdict `{ok, notes}` (right component for the intent, empty/error states). It never gates.
+- `evals.levels` (or `--levels bare,steering,parity`) — does the team's guidance help? The same cases run per
+  level: `bare` (no context), `steering` (the project's own instruction files, AGENTS.md, CLAUDE.md, rules,
+  joined into `evals/.context/steering.md`) and `parity` (`contracts/llms.txt`). The command gets the level in
+  `$EVAL_LEVEL` and the file in `$EVAL_CONTEXT`. Each level is scored by the same checks, the accessibility read
+  from the code included (a clean case has no violation and no accessibility finding), and compared with bare.
+  A level with nothing to give says why and is not run. A command that does not read its stdin is fine.
 Both **degrade safely** (a missing/failing command just leaves the committed candidates and skips the judge).
 Spec: `plans/PARITY-evals-spec.md`.

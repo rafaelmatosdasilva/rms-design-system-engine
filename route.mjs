@@ -55,8 +55,13 @@ const RULES = [
   ['guidelines-links', (t) => LINK.test(t)],
   ['fix-a-difference', (t) => /\b(change|set|make|update|muda|mudar|altera|alterar|p[oõ]e|coloca)\w*\b[\s\S]{0,60}\b(in|no|na)\s+figma\b|\bfigma\b[\s\S]{0,30}\b(to|para)\s+\d/i.test(t), 'figma'],
   ['refresh-figma', (t) => /maxSnapshotAgeDays|go(es)? green|fica(r)? verde|raise the (age|limit)/i.test(t), 'forbidden-green'],
+  // Before accept-debt: "que valores aceita o size" asks what a prop accepts, it accepts no debt.
+  ['ask-the-system', (t) => QUESTION.test(t) && /\b(props?|propriedades?|values?|valores?|tokens?|variables?|vari[aá]ve(l|is)|names?|nomes?)\b/i.test(t) && !/debt|d[ií]vida|baseline/i.test(t)],
   ['accept-debt', (t) => /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit/i.test(t)],
   ['fix-a-difference', (t) => /\b(fix|correct|repair|corrig|conserta|repara|resolve)\w*/i.test(t) && !QUESTION.test(t)],
+  // New UI to build ("add a Saved confirmation next to the Save button"): the names come from the system, never from
+  // memory, and a value the system does not have is said, not invented (I62). Not a note, not Figma, not debt.
+  ['ask-the-system', (t) => /\b(add|create|build|make|put|insert|show|acrescent\w*|adicion\w*|cria\w*|constr[oó]i\w*|p[oõ]e|coloca\w*|mostra\w*)\b/i.test(t) && /\b(confirmation|message|badge|banner|toast|button|link|label|page|screen|section|row|card|list|menu|modal|dialog|form|field|header|footer|empty state|tooltip|confirma[çc][ãa]o|mensagem|p[aá]gina|ecr[ãa]|sec[çc][ãa]o|linha|bot[ãa]o|cart[ãa]o|lista|formul[aá]rio|campo|estado vazio)s?\b/i.test(t) && !/figma|\bnotes?\b|\bnotas?\b|baseline|debt|d[ií]vida|config/i.test(t) && !QUESTION.test(t), 'build-ui'],
   ['a11y-notes', (t) => /\bnotes?\b|\bnotas?\b|annotat|anota|toggle|\brole\b|\baria\b|accessib|acessib|alt text|screen reader|leitor de ecr/i.test(t)],
   ['visual-diff', (t) => /\bimages?\b|imagem|imagens|visual|screenshot|pixel/i.test(t)],
   ['burndown', (t) => /fix first|first to fix|what first|primeiro|prioridad|priorit|work .{0,20}down|next up/i.test(t)],
@@ -112,12 +117,25 @@ function routeOnly(text, { hasConfig, components, cmd }) {
       notes.push('Do not raise maxSnapshotAgeDays or edit ds-config.json to go green: that hides drift. Say so, and run the audit to show what really fails.');
       return { recipe, question: false, run: [cmd], notes, kind };
     }
-    if (recipe === 'accept-debt') return { recipe, question, run: question ? [] : [`${scoped} --baseline --findings`], notes };
+    if (recipe === 'accept-debt') {
+      // The difference the person named (the radius, not the rest): only the findings that name it are accepted.
+      const match = debtWords(t);
+      return { recipe, question, run: question ? [] : [`${scoped} --baseline --findings${match.length ? ` --match ${match.join(',')}` : ''}`], notes };
+    }
     if (recipe === 'fix-a-difference') {
-      notes.push('Fix exactly what was asked, in the code, at the file and line the audit names; then run the same audit again.');
+      notes.push('Fix exactly what was asked, in the code, at the file and line the audit names, and nothing else: list the other differences the audit shows and leave them as they are; then run the same audit again.');
       return { recipe, question, run: [scoped], notes };
     }
     if (recipe === 'burndown') return { recipe, question, run: [cmd], notes };
+    if (recipe === 'ask-the-system') {
+      const terms = [...named, ...(t.match(/(?:--[a-z][\w-]*|\b[a-z][\w-]*(?:\/[\w-]+)+)/gi) ?? [])];
+      if (kind === 'build-ui') {
+        notes.push('The person asks for new UI: build it, in the file they name, with the design system\'s own components, classes and CSS variables, their names exactly as the query prints them. Write no colour, size or variable the system does not have: the edit check hands back anything that is not the system\'s. When the system has no value for what is asked (a green where it has none), use the closest one it has and say so, or ask; never invent one.');
+        return { recipe, question: false, run: terms.length ? [`${cmd} --query ${terms.join(' ')}`] : [], notes };
+      }
+      if (!terms.length) notes.push('Ask which component or token, then run the query with it.');
+      return { recipe, question, run: terms.length ? [`${cmd} --query ${terms.join(' ')}`] : [], notes };
+    }
     if (recipe === 'first-setup') return { recipe, question, run: question ? [] : [`${cmd} --doctor`], notes };
     if (recipe === 'ci-and-hooks') return { recipe, question: true, run: [], notes };
     // A how-to question is answered from the recipe; a question about a named component's states needs the
@@ -135,6 +153,21 @@ function setupRun(t, cmd, notes) {
   return [`${cmd} --init --figma-url='${figma ?? '<Figma file URL>'}'${css ? ` --theme-css='${css}'` : ''}`];
 }
 
+// Words a person uses for a kind of difference → what the audit's lines say for it. Only these, so the engine,
+// not the agent, decides what one named difference covers.
+const DEBT_WORDS = [
+  [/\b(radius|radii|corner|rounded|raio|cantos?|arredondad\w*)\b/i, 'radi'],
+  [/\b(height|altura)\b/i, 'height'],
+  [/\b(width|largura)\b/i, 'width'],
+  [/\b(padding|preenchimento)\b/i, 'padding'],
+  [/\b(gap|spacing|espa[cç]amento)\b/i, 'gap'],
+  [/\b(colou?rs?|cor(es)?)\b/i, 'color'],
+  [/\b(props?|propriedades?|prop names?)\b/i, 'props match'],
+];
+export function debtWords(text) {
+  return DEBT_WORDS.filter(([re]) => re.test(String(text ?? ''))).map(([, w]) => w);
+}
+
 // What --route prints: the route, the commands, the notes, one NEXT line, and the recipe itself.
 export function routeText(r, recipeText, cmd = 'rms-figma-code-parity', { maxRecipe = null } = {}) {
   const lines = [`ROUTE: ${r.recipe}`];
@@ -143,7 +176,9 @@ export function routeText(r, recipeText, cmd = 'rms-figma-code-parity', { maxRec
   for (const s of r.say ?? []) lines.push(`SAY${r.sayIf ? ` (${r.sayIf})` : ''}: ${s}`);
   const say = r.say?.length ? ` Put the SAY line${r.say.length > 1 ? 's' : ''} in your final reply, word for word${r.sayIf ? `, ${r.sayIf}` : ''}.` : '';
   lines.push(r.run.length
-    ? `NEXT: run ${r.run.length > 1 ? 'these commands' : 'the command'} above, relay its SUMMARY as it is, and follow its NEXT line.${say}`
+    ? r.recipe === 'ask-the-system'
+      ? `NEXT: run the command above and answer from what it prints, with the names exactly as written there.${say}`
+      : `NEXT: run ${r.run.length > 1 ? 'these commands' : 'the command'} above, relay its SUMMARY as it is, and follow its NEXT line.${say}`
     : `NEXT: answer from the recipe below (and the reference it points to), quoting its exact words for settings and formats; run nothing.${say}`);
   const recipe = (recipeText ?? '').trimEnd();
   if (maxRecipe != null && recipe.length > maxRecipe) lines.push('', `--- recipe ${r.recipe}: read it with ${cmd} --recipe ${r.recipe} before you follow a step it has ---`);

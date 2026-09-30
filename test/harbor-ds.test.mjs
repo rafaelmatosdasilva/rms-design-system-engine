@@ -13,6 +13,8 @@
 //   • an AGENTS.md that states tone="error" (the system says danger) and a variable that does not exist
 //   • the Figma file's own hygiene (component-values.snapshot.json): a raw fill, a detached instance, a variant
 //     with no auto layout, a component with no description
+//   • the page lays its own controls over the badge (a remove button) and over a search field (a clear button):
+//     reported to the design system as a missing action
 // And conventions that are not differences: the focus ring's outline lengths, which Figma has no value for,
 // and fixed heights with no flex-shrink:0 (advisory only).
 //
@@ -50,6 +52,10 @@ test('Harbor design system, without Chrome: every deliberate difference is found
   assert.match(r.out, /badge: fill #b42318 on Tone=Danger\/Label has no variable or style/);
   assert.match(r.out, /iconButton: Default\/Glyph is detached from its instance/);
   assert.match(r.out, /● Figma hygiene\s+1\/3 components/);
+  // Controls laid over a component or a field: a missing API, sent to the design system.
+  assert.match(r.out, /🧩 Built around a component: 2 places/);
+  assert.match(r.out, /badge: \.hb-badge-remove laid over it \(pages\/index\.html:7\)/);
+  assert.match(r.out, /a text field \(\.hb-search-input\): \.hb-search-clear laid over it/);
   // Conventions, not differences: a focus ring and fixed heights outside a flex column.
   assert.match(r.out, /✅ Clean - no literal diverges from Figma/);
   assert.match(r.out, /✅ PASS  3 component\(s\) - no phantom CSS borders/);
@@ -66,7 +72,7 @@ test('Harbor, scoped to one component: a page showing several components and a n
   const r = auditFixture(FIXTURE, bareEnv(), 'harbor-ds-', ['--component', 'badge']);
   assert.match(r.out, /SCOPED TO: badge/);
   assert.doesNotMatch(r.out, /nested components pulled in/);
-  assert.match(r.out, /📉 Burndown, open findings per component: badge 3 · /);
+  assert.match(r.out, /📉 Burndown, open findings per component: badge 4 · /);
   assert.match(r.out, /🎨 Figma file hygiene: 1 of 1 component \(1 value with no variable or style\)/);
   assert.doesNotMatch(r.out, /iconButton: /);
 });

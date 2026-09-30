@@ -84,10 +84,18 @@ export function classifyBaseline(gates, baselineLabels, acceptedFindings = null)
 // with no ❌ line to accept is still recorded as a gate.
 // merge: a scoped run (--component) sees only its components' findings, so it adds to the file instead of
 // replacing it; the debt of every other component stays accepted (I56). An unscoped run rewrites it.
-export function writeBaseline(path, gates, { findings = false, merge = false } = {}) {
+// match: only the findings whose line (or gate) contains one of these words are accepted ("the radius, not the
+// rest"): it implies findings, and a gate with no ❌ line is accepted only when its name matches.
+export function writeBaseline(path, gates, { findings = false, merge = false, match = null } = {}) {
+  const words = (match ?? []).map((w) => String(w).toLowerCase()).filter(Boolean);
+  const hit = (text) => !words.length || words.some((w) => String(text).replace(ANSI, '').toLowerCase().includes(w));
+  if (words.length) findings = true;
   const failing = (gates || []).filter((g) => !g.pass && !g.planLimited);
-  let lines = findings ? failing.flatMap(findingKeys) : [];
-  let labels = findings ? failing.filter((g) => !findingKeys(g).length).map((g) => g.label) : currentFailingLabels(gates);
+  // A gate's count line (❌ FAIL  1, ❌ NAME  5) names nothing: it goes with the gate's lines that match.
+  const COUNT = /:: ❌\s+[A-Z][A-Z ?]*?\s+\d+(\/\d+)?(\s|$)/;
+  let lines = findings ? failing.flatMap((g) => { const keys = findingKeys(g); const own = keys.filter((k) => !COUNT.test(k) && hit(k)); return words.length ? (own.length ? [...keys.filter((k) => COUNT.test(k)), ...own] : []) : keys; }) : [];
+  let labels = findings ? failing.filter((g) => !findingKeys(g).length && hit(g.label)).map((g) => g.label) : currentFailingLabels(gates);
+  if (words.length && merge === false) merge = true;   // accepting some lines never drops the ones accepted before
   if (merge && existsSync(path)) {
     let old = {};
     try { old = JSON.parse(readFileSync(path, 'utf8')); } catch { /* unreadable: nothing to keep */ }

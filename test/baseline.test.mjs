@@ -94,3 +94,24 @@ test('findings: a gate is debt only when every ❌ line is accepted; fixed lines
   writeBaseline(path, [gate('Structure', ['❌ chip: radius 16px, code 12px'])], { findings: true });   // unscoped: a rewrite
   assert.deepEqual(loadBaselineFindings(path), ['Structure :: ❌ chip: radius 16px, code 12px']);
 });
+
+test('--match: only the findings that name the difference, with their gate\'s count line; nothing accepted before is dropped', async () => {
+  const { mkdtempSync, readFileSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'bl-'));
+  const path = join(dir, 'parity-baseline.json');
+  writeFileSync(path, JSON.stringify({ gates: [], findings: ['Icons :: ❌ an older one'] }));
+  const gates = [
+    { label: '[3] Token values  (color · sizing)', pass: false, lines: ['❌ FAIL  1', '❌ [sizing/-] radii/chip → --radii-chip'] },
+    { label: '[15] Component props match Figma  (names)', pass: false, lines: ['❌ NAME      1', '❌ chip/Size: the code names it "size"'] },
+    { label: '[20] Icons', pass: false, lines: [] },
+  ];
+  writeBaseline(path, gates, { match: ['radi'] });
+  const doc = JSON.parse(readFileSync(path, 'utf8'));
+  assert.deepEqual(doc.findings, ['Icons :: ❌ an older one', '[3] Token values :: ❌ FAIL  1', '[3] Token values :: ❌ [sizing/-] radii/chip → --radii-chip']);
+  assert.deepEqual(doc.gates, []);   // a gate with no line is accepted only when its name matches
+  const cls = classifyBaseline(gates, doc.gates, doc.findings);
+  assert.deepEqual(cls.debt, ['[3] Token values  (color · sizing)']);
+  assert.ok(cls.regressions.includes('[15] Component props match Figma  (names)'));
+});

@@ -92,3 +92,12 @@ test('in a real run on the demo design system: wrong names are listed, a correct
   const good = run({ 'CLAUDE.md': 'Use <Chip size="L" /> with var(--radii-chip); the token is radii/chip.\n' });
   assert.match(good, /🧭 Agent instruction files \(CLAUDE\.md\): every design-system name they state exists\./);
 });
+
+test('I63: a file about the design system that only says what not to use', async () => {
+  const { mandateOf } = await import('../steering-check.mjs');
+  const comps = ['chip', 'button', 'badge'];
+  assert.equal(mandateOf('# Agents\nNever build your own chip. Avoid inline styles in the design system.', comps).onlyForbids, true);
+  assert.equal(mandateOf('# Agents\nThe design system is installed: use its components (Chip, Button). Never build your own chip.', comps).onlyForbids, false);
+  assert.equal(mandateOf('# Agentes\nO sistema de design está instalado: usa os componentes dele. Nunca cries o teu próprio chip.', comps).onlyForbids, false);
+  assert.equal(mandateOf('# Project\nNever push on Fridays. Run npm test first.', comps).onlyForbids, false);   // not about the system
+});

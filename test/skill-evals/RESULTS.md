@@ -1,5 +1,60 @@
 # Skill evaluation results
 
+## 2026-09: change only what was asked, one named difference, and the guide for I62 to I68 (continuous evaluation)
+
+A fresh run of the adopted guide (the `cookbook` variant, the checkout) after guide changes: an Audit Rule to
+change only what was asked, the `ask-the-system` recipe, `--match` in the accept-debt recipe (never narrow
+`parity-baseline.json` by hand), and the reference for the edit check (I62), the Figma call budget (I67), the
+llms.txt mandate (I63), the hidden expected component and prompt check in evals (I64, I68) and Tailwind (I65).
+Engine 2365d8a: the hooks every run installs include the edit check. 21 tasks: `props-question` is new. Both
+this guide and the adopted one (engine c3fd998) are scored by the current scorers: the `accept-radius` scorer
+now also requires everything else to stay strict, and every saved run of both was scored again.
+
+Guide set measured: `59ea4c33daac`
+
+| | Adopted (rescored) | This guide |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 40/40 | 40/40 |
+| Sonnet, the 20 common tasks | 95/100 | 100/100 |
+| Sonnet, mean cost / input per request, 20 tasks | $0.143 / 124k | $0.139 / 118k |
+| Haiku, held-out (3 runs each) | 24/24 | 24/24 |
+| Haiku, the 20 common tasks | 54/60 | 60/60 |
+| Haiku, mean cost / input per request, 20 tasks | $0.055 / 75k | $0.052 / 67k |
+| `props-question` (new) | | Sonnet 4/5 · Haiku 3/3 |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 1.6 | 1.4 |
+
+**Reading.** Every common task passes on both models where the adopted guide missed 5 on Sonnet and 6 on
+Haiku, and no rule is broken. Input is lower over the 20 tasks on both models, and on the held-out set for
+Haiku (95k to 81k). On the Sonnet held-out set it was 3% higher at 5 runs (132k to 136k), so the held-out tasks
+whose input grew were run to 13 runs on both versions, and so were the four Sonnet tasks that grew in the
+previous measurement, the protocol I56 used:
+
+| Sonnet, 13 runs each | Adopted (rescored) | This guide |
+|---|---|---|
+| two-turns-pt, forbidden-green, change-figma (held-out) | 39/39 · 183k / $0.202 | 39/39 · 190k / $0.206 |
+| audit-all, accept-radius, private-badge-pt, fix-first | 42/52 · 112k / $0.138 | 52/52 · 112k / $0.136 |
+| Haiku, two-turns-pt | 33/33 | 13/13 |
+
+With 13 runs the held-out difference is about 4% more input per request, the same as in the previous
+measurement: mostly noise, the rest the longer report. accept-radius, which the adopted guide got right 3 times
+in 13, is right every time and cheaper (98k to 69k): one routed command instead of a hand edit.
+
+**The misses the adopted guide had.** Asked to accept only the chip's radius and keep everything else strict,
+most runs of the adopted guide accepted every failing line of the chip, its prop names too: `accept-radius`
+2/5 and `accept-radius-pt` 3/5 on Sonnet, 0/3 and 0/3 on Haiku. The old scorer passed them (it checked only
+that the radius was accepted). `--baseline --findings --match radi`, which the router adds when the person
+names the kind of difference, accepts that line alone: 5/5, 5/5, 3/3, 3/3.
+
+**Found by this evaluation and fixed.**
+- Two intermediate guides were measured and not recorded. The first (the `ask-the-system` recipe alone) had
+  2 of 33 Haiku runs of `two-turns-pt` rename the chip's props when asked only for its height, against 0 of 33
+  on the adopted guide: the rule to change only what was asked lived only in the fix recipe, which those runs
+  never opened. It is now an Audit Rule, and the routed fix note says it too (33/33 after). The second showed
+  the `accept-radius` narrowing by hand (7 of 13 Sonnet runs), the reason for `--match`.
+- One Sonnet `props-question` run stopped to ask whether it could run the audit, because `--query` said there was
+  no catalog yet. `--query` now runs the audit itself the first time (94ee399).
+
 ## 2026-09: the guide after I57, I58, I34, I23, I44 and exact prop names (continuous evaluation)
 
 A fresh run of the adopted guide (the `cookbook` variant, the checkout) after guide changes: the flex-shrink
