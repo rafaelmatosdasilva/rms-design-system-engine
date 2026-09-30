@@ -72,8 +72,10 @@
        ✅ CORRECT   0
 
 ❌  [15] Component props match Figma  (names, defaults, variant options & slots vs code)
-       ✅ OK        5
+       ✅ OK        4
+       ❌ NAME      1   (the code names a Figma property differently: letter case, spaces)
        ❌ VALUE     2   (wrong default, or a Figma variant the code doesn't accept)
+         ❌ badge/Tone: the code names it "tone" (letter case T → t)  (components/HbBadge.vue)
          ❌ badge/Tone: default differs - Figma "Neutral" vs code "tone=neutral" (the code writes it "neutral")  (components/HbBadge.vue)
          ❌ badge/Tone: code prop "tone" is missing Figma variant option(s) "Neutral" (the code writes it "neutral"), "Success" (the code writes it "success"), "Danger" (the code writes it "danger")  (components/HbBadge.vue)
 
@@ -125,11 +127,11 @@
 
   PROPS  (component properties)
   FIGMA PROP      FIGMA VALUE                 CODE PROP  CODE VALUE                
-  button/Variant  Primary · Secondary         variant    Primary · Secondary         ✓
-  button/Size     Small · Large               size       Small · Large               ✓
-  button/Label    text                        label      default Continue            ✓
+  button/variant  Primary · Secondary         variant    Primary · Secondary         ✓
+  button/size     Small · Large               size       Small · Large               ✓
+  button/label    text                        label      default Continue            ✓
   badge/Tone      Neutral · Success · Danger  tone       neutral · success · danger  ✗
-  badge/Label     text                        label      default Draft               ✓
+  badge/label     text                        label      default Draft               ✓
   ✓ 4 match   ✗ 1 diverge
 
   VARIABLES  (design tokens)
@@ -207,7 +209,7 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: badge 2 · iconButton 2 · 6 not tied to a component
+📉 Burndown, open findings per component: badge 3 · iconButton 2 · 6 not tied to a component
    next up: badge. Run with --component badge, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -223,10 +225,11 @@
     - Fix:  styles/tokens.css:10 - change --hb-radius-control: 4px → 6px
 
 - **Component props match Figma** fails:
+  - badge/Tone: the code names it "tone" (letter case T → t)  (components/HbBadge.vue)
   - badge/Tone: default differs - Figma "Neutral" vs code "tone=neutral" (the code writes it "neutral")  (components/HbBadge.vue)
   - badge/Tone: code prop "tone" is missing Figma variant option(s) "Neutral" (the code writes it "neutral"), "Success" (the code writes it "success"), "Danger" (the code writes it "danger")  (components/HbBadge.vue)
 
-Burndown, open findings per component: badge 2 · iconButton 2 · 6 not tied to a component
+Burndown, open findings per component: badge 3 · iconButton 2 · 6 not tied to a component
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 

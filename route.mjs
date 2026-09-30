@@ -69,7 +69,7 @@ const RULES = [
 // Sentences the agent says as written, so what it can and cannot do is never its own wording.
 export const SAY = {
   figma: 'I can\'t change Figma: this skill only reads it. A person makes that change in the Figma editor; the audit below shows the Figma value and the code value.',
-  noRefresh: (date) => `I couldn't refresh the Figma snapshots here: there is no Figma tool in this session. The audit below uses the committed snapshots${date ? ` (captured ${date})` : ''}, so a change made in Figma after that is not in it.`,
+  noRefresh: (date) => `I couldn't refresh the Figma snapshots here: there is no Figma tool in this session. The audit below uses the committed snapshots${date ? ` (captured ${date})` : ''}, so a change made in Figma after that is not in it. To refresh them, connect the Figma MCP server to Claude Code, or set FIGMA_TOKEN in the project's .env file; never paste a token in the chat.`,
 };
 
 // route(text, { hasConfig, components, cmd, snapshotDate }) → { recipe, question, run: [commands], notes: [lines], say: [lines], sayIf }

@@ -74,10 +74,16 @@
        ✅ CORRECT   0
        ⏭ SKIP      1   (no captured value or no rule found - advisory)
 
-✅  [15] Component props match Figma  (names, defaults, variant options & slots vs code)
-       ✅ OK        5
+❌  [15] Component props match Figma  (names, defaults, variant options & slots vs code)
+       ✅ OK        0
+       ❌ NAME      5   (the code names a Figma property differently: letter case, spaces)
        ℹ️ VALUE?    3   (could not read a code value to verify - advisory)
        ─── Values not verified (advisory) ──
+         ❌ button/Disabled: the code names it "disabled" (letter case D → d)  (src/components/Button.jsx)
+         ❌ button/Label: the code names it "label" (letter case L → l)  (src/components/Button.jsx)
+         ❌ chip/Size: the code names it "size" (letter case S → s)  (src/components/Chip.jsx)
+         ❌ chip/Icon: the code names it "icon" (letter case I → i)  (src/components/Chip.jsx)
+         ❌ chip/Label: the code names it "label" (letter case L → l)  (src/components/Chip.jsx)
 
 ⏭   [16] Sub-components match Figma  (the sub-components Figma nests are the ones the code uses)
        ⏭ SKIPPED - snapshot not captured (opt-in). Run the Plugin API capture and commit it to enable.
@@ -128,12 +134,12 @@
 
   PROPS  (component properties)
   FIGMA PROP       FIGMA VALUE   CODE PROP  CODE VALUE    
-  button/Disabled  False · True  disabled   (present)       ✓
-  button/Label     text          label      default Save    ✓
-  chip/Size        M · L         size       (present)       ✓
-  chip/Icon        False · True  icon       (present)       ✓
-  chip/Label       text          label      default Filter  ✓
-  ✓ 5 match   ✗ 0 diverge
+  button/Disabled  False · True  disabled   (present)       ✗
+  button/Label     text          label      default Save    ✗
+  chip/Size        M · L         size       (present)       ✗
+  chip/Icon        False · True  icon       (present)       ✗
+  chip/Label       text          label      default Filter  ✗
+  ✓ 0 match   ✗ 5 diverge
 
   VARIABLES  (design tokens)
   VARIABLE    MODE  FIGMA  CODE
@@ -157,7 +163,7 @@
   ✅  [12]  Nested components keep their own styles             Pass
   ✅  [13]  Structure matches (height, spacing, corners)        Pass
   ✅  [14]  All states are built                                Pass
-  ✅  [15]  Component props match Figma                         Pass
+  ❌  [15]  Component props match Figma                         Fail
   ⏭  [16]  Sub-components match Figma                          Skipped
          snapshot not captured (opt-in). Run the Plugin API capture and commit it to enable.
   ✅  [17]  Templates compose the right components              Pass
@@ -192,7 +198,7 @@
      src/theme.css:70  .tp-field__input removes the focus outline and no focus style puts one back
 
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
-  ● Gate health      23/25 gates pass
+  ● Gate health      22/25 gates pass
   ● Coverage         3/3 components modelled (100%)  ·  exemption debt 0
   ● Documentation    4/4 contracts have a description (100%)
   ● AI guidance      0/4 carry whenNotToUse/useInstead (0%)
@@ -201,14 +207,14 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: chip 1 · field 1 · 2 not tied to a component
+📉 Burndown, open findings per component: chip 4 · button 2 · field 1 · 2 not tied to a component
    next up: chip. Run with --component chip, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
 
 # Parity result
 
-**Not in parity.** 1 of 25 gates fail.
+**Not in parity.** 2 of 25 gates fail.
 
 **Figma data was not refreshed in this run.** The audit used the committed snapshots (the oldest, src/figma-vars.snapshot.json, updated today). To refresh them: rms-figma-code-parity --recipe refresh-figma.
 
@@ -216,7 +222,14 @@
   - [sizing/-] radii/chip → --radii-chip
     - Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px
 
-Burndown, open findings per component: chip 1 · field 1 · 2 not tied to a component
+- **Component props match Figma** fails:
+  - button/Disabled: the code names it "disabled" (letter case D → d)  (src/components/Button.jsx)
+  - button/Label: the code names it "label" (letter case L → l)  (src/components/Button.jsx)
+  - chip/Size: the code names it "size" (letter case S → s)  (src/components/Chip.jsx)
+  - chip/Icon: the code names it "icon" (letter case I → i)  (src/components/Chip.jsx)
+  - chip/Label: the code names it "label" (letter case L → l)  (src/components/Chip.jsx)
 
-NEXT: tell the user what fails under "Token values" and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
+Burndown, open findings per component: chip 4 · button 2 · field 1 · 2 not tied to a component
+
+NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 
