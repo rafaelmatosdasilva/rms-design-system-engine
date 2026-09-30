@@ -231,6 +231,9 @@ test('emits an llms.txt AI index listing components and the token dictionary', a
   assert.match(llms, /# Design system/);
   assert.match(llms, /buttonPrimary\]\(\.\/buttonPrimary\.contract\.json\)/);
   assert.match(llms, /tokens\.json/);
+  // I63: the index says to use the components, not only which exist.
+  assert.match(llms, /\*\*Use these components\.\*\* This design system is part of this project: build nothing by hand/);
+  assert.match(llms, /--query <name>/);
 });
 
 test('a token whose path collides with another is surfaced in droppedTokens, not silently lost', async () => {

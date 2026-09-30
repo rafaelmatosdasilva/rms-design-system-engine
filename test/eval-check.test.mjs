@@ -50,3 +50,25 @@ test('counts inline style attributes (S16 metric), independent of violations', (
   assert.equal(r.metrics.inlineStyles, 2);
   assert.equal(r.metrics.clean, true, JSON.stringify(r.violations));
 });
+
+test('I64: a candidate that does not use the component the case expects avoided the system, and fails', async () => {
+  const { usesComponent } = await import('../eval-check.mjs');
+  const c = { ...ctx, componentClass: new Map([['chip', '.chip'], ['buttonPrimary', '.buttonPrimary']]) };
+  const used = evalConformance('<button class="chip">Filter</button>', c, { component: 'chip' });
+  assert.equal(used.metrics.avoided, false);
+  assert.equal(used.metrics.clean, true);
+  // Hand-built: no token or API mistake to make, so without this it would read as clean.
+  const hand = evalConformance('<button class="my-filter" aria-pressed="false">Filter</button>', c, { component: 'chip' });
+  assert.equal(hand.metrics.avoided, true);
+  assert.equal(hand.metrics.clean, false);
+  assert.deepEqual(hand.violations, [{ type: 'avoided-component', value: 'chip' }]);
+  // No expectation, no judgement; an empty candidate is "not produced", not "avoided".
+  assert.equal(evalConformance('<button class="my-filter">x</button>', c).metrics.avoided, false);
+  assert.equal(evalConformance('', c, { component: 'chip' }).metrics.avoided, false);
+  // A component tag counts, in any framework's casing, with a short library prefix.
+  assert.equal(usesComponent('<Chip size="M">x</Chip>', 'chip'), true);
+  assert.equal(usesComponent('<ButtonPrimary/>', 'buttonPrimary'), true);
+  assert.equal(usesComponent('<hb-chip>x</hb-chip>', 'chip'), true);
+  assert.equal(usesComponent('<MyFancyChip/>', 'chip'), false);
+  assert.equal(usesComponent('<span class="chip-label">x</span>', 'chip', '.chip'), false);
+});
