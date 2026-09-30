@@ -180,7 +180,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const sh = cfg.styleguide || {};
   const templatePath = resolve(ROOT, sh.template || 'apps/styleguide/styleguide.template.html');
   const projectOut = resolve(ROOT, sh.out || 'apps/styleguide/index.html');
-  // opts.out writes the page somewhere else (the code capture keeps a private copy in .parity-out);
+  // opts.out writes the page somewhere else (the code capture keeps a private copy in .design-system-engine-out);
   // a <base> then keeps the template's relative links pointing where the project's page would be.
   const outPath = opts.out ? resolve(ROOT, opts.out) : projectOut;
   if (!existsSync(templatePath)) throw new Error('styleguide template not found: ' + templatePath);

@@ -321,7 +321,7 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
     await send('Runtime.evaluate', {
       expression: `(() => {
         const s = document.createElement('style');
-        s.id = '__parity_no_transitions__';
+        s.id = '__designSystemEngine_no_transitions__';
         s.textContent = '*,*::before,*::after{transition:none !important;animation:none !important}';
         document.head.appendChild(s);
         return true;

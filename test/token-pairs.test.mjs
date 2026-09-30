@@ -14,7 +14,7 @@ test('a text colour is readable on a surface only when it meets 4.5:1 in every m
 });
 
 test('the tokens file carries the list, and --query shows it', () => {
-  const tokens = flattenTokens({ text: { default: { color: { $type: 'color', $value: '#15202b', $extensions: { 'com.rms.parity': { readableOn: ['surface/base/color'] } } } } } });
+  const tokens = flattenTokens({ text: { default: { color: { $type: 'color', $value: '#15202b', $extensions: { 'com.rms.design-system-engine': { readableOn: ['surface/base/color'] } } } } } });
   assert.deepEqual(answerLines(answer('text/default', { tokens, varOf: () => '--text-default' })),
     ['text/default/color  →  var(--text-default)  #15202b', '  readable on (4.5:1 in every mode): surface/base/color']);
 });

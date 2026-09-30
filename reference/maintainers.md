@@ -1,6 +1,6 @@
 # Maintaining the engine and the skill
 
-Part of the rms-figma-code-parity reference (`rms-figma-code-parity --reference maintainers`). The rules that always apply are in the main guide.
+Part of the rms-design-system-engine reference (`rms-design-system-engine --reference maintainers`). The rules that always apply are in the main guide.
 
 ---
 
@@ -101,7 +101,7 @@ as `ISOLATION FIX`.
 
 The guide is instructions for an agent, so a change to it (the main file, a recipe or a reference file) can
 make the skill worse in ways no unit test sees. `test/skill-evals/` runs the real skill headless
-(`claude -p "/rms-figma-code-parity <task>"`) on fixed tasks and scores each run by code: what the agent ran,
+(`claude -p "/rms-design-system-engine <task>"`) on fixed tasks and scores each run by code: what the agent ran,
 the files after, and the rules it must never break (asking for a token in the chat, committing, pushing,
 hand-editing a snapshot or `ds-config.json`, applying the hand-back unasked). It spends model tokens, so it is
 not part of `node --test`.
@@ -120,7 +120,7 @@ node test/skill-evals/report.mjs --a baseline --b cookbook --model claude-sonnet
   environment.
 - **Tasks.** `tasks.mjs` is the development set, used while writing recipes; `heldout.mjs` is the held-out
   set, not looked at while writing them. Adoption is decided on the held-out set. Private tasks
-  (`PARITY_EVAL_PRIVATE_TASKS`) write only under `PARITY_EVAL_PRIVATE_OUT`, never in the repository.
+  (`DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_TASKS`) write only under `DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT`, never in the repository.
 - **A run the API refused is not a result.** A usage limit or a 429 stops the pool without writing a row;
   the same command with `--resume` carries on. A results file from another guide or engine is refused.
 - **Adoption rule** (`report.mjs`, applied by code, per model): no held-out task with a lower pass rate (a

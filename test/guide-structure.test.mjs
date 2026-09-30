@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { units } from './skill-evals/check-split.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
-const MAIN = 'rms-figma-code-parity.md';
+const MAIN = 'rms-design-system-engine.md';
 const list = (d) => (existsSync(join(ENGINE, d)) ? readdirSync(join(ENGINE, d)).filter((f) => f.endsWith('.md')).sort().map((f) => `${d}/${f}`) : []);
 const RECIPES = list('cookbook'), REFERENCE = list('reference');
 const FILES = [MAIN, ...REFERENCE, ...RECIPES];
@@ -40,7 +40,7 @@ test('every recipe follows the template', () => {
     assert.match(t, /\n## Steps\n\n1\. \S/, `${f}: numbered steps`);
     assert.match(t, /\nAlways: relay the SUMMARY block as it is, then follow its `NEXT:` line\. Change code, config or snapshots only when the person asks for that change\./, `${f}: the NEXT handling`);
     assert.match(t, /\n## Read more\n\n- \S/, `${f}: links into the reference`);
-    assert.match(t, /\n```recipe-check\nrms-figma-code-parity\b[^\n]*\n```\n/, `${f}: a recipe-check block`);
+    assert.match(t, /\n```recipe-check\nrms-design-system-engine\b[^\n]*\n```\n/, `${f}: a recipe-check block`);
   }
 });
 
@@ -73,11 +73,11 @@ test('every "see *X*" and read-more label resolves in the file it names', () => 
   const bad = [];
   for (const f of FILES) {
     const t = read(f);
-    for (const m of t.matchAll(/see \*([^*\n]+)\*( in (the main guide|`rms-figma-code-parity --(recipe|reference) ([a-z0-9-]+)`))?/g)) {
+    for (const m of t.matchAll(/see \*([^*\n]+)\*( in (the main guide|`rms-design-system-engine --(recipe|reference) ([a-z0-9-]+)`))?/g)) {
       const target = m[3] === 'the main guide' ? MAIN : m[4] ? fileOf(m[4], m[5]) : f;
       if (!hasLabel(read(target), m[1])) bad.push(`${f}: see *${m[1]}*${m[2] ?? ''}`);
     }
-    // Recipe "Read more" lines: `rms-figma-code-parity --reference usage`: *A*, *B*
+    // Recipe "Read more" lines: `rms-design-system-engine --reference usage`: *A*, *B*
     for (const line of t.match(/\n## Read more\n\n[\s\S]*?(?=\n```|\n## |$)/)?.[0].split('\n') ?? []) {
       const m = line.match(/--(recipe|reference) ([a-z0-9-]+)`:(.*)/);
       if (!m) continue;
@@ -112,7 +112,7 @@ test('every recipe-check command runs on the demo design system', { timeout: 600
   assert.equal(checks.length >= RECIPES.length, true);
   const bad = [];
   for (const { f, cmd } of checks) {
-    const r = run(cmd.replace(/^rms-figma-code-parity\s*/, '').split(/\s+/).filter(Boolean));
+    const r = run(cmd.replace(/^rms-design-system-engine\s*/, '').split(/\s+/).filter(Boolean));
     const out = (r.stdout ?? '') + (r.stderr ?? '');
     if (![0, 1].includes(r.status) || /Unknown (option|flag)|TypeError|ReferenceError|SyntaxError|\n\s+at .+:\d+:\d+\)/.test(out) || !out.trim()) bad.push(`${f}: \`${cmd}\` exit ${r.status}: ${out.trim().split('\n').slice(-3).join(' / ').slice(0, 300)}`);
   }

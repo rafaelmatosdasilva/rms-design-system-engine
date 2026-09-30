@@ -19,9 +19,10 @@ import { join, relative, resolve, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { steeringTruth, steeringFindings } from './steering-check.mjs';
 import { usesTailwind, themeValues, arbitraryFindings } from './tailwind-check.mjs';
+import { codeSnapshotPath } from './names.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
-const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.parity-out|\.parity-refs)\//;
+const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.design-system-engine-out|\.design-system-engine-refs|\.parity-out|\.parity-refs)\//;
 const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g;
 const NOT_COLOUR = /(href|to|src|action|xlink:href)\s*=\s*\{?\s*["'`]$|url\(\s*["']?$|&$/i;   // #add in a link is a fragment
 // Outside a style sheet, a colour counts only where it styles something: after a colour-bearing property
@@ -85,7 +86,7 @@ export function editTruth(ROOT, cfg = {}) {
   }
   const contracts = cfg.contracts?.out ?? 'contracts';
   const catalog = json(join(contracts, 'catalog.json'));
-  const api = json(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json').api ?? {};
+  const api = json(codeSnapshotPath(cfg)).api ?? {};
   const truth = steeringTruth({ catalog, api, cssVars });
   const tailwind = cfg.tailwind !== false && usesTailwind(theme, ROOT) ? themeValues(theme) : null;
   return { truth, tokenByValue, tailwind, themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
@@ -144,7 +145,7 @@ export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
   const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs) });
   if (!found.length) return null;
   const lines = found.slice(0, 12).map((f) => `  ${basename(rel)}${f.line ? `:${f.line}` : ''}  ${f.text}`);
-  return `rms-figma-code-parity checked this edit against the design system: ${found.length} thing${found.length === 1 ? '' : 's'} it added the system does not have.\n${lines.join('\n')}${found.length > 12 ? `\n  and ${found.length - 12} more` : ''}\nFix ${found.length === 1 ? 'it' : 'them'} in this file now. Not sure of a name? rms-figma-code-parity --query <name>.`;
+  return `rms-design-system-engine checked this edit against the design system: ${found.length} thing${found.length === 1 ? '' : 's'} it added the system does not have.\n${lines.join('\n')}${found.length > 12 ? `\n  and ${found.length - 12} more` : ''}\nFix ${found.length === 1 ? 'it' : 'them'} in this file now. Not sure of a name? rms-design-system-engine --query <name>.`;
 }
 
 export function editHookOutput(reason) {

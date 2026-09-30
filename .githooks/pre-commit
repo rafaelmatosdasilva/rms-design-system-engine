@@ -10,7 +10,7 @@ ROOT="$(git rev-parse --show-toplevel)"
 node "$ROOT/sync-docs.mjs"
 
 # 2. Re-stage any doc files that were changed by the patch so they land in this commit.
-git add "$ROOT/README.md" "$ROOT/rms-figma-code-parity.md" 2>/dev/null || true
+git add "$ROOT/README.md" "$ROOT/rms-design-system-engine.md" 2>/dev/null || true
 
 # 3. Verify nothing remains that needs a manual fix (e.g. truncated checks table).
 #    Exits 1 and prints what needs fixing if stale; commit is blocked.

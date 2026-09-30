@@ -216,7 +216,7 @@ test('styleguide: the capture builds a private copy from the template, or names 
   assert.match(wrong.note, /not found at apps\/styleguide\/styleguide\.template\.html \(found apps\/guide\/gallery\.template\.html/);
   const cfg = { paths: { themeCSS: 'src/theme.css' }, styleguide: { template: 'apps/guide/gallery.template.html', out: 'apps/guide/index.html' } };
   const plan = styleguidePlan(dir, cfg);
-  assert.deepEqual(plan, { generate: true, template: 'apps/guide/gallery.template.html', out: '.parity-out/styleguide.html' });
+  assert.deepEqual(plan, { generate: true, template: 'apps/guide/gallery.template.html', out: '.design-system-engine-out/styleguide.html' });
   await generateStyleguide(dir, cfg, { out: plan.out });
   const { readFileSync, existsSync } = await import('node:fs');
   const html = readFileSync(join(dir, plan.out), 'utf8');

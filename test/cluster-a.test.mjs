@@ -15,10 +15,10 @@
 //     (`padding: 4px; }`) no longer swallows the following rule.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runGate, EMPTY_PARITY_MAP, crashed } from './helpers.mjs';
+import { runGate, EMPTY_ENGINE_MAP, crashed } from './helpers.mjs';
 
 // ── 1) bound-check.mjs ────────────────────────────────────────────────────────
-// Inputs: ds-config.json (else exit 1), parity-map.mjs (optional), bound-tokens.json
+// Inputs: ds-config.json (else exit 1), design-system-engine-map.mjs (optional), bound-tokens.json
 // (else exit 2 - "not run"), and the themeCSS file(s). isCovered maps a Figma token `a/b`
 // to CSS var `--a-b` (normalize drops /color, then `/`→`-`). No snapshotVars ⇒ the orphan
 // report is skipped and a fully-covered run exits 0.
@@ -26,7 +26,7 @@ import { runGate, EMPTY_PARITY_MAP, crashed } from './helpers.mjs';
 test('[regression bound-check] single-file themeCSS: a bound token whose --a-b var is declared → COVERED, exit 0', () => {
   const { code, out } = runGate('bound-check.mjs', {
     'ds-config.json': { paths: { themeCSS: 'theme.css' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand-primary: #f00; }',
     'bound-tokens.json': ['brand/primary'],           // brand/primary → --brand-primary (declared)
   });
@@ -38,7 +38,7 @@ test('[regression bound-check] single-file themeCSS: a bound token whose --a-b v
 test('[regression bound-check] a bound token with no matching CSS var → UNCOVERED, exit 1', () => {
   const { code, out } = runGate('bound-check.mjs', {
     'ds-config.json': { paths: { themeCSS: 'theme.css' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand-primary: #f00; }',
     'bound-tokens.json': ['brand/missing'],           // → --brand-missing (NOT declared)
   });
@@ -50,7 +50,7 @@ test('[regression bound-check] a bound token with no matching CSS var → UNCOVE
 test('[bugfix bound-check] themeCSS as an ARRAY of two files resolves a var declared only in the SECOND file → exit 0, no crash', () => {
   const { code, out } = runGate('bound-check.mjs', {
     'ds-config.json': { paths: { themeCSS: ['a.css', 'b.css'] } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'a.css': ':root { --unrelated: 1px; }',           // needed var is NOT here …
     'b.css': ':root { --brand-primary: #f00; }',      // … it is only in the second file
     'bound-tokens.json': ['brand/primary'],
@@ -61,7 +61,7 @@ test('[bugfix bound-check] themeCSS as an ARRAY of two files resolves a var decl
 });
 
 // ── 2) state-check.mjs ────────────────────────────────────────────────────────
-// Inputs: ds-config.json (else exit 1), parity-map.mjs (optional), component-state-tokens.json
+// Inputs: ds-config.json (else exit 1), design-system-engine-map.mjs (optional), component-state-tokens.json
 // (else exit 2 - the early exit that guards the theme-CSS read), and the themeCSS file(s).
 // The theme-CSS read (the array-crash site) is only reached AFTER component-state-tokens.json
 // is present, so every fixture below supplies it. Same `a/b` → `--a-b` coverage convention.
@@ -69,7 +69,7 @@ test('[bugfix bound-check] themeCSS as an ARRAY of two files resolves a var decl
 test('[regression state-check] a covered visible state token → COVERED, exit 0', () => {
   const { code, out } = runGate('state-check.mjs', {
     'ds-config.json': { paths: { themeCSS: 'theme.css' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --button-hover-bg: #eee; }',
     'component-state-tokens.json': { 'button/hover/bg': 'x' },  // → --button-hover-bg (declared)
   });
@@ -81,7 +81,7 @@ test('[regression state-check] a covered visible state token → COVERED, exit 0
 test('[regression state-check] an uncovered visible state token → UNCOVERED, exit 1', () => {
   const { code, out } = runGate('state-check.mjs', {
     'ds-config.json': { paths: { themeCSS: 'theme.css' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --button-hover-bg: #eee; }',
     'component-state-tokens.json': { 'button/missing/bg': 'x' },  // → --button-missing-bg (NOT declared)
   });
@@ -93,7 +93,7 @@ test('[regression state-check] an uncovered visible state token → UNCOVERED, e
 test('[bugfix state-check] themeCSS as an ARRAY does not crash and resolves a var in the SECOND file → exit 0, no crash', () => {
   const { code, out } = runGate('state-check.mjs', {
     'ds-config.json': { paths: { themeCSS: ['a.css', 'b.css'] } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'a.css': ':root { --unrelated: 1px; }',
     'b.css': ':root { --button-hover-bg: #eee; }',
     'component-state-tokens.json': { 'button/hover/bg': 'x' },

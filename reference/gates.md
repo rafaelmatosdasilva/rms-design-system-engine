@@ -1,6 +1,6 @@
 # Gate-specific rules
 
-Part of the rms-figma-code-parity reference (`rms-figma-code-parity --reference gates`). The rules that always apply are in the main guide.
+Part of the rms-design-system-engine reference (`rms-design-system-engine --reference gates`). The rules that always apply are in the main guide.
 
 ---
 
@@ -12,7 +12,7 @@ Every Figma annotation attached to a component node is a design specification. T
 ### How it works
 
 1. **`audit.mjs` refresh** - `refreshComponentProps()` fetches `doc.annotations[]` alongside `componentPropertyDefinitions` for every component node. Nodes with either properties **or** annotations are included in the snapshot. (`/nodes` works on any plan with a token.)
-2. **Gate [10g] check** - for every component in the snapshot that has annotations, `structure-check.mjs` looks up `CONTRACT[key].annotations` and verifies each annotation label is present. Missing label → `FAIL`. If a CSS selector is provided, it must exist in the CSS - not found → `FAIL`. An accessibility note the accessibility check verifies (a role, name, heading level or alt text, see *Writing accessibility notes in Figma* in `rms-figma-code-parity --reference usage`) passes without an entry.
+2. **Gate [10g] check** - for every component in the snapshot that has annotations, `structure-check.mjs` looks up `CONTRACT[key].annotations` and verifies each annotation label is present. Missing label → `FAIL`. If a CSS selector is provided, it must exist in the CSS - not found → `FAIL`. An accessibility note the accessibility check verifies (a role, name, heading level or alt text, see *Writing accessibility notes in Figma* in `rms-design-system-engine --reference usage`) passes without an entry.
 3. **`anyFail`** - annotation failures count the same as property failures; the gate exits non-zero.
 
 ### Plugin API capture (no token, any plan)
@@ -129,11 +129,11 @@ Annotations describe design intent, not CSS mechanics. Read them for what they r
 
 ### Workflow when an annotation appears
 
-1. `pnpm parity` fails: `someComponent: annotation "..." not acknowledged in CONTRACT.annotations`
+1. `pnpm design-system-engine` fails: `someComponent: annotation "..." not acknowledged in CONTRACT.annotations`
 2. Read the annotation - decide what it requires in code
 3. Implement the CSS if needed
 4. Add to `CONTRACT.annotations` with the appropriate selector or `null`
-5. Re-run `pnpm parity` - gate must pass before closing
+5. Re-run `pnpm design-system-engine` - gate must pass before closing
 
 ---
 

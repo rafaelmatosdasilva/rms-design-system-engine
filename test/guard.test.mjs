@@ -28,12 +28,12 @@ test('asks: ds-config.json edits, commit, push, applying the hand-back', () => {
   assert.equal(d(edit('/p/ds-config.json')), 'ask');
   assert.equal(d(bash('git commit -m "x"')), 'ask');
   assert.equal(d(bash('git -C repo push origin main')), 'ask');
-  assert.equal(d(bash('git apply .parity-out/handback/code-changes.diff')), 'ask');
+  assert.equal(d(bash('git apply .design-system-engine-out/handback/code-changes.diff')), 'ask');
 });
 
 test('lets through: the engine, reading snapshots, ordinary edits and git reads', () => {
-  assert.equal(d(bash('node ~/.claude/skills/rms-figma-code-parity/audit.mjs --capture-code > src/figma-vars.snapshot.json')), 'pass');
-  assert.equal(d(bash('rms-figma-code-parity --component chip')), 'pass');
+  assert.equal(d(bash('node ~/.claude/skills/rms-design-system-engine/audit.mjs --capture-code > src/figma-vars.snapshot.json')), 'pass');
+  assert.equal(d(bash('rms-design-system-engine --component chip')), 'pass');
   assert.equal(d(bash('cat src/figma-vars.snapshot.json | head')), 'pass');
   assert.equal(d(bash('grep -n radii src/figma-vars.snapshot.json')), 'pass');
   assert.equal(d(edit('/p/src/theme.css')), 'pass');
@@ -107,7 +107,7 @@ test('the person\'s latest message decides a code edit and the hand-back apply (
   assert.equal(judge(edit, {}), null);                                                 // no transcript: as before
   assert.equal(judge({ tool_name: 'Edit', tool_input: { file_path: '/p/notes.md' } }, { userText: 'audit the chip' }), null);   // not code
 
-  const apply = { tool_name: 'Bash', tool_input: { command: 'git apply .parity-out/handback/code-changes.diff' } };
+  const apply = { tool_name: 'Bash', tool_input: { command: 'git apply .design-system-engine-out/handback/code-changes.diff' } };
   assert.equal(judge(apply, { userText: 'agora corrige a altura no código' }), null);   // asked: no second confirmation
   assert.equal(judge(apply, { userText: 'audita o chip' }).decision, 'ask');
   assert.equal(judge(apply, {}).decision, 'ask');                                      // no transcript: still asks
@@ -137,20 +137,20 @@ test('the router as a hook: a request made with the command arrives already rout
   });
   const env = { PATH: '' };
   const ctx = (prompt, cfg = {}) => routePrompt({ prompt }, { root: dir, engineDir: ENGINE, cfg, env });
-  const chip = ctx('/rms-figma-code-parity audit the chip');
+  const chip = ctx('/rms-design-system-engine audit the chip');
   assert.match(chip, /^The engine already routed this request/);
   assert.match(chip, new RegExp(`\\nROUTE: audit-component\\nRUN: node ${join(ENGINE, 'audit.mjs').replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} --component chip\\n`));
-  const figma = ctx('/rms-figma-code-parity change the chip radius in Figma to 12px so it matches the code');
+  const figma = ctx('/rms-design-system-engine change the chip radius in Figma to 12px so it matches the code');
   assert.match(figma, /\nSAY: I can't change Figma: this skill only reads it\./);
-  const refresh = ctx('/rms-figma-code-parity refresh the Figma snapshots, the design changed yesterday');
+  const refresh = ctx('/rms-design-system-engine refresh the Figma snapshots, the design changed yesterday');
   assert.match(refresh, /SAY \(when there is no Figma tool in this session\): I couldn't refresh the Figma snapshots here: .* \(captured 2026-03-02\)/);
   assert.match(refresh, /--- recipe refresh-figma: read it with node \S+ --recipe refresh-figma before you follow a step it has ---$/);   // too long to inline
   assert.ok(refresh.length < MAX_RECIPE);
   assert.equal(ctx('audit the chip'), null);                           // not the command: no opinion
-  assert.equal(ctx('/rms-figma-code-parity'), null);                   // the command alone: nothing to route
-  assert.equal(ctx('/rms-figma-code-parity audit the chip', { hooks: false }), null);   // opt-out
+  assert.equal(ctx('/rms-design-system-engine'), null);                   // the command alone: nothing to route
+  assert.equal(ctx('/rms-design-system-engine audit the chip', { hooks: false }), null);   // opt-out
 
-  const out = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ cwd: dir, hook_event_name: 'UserPromptSubmit', prompt: '/rms-figma-code-parity audit the chip' }), encoding: 'utf8' });
+  const out = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ cwd: dir, hook_event_name: 'UserPromptSubmit', prompt: '/rms-design-system-engine audit the chip' }), encoding: 'utf8' });
   assert.equal(out.status, 0);
   const o = JSON.parse(out.stdout).hookSpecificOutput;
   assert.equal(o.hookEventName, 'UserPromptSubmit');

@@ -68,9 +68,12 @@ export function hooksStatus(ROOT) {
 
 // A project that installed the hooks before the router or the edit check existed gets them on its next run, so
 // an update reaches every project that opted in. Never installs hooks where there were none, never on
-// CI, never with "hooks": false. Returns true when it upgraded.
+// CI, never with "hooks": false. Hooks whose engine is gone (an install moved to its new name) point at this
+// one again. Returns true when it upgraded.
 export function upgradeHooks(ROOT, cfg = {}, { engineDir = ENGINE, env = process.env } = {}) {
   if (cfg.hooks === false || env.CI) return false;
-  if (!hooksStatus(ROOT).partial) return false;
+  const h = hooksStatus(ROOT);
+  // Partial (installed before the router or the edit check), or pointing at an engine that moved (the old name).
+  if (!h.partial && !(h.installed && h.exists === false)) return false;
   try { installHooks(ROOT, { engineDir }); return true; } catch { return false; }
 }

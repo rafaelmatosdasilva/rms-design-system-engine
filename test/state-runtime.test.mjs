@@ -10,7 +10,7 @@ const MAP = 'export const COVERED_STATE=new Set();export const COVERED=new Set()
 
 test('[bugfix state runtime] a visible state token used in code but absent from static CSS is covered', () => {
   const { code, out } = runGate('state-check.mjs', {
-    'ds-config.json': CFG, 'parity-map.mjs': MAP,
+    'ds-config.json': CFG, 'design-system-engine-map.mjs': MAP,
     'theme.css': ':root { --x: 1px; }\n',
     'component-state-tokens.json': { 'advanced/toast/bg': true },
     'src/Toast.vue': '<style>.t{ background: var(--advanced-toast-bg); }</style>\n',
@@ -21,7 +21,7 @@ test('[bugfix state runtime] a visible state token used in code but absent from 
 
 test('[regression state] a visible state token neither declared nor used is UNCOVERED', () => {
   const { code, out } = runGate('state-check.mjs', {
-    'ds-config.json': CFG, 'parity-map.mjs': MAP,
+    'ds-config.json': CFG, 'design-system-engine-map.mjs': MAP,
     'theme.css': ':root { --x: 1px; }\n',
     'component-state-tokens.json': { 'advanced/ghost/bg': true },
     'src/Toast.vue': '<style>.t{ color: red; }</style>\n',

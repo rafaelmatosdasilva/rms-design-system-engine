@@ -10,7 +10,7 @@ import { makeFixture } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const engine = () => makeFixture({
-  [GUIDE]: '# guide\nRead a recipe with `rms-figma-code-parity --recipe <name>`.\n',
+  [GUIDE]: '# guide\nRead a recipe with `rms-design-system-engine --recipe <name>`.\n',
   'cookbook/audit-component.md': '# Audit one component\n\n**Use when.** the person names a component.\n\nsteps\n',
   'cookbook/first-setup.md': '# First setup\n\n**Use when.** there is no ds-config.json.\n',
   'reference/config.md': '# Project config\n\nfields\n',
@@ -71,16 +71,16 @@ test('classic guide: the monolith from its git tag, for rollback', () => {
   assert.equal(classicGuide(install), 'the one big guide\n');
 });
 
-test('the usage log: off unless PARITY_USAGE_LOG=1, local, keeps the route and never the request text', () => {
+test('the usage log: off unless DESIGN_SYSTEM_ENGINE_USAGE_LOG=1, local, keeps the route and never the request text', () => {
   const dir = makeFixture({});
-  const file = join(dir, '.parity-out', 'skill-usage.json');
+  const file = join(dir, '.design-system-engine-out', 'skill-usage.json');
   assert.equal(logUsage(dir, { kind: 'route', recipe: 'audit-component' }, { env: {} }), false);
   assert.equal(existsSync(file), false);
   const now = () => new Date('2026-03-01T10:00:00Z');
-  assert.equal(logUsage(dir, { kind: 'route', recipe: 'audit-component', run: ['rms-figma-code-parity --component chip'] }, { env: { PARITY_USAGE_LOG: '1' }, now }), true);
-  logUsage(dir, { kind: 'recipe', name: 'fix-a-difference' }, { env: { PARITY_USAGE_LOG: '1' }, now });
+  assert.equal(logUsage(dir, { kind: 'route', recipe: 'audit-component', run: ['rms-design-system-engine --component chip'] }, { env: { DESIGN_SYSTEM_ENGINE_USAGE_LOG: '1' }, now }), true);
+  logUsage(dir, { kind: 'recipe', name: 'fix-a-difference' }, { env: { DESIGN_SYSTEM_ENGINE_USAGE_LOG: '1' }, now });
   assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), [
-    { at: '2026-03-01T10:00:00.000Z', kind: 'route', recipe: 'audit-component', run: ['rms-figma-code-parity --component chip'] },
+    { at: '2026-03-01T10:00:00.000Z', kind: 'route', recipe: 'audit-component', run: ['rms-design-system-engine --component chip'] },
     { at: '2026-03-01T10:00:00.000Z', kind: 'recipe', name: 'fix-a-difference' },
   ]);
 });

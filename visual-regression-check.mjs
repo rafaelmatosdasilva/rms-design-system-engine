@@ -7,7 +7,7 @@
 //   Accept a change:       mv <visualRefs>/<id>.new.png <visualRefs>/<id>.png
 //
 // Requires:
-//   ds-config.json    - figmaFileKey, frames[], visualRefs (default: .parity-refs)
+//   ds-config.json    - figmaFileKey, frames[], visualRefs (default: .design-system-engine-refs)
 //   FIGMA_TOKEN       - env var with a valid Figma personal access token
 //
 // Exit 0 = all frames match (or first run / FIGMA_TOKEN missing / no frames).
@@ -16,6 +16,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join }                                               from 'path';
 import { createHash }                                         from 'crypto';
+import { projectPath } from './names.mjs';
 
 // Every network call gives up after 30 s (FIGMA_FETCH_TIMEOUT_MS), so a stalled Figma response
 // cannot hang the audit or a pre-commit hook.
@@ -32,7 +33,8 @@ try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } ca
 
 const FILE_KEY  = cfg.figmaFileKey;
 const FRAMES    = cfg.frames ?? [];
-const REFS_DIR  = join(ROOT, cfg.visualRefs ?? '.parity-refs');
+const REFS      = cfg.visualRefs ?? projectPath(ROOT, 'refs');
+const REFS_DIR  = join(ROOT, REFS);
 
 if (!FRAMES.length) {
   console.log('⏭ No frames configured in ds-config.json - visual regression skipped');
@@ -141,7 +143,7 @@ console.log(`❌ CHANGED ${FAIL.length}`);
 if (NEW_REF.length) {
   console.log('\n─── New references saved ─────────────────────────────────────');
   for (const r of NEW_REF)
-    console.log(`  📸 "${r.name}" → ${cfg.visualRefs ?? '.parity-refs'}/${r.slug}.png`);
+    console.log(`  📸 "${r.name}" → ${REFS}/${r.slug}.png`);
   console.log('   Re-run to verify these new references on the next audit.');
 }
 
@@ -157,7 +159,7 @@ if (FAIL.length) {
 
 if (UPDATED.length) {
   console.log('\n─── Baselines auto-updated (advisory - DS frame changed) ─────');
-  for (const u of UPDATED) console.log(`  🔄 "${u.name}" → ${cfg.visualRefs ?? '.parity-refs'}/${u.slug}.png (review the PNG diff)`);
+  for (const u of UPDATED) console.log(`  🔄 "${u.name}" → ${REFS}/${u.slug}.png (review the PNG diff)`);
   console.log('   Not a code regression - structural code↔DS geometry is checked by frameGeom.');
 }
 

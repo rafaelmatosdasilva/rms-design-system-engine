@@ -20,7 +20,7 @@ const GIT_ENV = { GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com',
 // A fresh project from `source`, prepared by the task's setup, committed once, hooks installed.
 export function makeProject(source, setup) {
   const dir = mkdtempSync(join(tmpdir(), 'skill-eval-'));
-  cpSync(source, dir, { recursive: true, filter: (p) => !/expected-report|\/\.parity-out(\/|$)|\/\.git(\/|$)|node_modules/.test(p) });
+  cpSync(source, dir, { recursive: true, filter: (p) => !/expected-report|\/\.design-system-engine-out(\/|$)|\/\.git(\/|$)|node_modules/.test(p) });
   const today = new Date().toISOString();
   for (const f of walk(dir).filter((p) => /\.snapshot\.json$/.test(p))) {
     writeFileSync(f, readFileSync(f, 'utf8').replace(/"_updated": "[^"]*"/, `"_updated": "${today}"`));
@@ -52,11 +52,11 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
   // never another checkout on the machine. A variant that installs its own skill folder there keeps it.
   mkdirSync(join(home, '.claude', 'skills'), { recursive: true });
   variant.install(home);
-  if (!existsSync(join(home, '.claude', 'skills', 'rms-figma-code-parity'))) symlinkSync(ENGINE, join(home, '.claude', 'skills', 'rms-figma-code-parity'));
+  if (!existsSync(join(home, '.claude', 'skills', 'rms-design-system-engine'))) symlinkSync(ENGINE, join(home, '.claude', 'skills', 'rms-design-system-engine'));
   const bin = join(home, 'bin');
   mkdirSync(bin, { recursive: true });
   if (cliOnPath) {
-    for (const name of ['rms-figma-code-parity', 'rms-parity']) {
+    for (const name of ['rms-design-system-engine']) {
       writeFileSync(join(bin, name), `#!/usr/bin/env bash\nexec node "${join(ENGINE, 'audit.mjs')}" "$@"\n`);
       chmodSync(join(bin, name), 0o755);
     }
@@ -69,7 +69,7 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
 // CLAUDE* variable goes (the parent's session id, effort, extra directories, messaging), and so do tokens a
 // user would not hand the agent (GitHub, cloud, Figma, GitLab) and the evaluation's own settings. The
 // model's credentials stay.
-const DROP = [/^CLAUDE/, /^MAX_THINKING_TOKENS$/, /^(GH|GITHUB)_TOKEN$/, /^CLOUDSDK_/, /^SESSION_INGRESS/, /^FIGMA_/, /^GITLAB_/, /^PARITY_EVAL/];
+const DROP = [/^CLAUDE/, /^MAX_THINKING_TOKENS$/, /^(GH|GITHUB)_TOKEN$/, /^CLOUDSDK_/, /^SESSION_INGRESS/, /^FIGMA_/, /^GITLAB_/, /^PARITY_EVAL/, /^DESIGN_SYSTEM_ENGINE_EVAL/];
 export function childEnv(env, extra = {}) {
   return { ...Object.fromEntries(Object.entries(env).filter(([k]) => !DROP.some((re) => re.test(k)))), ...extra };
 }
@@ -129,10 +129,10 @@ export function context(events, dir, saved = null) {
   const results = events.filter((e) => e.type === 'result');
   const final = results.map((r) => String(r.result ?? '')).join('\n\n');
   const bash = calls.filter((c) => c.name === 'Bash').map((c) => ({ command: String(c.input.command ?? ''), result: c.result, isError: c.isError }));
-  const engine = bash.filter((b) => /(^|[\s;&|(])(rms-figma-code-parity|rms-parity|node\s+\S*audit\.mjs)\b/.test(b.command));
+  const engine = bash.filter((b) => /(^|[\s;&|(])(rms-design-system-engine|node\s+\S*audit\.mjs)\b/.test(b.command));
   const git = (...a) => { if (saved) return ''; try { return execFileSync('git', a, { cwd: dir, encoding: 'utf8' }); } catch { return ''; } };
   const changed = saved ? saved.changed ?? [] : git('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, ''))
-    .filter((p) => !/^\.parity-out\/|^contracts\/|^parity-(agreed|history)\.json$|^(component-prop-result|parity-check-result)\.json$|html-structure\.snapshot\.json$|^design-intent\.json$|^llms\.txt$/.test(p));
+    .filter((p) => !/^\.design-system-engine-out\/|^contracts\/|^parity-(agreed|history)\.json$|^(component-prop-result|design-system-engine-check-result)\.json$|html-structure\.snapshot\.json$|^design-intent\.json$|^llms\.txt$/.test(p));
   const nextLines = calls.flatMap((c) => String(c.result).split('\n')).map((l) => l.match(/^NEXT:\s*(.+)$/)?.[1]).filter(Boolean);
   const read = (p) => { if (saved) return saved.files?.[p] ?? null; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
   return {
@@ -153,7 +153,7 @@ export function decisionPoints(ctx) {
     if (!guided) decided++;
     for (const l of String(c.result ?? '').split('\n')) {
       const m = l.match(/^NEXT:\s*(.+)$/);
-      if (m) seen.push(m[1].replace(/\s+\(.*$/, '').replace(/^.*?(rms-figma-code-parity|git apply)/, '$1').replace(/[.;,]\s.*$/, '').trim());
+      if (m) seen.push(m[1].replace(/\s+\(.*$/, '').replace(/^.*?(rms-design-system-engine|git apply)/, '$1').replace(/[.;,]\s.*$/, '').trim());
     }
   }
   return decided;
@@ -165,7 +165,7 @@ export function hasEngineRun(ctx, pred = () => true) { return ctx.engine.some((b
 export function cleanup(...dirs) { for (const d of dirs) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } }
 
 // The files a scorer may read, kept with the result so the run can be scored again (at most 256 KB each).
-export const KEEP = ['ds-config.json', 'parity-baseline.json', 'src/theme.css', '.parity-out/summary.md'];
+export const KEEP = ['ds-config.json', 'design-system-engine-baseline.json', 'src/theme.css', '.design-system-engine-out/summary.md'];
 export function keepFiles(ctx, extra = []) {
   const out = {};
   for (const p of new Set([...KEEP, ...extra, ...ctx.changed])) { const t = ctx.read(p); if (t != null && t.length <= 256 * 1024) out[p] = t; }

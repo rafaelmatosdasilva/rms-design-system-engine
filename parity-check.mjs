@@ -12,7 +12,7 @@
 //
 // Requires at project root:
 //   ds-config.json   - themeCSS + snapshotVars paths + figma.modes config
-//   parity-map.mjs   - EXPLICIT, SKIP_TOKENS, NULL_TOKENS, KNOWN_NULL,
+//   design-system-engine-map.mjs   - EXPLICIT, SKIP_TOKENS, NULL_TOKENS, KNOWN_NULL,
 //                       EXPLICIT_SIZING, SIZING_SKIP, TYPO,
 //                       NEUTRAL_LIGHT, NEUTRAL_DARK, NEUTRAL_VAR_RE,
 //                       NEUTRAL_MAPS (for 3+ modes - { modeName: {...} } or array)
@@ -29,6 +29,7 @@ import { resolveNamingSpec, tokenToVar as toVar } from './naming-convention.mjs'
 
 const ROOT     = process.cwd();
 import { pathToFileURL } from 'url';
+import { newPath, projectPath } from './names.mjs';
 const FIX_MODE  = process.argv.includes('--fix');
 const JSON_MODE = process.argv.includes('--json');
 
@@ -73,7 +74,7 @@ if (figmaCfg.modes && Array.isArray(figmaCfg.modes) && figmaCfg.modes.length) {
   ];
 }
 
-// ── Load parity-map.mjs (project-specific token mappings) ────────────────────
+// ── Load design-system-engine-map.mjs (project-specific token mappings) ────────────────────
 const PRIMITIVE_PREFIX = cfg.figma?.primitivePrefix ?? 'primitives/';
 // Segments to strip from token paths when deriving CSS var names.
 // Default: drop trailing /color and /default (common DS conventions).
@@ -97,7 +98,7 @@ let noParityMap = false, parityMapBroken = false;
 let neutralMaps = MODES.map(() => ({}));
 
 try {
-  const map = await import(pathToFileURL(join(ROOT, 'parity-map.mjs')).href);
+  const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   if (map.EXPLICIT)        EXPLICIT        = map.EXPLICIT;
   if (map.NULL_TOKENS)     NULL_TOKENS     = map.NULL_TOKENS;
   if (map.SKIP_TOKENS)     SKIP_TOKENS     = map.SKIP_TOKENS;
@@ -124,8 +125,8 @@ try {
   }
 } catch (e) {
   // Optional: the naming convention maps most tokens on its own. Said only when it matters, after the counts.
-  // A parity-map.mjs that exists and does not load is always said: its maps are silently missing otherwise.
-  if (existsSync(join(ROOT, 'parity-map.mjs'))) parityMapBroken = true, console.log(`❌ parity-map.mjs could not be loaded - running with empty token maps: ${String(e?.message ?? e).split('\n')[0]}`);
+  // A design-system-engine-map.mjs that exists and does not load is always said: its maps are silently missing otherwise.
+  if (existsSync(join(ROOT, projectPath(ROOT, 'map')))) parityMapBroken = true, console.log(`❌ design-system-engine-map.mjs could not be loaded - running with empty token maps: ${String(e?.message ?? e).split('\n')[0]}`);
   else noParityMap = true;
 }
 
@@ -342,15 +343,15 @@ function parseMediaQueries(cssText) {
 // ── Load snapshot ─────────────────────────────────────────────────────────────
 const snap = JSON.parse(readFileSync(join(ROOT, SNAPSHOT_PATH), 'utf8'));
 
-// ── Primitive ramp: derived from the snapshot, not restated in parity-map ────
-// The ramp used to be hand-maintained in parity-map.mjs (NEUTRAL_LIGHT / NEUTRAL_DARK)
+// ── Primitive ramp: derived from the snapshot, not restated in design-system-engine-map ────
+// The ramp used to be hand-maintained in design-system-engine-map.mjs (NEUTRAL_LIGHT / NEUTRAL_DARK)
 // while the same numbers also lived in the token CSS and in Figma - three copies that
 // drift independently. When a DS primitive moves, updating the CSS alone leaves the
 // resolver comparing against the old hex and every token aliasing that primitive fails,
 // pointing at the tokens rather than at the stale map.
 //
 // When Phase 1 captures a `primitives` section, it wins: the snapshot is the closest
-// thing to Figma we have. parity-map stays as the fallback for projects that have not
+// thing to Figma we have. design-system-engine-map stays as the fallback for projects that have not
 // refreshed yet, so this is backwards-compatible.
 //
 // Keys are the trailing number of the primitive's name ("primitives/Neutral 800" → 800)
@@ -366,7 +367,7 @@ if (snap.primitives && typeof snap.primitives === 'object') {
       const k = String(name).match(keyRe)?.[1];
       if (k && hex) derived[k] = hex;
     }
-    // Merge over the parity-map values rather than replacing wholesale, so a primitive
+    // Merge over the design-system-engine-map values rather than replacing wholesale, so a primitive
     // the capture missed still resolves from the map instead of silently vanishing.
     if (Object.keys(derived).length) neutralMaps[i] = { ...neutralMaps[i], ...derived };
   });
@@ -400,7 +401,7 @@ for (let modeIdx = 0; modeIdx < MODES.length; modeIdx++) {
       if (KNOWN_NULL.has(token))
         SKIP.push({ dimension: 'color', token, mode: modeMeta.name, reason: 'Figma value null (known)' });
       else
-        NEW_SKIP.push({ dimension: 'color', token, mode: modeMeta.name, reason: 'Figma value is NEW null - add to KNOWN_NULL in parity-map.mjs' });
+        NEW_SKIP.push({ dimension: 'color', token, mode: modeMeta.name, reason: 'Figma value is NEW null - add to KNOWN_NULL in design-system-engine-map.mjs' });
       continue;
     }
     const loc = locateVar(cssVar, modeIdx);
@@ -421,7 +422,7 @@ for (let modeIdx = 0; modeIdx < MODES.length; modeIdx++) {
     const actualVar = loc.name;   // real declared name (handles a differing case)
     const cssHex = resolve(actualVar, modeIdx);
     if (cssHex === null) {
-      NEW_SKIP.push({ dimension: 'color', token, cssVar: actualVar, mode: modeMeta.name, reason: 'CSS value is not a colour this gate can read (a gradient, a display-p3 colour, a keyword) - add to SKIP_TOKENS in parity-map.mjs if intentional' });
+      NEW_SKIP.push({ dimension: 'color', token, cssVar: actualVar, mode: modeMeta.name, reason: 'CSS value is not a colour this gate can read (a gradient, a display-p3 colour, a keyword) - add to SKIP_TOKENS in design-system-engine-map.mjs if intentional' });
       continue;
     }
     const sameHex = sameColor(figmaHex, cssHex) ?? (figmaHex.toLowerCase() === cssHex.toLowerCase());
@@ -574,13 +575,13 @@ if (snap.typography && Object.keys(TYPO).length) {
     }
   }
 } else if (!snap.typography) {
-  SKIP.push({ dimension: 'typography', token: 'ALL', mode: '-', reason: 'snapshot has no typography section - run /rms-parity Phase 1' });
+  SKIP.push({ dimension: 'typography', token: 'ALL', mode: '-', reason: 'snapshot has no typography section - run /rms-design-system-engine Phase 1' });
 } else if (!Object.keys(TYPO).length) {
-  SKIP.push({ dimension: 'typography', token: 'ALL', mode: '-', reason: 'TYPO map empty in parity-map.mjs - add your type scale vars' });
+  SKIP.push({ dimension: 'typography', token: 'ALL', mode: '-', reason: 'TYPO map empty in design-system-engine-map.mjs - add your type scale vars' });
 }
 // Advisory: snapshot has ls/textTransform fields not yet covered by a TYPO map entry.
 // Phase 1 captures these when letterSpacing / textCase are present in the Figma text style.
-// To gate-check them: add entries to parity-map.mjs TYPO, e.g.:
+// To gate-check them: add entries to design-system-engine-map.mjs TYPO, e.g.:
 //   '--m-ls': ['m', 'ls'], '--m-text-transform': ['m', 'textTransform'],
 if (snap.typography) {
   for (const [scale, entry] of Object.entries(snap.typography)) {
@@ -591,7 +592,7 @@ if (snap.typography) {
         const cssSuffix = field === 'ls' ? 'ls' : 'text-transform';
         TYPO_INFO.push({
           cssVar: `--${scale}-${cssSuffix} (inferred)`,
-          note: `snapshot has ${scale}.${field}="${entry[field]}" - add '--${scale}-${cssSuffix}': ['${scale}', '${field}'] to TYPO in parity-map.mjs to gate-check it`,
+          note: `snapshot has ${scale}.${field}="${entry[field]}" - add '--${scale}-${cssSuffix}': ['${scale}', '${field}'] to TYPO in design-system-engine-map.mjs to gate-check it`,
         });
       }
     }
@@ -720,7 +721,7 @@ for (const [modeName, tokens] of Object.entries(boolSnap)) {
 // ── EFFECTS: declared CSS effects must be present in the merged CSS ───────────
 // Verifies that hardcoded visual effects (backdrop-filter, box-shadow, filter) declared
 // in EFFECTS are present in the actual CSS. Not driven by Figma variables - these are
-// design-system-level effects documented manually in parity-map.mjs.
+// design-system-level effects documented manually in design-system-engine-map.mjs.
 for (const { selector, prop, expected } of EFFECTS) {
   const sEsc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pEsc = prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -732,7 +733,7 @@ for (const { selector, prop, expected } of EFFECTS) {
 }
 
 // ── FOCUS CONTRACT: verify focus treatment per component selector ──────────────
-// FOCUS_CONTRACT in parity-map.mjs declares how each interactive component handles focus.
+// FOCUS_CONTRACT in design-system-engine-map.mjs declares how each interactive component handles focus.
 // type 'visible'  → :focus-visible rule must exist for the selector
 // type 'within'   → :focus-within rule must exist
 // type 'suppress' → outline: none must be declared in the selector's rule block
@@ -752,7 +753,7 @@ for (const { selector, type } of FOCUS_CONTRACT) {
 }
 
 // ── SCOPE RULES: CSS vars must only appear in allowed CSS property types ───────
-// SCOPE_RULES in parity-map.mjs: [{ var: '--text', allowedProps: ['color'] }, ...]
+// SCOPE_RULES in design-system-engine-map.mjs: [{ var: '--text', allowedProps: ['color'] }, ...]
 // Scans all non-:root CSS rules for scope violations (e.g. color var used as padding).
 if (SCOPE_RULES.length) {
   const rulesCSS = css.replace(/:root\s*\{[\s\S]*?\}/g, '');
@@ -830,21 +831,21 @@ console.log(`\n✅ PASS  ${PASS.length}   (${_passLabel})`);
 console.log(`⏭  SKIP  ${SKIP.length}`);
 console.log(`⚠️  NEW SKIP  ${NEW_SKIP.length}`);
 console.log(`❌ FAIL  ${FAIL.length}`);
-// Without parity-map.mjs a token is found only by the naming convention: say so when a token was not found.
+// Without design-system-engine-map.mjs a token is found only by the naming convention: say so when a token was not found.
 const unnamed = FAIL.filter((f) => /not declared|missing in @media/.test(f.issue ?? '')).length + NEW_SKIP.length;
 if (noParityMap && unnamed)
-  console.log(`⚠️  NO PARITY MAP  ${unnamed} token(s) not found under the naming convention and no parity-map.mjs to map them - if the CSS names them another way, copy parity-map.example.mjs to parity-map.mjs and map them`);
+  console.log(`⚠️  NO PARITY MAP  ${unnamed} token(s) not found under the naming convention and no design-system-engine-map.mjs to map them - if the CSS names them another way, copy design-system-engine-map.example.mjs to design-system-engine-map.mjs and map them`);
 if (NEVER_APPLIED.length) {
   console.log(`⚠️  NEVER APPLIED ${NEVER_APPLIED.length}  (token block under an ancestor of :root - a browser never uses it)`);
   for (const n of NEVER_APPLIED.slice(0, 10)) console.log(`     ℹ️  ${n.file}:${n.line}  ${n.selector}${n.suggest ? `  → write ${n.suggest}` : ''}`);
 }
 if (snap.aliases) console.log(`🔗 ALIAS FAIL  ${ALIAS_FAIL.length}  (same hex, wrong primitive chain)`);
 if (sourceSnap)   console.log(`⏳ PENDING FIGMA SYNC  ${PENDING_FIGMA_SYNC.length}  (code matches DS source; consumer file has a pending library update)`);
-if (BOOL_INFO.length) console.log(`ℹ️  BOOLEAN TOKENS  ${BOOL_INFO.length}  (implement via display rules or class toggles - add to BOOLEAN_SKIP in parity-map.mjs to suppress)`);
-if (EFFECTS_FAIL.length) console.log(`❌ EFFECTS FAIL  ${EFFECTS_FAIL.length}  (declared CSS effects missing - update EFFECTS in parity-map.mjs)`);
+if (BOOL_INFO.length) console.log(`ℹ️  BOOLEAN TOKENS  ${BOOL_INFO.length}  (implement via display rules or class toggles - add to BOOLEAN_SKIP in design-system-engine-map.mjs to suppress)`);
+if (EFFECTS_FAIL.length) console.log(`❌ EFFECTS FAIL  ${EFFECTS_FAIL.length}  (declared CSS effects missing - update EFFECTS in design-system-engine-map.mjs)`);
 if (SCOPE_FAIL.length)   console.log(`❌ SCOPE FAIL  ${SCOPE_FAIL.length}  (token used in wrong CSS property type - fix or update SCOPE_RULES)`);
 if (TYPO_INFO.length)    console.log(`ℹ️  TYPO UNUSED  ${TYPO_INFO.length}  (typography vars not applied in component rules)`);
-if (FOCUS_INFO.length)   console.log(`ℹ️  FOCUS GAPS  ${FOCUS_INFO.length}  (update FOCUS_CONTRACT in parity-map.mjs)`);
+if (FOCUS_INFO.length)   console.log(`ℹ️  FOCUS GAPS  ${FOCUS_INFO.length}  (update FOCUS_CONTRACT in design-system-engine-map.mjs)`);
 
 if (SKIP.length) {
   console.log('\n─── Skipped (expected - each has a documented reason) ─────────');
@@ -890,7 +891,7 @@ if (BOOL_INFO.length) {
   console.log('\n─── ℹ️  Boolean tokens (need implementation map) ──────────────');
   console.log('   Figma BOOLEAN vars control visibility, feature flags, or theme toggles.');
   console.log('   Implement via display rules, data-* attributes, or JS class toggles,');
-  console.log('   then add each token to BOOLEAN_SKIP in parity-map.mjs to suppress.');
+  console.log('   then add each token to BOOLEAN_SKIP in design-system-engine-map.mjs to suppress.');
   for (const b of BOOL_INFO) {
     console.log(`  ℹ️  [${b.breakpoint}] ${b.token}  →  ${b.cssVar}`);
   }
@@ -903,12 +904,12 @@ if (TYPO_INFO.length) {
 }
 if (EFFECTS_FAIL.length) {
   console.log('\n─── ❌ Missing declared CSS effects ────────────────────────────');
-  console.log('   These effects are declared in EFFECTS (parity-map.mjs) but not found in CSS.');
+  console.log('   These effects are declared in EFFECTS (design-system-engine-map.mjs) but not found in CSS.');
   for (const e of EFFECTS_FAIL) console.log(`  ❌  ${e.selector}  -  ${e.issue}`);
 }
 if (FOCUS_INFO.length) {
   console.log('\n─── ℹ️  Focus contract gaps ─────────────────────────────────────');
-  console.log('   Declare focus treatment in FOCUS_CONTRACT (parity-map.mjs).');
+  console.log('   Declare focus treatment in FOCUS_CONTRACT (design-system-engine-map.mjs).');
   for (const f of FOCUS_INFO) console.log(`  ℹ️  ${f.selector} [${f.type}]  -  ${f.note}`);
 }
 if (SCOPE_FAIL.length) {
@@ -918,7 +919,7 @@ if (SCOPE_FAIL.length) {
 }
 
 if (JSON_MODE) {
-  writeFileSync(join(ROOT, 'parity-check-result.json'), JSON.stringify({
+  writeFileSync(join(ROOT, newPath('checkResult')), JSON.stringify({
     pass: FAIL.length === 0 && NEW_SKIP.length === 0 && ALIAS_FAIL.length === 0 && EFFECTS_FAIL.length === 0 && SCOPE_FAIL.length === 0,
     fail: FAIL, aliasFail: ALIAS_FAIL, newSkip: NEW_SKIP, skip: SKIP,
     pendingFigmaSync: PENDING_FIGMA_SYNC,

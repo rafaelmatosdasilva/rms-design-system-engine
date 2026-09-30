@@ -1,4 +1,4 @@
-# /rms-figma-code-parity - Figma-to-Code Parity
+# /rms-design-system-engine - the engine of a design system
 
 **In one line:** given a Figma design system and its codebase, decide whether the code
 matches the design, and emit machine-readable facts (real token names, values, selectors
@@ -58,7 +58,7 @@ for that fix.
 
 **Start every request with the router.** When the request already came with a `ROUTE:` block (the project's
 hook routed it), follow that block. Otherwise run the router, passing the request exactly as the person wrote it:
-`rms-figma-code-parity --route "<the request>"` (not on PATH: `node ~/.claude/skills/rms-figma-code-parity/audit.mjs
+`rms-design-system-engine --route "<the request>"` (not on PATH: `node ~/.claude/skills/rms-design-system-engine/audit.mjs
 --route "<the request>"`). It prints the recipe that fits, the exact command to run (`RUN:`), any rule that applies
 (`NOTE:`), the sentences to say (`SAY:`), one `NEXT:` line, and the recipe itself. Do what it prints: run the `RUN:`
 command and relay its SUMMARY, or, when it says to run nothing, answer from the recipe it printed. Put each `SAY:`
@@ -66,8 +66,8 @@ line in your final reply word for word (when it names a condition, only when tha
 recipe or a command yourself.
 
 This guide holds the rules that always apply. The steps for each task are in a **recipe**: before acting, print
-the one that fits with `rms-figma-code-parity --recipe <name>` (or read
-`~/.claude/skills/rms-figma-code-parity/cookbook/<name>.md`, the skill's install folder). Follow it, relay the
+the one that fits with `rms-design-system-engine --recipe <name>` (or read
+`~/.claude/skills/rms-design-system-engine/cookbook/<name>.md`, the skill's install folder). Follow it, relay the
 engine's SUMMARY, and take its NEXT line. If no recipe fits, read the reference. **A question is a task too**
 ("how do I…", "what does … mean", "why does …"): print its recipe first and answer from what the recipe and the
 reference it points to say, never from memory or from this table alone.
@@ -88,7 +88,7 @@ reference it points to say, never from memory or from this table alone.
 | a component's props and values, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
 
-Reference (`rms-figma-code-parity --reference <name>`): `usage` (every command, option and output), `config`
+Reference (`rms-design-system-engine --reference <name>`): `usage` (every command, option and output), `config`
 (`ds-config.json`, snapshot files, naming), `gates` (gate-specific rules), `maintainers` (changing the engine
 and the skill).
 
@@ -104,7 +104,7 @@ skill handles setup/scope/run/report) and proceed from the intent instead of exe
 listed steps.**
 
 **Relay the engine's words, and follow its NEXT line.** Every audit ends with a `SUMMARY` block (also written
-to `.parity-out/summary.md`; `rms-figma-code-parity --summary` prints the last one again) and one `NEXT:` line.
+to `.design-system-engine-out/summary.md`; `rms-design-system-engine --summary` prints the last one again) and one `NEXT:` line.
 Relay the summary in the chat as it is, without rewording its facts, then take the `NEXT:` line as the next
 step. `--init`, `--guidelines`, `--baseline` and `--install-hooks` end with a `NEXT:` line too. When a `NEXT:`
 line says to do something only when the person asks (commit, apply the hand-back), ask them; never do it on
@@ -119,23 +119,23 @@ refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.j
 applying the hand-back, or a code edit, unless the person's latest message asked for that change. After a UI edit
 they hand back what it added that the design system does not have (a colour written by hand, a variable declared
 nowhere, a prop value a component does not take): fix it in that file before going on. A request made
-with `/rms-figma-code-parity` arrives already routed (the `ROUTE:` block above). When a hook refuses or asks, that is the answer: do not work around it (no other
+with `/rms-design-system-engine` arrives already routed (the `ROUTE:` block above). When a hook refuses or asks, that is the answer: do not work around it (no other
 tool, no shell edit); tell the person what it said.
 
 **When someone pastes a GitLab or Notion link to their written guidelines into the chat**, run
-`rms-figma-code-parity --guidelines <link>` (several links can be passed at once). Do not edit
+`rms-design-system-engine --guidelines <link>` (several links can be passed at once). Do not edit
 `ds-config.json` by hand and do not fetch the page yourself: the command records the link, reads the page
 into its committed file right away, and says in plain words whether it worked. Relay that result. If it
 says the page could not be read, pass on the one fix it names (usually a token in `.env`), and **never ask
 the person to paste a token into the chat**. `--guidelines` with no link lists the links already set. From
 then on every run refreshes those pages and folds them into the design intent.
 
-**If the `rms-figma-code-parity` command is not on PATH** (a plain `command not found`),
+**If the `rms-design-system-engine` command is not on PATH** (a plain `command not found`),
 do not stop and do not hand-simulate setup - the engine is a folder of scripts, so run it
-directly with `node ~/.claude/skills/rms-figma-code-parity/audit.mjs <same flags>` (the install
+directly with `node ~/.claude/skills/rms-design-system-engine/audit.mjs <same flags>` (the install
 folder). Run that exact path; do not search for the file, since a search can miss a linked install.
-Everything below that shows `rms-figma-code-parity …` works identically as
-`node ~/.claude/skills/rms-figma-code-parity/audit.mjs …`.
+Everything below that shows `rms-design-system-engine …` works identically as
+`node ~/.claude/skills/rms-design-system-engine/audit.mjs …`.
 
 **First-time setup is interactive in the engine - let it run, don't re-ask the questions
 yourself.** When `ds-config.json` is missing, running the audit drops into the engine's own
@@ -164,8 +164,8 @@ Route by intent:
   user does not need to say "scoped" or know the flag exists. Naming the part IS the request to
   scope to it.
   ```bash
-  rms-figma-code-parity --component input                # scope to whatever the user named
-  rms-figma-code-parity --component ButtonPrimary        # or A,B  / repeat --component
+  rms-design-system-engine --component input                # scope to whatever the user named
+  rms-design-system-engine --component ButtonPrimary        # or A,B  / repeat --component
   ```
   Then every gate reports **only** findings that belong to that component; DS-wide issues in
   other components are collapsed to a "… N findings outside scope - not audited" line and never
@@ -194,8 +194,8 @@ Route by intent:
   > component surfaces it. And never stamp `_figmaVersion` from a capture that skipped the scoped
   > component's variants/variables: a version stamped over a partial capture reads "fresh" while
   > hiding exactly the change you were asked to check.
-- **The whole design system:** run `rms-figma-code-parity` in the terminal (or `/rms-figma-code-parity` in Claude Code),
-  then follow the `full-audit` recipe (`rms-figma-code-parity --recipe full-audit`).
+- **The whole design system:** run `rms-design-system-engine` in the terminal (or `/rms-design-system-engine` in Claude Code),
+  then follow the `full-audit` recipe (`rms-design-system-engine --recipe full-audit`).
 
 **Running the command means running the WHOLE thing - Phase 1 included - whenever Phase 1
 CAN run.** An unscoped invocation is a request for a full audit, not a Phase-2-only pass over
@@ -265,7 +265,7 @@ Full parity workflow in one command: Phase 1 (live Figma refresh) runs before Ph
 
 ## Hard Rules
 
-1. **Every Figma component token must have a dedicated CSS variable.** No token may be covered only by an inline value. `via` is acceptable only when a semantic alias is documented in `parity-map.mjs`.
+1. **Every Figma component token must have a dedicated CSS variable.** No token may be covered only by an inline value. `via` is acceptable only when a semantic alias is documented in `design-system-engine-map.mjs`.
 2. **Every CSS variable must be wired into at least one CSS rule.** A declared-but-unused var must be deleted. Variables are declared when the component exists in code, not before.
 3. **Naming convention must be followed exactly.** A correct value under a wrong name is still a divergence.
 4. **All modes must match.** A token correct in one mode but wrong in another is still a divergence - this applies to every mode your DS defines: light/dark, compact/comfortable, any breakpoint-based sizing mode, etc.
@@ -291,9 +291,9 @@ Full parity workflow in one command: Phase 1 (live Figma refresh) runs before Ph
 - Always compare **all** configured modes.
 - Naming violations are flagged regardless of whether the value is correct.
 - When renaming: update declarations, all usages, then rebuild. Update `EXPLICIT` in both `parity-check.mjs` and `bound-check.mjs` if the old name had an explicit entry.
-- When adding a token group: add CSS var + rule consumer + update `parity-map.mjs` + rebuild.
-- When removing a token from DS: remove CSS var if unused (Gate [5] catches it), replace in rules if used, remove from `parity-map.mjs`, remove from `EXPLICIT`/`COVERED` if present.
-- When removing an entire component from DS: Phase 1 shows many REMOVED tokens for that component. Remove all its CSS vars (Gate [5] flags any that remain). Remove all its CSS rules. Remove from `parity-map.mjs`, `EXPLICIT`, `COVERED`, and `figma-structure.snapshot.json`. Re-run bound walk to purge it from `bound-tokens.json`. Rebuild.
+- When adding a token group: add CSS var + rule consumer + update `design-system-engine-map.mjs` + rebuild.
+- When removing a token from DS: remove CSS var if unused (Gate [5] catches it), replace in rules if used, remove from `design-system-engine-map.mjs`, remove from `EXPLICIT`/`COVERED` if present.
+- When removing an entire component from DS: Phase 1 shows many REMOVED tokens for that component. Remove all its CSS vars (Gate [5] flags any that remain). Remove all its CSS rules. Remove from `design-system-engine-map.mjs`, `EXPLICIT`, `COVERED`, and `figma-structure.snapshot.json`. Re-run bound walk to purge it from `bound-tokens.json`. Rebuild.
 
 ---
 
@@ -319,6 +319,6 @@ After every run, report this table so the practitioner knows exactly what the au
 | Component states fully wired | Automated (Gate [10]) | High |
 | SVG symbols + path freshness | Automated (Gate [14] - icon contract: symbol docs + path data + live Figma check) | High if all symbols documented and FIGMA_TOKEN set |
 | Looks the same as Figma | Automated (Gate [9], requires FIGMA_TOKEN) or Manual (Step 7 screenshots) | **Not run** if neither is configured |
-| CI enforcement | GitHub Actions (`.github/workflows/parity.yml`) | High if configured |
+| CI enforcement | GitHub Actions (`.github/workflows/design-system-engine.yml`) | High if configured |
 
 Flag any row marked **not run** or **skipped** explicitly in the summary - do not imply full coverage.
