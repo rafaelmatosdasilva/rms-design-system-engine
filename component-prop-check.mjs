@@ -247,20 +247,19 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     }
     const figDefault = def?.defaultValue;
     const codeDefault = codeDefaults.get(cn);
-    if (figDefault != null && figDefault !== '' && codeDefault != null && !sameValue(figDefault, codeDefault)) {
+    // A wrong default and a variant the code names differently are two findings: both are listed.
+    const defaultDiffers = figDefault != null && figDefault !== '' && codeDefault != null && !sameValue(figDefault, codeDefault);
+    if (defaultDiffers)
       VALUE_FAIL.push(`${figmaName}/${fp}: default differs - Figma "${figDefault}" vs code "${codeName}=${codeDefault}"${valueHint(figDefault, [codeDefault])}  (${rel})`);
-      return { status: 'value', codeValue: `default ${codeDefault}` };
+    const opts = def?.type === 'VARIANT' && Array.isArray(def.variantOptions) && def.variantOptions.length ? codeOptions.get(cn) : null;
+    if (defaultDiffers && !opts) return { status: 'value', codeValue: `default ${codeDefault}` };
+    if (opts) {
+      const miss = def.variantOptions.filter(o => !opts.some((c) => sameValue(o, c)));
+      if (miss.length)
+        VALUE_FAIL.push(`${figmaName}/${fp}: code prop "${codeName}" is missing Figma variant option(s) ${miss.map(o => `"${o}"${valueHint(o, opts)}`).join(', ')}  (${rel})`);
+      return { status: miss.length || defaultDiffers ? 'value' : 'match', codeValue: opts.join(' · ') };
     }
     if (def?.type === 'VARIANT' && Array.isArray(def.variantOptions) && def.variantOptions.length) {
-      const opts = codeOptions.get(cn);
-      if (opts) {
-        const miss = def.variantOptions.filter(o => !opts.some((c) => sameValue(o, c)));
-        if (miss.length) {
-          VALUE_FAIL.push(`${figmaName}/${fp}: code prop "${codeName}" is missing Figma variant option(s) ${miss.map(o => `"${o}"${valueHint(o, opts)}`).join(', ')}  (${rel})`);
-          return { status: 'value', codeValue: opts.join(' · ') };
-        }
-        return { status: 'match', codeValue: opts.join(' · ') };
-      }
       VALUE_INFO.push(`${figmaName}/${fp}: Figma variants [${def.variantOptions.join(', ')}] - could not read the code prop's allowed values to verify  (${rel})`);
       return { status: 'match', codeValue: '(present)' };
     }

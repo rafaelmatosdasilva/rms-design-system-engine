@@ -23,6 +23,11 @@ test('a value named differently fails, with the code value it corresponds to as 
   assert.match(out, /Tag\/Size: code prop "size" is missing Figma variant option\(s\) "S" \(the code likely names it "small"\), "L" \(the code likely names it "large"\)/);
 });
 
+test('the code\'s values are read as written, so Primary matches Primary', () => {
+  const { code, out } = runGate(GATE, project(['Primary', 'Secondary'], ['Primary', 'Secondary']));
+  assert.equal(code, 0, out);
+});
+
 test('letter case is part of the name', () => {
   const { code, out } = runGate(GATE, project(['Small', 'Large'], ['small', 'large']));
   assert.equal(code, 1, out);

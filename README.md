@@ -64,7 +64,7 @@ Every run compares your code against Figma and reports it in plain words:
 - **Docs tell the** truth: they mention only things that actually exist.
 - **No invented text** casing: no forced UPPERCASE the design never asked for.
 - **No hand-built DS** components: a screen uses the real component, not a hand-styled copy.
-- **Clean CSS:** nothing unused, nothing that contradicts Figma.
+- **Clean CSS:** nothing unused, nothing that contradicts Figma. A focus ring's outline, which Figma has no value for, is listed apart, not failed.
 - **Nested components keep** their own styles: one component's look does not leak into another.
 - **Structure:** the right height, spacing and corners, from the design.
 - **All states are** built: hover, disabled, selected and the rest, each with the right values.

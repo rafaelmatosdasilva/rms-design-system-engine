@@ -161,7 +161,7 @@ export function extractDefaults(text) {
 export function extractOptions(text) {
   const out = new Map();
   for (const m of text.matchAll(/([A-Za-z_$][\w$]*)\s*\??\s*:\s*((?:['"`][^'"`]*['"`]\s*\|\s*)+['"`][^'"`]*['"`])/g)) {
-    const opts = [...m[2].matchAll(/['"`]([^'"`]*)['"`]/g)].map((x) => norm(x[1]));
+    const opts = [...m[2].matchAll(/['"`]([^'"`]*)['"`]/g)].map((x) => x[1]);   // as written: parity on a value is its exact name
     if (opts.length >= 2) out.set(norm(m[1]), new Set(opts));
   }
   return out;

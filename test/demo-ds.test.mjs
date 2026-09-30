@@ -14,70 +14,21 @@
 // check), expected-report-static.txt without it. UPDATE_GOLDEN=1 rewrites the one that ran.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, symlinkSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
+import { fixtureProject, bareEnv, auditFixture, golden as goldenOf } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const FIXTURE = join(ENGINE, 'test', 'fixtures', 'demo-ds');
 const CHROME = findChrome({ playwright: true });
 
-// A fresh copy, its snapshots dated today, committed once so git blame has a commit to name.
-function project() {
-  const dir = mkdtempSync(join(tmpdir(), 'demo-ds-'));
-  cpSync(FIXTURE, dir, { recursive: true, filter: (p) => !/expected-report/.test(p) });
-  const today = new Date().toISOString();
-  for (const f of readdirSync(join(dir, 'src')).filter((x) => x.endsWith('.json'))) {
-    const p = join(dir, 'src', f);
-    writeFileSync(p, readFileSync(p, 'utf8').replace(/"_updated": "[^"]*"/, `"_updated": "${today}"`));
-  }
-  const env = { ...process.env, GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.com', GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' };
-  for (const args of [['init', '-q'], ['add', '-A'], ['commit', '-qm', 'init']]) execFileSync('git', args, { cwd: dir, env });
-  return dir;
-}
-
-// A PATH with only git and which, so a run meant to be without Chrome cannot find one.
-function bareEnv() {
-  const bin = mkdtempSync(join(tmpdir(), 'demo-bin-'));
-  for (const name of ['git', 'which']) {
-    const p = spawnSync('which', [name], { encoding: 'utf8' }).stdout.trim();
-    if (p) symlinkSync(p, join(bin, name));
-  }
-  const { CHROME_PATH, ...rest } = process.env;
-  return { ...rest, PATH: bin, PLAYWRIGHT_BROWSERS_PATH: join(bin, 'none') };
-}
-
-// Dates, durations, ages, commit hashes and the temporary directory change from run to run.
-export function normalise(text, dir) {
-  return text.split(dir).join('<DIR>')
-    .replace(/\x1b\[[0-9;]*m/g, '')
-    .replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, '<TS>')
-    .replace(/PARITY AUDIT {2}· {2}[\d-]+/, 'PARITY AUDIT  ·  <DATE>')
-    .replace(/\b\d+(\.\d+)?m?s\b/g, '<DUR>')
-    .replace(/\(([0-9a-f]{7})\)/g, '(<HASH>)')
-    .replace(/\d+h (old|ago)/g, '<AGE>h $1')
-    .replace(/\d+ ?(day|days|hour|hours) ago/g, '<AGE> ago')
-    .replace(/^.*newer version of the parity skill.*\n/gm, '');
-}
-
-function audit(env) {
-  const dir = project();
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...env, NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 300000 });
-  return { dir, code: r.status, out: normalise((r.stdout ?? '') + (r.stderr ?? ''), dir) };
-}
-
-function golden(name, out) {
-  const p = join(FIXTURE, name);
-  if (process.env.UPDATE_GOLDEN === '1' || !existsSync(p)) { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, out); return; }
-  const want = readFileSync(p, 'utf8');
-  if (out === want) return;
-  const actual = join(mkdtempSync(join(tmpdir(), 'demo-ds-actual-')), name);
-  writeFileSync(actual, out);
-  assert.fail(`the report differs from ${name} (this run: ${actual}); if the change is intended, rerun with UPDATE_GOLDEN=1 and review the diff`);
-}
+const audit = (env) => auditFixture(FIXTURE, env, 'demo-ds-');
+const golden = (name, out) => goldenOf(FIXTURE, name, out);
+const project = () => fixtureProject(FIXTURE, 'demo-ds-');
 
 test('demo design system, without Chrome: the static report matches its golden', { timeout: 300000 }, () => {
   const r = audit(bareEnv());

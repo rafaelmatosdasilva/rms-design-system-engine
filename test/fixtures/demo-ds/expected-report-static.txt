@@ -201,7 +201,7 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: chip 2 · field 1 · 7 not tied to a component
+📉 Burndown, open findings per component: chip 1 · field 1 · 2 not tied to a component
    next up: chip. Run with --component chip, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
@@ -216,7 +216,7 @@
   - [sizing/-] radii/chip → --radii-chip
     - Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px
 
-Burndown, open findings per component: chip 2 · field 1 · 7 not tied to a component
+Burndown, open findings per component: chip 1 · field 1 · 2 not tied to a component
 
 NEXT: tell the user what fails under "Token values" and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
 
