@@ -79,6 +79,7 @@ Every run compares your code against Figma and reports it in plain words:
 - **Shadows and blurs:** match Figma, when your design defines them.
 - **Renders correctly in** a browser: checked on the real result, not just the code on paper.
 - **What this audit** covered: so you can see nothing slipped through.
+- **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist. A wrong name there makes every agent that reads it build the wrong thing. Advisory; `"steering": false` in `ds-config.json` turns it off.
 
 It also does an **accessibility** check: it flags anything that would make the design hard to use (text that is hard to read, a button with no label, something you cannot reach with the keyboard) and tells you, in plain words, how to fix it.
 
