@@ -27,6 +27,7 @@ import { evalConformance } from './eval-check.mjs';
 import { createLocator, loadLocator } from './component-locator.mjs';
 import { markupFindings } from './a11y-static.mjs';
 import { findSteeringFiles } from './steering-check.mjs';
+import { typeErrors, typeErrorLine, compileTarget, findTsc } from './compile-check.mjs';
 
 const CANDIDATE_EXTS = ['html', 'htm', 'jsx', 'tsx', 'vue', 'svelte', 'js', 'ts', 'md', 'txt'];
 
@@ -131,7 +132,19 @@ export function summarize(results) {
     runsPerCase: results[0] ? runsOf(results[0]) : 1,
     expecting: results.filter((r) => r.component).length,   // cases that name the component they expect
     avoided: results.reduce((s, r) => s + avoidedRunsOf(r), 0),   // runs that did not use it (I64)
+    typeErrors: results.reduce((s, r) => s + (r.metrics.typeErrors || 0), 0),   // I66, when candidates were compiled
   };
+}
+
+// One candidate's score: the DS-conformance core, and, when ctx.compile is set (a .tsx or .jsx candidate and a
+// compiler), a type check against the catalog's props (I66): each type error is a violation.
+export function score(code, ctx, c = {}) {
+  const chk = evalConformance(code, ctx, { component: c.component });
+  if (!ctx.compile || !String(code ?? '').trim()) return chk;
+  const tc = typeErrors(code, ctx.compile.catalog, { ROOT: ctx.compile.ROOT, id: c.id ?? 'candidate', tsc: ctx.compile.tsc, ext: ctx.compile.ext, ...(ctx.compile.dir ? { dir: ctx.compile.dir } : {}) });
+  if (!tc.ran) return chk;
+  const violations = [...chk.violations, ...tc.errors.map((e) => ({ type: 'type-error', value: typeErrorLine(e) }))];
+  return { violations, metrics: { ...chk.metrics, typeErrors: tc.errors.length, clean: chk.metrics.clean && !tc.errors.length } };
 }
 
 // Pure orchestration: run each case's candidate through the conformance core. `loadCandidate(case)`
@@ -140,7 +153,7 @@ export function runEvals(cases, ctx, loadCandidate) {
   const results = [];
   for (const c of cases) {
     const code = loadCandidate(c) || '';
-    const { violations, metrics } = evalConformance(code, ctx, { component: c.component });
+    const { violations, metrics } = score(code, ctx, c);
     results.push({ id: c.id, prompt: c.prompt || '', component: c.component ?? null, code, metrics, violations, runs: 1, cleanRuns: metrics.clean ? 1 : 0 });
   }
   return { results, summary: summarize(results) };
@@ -200,7 +213,7 @@ export function runLevels(cases, ctx, levels, generate, runs = 1) {
       const violations = [];
       for (let k = 0; k < runs; k++) {
         const code = generate(c, level) || '';
-        const chk = evalConformance(code, ctx, { component: c.component });
+        const chk = score(code, ctx, c);
         const found = code ? markupFindings(code).length : 0;
         if (chk.metrics.clean && !found) cleanRuns++;
         if (chk.metrics.avoided) avoidedRuns++;
@@ -255,6 +268,15 @@ async function main() {
   const outDir = cfg.evals?.outDir || 'evals';
   const ext = cfg.evals?.ext || 'html';
   const ctx = loadContext(ROOT, cfg, { locator: await loadLocator(ROOT, cfg) });
+  // I66: .tsx/.jsx candidates are type-checked against the catalog's props (evals.compile: false turns it off).
+  if (compileTarget(ext) && cfg.evals?.compile !== false) {
+    let catalog = {};
+    try { catalog = JSON.parse(readFileSync(resolve(ROOT, cfg.contracts?.out ?? 'contracts', 'catalog.json'), 'utf8')); } catch { /* no catalog yet */ }
+    const tsc = findTsc(ROOT);
+    if (!tsc) console.log('ℹ️  compile not checked: no TypeScript compiler (install typescript in the project, or tsc on the PATH).');
+    else if (!Object.keys(catalog.components ?? {}).length) console.log('ℹ️  compile not checked: no contracts/catalog.json yet (run the audit once to write it).');
+    else ctx.compile = { catalog, tsc, ROOT, ext };
+  }
   const leaks = promptLeaks(cases, [...ctx.componentClass.keys()]);
   for (const l of leaks) console.log(`⚠️  case "${l.id}": the prompt names the component "${l.name}", so its score measures reading the prompt, not finding the component. Say the intent and put the component in the case's "component" field.`);
 
@@ -298,7 +320,7 @@ async function main() {
         const t0 = Date.now();
         const code = generateCandidate(c, genCmd, ctxArg()) || '';
         totalMs += Date.now() - t0;
-        const chk = evalConformance(code, ctx, { component: c.component });
+        const chk = score(code, ctx, c);
         if (chk.metrics.clean) cleanRuns++;
         if (chk.metrics.avoided) avoidedRuns++;
         if (!rep) rep = { code, ...chk };
@@ -352,7 +374,7 @@ async function main() {
     const judge = r.judge ? `   ${r.judge.ok ? '⚖️ ok' : '⚖️ review'}${r.judge.notes ? ` — ${r.judge.notes}` : ''}` : '';
     console.log(`  ${icon} ${r.id}${r.component ? ` [${r.component}]` : ''} — ${base}${runNote}${judge}`);
   }
-  console.log(`\n   ${summary.produced}/${summary.cases} produced · ${summary.clean}/${summary.cases} zero-fix (${summary.zeroFixRate}%) · ${summary.violations} violation(s) · ${summary.inlineStyles} inline-style(s)${summary.expecting ? ` · ${summary.avoided} avoided the system` : ''}${judged ? ` · judge ${judgePass}/${judged} ok` : ''}${avgGenMs != null ? ` · avg gen ${avgGenMs}ms` : ''}`);
+  console.log(`\n   ${summary.produced}/${summary.cases} produced · ${summary.clean}/${summary.cases} zero-fix (${summary.zeroFixRate}%) · ${summary.violations} violation(s) · ${summary.inlineStyles} inline-style(s)${summary.expecting ? ` · ${summary.avoided} avoided the system` : ''}${ctx.compile ? ` · ${summary.typeErrors} type error(s)` : ''}${judged ? ` · judge ${judgePass}/${judged} ok` : ''}${avgGenMs != null ? ` · avg gen ${avgGenMs}ms` : ''}`);
   console.log(`   Advisory: evals measure agent output, they never gate the repo.\n`);
 
   // History (best-effort; capped)
