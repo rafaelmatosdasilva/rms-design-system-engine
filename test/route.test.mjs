@@ -110,3 +110,16 @@ test('a question about a component\'s props or a token routes to the query, with
   assert.match(none.notes.join(' '), /Ask which component or token/);
   assert.equal(route('audit the chip props', P).recipe, 'audit-component');   // not a question: the audit
 });
+
+test('a request for new UI asks the system for the names and builds with them (I62)', () => {
+  const b = r('add a small green "Saved" confirmation next to the Save button on the gallery page');
+  assert.deepEqual([b.recipe, b.run], ['ask-the-system', ['rms-figma-code-parity --query button']]);
+  assert.match(b.notes.join(' '), /build it, in the file they name, with the design system's own components/);
+  assert.match(b.notes.join(' '), /never invent one/);
+  assert.equal(r('acrescenta um botão de cancelar ao formulário').recipe, 'ask-the-system');
+  // Not new UI: a note in Figma, debt, a change in Figma, an audit.
+  assert.equal(r('how do I write a note in Figma saying the chip is a toggle, so the parity checks it?').recipe, 'a11y-notes');
+  assert.equal(r('add the chip radius to the baseline as debt').recipe, 'accept-debt');
+  assert.equal(r('make the button 32px in Figma').recipe, 'fix-a-difference');
+  assert.equal(r('run the parity on the button').recipe, 'audit-component');
+});

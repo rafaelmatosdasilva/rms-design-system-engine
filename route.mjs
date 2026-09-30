@@ -59,6 +59,9 @@ const RULES = [
   ['ask-the-system', (t) => QUESTION.test(t) && /\b(props?|propriedades?|values?|valores?|tokens?|variables?|vari[aá]ve(l|is)|names?|nomes?)\b/i.test(t) && !/debt|d[ií]vida|baseline/i.test(t)],
   ['accept-debt', (t) => /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit/i.test(t)],
   ['fix-a-difference', (t) => /\b(fix|correct|repair|corrig|conserta|repara|resolve)\w*/i.test(t) && !QUESTION.test(t)],
+  // New UI to build ("add a Saved confirmation next to the Save button"): the names come from the system, never from
+  // memory, and a value the system does not have is said, not invented (I62). Not a note, not Figma, not debt.
+  ['ask-the-system', (t) => /\b(add|create|build|make|put|insert|show|acrescent\w*|adicion\w*|cria\w*|constr[oó]i\w*|p[oõ]e|coloca\w*|mostra\w*)\b/i.test(t) && /\b(confirmation|message|badge|banner|toast|button|link|label|page|screen|section|row|card|list|menu|modal|dialog|form|field|header|footer|empty state|tooltip|confirma[çc][ãa]o|mensagem|p[aá]gina|ecr[ãa]|sec[çc][ãa]o|linha|bot[ãa]o|cart[ãa]o|lista|formul[aá]rio|campo|estado vazio)s?\b/i.test(t) && !/figma|\bnotes?\b|\bnotas?\b|baseline|debt|d[ií]vida|config/i.test(t) && !QUESTION.test(t), 'build-ui'],
   ['a11y-notes', (t) => /\bnotes?\b|\bnotas?\b|annotat|anota|toggle|\brole\b|\baria\b|accessib|acessib|alt text|screen reader|leitor de ecr/i.test(t)],
   ['visual-diff', (t) => /\bimages?\b|imagem|imagens|visual|screenshot|pixel/i.test(t)],
   ['burndown', (t) => /fix first|first to fix|what first|primeiro|prioridad|priorit|work .{0,20}down|next up/i.test(t)],
@@ -126,6 +129,10 @@ function routeOnly(text, { hasConfig, components, cmd }) {
     if (recipe === 'burndown') return { recipe, question, run: [cmd], notes };
     if (recipe === 'ask-the-system') {
       const terms = [...named, ...(t.match(/(?:--[a-z][\w-]*|\b[a-z][\w-]*(?:\/[\w-]+)+)/gi) ?? [])];
+      if (kind === 'build-ui') {
+        notes.push('The person asks for new UI: build it, in the file they name, with the design system\'s own components, classes and CSS variables, their names exactly as the query prints them. Write no colour, size or variable the system does not have: the edit check hands back anything that is not the system\'s. When the system has no value for what is asked (a green where it has none), use the closest one it has and say so, or ask; never invent one.');
+        return { recipe, question: false, run: terms.length ? [`${cmd} --query ${terms.join(' ')}`] : [], notes };
+      }
       if (!terms.length) notes.push('Ask which component or token, then run the query with it.');
       return { recipe, question, run: terms.length ? [`${cmd} --query ${terms.join(' ')}`] : [], notes };
     }
