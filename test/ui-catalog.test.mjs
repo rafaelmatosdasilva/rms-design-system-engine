@@ -18,7 +18,7 @@ const code = { api: { Card: { props: { elevated: {} } } }, nesting: { Card: { co
 const catalog = buildCatalog(built, { code, selectorFor: (n) => '.' + n.toLowerCase() });
 
 test('catalog: props with values and code names, children, status; interaction states left out', () => {
-  assert.deepEqual(catalog.components.Badge.props, { Tone: { type: 'enum', values: ['info', 'warn'], default: 'info', codeName: 'tone' }, Text: { type: 'text' } });
+  assert.deepEqual(catalog.components.Badge.props, { Tone: { type: 'enum', values: ['info', 'warn'], default: 'info', codeName: 'tone', rejected: { informative: 'info', information: 'info', warning: 'warn', caution: 'warn' } }, Text: { type: 'text' } });
   assert.deepEqual(catalog.components.Card.props.Elevated, { type: 'boolean', default: false, codeName: 'elevated' });
   assert.deepEqual(catalog.components.Card.children, ['Badge']);   // Button is not a catalog component
   assert.equal(catalog.components.Card.selector, '.card');
@@ -91,4 +91,22 @@ test('ui-check command: reads contracts/catalog.json, prints findings, writes th
   assert.match(out, /❌ 1 error\(s\) · 0 warning\(s\)/);
   assert.match(out, /Badge\.Tone = "nope" is not one of info, warn  \(rule 2:/);
   assert.equal(JSON.parse(execFileSync('cat', [join(dir, '.parity-out/ui-check.json')], { encoding: 'utf8' })).counts.errors, 1);
+});
+
+test('catalog (I58): the code\'s own values when it names them differently, and the wrong names with the right one', () => {
+  const b = [{ name: 'Tag', contract: { props: [{ name: 'Size', type: 'enum', options: ['S', 'L'] }, { name: 'Tone', type: 'enum', options: ['Error', 'Info'] }] } }];
+  const cap = { api: { Tag: { props: { size: { options: ['small', 'large'] }, tone: { options: ['danger', 'info'] } } } } };
+  const cat = buildCatalog(b, { code: cap });
+  const { Size, Tone } = cat.components.Tag.props;
+  assert.deepEqual(Size.codeValues, ['small', 'large']);   // Figma S/L, code small/large: a naming difference, kept visible
+  assert.equal(Size.rejected.S, 'small');
+  assert.equal(Size.rejected.sm, 'small');
+  assert.equal(Tone.rejected.Error, 'danger');
+  assert.equal(Tone.rejected.critical, 'danger');
+  assert.equal(Tone.rejected.danger, undefined);           // a right name is never rejected
+  const ui = { root: 't', components: [{ id: 't', component: 'Tag', size: 'sm', tone: 'error', Size: 'S' }] };
+  const msgs = checkUi(ui, cat).findings.map((f) => f.message);
+  assert.ok(msgs.includes('Tag.size = "sm" is not one of small, large: use "small"'), msgs.join(' | '));
+  assert.ok(msgs.includes('Tag.tone = "error" is not one of danger, info: use "danger"'), msgs.join(' | '));
+  assert.ok(!msgs.some((m) => m.startsWith('Tag.Size')), msgs.join(' | '));   // the Figma name takes the Figma value
 });

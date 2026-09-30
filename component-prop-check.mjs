@@ -23,6 +23,7 @@
 // Exit 2 = the component-props snapshot is missing (gate did NOT run, never a pass) -
 //          it should be committed; run the audit with FIGMA_TOKEN to generate it.
 
+import { counterpart } from './prop-vocabulary.mjs';
 import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import { loadLocator } from './component-locator.mjs';
@@ -94,6 +95,16 @@ function contractBindings(figmaName) {
 }
 
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+// Parity on a value is the exact name (I58, the owner's rule): "L" and "large", or "Large" and "large", are not the
+// same value, whatever they mean. Only a boolean is written two ways for one value (Figma True, code true).
+const sameValue = (a, b) => String(a) === String(b) || (/^(true|false)$/i.test(String(a)) && String(a).toLowerCase() === String(b).toLowerCase());
+// A suggestion for the person fixing it, never part of the verdict: which code value it most likely is.
+const valueHint = (figma, code) => {
+  const exactLetters = code.find((c) => norm(c) === norm(figma));
+  if (exactLetters) return ` (the code writes it "${exactLetters}")`;
+  const c = counterpart(figma, code);
+  return c ? ` (the code likely names it "${c}")` : '';
+};
 // Figma property keys carry a node-id suffix: "Show Label#958:0" -> "Show Label".
 const LOCATOR = await loadLocator(ROOT, cfg);   // the one shared component finder
 
@@ -215,7 +226,7 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
   const api = API.apiFor(figmaName);
   const codeNorm     = new Map(Object.keys(api.props).map(p => [norm(p), p]));   // normName -> original
   const codeDefaults = new Map(Object.entries(api.props).filter(([, f]) => f.default != null).map(([p, f]) => [norm(p), f.default]));
-  const codeOptions  = new Map(Object.entries(api.props).filter(([, f]) => Array.isArray(f.options)).map(([p, f]) => [norm(p), new Set(f.options.map(norm))]));
+  const codeOptions  = new Map(Object.entries(api.props).filter(([, f]) => Array.isArray(f.options)).map(([p, f]) => [norm(p), f.options.map(String)]));
   const unsure       = new Map(Object.entries(api.props).filter(([, f]) => f.confidence === 'uncertain').map(([p, f]) => [norm(p), f.readings]));
   const cbind    = contractBindings(figmaName);                            // authored Figma->code bindings (the contract hub)
   // A Code Connect mapping is pairing evidence; a documented alias or a contract binding wins over it.
@@ -236,19 +247,19 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     }
     const figDefault = def?.defaultValue;
     const codeDefault = codeDefaults.get(cn);
-    if (figDefault != null && figDefault !== '' && codeDefault != null && norm(figDefault) !== norm(codeDefault)) {
-      VALUE_FAIL.push(`${figmaName}/${fp}: default differs - Figma "${figDefault}" vs code "${codeName}=${codeDefault}"  (${rel})`);
+    if (figDefault != null && figDefault !== '' && codeDefault != null && !sameValue(figDefault, codeDefault)) {
+      VALUE_FAIL.push(`${figmaName}/${fp}: default differs - Figma "${figDefault}" vs code "${codeName}=${codeDefault}"${valueHint(figDefault, [codeDefault])}  (${rel})`);
       return { status: 'value', codeValue: `default ${codeDefault}` };
     }
     if (def?.type === 'VARIANT' && Array.isArray(def.variantOptions) && def.variantOptions.length) {
       const opts = codeOptions.get(cn);
       if (opts) {
-        const miss = def.variantOptions.filter(o => !opts.has(norm(o)));
+        const miss = def.variantOptions.filter(o => !opts.some((c) => sameValue(o, c)));
         if (miss.length) {
-          VALUE_FAIL.push(`${figmaName}/${fp}: code prop "${codeName}" is missing Figma variant option(s) ${miss.map(o => `"${o}"`).join(', ')}  (${rel})`);
-          return { status: 'value', codeValue: [...opts].join(' · ') };
+          VALUE_FAIL.push(`${figmaName}/${fp}: code prop "${codeName}" is missing Figma variant option(s) ${miss.map(o => `"${o}"${valueHint(o, opts)}`).join(', ')}  (${rel})`);
+          return { status: 'value', codeValue: opts.join(' · ') };
         }
-        return { status: 'match', codeValue: [...opts].join(' · ') };
+        return { status: 'match', codeValue: opts.join(' · ') };
       }
       VALUE_INFO.push(`${figmaName}/${fp}: Figma variants [${def.variantOptions.join(', ')}] - could not read the code prop's allowed values to verify  (${rel})`);
       return { status: 'match', codeValue: '(present)' };
