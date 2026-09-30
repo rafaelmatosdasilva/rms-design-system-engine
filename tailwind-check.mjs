@@ -118,3 +118,72 @@ export function projectArbitrary(ROOT, themeCss) {
   }
   return { tailwind: true, findings };
 }
+
+// ── Utility classes against Figma (I65) ───────────────────────────────────────
+// A Tailwind component writes its measures as classes, where no CSS rule carries them: h-9 is the height, px-3
+// the padding, rounded-control the corner, bg-action-primary the fill. Each component's own file is read and
+// compared with what Figma states for it (figma-structure: h, paddingVar, innerRadiusVar, colors): the class Figma's
+// token asks for, and the height in px. Only a difference is reported, with the class to write.
+const classTokens = (text) => [...String(text ?? '').matchAll(/(?<![\w-])((?:[\w-]+:)*)(-?[a-z]+(?:-[a-z0-9.]+)*(?:-\[[^\]\s]+\])?)(?:\/\d+)?(?![\w-])/g)].map((m) => ({ variants: m[1], cls: m[2] }));
+
+// The spacing step in px: Tailwind v4's --spacing (default 0.25rem, 4px).
+export function spacingBase(themeCss) {
+  const m = /--spacing\s*:\s*([\d.]+)(px|rem)\s*;/.exec(String(themeCss ?? ''));
+  return m ? Number(m[1]) * (m[2] === 'rem' ? 16 : 1) : 4;
+}
+
+// A size class's value in px: h-9 (the spacing step), h-control (a theme name), h-[36px].
+export function sizePx(value, { theme = new Map(), base = 4 } = {}) {
+  if (/^\[\s*[\d.]+px\s*\]$/.test(value)) return Number(value.replace(/[^\d.]/g, ''));
+  if (/^\[\s*[\d.]+rem\s*\]$/.test(value)) return Number(value.replace(/[^\d.]/g, '')) * 16;
+  if (/^\d+(\.\d+)?$/.test(value)) return Number(value) * base;
+  for (const [v, names] of theme.get('spacing') ?? []) if (names.includes(value) && /px$/.test(v)) return parseFloat(v);
+  return null;
+}
+
+// → [{ component, what, figma, code, write }] for each measure that differs.
+// structure: figma-structure components; files: { component: text }; varOf(token, raw) → the CSS variable.
+export function utilityFindings({ structure = {}, files = {}, theme = new Map(), base = 4, varOf, sizing = {} }) {
+  const out = [];
+  const nameIn = (cssVar, ns) => String(cssVar ?? '').replace(new RegExp(`^--${ns}-`), '');
+  for (const [comp, s] of Object.entries(structure)) {
+    const text = files[comp];
+    if (!text) continue;
+    const toks = classTokens(text).map((t) => t.cls);
+    const has = (re) => toks.filter((c) => re.test(c));
+    // Height.
+    if (Number.isFinite(s.h)) {
+      const hs = has(/^h-/);
+      const px = hs.map((c) => sizePx(c.slice(2), { theme, base })).filter((v) => v != null);
+      if (hs.length && !px.includes(s.h)) out.push({ component: comp, what: 'height', figma: `${s.h}px`, code: hs.join(' '), write: Number.isInteger(s.h / base) ? `h-${s.h / base}` : `h-[${s.h}px]` });
+    }
+    // Padding, from the tokens Figma binds.
+    const pad = s.paddingVar ?? {};
+    const want = (tok) => (tok ? nameIn(varOf(tok, true), 'spacing') : null);
+    const [tb, lr] = [want(pad.tb), want(pad.lr)];
+    if (tb && lr) {
+      const ok = tb === lr ? toks.includes(`p-${tb}`) || (toks.includes(`px-${lr}`) && toks.includes(`py-${tb}`)) : toks.includes(`px-${lr}`) && toks.includes(`py-${tb}`);
+      const code = has(/^p[xytrblse]?-/);
+      if (code.length && !ok) out.push({ component: comp, what: 'padding', figma: `${pad.tb} · ${pad.lr}`, code: code.join(' '), write: tb === lr ? `p-${tb}` : `px-${lr} py-${tb}` });
+    }
+    // Corner.
+    if (s.innerRadiusVar) {
+      const r = nameIn(varOf(s.innerRadiusVar, true), 'radius');
+      const code = has(/^rounded(-|$)/);
+      if (code.length && !code.includes(`rounded-${r}`)) out.push({ component: comp, what: 'corner', figma: `${s.innerRadiusVar}${sizing[s.innerRadiusVar] ? ` (${sizing[s.innerRadiusVar]})` : ''}`, code: code.join(' '), write: `rounded-${r}` });
+    }
+    // Colours: the fill and the text Figma binds.
+    for (const [role, prefix] of [['fill', 'bg'], ['text', 'text'], ['stroke', 'border']]) {
+      const tok = s.colors?.[role]?.token;
+      if (!tok) continue;
+      const name = nameIn(varOf(tok, false), 'color');
+      const code = has(new RegExp(`^${prefix}-`)).filter((c) => prefix !== 'text' || !/^text-(xs|sm|base|lg|[2-9]?xl|left|right|center|justify)$/.test(c));
+      if (code.length && !code.includes(`${prefix}-${name}`)) out.push({ component: comp, what: role === 'fill' ? 'fill' : role === 'text' ? 'text colour' : 'border colour', figma: tok, code: code.join(' '), write: `${prefix}-${name}` });
+    }
+  }
+  return out;
+}
+
+export function utilityLine(f) {
+  return `${f.component}: ${f.what}, Figma ${f.figma}, the code writes ${f.code}; write ${f.write}`;
+}

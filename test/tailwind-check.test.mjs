@@ -77,3 +77,28 @@ test('a theme variable is used through its utility', async () => {
   assert.equal(usedByUtility('--color-surface-base', src), false);
   assert.equal(usedByUtility('--my-own-var', src), false);   // not a namespace Tailwind makes utilities from
 });
+
+test('each component\'s classes against Figma: height, padding, corner and colours', async () => {
+  const { utilityFindings, utilityLine, sizePx, spacingBase } = await import('../tailwind-check.mjs');
+  const { resolveNamingSpec, tokenToVar } = await import('../naming-convention.mjs');
+  const spec = resolveNamingSpec({ figma: { namingConvention: { preset: 'tailwind', dropSegments: ['color'] } } });
+  const varOf = (tok, raw) => tokenToVar(tok, spec, { raw });
+  assert.equal(spacingBase('@theme { --spacing: 0.25rem; }'), 4);
+  assert.equal(spacingBase('@theme { --spacing: 2px; }'), 2);
+  assert.equal(sizePx('9'), 36);
+  assert.equal(sizePx('[37px]'), 37);
+  assert.equal(sizePx('2', { theme, base: 4 }), 8);
+  const structure = { button: { h: 36, paddingVar: { tb: 'space/2', lr: 'space/3' }, innerRadiusVar: 'radius/control', colors: { fill: { token: 'action/primary/color' }, text: { token: 'action/primary/text/color' } } } };
+  const good = '<button className="h-9 px-3 py-2 rounded-control bg-action-primary text-action-primary-text text-sm">';
+  assert.deepEqual(utilityFindings({ structure, files: { button: good }, varOf }), []);
+  const bad = '<button className="h-10 p-2 rounded-md bg-action-primary text-white text-sm">';
+  assert.deepEqual(utilityFindings({ structure, files: { button: bad }, varOf, sizing: { 'radius/control': '6px' } }).map(utilityLine), [
+    'button: height, Figma 36px, the code writes h-10; write h-9',
+    'button: padding, Figma space/2 · space/3, the code writes p-2; write px-3 py-2',
+    'button: corner, Figma radius/control (6px), the code writes rounded-md; write rounded-control',
+    'button: text colour, Figma action/primary/text/color, the code writes text-white; write text-action-primary-text',
+  ]);
+  // A component with no file, or a measure it does not write as a class, is not a difference.
+  assert.deepEqual(utilityFindings({ structure, files: {}, varOf }), []);
+  assert.deepEqual(utilityFindings({ structure, files: { button: '<button className="bg-action-primary">' }, varOf }), []);
+});

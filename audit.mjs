@@ -3800,6 +3800,27 @@ function reportFull(label, items, shown) {
     try {
       const { projectArbitrary, arbitraryLine } = await import('./tailwind-check.mjs');
       const { tailwind, findings } = projectArbitrary(ROOT, readThemeCSS());
+      // Each component's own classes against what Figma states for it: height, padding, corner, colours.
+      if (tailwind) {
+        const { utilityFindings, utilityLine, themeValues, spacingBase } = await import('./tailwind-check.mjs');
+        const { resolveNamingSpec, tokenToVar } = await import('./naming-convention.mjs');
+        const spec = resolveNamingSpec(cfg);
+        const themeCss = readThemeCSS();
+        let structure = {}, sizing = {};
+        try { structure = JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8')).components ?? {}; } catch { /* no structure snapshot */ }
+        try { sizing = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8')).sizing ?? {}; } catch { /* no sizing */ }
+        if (_scopeNames.length) structure = Object.fromEntries(Object.entries(structure).filter(([n]) => _scopeNames.includes(n)));
+        const files = {};
+        for (const [n, p] of Object.entries(cfg.componentFiles ?? {})) for (const f of [p].flat()) { try { files[n] = (files[n] ?? '') + readFileSync(join(ROOT, f), 'utf8'); } catch { /* missing file */ } }
+        const diffs = utilityFindings({ structure, files, theme: themeValues(themeCss), base: spacingBase(themeCss), varOf: (tok, raw) => tokenToVar(tok, spec, { raw }), sizing });
+        const read = Object.keys(structure).filter((n) => files[n]).length;
+        if (diffs.length) {
+          console.log(C.yellow(`\n🎯 Tailwind classes against Figma: ${diffs.length} measure${diffs.length === 1 ? '' : 's'} in ${read} component${read === 1 ? '' : 's'} ${diffs.length === 1 ? 'differs' : 'differ'} from what Figma states. Advisory.`));
+          for (const d of diffs) console.log(C.yellow(`     ${utilityLine(d)}`));
+        } else if (read) {
+          console.log(C.green(`\n🎯 Tailwind classes against Figma: height, padding, corner and colours match in ${read} component${read === 1 ? '' : 's'}.`));
+        }
+      }
       if (tailwind && findings.length) {
         const fixable = findings.filter((f) => f.fix).length;
         console.log(C.yellow(`\n🎯 Tailwind arbitrary values: ${findings.length} class${findings.length === 1 ? '' : 'es'} with a value in brackets, outside the theme (${fixable} the theme already has: write its utility). Advisory.`));
