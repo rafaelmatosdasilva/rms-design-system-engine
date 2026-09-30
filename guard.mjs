@@ -11,6 +11,8 @@
 // As a UserPromptSubmit hook (I56), a request made with /rms-figma-code-parity is routed by the engine before
 // the agent reads it: the route, the exact command and the sentences to say arrive with the request, so
 // picking them is never the agent's decision, even when it skips the router.
+// As a PostToolUse hook (I62), a UI edit is checked when it is made: what it added that the design system does
+// not have goes back to the agent with the right name (edit-check.mjs). "editCheck": false turns that part off.
 // Anything else, or any project without a ds-config.json, or one with "hooks": false, passes untouched.
 // The engine's own writes (node … audit.mjs, rms-figma-code-parity) are never blocked.
 import { readFileSync, existsSync } from 'node:fs';
@@ -18,6 +20,7 @@ import { join, basename, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { route, routeText, projectState } from './route.mjs';
 import { readDoc } from './skill-files.mjs';
+import { editCheck, editHookOutput } from './edit-check.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 
@@ -113,6 +116,13 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
       try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* no or broken config: route it anyway (setup) */ }
       const out = promptOutput(routePrompt(event, { root, cfg }));
       if (out) process.stdout.write(out);
+    } else if (event.hook_event_name === 'PostToolUse') {
+      if (existsSync(cfgPath)) {
+        let cfg = {};
+        try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* defaults */ }
+        const out = editHookOutput(editCheck(event, { root, cfg }));
+        if (out) process.stdout.write(out);
+      }
     } else if (existsSync(cfgPath)) {
       let cfg = {};
       try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* a broken config still gets the default rules */ }

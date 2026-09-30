@@ -102,9 +102,10 @@ The engine makes the decisions, not the AI model, so it behaves the same on a sm
 
 - **Every request is routed by the engine.** `--init` adds project hooks (`.claude/settings.local.json`, never committed). With them, each `/rms-figma-code-parity` request arrives already matched to the right recipe and the exact command to run, with the words to use for what the tool cannot do (it never changes Figma, and never fakes a Figma refresh).
 - **The hooks also keep the rules.** A Figma snapshot is never edited by hand, and the AI asks you before a commit, a push, a `ds-config.json` edit, or a code change you did not ask for.
+- **Every UI edit is checked when it is made.** After the AI edits a style, markup or component file, the hook reads only what that edit added and hands back, with the right name, anything the design system does not have: a colour written by hand (and the token that has it), a CSS variable declared nowhere, a prop value or prop name a component does not take. The AI fixes it before moving on, whether or not it thought to ask. Silent when the edit is clean; your own components, the browser's own attributes, token definitions, comments and data are never flagged. `"editCheck": false` in `ds-config.json` turns this part off.
 - **Short guide, recipes on demand.** The AI reads a short guide, then only the recipe the task needs (`rms-figma-code-parity --recipe` lists them). Measured on 20 real requests: every one done right on both a large and a small model, at about a fifth of the cost of the old one-file guide (results in `test/skill-evals/RESULTS.md`).
 - **Going back is one command.** `rms-figma-code-parity --guide classic` switches to the old one-file guide, `--guide current` switches back.
-- `rms-figma-code-parity --doctor` checks the install. `--remove-hooks` (or `"hooks": false` in `ds-config.json`) turns the hooks off. Projects set up before the router existed get it on their next run.
+- `rms-figma-code-parity --doctor` checks the install. `--remove-hooks` (or `"hooks": false` in `ds-config.json`) turns the hooks off. Projects set up before the router or the edit check existed get them on their next run.
 - Optional and local only: `PARITY_USAGE_LOG=1` records which recipes and commands ran in `.parity-out/skill-usage.json`. Nothing is ever sent anywhere.
 
 ## That's it
