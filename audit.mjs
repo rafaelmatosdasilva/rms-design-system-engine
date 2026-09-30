@@ -3022,7 +3022,12 @@ function reportFull(label, items, shown) {
   // (generated surfaces like the styleguide are NOT listed - showing every component is their job).
   {
     const dupSurfaces = (cfg.duplication?.surfaces ?? []).flat().filter(Boolean);
-    if (dupSurfaces.length) {
+    // Agent instruction files are found on their own (I57): a list copied into AGENTS.md is the classic case.
+    let found = [];
+    if (cfg.steering !== false) {
+      try { const { findSteeringFiles } = await import('./steering-check.mjs'); found = findSteeringFiles(ROOT, { skip: [cfg.contracts?.out ?? 'contracts', 'node_modules', '.parity-out'] }).filter((f) => !dupSurfaces.includes(f.file)); } catch { /* declared surfaces still run */ }
+    }
+    if (dupSurfaces.length || found.length) {
       const { duplicationFindings } = await import('./duplication-check.mjs');
       // DS truth: component names from the structure snapshot, token names from the vars snapshot.
       let componentNames = [], tokenNames = [];
@@ -3044,6 +3049,7 @@ function reportFull(label, items, shown) {
         try { surfaces.push({ name: p, text: readFileSync(join(ROOT, p), 'utf8') }); }
         catch { console.log(C.dim(`     (duplication) surface not found, skipped: ${p}`)); }
       }
+      for (const f of found) surfaces.push({ name: f.file, text: f.text });
       const minCluster = Number.isFinite(cfg.duplication?.minCluster) ? cfg.duplication.minCluster : 5;
       let findings = [], parallel = [];
       try { ({ findings, parallel } = duplicationFindings({ surfaces, componentNames, tokenNames, minCluster })); }
@@ -3562,6 +3568,40 @@ function reportFull(label, items, shown) {
     } catch (e) {
       console.log(C.yellow('\n⚠️  contracts: generation failed (never fails the audit): ' + e.message));
     }
+  }
+
+  // ── Agent instruction files tell the truth (I57, advisory) ──────────────────
+  // AGENTS.md, CLAUDE.md, DESIGN.md, Cursor/Copilot rules and skills state design-system names from memory;
+  // a wrong one makes every agent that reads it build the wrong thing. Each name they state is checked against
+  // the catalog, the code API, the declared CSS variables and the tokens. Off with ds-config "steering": false.
+  if (cfg.steering !== false) {
+    try {
+      const { findSteeringFiles, steeringTruth, steeringFindings, steeringLine } = await import('./steering-check.mjs');
+      const contractsDir = cfg.contracts?.out ?? 'contracts';
+      const files = findSteeringFiles(ROOT, { skip: [contractsDir, 'node_modules', '.parity-out'] });
+      if (files.length) {
+        const readJson = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+        const catalog = readJson(join(contractsDir, 'catalog.json'));
+        const api = readJson(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json').api ?? {};
+        const cssVars = [...new Set([...readThemeCSS().matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))];
+        const tokenNames = [];
+        try {
+          const vs = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8'));
+          for (const mode of Object.values(vs.color || {})) for (const k of Object.keys(mode)) tokenNames.push(k);
+          for (const k of Object.keys(vs.sizing || {})) tokenNames.push(k);
+        } catch { /* no vars snapshot: token paths are not checked */ }
+        const truth = steeringTruth({ catalog, api, cssVars, tokenNames: [...new Set(tokenNames)] });
+        const found = files.flatMap((f) => steeringFindings(f.text, truth).map((x) => steeringLine(f.file, x)));
+        const names = files.map((f) => f.file).join(', ');
+        if (found.length) {
+          console.log(C.yellow(`\n🧭 Agent instruction files: ${found.length} design-system name${found.length === 1 ? '' : 's'} that do${found.length === 1 ? 'es' : ''} not exist (${names}). An agent that reads them builds the wrong thing: fix the line, or point the file at ${contractsDir}/llms.txt instead of restating names. Advisory.`));
+          for (const l of found.slice(0, 20)) console.log(C.yellow(`     ${l}`));
+          if (found.length > 20) console.log(C.yellow(`     and ${found.length - 20} more`));
+        } else {
+          console.log(C.green(`\n🧭 Agent instruction files (${names}): every design-system name they state exists.`));
+        }
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Agent instruction files not checked: ${e.message}`)); }
   }
 
   // ── AI-readiness scorecard (I12, advisory, never a gate) ────────────────────
