@@ -57,6 +57,7 @@ test('Harbor design system, without Chrome: every deliberate difference is found
   assert.match(r.out, /✅  \[13\]/);
   assert.match(r.out, /\*\*Not in parity\.\*\* 2 of 25 gates fail\./);
   assert.doesNotMatch(r.out, /printed no result line/);   // every gate shows its outcome
+  assert.doesNotMatch(r.out, /^ {7}\S+\s+(Gate )?\[\d+[a-z]?\]\s/m);   // a line never carries a script's old gate number
   golden(FIXTURE, 'expected-report-static.txt', r.out);
 });
 
