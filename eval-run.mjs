@@ -244,6 +244,17 @@ export function levelLines(byLevel, notRun = {}) {
   return lines;
 }
 
+// A worse run than the last one (S29's ci: a drop of more than 5 points fails). → [reason] (empty when not worse).
+export function ciDrop(prev, cur, { points = 5 } = {}) {
+  if (!prev || !cur) return [];
+  const out = [];
+  if (prev.zeroFixRate != null && cur.zeroFixRate != null && prev.zeroFixRate - cur.zeroFixRate > points) out.push(`zero-fix ${prev.zeroFixRate}% → ${cur.zeroFixRate}%`);
+  if ((cur.avoided ?? 0) > (prev.avoided ?? 0)) out.push(`avoided the system ${prev.avoided ?? 0} → ${cur.avoided}`);
+  if ((cur.typeErrors ?? 0) > (prev.typeErrors ?? 0)) out.push(`type errors ${prev.typeErrors ?? 0} → ${cur.typeErrors}`);
+  if ((cur.a11y ?? 0) > (prev.a11y ?? 0)) out.push(`accessibility findings ${prev.a11y ?? 0} → ${cur.a11y}`);
+  return out;
+}
+
 function fileLoader(ROOT, outDir) {
   return (c) => {
     for (const ext of CANDIDATE_EXTS) {
@@ -306,8 +317,12 @@ async function main() {
     try {
       const hp = join(ROOT, 'evals-history.json');
       let hist = []; try { hist = JSON.parse(readFileSync(hp, 'utf8')); } catch { /* first run */ }
+      const last = [...hist].reverse().find((h) => h.levels);
+      const worse = Object.entries(byLevel).flatMap(([l, v]) => ciDrop(last?.levels?.[l], v.summary).map((r) => `${l}: ${r}`));
+      if (worse.length) console.log(`   Worse than the last run: ${worse.join(' · ')}${process.argv.includes('--ci') ? ' (--ci: failing)' : ''}\n`);
       hist.push({ timestamp: new Date().toISOString(), levels: Object.fromEntries(Object.entries(byLevel).map(([l, v]) => [l, v.summary])) });
       writeFileSync(hp, JSON.stringify(hist.slice(-100), null, 2) + '\n');
+      if (worse.length && process.argv.includes('--ci')) process.exit(1);
     } catch { /* optional */ }
     process.exit(0);
   }
@@ -377,17 +392,20 @@ async function main() {
   console.log(`\n   ${summary.produced}/${summary.cases} produced · ${summary.clean}/${summary.cases} zero-fix (${summary.zeroFixRate}%) · ${summary.violations} violation(s) · ${summary.inlineStyles} inline-style(s)${summary.expecting ? ` · ${summary.avoided} avoided the system` : ''}${ctx.compile ? ` · ${summary.typeErrors} type error(s)` : ''}${judged ? ` · judge ${judgePass}/${judged} ok` : ''}${avgGenMs != null ? ` · avg gen ${avgGenMs}ms` : ''}`);
   console.log(`   Advisory: evals measure agent output, they never gate the repo.\n`);
 
-  // History (best-effort; capped)
+  // History (best-effort; capped). With --ci, a run worse than the last one fails (I60, S29).
+  let worse = [];
   try {
     const hp = join(ROOT, 'evals-history.json');
     let hist = []; try { hist = JSON.parse(readFileSync(hp, 'utf8')); } catch { /* first run */ }
+    worse = ciDrop([...hist].reverse().find((h) => h.zeroFixRate != null && !h.levels), summary);
+    if (worse.length) console.log(`   Worse than the last run: ${worse.join(' · ')}${process.argv.includes('--ci') ? ' (--ci: failing)' : ''}\n`);
     hist.push({ timestamp: new Date().toISOString(), ...summary, judged, judgePass, avgGenMs });
     if (hist.length > 100) hist = hist.slice(-100);
     writeFileSync(hp, JSON.stringify(hist, null, 2) + '\n');
   } catch { /* optional */ }
 
   const strict = cfg.evals?.strict === true;
-  process.exit(strict && summary.violations > 0 ? 1 : 0);
+  process.exit((strict && summary.violations > 0) || (worse.length && process.argv.includes('--ci')) ? 1 : 0);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
