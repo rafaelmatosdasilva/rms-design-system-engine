@@ -572,6 +572,12 @@ export function annotationMismatches(f, got) {
   if (f.level && got.level != null && Number(got.level) !== f.level) out.push(`Figma says heading level ${f.level}, it renders as level ${got.level}`);
   return out;
 }
+// The page is loaded: its own document, not the about:blank a new target starts on (which already reports
+// readyState "complete", so a slow navigation would be checked as an empty page), and waitFor when set.
+export function pageLoadedExpression(waitFor = null) {
+  return `location.href !== "about:blank" && document.readyState === "complete"${waitFor ? ` && !!document.querySelector(${JSON.stringify(waitFor)})` : ''}`;
+}
+
 // One deeper check at a time. A check that throws (the browser slow to answer, a page that changed under it)
 // is tried once more with its partial findings removed; if it fails again it is listed in `unfinished` and
 // reported as not checked, never silently clean.
@@ -953,9 +959,8 @@ async function main() {
     const label = target.label;
     const { targetId, sessionId } = await openPage(send, target.url);
     // up to ~10s — a dev server / SPA can be slower than a file://
-    const loadedExpr = `document.readyState === "complete"${waitFor ? ` && !!document.querySelector(${JSON.stringify(waitFor)})` : ''}`;
-    const loaded = await waitForTrue(send, sessionId, loadedExpr, { attempts: 200, intervalMs: 50, tolerateErrors: true });
-    if (!loaded) { await send('Target.closeTarget', { targetId }); continue; }
+    const loaded = await waitForTrue(send, sessionId, pageLoadedExpression(waitFor), { attempts: 200, intervalMs: 50, tolerateErrors: true });
+    if (!loaded) { unread.push(`${label} (the page did not finish loading within 10s)`); await send('Target.closeTarget', { targetId }); continue; }
     await new Promise((res) => setTimeout(res, 300));   // settle — let an SPA finish its first render
     // Something to check must be on the page: a page that shows none of the design system's components
     // (still rendering, or blank) is not a clean page. Wait for it, up to ~10s, then say it was not checked,
