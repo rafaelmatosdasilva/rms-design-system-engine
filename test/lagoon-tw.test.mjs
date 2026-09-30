@@ -42,3 +42,16 @@ test('Lagoon, a Tailwind design system: every deliberate difference is found, no
   assert.doesNotMatch(r.out, /printed no result line/);
   golden(FIXTURE, 'expected-report-static.txt', r.out);
 });
+
+test('--init on a Tailwind project sets the naming preset and reads the class dark mode', { timeout: 120000 }, async () => {
+  const { fixtureProject } = await import('./helpers.mjs');
+  const { spawnSync, execFileSync } = await import('node:child_process');
+  const { readFileSync } = await import('node:fs');
+  const dir = fixtureProject(FIXTURE, 'lagoon-init-');
+  execFileSync('git', ['rm', '-q', 'ds-config.json'], { cwd: dir });
+  const r = spawnSync(process.execPath, [join(dirname(dirname(fileURLToPath(import.meta.url))), 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/LgNfIcT1234/Lagoon', '--theme-css=src/app.css', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /Tailwind theme found: token names are matched as Tailwind writes them/);
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  assert.equal(cfg.figma.namingConvention.preset, 'tailwind');
+});

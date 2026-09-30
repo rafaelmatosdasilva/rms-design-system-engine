@@ -1113,6 +1113,13 @@ async function bootstrapConfig() {
   }
   if (detected.unsure.length) console.log(C.yellow(`  ⚠️  No override block found for ${detected.unsure.join(', ')} in the theme CSS: set its cssSelector in ds-config.json → figma.modes (it defaulted to ${detected.modes.filter((m) => detected.unsure.includes(m.snapshotKey) || detected.unsure.includes(m.name)).map((m) => m.cssSelector).join(', ')}).`));
 
+  // A Tailwind v4 theme names its tokens under namespaces (--color-…, --spacing-…): the preset matches them (I65).
+  let twThemeText = '';
+  for (const p of [themeCSS].flat()) { try { twThemeText += readFileSync(resolve(ROOT, p), 'utf8'); } catch { /* not readable yet */ } }
+  if (usesTailwind(twThemeText, ROOT) && !figmaCfg.namingConvention?.preset) {
+    figmaCfg.namingConvention = { ...(figmaCfg.namingConvention ?? {}), preset: 'tailwind' };
+    console.log(C.green('  ✓ Tailwind theme found: token names are matched as Tailwind writes them (figma.namingConvention.preset "tailwind").'));
+  }
   const generated = {
     figmaFileKey:  figmaFileKey || '',
     ...(figmaSourceKey ? { figmaSourceKey } : {}),
