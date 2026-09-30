@@ -1,4 +1,4 @@
-// icon-check.mjs - Run from project root: node ../rms-figma-code-parity/icon-check.mjs
+// icon-check.mjs - Run from project root: node ../rms-design-system-engine/icon-check.mjs
 //
 // Hard Rule #15 - SVG symbol audit:
 //   Every <symbol> defined in any plugin HTML file must be declared in ICON_SYMBOLS

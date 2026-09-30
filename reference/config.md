@@ -1,6 +1,6 @@
 # Project configuration, snapshot files and naming
 
-Part of the rms-figma-code-parity reference (`rms-figma-code-parity --reference config`). The rules that always apply are in the main guide.
+Part of the rms-design-system-engine reference (`rms-design-system-engine --reference config`). The rules that always apply are in the main guide.
 
 ---
 
@@ -49,9 +49,9 @@ Then auto-detect and write `ds-config.json`:
 - `frames` → `[]` (add frame node IDs manually after setup)
 
 Also:
-- Scaffold `parity-map.mjs` from `parity-map.example.mjs` if not present
+- Scaffold `design-system-engine-map.mjs` from `design-system-engine-map.example.mjs` if not present
 - Scaffold `structure-contract.mjs` from `structure-contract.example.mjs` if not present
-- Append `ds-config.json`, `parity-map.mjs`, `structure-contract.mjs`, `.env` to `.gitignore`
+- Append `ds-config.json`, `design-system-engine-map.mjs`, `structure-contract.mjs`, `.env` to `.gitignore`
 - Print a **next-steps checklist** (frame IDs, primitive scale, component contracts)
 
 With `--init`: stop after setup (print checklist, exit). Without `--init` and when called because `ds-config.json` was missing: continue the audit immediately.
@@ -90,13 +90,13 @@ Once `ds-config.json` exists, extract:
 - `paths.pluginCSS` *(optional)* - the **compiled** component CSS the structure and markup gates read. Each entry is a local path **or an http(s) URL** - compiled CSS is frequently a build artifact served from a CDN the repo only links to, so a URL entry is fetched. These gates match literal compiled selectors like `.button-primary.m`, which exist **only after a build**: in any pre-processor / single-file-component source that selector is written nested (`.button-primary { &.m { … } }`) and mixins never expand - so **never point `pluginCSS` at `.vue`/`.scss`/`.sass` source**. Build the design system to compiled CSS (any tool) and list the output, or list the URL that serves it; if the component rules already live in `themeCSS`, `pluginCSS` can stay empty. **Compiled CSS inlined inside an HTML file is fine** - the plugins here ship it in a `<style>` block inside `ui.(src.)html`, and the source-vs-compiled test scans only the `<style>` contents (never the surrounding markup or a `<script>`), so an inline `<style>` tag, a bitwise `&` in JS, or a `<style` string in code no longer misreads the file as pre-processor source. Only real preprocessor markers - a `.scss`/`.sass`/`.vue`/… extension, `@include`/`@mixin`/`@use`, or nested `&.`/`&:` **inside the CSS** - count as un-compiled. When there is no compiled CSS to check against (empty/token-only, genuinely still-source, or an unreachable URL), the structure gate exits with a distinct **cannot-verify** status (exit `2`, surfaced as a setup block - not a parity failure) and prints exactly how to fix it, instead of silently reporting every component as missing. Auto-detection only picks up `apps/*/ui.src.html`; a folder of `.css` dropped into the repo but not listed here is **ignored**.
 - `screens` *(optional)* - reference SCREENS for the Markup gate (screen element completeness): an array of `{ name, nodeId, plugin }` for detail views and modals whose DS controls must each have a code counterpart. Distinct from `frames[]` (whole-plugin screenshots for Gate [2]): `screens[]` are the finer views where a designer adds a control the code may not have built. Phase 1 (`refreshScreenElements`) captures each screen's interactive-control inventory into `figma-screens.snapshot.json`; falls back to `frames[]` when unset. `screenElementStrict` *(optional, default `false`)* promotes a missing control from an advisory to a hard fail. `knownScreenElementExemptions` *(optional)* - array of `"<plugin>/<label>"` strings recording a deliberate different realization (e.g. `"my-app/Export"` when Export is built as inline sections rather than a button+modal), which silences that control.
 - `templates` *(optional)* - reference TEMPLATE / PAGE frames for Gate [11d] (template composition), one level above the sub-component gate: an array of `{ name, nodeId, file? }` for the DS's composed views (a Consult view, an Operation screen). Phase 1 (`refreshTemplateComposition`, REST `/nodes`, any plan) records the ordered top-level DS component instances each frame composes into `figma-templates.snapshot.json`; the gate then requires the template's code to use each. Unset = a no-op PASS (a DS without templates is unaffected); inert until the snapshot exists. `file` pins the template's code file (else it is resolved by name/basename/selector under `templateSrcDirs`, falling back to `componentSrcDirs`). `templateCompositionStrict` *(optional, default `false`)* promotes a **MISSING** composed component from advisory to a hard fail (a **NO FILE** always fails). Exempt a pair via `knownTemplateExceptions` (`["Consult/Filters"]`) or a whole template via `knownUnimplementedComponents`.
-- `visualRefs` - directory for stored reference screenshots (default: `.parity-refs`)
+- `visualRefs` - directory for stored reference screenshots (default: `.design-system-engine-refs`)
 - `visualRefScale` *(optional)* - PNG export scale for Gate [2] screenshots (default: `2`). Set to `3` for higher-fidelity references. Changing this value invalidates all stored refs - accept the new `.new.png` files with `mv *.new.png *.png` after the first run at the new scale.
 - `knownUnimplementedComponents` - array of component names (matching keys in `structure-contract.mjs`) to exclude from Gate [10] and Gate [4] checks. Use this only as a temporary hold for DS components not yet built in code. Remove a component from this list as soon as its CSS and propertyMap are implemented. An empty array is the target state.
 - **Work in progress is not drift.** A component on one side only that is in `knownUnimplementedComponents`, or whose decision status is `experimental` (`contract.authored.json`, or `@experimental` in its Figma description), is listed by Gate [17] as `IN PROGRESS` and never fails a gate. An experimental component is compared as usual once it is in Figma and in code. A `knownUnimplementedComponents` entry that is in both is reported as `READY TO COMPARE`, so you can take it off the list; the list itself is never edited for you.
 - `knownStateExemptions` *(optional)* - array of `{ var, selector, _note }` objects exempting a specific `var`+`selector` pair from Gate [11]. Use when a state-suffix var is intentionally used outside its state selector - component mirrors (one component reusing another's token), semantic reuse (hover bg repurposed as neutral tint), or non-obvious class naming (`:checked` = selected for radio buttons). Always include a `_note` explaining the intent.
 - `frameworkComponents` *(optional, default `true`)* - set to `false` when the code implements DS components as **CSS classes + markup** rather than as prop-based framework components (a plain-HTML/CSS DS consumer - a Figma plugin UI, an email-template repo). Gates [12] (component props match Figma) and [13] (sub-components match Figma) only make sense for a Vue/React-style codebase with declared props and instance nesting; with no such code they would report "no code file" for every DS component and hard-fail a codebase they don't apply to. `frameworkComponents: false` makes both gates **SKIP** (neutral, like the opt-in motion/effect gates) instead of failing. The value/structure/state/markup/icon/rendered gates are unaffected - the components are still fully audited as CSS. (Leave it `true`, the default, for a real component library.)
-  - **`htmlRealization`** *(optional, default off)* - opt in and Gate [12] stops skipping for a `frameworkComponents:false` project and instead runs in **HTML-realization mode**: each Figma component property must map to a concrete code artifact, so the property is *realized* in the plain-HTML/CSS build rather than silently unverified. Drive it with `ds-config.json → htmlRealizations[Component][property] = '.class' | '#id' | 'tag' | 'state:'` - a `.class`/`#id`/element that must be present in the plugin source, or the `state:` sentinel for an interaction state that Gate [11] already covers (interaction-state properties are auto-classified as `state:` even without a map entry). A mapped artifact **absent** from the source is a **fail**; a property with **no** map entry is an advisory TODO by default, or a fail under **`htmlRealizationStrict: true`**. This is how a plain-HTML consumer verifies "every Figma property has a home in the markup" without pretending to be a prop-based framework. **The same `htmlRealization` flag also switches Gate [13] (sub-components) into an HTML mode**: each sub-component Figma nests must be realized as a **class** in the plugin source. Only parents actually built here are checked (an unbuilt DS component's composition is moot); icons are excluded (Gate [15]/[16] cover them). A missing sub-component is advisory by default, or a fail under **`htmlCompositionStrict: true`**. Capture the data it needs - `component-composition.snapshot.json` - in **every** Phase 1 when the DS has nested components (the Plugin API snippet in `rms-figma-code-parity --reference gates` works on any plan, no token); it is not optional bookkeeping.
+  - **`htmlRealization`** *(optional, default off)* - opt in and Gate [12] stops skipping for a `frameworkComponents:false` project and instead runs in **HTML-realization mode**: each Figma component property must map to a concrete code artifact, so the property is *realized* in the plain-HTML/CSS build rather than silently unverified. Drive it with `ds-config.json → htmlRealizations[Component][property] = '.class' | '#id' | 'tag' | 'state:'` - a `.class`/`#id`/element that must be present in the plugin source, or the `state:` sentinel for an interaction state that Gate [11] already covers (interaction-state properties are auto-classified as `state:` even without a map entry). A mapped artifact **absent** from the source is a **fail**; a property with **no** map entry is an advisory TODO by default, or a fail under **`htmlRealizationStrict: true`**. This is how a plain-HTML consumer verifies "every Figma property has a home in the markup" without pretending to be a prop-based framework. **The same `htmlRealization` flag also switches Gate [13] (sub-components) into an HTML mode**: each sub-component Figma nests must be realized as a **class** in the plugin source. Only parents actually built here are checked (an unbuilt DS component's composition is moot); icons are excluded (Gate [15]/[16] cover them). A missing sub-component is advisory by default, or a fail under **`htmlCompositionStrict: true`**. Capture the data it needs - `component-composition.snapshot.json` - in **every** Phase 1 when the DS has nested components (the Plugin API snippet in `rms-design-system-engine --reference gates` works on any plan, no token); it is not optional bookkeeping.
 - `maxSnapshotAgeDays` **(recommended - this is the switch that stops a skipped/partial refresh)** - a hard age ceiling for the snapshots, in days. Day-to-day, a plan without a REST refresh downgrades staleness to a non-failing advisory (so the audit still runs) - but that lets a snapshot drift indefinitely, which is how real DS drift (retuned tokens, a resized component, a slot gap) hides behind all-green gates. **This is the engine's answer to "how do I stop myself cutting the Phase 1 corner?":** set it (e.g. `2`-`14`) and Gate [1] **hard-fails** the moment ANY snapshot is older than the ceiling, **even when plan-limited** - the Plugin-API capture works on any plan, so "we never refreshed" is a real problem, not a plan excuse. Because the pre-commit / pre-push hooks run the audit, a stale snapshot then **blocks the commit** - so refreshing only the vars while skipping the structure/bound/state walks fails closed (structure stays old → Gate [1] red → commit blocked), instead of quietly passing green. A green report is only trustworthy when Phase 1 actually ran this session; this ceiling is what makes that mechanical rather than a discipline you can forget. Below the ceiling, behaviour is unchanged.
 - `versionLockStrict` **(recommended - "the file changed → Gate [1] MUST re-run" enforcement)** - promote Gate [1]'s whole-file `_figmaVersion` mismatch from an advisory to a **hard fail**. `maxSnapshotAgeDays` catches *time* (a snapshot nobody refreshed); this catches *change* (the designer edited the file **since** your last capture, even minutes ago). When the live file `version` differs from the snapshot's stamped `_figmaVersion`, Gate [1] **fails** and the pre-commit hook blocks the commit until you re-run Phase 1 — so "I refreshed a moment ago, nothing can have changed" stops being an assumption you're allowed to make: if the version moved, you re-capture, full stop. Off by default only because Figma versions the *whole* file, so a bump can be an unrelated edit elsewhere; turn it on for a DS you actively work against (any bump warrants a Phase 1 re-run) — the only cost is re-running the cheap Plugin-API walk. **Because a Plugin-API capture itself bumps the version (`setCurrentPageAsync`), stamp `_figmaVersion` as the LAST step of Phase 1, via REST, after all page navigations** — otherwise the gate fails on the bump your own capture caused. Clearing the fail is exactly the work the gate wants: re-run Phase 1, reconcile any drift, stamp the fresh version.
 - `webhook.port` / `webhook.secret` - webhook server config
@@ -109,7 +109,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 
 - `gateTimeoutSec` (default 180) - a gate that runs longer is stopped and reported as a failure ("timed out, not verified"), so one stuck gate never freezes the audit or a pre-commit hook.
 - `codeReading.timeoutSec` (default 120) - the time limit for the code capture inside the audit; past it the gates keep their own readings. `codeReading.hookBrowser: true` lets the capture use the browser inside git hooks too.
-- `codeReading.visual: true` - the visual diff under MEASURED (see *Each component against its Figma image* in `rms-figma-code-parity --recipe refresh-figma`). `codeReading.visualTolerance` (default 10, per colour channel) and `codeReading.visualThreshold` (default 2, the percentage of pixels outside text that marks a component ⚠️).
+- `codeReading.visual: true` - the visual diff under MEASURED (see *Each component against its Figma image* in `rms-design-system-engine --recipe refresh-figma`). `codeReading.visualTolerance` (default 10, per colour channel) and `codeReading.visualThreshold` (default 2, the percentage of pixels outside text that marks a component ⚠️).
 - `scanExcludeDirs`, `scanExcludeFilenames` - folders and file names (with `*` wildcards) the hardcoded-value and clean-CSS scans skip, such as demo pages. The styleguide template and output are always skipped (they are generated surfaces).
 - `gate6ExcludeDirs` - folders the hardcoded-value scan skips, to scope it to the design system package (the layout checks still cover every file).
 - `knownHardcodedExceptions` (older name `knownFontSizeExceptions`) - literal values or patterns the hardcoded-value scan accepts. An entry that no longer excuses anything is listed so it can be removed.
@@ -138,8 +138,8 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
   - `"class:<name>"` → `:root.<name> { }` (or `html.<name>`, or `.<name>` on the root element)
   - `"data:<attr>=<val>"` → `:root[data-theme="dark"] { }`
   - The older forms `.<name> :root { }` and `[data-theme="dark"] :root { }` are still read, but no browser applies them (`:root` has no ancestor, so the mode never switches on screen). Gate [3] lists each one as `NEVER APPLIED` with the form to write instead.
-- **Token naming convention:** by default, `token/path/default` → `--token-path` (drop `/default`, `/color`; `/` → `-`). Override with `figma.namingConvention` in `ds-config.json` when the project uses a different convention (e.g. keeping `/color` as `-color` suffix). Any additional shortenings are documented in `parity-map.mjs`.
-- **Primitive scale:** document your DS's primitive tokens in `parity-map.mjs` under `NEUTRAL_LIGHT` / `NEUTRAL_DARK` (two modes) or `NEUTRAL_MAPS` (three or more modes) so the resolver can follow alias chains automatically.
+- **Token naming convention:** by default, `token/path/default` → `--token-path` (drop `/default`, `/color`; `/` → `-`). Override with `figma.namingConvention` in `ds-config.json` when the project uses a different convention (e.g. keeping `/color` as `-color` suffix). Any additional shortenings are documented in `design-system-engine-map.mjs`.
+- **Primitive scale:** document your DS's primitive tokens in `design-system-engine-map.mjs` under `NEUTRAL_LIGHT` / `NEUTRAL_DARK` (two modes) or `NEUTRAL_MAPS` (three or more modes) so the resolver can follow alias chains automatically.
 - **Snapshot files** at paths defined in `ds-config.json`.
 
 ---
@@ -176,7 +176,7 @@ the committed snapshots — re-run later (or raise `FIGMA_FETCH_TIMEOUT_MS` for 
 **A Figma call budget.** A seat has a daily or monthly quota of API calls, so a refresh spends as few as it
 can and says how many: the same request is asked once per run, the refresh prints `Figma refresh: N API calls`,
 and it is skipped (one call, for the file's version) when the file's version, the config and the engine are the
-same as at the last complete refresh and its snapshots are all there (`.parity-out/figma-refresh.json`;
+same as at the last complete refresh and its snapshots are all there (`.design-system-engine-out/figma-refresh.json`;
 `FIGMA_REFRESH=force` refreshes anyway). A 429 whose `Retry-After` is longer than `FIGMA_LONG_LIMIT_S`
 (default 120) is a daily or monthly limit: the refresh stops at once, names the plan and the wait Figma gives,
 and keeps the snapshots as they were, instead of spending more calls on retries.
@@ -186,14 +186,14 @@ runaway: Figma's `/nodes` endpoint expands instance subtrees inline, so a compon
 instances can return a document tree with millions of nodes, and walking it pins the CPU at 100% —
 which also blocks the event loop, so no timer fires (this, not a slow network, was the real cause of
 the audit "hanging" mid–Phase 1). The value walk (`collect-raw-values.mjs`) therefore carries a
-node-visit budget (`PARITY_VALUE_NODE_BUDGET`, default 300k): once spent it stops descending and the
+node-visit budget (`DESIGN_SYSTEM_ENGINE_VALUE_NODE_BUDGET`, default 300k): once spent it stops descending and the
 sweep finishes with a representative sample, logging `walk capped at N nodes`. Normal component sets
 are far under the cap and are collected in full.
 
-**Audit history** is appended to `parity-history.json` at project root after every run. View trend: `rms-figma-code-parity --trend`.
+**Audit history** is appended to `design-system-engine-history.json` at project root after every run. View trend: `rms-design-system-engine --trend`.
 
 **Which side moved.** Every run records, for each compared fact that matches (a token in each mode, a
-padding, gap, radius, colour, height, visible layer…), the value on each side in `parity-agreed.json` at
+padding, gap, radius, colour, height, visible layer…), the value on each side in `design-system-engine-agreed.json` at
 the project root. Commit it. When a fact later differs, the measured difference says which side changed
 since they last agreed: `[Figma moved, code is behind]`, `[code moved, Figma is behind]` or `[both moved
 since they agreed]`. A fact that never agreed is just a difference, as before. A difference never
@@ -209,10 +209,10 @@ one line says per area (tokens, spacing, colour, typography, size and shape, lay
 which side moved first, as a share. It only describes; it never sets who wins.
 
 **Sending it back.** Each measured difference says which way it goes, and Gate [13] writes both hand-backs
-under `.parity-out/handback/`. Nothing is applied:
+under `.design-system-engine-out/handback/`. Nothing is applied:
 - **Code is behind** (Figma moved, or no earlier agreement): `code-changes.diff`, a patch that changes the
   declaration at the rule's `file:line` to the Figma token (or the project's text-style variable from
-  `parity-map.mjs` TYPO, or the value). Review it, then `git apply .parity-out/handback/code-changes.diff`.
+  `design-system-engine-map.mjs` TYPO, or the value). Review it, then `git apply .design-system-engine-out/handback/code-changes.diff`.
   Only single-value declarations and two-value `padding` are patched; the report counts the rest as by hand.
 - **Figma is behind** (code moved): `figma-changes.md`, per component with a link to it in Figma, the
   property and the value to set there. When both sides moved, it lists the decision to make.
@@ -223,8 +223,8 @@ says `EVERY GATE THAT RAN PASSES ✅ (N not verified)` instead of `ALL GATES PAS
 
 **Since the last run.** The report ends with what changed since the previous run with the same scope:
 findings that are new, findings that are gone, and findings whose count or value moved. Accessibility
-findings are compared element by element (the check also writes `.parity-out/a11y.json`). The findings
-are kept in `.parity-out/last-findings.json`. A long report still says at a glance what this change did.
+findings are compared element by element (the check also writes `.design-system-engine-out/a11y.json`). The findings
+are kept in `.design-system-engine-out/last-findings.json`. A long report still says at a glance what this change did.
 
 **Burndown.** One `📉` line then counts the open findings per component, most first, each with what the last
 run with the same scope had (`chip 2 (was 3)`), plus the components cleared since then and a `next up` line.
@@ -258,7 +258,7 @@ description, author and date. Figma keeps versions per file, so this is one line
 | Preserve camelCase | Component names stay as-is |
 | State names verbatim | `active`, `selected`, `hover`, `disabled` - never substitute |
 
-Any DS-specific shortenings are documented in `parity-map.mjs` under `EXPLICIT`.
+Any DS-specific shortenings are documented in `design-system-engine-map.mjs` under `EXPLICIT`.
 
 ---
 
@@ -267,4 +267,4 @@ Any DS-specific shortenings are documented in `parity-map.mjs` under `EXPLICIT`.
 
 If Figma aliases `component/background → primitives/SomeToken`, CSS must use `var(--some-token)` - never a hardcoded literal. The alias chain must be fully traceable through CSS `var()` references.
 
-Document your primitive → CSS var mapping in `parity-map.mjs` under `NEUTRAL_LIGHT` / `NEUTRAL_DARK` (two modes) or `NEUTRAL_MAPS` (three or more modes) so the resolver can follow chains automatically.
+Document your primitive → CSS var mapping in `design-system-engine-map.mjs` under `NEUTRAL_LIGHT` / `NEUTRAL_DARK` (two modes) or `NEUTRAL_MAPS` (three or more modes) so the resolver can follow chains automatically.

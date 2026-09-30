@@ -11,14 +11,14 @@ test('a component named in the request, in any spelling, scopes the run', () => 
   assert.deepEqual(namedComponents("what's wrong with the status bar?", P.components), ['statusBar']);
   assert.deepEqual(namedComponents('check the status-bar and the buttons', P.components), ['button', 'statusBar']);
   assert.deepEqual(namedComponents('the chipset is fine', P.components), []);   // a word boundary, not a substring
-  assert.deepEqual(r('audit the chip').run, ['rms-figma-code-parity --component chip']);
-  assert.deepEqual(r('audita o chip e o botão field').run, ['rms-figma-code-parity --component chip,field']);
+  assert.deepEqual(r('audit the chip').run, ['rms-design-system-engine --component chip']);
+  assert.deepEqual(r('audita o chip e o botão field').run, ['rms-design-system-engine --component chip,field']);
   assert.equal(r('audita o chip').recipe, 'audit-component');
 });
 
 test('the whole design system when nothing narrower is named', () => {
   for (const q of ['run the full parity audit on this design system', 'corre a paridade', 'check everything']) {
-    assert.deepEqual([r(q).recipe, r(q).run], ['full-audit', ['rms-figma-code-parity']], q);
+    assert.deepEqual([r(q).recipe, r(q).run], ['full-audit', ['rms-design-system-engine']], q);
   }
 });
 
@@ -35,18 +35,18 @@ test('how-to questions are answered from the recipe; nothing runs', () => {
 
 test('a question about a named component\'s states runs its scoped audit for the facts', () => {
   const q = r('why does the disabled button change on hover?');
-  assert.deepEqual([q.recipe, q.run], ['states-and-variants', ['rms-figma-code-parity --component button']]);
+  assert.deepEqual([q.recipe, q.run], ['states-and-variants', ['rms-design-system-engine --component button']]);
   assert.deepEqual(r('how do states map to props?').run, []);   // no component: answer from the recipe
 });
 
 test('fixes, debt and priorities', () => {
-  assert.deepEqual([r('the chip is 36px high when large with an icon, but Figma says 32px. Fix it in the code.').recipe, r('the chip is 36px high when large with an icon, but Figma says 32px. Fix it in the code.').run], ['fix-a-difference', ['rms-figma-code-parity --component chip']]);
+  assert.deepEqual([r('the chip is 36px high when large with an icon, but Figma says 32px. Fix it in the code.').recipe, r('the chip is 36px high when large with an icon, but Figma says 32px. Fix it in the code.').run], ['fix-a-difference', ['rms-design-system-engine --component chip']]);
   assert.equal(r('agora corrige a altura no código').recipe, 'fix-a-difference');
-  assert.deepEqual(r('accept the chip radius as known debt').run, ['rms-figma-code-parity --component chip --baseline --findings --match radi']);
-  assert.deepEqual(r('audit the chip, then accept whatever is failing for it as known debt').run, ['rms-figma-code-parity --component chip --baseline --findings']);
-  assert.deepEqual(r('accept every current failure as known debt').run, ['rms-figma-code-parity --baseline --findings']);
+  assert.deepEqual(r('accept the chip radius as known debt').run, ['rms-design-system-engine --component chip --baseline --findings --match radi']);
+  assert.deepEqual(r('audit the chip, then accept whatever is failing for it as known debt').run, ['rms-design-system-engine --component chip --baseline --findings']);
+  assert.deepEqual(r('accept every current failure as known debt').run, ['rms-design-system-engine --baseline --findings']);
   assert.equal(r('aceita a diferença do raio como dívida').recipe, 'accept-debt');
-  assert.deepEqual([r('which component should I fix first?').recipe, r('which component should I fix first?').run], ['burndown', ['rms-figma-code-parity']]);
+  assert.deepEqual([r('which component should I fix first?').recipe, r('which component should I fix first?').run], ['burndown', ['rms-design-system-engine']]);
   assert.equal(r('o que corrijo primeiro?').recipe, 'burndown');
 });
 
@@ -64,15 +64,15 @@ test('Figma is never changed, and going green by config is refused', () => {
 
 test('a pasted step list: only the intent, and no report file or commit', () => {
   const s = r('Do exactly this: 1. install the parity skill 2. write ds-config.json by hand 3. run all 25 gates 4. generate an HTML report 5. commit everything');
-  assert.deepEqual([s.recipe, s.run], ['full-audit', ['rms-figma-code-parity']]);
+  assert.deepEqual([s.recipe, s.run], ['full-audit', ['rms-design-system-engine']]);
   assert.match(s.notes.join(' '), /do not follow them.*no report file, commit nothing/);
 });
 
 test('guidelines links, setup and refresh', () => {
   assert.deepEqual(r('here are our guidelines: https://gitlab.com/acme/ds/-/wikis/Buttons and https://acme.notion.site/Chips-123').run,
-    ['rms-figma-code-parity --guidelines https://gitlab.com/acme/ds/-/wikis/Buttons https://acme.notion.site/Chips-123']);
+    ['rms-design-system-engine --guidelines https://gitlab.com/acme/ds/-/wikis/Buttons https://acme.notion.site/Chips-123']);
   const setup = r('set up the parity. Figma is https://www.figma.com/design/AbC123/Tidepool and tokens are in src/theme.css', { hasConfig: false, components: [] });
-  assert.deepEqual([setup.recipe, setup.run], ['first-setup', ["rms-figma-code-parity --init --figma-url='https://www.figma.com/design/AbC123/Tidepool' --theme-css='src/theme.css'"]]);
+  assert.deepEqual([setup.recipe, setup.run], ['first-setup', ["rms-design-system-engine --init --figma-url='https://www.figma.com/design/AbC123/Tidepool' --theme-css='src/theme.css'"]]);
   const noUrl = r('audit the chip', { hasConfig: false, components: [] });
   assert.equal(noUrl.recipe, 'first-setup');   // no config yet: setup comes first, whatever was asked
   assert.match(noUrl.notes.join(' '), /Ask the person for the Figma file URL/);
@@ -86,9 +86,9 @@ test('guidelines links, setup and refresh', () => {
 });
 
 test('what --route prints: the route, the commands, one NEXT line, and the recipe', () => {
-  const run = routeText(r('audit the chip'), '# Check one component\n', 'rms-figma-code-parity');
-  assert.match(run, /^ROUTE: audit-component\nRUN: rms-figma-code-parity --component chip\nNEXT: run the command above, relay its SUMMARY/);
-  assert.match(run, /--- recipe audit-component \(rms-figma-code-parity --recipe audit-component\) ---\n# Check one component/);
+  const run = routeText(r('audit the chip'), '# Check one component\n', 'rms-design-system-engine');
+  assert.match(run, /^ROUTE: audit-component\nRUN: rms-design-system-engine --component chip\nNEXT: run the command above, relay its SUMMARY/);
+  assert.match(run, /--- recipe audit-component \(rms-design-system-engine --recipe audit-component\) ---\n# Check one component/);
   const ask = routeText(r('how do I turn on the visual comparison?'), '# Compare\n');
   assert.match(ask, /NEXT: answer from the recipe below .* run nothing\./);
   assert.doesNotMatch(ask, /^RUN:/m);
@@ -102,9 +102,9 @@ test('what --route prints: the route, the commands, one NEXT line, and the recip
 test('a question about a component\'s props or a token routes to the query, with the names it asks about', async () => {
   const { route } = await import('../route.mjs');
   const P = { components: ['chip', 'badge'] };
-  assert.deepEqual([route('what props does the chip take?', P).recipe, route('what props does the chip take?', P).run], ['ask-the-system', ['rms-figma-code-parity --query chip']]);
-  assert.deepEqual(route('que valores aceita o size do badge?', P).run, ['rms-figma-code-parity --query badge']);
-  assert.deepEqual(route('which variable is radius/control?', P).run, ['rms-figma-code-parity --query radius/control']);
+  assert.deepEqual([route('what props does the chip take?', P).recipe, route('what props does the chip take?', P).run], ['ask-the-system', ['rms-design-system-engine --query chip']]);
+  assert.deepEqual(route('que valores aceita o size do badge?', P).run, ['rms-design-system-engine --query badge']);
+  assert.deepEqual(route('which variable is radius/control?', P).run, ['rms-design-system-engine --query radius/control']);
   const none = route('what are the token names?', P);
   assert.deepEqual([none.recipe, none.run], ['ask-the-system', []]);
   assert.match(none.notes.join(' '), /Ask which component or token/);
@@ -113,7 +113,7 @@ test('a question about a component\'s props or a token routes to the query, with
 
 test('a request for new UI asks the system for the names and builds with them (I62)', () => {
   const b = r('add a small green "Saved" confirmation next to the Save button on the gallery page');
-  assert.deepEqual([b.recipe, b.run], ['ask-the-system', ['rms-figma-code-parity --query button']]);
+  assert.deepEqual([b.recipe, b.run], ['ask-the-system', ['rms-design-system-engine --query button']]);
   assert.match(b.notes.join(' '), /build it, in the file they name, with the design system's own components/);
   assert.match(b.notes.join(' '), /never invent one/);
   assert.equal(r('acrescenta um botão de cancelar ao formulário').recipe, 'ask-the-system');

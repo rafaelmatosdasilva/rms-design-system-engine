@@ -14,9 +14,9 @@ import { runGate } from './helpers.mjs';
 const BASE = {
   'ds-config.json': { paths: { themeCSS: 'theme.css', snapshotVars: 'snap.json' }, componentSrcDirs: ['src'],
     figma: { colorCollection: 'Color', modes: [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }] } },
-  'parity-map.mjs': 'export const EXPLICIT={};export const SKIP_TOKENS=new Set();export const SIZING_SKIP=new Map();export const EXPLICIT_SIZING={};',
+  'design-system-engine-map.mjs': 'export const EXPLICIT={};export const SKIP_TOKENS=new Set();export const SIZING_SKIP=new Map();export const EXPLICIT_SIZING={};',
 };
-const result = (dir) => JSON.parse(readFileSync(join(dir, 'parity-check-result.json'), 'utf8'));
+const result = (dir) => JSON.parse(readFileSync(join(dir, 'design-system-engine-check-result.json'), 'utf8'));
 
 test('[bugfix runtime] a sizing token used in code but absent from static CSS is runtime-injected, not a fail', () => {
   const { dir } = runGate('parity-check.mjs', {
@@ -128,7 +128,7 @@ const TYPO_MAP = 'export const EXPLICIT={};export const SKIP_TOKENS=new Set();ex
 test('[bugfix typography runtime] a type var used in code but absent from static CSS is runtime-injected, not a fail', () => {
   const { dir } = runGate('parity-check.mjs', {
     ...BASE,
-    'parity-map.mjs': TYPO_MAP,
+    'design-system-engine-map.mjs': TYPO_MAP,
     'theme.css': ':root { --x: 1px; }\n',
     'snap.json': { typography: { m: { size: '11px' } } },
     'src/Text.vue': '<style>.t{ font-size: var(--advanced-type-size); }</style>\n',
@@ -141,7 +141,7 @@ test('[bugfix typography runtime] a type var used in code but absent from static
 test('[regression typography] a type var absent AND unused still fails', () => {
   const { dir } = runGate('parity-check.mjs', {
     ...BASE,
-    'parity-map.mjs': TYPO_MAP,
+    'design-system-engine-map.mjs': TYPO_MAP,
     'theme.css': ':root { --x: 1px; }\n',
     'snap.json': { typography: { m: { size: '11px' } } },
     'src/Text.vue': '<style>.t{ color: red; }</style>\n',

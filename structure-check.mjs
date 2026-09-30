@@ -23,6 +23,7 @@ import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
 import { createLocator } from './component-locator.mjs';
 import { pathToFileURL } from 'url';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
+import { codeSnapshotPath, projectPath } from './names.mjs';
 
 const ROOT = process.cwd();
 
@@ -55,10 +56,10 @@ try {
   if (m.BUTTON_CLASS_RULES)        BUTTON_CLASS_RULES        = m.BUTTON_CLASS_RULES;
 } catch { /* optional - runs with empty contract */ }
 
-// ── Load parity-map.mjs (EXPLICIT + SKIP_TOKENS for auto-derivation) ─────────
+// ── Load design-system-engine-map.mjs (EXPLICIT + SKIP_TOKENS for auto-derivation) ─────────
 let EXPLICIT = {}, SKIP_TOKENS = new Set();
 try {
-  const pm = await import(pathToFileURL(join(ROOT, 'parity-map.mjs')).href);
+  const pm = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   if (pm.EXPLICIT)    EXPLICIT    = pm.EXPLICIT;
   if (pm.SKIP_TOKENS) SKIP_TOKENS = pm.SKIP_TOKENS;
 } catch { /* optional */ }
@@ -77,7 +78,7 @@ try {
   snap = JSON.parse(readFileSync(join(ROOT, SNAPSHOT_PATH), 'utf8'));
 } catch {
   console.log('\n❌ figma-structure.snapshot.json not found or unreadable.');
-  console.log('   Run /rms-parity Phase 1 to capture it.\n');
+  console.log('   Run /rms-design-system-engine Phase 1 to capture it.\n');
   process.exit(1);
 }
 
@@ -1848,7 +1849,7 @@ try {
       console.log(`\n${mark} MEASURED ${r.differ.length}  (rendered in the browser, the component differs from Figma${strictMeasured ? '' : ' - advisory'})`);
       // Who last changed the rule's line, and why (git), so the reason travels with the finding.
       const { codeReason, reasonLine } = await import('./change-reason.mjs');
-      // Which side moved since they last agreed (parity-agreed.json), when there is a record.
+      // Which side moved since they last agreed (design-system-engine-agreed.json), when there is a record.
       const { loadAgreed, classify, MOVED_LABEL } = await import('./agreed.mjs');
       const { factOf } = await import('./capture-compare.mjs');
       const agreed = loadAgreed(ROOT);
@@ -1866,7 +1867,7 @@ try {
       for (const comp of [...new Set(r.differ.map((d) => d.component))]) { const u = linkFor(comp); if (u) console.log(`   🔗 ${comp} in Figma: ${u}`); }
       // Which way each difference goes back (I48): a patch for the code, a list for Figma. Never applied.
       const { writeHandback } = await import('./handback.mjs');
-      const outDir = dirname(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json');
+      const outDir = dirname(codeSnapshotPath(cfg));
       const hb = writeHandback(ROOT, outDir, { codeDiffs: toCode, figmaItems: toFigma, linkFor });
       if (hb.code) console.log(`   ↳ code changes proposed (${hb.patched}): ${hb.code}  (review, then git apply it; ${hb.manual.length} more by hand)`);
       else if (toCode.length) console.log(`   ↳ ${toCode.length} code change(s) to make by hand (no single-value declaration to patch)`);
@@ -1876,15 +1877,15 @@ try {
     // What was actually checked (I53): a clean result is only as good as its reach.
     const { censusOf, censusLines } = await import('./capture-compare.mjs');
     const census = censusOf(r, bpr);
-    const censusFile = join(dirname(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json'), 'census.json');
+    const censusFile = join(dirname(codeSnapshotPath(cfg)), 'census.json');
     try { mkdirSync(join(ROOT, dirname(censusFile)), { recursive: true }); writeFileSync(join(ROOT, censusFile), JSON.stringify(census, null, 1) + '\n'); } catch { /* the report line still shows it */ }
     censusLines(census).forEach((l, i) => console.log(`   ${i ? '  ' : '📋 '}${l}${i ? '' : `  (${censusFile})`}`));
     // Each component as drawn against its Figma image (I43), when codeReading.visual is on.
     if (cfg.codeReading?.visual === true) {
       try {
         const { visualDiff, visualLines } = await import('./visual-diff.mjs');
-        const vr = await visualDiff(ROOT, cfg, cap, snap?.components ?? {}, { outDir: dirname(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json'), version: snap?._figmaVersion ?? null });
-        for (const l of visualLines(vr, cfg.visualRefs ?? '.parity-refs')) console.log(`   ${l.trimStart().startsWith('🖼  VISUAL') ? l : l.trimStart()}`);
+        const vr = await visualDiff(ROOT, cfg, cap, snap?.components ?? {}, { outDir: dirname(codeSnapshotPath(cfg)), version: snap?._figmaVersion ?? null });
+        for (const l of visualLines(vr, cfg.visualRefs ?? projectPath(ROOT, 'refs'))) console.log(`   ${l.trimStart().startsWith('🖼  VISUAL') ? l : l.trimStart()}`);
       } catch (e) { console.log(`   🖼  ⏭ visual diff not run (${String(e.message || e).split('\n')[0]})`); }
     }
     // Every variant built: each Figma axis value has a counterpart the capture found in code.

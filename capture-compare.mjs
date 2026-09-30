@@ -7,8 +7,8 @@
 //     leads (the author decides who is behind, this module only says what differs).
 //
 // Tokens: every Figma colour and sizing token (per mode) through the project's own naming
-// (parity-map.mjs EXPLICIT / EXPLICIT_SIZING, else naming-convention.mjs), and the text scale
-// through parity-map TYPO. Components: height, padding, gap, radius, font size and weight,
+// (design-system-engine-map.mjs EXPLICIT / EXPLICIT_SIZING, else naming-convention.mjs), and the text scale
+// through design-system-engine-map TYPO. Components: height, padding, gap, radius, font size and weight,
 // fill structure and default stroke, from figma-structure.snapshot.json.
 // A code fact the capture could not read reliably is "not comparable", never a difference.
 
@@ -19,9 +19,10 @@ import { pathToFileURL } from 'node:url';
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
 import { sameValue } from './component-capture.mjs';
 import { parseColor, colorHex } from './css-values.mjs';
+import { projectPath } from './names.mjs';
 
 export async function loadParityMaps(ROOT, cfg) {
-  const p = resolve(ROOT, cfg.paths?.parityMap ?? 'parity-map.mjs');
+  const p = resolve(ROOT, cfg.paths?.parityMap ?? projectPath(ROOT, 'map'));
   let m = {};
   if (existsSync(p)) { try { m = await import(pathToFileURL(p).href); } catch { /* optional */ } }
   return {
@@ -52,7 +53,7 @@ export function compareTokens(code, vars, cfg, maps) {
     else settle(same === true, { token, cssVar, mode, figma: figmaValue, code: fact.value, at: code.tokens[cssVar].declaredAt });
   };
   // Token names resolve exactly as Gate 3 resolves them: the trailing "/color" is dropped first
-  // (when the naming convention drops it), then parity-map EXPLICIT, then the convention.
+  // (when the naming convention drops it), then design-system-engine-map EXPLICIT, then the convention.
   const dropColor = (spec.dropSegments ?? []).includes('color');
   for (const [mode, tokens] of Object.entries(vars.color ?? {})) {
     for (const [key, value] of Object.entries(tokens ?? {})) {
@@ -211,7 +212,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     // Font: Figma's font fields describe the component's first TEXT node, so the code side is the
     // contract's fontSel part, else the first element holding text, else the root.
     const fp = c.parts?.font?.props ?? c.parts?.text?.props ?? c.props;
-    // The project's own variable for a text-style field (parity-map TYPO), proposed in a hand-back patch.
+    // The project's own variable for a text-style field (design-system-engine-map TYPO), proposed in a hand-back patch.
     const typoVar = (scale, prop) => Object.entries(maps.TYPO ?? {}).find(([, [sc, pr]]) => sc === scale && pr === prop)?.[0];
     if (f.fontSizeVar && ty(f.fontSizeVar)) push(name, 'font size', f.fontSizeVar, fp?.fontSize, { figmaValue: ty(f.fontSizeVar).size, suggestVar: typoVar(f.fontSizeVar, 'size') });
     if (f.fontWeightVar && ty(f.fontWeightVar)) push(name, 'font weight', f.fontWeightVar, fp?.fontWeight, { figmaValue: ty(f.fontWeightVar).weight });

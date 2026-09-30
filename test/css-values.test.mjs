@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { colorHex, sameColor, lengthPx, timeMs, sameValue, sameEasing } from '../css-values.mjs';
-import { runGate, EMPTY_PARITY_MAP } from './helpers.mjs';
+import { runGate, EMPTY_ENGINE_MAP } from './helpers.mjs';
 
 test('colours: every CSS spelling reads as the same hex', () => {
   assert.equal(colorHex('#FFF'), '#ffffff');
@@ -38,14 +38,14 @@ const paths = { themeCSS: 'theme.css', snapshotVars: 'figma-vars.snapshot.json' 
 test('Gate 3: short hex and rgb() tokens match the Figma hex; a real difference still fails', () => {
   const ok = runGate('parity-check.mjs', {
     'ds-config.json': { paths, figma: { colorCollection: 'Color' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand: #FFF; --ink: rgb(17 17 17); }\n@media (prefers-color-scheme: dark) { :root { --brand: #000; --ink: hsl(0 0% 93.3%); } }',
     'figma-vars.snapshot.json': { color: { light: { 'brand/color': '#ffffff', 'ink/color': '#111111' }, dark: { 'brand/color': '#000000', 'ink/color': '#eeeeee' } } },
   });
   assert.equal(ok.code, 0, ok.out);
   const bad = runGate('parity-check.mjs', {
     'ds-config.json': { paths, figma: { colorCollection: 'Color' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand: rgb(250 250 250); }\n@media (prefers-color-scheme: dark) { :root { --brand: #000; } }',
     'figma-vars.snapshot.json': { color: { light: { 'brand/color': '#ffffff' }, dark: { 'brand/color': '#000000' } } },
   });
@@ -56,7 +56,7 @@ test('Gate 3: short hex and rgb() tokens match the Figma hex; a real difference 
 test('Gate 3: a sizing token written in rem matches the Figma px value', () => {
   const r = runGate('parity-check.mjs', {
     'ds-config.json': { paths, figma: { colorCollection: 'Color' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --padding-s: 0.5rem; --radius-m: 8px; }',
     'figma-vars.snapshot.json': { color: { light: {} }, sizing: { 'padding/s': '8px', 'radius/m': '8' } },
   });

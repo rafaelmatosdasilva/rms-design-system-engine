@@ -28,6 +28,7 @@ import { createLocator, loadLocator } from './component-locator.mjs';
 import { markupFindings } from './a11y-static.mjs';
 import { findSteeringFiles } from './steering-check.mjs';
 import { typeErrors, typeErrorLine, compileTarget, findTsc } from './compile-check.mjs';
+import { ENGINE_DIRS } from './names.mjs';
 
 const CANDIDATE_EXTS = ['html', 'htm', 'jsx', 'tsx', 'vue', 'svelte', 'js', 'ts', 'md', 'txt'];
 
@@ -193,7 +194,7 @@ export function levelContext(ROOT, cfg, level, { outDir = 'evals', llmsPath = nu
     return existsSync(p) ? { path: p } : { path: '', why: `no ${p.replace(ROOT + '/', '')} yet (run the audit once to write it)` };
   }
   if (level === 'steering') {
-    const files = findSteeringFiles(ROOT, { skip: [cfg.contracts?.out || 'contracts', 'node_modules', '.parity-out', outDir] });
+    const files = findSteeringFiles(ROOT, { skip: [cfg.contracts?.out || 'contracts', 'node_modules', ...ENGINE_DIRS, outDir] });
     if (!files.length) return { path: '', why: 'no instruction files found (AGENTS.md, CLAUDE.md, rules)' };
     const p = resolve(ROOT, outDir, '.context', 'steering.md');
     mkdirSync(dirname(p), { recursive: true });

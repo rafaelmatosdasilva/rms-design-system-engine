@@ -30,7 +30,7 @@ try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } ca
 }
 
 const FILE_KEY = cfg.figmaFileKey;
-const SECRET   = cfg.webhook?.secret ?? process.env.FIGMA_WEBHOOK_SECRET ?? 'rms-parity';
+const SECRET   = cfg.webhook?.secret ?? process.env.FIGMA_WEBHOOK_SECRET ?? 'rms-design-system-engine';
 
 if (!FILE_KEY) { console.error('❌ figmaFileKey missing in ds-config.json'); process.exit(1); }
 
@@ -91,7 +91,7 @@ for (const event of EVENTS) {
     endpoint:    hookUrl,
     passcode:    SECRET,
     status:      'ACTIVE',
-    description: `rms-parity ${event}`,
+    description: `rms-design-system-engine ${event}`,
   };
 
   const resp = await fetch('https://api.figma.com/v2/webhooks', {

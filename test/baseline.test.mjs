@@ -53,7 +53,7 @@ test('loadBaselineLabels degrades to null on missing/malformed files', () => {
 
 test('writeBaseline round-trips the current failing gates', () => {
   const dir = mkdtempSync(join(tmpdir(), 'baseline-'));
-  const path = join(dir, 'parity-baseline.json');
+  const path = join(dir, 'design-system-engine-baseline.json');
   const gates = [G('A', true), G('B', false), G('C', false, true), G('D', false)];
   const written = writeBaseline(path, gates);
   assert.deepEqual(written, ['B', 'D']);
@@ -81,7 +81,7 @@ test('findings: a gate is debt only when every ❌ line is accepted; fixed lines
   assert.deepEqual(moved.regressions, ['Structure  (12 components)']);
   // Written and read back; a failing gate with no ❌ line to accept stays a gate.
   const dir = mkdtempSync(join(tmpdir(), 'baseline-'));
-  const path = join(dir, 'parity-baseline.json');
+  const path = join(dir, 'design-system-engine-baseline.json');
   writeBaseline(path, [A, B, gate('Coverage', ['2 components not reached'])], { findings: true });
   assert.deepEqual(loadBaselineLabels(path), ['Coverage']);
   assert.deepEqual(loadBaselineFindings(path), ['Structure :: ❌ chip: padding 8px, code 6px', 'Tokens :: ❌ --ink differs', 'Tokens :: ❌ --brand differs']);
@@ -100,7 +100,7 @@ test('--match: only the findings that name the difference, with their gate\'s co
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const dir = mkdtempSync(join(tmpdir(), 'bl-'));
-  const path = join(dir, 'parity-baseline.json');
+  const path = join(dir, 'design-system-engine-baseline.json');
   writeFileSync(path, JSON.stringify({ gates: [], findings: ['Icons :: ❌ an older one'] }));
   const gates = [
     { label: '[3] Token values  (color · sizing)', pass: false, lines: ['❌ FAIL  1', '❌ [sizing/-] radii/chip → --radii-chip'] },

@@ -1,5 +1,5 @@
 // component-slot-check.mjs - Gate [14]: Component slot parity
-// Run from project root: node ../rms-figma-code-parity/component-slot-check.mjs
+// Run from project root: node ../rms-design-system-engine/component-slot-check.mjs
 //
 // For every entry in COMPONENT_USAGES (structure-contract.mjs), locates the element
 // by selector in the plugin's static HTML source and verifies the element's class

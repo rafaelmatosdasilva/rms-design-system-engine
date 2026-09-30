@@ -18,7 +18,7 @@
 //
 // Requires at project root:
 //   ds-config.json   - snapshot path, themeCSS, figma.modes, figma.collections (optional)
-//   parity-map.mjs   - EXPLICIT, SKIP_TOKENS, NEUTRAL_LIGHT/DARK, NEUTRAL_VAR_RE
+//   design-system-engine-map.mjs   - EXPLICIT, SKIP_TOKENS, NEUTRAL_LIGHT/DARK, NEUTRAL_VAR_RE
 //   figma-vars.snapshot.json - color.<mode> maps + (optional) modeVariants.<collection> maps
 //
 // Exit 0 = all mode-variant tokens adapt correctly.  Exit 1 = a missing per-mode override.
@@ -29,6 +29,7 @@ import { loadModes, loadCollections, allModes, buildResolver } from './mode-reso
 import { loadCssSources } from './css-source.mjs';
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
 import { pathToFileURL } from 'url';
+import { projectPath } from './names.mjs';
 
 const ROOT = process.cwd();
 
@@ -40,11 +41,11 @@ try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } ca
 const SNAP_VARS  = cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json';
 const THEME_PATHS = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();
 
-// ── Load parity-map.mjs ───────────────────────────────────────────────────────
+// ── Load design-system-engine-map.mjs ───────────────────────────────────────────────────────
 let EXPLICIT = {}, SKIP_TOKENS = new Set();
 let NL = {}, ND = {}, NEUTRAL_MAPS = null, NEUTRAL_VAR_RE = /^--neutral-(\d+)$/;
 try {
-  const map = await import(pathToFileURL(join(ROOT, 'parity-map.mjs')).href);
+  const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   if (map.EXPLICIT)        EXPLICIT        = map.EXPLICIT;
   if (map.SKIP_TOKENS)     SKIP_TOKENS     = map.SKIP_TOKENS;
   if (map.NEUTRAL_LIGHT)   NL              = map.NEUTRAL_LIGHT;

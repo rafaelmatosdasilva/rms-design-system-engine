@@ -18,9 +18,9 @@
 // Cached by content: the snapshot records a hash of every input; an unchanged project reuses it.
 //
 // CLI:  node code-capture.mjs [--force] [--no-browser] [--json]
-//       (also: rms-figma-code-parity --capture-code)
+//       (also: rms-design-system-engine --capture-code)
 // Config (all optional): ds-config.json → codeReading: { browser: "auto" | "off", pages: [paths or URLs],
-//                                                       out: ".parity-out/code.snapshot.json" }
+//                                                       out: ".design-system-engine-out/code.snapshot.json" }
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve, dirname, relative } from 'node:path';
@@ -34,6 +34,7 @@ import { createLocator, loadLocator } from './component-locator.mjs';
 import { apiReaderFor, captureApis, captureIcons, captureMarkup, renderedNesting, sourceNesting, mergeNesting, structureInputFiles, markupInputKey } from './structure-capture.mjs';
 import { conceptOf } from './state-concepts.mjs';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
+import { codeSnapshotPath } from './names.mjs';
 
 export const CAPTURE_VERSION = 2;
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
@@ -63,10 +64,10 @@ export function captureInputs(ROOT, cfg) {
   return { themeEntries, pages: present, styleguide };
 }
 
-// { generate, template, out, note } for the styleguide. `out` is the private copy in .parity-out.
+// { generate, template, out, note } for the styleguide. `out` is the private copy in .design-system-engine-out.
 export function styleguidePlan(ROOT, cfg) {
   const sg = cfg.styleguide;
-  const outDir = dirname(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json');
+  const outDir = dirname(codeSnapshotPath(cfg));
   if (!sg?.template) return { generate: false, note: sg ? null : 'no styleguide configured (ds-config.json → styleguide.template)' };
   if (existsSync(resolve(ROOT, sg.template))) return { generate: true, template: sg.template, out: join(outDir, 'styleguide.html') };
   const found = findTemplates(ROOT);
@@ -159,8 +160,8 @@ export function modeSwitch(mode, { styleguide = false } = {}) {
   if (!styleguide || sw.unsupported) return sw;
   const scheme = sw.media?.find((f) => f.name === 'prefers-color-scheme')?.value;
   if (!scheme) return sw;
-  const set = `(() => { const r = document.documentElement; if (!r.hasAttribute('data-color')) return; if (!r.hasAttribute('data-parity-color-was')) r.setAttribute('data-parity-color-was', r.getAttribute('data-color')); r.setAttribute('data-color', ${JSON.stringify(scheme)}); })()`;
-  const reset = `(() => { const r = document.documentElement; if (!r.hasAttribute('data-parity-color-was')) return; r.setAttribute('data-color', r.getAttribute('data-parity-color-was')); r.removeAttribute('data-parity-color-was'); })()`;
+  const set = `(() => { const r = document.documentElement; if (!r.hasAttribute('data-color')) return; if (!r.hasAttribute('data-design-system-engine-color-was')) r.setAttribute('data-design-system-engine-color-was', r.getAttribute('data-color')); r.setAttribute('data-color', ${JSON.stringify(scheme)}); })()`;
+  const reset = `(() => { const r = document.documentElement; if (!r.hasAttribute('data-design-system-engine-color-was')) return; r.setAttribute('data-color', r.getAttribute('data-design-system-engine-color-was')); r.removeAttribute('data-design-system-engine-color-was'); })()`;
   return { ...sw, apply: sw.apply ? `${sw.apply}; ${set}` : set, undo: sw.undo ? `${sw.undo}; ${reset}` : reset };
 }
 
@@ -413,7 +414,7 @@ export function apiCoverage(api, note, sources) {
 // Everything the capture reads, and the content hash of it (the cache key). Shared by captureCode
 // and readFreshSnapshot so both agree on what "unchanged" means.
 async function prepareCapture(ROOT, cfg) {
-  const outPath = resolve(ROOT, cfg.codeReading?.out ?? '.parity-out/code.snapshot.json');
+  const outPath = resolve(ROOT, codeSnapshotPath(cfg));
   const modes = allModes(cfg);
   const { themeEntries, pages, styleguide } = captureInputs(ROOT, cfg);
   const { files, missing, remote } = loadCssSources(ROOT, themeEntries);
@@ -431,7 +432,7 @@ async function prepareCapture(ROOT, cfg) {
 // engine). Gates use it for facts only the capture has (the browser reading, rendered nesting);
 // a missing or stale snapshot returns null and the gate keeps its own reading.
 export async function readFreshSnapshot(ROOT, cfg) {
-  const outPath = resolve(ROOT, cfg.codeReading?.out ?? '.parity-out/code.snapshot.json');
+  const outPath = resolve(ROOT, codeSnapshotPath(cfg));
   if (!existsSync(outPath)) return null;
   let prev;
   try { prev = JSON.parse(readFileSync(outPath, 'utf8')); } catch { return null; }
@@ -618,7 +619,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (argv.includes('--json')) { process.stdout.write(JSON.stringify(snapshot, null, 2) + '\n'); process.exit(0); }
   console.log('\n' + captureSummary(snapshot, outPath, ROOT) + (cached ? '\n  (unchanged since the last capture)' : '') + '\n');
   // --compare: the same facts side by side with the Figma snapshots (calibration, and the neutral
-  // comparison the authoring model builds on). Written in full to .parity-out/code-vs-figma.json.
+  // comparison the authoring model builds on). Written in full to .design-system-engine-out/code-vs-figma.json.
   if (argv.includes('--compare')) {
     const { compareCapture, compareReport } = await import('./capture-compare.mjs');
     const readJSON = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };

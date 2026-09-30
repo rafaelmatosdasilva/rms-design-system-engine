@@ -14,7 +14,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runGate, EMPTY_PARITY_MAP, crashed } from './helpers.mjs';
+import { runGate, EMPTY_ENGINE_MAP, crashed } from './helpers.mjs';
 
 // Gates skip on env: icon-freshness needs FIGMA_TOKEN, rendered-check honours CHROME_PATH.
 // runGate's child inherits this process's env, so clear both here to make the smoke run
@@ -34,11 +34,11 @@ const THEME = ':root{}';
 // own maps. Every map is empty, so each gate finds nothing to check and exits cleanly.
 const SNAP = { color: { light: {}, dark: {} }, sizing: {}, motion: {}, effects: {} };
 
-// Every gate that dynamic-imports parity-map.mjs + reads the vars snapshot needs all three
+// Every gate that dynamic-imports design-system-engine-map.mjs + reads the vars snapshot needs all three
 // files present to exercise that path instead of bailing early.
 const WITH_MAP_AND_SNAP = {
   'ds-config.json': CONFIG,
-  'parity-map.mjs': EMPTY_PARITY_MAP,
+  'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
   'figma-vars.snapshot.json': SNAP,
   'theme.css': THEME,
 };
@@ -104,10 +104,10 @@ test('[smoke rendered-check] runs without crashing on a minimal fixture', () => 
   assertClean('rendered-check.mjs', { 'ds-config.json': CONFIG });
 });
 
-// ── Gates that read the vars snapshot (hard-required) + import parity-map.mjs ────
+// ── Gates that read the vars snapshot (hard-required) + import design-system-engine-map.mjs ────
 
 test('[smoke exemption-check] runs without crashing on a minimal fixture', () => {
-  // Reads the snapshot unconditionally once parity-map loads; empty maps → nothing stale (exit 0).
+  // Reads the snapshot unconditionally once design-system-engine-map loads; empty maps → nothing stale (exit 0).
   assertClean('exemption-check.mjs', WITH_MAP_AND_SNAP);
 });
 
@@ -121,7 +121,7 @@ test('[smoke mode-completeness-check] runs without crashing on a minimal fixture
   assertClean('mode-completeness-check.mjs', WITH_MAP_AND_SNAP);
 });
 
-// ── Opt-in gates that read only the vars snapshot (no parity-map import) ─────────
+// ── Opt-in gates that read only the vars snapshot (no design-system-engine-map import) ─────────
 
 test('[smoke motion-check] runs without crashing on a minimal fixture', () => {
   // Reads the snapshot unconditionally; no snapshot.motion + no figma.motion → not configured (exit 0).

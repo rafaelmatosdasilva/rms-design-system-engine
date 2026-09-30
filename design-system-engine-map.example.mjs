@@ -1,4 +1,4 @@
-// parity-map.mjs - Copy to your PROJECT ROOT and fill in your DS token mappings.
+// design-system-engine-map.mjs - Copy to your PROJECT ROOT and fill in your DS token mappings.
 // Consumed by parity-check.mjs and bound-check.mjs.
 // Do not commit to the public scripts repo - project-specific, lives at project root.
 

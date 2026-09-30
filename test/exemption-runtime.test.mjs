@@ -12,7 +12,7 @@ const MAP = 'export const EXPLICIT={};export const SKIP_TOKENS=new Set();export 
 
 test('[bugfix exemption runtime] a runtime-injected mapped sizing var is OK, not BROKEN', () => {
   const { code, out } = runGate('exemption-check.mjs', {
-    'ds-config.json': CFG, 'parity-map.mjs': MAP,
+    'ds-config.json': CFG, 'design-system-engine-map.mjs': MAP,
     'theme.css': ':root { --x: 1px; }\n',
     'snap.json': { sizing: { 'advanced/toast/margin/bottom': '8px' } },
     'src/Toast.vue': '<style>.t{ margin-bottom: var(--advanced-toast-margin-bottom); }</style>\n',
@@ -24,7 +24,7 @@ test('[bugfix exemption runtime] a runtime-injected mapped sizing var is OK, not
 
 test('[regression exemption] a genuinely-absent, unused mapped var is still BROKEN', () => {
   const { code, out } = runGate('exemption-check.mjs', {
-    'ds-config.json': CFG, 'parity-map.mjs': MAP,
+    'ds-config.json': CFG, 'design-system-engine-map.mjs': MAP,
     'theme.css': ':root { --x: 1px; }\n',
     'snap.json': { sizing: { 'advanced/toast/margin/bottom': '8px' } },
     'src/Toast.vue': '<style>.t{ color: red; }</style>\n',   // does NOT reference the var
@@ -35,7 +35,7 @@ test('[regression exemption] a genuinely-absent, unused mapped var is still BROK
 
 test('[regression exemption] a declared mapped var with the WRONG value is still BROKEN', () => {
   const { code, out } = runGate('exemption-check.mjs', {
-    'ds-config.json': CFG, 'parity-map.mjs': MAP,
+    'ds-config.json': CFG, 'design-system-engine-map.mjs': MAP,
     'theme.css': ':root { --advanced-toast-margin-bottom: 99px; }\n',   // declared, wrong value
     'snap.json': { sizing: { 'advanced/toast/margin/bottom': '8px' } },
   });

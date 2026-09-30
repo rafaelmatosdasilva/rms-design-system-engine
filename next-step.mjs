@@ -4,7 +4,7 @@
 //
 //   • nextStep(state)   → the single NEXT line: what to do now, with the exact command.
 //   • buildSummary(...) → the plain-language result to relay in the chat as is; also written to
-//                         .parity-out/summary.md, and printed again by `--summary`.
+//                         .design-system-engine-out/summary.md, and printed again by `--summary`.
 // Pure: the audit passes in what it already computed.
 import { ZERO_FAIL } from './run-diff.mjs';
 
@@ -25,7 +25,7 @@ export function measuredLines(gates) {
 }
 
 // state: { failing: [gate], scope: [names], handback: { code, figma }, burndownNext, baselineWritten: { count, file }, cmd }
-export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, cmd = 'rms-figma-code-parity' } = {}) {
+export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, cmd = 'rms-design-system-engine' } = {}) {
   const rerun = scope.length ? `${cmd} --component ${scope.join(',')}` : cmd;
   if (baselineWritten) return `NEXT: tell the user ${baselineWritten.file} now holds the accepted debt; commit it only when they ask.`;
   if (failing.length) {
@@ -42,7 +42,7 @@ export function nextStep({ failing = [], scope = [], handback = {}, burndownNext
 // The state of the Figma data, said once, so no one has to infer it (idea I56): whether this run refreshed anything
 // from the Figma API, and how old the committed snapshots it used are. An agent relays it; it never claims a
 // refresh the engine did not make. snapshots: [{ file, ageHours }] (ageHours null when unreadable).
-export function dataStateLine({ refreshedFromApi = false, snapshots = [], cmd = 'rms-figma-code-parity' } = {}) {
+export function dataStateLine({ refreshedFromApi = false, snapshots = [], cmd = 'rms-design-system-engine' } = {}) {
   const known = snapshots.filter((s) => Number.isFinite(s.ageHours));
   const age = (h) => (h < 24 ? 'updated today' : `${Math.floor(h / 24)} day${Math.floor(h / 24) === 1 ? '' : 's'} old`);
   const oldest = known.length ? known.reduce((a, b) => (b.ageHours > a.ageHours ? b : a)) : null;
@@ -58,7 +58,7 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
   const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
   const debt = gates.filter((g) => g.baselined);
   lines.push(`# Parity result${scope.length ? ` for ${scope.join(', ')}` : ''}`, '');
-  lines.push(verdict === 'baseline' ? `**Baseline written.** ${baselineWritten?.count ?? 0} failing item${baselineWritten?.count === 1 ? '' : 's'} recorded as accepted debt in ${baselineWritten?.file ?? 'parity-baseline.json'}; from now on only new ones fail.`
+  lines.push(verdict === 'baseline' ? `**Baseline written.** ${baselineWritten?.count ?? 0} failing item${baselineWritten?.count === 1 ? '' : 's'} recorded as accepted debt in ${baselineWritten?.file ?? 'design-system-engine-baseline.json'}; from now on only new ones fail.`
     : verdict === 'failed' ? `**Not in parity.** ${failing.length} of ${gates.length} gates fail.`
     : verdict === 'debt' ? `**No regressions.** ${debt.length} gate${debt.length === 1 ? '' : 's'} carry accepted debt.`
       : `**In parity.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}.`);

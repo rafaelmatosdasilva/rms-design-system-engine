@@ -10,7 +10,7 @@ const maps = (over = {}) => ({ EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: n
 const cfg = { figma: { namingConvention: { dropSegments: ['color', 'default'] } } };
 const tok = (v) => ({ modes: { light: { value: v, confidence: 'verified' } } });
 
-test('tokens: "/color" is dropped before parity-map lookup, an explicit null is skipped, values compare by meaning', () => {
+test('tokens: "/color" is dropped before design-system-engine-map lookup, an explicit null is skipped, values compare by meaning', () => {
   const code = { tokens: { '--card-bg': tok('#FFFFFF'), '--shared': tok('rgb(0, 0, 0)'), '--gap-s': tok('8px'), '--m-size': tok('11px') } };
   const vars = {
     color: { light: { 'card/bg/color': '#ffffff', 'badge/label/color': '#000000', 'overlay/color': '#000000', 'ghost/color': '#123456' } },

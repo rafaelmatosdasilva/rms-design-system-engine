@@ -256,5 +256,5 @@ for (const { iconId, nodeId, livePaths, snapPaths } of changed) {
 }
 console.log('\n   Fix: update figma-icons.snapshot.json with new Figma path data,');
 console.log('        then update the matching <symbol> in ui-shared.js (or equivalent sprite).');
-console.log('        Run /rms-figma-code-parity (Phase 1) to do this automatically.\n');
+console.log('        Run /rms-design-system-engine (Phase 1) to do this automatically.\n');
 process.exit(1);

@@ -1,4 +1,4 @@
-// pseudo-element-check.mjs - Run from project root: node ../rms-parity/pseudo-element-check.mjs
+// pseudo-element-check.mjs - Run from project root: node ../rms-design-system-engine/pseudo-element-check.mjs
 //
 // Hard Rule #14 - Pseudo-element content audit:
 //   Every ::before / ::after rule on a DS component selector that sets `content`

@@ -30,7 +30,7 @@ test('[regression] the legacy 2-mode default still yields light/dark', () => {
   assert.deepEqual(loadModes({}).map(m => m.snapshotKey), ['light', 'dark']);
 });
 
-// ── A3: NEUTRAL_MAPS may be keyed by mode NAME (as parity-map.mjs writes it) or index ──
+// ── A3: NEUTRAL_MAPS may be keyed by mode NAME (as design-system-engine-map.mjs writes it) or index ──
 const TWO_MODES = [
   { name: 'Light', snapshotKey: 'light', cssSelector: 'root' },
   { name: 'Dark',  snapshotKey: 'dark',  cssSelector: 'dark-media' },

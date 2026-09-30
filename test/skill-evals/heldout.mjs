@@ -1,7 +1,7 @@
 // test/skill-evals/heldout.mjs - the held-out task set (idea I55). Written together with the development
 // set, before any recipe existed, and not used while writing recipes: adoption is decided here, so the
 // recipes cannot be tuned to the test. Edge cases on purpose. Two more tasks run on a private library and
-// live outside the repository (PARITY_EVAL_PRIVATE_TASKS), so no private name is ever committed.
+// live outside the repository (DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_TASKS), so no private name is ever committed.
 import { hasEngineRun } from './lib.mjs';
 import { chipFixed } from './tasks.mjs';
 

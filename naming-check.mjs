@@ -1,14 +1,14 @@
 // naming-check.mjs - Gate [11]: CSS var naming round-trip.
 // Every CSS var declared in ANY project CSS file (theme.css + pluginCSS) must
 // trace back to a Figma token in the snapshot (via convention or EXPLICIT) or
-// be on the SYSTEM_VARS exemption list in parity-map.mjs.
+// be on the SYSTEM_VARS exemption list in design-system-engine-map.mjs.
 //
 // Direction: CSS → Figma (reverse of Gates [2] and [4]).
 // A var with no Figma backing is either hallucinated or needs to be documented.
 //
 // Requires at project root:
 //   ds-config.json   - snapshot path, themeCSS, pluginCSS
-//   parity-map.mjs   - EXPLICIT, EXPLICIT_SIZING, SKIP_TOKENS, SIZING_SKIP,
+//   design-system-engine-map.mjs   - EXPLICIT, EXPLICIT_SIZING, SKIP_TOKENS, SIZING_SKIP,
 //                      SYSTEM_VARS (known structural/semantic vars with no 1:1 token)
 //
 // Exit 0 = all CSS vars traceable.  Exit 1 = uninvented vars found.
@@ -19,6 +19,7 @@ import { join } from 'path';
 import { loadModes } from './mode-resolver.mjs';
 import { resolveNamingSpec, tokenToVar, varToToken } from './naming-convention.mjs';
 import { pathToFileURL } from 'url';
+import { projectPath } from './names.mjs';
 
 const ROOT = process.cwd();
 
@@ -32,11 +33,11 @@ const THEME_PATHS = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();
 const THEME_PATH  = THEME_PATHS[0];
 const PLUGIN_CSS = cfg.paths?.pluginCSS    ?? [];
 
-// ── Load parity-map.mjs ───────────────────────────────────────────────────────
+// ── Load design-system-engine-map.mjs ───────────────────────────────────────────────────────
 let EXPLICIT = {}, EXPLICIT_SIZING = {}, SKIP_TOKENS = new Set();
 let SIZING_SKIP = new Map(), SYSTEM_VARS = new Set(), typoMap = null;
 try {
-  const map = await import(pathToFileURL(join(ROOT, 'parity-map.mjs')).href);
+  const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   if (map.EXPLICIT)        EXPLICIT        = map.EXPLICIT;
   if (map.EXPLICIT_SIZING) EXPLICIT_SIZING = map.EXPLICIT_SIZING;
   if (map.SKIP_TOKENS)     SKIP_TOKENS     = map.SKIP_TOKENS;
@@ -159,7 +160,7 @@ if (PLUGIN_OVERRIDE.length) {
 // silently exempt it from the naming round-trip check.
 const STALE_SYSTEM_VARS = [...SYSTEM_VARS].filter(v => !declared.has(v));
 if (STALE_SYSTEM_VARS.length) {
-  console.log(`\nℹ️  STALE SYSTEM_VARS (${STALE_SYSTEM_VARS.length}) - in parity-map.mjs but not declared in any CSS file:`);
+  console.log(`\nℹ️  STALE SYSTEM_VARS (${STALE_SYSTEM_VARS.length}) - in design-system-engine-map.mjs but not declared in any CSS file:`);
   for (const v of STALE_SYSTEM_VARS) console.log(`     ${v}`);
   console.log('   Remove these entries from SYSTEM_VARS to keep the exemption list accurate.\n');
 }

@@ -26,7 +26,7 @@ test('imports become blank lines, so line numbers stay; the code\'s own componen
   assert.match(p.split('\n')[0], /declare const useState: any;/);
   assert.match(p.split('\n')[0], /declare const HbBadge: typeof Badge;/);
   assert.equal(p.split('\n')[3], 'export const A = () => <HbBadge tone="error" />;');
-  assert.deepEqual(parseTscOutput("/x/.parity-out/compile/a.tsx(4,26): error TS2322: Type '\"error\"' is not assignable to type '\"neutral\" | \"danger\"'.\nother.ts(1,1): error TS1: no", 'a.tsx'),
+  assert.deepEqual(parseTscOutput("/x/.design-system-engine-out/compile/a.tsx(4,26): error TS2322: Type '\"error\"' is not assignable to type '\"neutral\" | \"danger\"'.\nother.ts(1,1): error TS1: no", 'a.tsx'),
     [{ line: 4, code: 'TS2322', message: "Type '\"error\"' is not assignable to type '\"neutral\" | \"danger\"'." }]);
 });
 

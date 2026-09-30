@@ -37,7 +37,7 @@ test('[regression A5] a genuinely wrong base-rule var still fails', () => {
 // ── A8 ────────────────────────────────────────────────────────────────────────
 const a8Base = {
   'ds-config.json': { paths: { themeCSS: 'theme.css', snapshotVars: 'figma-vars.snapshot.json' }, figma: { colorCollection: 'Color', modes: [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }] } },
-  'parity-map.mjs': 'export const EXPLICIT={};export const SKIP_TOKENS=new Set();',
+  'design-system-engine-map.mjs': 'export const EXPLICIT={};export const SKIP_TOKENS=new Set();',
 };
 const a8Snap = (primitiveVar) => ({
   'theme.css': `:root { --brand: var(${primitiveVar}, #3b82f6); ${primitiveVar}: #3b82f6; }\n`,

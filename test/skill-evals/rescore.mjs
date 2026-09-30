@@ -9,9 +9,11 @@ import { context, decisionPoints } from './lib.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
 import { HELDOUT } from './heldout.mjs';
+import { envVar } from '../../names.mjs';
 
 let privateTasks = [];
-if (process.env.PARITY_EVAL_PRIVATE_TASKS) privateTasks = (await import(process.env.PARITY_EVAL_PRIVATE_TASKS)).PRIVATE;
+const PRIVATE_TASKS = envVar(process.env, 'EVAL_PRIVATE_TASKS');
+if (PRIVATE_TASKS) privateTasks = (await import(PRIVATE_TASKS)).PRIVATE;
 const byId = new Map([...DEV, ...HELDOUT, ...privateTasks].map((t) => [t.id, t]));
 for (const file of process.argv.slice(2)) {
   const rows = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
