@@ -191,3 +191,19 @@ test('RESULTS.md records the guide set that is in the repository', async () => {
   const now = guideSetHash(root);
   assert.ok(measured.includes(now), `the guide, a recipe or a reference file changed since the last evaluation (RESULTS.md has ${measured.join(', ') || 'none'}, the repository has ${now}): run the skill evaluation and record the results with "Guide set measured: \`${now}\`"`);
 });
+
+test('new-ui-saved: no colour or variable the system does not have, and the confirmation or the gap said', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'demo-ds', 'apps', 'gallery', 'ui.html'), 'utf8');
+  const withLine = (line) => page.replace('<button class="tp-button" type="button">Save</button>', `<button class="tp-button" type="button">Save</button>\n  ${line}`);
+  const ctx = (line, final = 'Added a Saved confirmation next to the Save button on the gallery page.') => fakeCtx({ final, files: { 'apps/gallery/ui.html': withLine(line) }, changed: ['apps/gallery/ui.html'] });
+  assert.equal(passes('new-ui-saved', ctx('<span style="color: var(--text-primary)">Saved</span>')), true);
+  assert.equal(passes('new-ui-saved', ctx('<span style="color: #22c55e">Saved</span>')), false);
+  assert.equal(passes('new-ui-saved', ctx('<span style="color: green">Saved</span>')), false);
+  assert.equal(passes('new-ui-saved', ctx('<span style="color: var(--success-green)">Saved</span>')), false);
+  // Nothing added, but the gap said: the system has no green.
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: "The design system has no green or success colour, so I didn't invent one. Want me to use the text colour, or add a success token in Figma first?" })), true);
+  assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Done, nothing else needed here, the page is as it was before.' })), false);
+});
