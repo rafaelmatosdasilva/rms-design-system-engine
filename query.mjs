@@ -7,7 +7,7 @@
 //   • a component: its selector and code file, each prop with its values and default as the code writes
 //     them, Figma's own names where they differ (that is a parity difference), the names an agent is
 //     likely to guess wrong, slots, what it must never contain, when not to use it and what to use instead;
-//   • a token: its CSS variable and its value in each mode;
+//   • a token: its CSS variable, its value in each mode, and for a text colour the surfaces it can be read on;
 //   • anything else: the closest component and token names.
 // Several terms answer in one call. Exit 0 when every term was found, 1 when one was not, 2 with no catalog.
 import './stdio-sync.mjs';   // the whole answer reaches a pipe before process.exit
@@ -23,7 +23,7 @@ export function flattenTokens(tree, prefix = []) {
   const out = [];
   for (const [k, v] of Object.entries(tree ?? {})) {
     if (k.startsWith('$') || !v || typeof v !== 'object') continue;
-    if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: v.$extensions?.['com.rms.parity']?.modes ?? null, deprecated: v.$deprecated === true });
+    if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: v.$extensions?.['com.rms.parity']?.modes ?? null, readableOn: v.$extensions?.['com.rms.parity']?.readableOn ?? null, deprecated: v.$deprecated === true });
     else out.push(...flattenTokens(v, [...prefix, k]));
   }
   return out;
@@ -46,7 +46,8 @@ export function answerLines(a) {
   if (a.kind === 'token') {
     const { token: x, cssVar } = a;
     const modes = x.modes ? Object.entries(x.modes).map(([m, v]) => `${m} ${v}`).join(' · ') : String(x.value);
-    return [`${x.path}${cssVar ? `  →  var(${cssVar})` : ''}  ${modes}${x.deprecated ? '  [deprecated]' : ''}`];
+    return [`${x.path}${cssVar ? `  →  var(${cssVar})` : ''}  ${modes}${x.deprecated ? '  [deprecated]' : ''}`,
+      ...(x.readableOn?.length ? [`  readable on (4.5:1 in every mode): ${x.readableOn.join(', ')}`] : [])];
   }
   const { name, entry: e } = a;
   const lines = [`${name}${e.selector ? `  (${e.selector})` : ''}${e.status ? `  [${e.status}]` : ''}`];
