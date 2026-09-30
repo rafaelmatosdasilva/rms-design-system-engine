@@ -1,5 +1,35 @@
 # Skill evaluation results
 
+## 2026-09: the guide after I57, I58, I34, I23, I44 and exact prop names (continuous evaluation)
+
+A fresh run of the adopted guide (the `cookbook` variant, the checkout) after guide changes: the flex-shrink
+rule made advisory, the focus-ring note on literals, the Figma hygiene record in the value sweep, and the
+props gate's NAME difference. Same tasks, runs and scorers as I56; engine c3fd998. Compared with the adopted
+I56 measurement, its first runs of each task up to the same count.
+
+Guide set measured: `8fe89ab23319`
+
+| | I56 (adopted) | This guide |
+|---|---|---|
+| Sonnet, all 20 tasks (5 runs each) | 100/100 | 100/100 |
+| Sonnet, mean cost / input per request | $0.130 / 121k | $0.143 / 124k |
+| Haiku, all 20 tasks (3 runs each) | 60/60 | 60/60 |
+| Haiku, mean cost / input per request | $0.047 / 65k | $0.055 / 75k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 1.3 | 1.6 |
+
+**Reading.** Every task passes on both models and no rule is broken. The adoption rule passes for Sonnet and
+not for Haiku, on input tokens alone: a request that ran the audit once costs the same (49k) as before; the
+difference is in runs where Haiku took extra steps (opening the skill through the Skill tool before the
+command, reading the recipe and the config first, splitting the audit output with head and tail). Three runs
+per task cannot tell that from noise, so the six tasks whose input grew are being run to 13 runs on both
+versions, the protocol I56 used for a lower pass rate; the result is recorded here when it is in.
+
+**Found by this evaluation and fixed.** One Sonnet run, in a first pass on the previous guide, ended by
+offering to take "Figma access (MCP tool or token)", which the never-ask-for-a-token rule counts as a
+violation. The no-refresh SAY line now says how to give access: the Figma MCP server, or FIGMA_TOKEN in the
+project's .env file, never in the chat. No violation in this run.
+
 ## 2026-09: a bare guide, the engine's router and nothing else (idea I61)
 
 The `bare` variant (`variants.mjs`, 449 bytes) only says to run `--route` and do what it prints. Same tasks, runs and
