@@ -81,3 +81,49 @@ test('judgeCandidate passes the component guidance (the "why") into the payload'
   assert.equal(seen.guidance.whenNotToUse, 'not for navigation');
   assert.deepEqual(seen.guidance.useInstead, ['Link']);
 });
+
+// I60: the same cases per kind of guidance, compared with bare.
+test('guidance levels: each level scored by the same checks, accessibility included, compared with bare', async () => {
+  const { runLevels, levelLines } = await import('../eval-run.mjs');
+  const out = { bare: '<div style="color:#ff0000">x</div>', steering: '<button class="buttonPrimary"><svg/></button>', parity: '<button class="buttonPrimary">Go</button>' };
+  const by = runLevels([{ id: 'a' }, { id: 'b' }], ctx, ['bare', 'steering', 'parity'], (c, level) => out[level], 2);
+  assert.equal(by.bare.summary.zeroFixRate, 0);
+  assert.equal(by.steering.summary.a11y, 4);            // an icon-only button, in 2 cases × 2 runs
+  assert.equal(by.steering.summary.zeroFixRate, 0);     // an accessibility finding is not clean
+  assert.equal(by.parity.summary.zeroFixRate, 100);
+  const lines = levelLines(by, { extra: 'nothing to give' });
+  assert.match(lines[0], /^  bare +2\/2 produced · 0% zero-fix · 4 violation\(s\) · 4 inline style\(s\) · 0 accessibility finding\(s\)$/);
+  assert.match(lines[2], /parity .*\(vs bare: zero-fix \+100 points, violations -4, accessibility 0\)/);
+  assert.equal(lines[3], '  extra     not run: nothing to give');
+});
+
+test('guidance levels: the context each level gets, and the whole run from ds-config', async () => {
+  const { levelContext } = await import('../eval-run.mjs');
+  const { spawnSync } = await import('node:child_process');
+  const { join } = await import('node:path');
+  const dir = makeFixture({
+    'ds-config.json': { paths: { themeCSS: 'theme.css' }, componentSelectors: { chip: '.chip' },
+      evals: { cases: [{ id: 'filter', prompt: 'a filter chip' }], generate: { cmd: 'if [ -n "$EVAL_CONTEXT" ]; then echo "<button class=\\"chip\\">Filter</button>"; else echo "<div style=\\"padding: 9px\\">Filter</div>"; fi' } } },
+    'theme.css': ':root { --chip-bg: #fff; }',
+    'AGENTS.md': '# Agents\nUse the chip component.\n',
+  });
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  assert.deepEqual(levelContext(dir, cfg, 'bare'), { path: '' });
+  const st = levelContext(dir, cfg, 'steering');
+  assert.deepEqual(st.files, ['AGENTS.md']);
+  assert.match(readFileSync(st.path, 'utf8'), /^# AGENTS\.md\n\n# Agents\nUse the chip component\./);
+  assert.match(levelContext(dir, cfg, 'parity').why, /no contracts\/llms\.txt yet/);
+  const r = spawnSync(process.execPath, [join(process.cwd(), 'eval-run.mjs'), '--levels', 'bare,steering,parity'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /bare +1\/1 produced · 0% zero-fix · 1 violation\(s\)/);
+  assert.match(r.stdout, /steering +1\/1 produced · 100% zero-fix · 0 violation\(s\) · 0 inline style\(s\) · 0 accessibility finding\(s\)  \(vs bare: zero-fix \+100 points, violations -1, accessibility 0\)/);
+  assert.match(r.stdout, /parity +not run: no contracts\/llms\.txt yet/);
+});
+
+test('a generate command that ignores its stdin still produces its candidate', async () => {
+  const { generateCandidate } = await import('../eval-run.mjs');
+  // A long prompt and a command that exits at once: writing the prompt can fail with EPIPE, never the candidate.
+  const c = { id: 'x', prompt: 'p'.repeat(1024 * 1024) };
+  for (let i = 0; i < 20; i++) assert.equal(generateCandidate(c, 'echo "<b>ok</b>"', ''), '<b>ok</b>\n');
+  assert.equal(generateCandidate(c, 'exit 3', ''), null);   // a failing command is still no candidate
+});

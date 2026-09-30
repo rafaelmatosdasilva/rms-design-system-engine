@@ -85,6 +85,8 @@ It also checks the **Figma file itself**, for whoever keeps it: a colour, radius
 
 It also does an **accessibility** check: it flags anything that would make the design hard to use (text that is hard to read, a button with no label, something you cannot reach with the keyboard) and tells you, in plain words, how to fix it. Part of it always runs straight from the code and the CSS, with no browser and no page to open (a button or link with only an icon and no label, an image whose alt is a file name, a removed focus outline, a mouse-only control, a hidden element that still takes focus, a misspelled `aria-*`, a page with no language, zoom blocked, animations with no reduced-motion option); when a page can be opened, the browser check goes deeper. `"a11yStatic": false` in `ds-config.json` turns the code part off.
 
+Does your guidance help your AI tools? `node eval-run.mjs --levels bare,steering,parity` runs the same generation tasks three ways: with the prompt alone, with your own instruction files (`AGENTS.md`, `CLAUDE.md`, rules), and with what this skill writes for agents (`contracts/llms.txt`). It scores each by the same checks (design-system tokens and classes, accessibility) and says what each kind of guidance adds or costs against the prompt alone. It needs your own generate command in `ds-config.json` (`evals.generate.cmd`), spends your model tokens, and never gates anything.
+
 Everything is advice with a clear fix. It points at the problem, it does not silently change your code.
 
 ## Inside Claude Code
