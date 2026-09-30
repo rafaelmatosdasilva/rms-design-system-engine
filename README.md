@@ -81,7 +81,7 @@ Every run compares your code against Figma and reports it in plain words:
 - **Shadows and blurs:** match Figma, when your design defines them.
 - **Renders correctly in** a browser: checked on the real result, not just the code on paper.
 - **What this audit** covered: so you can see nothing slipped through.
-- **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing. Advisory; `"steering": false` in `ds-config.json` turns it off.
+- **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing. A file that only says what not to use is noted too: saying the design system is installed and its components are the ones to use is what moves agents onto it. Advisory; `"steering": false` in `ds-config.json` turns it off.
 
 It also spots **workarounds around a component**: a screen that lays its own control over a component (a clear button over a text field, actions over a list row) is doing what the component cannot, so it is reported to the design system as a missing slot or prop, not as the screen's mistake. `"workarounds": false` in `ds-config.json` turns it off.
 
