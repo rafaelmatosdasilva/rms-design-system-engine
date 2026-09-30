@@ -25,7 +25,7 @@ try {
 } catch { /* optional - skip if not present */ }
 
 if (!COMPONENT_USAGES.length) {
-  console.log('⚠️  COMPONENT_USAGES not found in structure-contract.mjs - skipping Gate [14]');
+  console.log('⏭  no COMPONENT_USAGES in structure-contract.mjs - component slots not checked (skipped)');
   process.exit(0);
 }
 

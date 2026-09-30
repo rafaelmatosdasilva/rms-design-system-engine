@@ -30,7 +30,7 @@
        ⏭  SKIPPED   0  (no CSS var, documented)
 
 ✅  [6] Exception lists are valid  (no stale or overly broad entries)
-       ⚠️  this gate printed no result line, so its outcome is not visible here
+       ⏭  no parity-map.mjs - no exception list to check.
 
 ✅  [7] No invented CSS variables  (every CSS variable traces back to a Figma token)
        ✅ TRACEABLE    17  (maps back to a Figma token or SYSTEM_VARS)
@@ -97,13 +97,13 @@
        ⏭  screen elements: no figma-screens.snapshot.json - skipped (capture it to enable)
 
 ✅  [19] Required pieces are in place  (icon slots · component slots · form controls)
-       ⚠️  this gate printed no result line, so its outcome is not visible here
-       ⚠️  this gate printed no result line, so its outcome is not visible here
+       ⏭  no ICON_USAGES in structure-contract.mjs - icon slots not checked (skipped)
+       ⏭  no COMPONENT_USAGES in structure-contract.mjs - component slots not checked (skipped)
        ⏭  [13c] no paths.pluginCSS configured - skipping form-control check
 
 ✅  [20] Icons  (symbol markup · path data · live Figma check · every Figma icon is in the code)
-       ⚠️  this gate printed no result line, so its outcome is not visible here
-       ⚠️  this gate printed no result line, so its outcome is not visible here
+       ✅ No undocumented content-setting pseudo-elements.
+       ✅ No undocumented or misconfigured SVG symbols.
        ⏭  Gate [17] skipped - FIGMA_TOKEN not set (add to .env to enable icon freshness checks)
        ⏭  icon inventory: no figma-icons.snapshot.json - skipped (capture it to enable)
 

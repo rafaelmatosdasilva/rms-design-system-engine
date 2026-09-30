@@ -34,6 +34,7 @@ test('demo design system, without Chrome: the static report matches its golden',
   const r = audit(bareEnv());
   assert.equal(r.code, 1, r.out.slice(-3000));
   assert.match(r.out, /❌ \[sizing\/-\] radii\/chip → --radii-chip/);
+  assert.doesNotMatch(r.out, /printed no result line/);   // every gate shows its outcome
   golden('expected-report-static.txt', r.out);
 });
 

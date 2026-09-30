@@ -52,7 +52,7 @@ try {
   if (map.COVERED_STATE)   COVERED_STATE   = map.COVERED_STATE;
   if (map.COVERED_PREFIX)  COVERED_PREFIX  = map.COVERED_PREFIX;
 } catch {
-  console.log('⚠️  parity-map.mjs not found - nothing to check.\n');
+  console.log('⏭  no parity-map.mjs - no exception list to check.\n');
   process.exit(0);
 }
 
