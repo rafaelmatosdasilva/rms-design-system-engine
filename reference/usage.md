@@ -24,7 +24,13 @@ single-component check clean instead of drowning in the rest of the DS. Because 
 **contains** others (a button may hold an icon, a card a badge), the scope **auto-expands**
 to the nested components used inside the chosen ones (found via their source files, so the
 parent is never passed while a child it depends on is broken); the banner lists what was
-pulled in. Set a default in `ds-config.json → scopeComponents: ["ButtonPrimary"]` if a repo
+pulled in. Only a component's own source counts: the file `componentFiles` names for it, or a
+file whose name ends with its name (`HbIconButton.vue` is iconButton's, `Chip/index.tsx` is
+chip's). A page that shows several components, the theme CSS, a native element (`<button>`,
+`type="button"`) and a name inside a longer one (button inside iconButton) pull in nothing. A
+finding that names a component belongs to that component; one that names none (a token, a
+shared rule) belongs to the scope when its file mentions a component in scope. The burndown
+of a scoped run counts only its components. Set a default in `ds-config.json → scopeComponents: ["ButtonPrimary"]` if a repo
 should always run scoped. Omit the flag to audit the whole DS.
 
 **Utility flags (no full audit - run the terminal command directly):**
@@ -38,6 +44,7 @@ rms-figma-code-parity --trend                         # show last 20 audit runs 
 rms-figma-code-parity --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
 rms-figma-code-parity --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
 rms-figma-code-parity --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
+rms-figma-code-parity --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description (the first 15 show on every run)
 rms-figma-code-parity --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-figma-code-parity --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-figma-code-parity --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
