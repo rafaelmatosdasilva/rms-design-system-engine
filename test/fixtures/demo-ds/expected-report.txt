@@ -114,19 +114,19 @@
        ✅ [template-composition] no templates[] configured — skipped
 
 ✅  [18] Markup  (ids · component classes · icon references · every DS screen control is built)
-       ℹ️  [15] htmlStructureClasses not set in ds-config.json - DS component classes are not part of the fingerprint (ids and icon references still are).
-       ✅ [15] No snapshot found - baseline written (1 plugin(s))
+       ℹ️  htmlStructureClasses not set in ds-config.json - DS component classes are not part of the fingerprint (ids and icon references still are).
+       ✅ No snapshot found - baseline written (1 plugin(s))
        ⏭  screen elements: no figma-screens.snapshot.json - skipped (capture it to enable)
 
 ✅  [19] Required pieces are in place  (icon slots · component slots · form controls)
        ⏭  no ICON_USAGES in structure-contract.mjs - icon slots not checked (skipped)
        ⏭  no COMPONENT_USAGES in structure-contract.mjs - component slots not checked (skipped)
-       ⏭  [13c] no paths.pluginCSS configured - skipping form-control check
+       ⏭  no paths.pluginCSS configured - skipping form-control check
 
 ✅  [20] Icons  (symbol markup · path data · live Figma check · every Figma icon is in the code)
        ✅ No undocumented content-setting pseudo-elements.
        ✅ No undocumented or misconfigured SVG symbols.
-       ⏭  Gate [17] skipped - FIGMA_TOKEN not set (add to .env to enable icon freshness checks)
+       ⏭  skipped - FIGMA_TOKEN not set (add to .env to enable icon freshness checks)
        ⏭  icon inventory: no figma-icons.snapshot.json - skipped (capture it to enable)
 
 ✅  [21] Transitions  (duration · easing · property per DS selector)
@@ -139,7 +139,7 @@
        ⏭  Effect parity - not configured (no snapshot.effects or figma.effects). Skipped.
 
 ✅  [24] Renders correctly in a browser  (real computed styles vs the DS spec)
-       ⏭  [16] rendered parity skipped - RENDERED_ASSERTIONS empty (set ds-config.json → rendered.auto to generate height checks automatically)
+       ⏭  rendered parity skipped - RENDERED_ASSERTIONS empty (set ds-config.json → rendered.auto to generate height checks automatically)
 
 ✅  [25] What this audit actually checked  (which DS components & states are covered)
        ✅ MODELLED   3/3 DS components have at least one check

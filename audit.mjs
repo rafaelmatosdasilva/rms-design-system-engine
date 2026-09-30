@@ -2571,8 +2571,14 @@ function reportFull(label, items, shown) {
     return { ...result, pass, lines };
   }
 
+  // The gate scripts tag their lines with their own old numbers ("[15] No snapshot found", "Gate [17] skipped");
+  // the report numbers its gates 1 to 25, so a line never carries another number.
+  const legacyFree = (l) => (typeof l !== 'string' ? l : l
+    .replace(/Gate \[\d+[a-z]?\] skipped/g, 'skipped')
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*(?:✅|❌|⚠️|ℹ️|⏭|🚧)\s+)\[\d+[a-z]?\]\s+/u, '$1'));
   function addGate(label, result) {
     const r = scopeFilter(result);
+    if (Array.isArray(r.lines)) r.lines = r.lines.map(legacyFree);
     // planLimited gates are neutral - they don't block the audit
     if (!r.pass && !r.planLimited) anyFail = true;
     gates.push({ label, ...r });
