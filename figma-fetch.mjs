@@ -61,3 +61,10 @@ export function makeFigmaFetch(fetchImpl = globalThis.fetch, timeoutMs = FIGMA_F
     }
   };
 }
+
+// Published components and component sets by node id. REST returns them as a list
+// (`meta.component_sets: [{ node_id, name, description, … }]`); a map keyed by node id is read as is.
+export function byNodeId(list) {
+  if (Array.isArray(list)) return Object.fromEntries(list.filter((x) => x && x.node_id).map((x) => [x.node_id, x]));
+  return list && typeof list === 'object' ? list : {};
+}

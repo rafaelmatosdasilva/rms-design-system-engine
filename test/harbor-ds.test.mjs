@@ -10,6 +10,8 @@
 //     same name, so not in parity; the button's values are written exactly as Figma's and pass
 //   • an icon-only button with no accessible name, and an outline removed with no focus style back
 //   • an AGENTS.md that states tone="error" (the system says danger) and a variable that does not exist
+//   • the Figma file's own hygiene (component-values.snapshot.json): a raw fill, a detached instance, a variant
+//     with no auto layout, a component with no description
 // And conventions that are not differences: the focus ring's outline lengths, which Figma has no value for,
 // and fixed heights with no flex-shrink:0 (advisory only).
 //
@@ -41,6 +43,11 @@ test('Harbor design system, without Chrome: every deliberate difference is found
   // Agent instruction files.
   assert.match(r.out, /AGENTS\.md:3  tone="error" is not a value this prop takes; the system has tone="danger"/);
   assert.match(r.out, /AGENTS\.md:4  --hb-radius-pill is not a declared CSS variable/);
+  // The Figma file's own hygiene, advice for whoever keeps the file, never a gate and never in the burndown.
+  assert.match(r.out, /🎨 Figma file hygiene: 2 of 3 components \(1 value with no variable or style · 1 detached instance · 1 variant with no auto layout · 1 with no description\)/);
+  assert.match(r.out, /badge: fill #b42318 on Tone=Danger\/Label has no variable or style/);
+  assert.match(r.out, /iconButton: Default\/Glyph is detached from its instance/);
+  assert.match(r.out, /● Figma hygiene\s+1\/3 components/);
   // Conventions, not differences: a focus ring and fixed heights outside a flex column.
   assert.match(r.out, /✅ Clean - no literal diverges from Figma/);
   assert.match(r.out, /✅ PASS  3 component\(s\) - no phantom CSS borders/);
@@ -48,4 +55,13 @@ test('Harbor design system, without Chrome: every deliberate difference is found
   assert.match(r.out, /✅  \[13\]/);
   assert.match(r.out, /\*\*Not in parity\.\*\* 2 of 25 gates fail\./);
   golden(FIXTURE, 'expected-report-static.txt', r.out);
+});
+
+test('Harbor, scoped to one component: a page showing several components and a native <button> pull nothing in', { timeout: 300000 }, () => {
+  const r = auditFixture(FIXTURE, bareEnv(), 'harbor-ds-', ['--component', 'badge']);
+  assert.match(r.out, /SCOPED TO: badge/);
+  assert.doesNotMatch(r.out, /nested components pulled in/);
+  assert.match(r.out, /📉 Burndown, open findings per component: badge 2 · /);
+  assert.match(r.out, /🎨 Figma file hygiene: 1 of 1 component \(1 value with no variable or style\)/);
+  assert.doesNotMatch(r.out, /iconButton: /);
 });

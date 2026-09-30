@@ -88,9 +88,9 @@ export function normalise(text, dir) {
 }
 
 // The whole audit on a fresh copy, its output normalised.
-export function auditFixture(fixture, env, prefix) {
+export function auditFixture(fixture, env, prefix, args = []) {
   const dir = fixtureProject(fixture, prefix);
-  const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...env, NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 300000 });
+  const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...env, NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 300000 });
   return { dir, code: r.status, out: normalise((r.stdout ?? '') + (r.stderr ?? ''), dir) };
 }
 

@@ -161,7 +161,7 @@ test('variants: each Figma axis value is the default, a produced state or a decl
   const code = { components: { chip: { states: { 'State=Hover': {} }, statesNotProduced: [{ state: 'State=Focus' }] } } };
   const structure = { chip: { defaultVariant: 'State=Default, Size=M', variants: { 'State=Default, Size=M': {}, 'State=Hover, Size=M': {}, 'State=Focus, Size=M': {}, 'State=Default, Size=L': {} } } };
   const r = compareVariants(code, structure);
-  assert.deepEqual(r.missing, [{ component: 'chip', axis: 'size', value: 'l' }]);
+  assert.deepEqual(r.missing, [{ component: 'chip', axis: 'Size', value: 'L' }]);   // Figma's own names
   assert.equal(r.built, 4);
 });
 

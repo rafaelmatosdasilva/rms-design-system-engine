@@ -444,10 +444,12 @@ export function compareVariants(code, structure) {
     const def = axesOf(f.defaultVariant ?? '');
     const known = new Set([...Object.keys(c.states ?? {}), ...(c.statesNotProduced ?? []).map((x) => x.state)].flatMap((l) => Object.entries(axesOf(l)).map(([k, v]) => `${k}=${v}`)));
     const values = new Set(Object.keys(f.variants).flatMap((v) => Object.entries(axesOf(v)).map(([k, x]) => `${k}=${x}`)));
+    // Matched without letter case (a class realizes Size=Large as .large), reported with Figma's own names.
+    const asWritten = new Map(Object.keys(f.variants).flatMap((v) => String(v).split(',').map((p) => p.split('=').map((x) => x.trim())).filter((p) => p.length === 2).map(([k, x]) => [`${k.toLowerCase()}=${x.toLowerCase()}`, [k, x]])));
     for (const kv of values) {
       const [k, v] = kv.split('=');
       if (def[k] === v || known.has(kv)) out.built++;
-      else out.missing.push({ component: name, axis: k, value: v });
+      else { const [axis, value] = asWritten.get(kv) ?? [k, v]; out.missing.push({ component: name, axis, value }); }
     }
   }
   return out;

@@ -326,7 +326,9 @@ return JSON.stringify(result, null, 2);
 
 Powers the **per-component** parity scoping of the hardcoded-value gate (Hard Rule 5). For each component it records every raw geometry number and colour its nodes actually use - **not tokens, the literal values** - swept from ALL nodes (all variants, all descendants, hidden included). The gate checks a file's hardcoded literals against the component that file belongs to, so a `24px` is parity only when *that component's own* Figma node is 24px.
 
-`{ "ButtonPrimary": { "nums": [4, 24, 40, 48], "colors": ["2563eb", "ffffff"] }, … }`
+`{ "ButtonPrimary": { "nums": [4, 24, 40, 48], "colors": ["2563eb", "ffffff"], "hygiene": { … } }, … }`
+
+The same sweep records each component's **Figma file hygiene** in `hygiene`: values with no variable and no style (a solid fill or stroke colour, a corner radius, a padding, a gap in an auto layout, a text layer with no text style), frames detached from an instance (the Plugin API capture only; REST has no such flag), variants with two or more layers and no auto layout, and whether the component has a description. The audit lists them in a `🎨 Figma file hygiene` block, for whoever keeps the Figma file: code can only match what Figma states. Vector artwork and instances are left out (an instance holds its own component's values). Advisory, never a gate; `"figmaHygiene": false` turns it off and `--hygiene` lists every finding. The parity never changes Figma.
 
 **Optional convenience - auto-refresh (REST):** `audit.mjs` regenerates it on every run when `FIGMA_TOKEN` is set. Not required; the plugin capture below is the universal, any-plan, no-token path.
 
@@ -348,11 +350,64 @@ function collectRaw(node, nums, colors) {
   for (const e of (Array.isArray(node.effects) ? node.effects : [])) if (e?.color) colors.add(hex(e.color));
   for (const child of node.children ?? []) collectRaw(child, nums, colors);
 }
+// The Figma file hygiene record (the same function as the engine's figma-hygiene.mjs).
+function hygieneOf(root, description, budget = { n: Infinity }) {
+  const out = { raw: [], rawCount: 0, noAutoLayout: [], description: !!String(description ?? '').trim() };
+  const has = (o, k) => { const v = o ? o[k] : null; return Array.isArray(v) ? v.some(Boolean) : !!v; };
+  const bound = (n, k) => has(n.boundVariables, k);
+  const styled = (n, kind) => has(n.styles, kind) || (typeof n[kind + 'StyleId'] === 'string' && n[kind + 'StyleId'] !== '');
+  const hex = (c) => '#' + [c.r, c.g, c.b].map((x) => Math.round((x || 0) * 255).toString(16).padStart(2, '0')).join('');
+  const num = (v) => typeof v === 'number' && isFinite(v) && v > 0;
+  const kids = (n) => (Array.isArray(n.children) ? n.children : []);
+  const artwork = /^(VECTOR|BOOLEAN_OPERATION|STAR|LINE|POLYGON|REGULAR_POLYGON)$/;
+  const raw = (at, field, value) => { out.rawCount++; if (out.raw.length < 12) out.raw.push({ at, field, value }); };
+  const corners = ['topLeftRadius', 'topRightRadius', 'bottomRightRadius', 'bottomLeftRadius'];
+  const sides = [['paddingTop', 'top'], ['paddingRight', 'right'], ['paddingBottom', 'bottom'], ['paddingLeft', 'left']];
+  let detached = null;
+  const walk = (n, at) => {
+    if (!n || typeof n !== 'object' || budget.n <= 0) return;
+    budget.n--;
+    if (n.type === 'INSTANCE') return;   // an instance, overrides included, reads as its own component's values
+    if (n.detachedInfo !== undefined) { detached = detached || []; if (n.detachedInfo) detached.push(at); }
+    if (!artwork.test(n.type)) {
+      for (const [list, kind] of [['fills', 'fill'], ['strokes', 'stroke']]) {
+        const paints = Array.isArray(n[list]) ? n[list] : [];
+        paints.forEach((p, i) => {
+          if (!p || p.type !== 'SOLID' || p.visible === false || !p.color) return;
+          const viaNode = n.boundVariables && Array.isArray(n.boundVariables[list]) && n.boundVariables[list][i];
+          if (has(p.boundVariables, 'color') || viaNode || styled(n, kind)) return;
+          raw(at, kind, hex(p.color));
+        });
+      }
+    }
+    const radii = Array.isArray(n.rectangleCornerRadii) ? n.rectangleCornerRadii : corners.map((k) => n[k]);
+    const radius = num(n.cornerRadius) ? n.cornerRadius : Math.max(0, ...radii.filter(num));
+    if (radius > 0 && !bound(n, 'cornerRadius') && !corners.some((k) => bound(n, k))) raw(at, 'radius', radius);
+    const loose = sides.filter(([k]) => num(n[k]) && !bound(n, k)).map(([k, w]) => `${w} ${n[k]}`);
+    if (loose.length) raw(at, 'padding', loose.join(', '));
+    const auto = n.layoutMode && n.layoutMode !== 'NONE';
+    if (auto && num(n.itemSpacing) && kids(n).length > 1 && !bound(n, 'itemSpacing')) raw(at, 'gap', n.itemSpacing);
+    if (n.type === 'TEXT' && !styled(n, 'text') && !bound(n, 'fontSize')) {
+      const size = typeof n.fontSize === 'number' ? n.fontSize : n.style && n.style.fontSize;
+      raw(at, 'text style', size ? `${size}px` : 'mixed');
+    }
+    for (const c of kids(n)) walk(c, `${at}/${c.name}`);
+  };
+  const variants = root && root.type === 'COMPONENT_SET' ? kids(root) : [root];
+  for (const v of variants) {
+    if (!v) continue;
+    if (kids(v).length > 1 && (!v.layoutMode || v.layoutMode === 'NONE')) out.noAutoLayout.push(v.name);
+    walk(v, v.name);
+  }
+  if (detached) out.detached = detached;
+  return out;
+}
 const result = {};
-for (const set of figma.root.findAll(n => n.type === 'COMPONENT_SET' || n.type === 'COMPONENT')) {
+// Components, and component sets as one entry (a variant is part of its set, not a component of its own).
+for (const set of figma.root.findAll(n => n.type === 'COMPONENT_SET' || (n.type === 'COMPONENT' && n.parent?.type !== 'COMPONENT_SET'))) {
   const nums = new Set(), colors = new Set();
   collectRaw(set, nums, colors);
-  result[set.name] = { nums: [...nums].sort((a, b) => a - b), colors: [...colors].sort() };
+  result[set.name] = { nums: [...nums].sort((a, b) => a - b), colors: [...colors].sort(), hygiene: hygieneOf(set, set.description) };
 }
 return JSON.stringify({ _updated: new Date().toISOString(), ...result }, null, 2);
 ```

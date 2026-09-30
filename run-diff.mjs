@@ -11,7 +11,7 @@
 
 const ANSI = /\x1b\[[0-9;]*m/g;
 const GATE = /^(✅|❌|⚠️|⏭)\s+\[(\d+)\]\s+(.+?)(?:\s{2}\(.*)?$/;
-const HEADING = /^(⚠️|ℹ️|❌|✅|📌|♿|🧭)\s+(?:\[[^\]]+\]\s+)?([^:]+?)(?::|$)/;
+const HEADING = /^(⚠️|ℹ️|❌|✅|📌|♿|🧭|🎨)\s+(?:\[[^\]]+\]\s+)?([^:]+?)(?::|$)/;
 // A zero count on a fail line is not a finding: "❌ FAIL  0", "❌ MISSING  0 selectors", "❌ FAIL  0/140 (…)".
 export const ZERO_FAIL = /^❌\s+[A-Z][A-Z ?]*?\s+0(\/\d+)?(\s|$)/;
 
@@ -94,13 +94,15 @@ export function componentOf(finding, names) {
 // Lines that are not a finding of anything: a count ("❌ FAIL  1", "⚠️  NEW SKIP  0"), the fix under a
 // finding, a gate that printed no result line.
 const NOT_A_FINDING = / :: ((❌|⚠️)\s+[A-Z][A-Z ?]*\s+\d|Fix:|⚠️\s+this gate printed no result line)/;
+// Work in the Figma file, not in the code the burndown works down.
+const FIGMA_WORK = /^Figma file hygiene :: /;
 
 export function burndown(findings, names, prev = null) {
   const count = (list) => {
     const by = new Map();
     let loose = 0;
     for (const f of list ?? []) {
-      if (/ :: gate fails$/.test(f) || / :: (🔗|↳)/.test(f) || NOT_A_FINDING.test(f)) continue;   // a gate's own verdict, a link, a note or a count
+      if (/ :: gate fails$/.test(f) || / :: (🔗|↳)/.test(f) || NOT_A_FINDING.test(f) || FIGMA_WORK.test(f)) continue;   // a gate's own verdict, a link, a note or a count
       const c = componentOf(f, names);
       if (c) by.set(c, (by.get(c) ?? 0) + 1); else loose++;
     }

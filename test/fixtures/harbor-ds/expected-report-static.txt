@@ -190,11 +190,18 @@
      AGENTS.md:3  tone="error" is not a value this prop takes; the system has tone="danger"
      AGENTS.md:4  --hb-radius-pill is not a declared CSS variable
 
+🎨 Figma file hygiene: 2 of 3 components (1 value with no variable or style · 1 detached instance · 1 variant with no auto layout · 1 with no description). For whoever keeps the Figma file: code can only match what Figma states. The parity never changes Figma. Advisory.
+     badge: fill #b42318 on Tone=Danger/Label has no variable or style
+     iconButton: Default/Glyph is detached from its instance
+     iconButton: Default has no auto layout
+     iconButton: no description
+
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
   ● Gate health      22/25 gates pass
   ● Coverage         3/3 components modelled (100%)  ·  exemption debt 0
   ● Documentation    3/3 contracts have a description (100%)
   ● AI guidance      0/3 carry whenNotToUse/useInstead (0%)
+  ● Figma hygiene    1/3 components with every value bound, auto layout and a description (33%)
 
 ℹ️  Agreed values: 17 of 18 compared facts agree (recorded in parity-agreed.json, updated). Of the 1 that differ: 0 Figma moved · 0 code moved · 0 both moved · 1 with no earlier agreement.
 
