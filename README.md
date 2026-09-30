@@ -80,7 +80,7 @@ Every run compares your code against Figma and reports it in plain words:
 - **Shadows and blurs:** match Figma, when your design defines them.
 - **Renders correctly in** a browser: checked on the real result, not just the code on paper.
 - **What this audit** covered: so you can see nothing slipped through.
-- **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist. A wrong name there makes every agent that reads it build the wrong thing. Advisory; `"steering": false` in `ds-config.json` turns it off.
+- **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing. Advisory; `"steering": false` in `ds-config.json` turns it off.
 
 It also checks the **Figma file itself**, for whoever keeps it: a colour, radius, padding, gap or text with no variable or style, an instance detached from its component, a variant with no auto layout, a component with no description. Code can only match what Figma states. Advice only; the parity never changes Figma. `"figmaHygiene": false` in `ds-config.json` turns it off.
 
