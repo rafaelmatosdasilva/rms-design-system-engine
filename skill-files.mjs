@@ -3,24 +3,25 @@
 // The command file an agent loads holds only the rules that always apply and an index. The rest lives
 // beside the engine and is printed on demand, so it is found wherever the skill is installed (a linked
 // command, a copied one, or `node <install-dir>/audit.mjs`):
-//   rms-figma-code-parity --recipe [name]      a task recipe (cookbook/<name>.md); no name lists them
-//   rms-figma-code-parity --reference [name]   a reference file (reference/<name>.md); no name lists them
-//   rms-figma-code-parity --doctor             checks the install, with the one fix for each problem
-//   rms-figma-code-parity --guide classic      links the command to the guide as it was before the split
+//   rms-design-system-engine --recipe [name]      a task recipe (cookbook/<name>.md); no name lists them
+//   rms-design-system-engine --reference [name]   a reference file (reference/<name>.md); no name lists them
+//   rms-design-system-engine --doctor             checks the install, with the one fix for each problem
+//   rms-design-system-engine --guide classic      links the command to the guide as it was before the split
 import { readFileSync, existsSync, readdirSync, lstatSync, readlinkSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { OLD_SKILL, OUT_DIR, SKILL, envVar } from './names.mjs';
 
 export const KINDS = { recipe: 'cookbook', reference: 'reference' };
-export const GUIDE = 'rms-figma-code-parity.md';
+export const GUIDE = 'rms-design-system-engine.md';
 export const CLASSIC_TAG = 'guide-monolith';
 
 // The same guide as a native Claude Code Skill: the main file under a frontmatter, with the recipes and the
 // reference beside it as files. Built from the main file, never kept as a second copy.
-export const SKILL_DESCRIPTION = 'Checks a design system\'s code against its Figma file (tokens, structure, states, variants, accessibility) and reports what is not in parity, with the file and line to change. Use when the user asks for a parity audit, to compare code with Figma, to check a component against its design, or runs /rms-figma-code-parity.';
+export const SKILL_DESCRIPTION = 'The engine of a design system: checks its code against its Figma file (tokens, structure, states, variants, props, accessibility) and says what is out of sync with the file and line to change; answers which components, props and tokens exist, exactly as written; checks UI an AI generates, and each UI edit as it is made. Use when the user asks to audit or compare code with Figma, check a component, ask what the system has, build UI with it, or runs /rms-design-system-engine.';
 export function skillMd(guideText) {
-  return `---\nname: rms-figma-code-parity\ndescription: ${JSON.stringify(SKILL_DESCRIPTION)}\n---\n\n${guideText}`;
+  return `---\nname: rms-design-system-engine\ndescription: ${JSON.stringify(SKILL_DESCRIPTION)}\n---\n\n${guideText}`;
 }
 
 // Each file with its first "Use when" line (recipes) or first heading (reference).
@@ -46,7 +47,7 @@ export function printDoc(engineDir, kind, name, log = console.log) {
   const list = listDocs(engineDir, kind);
   if (!name) {
     if (!list.length) { log(`No ${kind === 'recipe' ? 'recipes' : 'reference files'} in this version of the skill: the guide itself holds everything.`); return 2; }
-    log(kind === 'recipe' ? 'Recipes (rms-figma-code-parity --recipe <name>):' : 'Reference (rms-figma-code-parity --reference <name>):');
+    log(kind === 'recipe' ? 'Recipes (rms-design-system-engine --recipe <name>):' : 'Reference (rms-design-system-engine --reference <name>):');
     for (const d of list) log(`  ${d.name.padEnd(22)} ${d.when}`);
     return 0;
   }
@@ -66,16 +67,16 @@ export function doctor({ engineDir, projectDir, home = process.env.HOME ?? '', n
   const major = Number(String(nodeVersion).split('.')[0]);
   add(major >= 22, `Node ${nodeVersion}`, 'install Node 22 or newer (the browser reading needs its built-in WebSocket)');
   const cmd = join(home, '.claude', 'commands', GUIDE);
-  let link = null, cmdOk = false, cmdWhat = 'the /rms-figma-code-parity command';
+  let link = null, cmdOk = false, cmdWhat = 'the /rms-design-system-engine command';
   try {
     const st = lstatSync(cmd);
     if (st.isSymbolicLink()) { link = resolve(join(home, '.claude', 'commands'), readlinkSync(cmd)); cmdOk = existsSync(link); cmdWhat += ` → ${link}`; }
     else { cmdOk = readFileSync(cmd, 'utf8') === readFileSync(join(engineDir, GUIDE), 'utf8'); cmdWhat += cmdOk ? ' (a copy, up to date)' : ' (a copy that differs from this engine\'s guide)'; }
   } catch { cmdWhat += ' (not installed)'; }
-  add(cmdOk, cmdWhat, 'run rms-figma-code-parity --link-command (a link follows every update; a copy goes stale)');
+  add(cmdOk, cmdWhat, 'run rms-design-system-engine --link-command (a link follows every update; a copy goes stale)');
   const recipes = listDocs(engineDir, 'recipe');
   const indexed = existsSync(join(engineDir, GUIDE)) && /--recipe/.test(readFileSync(join(engineDir, GUIDE), 'utf8'));
-  add(!indexed || recipes.length > 0, indexed ? `${recipes.length} recipes beside the engine` : 'the guide holds everything (no recipes in this version)', 'the cookbook/ folder is missing: run rms-figma-code-parity --update');
+  add(!indexed || recipes.length > 0, indexed ? `${recipes.length} recipes beside the engine` : 'the guide holds everything (no recipes in this version)', 'the cookbook/ folder is missing: run rms-design-system-engine --update');
   const chrome = findChrome();
   add(!!chrome, chrome ? `Chrome: ${chrome}` : 'Chrome not found', 'install Chrome or Chromium, or set CHROME_PATH (the browser reading and the accessibility check need it)');
   if (projectDir && existsSync(join(projectDir, 'ds-config.json'))) {
@@ -84,16 +85,25 @@ export function doctor({ engineDir, projectDir, home = process.env.HOME ?? '', n
     if (cfg.hooks === false) add(true, 'hooks: turned off in ds-config.json', null);
     else {
       const h = hooksStatus(projectDir);
-      add(h.installed && h.exists !== false, h.installed ? (h.exists === false ? 'hooks installed, but they point at an engine that is gone' : 'hooks installed in this project') : 'hooks not installed in this project', 'run rms-figma-code-parity --install-hooks');
+      add(h.installed && h.exists !== false, h.installed ? (h.exists === false ? 'hooks installed, but they point at an engine that is gone' : 'hooks installed in this project') : 'hooks not installed in this project', 'run rms-design-system-engine --install-hooks');
     }
   }
   return rows;
 }
 
+// A guide from before the rename, speaking of the new command and terminal command.
+export const renamedGuide = (text) => text.split(OLD_SKILL).join(SKILL).replace(/\brms-parity\b/g, SKILL);
+
 // The classic guide, as it was before the split, from the engine's git history (a tag).
 export function classicGuide(engineDir, tag = CLASSIC_TAG) {
-  try { return execFileSync('git', ['show', `${tag}:${GUIDE}`], { cwd: engineDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 16 * 1024 * 1024 }); }
-  catch { return null; }
+  // The tag predates the rename: its guide has the old file name and speaks of the old command.
+  for (const file of [GUIDE, `${OLD_SKILL}.md`]) {
+    try {
+      const text = execFileSync('git', ['show', `${tag}:${file}`], { cwd: engineDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 16 * 1024 * 1024 });
+      return file === GUIDE ? text : renamedGuide(text);
+    } catch {}
+  }
+  return null;
 }
 
 // Writes it beside the engine (never tracked) and returns its path, or null when the tag is not there.
@@ -111,13 +121,13 @@ export function writeClassicGuide(engineDir, tag = CLASSIC_TAG) {
   return file;
 }
 
-// Opt-in, local only (I55): with PARITY_USAGE_LOG=1, each route, recipe, reference and run is appended to
-// <project>/.parity-out/skill-usage.json, to see which recipes real requests use. Never sent anywhere; the
+// Opt-in, local only (I55): with DESIGN_SYSTEM_ENGINE_USAGE_LOG=1, each route, recipe, reference and run is appended to
+// <project>/.design-system-engine-out/skill-usage.json, to see which recipes real requests use. Never sent anywhere; the
 // request text is not kept, only the route it got. Returns true when it wrote.
 export function logUsage(projectDir, entry, { env = process.env, now = () => new Date() } = {}) {
-  if (env.PARITY_USAGE_LOG !== '1') return false;
+  if (envVar(env, 'USAGE_LOG') !== '1') return false;
   try {
-    const dir = join(projectDir, '.parity-out');
+    const dir = join(projectDir, OUT_DIR);
     const file = join(dir, 'skill-usage.json');
     let list = [];
     try { list = JSON.parse(readFileSync(file, 'utf8')); } catch { /* first entry */ }

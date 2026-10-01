@@ -1,20 +1,20 @@
 # Usage: every command, option and output
 
-Part of the rms-figma-code-parity reference (`rms-figma-code-parity --reference usage`). The rules that always apply are in the main guide.
+Part of the rms-design-system-engine reference (`rms-design-system-engine --reference usage`). The rules that always apply are in the main guide.
 
 ## Usage
 
 ```
-/rms-figma-code-parity
+/rms-design-system-engine
 ```
 
 **You do NOT have to audit the whole design system.** Scope the run to one or more chosen
 components - the common case when you are working on, or checking, a single component:
 
 ```bash
-rms-figma-code-parity --component ButtonPrimary                # one component
-rms-figma-code-parity --component ButtonPrimary,Toast          # several (comma-separated)
-rms-figma-code-parity --component ButtonPrimary --component Toast   # or repeated
+rms-design-system-engine --component ButtonPrimary                # one component
+rms-design-system-engine --component ButtonPrimary,Toast          # several (comma-separated)
+rms-design-system-engine --component ButtonPrimary --component Toast   # or repeated
 ```
 
 In a scoped run the gates report **only** findings that belong to the chosen components;
@@ -35,36 +35,36 @@ should always run scoped. Omit the flag to audit the whole DS.
 
 **Utility flags (no full audit - run the terminal command directly):**
 ```bash
-rms-figma-code-parity --init                          # first-time setup only: scaffold config files, then exit
-rms-figma-code-parity --init --figma-url=<url> --theme-css=<path>   # non-interactive setup (for agents/CI; --figma-source-url=<url> optional)
-rms-figma-code-parity --version                       # am I on the latest? compares local vs remote (a normal run also nudges once/day)
-rms-figma-code-parity --update                        # update to the latest - no re-download
-rms-figma-code-parity --link-command                  # (re)point the /rms-figma-code-parity command at the install via symlink
-rms-figma-code-parity --trend                         # show last 20 audit runs + pass/fail trend
-rms-figma-code-parity --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
-rms-figma-code-parity --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
-rms-figma-code-parity --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
-rms-figma-code-parity --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) or a token's variable, values per mode and, for a text colour, the surfaces it reads on
-rms-figma-code-parity --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description (the first 15 show on every run)
-rms-figma-code-parity --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
-rms-figma-code-parity --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
-rms-figma-code-parity --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
-rms-figma-code-parity --no-docs                       # skip the design-intent layer this run (emitted by default; local, gitignored)
-rms-figma-code-parity --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
-rms-figma-code-parity --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
-rms-figma-code-parity --baseline                      # capture today's failing gates as accepted adoption debt (commit parity-baseline.json)
-rms-figma-code-parity --baseline --findings           # the same, each failing ❌ line accepted on its own
-rms-figma-code-parity --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
-rms-figma-code-parity --no-baseline                   # ignore any parity-baseline.json this run (enforce every gate)
-rms-figma-code-parity --summary                       # print the plain result of the last run again (relay it as is)
-rms-figma-code-parity --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
-rms-figma-code-parity --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
-rms-figma-code-parity --route "<request>"             # the first step for any request: the recipe, the exact command, SAY and NEXT (the project's hook runs it for /rms-figma-code-parity requests)
-rms-figma-code-parity --recipe [name]                 # print a task recipe from the skill's cookbook (no name lists them)
-rms-figma-code-parity --reference [name]              # print a reference file from the skill (no name lists them)
-rms-figma-code-parity --guide classic|current         # link the command to the guide as one file (as before the split), or back
-node ~/.claude/skills/rms-figma-code-parity/parity-check.mjs --fix                   # auto-fix sizing/typography divergences in theme.css
-node ~/.claude/skills/rms-figma-code-parity/setup-webhook.mjs --list                 # list registered Figma webhooks for this file
+rms-design-system-engine --init                          # first-time setup only: scaffold config files, then exit
+rms-design-system-engine --init --figma-url=<url> --theme-css=<path>   # non-interactive setup (for agents/CI; --figma-source-url=<url> optional)
+rms-design-system-engine --version                       # am I on the latest? compares local vs remote (a normal run also nudges once/day)
+rms-design-system-engine --update                        # update to the latest - no re-download
+rms-design-system-engine --link-command                  # (re)point the /rms-design-system-engine command at the install via symlink
+rms-design-system-engine --trend                         # show last 20 audit runs + pass/fail trend
+rms-design-system-engine --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
+rms-design-system-engine --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
+rms-design-system-engine --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
+rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) or a token's variable, values per mode and, for a text colour, the surfaces it reads on
+rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description (the first 15 show on every run)
+rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
+rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
+rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
+rms-design-system-engine --no-docs                       # skip the design-intent layer this run (emitted by default; local, gitignored)
+rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
+rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
+rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
+rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
+rms-design-system-engine --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
+rms-design-system-engine --no-baseline                   # ignore any design-system-engine-baseline.json this run (enforce every gate)
+rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is)
+rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
+rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
+rms-design-system-engine --route "<request>"             # the first step for any request: the recipe, the exact command, SAY and NEXT (the project's hook runs it for /rms-design-system-engine requests)
+rms-design-system-engine --recipe [name]                 # print a task recipe from the skill's cookbook (no name lists them)
+rms-design-system-engine --reference [name]              # print a reference file from the skill (no name lists them)
+rms-design-system-engine --guide classic|current         # link the command to the guide as one file (as before the split), or back
+node ~/.claude/skills/rms-design-system-engine/parity-check.mjs --fix                   # auto-fix sizing/typography divergences in theme.css
+node ~/.claude/skills/rms-design-system-engine/setup-webhook.mjs --list                 # list registered Figma webhooks for this file
 ```
 
 ### The design-intent layer (auto OUTPUT, never a gate)
@@ -118,7 +118,7 @@ copy its secret; (2) **share the page** with that integration; (3) put the secre
 page not shared, or offline → the audit keeps the committed `guidelines.md` and never fails. The fetch
 reads one page and does not follow links inside it.
 
-**The easy way: paste the link into the chat.** The agent runs `rms-figma-code-parity --guidelines <link>`,
+**The easy way: paste the link into the chat.** The agent runs `rms-design-system-engine --guidelines <link>`,
 which works for GitLab and Notion alike, one or several links: it adds the link below for you, reads the page
 at once, and reports whether it worked. Notion also takes a list now (`"notion": ["<link>", …]`), each
 page to its own `guidelines/notion-<page>.md`; the original single link keeps writing to `sources[0]`.
@@ -286,10 +286,10 @@ it as the props type) and `tsc` shows prop drift in the editor and in CI. `contr
 #### The code capture (every run, and `--capture-code` on its own)
 
 Figma is captured once per run into snapshots every gate reads. The code is now captured the same way:
-each audit run writes `.parity-out/code.snapshot.json` (local, keep `.parity-out` gitignored; setup adds
+each audit run writes `.design-system-engine-out/code.snapshot.json` (local, keep `.design-system-engine-out` gitignored; setup adds
 it) before the gates start, and every fact in it says **where it came from** and **how sure the reading
 is**. It is cached by content, so an unchanged project reuses it at once; after a code change the
-browser part takes a few seconds per component. `rms-figma-code-parity --capture-code` runs it on its
+browser part takes a few seconds per component. `rms-design-system-engine --capture-code` runs it on its
 own. `ds-config.json → codeReading.capture: "off"` skips it in the audit (the gates then keep their own
 readings, and Gate [17] says the capture did not run). Inside a git hook the capture is static only, so a
 commit never waits for the browser: a pre-commit hook is detected on its own, any other hook passes
@@ -358,8 +358,8 @@ only while the snapshot still matches the code:
   icons, nesting) and how, or that the capture is missing or out of date.
 
 **`--capture-code --compare`** lays the capture beside the Figma snapshots, field by field, and writes
-`.parity-out/code-vs-figma.json`. Tokens resolve exactly as Gate 3 resolves them (the trailing `/color`
-dropped, then `parity-map` `EXPLICIT` / `EXPLICIT_SIZING`, then the naming convention; `SKIP_TOKENS`,
+`.design-system-engine-out/code-vs-figma.json`. Tokens resolve exactly as Gate 3 resolves them (the trailing `/color`
+dropped, then `design-system-engine-map` `EXPLICIT` / `EXPLICIT_SIZING`, then the naming convention; `SKIP_TOKENS`,
 `NULL_TOKENS` and an explicit `null` skipped). Component fields: a height only where the code fixes one (a
 `height` rule compared as the drawn box, a `min-height` by its value), padding, gap and radius by token or
 value, font against the first text element, background as "paints or not" (Figma often paints on a child
@@ -379,7 +379,7 @@ the component owns them. When the code capture is fresh, each entry also has `re
 real page, `targetSize` for a control (with `atLeast24`, WCAG 2.5.8), and what each state changes, by
 token where the code uses one (`"State=Hover": { "backgroundColor": "var(--btn-bg-hover)" }`).
 
-`rms-figma-code-parity --check-ui <generated.json>` checks one generated UI against that catalog. It
+`rms-design-system-engine --check-ui <generated.json>` checks one generated UI against that catalog. It
 accepts a flat A2UI-style list (`{ root, components: [{ id, component, children: [ids], …props }] }`) or a
 nested `{ component, props, children }` tree. The check is deterministic and prompt-blind: it never
 repairs the UI and never adds anything, so it can be run on every generation. Its rules are written
@@ -387,14 +387,14 @@ down once (only catalog components; only listed props and values; booleans are t
 ids, one root, existing children, one parent each, no cycles; nothing inside a component it must never
 combine with), and every finding names the rule it breaks. A deprecated component, a node not attached
 to the tree, or a child the design system never nests there is a warning. Findings are also written to
-`.parity-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
+`.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
 #### Adoption baseline / ratchet (opt-in, gate-level)
 
 A real codebase is rarely 100% green on day one. Rather than a wall of red (ignored) or turning gates
 off (drift hides), run `--baseline` once to record **today's failing gates as accepted debt** in a
-committed `parity-baseline.json`. After that, a normal run **tolerates** those baselined gates (shown
+committed `design-system-engine-baseline.json`. After that, a normal run **tolerates** those baselined gates (shown
 as `⚠️ Debt`, verdict `NO REGRESSIONS ✅`) but **fails on any gate not in the baseline that goes red** —
 a real regression. Debt only ratchets **down**: a baselined gate that goes green is surfaced as "ready
 to ratchet" so you can re-run `--baseline` to lock it in (it can no longer regress silently); stale
@@ -552,7 +552,7 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **axe-core** must match a pinned SHA-384 hash before it is ever injected into a page (from the CDN, or
   from the npm registry's package when a CDN is blocked). With `a11yStrict`, its serious and critical
   findings count toward failing the check.
-- **axe-core** is cached in `~/.cache/rms-figma-code-parity` after the first download (or `a11y.axePath`
+- **axe-core** is cached in `~/.cache/rms-design-system-engine` after the first download (or `a11y.axePath`
   points at a local copy), runs the WCAG 2.0/2.1/2.2 A and AA rules explicitly, and is scoped to the
   checked components.
 

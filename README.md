@@ -1,6 +1,6 @@
-# rms-figma-code-parity
+# rms-design-system-engine
 
-Checks that your code actually matches your design system: the real colours, sizes, fonts and component rules from Figma, not just whether it looks about right. It tells you exactly what is out of sync and where to fix it. It works the same on code you wrote and on code an AI wrote.
+The engine of your design system. It checks that your code actually matches your design system in Figma: the real colours, sizes, fonts and component rules, not just whether it looks about right, and tells you exactly what is out of sync and where to fix it. It answers which components, props and tokens exist, named exactly as they are. It checks the UI an AI builds with them, each edit as it is made. It works the same on code you wrote and on code an AI wrote.
 
 ## How it works
 
@@ -15,18 +15,18 @@ It also gives AI tools that generate interfaces a catalog of your real component
 In your terminal (the Terminal app on Mac, or Windows Terminal), paste this and press Enter:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-figma-code-parity/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.sh | bash
 ```
 
 ## Update
 
 ```bash
-rms-figma-code-parity --update
+rms-design-system-engine --update
 ```
 
-The skill updates itself: once a day, before an audit, it pulls the latest version and says so in one line. It only does this when the install is on `main` with no local changes, never on CI, and `PARITY_NO_AUTO_UPDATE=1` turns it off. `rms-figma-code-parity --update` updates it by hand, and `--version` tells you if you are behind. You never re-download.
+The skill updates itself: once a day, before an audit, it pulls the latest version and says so in one line. It only does this when the install is on `main` with no local changes, never on CI, and `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` turns it off. `rms-design-system-engine --update` updates it by hand, and `--version` tells you if you are behind. You never re-download.
 
-Keep a single copy: link anything that needs the skill's files to `~/.claude/skills/rms-figma-code-parity`, the folder that updates itself, instead of keeping a clone of your own.
+Keep a single copy: link anything that needs the skill's files to `~/.claude/skills/rms-design-system-engine`, the folder that updates itself, instead of keeping a clone of your own.
 
 ## Run it
 
@@ -34,22 +34,23 @@ First time in a project, set it up once (it asks a couple of quick questions):
 
 ```bash
 cd my-project
-rms-figma-code-parity --init
+rms-design-system-engine --init
 ```
 
 Then the easy way is to just ask, in plain language, inside Claude Code:
 
-- *"run the parity on the whole design system"*: checks everything
-- *"run the parity on input"*: checks the `input` component (and its parts) and reports only that
+- *"check the whole design system against Figma"*: checks everything
+- *"check input"*: checks the `input` component (and its parts) and reports only that
+- *"which props does the badge take?"*: answers from the design system, names written exactly
 
 Or from the terminal:
 
 ```bash
-rms-figma-code-parity                       # the whole design system
-rms-figma-code-parity --component input     # one component (or a few: input,button)
-rms-figma-code-parity --check-ui ui.json     # check a UI an AI tool generated against your components
-rms-figma-code-parity --query badge          # one component or token, names written exactly; a text colour also lists the surfaces it can be read on
-rms-figma-code-parity --component chip --baseline --findings --match radi   # accept one known difference (the chip's radius) as debt; everything else keeps failing
+rms-design-system-engine                       # the whole design system
+rms-design-system-engine --component input     # one component (or a few: input,button)
+rms-design-system-engine --check-ui ui.json     # check a UI an AI tool generated against your components
+rms-design-system-engine --query badge          # one component or token, names written exactly; a text colour also lists the surfaces it can be read on
+rms-design-system-engine --component chip --baseline --findings --match radi   # accept one known difference (the chip's radius) as debt; everything else keeps failing
 ```
 
 ## What it checks
@@ -103,17 +104,25 @@ Everything is advice with a clear fix. It points at the problem, it does not sil
 
 The engine makes the decisions, not the AI model, so it behaves the same on a small model as on a large one:
 
-- **Every request is routed by the engine.** `--init` adds project hooks (`.claude/settings.local.json`, never committed). With them, each `/rms-figma-code-parity` request arrives already matched to the right recipe and the exact command to run, with the words to use for what the tool cannot do (it never changes Figma, and never fakes a Figma refresh).
+- **Every request is routed by the engine.** `--init` adds project hooks (`.claude/settings.local.json`, never committed). With them, each `/rms-design-system-engine` request arrives already matched to the right recipe and the exact command to run, with the words to use for what the tool cannot do (it never changes Figma, and never fakes a Figma refresh).
 - **The hooks also keep the rules.** A Figma snapshot is never edited by hand, and the AI asks you before a commit, a push, a `ds-config.json` edit, or a code change you did not ask for.
 - **Every UI edit is checked when it is made.** After the AI edits a style, markup or component file, the hook reads only what that edit added and hands back, with the right name, anything the design system does not have: a colour written by hand (and the token that has it), a CSS variable declared nowhere, a prop value or prop name a component does not take, and in a Tailwind project a class with a value in brackets. The AI fixes it before moving on, whether or not it thought to ask. Silent when the edit is clean; your own components, the browser's own attributes, token definitions, comments and data are never flagged. `"editCheck": false` in `ds-config.json` turns this part off.
-- **Short guide, recipes on demand.** The AI reads a short guide, then only the recipe the task needs (`rms-figma-code-parity --recipe` lists them). Measured on 20 real requests: every one done right on both a large and a small model, at about a fifth of the cost of the old one-file guide (results in `test/skill-evals/RESULTS.md`).
-- **Going back is one command.** `rms-figma-code-parity --guide classic` switches to the old one-file guide, `--guide current` switches back.
-- `rms-figma-code-parity --doctor` checks the install. `--remove-hooks` (or `"hooks": false` in `ds-config.json`) turns the hooks off. Projects set up before the router or the edit check existed get them on their next run.
-- Optional and local only: `PARITY_USAGE_LOG=1` records which recipes and commands ran in `.parity-out/skill-usage.json`. Nothing is ever sent anywhere.
+- **Short guide, recipes on demand.** The AI reads a short guide, then only the recipe the task needs (`rms-design-system-engine --recipe` lists them). Measured on 20 real requests: every one done right on both a large and a small model, at about a fifth of the cost of the old one-file guide (results in `test/skill-evals/RESULTS.md`).
+- **Going back is one command.** `rms-design-system-engine --guide classic` switches to the old one-file guide, `--guide current` switches back.
+- `rms-design-system-engine --doctor` checks the install. `--remove-hooks` (or `"hooks": false` in `ds-config.json`) turns the hooks off. Projects set up before the router or the edit check existed get them on their next run.
+- Optional and local only: `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` records which recipes and commands ran in `.design-system-engine-out/skill-usage.json`. Nothing is ever sent anywhere.
 
 ## That's it
 
 Commit the files it creates so your whole team and CI check against the same design. The deeper setup and every option live in the full guide.
+
+## Coming from rms-figma-code-parity?
+
+This is the same skill under a new name, `rms-design-system-engine`, because it now does more than compare code with Figma. Nothing to do by hand:
+
+- **Your install moves itself.** The next run from the old install (or `--update`, or the install line above) moves `~/.claude/skills/rms-figma-code-parity` to `~/.claude/skills/rms-design-system-engine`, links the `/rms-design-system-engine` command, and replaces the `rms-figma-code-parity` and `rms-parity` terminal commands with `rms-design-system-engine`. It says so in one line: open a new Claude Code session to use the new command.
+- **Your project keeps working.** The engine's files in a project have new names: `design-system-engine-map.mjs`, `design-system-engine-baseline.json`, `design-system-engine-agreed.json`, `design-system-engine-history.json`, `design-system-engine-check-result.json`, and the folders `.design-system-engine-out/` and `.design-system-engine-refs/`. A file under its old `parity-` name is still read, and each run says which ones to rename. The output folder `.parity-out/` is moved for you, and `.gitignore` gets the new names. The project's hooks point at the new install on the next run.
+- **Environment variables** are now `DESIGN_SYSTEM_ENGINE_*` (for example `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1`); the old `PARITY_*` ones still work.
 
 ## License
 

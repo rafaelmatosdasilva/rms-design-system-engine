@@ -1,7 +1,7 @@
 // route.mjs - the request, as the person wrote it, routed by the engine to a recipe and the exact command
 // (idea I56: "if a decision can be made deterministically, the model does not make it").
 //
-//   rms-figma-code-parity --route "<the request, as written>"
+//   rms-design-system-engine --route "<the request, as written>"
 //
 // The agent's first step for every request. Picking the recipe, the scope and the command was the model's
 // decision, and the evaluation showed smaller models get it wrong (a question answered from memory, the wrong
@@ -22,12 +22,12 @@ export function projectState(ROOT, { engineDir, env = process.env } = {}) {
   const vars = read(conf.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
   const stamps = [structure?._updated, vars?._updated].filter(Boolean).map((u) => new Date(u)).filter((d) => !Number.isNaN(d.getTime()));
   const oldest = stamps.length ? new Date(Math.min(...stamps)) : null;
-  const onPath = String(env.PATH ?? '').split(':').some((d) => d && existsSync(join(d, 'rms-figma-code-parity')));
+  const onPath = String(env.PATH ?? '').split(':').some((d) => d && existsSync(join(d, 'rms-design-system-engine')));
   return {
     hasConfig,
     components: Object.keys(structure?.components ?? {}),
     snapshotDate: oldest ? oldest.toISOString().slice(0, 10) : null,
-    cmd: onPath || !engineDir ? 'rms-figma-code-parity' : `node ${join(engineDir, 'audit.mjs')}`,
+    cmd: onPath || !engineDir ? 'rms-design-system-engine' : `node ${join(engineDir, 'audit.mjs')}`,
   };
 }
 
@@ -78,7 +78,7 @@ export const SAY = {
 };
 
 // route(text, { hasConfig, components, cmd, snapshotDate }) → { recipe, question, run: [commands], notes: [lines], say: [lines], sayIf }
-export function route(text, { hasConfig = true, components = [], cmd = 'rms-figma-code-parity', snapshotDate = null } = {}) {
+export function route(text, { hasConfig = true, components = [], cmd = 'rms-design-system-engine', snapshotDate = null } = {}) {
   const r = routeOnly(text, { hasConfig, components, cmd });
   const say = [];
   let sayIf = null;
@@ -169,7 +169,7 @@ export function debtWords(text) {
 }
 
 // What --route prints: the route, the commands, the notes, one NEXT line, and the recipe itself.
-export function routeText(r, recipeText, cmd = 'rms-figma-code-parity', { maxRecipe = null } = {}) {
+export function routeText(r, recipeText, cmd = 'rms-design-system-engine', { maxRecipe = null } = {}) {
   const lines = [`ROUTE: ${r.recipe}`];
   for (const c of r.run) lines.push(`RUN: ${c}`);
   for (const n of r.notes) lines.push(`NOTE: ${n}`);

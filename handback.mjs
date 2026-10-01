@@ -1,10 +1,10 @@
 // handback.mjs - every measured difference says which way to send it back (idea I48).
 //
 //   • Figma moved (or no record of an agreement): the code is behind. The change to the declaration at
-//     the rule's file:line is written as a patch, .parity-out/handback/code-changes.diff, which a person
+//     the rule's file:line is written as a patch, .design-system-engine-out/handback/code-changes.diff, which a person
 //     applies with `git apply` (or not). Only single-value declarations are patched; the rest are listed.
 //   • Code moved: Figma is behind. The Figma change (component, variant, property, value) is listed in
-//     .parity-out/handback/figma-changes.md, with a link to the component.
+//     .design-system-engine-out/handback/figma-changes.md, with a link to the component.
 //   • Both moved: a person decides; listed in the Figma list as a decision.
 // Nothing is ever applied here.
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
@@ -93,7 +93,7 @@ export function codePatch(root, diffs) {
 
 // The Figma side: what to change in the design, per component.
 export function figmaChanges(items, linkFor = () => null) {
-  const rows = ['# Figma changes to make', '', 'Proposed by rms-figma-code-parity. Nothing was changed in Figma.', ''];
+  const rows = ['# Figma changes to make', '', 'Proposed by rms-design-system-engine. Nothing was changed in Figma.', ''];
   const by = new Map();
   for (const it of items) { if (!by.has(it.d.component)) by.set(it.d.component, []); by.get(it.d.component).push(it); }
   for (const [comp, list] of by) {

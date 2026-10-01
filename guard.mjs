@@ -2,19 +2,19 @@
 // guard.mjs - the skill's never-rules as a Claude Code PreToolUse hook (idea I55), so they hold every time
 // instead of depending on an agent remembering a paragraph.
 //
-// Installed per project by `rms-figma-code-parity --install-hooks` (and by --init), in
+// Installed per project by `rms-design-system-engine --install-hooks` (and by --init), in
 // .claude/settings.local.json. It reads the tool call Claude Code is about to make (JSON on stdin) and:
 //   • denies editing a Figma snapshot by hand: they come from the capture, never from a hand edit;
 //   • asks the person before editing ds-config.json, committing, pushing, or applying the hand-back patch;
 //   • reads the person's latest message (the hook's transcript_path, idea I56): a code edit or the hand-back
 //     apply passes when that message asks for a change, and asks first when it does not.
-// As a UserPromptSubmit hook (I56), a request made with /rms-figma-code-parity is routed by the engine before
+// As a UserPromptSubmit hook (I56), a request made with /rms-design-system-engine is routed by the engine before
 // the agent reads it: the route, the exact command and the sentences to say arrive with the request, so
 // picking them is never the agent's decision, even when it skips the router.
 // As a PostToolUse hook (I62), a UI edit is checked when it is made: what it added that the design system does
 // not have goes back to the agent with the right name (edit-check.mjs). "editCheck": false turns that part off.
 // Anything else, or any project without a ds-config.json, or one with "hooks": false, passes untouched.
-// The engine's own writes (node … audit.mjs, rms-figma-code-parity) are never blocked.
+// The engine's own writes (node … audit.mjs, rms-design-system-engine) are never blocked.
 import { readFileSync, existsSync } from 'node:fs';
 import { join, basename, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,16 +61,16 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
   const isSnapshot = (p) => SNAPSHOT.test(basename(String(p ?? ''))) || snapshotPaths.has(basename(String(p ?? '')));
   if (EDIT_TOOLS.has(tool)) {
     const file = input.file_path ?? input.notebook_path ?? input.path;
-    if (isSnapshot(file)) return { decision: 'deny', reason: `${basename(file)} is written by the Figma capture, never by hand (a hand edit fakes a refresh). Refresh it with the capture (rms-figma-code-parity --recipe refresh-figma), or leave it stale and say so.` };
-    if (basename(String(file ?? '')) === 'ds-config.json') return { decision: 'ask', reason: 'ds-config.json is the project\'s parity setup. Confirm this edit is what you asked for (guidelines links go through rms-figma-code-parity --guidelines, never a hand edit).' };
+    if (isSnapshot(file)) return { decision: 'deny', reason: `${basename(file)} is written by the Figma capture, never by hand (a hand edit fakes a refresh). Refresh it with the capture (rms-design-system-engine --recipe refresh-figma), or leave it stale and say so.` };
+    if (basename(String(file ?? '')) === 'ds-config.json') return { decision: 'ask', reason: 'ds-config.json is the project\'s parity setup. Confirm this edit is what you asked for (guidelines links go through rms-design-system-engine --guidelines, never a hand edit).' };
     if (userText !== null && CODE.test(String(file ?? '')) && !asksForChange(userText)) return { decision: 'ask', reason: `The person's last message does not ask for a change to ${basename(file)}. Report the fix the audit names instead of making it, or confirm they asked for it.` };
     return null;
   }
   if (tool === 'Bash') {
     const cmd = String(input.command ?? '');
-    const engine = /^\s*(node\s+\S*audit\.mjs|rms-figma-code-parity|rms-parity)\b/.test(cmd);
+    const engine = /^\s*(node\s+\S*audit\.mjs|rms-design-system-engine)\b/.test(cmd);
     if (!engine && SNAPSHOT.test(cmd) && (/(>|>>)\s*\S*figma-[\w.-]*\.snapshot\.json/.test(cmd) || /\b(sed\s+(-[a-zA-Z]*i|--in-place)|perl\s+-[a-zA-Z]*i|tee)\b/.test(cmd) || /\b(cp|mv)\s+\S+\s+\S*figma-[\w.-]*\.snapshot\.json/.test(cmd))) {
-      return { decision: 'deny', reason: 'Figma snapshots are written by the capture, never by a shell edit. Refresh them with the capture (rms-figma-code-parity --recipe refresh-figma).' };
+      return { decision: 'deny', reason: 'Figma snapshots are written by the capture, never by a shell edit. Refresh them with the capture (rms-design-system-engine --recipe refresh-figma).' };
     }
     if (/\bgit\b[^|;&\n]*\spush\b/.test(cmd)) return { decision: 'ask', reason: 'Pushing sends the work to the remote. Confirm the person asked for a push.' };
     if (/\bgit\b[^|;&\n]*\scommit\b/.test(cmd)) return { decision: 'ask', reason: 'Committing records the change. Confirm the person asked for a commit.' };
@@ -80,7 +80,7 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
 }
 
 // The route for a request made with the skill's command, as context for the agent; null for any other prompt.
-const COMMAND = /^\s*\/rms-figma-code-parity\b[ \t]*([\s\S]*)$/;
+const COMMAND = /^\s*\/rms-design-system-engine\b[ \t]*([\s\S]*)$/;
 export const MAX_RECIPE = 6000;
 export function routePrompt(event, { root, engineDir = ENGINE, cfg = {}, env = process.env } = {}) {
   if (cfg.hooks === false) return null;
@@ -90,7 +90,7 @@ export function routePrompt(event, { root, engineDir = ENGINE, cfg = {}, env = p
   const r = route(text, state);
   let recipe = '';
   try { recipe = readDoc(engineDir, 'recipe', r.recipe) ?? ''; } catch { /* the pointer line still names it */ }
-  return `The engine already routed this request (rms-figma-code-parity's project hook); follow it and do not run --route again.\n${routeText(r, recipe, state.cmd, { maxRecipe: MAX_RECIPE })}`;
+  return `The engine already routed this request (rms-design-system-engine's project hook); follow it and do not run --route again.\n${routeText(r, recipe, state.cmd, { maxRecipe: MAX_RECIPE })}`;
 }
 
 export function promptOutput(context) {
@@ -100,7 +100,7 @@ export function promptOutput(context) {
 
 export function hookOutput(verdict) {
   if (!verdict) return '';
-  return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: verdict.decision, permissionDecisionReason: `rms-figma-code-parity: ${verdict.reason}` } });
+  return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: verdict.decision, permissionDecisionReason: `rms-design-system-engine: ${verdict.reason}` } });
 }
 
 // As a hook: stdin → stdout, always exit 0 (a broken guard must never block work; --doctor reports it).

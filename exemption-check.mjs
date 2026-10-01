@@ -13,7 +13,7 @@
 //
 // Requires at project root:
 //   ds-config.json   - snapshot path, themeCSS
-//   parity-map.mjs   - EXPLICIT, SKIP_TOKENS, EXPLICIT_SIZING, COVERED, COVERED_STATE
+//   design-system-engine-map.mjs   - EXPLICIT, SKIP_TOKENS, EXPLICIT_SIZING, COVERED, COVERED_STATE
 //
 // Exit 0 = all exemptions valid.  Exit 1 = stale/broken entry found.
 
@@ -22,6 +22,7 @@ import { join } from 'path';
 import { loadModes, buildResolver } from './mode-resolver.mjs';
 import { loadCssSources } from './css-source.mjs';
 import { pathToFileURL } from 'url';
+import { projectPath } from './names.mjs';
 
 const ROOT = process.cwd();
 
@@ -36,13 +37,13 @@ const THEME_PATH  = THEME_PATHS[0];
 const PLUGIN_CSS = cfg.paths?.pluginCSS    ?? [];
 const PRIM_PFX   = cfg.figma?.primitivePrefix ?? 'primitives/';
 
-// ── Load parity-map.mjs ───────────────────────────────────────────────────────
+// ── Load design-system-engine-map.mjs ───────────────────────────────────────────────────────
 let EXPLICIT = {}, SKIP_TOKENS = new Set();
 let EXPLICIT_SIZING = {}, SIZING_SKIP = new Map();
 let COVERED = new Set(), COVERED_STATE = new Set(), COVERED_PREFIX = [];
-let PMAP = null;   // the imported parity-map module, reused below (avoids a second dynamic import)
+let PMAP = null;   // the imported design-system-engine-map module, reused below (avoids a second dynamic import)
 try {
-  PMAP = await import(pathToFileURL(join(ROOT, 'parity-map.mjs')).href);
+  PMAP = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   const map = PMAP;
   if (map.EXPLICIT)        EXPLICIT        = map.EXPLICIT;
   if (map.SKIP_TOKENS)     SKIP_TOKENS     = map.SKIP_TOKENS;
@@ -52,7 +53,7 @@ try {
   if (map.COVERED_STATE)   COVERED_STATE   = map.COVERED_STATE;
   if (map.COVERED_PREFIX)  COVERED_PREFIX  = map.COVERED_PREFIX;
 } catch {
-  console.log('⏭  no parity-map.mjs - no exception list to check.\n');
+  console.log('⏭  no design-system-engine-map.mjs - no exception list to check.\n');
   process.exit(0);
 }
 
@@ -127,7 +128,7 @@ function mappedVar(cssVar) {
 }
 
 // ── CSS color resolver (shared, N-mode) ───────────────────────────────────────
-// Primitive scale + modes from parity-map.mjs / ds-config.json - no hardcoded light/dark.
+// Primitive scale + modes from design-system-engine-map.mjs / ds-config.json - no hardcoded light/dark.
 const NL = PMAP?.NEUTRAL_LIGHT ?? {};
 const ND = PMAP?.NEUTRAL_DARK  ?? {};
 const NEUTRAL_MAPS = PMAP?.NEUTRAL_MAPS ?? null;
@@ -251,7 +252,7 @@ console.log(`🚨 STALE     ${STALE.length}  (phantom exemptions - token no long
 console.log(`❌ BROKEN    ${BROKEN.length}  (CSS var missing or value mismatch)`);
 
 if (STALE.length) {
-  console.log('\n─── Phantom exemptions (update parity-map.mjs) ──────────────────');
+  console.log('\n─── Phantom exemptions (update design-system-engine-map.mjs) ──────────────────');
   for (const e of STALE) console.log(`  🚨 [${e.section}] ${e.token}\n      ${e.reason}`);
 }
 if (BROKEN.length) {

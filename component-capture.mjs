@@ -120,12 +120,12 @@ export function winningDecl(matched, inlineStyle, prop) {
 
 // ── In-page helpers ─────────────────────────────────────────────────────────────
 const HOST = "position:absolute;left:0;top:0;width:600px;display:block;pointer-events:none;";
-// Find (or build) one instance of each component and tag it with data-parity-cap="<i>".
+// Find (or build) one instance of each component and tag it with data-design-system-engine-cap="<i>".
 function locateExpression(specs) {
   return `(() => {
     const specs = ${JSON.stringify(specs)};
-    let host = document.getElementById('__parity_cap_host__');
-    if (!host) { host = document.createElement('div'); host.id = '__parity_cap_host__'; host.style.cssText = ${JSON.stringify(HOST)}; document.body.appendChild(host); }
+    let host = document.getElementById('__designSystemEngine_cap_host__');
+    if (!host) { host = document.createElement('div'); host.id = '__designSystemEngine_cap_host__'; host.style.cssText = ${JSON.stringify(HOST)}; document.body.appendChild(host); }
     const shown = (e) => { const r = e.getBoundingClientRect(); return (r.width > 0 || r.height > 0) && getComputedStyle(e).visibility !== 'hidden'; };
     const build = (sel) => {
       let parent = null, first = null;
@@ -156,7 +156,7 @@ function locateExpression(specs) {
         // a particular usage (an app styles it for that spot), so it is copied into a neutral host with
         // those extras removed, and the removed extras are recorded.
         const own = new Set((s.selector.split(/\\s+/).pop().match(/\\.[\\w-]+/g) || []).map((c) => c.slice(1)));
-        const extras = (e) => [...e.classList].filter((c) => !own.has(c) && !c.startsWith('data-parity'));
+        const extras = (e) => [...e.classList].filter((c) => !own.has(c) && !c.startsWith('data-design-system-engine'));
         const visible = all.filter(shown);
         // Rank: a plain instance first, then one that carries text (a design's default variant has
         // its label; an icon-only usage is a variant of its own), then the rest.
@@ -183,24 +183,24 @@ function locateExpression(specs) {
         host.appendChild(b.root); el = b.target.matches(s.selector) ? b.target : null; if (el) how = 'bare';
       }
       if (!el) return { i, how: null, count };
-      el.setAttribute('data-parity-cap', ((el.getAttribute('data-parity-cap') || '') + ' ' + i).trim());   // two names can share one element
+      el.setAttribute('data-design-system-engine-cap', ((el.getAttribute('data-design-system-engine-cap') || '') + ' ' + i).trim());   // two names can share one element
       // The parts the contract names (fontSel / radiusSel / gapSel / beforeSel), found inside the instance.
       const parts = {};
       for (const [kind, sel] of Object.entries(s.parts || {})) {
         let p = null;
         try { p = el.matches(sel) ? el : el.querySelector(sel) || el.querySelector(sel.split(/\s+/).pop()); } catch { p = null; }
-        if (p) { p.setAttribute('data-parity-part', ((p.getAttribute('data-parity-part') || '') + ' ' + i + '-' + kind).trim()); parts[kind] = true; }
+        if (p) { p.setAttribute('data-design-system-engine-part', ((p.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-' + kind).trim()); parts[kind] = true; }
       }
       // The first element that holds visible text: what Figma's font fields describe (the first TEXT node).
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       for (let t = walker.nextNode(); t; t = walker.nextNode()) {
-        if (t.textContent.trim() && t.parentElement) { t.parentElement.setAttribute('data-parity-part', ((t.parentElement.getAttribute('data-parity-part') || '') + ' ' + i + '-text').trim()); parts.text = true; break; }
+        if (t.textContent.trim() && t.parentElement) { t.parentElement.setAttribute('data-design-system-engine-part', ((t.parentElement.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; break; }
       }
       return { i, how, count, stripped, parts, hasText: !!el.textContent.trim() };
     });
   })()`;
 }
-const capSel = (i) => `[data-parity-cap~="${i}"]`;
+const capSel = (i) => `[data-design-system-engine-cap~="${i}"]`;
 function measureExpression(selector) {
   return `(() => {
     const el = document.querySelector(${JSON.stringify(selector)});
@@ -219,7 +219,7 @@ function measureExpression(selector) {
       if (!c.startsWith('rgba') && !c.includes('/')) break;
     }
     // The capture host turns pointer events off for everything inside it; read the component's own.
-    const host = document.getElementById('__parity_cap_host__'), hostPe = host ? host.style.pointerEvents : null;
+    const host = document.getElementById('__designSystemEngine_cap_host__'), hostPe = host ? host.style.pointerEvents : null;
     if (host) host.style.pointerEvents = 'auto';
     const pointerEvents = getComputedStyle(el).pointerEvents;
     if (host) host.style.pointerEvents = hostPe;
@@ -583,7 +583,7 @@ export async function captureComponents(ctx) {
     const specs = list.map((c) => ({ selector: c.selector, probe: c.probe ?? null, allowBare: pi === pages.length - 1, children: c.children ?? [], parts: c.parts ?? {} }));
     const located = (await P.evaluate(locateExpression(specs))) ?? [];
     // Every located instance and part, measured in each mode at once, before any state is applied.
-    const partSel = (i, kind) => `[data-parity-part~="${i}-${kind}"]`;
+    const partSel = (i, kind) => `[data-design-system-engine-part~="${i}-${kind}"]`;
     const sels = located.filter((l) => !l.error && l.how).flatMap((l) => [capSel(l.i), ...Object.keys(l.parts ?? {}).map((k) => partSel(l.i, k))]);
     let pre = new Map();
     const stateJobs = [];
@@ -652,7 +652,7 @@ export async function captureComponents(ctx) {
       // Parts: each measured and traced like the instance, keeping only the properties the part is for.
       const PART_PROPS = { font: ['fontSize', 'fontWeight', 'lineHeight', 'color', 'fontFamily', 'letterSpacing', 'textTransform'], text: ['fontSize', 'fontWeight', 'lineHeight', 'color', 'fontFamily', 'letterSpacing', 'textTransform'], radius: ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'], gap: ['rowGap', 'columnGap'], before: ['borderTopLeftRadius', 'backgroundColor'] };
       for (const kind of Object.keys(loc.parts ?? {})) {
-        const sel = `[data-parity-part~="${loc.i}-${kind}"]`;
+        const sel = `[data-design-system-engine-part~="${loc.i}-${kind}"]`;
         const pNode = await P.nodeOf(sel);
         if (!pNode) continue;
         const pMode = pre.get(sel) ?? await P.measureAll(sel);
@@ -698,17 +698,17 @@ export async function captureComponents(ctx) {
     for (const [k, d] of left.entries()) {
       const tag = `st${k}`;
       const found = await P.evaluate(`(() => { try {
-        const host = document.getElementById('__parity_cap_host__');
+        const host = document.getElementById('__designSystemEngine_cap_host__');
         const all = [...document.querySelectorAll(${JSON.stringify(d.st.selector)})].filter((e) => !(host && host.contains(e)));
         let el = all.find((e) => e.getBoundingClientRect().height > 0) || null;
         if (!el && all.length) {
-          let h = host; if (!h) { h = document.createElement('div'); h.id = '__parity_cap_host__'; h.style.cssText = ${JSON.stringify(HOST)}; document.body.appendChild(h); }
+          let h = host; if (!h) { h = document.createElement('div'); h.id = '__designSystemEngine_cap_host__'; h.style.cssText = ${JSON.stringify(HOST)}; document.body.appendChild(h); }
           const copy = all[0].cloneNode(true); h.appendChild(copy); if (copy.matches(${JSON.stringify(d.st.selector)})) el = copy;
         }
-        if (!el) return false; el.setAttribute('data-parity-state', ${JSON.stringify(tag)}); return true; } catch { return false; } })()`);
-      const sNode = found ? await P.nodeOf(`[data-parity-state="${tag}"]`) : null;
+        if (!el) return false; el.setAttribute('data-design-system-engine-state', ${JSON.stringify(tag)}); return true; } catch { return false; } })()`);
+      const sNode = found ? await P.nodeOf(`[data-design-system-engine-state="${tag}"]`) : null;
       if (!sNode) { still.push(d); continue; }
-      const sMode = await P.measureAll(`[data-parity-state="${tag}"]`);
+      const sMode = await P.measureAll(`[data-design-system-engine-state="${tag}"]`);
       const sTrace = await P.trace(sNode);
       (result[d.comp].states ??= {})[d.st.label] = stateEntry(d.st, `found an element already in this state (${pages[pi].label})`, sMode, sTrace, result[d.comp].props);
     }
@@ -749,7 +749,7 @@ export function stateRecipe(baseSel, stateSel) {
   return { ...add, describe };
 }
 async function applyRecipe(send, sessionId, capId, nodeId, how, on) {
-  const js = `(() => { const el = document.querySelector('[data-parity-cap~="${capId}"]'); if (!el) return;
+  const js = `(() => { const el = document.querySelector('[data-design-system-engine-cap~="${capId}"]'); if (!el) return;
     ${JSON.stringify(how.classes)}.forEach((c) => el.classList.${on ? 'add' : 'remove'}(c));
     ${JSON.stringify(how.attrs)}.forEach(([k, v]) => ${on ? 'el.setAttribute(k, v)' : 'el.removeAttribute(k)'});
     ${how.disabled ? `el.${on ? 'setAttribute("disabled", "")' : 'removeAttribute("disabled")'};` : ''}

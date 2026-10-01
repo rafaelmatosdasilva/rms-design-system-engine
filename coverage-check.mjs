@@ -17,6 +17,7 @@ import { existsSync } from 'fs';
 import { readFreshSnapshot, nestingLabel } from './code-capture.mjs';
 import { pathToFileURL } from 'url';
 import { inProgressNames, inProgressList, sideLabel } from './in-progress.mjs';   // I52: work in progress is not drift
+import { codeSnapshotPath } from './names.mjs';
 
 const ROOT = process.cwd();
 let cfg = {};
@@ -141,7 +142,7 @@ if (noVariants.length) console.log(`     → ${noVariants.map(r => r.comp).join(
 {
   const cap = await readFreshSnapshot(ROOT, cfg).catch(() => null);
   if (!cap) {
-    const saved = existsSync(join(ROOT, cfg.codeReading?.out ?? '.parity-out/code.snapshot.json'));
+    const saved = existsSync(join(ROOT, codeSnapshotPath(cfg)));
     console.log(`ℹ️  CODE CAPTURE ${saved ? 'out of date (the code changed since it ran)' : 'not run'}  - gates use their own readings only`);
   } else {
     const c = cap._coverage ?? {}, b = c.byConfidence ?? {}, cc = c.components ?? {}, ap = c.api;

@@ -28,12 +28,12 @@
 //      equal, so "#00000026" vs "rgba(0,0,0,0.15)" is not a false mismatch.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runGate, EMPTY_PARITY_MAP, crashed } from './helpers.mjs';
+import { runGate, EMPTY_ENGINE_MAP, crashed } from './helpers.mjs';
 
 // ==============================================================================
 // 1) exemption-check.mjs
 // ==============================================================================
-// Inputs: ds-config.json (else exit 1), parity-map.mjs (absent -> exit 0 "nothing to
+// Inputs: ds-config.json (else exit 1), design-system-engine-map.mjs (absent -> exit 0 "nothing to
 // check"), the vars snapshot at paths.snapshotVars (absent/unreadable -> exit 0 "skipped"),
 // the theme CSS, and the optional runtime-walk files bound-tokens.json /
 // component-state-tokens.json. Token universe = every token in each mode's snap.color map
@@ -45,12 +45,12 @@ const EX_GATE = 'exemption-check.mjs';
 const varsSnap = (light = {}, dark = {}, sizing = {}) => ({ color: { light, dark }, sizing });
 
 test('[bugfix exemption] a MISSING vars snapshot skips cleanly (exit 0, no crash)', () => {
-  // parity-map is present (so we are past the "nothing to check" exit) but the snapshot file
+  // design-system-engine-map is present (so we are past the "nothing to check" exit) but the snapshot file
   // named by paths.snapshotVars does not exist. Pre-fix this threw before any report; the fix
   // catches the read and prints a skip line.
   const { code, out } = runGate(EX_GATE, {
     'ds-config.json': { paths: { snapshotVars: 'vars.json', themeCSS: 'theme.css' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     // NO vars.json on disk.
   });
   assert.ok(!crashed(out), `gate crashed instead of skipping:\n${out}`);
@@ -64,7 +64,7 @@ test('[bugfix exemption] an array-form bound-tokens.json does not make a runtime
   // runtime set -> false STALE -> exit 1. Post-fix the array is read as the key list.
   const { code, out } = runGate(EX_GATE, {
     'ds-config.json': { paths: { snapshotVars: 'vars.json', themeCSS: 'theme.css' } },
-    'parity-map.mjs': "export const COVERED = new Set(['widget/foo']);",
+    'design-system-engine-map.mjs': "export const COVERED = new Set(['widget/foo']);",
     'vars.json': varsSnap({}, {}, {}),          // token absent from the snapshot
     'theme.css': ':root {}',
     'bound-tokens.json': ['widget/foo'],        // ARRAY shape - the regression trigger
@@ -79,7 +79,7 @@ test('[bugfix exemption] an array-form bound-tokens.json does not make a runtime
 test('[bugfix exemption] an EXPLICIT token whose Figma value is #ffffff and CSS resolves to #fff is NOT BROKEN (exit 0)', () => {
   const { code, out } = runGate(EX_GATE, {
     'ds-config.json': { paths: { snapshotVars: 'vars.json', themeCSS: 'theme.css' } },
-    'parity-map.mjs': "export const EXPLICIT = { 'brand/white': '--brand-white' };",
+    'design-system-engine-map.mjs': "export const EXPLICIT = { 'brand/white': '--brand-white' };",
     'vars.json': varsSnap({ 'brand/white': '#ffffff' }, { 'brand/white': '#ffffff' }, {}),
     'theme.css': ':root { --brand-white: #fff; }',   // shorthand of the same colour
   });
@@ -93,7 +93,7 @@ test('[regression exemption] a genuinely STALE exemption still fails (exit 1)', 
   // ghost/token is in neither the snapshot nor any runtime walk -> a real phantom exemption.
   const { code, out } = runGate(EX_GATE, {
     'ds-config.json': { paths: { snapshotVars: 'vars.json', themeCSS: 'theme.css' } },
-    'parity-map.mjs': "export const COVERED = new Set(['ghost/token']);",
+    'design-system-engine-map.mjs': "export const COVERED = new Set(['ghost/token']);",
     'vars.json': varsSnap({}, {}, {}),
     'theme.css': ':root {}',
   });
@@ -106,7 +106,7 @@ test('[regression exemption] a genuinely BROKEN EXPLICIT (real value mismatch) s
   // Figma says blue, the CSS var resolves to red - not a shorthand/whitespace artefact.
   const { code, out } = runGate(EX_GATE, {
     'ds-config.json': { paths: { snapshotVars: 'vars.json', themeCSS: 'theme.css' } },
-    'parity-map.mjs': "export const EXPLICIT = { 'brand/blue': '--brand-blue' };",
+    'design-system-engine-map.mjs': "export const EXPLICIT = { 'brand/blue': '--brand-blue' };",
     'vars.json': varsSnap({ 'brand/blue': '#0000ff' }, {}, {}),
     'theme.css': ':root { --brand-blue: #ff0000; }',
   });
@@ -118,7 +118,7 @@ test('[regression exemption] a genuinely BROKEN EXPLICIT (real value mismatch) s
 test('[regression exemption] a fully valid, exact-match exemption set passes (exit 0)', () => {
   const { code, out } = runGate(EX_GATE, {
     'ds-config.json': { paths: { snapshotVars: 'vars.json', themeCSS: 'theme.css' } },
-    'parity-map.mjs': "export const EXPLICIT = { 'brand/blue': '--brand-blue' };",
+    'design-system-engine-map.mjs': "export const EXPLICIT = { 'brand/blue': '--brand-blue' };",
     'vars.json': varsSnap({ 'brand/blue': '#0000ff' }, { 'brand/blue': '#0000ff' }, {}),
     'theme.css': ':root { --brand-blue: #0000ff; }',
   });
@@ -250,10 +250,10 @@ test('parity map: optional and silent when every token is found; a file that doe
   });
   const clean = runGate('parity-check.mjs', files());
   assert.equal(clean.code, 0, clean.out);
-  assert.doesNotMatch(clean.out, /parity-map|PARITY MAP/);
+  assert.doesNotMatch(clean.out, /design-system-engine-map|PARITY MAP/);
   const missing = runGate('parity-check.mjs', files({ 'vars.json': { color: { light: { 'text/color': '#111111' } }, sizing: { 'radius/m': '8px', 'gap/s': '4px' } } }));
   assert.match(missing.out, /NO PARITY MAP  1 token\(s\) not found under the naming convention/);
-  const broken = runGate('parity-check.mjs', files({ 'parity-map.mjs': 'export const X = ;' }));
+  const broken = runGate('parity-check.mjs', files({ 'design-system-engine-map.mjs': 'export const X = ;' }));
   assert.equal(broken.code, 1, broken.out);
-  assert.match(broken.out, /❌ parity-map\.mjs could not be loaded/);
+  assert.match(broken.out, /❌ design-system-engine-map\.mjs could not be loaded/);
 });

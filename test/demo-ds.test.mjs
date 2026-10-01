@@ -14,13 +14,13 @@
 // check), expected-report-static.txt without it. UPDATE_GOLDEN=1 rewrites the one that ran.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
-import { fixtureProject, bareEnv, auditFixture, golden as goldenOf } from './helpers.mjs';
+import { fixtureProject, bareEnv, auditFixture, normalise, golden as goldenOf } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const FIXTURE = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -54,6 +54,30 @@ test('demo design system, with Chrome: every deliberate difference is found, and
   golden('expected-report.txt', r.out);
 });
 
+test('demo design system under the old names: the same report, the output folder moved, each old name said once', { timeout: 300000 }, () => {
+  const dir = project();
+  const git = (...args) => execFileSync('git', args, { cwd: dir, env: { ...process.env, GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.com', GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' } });
+  git('mv', '.design-system-engine-refs', '.parity-refs');
+  writeFileSync(join(dir, 'parity-history.json'), JSON.stringify([{ date: '2026-01-01', passed: 1, total: 2 }]));
+  writeFileSync(join(dir, '.gitignore'), '.parity-out/\nparity-check-result.json\n');
+  git('add', '-A'); git('commit', '-qm', 'old names');
+  mkdirSync(join(dir, '.parity-out')); writeFileSync(join(dir, '.parity-out', 'kept.txt'), 'x');
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 300000 });
+  const out = normalise((r.stdout ?? '') + (r.stderr ?? ''), dir);
+  const notices = [
+    'ℹ️  Moved .parity-out to .design-system-engine-out (the engine\'s output folder has a new name).',
+    'ℹ️  Added .design-system-engine-out/, design-system-engine-check-result.json to .gitignore (the new names of the engine\'s own files).',
+    'ℹ️  .parity-refs is the old name: rename it to .design-system-engine-refs. It is read from the old name for now.',
+    'ℹ️  parity-history.json is the old name: rename it to design-system-engine-history.json. It is read from the old name for now.',
+  ];
+  for (const n of notices) assert.equal(out.split(n).length - 1, 1, `said once: ${n}`);
+  const rest = notices.reduce((t, n) => t.replace(`${n}\n`, ''), out);
+  assert.equal(rest, readFileSync(join(FIXTURE, 'expected-report-static.txt'), 'utf8'));
+  assert.equal(existsSync(join(dir, '.parity-out')), false);
+  assert.equal(readFileSync(join(dir, '.design-system-engine-out', 'kept.txt'), 'utf8'), 'x');
+  assert.equal(JSON.parse(readFileSync(join(dir, 'design-system-engine-history.json'), 'utf8')).length, 2);   // the old history, carried on
+});
+
 test('in progress: an experimental component on one side is listed, never failed; on both sides it is compared', async () => {
   const { inProgressList, inProgressNames } = await import('../in-progress.mjs');
   const { makeFixture } = await import('./helpers.mjs');
@@ -78,7 +102,7 @@ test('in progress: an experimental component on one side is listed, never failed
 test('visual diff: a Figma image from a reference, else the REST API (a component set gives its default variant), cached', async () => {
   const { figmaImage } = await import('../visual-diff.mjs');
   const { makeFixture } = await import('./helpers.mjs');
-  const dir = makeFixture({ '.parity-refs/components/chip.png': 'png' });
+  const dir = makeFixture({ '.design-system-engine-refs/components/chip.png': 'png' });
   const cfg = { figmaFileKey: 'KEY' };
   assert.equal((await figmaImage(dir, cfg, 'chip', {})).from, 'reference');
   assert.match((await figmaImage(dir, cfg, 'tag', { nodeId: '1:2', token: null })).why, /no FIGMA_TOKEN/);

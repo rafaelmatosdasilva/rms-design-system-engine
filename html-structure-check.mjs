@@ -1,6 +1,6 @@
 // html-structure-check.mjs - Gate [15]: HTML structure snapshot
-// Run from project root: node ../rms-figma-code-parity/html-structure-check.mjs
-//                    or: node ../rms-figma-code-parity/html-structure-check.mjs --accept
+// Run from project root: node ../rms-design-system-engine/html-structure-check.mjs
+//                    or: node ../rms-design-system-engine/html-structure-check.mjs --accept
 //
 // Parses each plugin's ui.src.html (static part only - strips <script> blocks),
 // extracts a structural fingerprint (all element IDs, DS component classes on
@@ -125,7 +125,7 @@ for (const plugin of plugins) {
 }
 
 if (!pass) {
-  console.log(`\n  To accept: node ../rms-figma-code-parity/html-structure-check.mjs --accept`);
+  console.log(`\n  To accept: node ../rms-design-system-engine/html-structure-check.mjs --accept`);
 }
 
 process.exit(pass ? 0 : 1);

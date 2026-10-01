@@ -18,8 +18,9 @@
 // never reported.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
+import { ENGINE_DIRS } from './names.mjs';
 
-const SKIP_DIR = new Set(['node_modules', 'dist', 'build', 'out', '.git', '.next', '.nuxt', 'coverage', '.parity-refs', '.parity-out', 'contracts', 'storybook-static', 'vendor']);
+const SKIP_DIR = new Set(['node_modules', 'dist', 'build', 'out', '.git', '.next', '.nuxt', 'coverage', ...ENGINE_DIRS, 'contracts', 'storybook-static', 'vendor']);
 const MARKUP = new Set(['.html', '.htm', '.vue', '.jsx', '.tsx', '.svelte']);
 const STYLE = new Set(['.css', '.scss', '.less', '.vue', '.svelte']);
 

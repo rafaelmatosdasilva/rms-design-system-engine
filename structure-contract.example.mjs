@@ -2,7 +2,7 @@
 // This file is consumed by structure-check.mjs.
 
 // ─── Structural contract (ground-truth per component, State=Default variant) ──
-// Captured from live Figma via /rms-parity Phase 1.
+// Captured from live Figma via /rms-design-system-engine Phase 1.
 // Fields:
 //   h              - height in px, or 'auto'
 //   paddingVar     - { tb: 'padding/token', lr: 'padding/token' } or null

@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { makeFixture, EMPTY_PARITY_MAP } from './helpers.mjs';
+import { makeFixture, EMPTY_ENGINE_MAP } from './helpers.mjs';
 import { captureCode, readFreshSnapshot } from '../code-capture.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -35,7 +35,7 @@ test('freshness: a snapshot is used while the code is unchanged, and ignored onc
 test('token gate: a mismatch on a token the capture could not read reliably is not verified, never a design failure', async () => {
   const files = {
     'ds-config.json': JSON.stringify({ paths: { themeCSS: 'theme.css', snapshotVars: 'figma-vars.snapshot.json' }, figma: { colorCollection: 'Color' } }),
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand: #123456; }\n@media (prefers-color-scheme: dark) { :root { --brand: #000000; } }',
     'figma-vars.snapshot.json': JSON.stringify({ color: { light: { 'brand/color': '#ffffff' }, dark: { 'brand/color': '#000000' } } }),
   };

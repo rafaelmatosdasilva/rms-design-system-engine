@@ -33,6 +33,7 @@
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, extname, basename, relative } from 'path';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
+import { ENGINE_DIRS } from './names.mjs';
 
 const ROOT = process.cwd();
 let cfg = {};
@@ -50,7 +51,7 @@ if (!TEMPLATES_CFG.length) {
 // ── Inert until the snapshot is captured (mirrors screen-element-check) ──────────
 const SNAP_PATH = 'figma-templates.snapshot.json';
 if (!existsSync(join(ROOT, SNAP_PATH))) {
-  console.log(`⚠️  [template-composition] ${SNAP_PATH} not found — run /rms-figma-code-parity to capture it`);
+  console.log(`⚠️  [template-composition] ${SNAP_PATH} not found — run /rms-design-system-engine to capture it`);
   console.log('   (it records, per template frame, the DS components it composes; captured via REST /nodes,');
   console.log('    any plan). Inert until then — never a false failure.');
   process.exit(0);
@@ -80,7 +81,7 @@ const uni = [...universe].map(n => ({ name: n, nameNorm: norm(n), selNorm: selNo
 // ── Discover source files ─────────────────────────────────────────────────────
 const SRC_DIRS = (cfg.templateSrcDirs ?? cfg.componentSrcDirs ?? ['src', 'components', 'app', 'lib', 'packages'])
   .map(d => join(ROOT, d));
-const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.git', '.next', 'coverage', '.parity-refs', '.parity-out']);
+const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.git', '.next', 'coverage', ...ENGINE_DIRS]);
 const CODE_EXT = new Set(['.vue', '.tsx', '.jsx', '.ts', '.js', '.svelte']);
 function walk(dir, out) {
   let entries = [];

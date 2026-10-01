@@ -6,7 +6,7 @@
 //
 // What it does:
 //   1. Parses audit.mjs to extract the authoritative gate list (labels + scripts).
-//   2. Checks README.md and the guide (rms-figma-code-parity.md, reference/, cookbook/) for stale gate counts.
+//   2. Checks README.md and the guide (rms-design-system-engine.md, reference/, cookbook/) for stale gate counts.
 //   3. Auto-patches all "N automated gates" / "Run all N audit gates" / trend bar
 //      references to match the real count.
 //   4. Checks that each gate label (or a keyword form of it) appears in the doc.
@@ -124,7 +124,7 @@ function generateExampleOutput() {
   return lines.join('\n');
 }
 
-console.log(bold(`\nrms-figma-code-parity sync-docs - source of truth: ${GATE_COUNT} gates\n`));
+console.log(bold(`\nrms-design-system-engine sync-docs - source of truth: ${GATE_COUNT} gates\n`));
 for (const g of gates) {
   console.log(dim(`  [${String(g.n).padStart(2)}] ${g.label}`));
 }
@@ -133,12 +133,12 @@ console.log('');
 // ── 2. Doc files to check ─────────────────────────────────────────────────────
 // The guide is the main file plus its reference/ and cookbook/ files: counts are patched in each file, and
 // every gate label must appear somewhere in the guide as a whole (the gate table is in a recipe).
-const GUIDE_FILES = ['rms-figma-code-parity.md', ...['reference', 'cookbook'].flatMap((d) => (existsSync(join(DIR, d)) ? readdirSync(join(DIR, d)).filter((f) => f.endsWith('.md')).sort().map((f) => `${d}/${f}`) : []))];
+const GUIDE_FILES = ['rms-design-system-engine.md', ...['reference', 'cookbook'].flatMap((d) => (existsSync(join(DIR, d)) ? readdirSync(join(DIR, d)).filter((f) => f.endsWith('.md')).sort().map((f) => `${d}/${f}`) : []))];
 const guideText = GUIDE_FILES.map((f) => readFileSync(join(DIR, f), 'utf8')).join('\n');
 const DOCS = [
   { path: join(DIR, 'README.md'),                        label: 'README.md'       },
   ...GUIDE_FILES.map((f, i) => ({ path: join(DIR, f), label: f, labelsIn: i === 0 ? guideText : null })),
-  { path: join(DIR, '.claude/commands/rms-figma-code-parity.md'), label: 'rms-figma-code-parity.md (commands)' },
+  { path: join(DIR, '.claude/commands/rms-design-system-engine.md'), label: 'rms-design-system-engine.md (commands)' },
 ];
 
 let anyStale = false;

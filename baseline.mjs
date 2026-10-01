@@ -86,7 +86,7 @@ export function classifyBaseline(gates, baselineLabels, acceptedFindings = null)
 // replacing it; the debt of every other component stays accepted (I56). An unscoped run rewrites it.
 // match: only the findings whose line (or gate) contains one of these words are accepted ("the radius, not the
 // rest"): it implies findings, and a gate with no ❌ line is accepted only when its name matches.
-export function writeBaseline(path, gates, { findings = false, merge = false, match = null } = {}) {
+export function writeBaseline(path, gates, { findings = false, merge = false, match = null, from = path } = {}) {
   const words = (match ?? []).map((w) => String(w).toLowerCase()).filter(Boolean);
   const hit = (text) => !words.length || words.some((w) => String(text).replace(ANSI, '').toLowerCase().includes(w));
   if (words.length) findings = true;
@@ -96,17 +96,17 @@ export function writeBaseline(path, gates, { findings = false, merge = false, ma
   let lines = findings ? failing.flatMap((g) => { const keys = findingKeys(g); const own = keys.filter((k) => !COUNT.test(k) && hit(k)); return words.length ? (own.length ? [...keys.filter((k) => COUNT.test(k)), ...own] : []) : keys; }) : [];
   let labels = findings ? failing.filter((g) => !findingKeys(g).length && hit(g.label)).map((g) => g.label) : currentFailingLabels(gates);
   if (words.length && merge === false) merge = true;   // accepting some lines never drops the ones accepted before
-  if (merge && existsSync(path)) {
+  if (merge && existsSync(from)) {
     let old = {};
-    try { old = JSON.parse(readFileSync(path, 'utf8')); } catch { /* unreadable: nothing to keep */ }
+    try { old = JSON.parse(readFileSync(from, 'utf8')); } catch { /* unreadable: nothing to keep */ }
     labels = [...new Set([...(Array.isArray(old.gates) ? old.gates : []), ...labels])];
     lines = [...new Set([...(Array.isArray(old.findings) ? old.findings : []), ...lines])];
     if (!findings && Array.isArray(old.findings)) findings = old.findings.length > 0;
   }
   const doc = {
     $note: findings
-      ? 'rms-parity adoption baseline (finding-level accepted debt). Each listed finding is a known ❌ line, accepted as debt; a failing gate whose ❌ lines are all listed does not fail the run. Any other ❌ line, including a listed one whose value changed, is a regression. A listed finding that is fixed is reported so you can re-run --baseline --findings to drop it. COMMIT this file.'
-      : 'rms-parity adoption baseline (gate-level accepted debt). These gates are currently failing and are treated as KNOWN DEBT - they do not fail the run. A gate NOT listed here that fails is a real regression and fails the audit. Debt only ratchets down: a baselined gate that goes green is reported so you can re-run --baseline to lock it in. COMMIT this file (no secrets - only gate labels).',
+      ? 'rms-design-system-engine adoption baseline (finding-level accepted debt). Each listed finding is a known ❌ line, accepted as debt; a failing gate whose ❌ lines are all listed does not fail the run. Any other ❌ line, including a listed one whose value changed, is a regression. A listed finding that is fixed is reported so you can re-run --baseline --findings to drop it. COMMIT this file.'
+      : 'rms-design-system-engine adoption baseline (gate-level accepted debt). These gates are currently failing and are treated as KNOWN DEBT - they do not fail the run. A gate NOT listed here that fails is a real regression and fails the audit. Debt only ratchets down: a baselined gate that goes green is reported so you can re-run --baseline to lock it in. COMMIT this file (no secrets - only gate labels).',
     created: new Date().toISOString(),
     gates: labels,
     ...(findings ? { findings: lines } : {}),

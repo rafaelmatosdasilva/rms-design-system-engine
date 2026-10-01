@@ -12,9 +12,9 @@ Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change c
 
 ## Read more
 
-- `rms-figma-code-parity --reference config`: *More settings* (`states`)
-- `rms-figma-code-parity --recipe refresh-figma`: *Disabled wins*, the variant capture
+- `rms-design-system-engine --reference config`: *More settings* (`states`)
+- `rms-design-system-engine --recipe refresh-figma`: *Disabled wins*, the variant capture
 
 ```recipe-check
-rms-figma-code-parity --component button
+rms-design-system-engine --component button
 ```

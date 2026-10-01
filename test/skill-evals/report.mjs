@@ -14,6 +14,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { envVar } from '../../names.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -85,7 +86,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { DEV } = await import('./tasks.mjs'), { HELDOUT } = await import('./heldout.mjs');
   const minRuns = get('runs').map(Number);
   const ids = [...DEV, ...HELDOUT].map((t) => t.id);
-  const dirs = [join(HERE, 'results'), ...(process.env.PARITY_EVAL_PRIVATE_OUT ? [process.env.PARITY_EVAL_PRIVATE_OUT] : [])];
+  const dirs = [join(HERE, 'results'), ...(envVar(process.env, 'EVAL_PRIVATE_OUT') ? [envVar(process.env, 'EVAL_PRIVATE_OUT')] : [])];
   let all = true;
   for (const [i, model] of get('model').entries()) {
     const A = byTask(load(nameA, model, dirs)), B = byTask(load(nameB, model, dirs));

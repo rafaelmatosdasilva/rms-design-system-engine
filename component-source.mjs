@@ -15,12 +15,13 @@
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, extname, basename } from 'node:path';
+import { ENGINE_DIRS } from './names.mjs';
 
 export const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // ── Files ─────────────────────────────────────────────────────────────────────
-export const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.git', '.next', 'coverage', '.parity-refs', '.parity-out']);
+export const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.git', '.next', 'coverage', ...ENGINE_DIRS]);
 export const CODE_EXT = new Set(['.vue', '.tsx', '.jsx', '.ts', '.js', '.svelte']);
 
 function walk(dir, out) {

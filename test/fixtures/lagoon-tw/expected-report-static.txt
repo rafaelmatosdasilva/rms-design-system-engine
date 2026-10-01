@@ -15,7 +15,7 @@
 ❌  [3] Token values  (color · sizing · typography · breakpoints · text)
        ✅ PASS  7   (color · radius · gap · padding · stroke · typography)
        ❌ FAIL  1
-       ⚠️  NO PARITY MAP  1 token(s) not found under the naming convention and no parity-map.mjs to map them - if the CSS names them another way, copy parity-map.example.mjs to parity-map.mjs and map them
+       ⚠️  NO PARITY MAP  1 token(s) not found under the naming convention and no design-system-engine-map.mjs to map them - if the CSS names them another way, copy design-system-engine-map.example.mjs to design-system-engine-map.mjs and map them
        ❌ [sizing/-] stroke/default → --stroke-default: CSS var not declared
          Fix:  Add --stroke-default: 1px to src/app.css
 
@@ -29,7 +29,7 @@
        ⏭  SKIPPED   0  (no CSS var, documented)
 
 ✅  [6] Exception lists are valid  (no stale or overly broad entries)
-       ⏭  no parity-map.mjs - no exception list to check.
+       ⏭  no design-system-engine-map.mjs - no exception list to check.
 
 ✅  [7] No invented CSS variables  (every CSS variable traces back to a Figma token)
        ✅ TRACEABLE    10  (maps back to a Figma token or SYSTEM_VARS)
@@ -189,20 +189,20 @@
   ● Documentation    3/3 contracts have a description (100%)
   ● AI guidance      0/3 carry whenNotToUse/useInstead (0%)
 
-ℹ️  Agreed values: 7 of 7 compared facts agree (recorded in parity-agreed.json, updated).
+ℹ️  Agreed values: 7 of 7 compared facts agree (recorded in design-system-engine-agreed.json, updated).
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
 📉 Burndown, open findings per component: badge 3 · 5 not tied to a component
    next up: badge. Run with --component badge, fix, run again.
 
-─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
+─── SUMMARY (relay this in the chat as is; also in .design-system-engine-out/summary.md) ───
 
 # Parity result
 
 **Not in parity.** 2 of 25 gates fail.
 
-**Figma data was not refreshed in this run.** The audit used the committed snapshots (the oldest, figma/vars.snapshot.json, updated today). To refresh them: rms-figma-code-parity --recipe refresh-figma.
+**Figma data was not refreshed in this run.** The audit used the committed snapshots (the oldest, figma/vars.snapshot.json, updated today). To refresh them: rms-design-system-engine --recipe refresh-figma.
 
 - **Token values** fails:
   - [sizing/-] stroke/default → --stroke-default: CSS var not declared
@@ -213,5 +213,5 @@
 
 Burndown, open findings per component: badge 3 · 5 not tied to a component
 
-NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
+NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

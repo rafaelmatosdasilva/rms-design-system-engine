@@ -20,6 +20,7 @@ import { readFileSync }                    from 'fs';
 import { join, dirname, resolve as resolvePath } from 'path';
 import { fileURLToPath }                   from 'url';
 import { spawnSync }                       from 'child_process';
+import { projectPath } from './names.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT       = process.cwd();
@@ -88,13 +89,13 @@ const server = createServer((req, res) => {
     // Run parity check
     console.log('  🔄 Running parity-check.mjs...');
     const pc = runScript('parity-check.mjs');
-    console.log(pc.pass ? '  ✅ Token parity OK' : '  ❌ Token parity FAIL - run /rms-parity to audit');
+    console.log(pc.pass ? '  ✅ Token parity OK' : '  ❌ Token parity FAIL - run /rms-design-system-engine to audit');
 
     // Run visual regression check (only if FIGMA_TOKEN set)
     if (process.env.FIGMA_TOKEN) {
       console.log('  🔄 Running visual-regression-check.mjs...');
       const vr = runScript('visual-regression-check.mjs');
-      console.log(vr.pass ? '  ✅ Visual regression OK' : '  ❌ Visual regression FAIL - inspect .parity-refs/*.new.png');
+      console.log(vr.pass ? '  ✅ Visual regression OK' : `  ❌ Visual regression FAIL - inspect ${cfg.visualRefs ?? projectPath(ROOT, 'refs')}/*.new.png`);
     }
 
     console.log('  Done.\n');
@@ -102,7 +103,7 @@ const server = createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n📡 rms-parity webhook server`);
+  console.log(`\n📡 rms-design-system-engine webhook server`);
   console.log(`   Listening: http://localhost:${PORT}/webhook`);
   console.log(`   Health:    http://localhost:${PORT}/health`);
   console.log(`   Events:    ${[...HANDLED_EVENTS].join(', ')}`);

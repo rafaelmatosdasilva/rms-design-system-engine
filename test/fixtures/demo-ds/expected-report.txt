@@ -28,7 +28,7 @@
        ⏭  SKIPPED   0  (no CSS var, documented)
 
 ✅  [6] Exception lists are valid  (no stale or overly broad entries)
-       ⏭  no parity-map.mjs - no exception list to check.
+       ⏭  no design-system-engine-map.mjs - no exception list to check.
 
 ✅  [7] No invented CSS variables  (every CSS variable traces back to a Figma token)
        ✅ TRACEABLE    17  (maps back to a Figma token or SYSTEM_VARS)
@@ -78,13 +78,13 @@
        ↳ last changed 2026-01-01 by demo: "init" (<HASH>)
        ⚠️  chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip.tp-chip--l.tp-chip--icon · src/theme.css:60)  → set 32px
        ↳ last changed 2026-01-01 by demo: "init" (<HASH>)
-       ↳ code changes proposed (1): .parity-out/handback/code-changes.diff  (review, then git apply it; 1 more by hand)
-       📋 census: 45 facts compared on 3 components · 0 not comparable · 0 components not captured  (.parity-out/census.json)
+       ↳ code changes proposed (1): .design-system-engine-out/handback/code-changes.diff  (review, then git apply it; 1 more by hand)
+       📋 census: 45 facts compared on 3 components · 0 not comparable · 0 components not captured  (.design-system-engine-out/census.json)
        🖼  VISUAL 2 compared with their Figma image (advisory, worst first): 1 differ by more than 2% of pixels outside text
-       🖼  ⚠️  button: 26.5% of pixels differ outside text, 22.3% with it  → .parity-out/visual/diff/button.png
-       🖼  ✓  chip: 0% of pixels differ outside text, 10.1% with it  → .parity-out/visual/diff/chip.png
+       🖼  ⚠️  button: 26.5% of pixels differ outside text, 22.3% with it  → .design-system-engine-out/visual/diff/button.png
+       🖼  ✓  chip: 0% of pixels differ outside text, 10.1% with it  → .design-system-engine-out/visual/diff/chip.png
        🖼  ⏭ not compared (1), no reference image and no FIGMA_TOKEN: field
-       🖼  ⏭ to compare them: set FIGMA_TOKEN, or save each default variant at scale 2 as .parity-refs/components/<name>.png
+       🖼  ⏭ to compare them: set FIGMA_TOKEN, or save each default variant at scale 2 as .design-system-engine-refs/components/<name>.png
        ✅ VARIANTS  every Figma variant value has a counterpart in code (10)
 
 ✅  [14] All states are built  (each state implemented · correct selector · variable in the right rule)
@@ -248,20 +248,20 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
   ● Documentation    4/4 contracts have a description (100%)
   ● AI guidance      0/4 carry whenNotToUse/useInstead (0%)
 
-ℹ️  Agreed values: 68 of 71 compared facts agree (recorded in parity-agreed.json, updated). Of the 3 that differ: 0 Figma moved · 0 code moved · 0 both moved · 3 with no earlier agreement.
+ℹ️  Agreed values: 68 of 71 compared facts agree (recorded in design-system-engine-agreed.json, updated). Of the 3 that differ: 0 Figma moved · 0 code moved · 0 both moved · 3 with no earlier agreement.
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
 📉 Burndown, open findings per component: button 5 · chip 5 · field 1 · 8 not tied to a component
    next up: button. Run with --component button, fix, run again.
 
-─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───
+─── SUMMARY (relay this in the chat as is; also in .design-system-engine-out/summary.md) ───
 
 # Parity result
 
 **Not in parity.** 2 of 25 gates fail.
 
-**Figma data was not refreshed in this run.** The audit used the committed snapshots (the oldest, src/figma-vars.snapshot.json, updated today). To refresh them: rms-figma-code-parity --recipe refresh-figma.
+**Figma data was not refreshed in this run.** The audit used the committed snapshots (the oldest, src/figma-vars.snapshot.json, updated today). To refresh them: rms-design-system-engine --recipe refresh-figma.
 
 - **Token values** fails:
   - [sizing/-] radii/chip → --radii-chip
@@ -280,5 +280,5 @@ Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows 
 
 Burndown, open findings per component: button 5 · chip 5 · field 1 · 8 not tied to a component
 
-NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-figma-code-parity. To accept a known difference instead: rms-figma-code-parity --baseline --findings (only when they ask).
+NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

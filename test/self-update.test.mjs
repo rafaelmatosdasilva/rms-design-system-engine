@@ -27,7 +27,7 @@ test('a clean install on main is brought up to date, once a day', () => {
   const r = autoUpdate(install, { env: {}, stamp, now: 1e12 });
   assert.equal(r.updated, true);
   assert.equal(git(install, 'rev-parse', 'HEAD'), v2);
-  assert.match(updatedLine(r), /^ℹ️  The parity skill updated itself \([0-9a-f]{7} → [0-9a-f]{7}\)\. Turn this off with PARITY_NO_AUTO_UPDATE=1\.$/);
+  assert.match(updatedLine(r), /^ℹ️  The engine updated itself \([0-9a-f]{7} → [0-9a-f]{7}\)\. Turn this off with DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1\.$/);
   assert.deepEqual(autoUpdate(install, { env: {}, stamp, now: 1e12 + 3600e3 }), { updated: false, why: 'checked today' });
   assert.deepEqual(autoUpdate(install, { env: {}, stamp, now: 1e12 + 25 * 3600e3 }), { updated: false, why: 'already current' });
 });
@@ -45,7 +45,7 @@ test('never with local changes, on another branch, on CI, or when turned off', (
 
   ({ install, stamp } = setup());
   assert.deepEqual(autoUpdate(install, { env: { CI: 'true' }, stamp, now: 1e12 }), { updated: false, why: 'CI' });
-  assert.deepEqual(autoUpdate(install, { env: { PARITY_NO_AUTO_UPDATE: '1' }, stamp, now: 1e12 }), { updated: false, why: 'turned off' });
+  assert.deepEqual(autoUpdate(install, { env: { DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, stamp, now: 1e12 }), { updated: false, why: 'turned off' });
   assert.equal(existsSync(stamp), false);   // an off switch does not even count as a check
 });
 
