@@ -45,5 +45,18 @@
   "codeReading": {
     "visual": true
   },
-  "_visualNote": "The .design-system-engine-refs/components images stand in for Figma exports of each default variant. The button one has a 2px border the structure facts do not record, so only the visual diff sees it."
+  "_visualNote": "The .design-system-engine-refs/components images stand in for Figma exports of each default variant. The button one has a 2px border the structure facts do not record, so only the visual diff sees it.",
+  "primitives": [
+    {
+      "component": "Stack",
+      "props": {
+        "gap": "s"
+      },
+      "when": {
+        "display": "flex",
+        "gap": "var(--gap-s)"
+      }
+    }
+  ],
+  "_primitivesNote": "Stack is a fictional layout primitive: apps/gallery/Promo.jsx builds it by hand with a flex div, which only the primitives table names."
 }

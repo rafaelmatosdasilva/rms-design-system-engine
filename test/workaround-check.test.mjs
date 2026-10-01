@@ -43,3 +43,9 @@ test('the project: a built file is read once, from its source; excluded folders 
   const f = projectWorkarounds(dir, { names: ['listRow'], classFor: () => '.row', excludeDirs: ['demo'] });
   assert.deepEqual(f.map((x) => `${x.file}:${x.host.name}`), ['ui.src.html:listRow']);
 });
+
+test('the project: component files (.jsx, .vue) are read, not only HTML', () => {
+  const dir = makeFixture({ 'src/Row.jsx': 'export const R = () => <div className="row x"><button className="x-go">Go</button></div>;', 'src/Field.vue': '<template><div class="row x"><button class="x-pin">Pin</button></div></template>', 'style.css': '.x .x-go, .x .x-pin { position: absolute; }' });
+  const f = projectWorkarounds(dir, { names: ['listRow'], classFor: () => '.row' });
+  assert.deepEqual(f.map((x) => x.file).sort(), ['src/Field.vue', 'src/Row.jsx']);
+});
