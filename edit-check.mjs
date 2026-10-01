@@ -203,7 +203,7 @@ export function editFindings(added, fullText, { truth, tokenByValue, tailwind = 
         ? `${m[0]} is written by hand; use var(${tokens[0]})${tokens.length > 1 ? ` (or ${tokens.slice(1, 3).map((t) => `var(${t})`).join(', ')})` : ''}`
         : `${m[0]} is not a design-system colour; use one of its colour tokens`);
     }
-    if (sizes) for (const f of sizeFindings(scan, sizes, { styled: /\b(style|sx)\s*=/.test(l) })) push(line, f);
+    if (sizes) for (const f of sizeFindings(scan, sizes, { styled: /\bstyle\s*=/.test(l) })) push(line, f);   // MUI's sx={{ padding: 2 }} is a theme step, not 2px
   }
   // A plain element the edit added that is styled as a primitive the owner declared (I42).
   if (primitives.length && !sheet) {
