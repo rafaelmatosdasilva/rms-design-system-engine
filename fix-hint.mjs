@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Token "radii/button" -> CSS var "--radii-button" (the naming convention: the default the code is
-// expected to use). Project-specific EXPLICIT overrides live in parity-map and are not needed here;
+// expected to use). Project-specific EXPLICIT overrides live in design-system-engine-map and are not needed here;
 // this is only the citation's suggested var, never a match decision.
 export function tokenVar(name) {
   const parts = String(name || '').split('/').map((s) => s.trim()).filter(Boolean);

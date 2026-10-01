@@ -9,9 +9,11 @@ import { context, decisionPoints } from './lib.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
 import { HELDOUT } from './heldout.mjs';
+import { envVar } from '../../names.mjs';
 
 let privateTasks = [];
-if (process.env.PARITY_EVAL_PRIVATE_TASKS) privateTasks = (await import(process.env.PARITY_EVAL_PRIVATE_TASKS)).PRIVATE;
+const PRIVATE_TASKS = envVar(process.env, 'EVAL_PRIVATE_TASKS');
+if (PRIVATE_TASKS) privateTasks = (await import(PRIVATE_TASKS)).PRIVATE;
 const byId = new Map([...DEV, ...HELDOUT, ...privateTasks].map((t) => [t.id, t]));
 for (const file of process.argv.slice(2)) {
   const rows = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
@@ -26,7 +28,7 @@ for (const file of process.argv.slice(2)) {
     const rules = globalChecks(ctx, t);
     const pass = [...checks, ...rules].every((c) => c.ok);
     if (pass !== r.pass) changed++;
-    return { ...r, checks, rules, pass, decisionPoints: decisionPoints(ctx), rescoredAt: new Date().toISOString() };
+    return { ...r, checks, rules, pass, changed: ctx.changed, decisionPoints: decisionPoints(ctx), rescoredAt: new Date().toISOString() };
   });
   writeFileSync(file, out.map((r) => JSON.stringify(r)).join('\n') + '\n');
   console.log(`${file}: ${rows.length} runs, ${changed} changed verdict`);

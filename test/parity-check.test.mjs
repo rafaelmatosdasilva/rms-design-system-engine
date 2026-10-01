@@ -2,7 +2,7 @@
 // mode selector now matches whether the CSS writes [data-theme=…] or [theme=…].
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runGate, EMPTY_PARITY_MAP } from './helpers.mjs';
+import { runGate, EMPTY_ENGINE_MAP } from './helpers.mjs';
 
 const GATE = 'parity-check.mjs';
 const paths = { themeCSS: 'theme.css', snapshotVars: 'figma-vars.snapshot.json' };
@@ -10,7 +10,7 @@ const paths = { themeCSS: 'theme.css', snapshotVars: 'figma-vars.snapshot.json' 
 test('[regression] a color token whose CSS var matches Figma passes', () => {
   const { code, out } = runGate(GATE, {
     'ds-config.json': { paths, figma: { colorCollection: 'Color' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand: #ffffff; }\n@media (prefers-color-scheme: dark) { :root { --brand: #000000; } }',
     'figma-vars.snapshot.json': { color: { light: { 'brand/color': '#ffffff' }, dark: { 'brand/color': '#000000' } } },
   });
@@ -20,7 +20,7 @@ test('[regression] a color token whose CSS var matches Figma passes', () => {
 test('[regression] a color token whose CSS var diverges from Figma fails', () => {
   const { code, out } = runGate(GATE, {
     'ds-config.json': { paths, figma: { colorCollection: 'Color' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand: #123456; }\n@media (prefers-color-scheme: dark) { :root { --brand: #000000; } }',
     'figma-vars.snapshot.json': { color: { light: { 'brand/color': '#ffffff' }, dark: { 'brand/color': '#000000' } } },
   });
@@ -33,7 +33,7 @@ test('[bugfix A2] a data-attribute mode override written [data-theme] is found',
       { name: 'Light',    snapshotKey: 'light',    cssSelector: 'root' },
       { name: 'Contrast', snapshotKey: 'contrast', cssSelector: 'data:theme=contrast' },
     ] } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand: #ffffff; }\n[data-theme="contrast"] :root { --brand: #000000; }',
     'figma-vars.snapshot.json': { color: { light: { 'brand/color': '#ffffff' }, contrast: { 'brand/color': '#000000' } } },
   });
@@ -44,7 +44,7 @@ test('[bugfix A2] a data-attribute mode override written [data-theme] is found',
 test('[bugfix base-root] a dark @media block above the base :root does not poison base parity', () => {
   const { code, out } = runGate(GATE, {
     'ds-config.json': { paths, figma: { colorCollection: 'Color' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     // dark @media FIRST, base :root SECOND - old code read the base from the @media block.
     'theme.css': '@media (prefers-color-scheme: dark) { :root { --brand: #000000; } }\n:root { --brand: #ffffff; }',
     'figma-vars.snapshot.json': { color: { light: { 'brand/color': '#ffffff' }, dark: { 'brand/color': '#000000' } } },
@@ -59,7 +59,7 @@ test('[bugfix base-root] a dark @media block above the base :root does not poiso
 test('the theme is read like the browser: every :root block and @import count', () => {
   const { code, out } = runGate(GATE, {
     'ds-config.json': { paths, figma: { colorCollection: 'Color' } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': '@import "brand.css";\n:root { --a: #111111; }\n:root { --b: #222222; }\n@media (prefers-color-scheme: dark) { :root { --a: #eeeeee; --b: #dddddd; --c: #cccccc; } }',
     'brand.css': ':root { --c: #333333; }',
     'figma-vars.snapshot.json': { color: { light: { 'a/color': '#111111', 'b/color': '#222222', 'c/color': '#333333' }, dark: { 'a/color': '#eeeeee', 'b/color': '#dddddd', 'c/color': '#cccccc' } } },
@@ -73,7 +73,7 @@ test('[bugfix media-mode] a generic media: color mode resolves its OWN override,
       { name: 'Base', snapshotKey: 'base', cssSelector: 'root' },
       { name: 'Wide', snapshotKey: 'wide', cssSelector: 'media:(min-width: 768px)' },
     ] } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand: #ffffff; }\n@media (min-width: 768px) { :root { --brand: #000000; } }',
     'figma-vars.snapshot.json': { color: { base: { 'brand/color': '#ffffff' }, wide: { 'brand/color': '#000000' } } },
   });
@@ -89,7 +89,7 @@ test('a token block under an ancestor of :root is still read, and listed as neve
       { name: 'Light', snapshotKey: 'light', cssSelector: 'root' },
       { name: 'Contrast', snapshotKey: 'contrast', cssSelector: 'data:theme=contrast' },
     ] } },
-    'parity-map.mjs': EMPTY_PARITY_MAP,
+    'design-system-engine-map.mjs': EMPTY_ENGINE_MAP,
     'theme.css': ':root { --brand: #ffffff; }\n[data-theme="contrast"] :root { --brand: #000000; }',
     'figma-vars.snapshot.json': { color: { light: { 'brand/color': '#ffffff' }, contrast: { 'brand/color': '#000000' } } },
   });

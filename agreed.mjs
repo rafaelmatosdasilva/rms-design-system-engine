@@ -7,7 +7,7 @@
 //   • both changed                                  → both-moved   (a conflict for a person to decide)
 //   • no record yet, or neither changed             → unknown      (today's behaviour: just a difference)
 // A differing fact never overwrites the record: only an agreement (or an explicit decision) does.
-// The record lives in parity-agreed.json at the project root and is meant to be committed.
+// The record lives in design-system-engine-agreed.json at the project root and is meant to be committed.
 //
 // History (ideas I50, I51): `seen` keeps, per fact, both values at the last run and its last 10 moves
 // ({ at, side: figma | code | both, lead }), a move being a side whose value changed since the last run.
@@ -17,10 +17,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { newPath, projectPath } from './names.mjs';
 
-export const AGREED_FILE = 'parity-agreed.json';
+export const AGREED_FILE = newPath('agreed');
 
-export function loadAgreed(root, file = AGREED_FILE) {
+export function loadAgreed(root, file = projectPath(root, 'agreed')) {
   try { const j = JSON.parse(readFileSync(join(root, file), 'utf8')); return j?.facts ? { ...j, seen: j.seen ?? {} } : { version: 1, facts: {}, seen: {} }; }
   catch { return { version: 1, facts: {}, seen: {} }; }
 }
@@ -40,8 +41,8 @@ export const MOVED_LABEL = { 'figma-moved': 'Figma moved, code is behind', 'code
 const MAX_MOVES = 10;
 // Records every matching fact, and every fact's move since the last run. Returns { recorded, changed, agreed }
 // (changed: the file differs from before).
-export function recordAgreed(root, facts, { at = new Date().toISOString(), commit = headCommit(root), file = AGREED_FILE } = {}) {
-  const agreed = loadAgreed(root, file);
+export function recordAgreed(root, facts, { at = new Date().toISOString(), commit = headCommit(root), file = AGREED_FILE, from = file === AGREED_FILE ? projectPath(root, 'agreed') : file } = {}) {
+  const agreed = loadAgreed(root, from);
   let recorded = 0, changed = false;
   for (const f of facts ?? []) {
     const s = agreed.seen[f.key];
@@ -61,7 +62,7 @@ export function recordAgreed(root, facts, { at = new Date().toISOString(), commi
   }
   if (changed) {
     const sorted = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
-    writeFileSync(join(root, file), JSON.stringify({ version: 1, $description: 'What Figma and the code last agreed on, per fact, and the recent moves of each side. Written by rms-figma-code-parity; commit it.', facts: sorted(agreed.facts), seen: sorted(agreed.seen) }, null, 1) + '\n');
+    writeFileSync(join(root, file), JSON.stringify({ version: 1, $description: 'What Figma and the code last agreed on, per fact, and the recent moves of each side. Written by rms-design-system-engine; commit it.', facts: sorted(agreed.facts), seen: sorted(agreed.seen) }, null, 1) + '\n');
   }
   return { recorded, changed, agreed };
 }

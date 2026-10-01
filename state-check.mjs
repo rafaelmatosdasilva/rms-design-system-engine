@@ -9,7 +9,7 @@
 //
 // Requires at project root:
 //   ds-config.json              - themeCSS + pluginCSS paths
-//   parity-map.mjs              - COVERED_STATE (or COVERED), COVERED_PREFIX, EXPLICIT
+//   design-system-engine-map.mjs              - COVERED_STATE (or COVERED), COVERED_PREFIX, EXPLICIT
 //   component-state-tokens.json - output of Phase 2 COMPONENT_SET state walk
 //
 // Exit 0 = all state tokens covered.
@@ -21,6 +21,7 @@ import { declaredVarNames } from './css-source.mjs';
 import { join } from 'path';
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
 import { pathToFileURL } from 'url';
+import { projectPath } from './names.mjs';
 
 const ROOT = process.cwd();
 
@@ -33,10 +34,10 @@ const THEME_PATHS = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();   // themeC
 const THEME_PATH  = THEME_PATHS[0];
 const PLUGIN_CSS = cfg.paths?.pluginCSS ?? [];
 
-// ── Load parity-map.mjs ───────────────────────────────────────────────────────
+// ── Load design-system-engine-map.mjs ───────────────────────────────────────────────────────
 let COVERED = new Set(), COVERED_PREFIX = [], EXPLICIT = {}, EXPLICIT_SIZING = {};
 try {
-  const map = await import(pathToFileURL(join(ROOT, 'parity-map.mjs')).href);
+  const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   // Prefer COVERED_STATE (state-walk superset) if provided, fall back to COVERED
   if (map.COVERED_STATE)  COVERED        = map.COVERED_STATE;
   else if (map.COVERED)   COVERED        = map.COVERED;
@@ -143,7 +144,7 @@ if (HIDDEN_STATIC.length) {
 }
 
 if (UNCOVERED.length) {
-  console.log('\n─── In COMPONENT_SET variants (visible), no CSS var (implement or add to COVERED_STATE in parity-map.mjs) ──');
+  console.log('\n─── In COMPONENT_SET variants (visible), no CSS var (implement or add to COVERED_STATE in design-system-engine-map.mjs) ──');
   for (const t of UNCOVERED) console.log(`  ❌ ${t}`);
   console.log('');
   process.exit(1);

@@ -44,6 +44,15 @@ test('state contrast: every mode and every produced state, disabled and pageless
   assert.deepEqual(r.findings.map((f) => `${f.component}|${f.state}|${f.mode}`), ['chip|default|dark', 'chip|State=Hover|light']);
 });
 
+// The --json result of a page check; a page that was not checked fails with the reason, never as a JSON error.
+const pageResult = (out) => {
+  const at = out.indexOf('{');
+  assert.ok(at > -1, `a11y-check printed no JSON:\n${out}`);
+  const d = JSON.parse(out.slice(at));
+  assert.equal(d.notChecked, undefined, `a11y-check did not check the page: ${d.notChecked}`);
+  return d;
+};
+
 test('page: target size, a positive tabindex, Escape, reduced motion, forced colours, text spacing, semantics', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
   const page = `<!doctype html><html><head><style>
     body { font: 14px sans-serif; }
@@ -66,7 +75,7 @@ test('page: target size, a positive tabindex, Escape, reduced motion, forced col
   let out = '';
   try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
-  const d = JSON.parse(out.slice(out.indexOf('{')));
+  const d = pageResult(out);
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
   assert.equal(kinds('target').length, 2, out);                               // both 16×16 buttons, 16px apart
   assert.ok(kinds('tabindex').some((s) => s.startsWith('button')), out);
@@ -123,7 +132,7 @@ test('keyboard, zoom, focus hidden or thin, and Figma annotations', { skip: HAS_
   let out = '';
   try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
-  const d = JSON.parse(out.slice(out.indexOf('{')));
+  const d = pageResult(out);
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
   assert.ok(kinds('activate').includes('div.fake [role=button] (Enter)'), out);
   assert.ok(!kinds('activate').some((x) => /good/.test(x)), out);            // handles the keys
@@ -187,7 +196,7 @@ test('annotations in the browser: a toggle button without aria-pressed, and a no
   let out = '';
   try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
-  const d = JSON.parse(out.slice(out.indexOf('{')));
+  const d = pageResult(out);
   const got = d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector);
   assert.ok(got.includes('fav: Figma says it is a toggle button, it has no aria-pressed'), out);
   assert.ok(got.some((x) => /^fav › Icon: Figma says its name is "Favoritar", it is announced as "Salvar"/.test(x)), out);
@@ -217,7 +226,7 @@ test('role contracts: what each role requires, on the rendered component', { ski
   let out = '';
   try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
-  const d = JSON.parse(out.slice(out.indexOf('{')));
+  const d = pageResult(out);
   const got = d.issues.filter((i) => i.issue === 'rolecontract').map((i) => i.selector).sort();
   assert.deepEqual(got, [
     'fakeCheck (checkbox): has no checkbox control (a native input, or role="checkbox" with aria-checked)',
@@ -250,4 +259,12 @@ test('a page counts as loaded only once it is no longer the about:blank a new ta
   assert.equal(loaded('file:///p/ui.html', 'complete', false), false);
   assert.equal(loaded('file:///p/ui.html', 'complete'), true);
   assert.equal(new Function('location', 'document', `return ${pageLoadedExpression()}`)({ href: 'http://localhost:6006/' }, { readyState: 'complete' }), true);
+});
+
+test('a page that was not checked says so in --json, with the reason, never as a clean result', () => {
+  const dir = makeFixture({ 'page.html': '<!doctype html><html><body><button>x</button></body></html>' });
+  const out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: '/bin/false' } });
+  const d = JSON.parse(out.slice(out.indexOf('{')));
+  assert.match(d.notChecked, /^Chrome failed to start/);
+  assert.equal(d.issues, undefined);
 });

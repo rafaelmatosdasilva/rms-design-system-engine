@@ -1,5 +1,5 @@
 // query.mjs - ask the design system a question from the terminal (idea I22).
-// Run from project root:  rms-figma-code-parity --query <term> [<term> …] [--json]
+// Run from project root:  rms-design-system-engine --query <term> [<term> …] [--json]
 //
 // An agent about to write UI asks for one component or token instead of reading the whole catalog, and
 // gets the names exactly as they are written: a guessed name is the most common way generated code
@@ -17,6 +17,7 @@ import { join, resolve, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
+import { envVar } from './names.mjs';
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -25,7 +26,9 @@ export function flattenTokens(tree, prefix = []) {
   const out = [];
   for (const [k, v] of Object.entries(tree ?? {})) {
     if (k.startsWith('$') || !v || typeof v !== 'object') continue;
-    if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: v.$extensions?.['com.rms.parity']?.modes ?? null, readableOn: v.$extensions?.['com.rms.parity']?.readableOn ?? null, deprecated: v.$deprecated === true });
+    // A contract written before the rename keeps its facts under the old extension name.
+    const ext = v.$extensions?.['com.rms.design-system-engine'] ?? v.$extensions?.['com.rms.parity'];
+    if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: ext?.modes ?? null, readableOn: ext?.readableOn ?? null, deprecated: v.$deprecated === true });
     else out.push(...flattenTokens(v, [...prefix, k]));
   }
   return out;
@@ -53,7 +56,7 @@ export function answerLines(a) {
   }
   const { name, entry: e } = a;
   const lines = [`${name}${e.selector ? `  (${e.selector})` : ''}${e.status ? `  [${e.status}]` : ''}`];
-  if (e.description && !/captured from Figma by rms-parity/.test(e.description)) lines.push(`  ${e.description}`);
+  if (e.description && !/captured from Figma by rms-design-system-engine/.test(e.description)) lines.push(`  ${e.description}`);
   const props = Object.entries(e.props ?? {});
   if (props.length) lines.push('  props, written exactly like this:');
   for (const [figma, p] of props) {
@@ -85,17 +88,17 @@ function main() {
   const dir = resolve(ROOT, cfg.contracts?.out ?? 'contracts');
   // No catalog yet: the audit writes it, so run it once, quietly, instead of handing that step to the agent
   // (an agent asked to answer a question stops and asks whether it may run the audit first).
-  if (!existsSync(join(dir, 'catalog.json')) && existsSync(join(ROOT, 'ds-config.json')) && terms.length && process.env.PARITY_QUERY_NO_AUDIT !== '1') {
+  if (!existsSync(join(dir, 'catalog.json')) && existsSync(join(ROOT, 'ds-config.json')) && terms.length && envVar(process.env, 'QUERY_NO_AUDIT') !== '1') {
     const t0 = Date.now();
-    spawnSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'audit.mjs')], { cwd: ROOT, stdio: 'ignore', timeout: 600000, env: { ...process.env, PARITY_QUERY_NO_AUDIT: '1' } });
+    spawnSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'audit.mjs')], { cwd: ROOT, stdio: 'ignore', timeout: 600000, env: { ...process.env, DESIGN_SYSTEM_ENGINE_QUERY_NO_AUDIT: '1' } });
     if (existsSync(join(dir, 'catalog.json')) && !json) console.log(`\nℹ️  No catalog yet: ran the audit once to write it (${Math.round((Date.now() - t0) / 1000)}s). Later questions answer at once.`);
   }
   if (!existsSync(join(dir, 'catalog.json'))) {
-    console.log(`\n⏭  no ${join(cfg.contracts?.out ?? 'contracts', 'catalog.json')} yet: run rms-figma-code-parity once to write it, then ask again.\n`);
+    console.log(`\n⏭  no ${join(cfg.contracts?.out ?? 'contracts', 'catalog.json')} yet: run rms-design-system-engine once to write it, then ask again.\n`);
     process.exit(2);
   }
   if (!terms.length) {
-    console.log('\nUsage: rms-figma-code-parity --query <component or token> [more …] [--json]\n');
+    console.log('\nUsage: rms-design-system-engine --query <component or token> [more …] [--json]\n');
     process.exit(2);
   }
   const catalog = JSON.parse(readFileSync(join(dir, 'catalog.json'), 'utf8'));
@@ -108,7 +111,7 @@ function main() {
   else {
     console.log('');
     for (const a of answers) { for (const l of answerLines(a)) console.log(l); console.log(''); }
-    if (answers.some((a) => a.kind === 'component')) console.log('NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-figma-code-parity --check-ui <file>\n');
+    if (answers.some((a) => a.kind === 'component')) console.log('NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-design-system-engine --check-ui <file>\n');
   }
   process.exit(answers.every((a) => a.kind !== 'none') ? 0 : 1);
 }

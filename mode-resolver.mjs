@@ -98,7 +98,7 @@ export function buildResolver(rawCss, MODES, prims = {}) {
   const rootVars = asObject(rootTokens(sources, { cssSelector: 'root' }));
   const modeBlocks = Object.fromEntries(MODES.map(m => [m.snapshotKey, asObject(rootTokens(sources, m))]));
   // NEUTRAL_MAPS may be an array (by mode index) or an object keyed by mode NAME (as
-  // parity-map.mjs writes it) or by snapshotKey. Resolve it to snapshotKey → map so the
+  // design-system-engine-map.mjs writes it) or by snapshotKey. Resolve it to snapshotKey → map so the
   // lookup below (which only knows the snapshotKey) works for every form; fall back to the
   // legacy NL/ND for the 2-mode light/dark case.
   const neutralByKey = {};

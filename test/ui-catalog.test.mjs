@@ -90,7 +90,7 @@ test('ui-check command: reads contracts/catalog.json, prints findings, writes th
   assert.equal(code, 1);
   assert.match(out, /❌ 1 error\(s\) · 0 warning\(s\)/);
   assert.match(out, /Badge\.Tone = "nope" is not one of info, warn  \(rule 2:/);
-  assert.equal(JSON.parse(execFileSync('cat', [join(dir, '.parity-out/ui-check.json')], { encoding: 'utf8' })).counts.errors, 1);
+  assert.equal(JSON.parse(execFileSync('cat', [join(dir, '.design-system-engine-out/ui-check.json')], { encoding: 'utf8' })).counts.errors, 1);
 });
 
 test('catalog (I58): the code\'s own values when it names them differently, and the wrong names with the right one', () => {

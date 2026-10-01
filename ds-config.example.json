@@ -44,7 +44,7 @@
   "rendered": { "auto": false, "colorScheme": "light" },
 
   "_visual_note": "Directory for stored reference screenshots. Commit this dir to track visual history.",
-  "visualRefs": ".parity-refs",
+  "visualRefs": ".design-system-engine-refs",
 
   "_webhook_note": "Config for webhook-server.mjs. Run setup-webhook.mjs to register with Figma.",
   "webhook": {

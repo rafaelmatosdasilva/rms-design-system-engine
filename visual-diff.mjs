@@ -4,25 +4,26 @@
 // glyph. With ds-config.json → codeReading.visual: true, the capture saves a PNG of each component's instance
 // (first mode, default state, at scale 2). This compares it with the Figma image of the component's default
 // variant, from the first of:
-//   1. <visualRefs>/components/<name>.png (default .parity-refs), saved by hand or with the Figma MCP;
-//   2. the Figma REST images API (FIGMA_TOKEN and figmaFileKey), cached under .parity-out/visual/figma/.
+//   1. <visualRefs>/components/<name>.png (default .design-system-engine-refs), saved by hand or with the Figma MCP;
+//   2. the Figma REST images API (FIGMA_TOKEN and figmaFileKey), cached under .design-system-engine-out/visual/figma/.
 // A component with neither is listed as not compared, never guessed. The images are compared in Chrome on
 // a canvas (no image library needed): the Figma image is drawn on the background the component sits on,
 // then every pixel whose colour differs by more than the tolerance, and is not found within one pixel in
 // the other image (anti-aliasing), counts. The result is advisory: two
 // percentages per component, with and without its text, worst first, and a diff image under
-// .parity-out/visual/diff/. The one without text decides the ⚠️ (codeReading.visualThreshold, default 2%).
+// .design-system-engine-out/visual/diff/. The one without text decides the ⚠️ (codeReading.visualThreshold, default 2%).
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
 import { findChrome, launchChrome, connectCDP, openPage } from './cdp.mjs';
+import { OUT_DIR, REFS_DIR, projectPath } from './names.mjs';
 
 const safe = (name) => String(name).replace(/[^\w.-]+/g, '_');
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const axes = (n) => String(n ?? '').toLowerCase().replace(/\s+/g, '');
 
 // Where the Figma image of a component comes from. Returns { file, from } or { why }.
-export async function figmaImage(ROOT, cfg, name, { nodeId, defaultVariant, version, token = process.env.FIGMA_TOKEN, fetchImpl = fetch, outDir = '.parity-out' } = {}) {
-  const ref = resolve(ROOT, cfg.visualRefs ?? '.parity-refs', 'components', `${safe(name)}.png`);
+export async function figmaImage(ROOT, cfg, name, { nodeId, defaultVariant, version, token = process.env.FIGMA_TOKEN, fetchImpl = fetch, outDir = OUT_DIR } = {}) {
+  const ref = resolve(ROOT, cfg.visualRefs ?? projectPath(ROOT, 'refs'), 'components', `${safe(name)}.png`);
   if (existsSync(ref)) return { file: ref, from: 'reference' };
   if (!token) return { why: 'no reference image and no FIGMA_TOKEN' };
   if (!cfg.figmaFileKey) return { why: 'no reference image and no figmaFileKey in ds-config.json' };
@@ -100,7 +101,7 @@ export function compareExpression(figmaUrl, codeUrl, background, tolerance, text
 }
 
 // Every component the capture drew, compared with its Figma image. Returns { rows, missing, note }.
-export async function visualDiff(ROOT, cfg, code, structure, { outDir = '.parity-out', version = null, chromePath = findChrome({ playwright: true }), token, fetchImpl } = {}) {
+export async function visualDiff(ROOT, cfg, code, structure, { outDir = OUT_DIR, version = null, chromePath = findChrome({ playwright: true }), token, fetchImpl } = {}) {
   const drawn = Object.entries(code?.components ?? {}).filter(([, c]) => c.visual?.file);
   if (!drawn.length) return { rows: [], missing: [], note: null };
   const tolerance = Number.isFinite(cfg.codeReading?.visualTolerance) ? cfg.codeReading.visualTolerance : 10;
@@ -138,7 +139,7 @@ export async function visualDiff(ROOT, cfg, code, structure, { outDir = '.parity
   return { rows: rows.sort((a, b) => b.noText - a.noText || b.pct - a.pct || a.name.localeCompare(b.name)), missing, note: null, threshold };
 }
 
-export function visualLines(r, refsDir = '.parity-refs') {
+export function visualLines(r, refsDir = REFS_DIR) {
   const lines = [];
   if (r.rows.length) {
     const over = r.rows.filter((x) => x.over);

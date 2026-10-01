@@ -10,25 +10,30 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, exist
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ENGINE } from './lib.mjs';
-import { skillMd } from '../../skill-files.mjs';
+import { skillMd, renamedGuide } from '../../skill-files.mjs';
+import { OLD_SKILL } from '../../names.mjs';
 
-const GUIDE = 'rms-figma-code-parity.md';
+const GUIDE = 'rms-design-system-engine.md';
 const git = (...a) => execFileSync('git', a, { cwd: ENGINE, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
 // I61: the whole guide as the engine's router and nothing else.
-export const BARE = `# /rms-figma-code-parity - Figma-to-Code Parity
+export const BARE = `# /rms-design-system-engine - the engine of a design system
 
 Checks that the code matches the team's Figma design system.
 
 Run the engine's router with the request exactly as the person wrote it, then do what it prints:
 
-    rms-figma-code-parity --route "<the request>"
+    rms-design-system-engine --route "<the request>"
 
-Not on PATH: \`node ~/.claude/skills/rms-figma-code-parity/audit.mjs --route "<the request>"\`.
+Not on PATH: \`node ~/.claude/skills/rms-design-system-engine/audit.mjs --route "<the request>"\`.
 If the request already came with a ROUTE block, follow that block instead. Report in the chat.
 `;
 
-export function guideAt(ref) { return git('show', `${ref}:${GUIDE}`); }
+// A ref from before the rename has the guide under the old name, speaking of the old command: read as the new one.
+export function guideAt(ref) {
+  try { return execFileSync('git', ['show', `${ref}:${GUIDE}`], { cwd: ENGINE, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }); }
+  catch { return renamedGuide(git('show', `${ref}:${OLD_SKILL}.md`)); }
+}
 export function defaultBaselineRef() { try { git('rev-parse', '--verify', '-q', 'guide-monolith'); return 'guide-monolith'; } catch { return 'HEAD'; } }
 
 export function variant(name, { ref = defaultBaselineRef() } = {}) {
@@ -45,7 +50,7 @@ export function variant(name, { ref = defaultBaselineRef() } = {}) {
     // "node <install-dir>/audit.mjs" and the recipes' paths work, and SKILL.md is the only file of its own.
     const text = skillMd(readFileSync(join(ENGINE, GUIDE), 'utf8'));
     return { name, ref: 'working tree', text, install: (home) => {
-      const dir = join(home, '.claude', 'skills', 'rms-figma-code-parity');
+      const dir = join(home, '.claude', 'skills', 'rms-design-system-engine');
       mkdirSync(dir, { recursive: true });
       for (const f of readdirSync(ENGINE)) if (!['.git', 'test', GUIDE, 'SKILL.md'].includes(f)) symlinkSync(join(ENGINE, f), join(dir, f));
       writeFileSync(join(dir, 'SKILL.md'), text);

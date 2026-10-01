@@ -52,7 +52,7 @@ function whichBin(name) {
 // Launch headless Chrome and resolve once its DevTools socket is listening.
 // Returns { chrome, userDataDir, wsUrl, kill }. Rejects if Chrome exits first.
 // Gives up after timeoutMs (default 30 s) so a Chrome that never starts cannot hang a run.
-export async function launchChrome(chromePath, { tmpPrefix = 'parity-chrome-', timeoutMs = 30000 } = {}) {
+export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engine-chrome-', timeoutMs = 30000 } = {}) {
   const userDataDir = mkdtempSync(join(tmpdir(), tmpPrefix));
   const chrome = spawn(chromePath, [
     '--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-sandbox',

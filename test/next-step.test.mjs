@@ -8,10 +8,10 @@ const tokens = gate('Token values  (color · sizing)', false, ['✅ PASS  25', '
 const structure = gate('Structure', true, ['⚠️  MEASURED 1  (rendered in the browser)', '⚠️  chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip · src/theme.css:60)  → set 32px']);
 
 test('NEXT: failing gates first, then the hand-back, then the burndown, else nothing to do', () => {
-  assert.match(nextStep({ failing: [tokens] }), /^NEXT: tell the user what fails under "Token values" and the fix it names\. Change the code only when they ask for that fix, then run rms-figma-code-parity\./);
-  assert.match(nextStep({ failing: [tokens], scope: ['chip'] }), /then run rms-figma-code-parity --component chip\./);
-  assert.match(nextStep({ handback: { code: '.parity-out/handback/code-changes.diff' } }), /apply it only when they ask \(git apply/);
-  assert.equal(nextStep({ burndownNext: 'chip' }), 'NEXT: rms-figma-code-parity --component chip');
+  assert.match(nextStep({ failing: [tokens] }), /^NEXT: tell the user what fails under "Token values" and the fix it names\. Change the code only when they ask for that fix, then run rms-design-system-engine\./);
+  assert.match(nextStep({ failing: [tokens], scope: ['chip'] }), /then run rms-design-system-engine --component chip\./);
+  assert.match(nextStep({ handback: { code: '.design-system-engine-out/handback/code-changes.diff' } }), /apply it only when they ask \(git apply/);
+  assert.equal(nextStep({ burndownNext: 'chip' }), 'NEXT: rms-design-system-engine --component chip');
   assert.match(nextStep({ burndownNext: 'chip', scope: ['chip'] }), /nothing to do/);
   assert.match(nextStep({}), /nothing to do/);
 });
@@ -29,8 +29,8 @@ test('summary: the failing lines with their fix, the measured differences, the s
 });
 
 test('a run that writes the baseline says so, and never reads as in parity', () => {
-  const written = { count: 2, file: 'parity-baseline.json' };
-  assert.match(nextStep({ failing: [tokens], baselineWritten: written }), /^NEXT: tell the user parity-baseline\.json now holds the accepted debt; commit it only when they ask\./);
+  const written = { count: 2, file: 'design-system-engine-baseline.json' };
+  assert.match(nextStep({ failing: [tokens], baselineWritten: written }), /^NEXT: tell the user design-system-engine-baseline\.json now holds the accepted debt; commit it only when they ask\./);
   const s = buildSummary({ verdict: 'baseline', gates: [tokens], baselineWritten: written });
   assert.match(s, /\*\*Baseline written\.\*\* 2 failing items recorded/);
   assert.doesNotMatch(s, /In parity|fails:/);
@@ -41,7 +41,7 @@ test('the summary says whether the Figma data was refreshed, so no one has to in
   const not = dataStateLine({ snapshots: snaps });
   assert.match(not, /^\*\*Figma data was not refreshed in this run\.\*\*/);
   assert.match(not, /the oldest, src\/figma-structure\.snapshot\.json, 3 days old/);
-  assert.match(not, /rms-figma-code-parity --recipe refresh-figma/);
+  assert.match(not, /rms-design-system-engine --recipe refresh-figma/);
   assert.match(dataStateLine({ snapshots: [{ file: 'a.json', ageHours: 2 }] }), /a\.json, updated today/);
   assert.match(dataStateLine({ snapshots: [{ file: 'a.json', ageHours: 30 }] }), /1 day old/);
   const api = dataStateLine({ refreshedFromApi: true, snapshots: snaps });

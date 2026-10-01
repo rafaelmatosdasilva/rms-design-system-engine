@@ -14,6 +14,7 @@
 
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, extname } from 'path';
+import { ENGINE_DIRS } from './names.mjs';
 
 const ROOT = process.cwd();
 let cfg = {};
@@ -40,7 +41,7 @@ const EXEMPT = new Set((cfg.knownUnimplementedIcons ?? []).map(s => norm(s)));
 function norm(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
 
 // ── Collect the icon names the CODE defines (sprite symbols + #icon-... references) ──
-const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.git', '.next', 'coverage', '.parity-refs', '.parity-out']);
+const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.git', '.next', 'coverage', ...ENGINE_DIRS]);
 const EXT = new Set(['.vue', '.tsx', '.jsx', '.ts', '.js', '.html', '.svg', '.svelte', '.css']);
 function walk(dir, out) {
   let entries = [];

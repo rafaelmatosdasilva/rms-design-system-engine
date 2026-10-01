@@ -7,8 +7,8 @@
 //
 // Requires at project root:
 //   ds-config.json   - themeCSS + pluginCSS paths
-//   parity-map.mjs   - COVERED, COVERED_PREFIX, EXPLICIT (optional)
-//   bound-tokens.json - output of /rms-parity Phase 2 Step 1b
+//   design-system-engine-map.mjs   - COVERED, COVERED_PREFIX, EXPLICIT (optional)
+//   bound-tokens.json - output of /rms-design-system-engine Phase 2 Step 1b
 //
 // Exit 0 = every bound token covered.
 // Exit 1 = uncovered bound token(s).
@@ -20,6 +20,7 @@ import { join } from 'path';
 import { loadModes } from './mode-resolver.mjs';
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
 import { pathToFileURL } from 'url';
+import { projectPath } from './names.mjs';
 
 const ROOT = process.cwd();
 
@@ -33,10 +34,10 @@ const THEME_PATHS = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();   // themeC
 const THEME_PATH  = THEME_PATHS[0];
 const PLUGIN_CSS = cfg.paths?.pluginCSS ?? [];
 
-// ── Load parity-map.mjs ───────────────────────────────────────────────────────
+// ── Load design-system-engine-map.mjs ───────────────────────────────────────────────────────
 let COVERED = new Set(), COVERED_PREFIX = [], EXPLICIT = {};
 try {
-  const map = await import(pathToFileURL(join(ROOT, 'parity-map.mjs')).href);
+  const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   if (map.COVERED)        COVERED        = map.COVERED;
   if (map.COVERED_PREFIX) COVERED_PREFIX = map.COVERED_PREFIX;
   if (map.EXPLICIT)       EXPLICIT       = map.EXPLICIT;
@@ -46,7 +47,7 @@ try {
 let raw;
 try { raw = readFileSync(join(ROOT, 'bound-tokens.json'), 'utf8'); } catch {
   console.log('\n⚠️  bound-tokens.json not found at project root.');
-  console.log('   Run /rms-parity Phase 2 Step 1b and save output to bound-tokens.json.');
+  console.log('   Run /rms-design-system-engine Phase 2 Step 1b and save output to bound-tokens.json.');
   console.log('   (exit 2 - treated as "not run", never as a pass)\n');
   process.exit(2);
 }
@@ -125,7 +126,7 @@ console.log(`\n✅ COVERED   ${OK.length}`);
 console.log(`❌ UNCOVERED ${UNCOVERED.length}`);
 
 if (UNCOVERED.length) {
-  console.log('\n─── Bound in Figma, no CSS var (implement or add to COVERED in parity-map.mjs) ──');
+  console.log('\n─── Bound in Figma, no CSS var (implement or add to COVERED in design-system-engine-map.mjs) ──');
   for (const t of UNCOVERED) console.log(`  ❌ ${t}`);
   console.log('');
   process.exit(1);

@@ -4,15 +4,15 @@
 
 ## Steps
 
-1. Run `rms-figma-code-parity`; its 📉 line counts open findings per component, most first, with a next-up line.
-2. Recommend the next-up component, then `rms-figma-code-parity --component <name>`.
+1. Run `rms-design-system-engine`; its 📉 line counts open findings per component, most first, with a next-up line.
+2. Recommend the next-up component, then `rms-design-system-engine --component <name>`.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 
 ## Read more
 
-- `rms-figma-code-parity --reference config`: *Burndown*
+- `rms-design-system-engine --reference config`: *Burndown*
 
 ```recipe-check
-rms-figma-code-parity --summary
+rms-design-system-engine --summary
 ```

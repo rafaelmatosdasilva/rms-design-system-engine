@@ -9,8 +9,10 @@
 // coarse "raw values present" sweep, so a truncated walk on a pathological tree still yields a
 // representative sample; the caller reports when the cap was hit.
 
+import { envVar } from './names.mjs';
+
 export const COLLECT_NODE_BUDGET =
-  Math.max(10000, parseInt(process.env.PARITY_VALUE_NODE_BUDGET, 10) || 300000);
+  Math.max(10000, parseInt(envVar(process.env, 'VALUE_NODE_BUDGET'), 10) || 300000);
 
 export const _rgbToHex = (c) => {
   if (!c) return null;

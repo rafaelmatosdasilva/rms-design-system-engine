@@ -78,7 +78,7 @@ test('a GitLab page reaches the intent layer: its component section lands on tha
   assert.match(JSON.stringify(intent.components.buttonPrimary), /One per view, for the main action/);
 });
 
-// ── Pasting a link into the chat: rms-figma-code-parity --guidelines <link> ───────────────────
+// ── Pasting a link into the chat: rms-design-system-engine --guidelines <link> ───────────────────
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { notionTargets } from '../intent-gen.mjs';

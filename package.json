@@ -1,7 +1,7 @@
 {
-  "name": "rms-figma-code-parity",
+  "name": "rms-design-system-engine",
   "version": "1.0.0",
-  "description": "Figma-to-code parity engine (DS-agnostic gates).",
+  "description": "The engine of a design system: checks code against its Figma file, answers what the system has, and checks UI an AI builds with it.",
   "type": "module",
   "private": true,
   "license": "MIT",

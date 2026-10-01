@@ -7,7 +7,7 @@
 // First run: if ds-config.json is missing, asks a few questions (Figma URL, token CSS
 // path, and whether it is a consumer file) then auto-detects collection structure via the
 // Figma API when a token is present, scaffolds
-// parity-map.mjs + structure-contract.mjs, and writes ds-config.json.
+// design-system-engine-map.mjs + structure-contract.mjs, and writes ds-config.json.
 // Commit all three - they contain no secrets and are required for CI.
 // Subsequent runs: config exists, audit starts immediately.
 //
@@ -38,9 +38,23 @@ import { frameworkGateSkipReason }                              from './componen
 import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-parse.mjs';
 import { ZERO_FAIL }                                             from './run-diff.mjs';
 import { loadBaselineLabels, loadBaselineFindings, classifyBaseline, writeBaseline } from './baseline.mjs';
+import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, gitignoreNewNames, moveOutDir, newPath, oldNameLines, projectPath } from './names.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT       = process.cwd();
+
+// An install under the old name (rms-figma-code-parity) moves to the new one, then this run starts again there.
+if (!process.env.CI) {
+  try {
+    const { migrateInstall } = await import('./self-update.mjs');
+    const moved = migrateInstall(SCRIPT_DIR);
+    if (moved) {
+      console.log(moved.line);
+      const r = spawnSync(process.execPath, [join(moved.to, 'audit.mjs'), ...process.argv.slice(2)], { stdio: 'inherit' });
+      process.exit(r.status ?? 1);
+    }
+  } catch { /* a move that fails leaves the install where it was */ }
+}
 
 // Load .env from project root if present (no dotenv dependency)
 const envPath = join(ROOT, '.env');
@@ -100,27 +114,27 @@ const INIT_NONINTERACTIVE = INIT_FIGMA_URL != null;
 
 // ── Easy updates: link the command to this folder, and pull latest ────────────
 // So people never have to re-download. `--link-command` points the global
-// /rms-figma-code-parity command at THIS local skill folder via a symlink, so a
+// /rms-design-system-engine command at THIS local skill folder via a symlink, so a
 // plain `git pull` here updates the command too. `--update` does the pull for them
 // and refreshes the link. Works whether the folder is a sibling clone or a submodule.
 const HOME = process.env.HOME || process.env.USERPROFILE || '';
 function linkCommand() {
   // A person who chose the classic guide (--guide classic) keeps it across updates.
-  let src = join(SCRIPT_DIR, 'rms-figma-code-parity.md');
+  let src = join(SCRIPT_DIR, 'rms-design-system-engine.md');
   if (existsSync(join(SCRIPT_DIR, '.guide-choice')) && readFileSync(join(SCRIPT_DIR, '.guide-choice'), 'utf8').trim() === 'classic') {
     const classic = writeClassicGuide(SCRIPT_DIR);
     if (classic) src = classic;
     else console.log('⚠️  The classic guide is not in this copy of the skill (no guide-monolith tag); linking the current guide.');
   }
   const cmdDir = join(HOME, '.claude', 'commands');
-  const link = join(cmdDir, 'rms-figma-code-parity.md');
+  const link = join(cmdDir, 'rms-design-system-engine.md');
   try {
     mkdirSync(cmdDir, { recursive: true });
     try { unlinkSync(link); } catch { /* nothing to replace */ }
     symlinkSync(src, link);
     console.log(`✅ Command linked: ${link}`);
     console.log(`   → ${src}`);
-    console.log('   From now on a `git pull` in this folder updates /rms-figma-code-parity - no re-download.');
+    console.log('   From now on a `git pull` in this folder updates /rms-design-system-engine - no re-download.');
     return true;
   } catch (e) {
     console.log(`⚠️  Could not link the command (${e.message}).`);
@@ -145,7 +159,7 @@ function updateSkill() {
   linkCommand();
   const head = describeHead();
   console.log(`\n✅ Done. You are on the latest${head ? `:\n   ${head}` : '.'}`);
-  console.log('   Run /rms-figma-code-parity to use it.');
+  console.log('   Run /rms-design-system-engine to use it.');
 }
 // "Am I on the latest?" - compare local HEAD to the remote main tip with a single
 // lightweight `git ls-remote` (no fetch/merge, short timeout). Returns null when it
@@ -168,7 +182,7 @@ function checkForUpdate({ quiet } = {}) {
   if (!quiet) {
     const head = describeHead();
     console.log(behind
-      ? `⚠️  A newer version is available.\n   you: ${head || local.slice(0, 7)}\n   latest: ${remote.slice(0, 7)}\n   Update: rms-figma-code-parity --update`
+      ? `⚠️  A newer version is available.\n   you: ${head || local.slice(0, 7)}\n   latest: ${remote.slice(0, 7)}\n   Update: rms-design-system-engine --update`
       : `✅ You are on the latest version${head ? `:\n   ${head}` : ` (${local.slice(0, 7)}).`}`);
   }
   return { behind, local, remote };
@@ -186,7 +200,7 @@ for (const kind of ['recipe', 'reference']) {
 if (process.argv.includes('--route')) {
   const { route, routeText, projectState } = await import('./route.mjs');
   const text = process.argv.slice(process.argv.indexOf('--route') + 1).join(' ');
-  if (!text.trim()) { console.log('Give the request as the person wrote it: rms-figma-code-parity --route "<request>"'); process.exit(2); }
+  if (!text.trim()) { console.log('Give the request as the person wrote it: rms-design-system-engine --route "<request>"'); process.exit(2); }
   const state = projectState(ROOT, { engineDir: SCRIPT_DIR });
   const cmd = state.cmd;
   const r = route(text, state);
@@ -203,7 +217,7 @@ if (process.argv.includes('--guide')) {
   } else if (which === 'current') { try { unlinkSync(join(SCRIPT_DIR, '.guide-choice')); } catch { /* already current */ } }
   else { console.log('Use --guide classic (the guide as one file, as before the split) or --guide current.'); process.exit(2); }
   const ok = linkCommand();
-  console.log(ok ? `NEXT: open a new Claude Code session so /rms-figma-code-parity loads the ${which} guide` : 'NEXT: link the command by hand with the line above');
+  console.log(ok ? `NEXT: open a new Claude Code session so /rms-design-system-engine loads the ${which} guide` : 'NEXT: link the command by hand with the line above');
   process.exit(ok ? 0 : 1);
 }
 // ── --doctor: is the skill installed right? One fix per problem (I55) ──
@@ -213,7 +227,7 @@ if (process.argv.includes('--doctor')) {
   const rows = doctor({ engineDir: SCRIPT_DIR, projectDir: ROOT, findChrome: () => findChrome({ playwright: true }), hooksStatus });
   for (const r of rows) console.log(`${r.ok ? '✅' : '⚠️ '} ${r.what}${r.fix ? `\n   fix: ${r.fix}` : ''}`);
   const bad = rows.filter((r) => !r.ok);
-  console.log(bad.length ? `NEXT: ${bad[0].fix}` : 'NEXT: rms-figma-code-parity');
+  console.log(bad.length ? `NEXT: ${bad[0].fix}` : 'NEXT: rms-design-system-engine');
   process.exit(bad.length ? 1 : 0);
 }
 if (process.argv.includes('--link-command'))                                { process.exit(linkCommand() ? 0 : 1); }
@@ -224,10 +238,10 @@ if (process.argv.includes('--install-hooks') || process.argv.includes('--remove-
   const remove = process.argv.includes('--remove-hooks');
   try {
     const r = installHooks(ROOT, { remove });
-    console.log(remove ? `✅ Hooks removed from ${relative(ROOT, r.file)}` : `✅ Hooks ${r.changed ? 'installed' : 'already installed'} in ${relative(ROOT, r.file)}: a Figma snapshot is never edited by hand, ds-config.json edits, commits, pushes and applying the hand-back ask you first, and each /rms-figma-code-parity request is routed by the engine.`);
+    console.log(remove ? `✅ Hooks removed from ${relative(ROOT, r.file)}` : `✅ Hooks ${r.changed ? 'installed' : 'already installed'} in ${relative(ROOT, r.file)}: a Figma snapshot is never edited by hand, ds-config.json edits, commits, pushes and applying the hand-back ask you first, and each /rms-design-system-engine request is routed by the engine.`);
     if (r.gitignored) console.log('   Added .claude/settings.local.json to .gitignore (it holds this machine\'s engine path).');
-    if (!remove) console.log('   Turn them off with rms-figma-code-parity --remove-hooks, or "hooks": false in ds-config.json.');
-    console.log('NEXT: rms-figma-code-parity');
+    if (!remove) console.log('   Turn them off with rms-design-system-engine --remove-hooks, or "hooks": false in ds-config.json.');
+    console.log('NEXT: rms-design-system-engine');
     process.exit(0);
   } catch (e) { console.log(`❌ ${e.message}`); process.exit(1); }
 }
@@ -235,10 +249,10 @@ if (process.argv.includes('--version') || process.argv.includes('--check-update'
 
 // ── --summary: the plain result of the last run, to relay in the chat as is (I55) ──
 if (process.argv.includes('--summary')) {
-  const f = join(process.cwd(), '.parity-out', 'summary.md');
+  const f = join(process.cwd(), projectPath(process.cwd(), 'out'), 'summary.md');
   if (existsSync(f)) { process.stdout.write(readFileSync(f, 'utf8')); process.exit(0); }
-  console.log('No summary yet: run the audit first (rms-figma-code-parity, or --component <name>).');
-  console.log('NEXT: rms-figma-code-parity');
+  console.log('No summary yet: run the audit first (rms-design-system-engine, or --component <name>).');
+  console.log('NEXT: rms-design-system-engine');
   process.exit(2);
 }
 
@@ -340,7 +354,7 @@ const C = {
 // link it lists the links already set. Tokens stay in .env and are never asked for in the chat.
 if (process.argv.includes('--guidelines') || process.argv.some((a) => a.startsWith('--guidelines='))) {
   const cfgPath = join(ROOT, 'ds-config.json');
-  if (!existsSync(cfgPath)) { console.error('❌ ds-config.json not found. Run the first-time setup first (rms-figma-code-parity --init).'); process.exit(1); }
+  if (!existsSync(cfgPath)) { console.error('❌ ds-config.json not found. Run the first-time setup first (rms-design-system-engine --init).'); process.exit(1); }
   const conf = JSON.parse(readFileSync(cfgPath, 'utf8'));
   const { parseGitlabUrl, fetchGitlabMarkdown, tokenAllowedFor } = await import('./gitlab-fetch.mjs');
   const { pageIdFromUrl, fetchNotionMarkdown } = await import('./notion-fetch.mjs');
@@ -351,7 +365,7 @@ if (process.argv.includes('--guidelines') || process.argv.some((a) => a.startsWi
     console.log('\nGuidelines links in ds-config.json:');
     for (const t of n) console.log(`  Notion  ${t.url}  → ${t.file}`);
     for (const t of g) console.log(`  GitLab  ${t.url}  → ${t.file}`);
-    if (!n.length && !g.length) console.log('  none yet. Paste a GitLab or Notion link: rms-figma-code-parity --guidelines <link>');
+    if (!n.length && !g.length) console.log('  none yet. Paste a GitLab or Notion link: rms-design-system-engine --guidelines <link>');
     process.exit(0);
   }
   let failed = 0;
@@ -400,7 +414,7 @@ if (process.argv.includes('--guidelines') || process.argv.some((a) => a.startsWi
       }
     }
   }
-  console.log(failed ? `\nNEXT: make the fix named above, then run rms-figma-code-parity --guidelines ${links.join(' ')} again` : '\nNEXT: rms-figma-code-parity   (every run refreshes these pages and folds them into the design intent)');
+  console.log(failed ? `\nNEXT: make the fix named above, then run rms-design-system-engine --guidelines ${links.join(' ')} again` : '\nNEXT: rms-design-system-engine   (every run refreshes these pages and folds them into the design intent)');
   process.exit(failed ? 1 : 0);
 }
 
@@ -426,7 +440,7 @@ if (process.argv.includes('--check-ui')) {
 
 // ── --trend: no config needed - just show history and exit ────────────────────
 if (SHOW_TREND) {
-  const histPath = join(ROOT, 'parity-history.json');
+  const histPath = join(ROOT, projectPath(ROOT, 'history'));
   try {
     const hist = JSON.parse(readFileSync(histPath, 'utf8'));
     console.log('\n' + C.bold('─── Parity Trend ───────────────────────────────────────────'));
@@ -887,7 +901,7 @@ async function refreshComponentValues(fileKey, token, outPath) {
     }
     const capped = budget.n <= 0;
     writeFileSync(outPath, JSON.stringify({ _updated: new Date().toISOString(), ...result }, null, 2) + '\n');
-    console.log(C.dim(`  ✅ Component values: ${Object.keys(result).length} component set(s) swept${capped ? ` (walk capped at ${COLLECT_NODE_BUDGET} nodes — raise PARITY_VALUE_NODE_BUDGET if needed)` : ''}`));
+    console.log(C.dim(`  ✅ Component values: ${Object.keys(result).length} component set(s) swept${capped ? ` (walk capped at ${COLLECT_NODE_BUDGET} nodes — raise DESIGN_SYSTEM_ENGINE_VALUE_NODE_BUDGET if needed)` : ''}`));
     return true;
   } catch (e) {
     console.log(C.yellow(`  ⚠️  Component values refresh failed: ${e.message}`));
@@ -899,7 +913,7 @@ async function refreshComponentValues(fileKey, token, outPath) {
 // Called when ds-config.json is missing (or --init flag). Auto-detects CSS paths,
 // plugin files, snapshot locations, and Figma collection structure via API.
 async function bootstrapConfig() {
-  console.log('\n' + C.bold('rms-parity - first-time setup'));
+  console.log('\n' + C.bold('rms-design-system-engine - first-time setup'));
   console.log(C.dim('─'.repeat(WIDTH)));
 
   // Auto-detect token CSS
@@ -956,7 +970,7 @@ async function bootstrapConfig() {
   function detectRuntimeStylesheets(root) {
     const hits = new Set();
     const SRC_EXT = ['.js', '.ts', '.mjs', '.vue', '.jsx', '.tsx', '.html'];
-    const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.parity-refs', '.parity-out', 'coverage']);
+    const SKIP = new Set(['node_modules', '.git', 'dist', 'build', ...ENGINE_DIRS, 'coverage']);
     const URL_RE  = /https?:\/\/[^'"`\s)]+\.css(?:[^'"`\s)]*)?/gi;      // remote .css (incl. ${..} in backticks)
     const TMPL_RE = /(?:href|url)\s*[:=]\s*`([^`]*\.css[^`]*)`/gi;      // href = `…css` template literals
     const LINK_RE = /<link\b[^>]*\bid=["']([^"']+)["'][^>]*\brel=["']stylesheet["']|<link\b[^>]*\brel=["']stylesheet["'][^>]*\bid=["']([^"']+)["']/gi;
@@ -1136,7 +1150,7 @@ async function bootstrapConfig() {
       modes: detected.modes,
     },
     paths: { themeCSS, snapshotVars, snapshotStructure, pluginCSS, plugins },
-    visualRefs: '.parity-refs',
+    visualRefs: newPath('refs'),
     webhook: { port: 3456, secret: 'YOUR_WEBHOOK_SECRET' },
     knownUnusedVars: [],
     knownHardcodedExceptions: [],
@@ -1157,9 +1171,9 @@ async function bootstrapConfig() {
     }
   }
 
-  // ── Scaffold parity-map.mjs and structure-contract.mjs ───────────────────────
+  // ── Scaffold design-system-engine-map.mjs and structure-contract.mjs ───────────────────────
   for (const [example, target] of [
-    ['parity-map.example.mjs',          'parity-map.mjs'],
+    ['design-system-engine-map.example.mjs', newPath('map')],
     ['structure-contract.example.mjs',  'structure-contract.mjs'],
   ]) {
     const src  = join(SCRIPT_DIR, example);
@@ -1174,21 +1188,21 @@ async function bootstrapConfig() {
   const giPath    = join(ROOT, '.gitignore');
   const giContent = existsSync(giPath) ? readFileSync(giPath, 'utf8') : '';
   // Only gitignore secrets and auto-generated transients.
-  // ds-config.json, parity-map.mjs, structure-contract.mjs contain no secrets -
+  // ds-config.json, design-system-engine-map.mjs, structure-contract.mjs contain no secrets -
   // commit them so CI can run parity without interactive setup.
-  const toAdd     = ['.env', 'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', 'parity-check-result.json', '.parity-out/']
+  const toAdd     = ['.env', 'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', newPath('checkResult'), `${OUT_DIR}/`]
     .filter(e => !giContent.split('\n').some(l => l.trim() === e));
   if (toAdd.length) {
-    const block = '\n# rms-parity: secrets + auto-generated transients - do not commit\n' + toAdd.join('\n') + '\n';
+    const block = '\n# rms-design-system-engine: secrets + auto-generated transients - do not commit\n' + toAdd.join('\n') + '\n';
     writeFileSync(giPath, giContent + (giContent.endsWith('\n') ? '' : '\n') + block);
     console.log(C.green('✅ .gitignore updated'));
   }
 
   // ── Next-steps checklist ──────────────────────────────────────────────────────
   console.log('\n' + C.bold('─── Next steps ─────────────────────────────────────────────'));
-  console.log(`  1. Run ${C.bold('/rms-figma-code-parity')} - it captures the Figma data for you`);
+  console.log(`  1. Run ${C.bold('/rms-design-system-engine')} - it captures the Figma data for you`);
   console.log(`     (no token needed) and audits the code. Commit the *.snapshot.json files.`);
-  console.log(`  2. ${C.bold('parity-map.mjs')} - fill in primitive scale (NEUTRAL_LIGHT/DARK)`);
+  console.log(`  2. ${C.bold(newPath('map'))} - fill in primitive scale (NEUTRAL_LIGHT/DARK)`);
   console.log(`       and any token→var exceptions (EXPLICIT, SKIP_TOKENS)`);
   console.log(`  3. ${C.bold('structure-contract.mjs')} - add component height/padding contracts`);
   console.log(`       (only needed for Gates [3] and [8])`);
@@ -1200,10 +1214,10 @@ async function bootstrapConfig() {
     try {
       const { installHooks } = await import('./hooks-install.mjs');
       const r = installHooks(ROOT);
-      console.log(C.green(`✅ Hooks installed in ${relative(ROOT, r.file)}`) + C.dim(' (never edit a Figma snapshot by hand; ask before commit, push, applying the hand-back or editing ds-config.json; route each /rms-figma-code-parity request). Off: --remove-hooks.'));
+      console.log(C.green(`✅ Hooks installed in ${relative(ROOT, r.file)}`) + C.dim(' (never edit a Figma snapshot by hand; ask before commit, push, applying the hand-back or editing ds-config.json; route each /rms-design-system-engine request). Off: --remove-hooks.'));
     } catch (e) { console.log(C.yellow(`⚠️  Hooks not installed: ${e.message}`)); }
   }
-  console.log('NEXT: rms-figma-code-parity   (the first run: it refreshes the Figma data when it can, then audits)\n');
+  console.log('NEXT: rms-design-system-engine   (the first run: it refreshes the Figma data when it can, then audits)\n');
 
   return generated;
 }
@@ -1217,7 +1231,7 @@ async function bootstrapConfig() {
     const up = autoUpdate(SCRIPT_DIR);
     if (up.updated) {
       console.log(updatedLine(up, describeHead() ?? ''));
-      const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'audit.mjs'), ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, PARITY_NO_AUTO_UPDATE: '1' } });
+      const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'audit.mjs'), ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
       process.exit(r.status ?? 1);
     }
   } catch { /* an update must never stop an audit */ }
@@ -1236,11 +1250,20 @@ async function bootstrapConfig() {
     }
     cfg = await bootstrapConfig();
   }
+  // A project set up under the old name (rms-figma-code-parity): the output folder moves, the ignore list gets
+  // the new names, and each old file still read is said once, with the rename to make.
+  try {
+    const moved = moveOutDir(ROOT);
+    if (moved) console.log(C.dim(moved));
+    const added = gitignoreNewNames(ROOT);
+    if (added.length) console.log(C.dim(`ℹ️  Added ${added.join(', ')} to .gitignore (the new names of the engine's own files).`));
+    for (const l of oldNameLines(ROOT)) console.log(C.dim(l));
+  } catch { /* never blocks a run */ }
   logUsage(ROOT, { kind: 'run', args: process.argv.slice(2).filter((a) => a.startsWith('--') || !a.includes('/')) });
   // Hooks installed before the router existed get it now (I56): the update reaches every opted-in project.
   try {
     const { upgradeHooks } = await import('./hooks-install.mjs');
-    if (upgradeHooks(ROOT, cfg)) console.log(C.dim('ℹ️  Hooks updated: each /rms-figma-code-parity request is now routed by the engine (.claude/settings.local.json). Off: --remove-hooks.'));
+    if (upgradeHooks(ROOT, cfg)) console.log(C.dim('ℹ️  Hooks updated: each /rms-design-system-engine request is now routed by the engine (.claude/settings.local.json). Off: --remove-hooks.'));
   } catch { /* never blocks a run */ }
 
   // THEMES: always an array - supports single string or array of paths
@@ -1265,7 +1288,7 @@ async function bootstrapConfig() {
 // half-truth: "80 hit(s)" that prints 20 sends you off to write your own scanner to
 // see the rest - which is exactly what happened. Write the complete list next to the
 // summary and name the file, so nothing is ever only-partly reported.
-const _overflowDir = join(ROOT, '.parity-out');
+const _overflowDir = join(ROOT, OUT_DIR);
 const _overflowFiles = [];
 function reportFull(label, items, shown) {
   if (items.length <= shown) return [];
@@ -1292,7 +1315,7 @@ function reportFull(label, items, shown) {
   const SCAN_EXCLUDE_DIRS = new Set([
     'node_modules', '.git', 'dist', 'build', '.nuxt', '.next', '.output',
     'coverage', '.cache', 'public', 'static',
-    '.parity-out', '.parity-refs',   // the engine's own output and references, never the project's source
+    ...ENGINE_DIRS,   // the engine's own output and references, never the project's source
     ...(cfg.scanExcludeDirs ?? []),
   ]);
   // Only scan files that can realistically contain CSS var() references.
@@ -1306,7 +1329,7 @@ function reportFull(label, items, shown) {
   const SCAN_EXCLUDE_FILENAMES = new Set([
     'figma-vars.snapshot.json', 'figma-structure.snapshot.json',
     'figma-component-props.snapshot.json',
-    'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', 'parity-history.json', 'master-token-table.md',
+    'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', PROJECT.history.now, PROJECT.history.old, 'master-token-table.md',
     ...(cfg.scanExcludeFilenames ?? []),
   ]);
 
@@ -1593,7 +1616,7 @@ function reportFull(label, items, shown) {
         lines.push(C.yellow(`   snapshot version ${snapVersion} → file is now ${_figmaFileVersion}`));
         if (_figmaFileModified) lines.push(C.yellow(`   last modified ${_figmaFileModified}`));
         lines.push(C.yellow('   Figma versions the whole file, so this is often an unrelated edit elsewhere.'));
-        lines.push(C.yellow('   Re-run /rms-figma-code-parity (Phase 1) if the change touched audited components.'));
+        lines.push(C.yellow('   Re-run /rms-design-system-engine (Phase 1) if the change touched audited components.'));
         lines.push(C.yellow('   Real drift is still caught below by the component inventory and the value gates.'));
         versionMismatch = true;
         // Advisory only by default - escalated to a hard fail below when versionLockStrict is set.
@@ -1666,7 +1689,7 @@ function reportFull(label, items, shown) {
       ? 'has no _updated stamp or is unreadable - re-run'
       : 'missing - run';
     if (vars === null) {
-      lines.push(C.red(`${SNAP_VARS} ${nullReason(SNAP_VARS)} /rms-parity Phase 1`)); warn = true;
+      lines.push(C.red(`${SNAP_VARS} ${nullReason(SNAP_VARS)} /rms-design-system-engine Phase 1`)); warn = true;
     } else if (vars > 24) {
       lines.push(C.yellow(`⚠️  ${SNAP_VARS} is ${vars}h old - refresh with the Phase 1 Plugin API capture`));
     } else {
@@ -1674,7 +1697,7 @@ function reportFull(label, items, shown) {
     }
 
     if (struct === null) {
-      lines.push(C.red(`${SNAP_STRUCT} ${nullReason(SNAP_STRUCT)} /rms-parity Phase 1`)); warn = true;
+      lines.push(C.red(`${SNAP_STRUCT} ${nullReason(SNAP_STRUCT)} /rms-design-system-engine Phase 1`)); warn = true;
     } else if (struct > 24) {
       lines.push(C.yellow(`⚠️  ${SNAP_STRUCT} is ${struct}h old - refresh with the Phase 1 Step 1c Plugin API capture`));
     } else {
@@ -2459,7 +2482,7 @@ function reportFull(label, items, shown) {
     const iconFile = (cfg.iconLibraryFileKey || cfg.icons?.libraryFileKey)
       ? (cfg.paths?.snapshotIcons && resolve(ROOT, cfg.paths.snapshotIcons) === join(ROOT, 'figma-icons.snapshot.json') ? 'figma-icon-inventory.snapshot.json' : 'figma-icons.snapshot.json') : null;
     const refreshFiles = [SNAP_COMP_PROPS, 'component-values.snapshot.json', iconFile, SNAP_FRAME_GEOM, 'figma-screens.snapshot.json', 'figma-templates.snapshot.json'].filter(Boolean);
-    const stampPath = join(ROOT, '.parity-out', 'figma-refresh.json');
+    const stampPath = join(ROOT, OUT_DIR, 'figma-refresh.json');
     let engineHash = ''; try { engineHash = createHash('sha1').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex'); } catch { /* keyed on the config alone */ }
     const refreshKey = createHash('sha1').update(JSON.stringify([figmaFileKey, cfg.figma?.componentsPage ?? cfg.componentsPage, cfg.iconLibraryFileKey, cfg.icons, cfg.frames, cfg.screens, cfg.templates, cfg.paths, engineHash])).digest('hex');
     let stamp = null; try { stamp = JSON.parse(readFileSync(stampPath, 'utf8')); } catch { /* first refresh */ }
@@ -2645,7 +2668,7 @@ function reportFull(label, items, shown) {
 
   // Accessibility gate (I18) args: forward the --component scope and --a11y verbosity so the
   // audit's a11y advisory covers the same components the user scoped the run to.
-  const A11Y_JSON = join(ROOT, '.parity-out', 'a11y.json');
+  const A11Y_JSON = join(ROOT, OUT_DIR, 'a11y.json');
   try { unlinkSync(A11Y_JSON); } catch { /* not there */ }
   const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') ? ['--a11y'] : []), '--json-out', A11Y_JSON];
 
@@ -2672,7 +2695,7 @@ function reportFull(label, items, shown) {
 
   // Result files some gates write for the report tables. Removed first, so a gate that stops early
   // leaves no table rather than the previous run's rows.
-  for (const f of ['component-prop-result.json', 'parity-check-result.json']) { try { unlinkSync(join(ROOT, f)); } catch { /* not there */ } }
+  for (const f of ['component-prop-result.json', PROJECT.checkResult.now, PROJECT.checkResult.old]) { try { unlinkSync(join(ROOT, f)); } catch { /* not there */ } }
 
   // Subprocess gates. The file-reading gates launch concurrently. The two browser gates each start a
   // Chrome, so they run one after the other, beside the rest: two browsers competing with thirty
@@ -2818,20 +2841,21 @@ function reportFull(label, items, shown) {
   //   node audit.mjs              → enforce: debt is tolerated, regressions fail, ratchets surfaced
   //   --no-baseline / ds-config baseline.enabled:false → ignore any baseline file
   const BASELINE_OFF  = process.argv.includes('--no-baseline') || cfg.baseline?.enabled === false;
-  const BASELINE_PATH = join(ROOT, cfg.baseline?.path ?? 'parity-baseline.json');
+  const BASELINE_PATH = join(ROOT, cfg.baseline?.path ?? newPath('baseline'));
+  const BASELINE_READ = join(ROOT, cfg.baseline?.path ?? projectPath(ROOT, 'baseline'));
   let baselineInfo = null;
   if (!BASELINE_OFF && process.argv.includes('--baseline')) {
     // --match <words>: only the findings that name them (the radius, not the rest), added to the file (I54).
     const mi = process.argv.indexOf('--match');
     const match = mi > -1 ? process.argv.slice(mi + 1).filter((x, i, all) => !x.startsWith('--') && all.slice(0, i).every((y) => !y.startsWith('--'))).flatMap((x) => x.split(',')).map((x) => x.trim()).filter(Boolean) : null;
     const perFinding = process.argv.includes('--findings') || !!match?.length;
-    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0, match });
+    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0, match, from: BASELINE_READ });
     baselineInfo = { mode: 'write', written, path: BASELINE_PATH, perFinding };
     anyFail = false;   // capturing the baseline is not a failing run
   } else if (!BASELINE_OFF) {
-    const baseLabels = loadBaselineLabels(BASELINE_PATH);
+    const baseLabels = loadBaselineLabels(BASELINE_READ);
     if (baseLabels) {
-      const cls = classifyBaseline(gates, baseLabels, loadBaselineFindings(BASELINE_PATH));
+      const cls = classifyBaseline(gates, baseLabels, loadBaselineFindings(BASELINE_READ));
       baselineInfo = { mode: 'enforce', ...cls };
       // Re-derive the verdict: accepted debt no longer fails; only regressions do. Preserve the
       // one non-gate contribution (a11yStrict, folded into anyFail above).
@@ -2890,7 +2914,7 @@ function reportFull(label, items, shown) {
     // A props gate the project opted out of (frameworkComponents:false) shows no props table.
     const propsSkipped = cfg.frameworkComponents === false && !cfg.htmlRealization;
     const props  = propsSkipped ? null : read('component-prop-result.json');
-    const parity = read('parity-check-result.json');
+    const parity = read(PROJECT.checkResult.now);
     if (!props && !(parity?.fail?.length || parity?.aliasFail?.length || parity?.passList?.length)) return;
 
     console.log(C.bold('─'.repeat(WIDTH)));
@@ -3004,7 +3028,7 @@ function reportFull(label, items, shown) {
     console.log('─'.repeat(WIDTH));
     const n = baselineInfo.written.length;
     const what = baselineInfo.perFinding ? `failing finding${n === 1 ? '' : 's'}` : `failing gate${n === 1 ? '' : 's'}`;
-    console.log(C.yellow(`\n  📌 BASELINE CAPTURED - ${n} ${what} recorded as accepted debt in ${relative(ROOT, baselineInfo.path) || 'parity-baseline.json'}.`));
+    console.log(C.yellow(`\n  📌 BASELINE CAPTURED - ${n} ${what} recorded as accepted debt in ${relative(ROOT, baselineInfo.path) || newPath('baseline')}.`));
     if (n) for (const l of baselineInfo.written) console.log(C.yellow(`       • ${l}`));
     console.log(C.dim(baselineInfo.perFinding
       ? '       Commit this file. From now on these findings are tolerated; any OTHER ❌ line, or a listed one whose value changed, is a regression.'
@@ -3046,9 +3070,9 @@ function reportFull(label, items, shown) {
   console.log('─'.repeat(WIDTH) + '\n');
 
   // ── Write parity history ──────────────────────────────────────────────────────
-  const histPath = join(ROOT, 'parity-history.json');
+  const histPath = join(ROOT, newPath('history'));
   let hist = [];
-  try { hist = JSON.parse(readFileSync(histPath, 'utf8')); } catch {}
+  try { hist = JSON.parse(readFileSync(join(ROOT, projectPath(ROOT, 'history')), 'utf8')); } catch {}
   hist.push({
     date:        today,
     timestamp:   new Date().toISOString(),
@@ -3166,7 +3190,7 @@ function reportFull(label, items, shown) {
     // Agent instruction files are found on their own (I57): a list copied into AGENTS.md is the classic case.
     let found = [];
     if (cfg.steering !== false) {
-      try { const { findSteeringFiles } = await import('./steering-check.mjs'); found = findSteeringFiles(ROOT, { skip: [cfg.contracts?.out ?? 'contracts', 'node_modules', '.parity-out'] }).filter((f) => !dupSurfaces.includes(f.file)); } catch { /* declared surfaces still run */ }
+      try { const { findSteeringFiles } = await import('./steering-check.mjs'); found = findSteeringFiles(ROOT, { skip: [cfg.contracts?.out ?? 'contracts', 'node_modules', ...ENGINE_DIRS] }).filter((f) => !dupSurfaces.includes(f.file)); } catch { /* declared surfaces still run */ }
     }
     if (dupSurfaces.length || found.length) {
       const { duplicationFindings } = await import('./duplication-check.mjs');
@@ -3740,11 +3764,11 @@ function reportFull(label, items, shown) {
     try {
       const { findSteeringFiles, steeringTruth, steeringFindings, steeringLine, mandateOf } = await import('./steering-check.mjs');
       const contractsDir = cfg.contracts?.out ?? 'contracts';
-      const files = findSteeringFiles(ROOT, { skip: [contractsDir, 'node_modules', '.parity-out'] });
+      const files = findSteeringFiles(ROOT, { skip: [contractsDir, 'node_modules', ...ENGINE_DIRS] });
       if (files.length) {
         const readJson = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
         const catalog = readJson(join(contractsDir, 'catalog.json'));
-        const api = readJson(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json').api ?? {};
+        const api = readJson(codeSnapshotPath(cfg)).api ?? {};
         const cssVars = [...new Set([...readThemeCSS().matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))];
         const tokenNames = [];
         try {
@@ -3888,7 +3912,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── What both sides last agreed on (I47) ────────────────────────────────────────
-  // Every fact that matches this run is recorded in parity-agreed.json (committed), so a later
+  // Every fact that matches this run is recorded in design-system-engine-agreed.json (committed), so a later
   // difference can say which side moved. Never written inside a git hook: a commit must not change a
   // file it did not stage.
   try {
@@ -3941,7 +3965,7 @@ function reportFull(label, items, shown) {
   let _burndownLines = [], _burndownNext = null;
   try {
     const { collectFindings, diffFindings, diffReport, burndown, burndownLines, componentOf } = await import('./run-diff.mjs');
-    const ledgerPath = join(ROOT, '.parity-out', 'last-findings.json');
+    const ledgerPath = join(ROOT, OUT_DIR, 'last-findings.json');
     let ledger = {};
     try { ledger = JSON.parse(readFileSync(ledgerPath, 'utf8')); } catch { /* first run */ }
     const scopeKey = _scopeNames.slice().sort().join(',') || '(all)';
@@ -3984,25 +4008,25 @@ function reportFull(label, items, shown) {
   // relays the engine's words instead of its own reading. Also kept for `--summary`.
   try {
     const { nextStep, buildSummary } = await import('./next-step.mjs');
-    const outDir = dirname(cfg.codeReading?.out ?? '.parity-out/code.snapshot.json');
+    const outDir = dirname(codeSnapshotPath(cfg));
     const hb = (f) => (existsSync(join(ROOT, outDir, 'handback', f)) ? join(outDir, 'handback', f) : null);
     const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
-    const written = baselineInfo?.mode === 'write' ? { count: baselineInfo.written.length, file: relative(ROOT, baselineInfo.path) || 'parity-baseline.json' } : null;
+    const written = baselineInfo?.mode === 'write' ? { count: baselineInfo.written.length, file: relative(ROOT, baselineInfo.path) || newPath('baseline') } : null;
     const next = nextStep({ failing, baselineWritten: written, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext });
     const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
     const { dataStateLine } = await import('./next-step.mjs');
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
     const data = dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
     const summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data });
-    mkdirSync(join(ROOT, '.parity-out'), { recursive: true });
-    writeFileSync(join(ROOT, '.parity-out', 'summary.md'), summary);
-    console.log(`\n${C.bold('─── SUMMARY (relay this in the chat as is; also in .parity-out/summary.md) ───')}\n\n${summary}`);
+    mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+    writeFileSync(join(ROOT, OUT_DIR, 'summary.md'), summary);
+    console.log(`\n${C.bold(`─── SUMMARY (relay this in the chat as is; also in ${OUT_DIR}/summary.md) ───`)}\n\n${summary}`);
   } catch { /* the full report above still stands */ }
 
   // Passive, throttled "you're behind" nudge - at most once/day, best-effort, never
   // blocks or errors a run. Explicit checks: `node scripts/audit.mjs --version`.
   try {
-    const stamp = join(HOME, '.claude', '.rms-parity-update-check');
+    const stamp = join(HOME, '.claude', '.rms-design-system-engine-update-check');
     const now = Date.now();
     let last = 0;
     try { last = Number(readFileSync(stamp, 'utf8').trim()) || 0; } catch { /* first run */ }
@@ -4010,7 +4034,7 @@ function reportFull(label, items, shown) {
       const res = checkForUpdate({ quiet: true });
       try { mkdirSync(dirname(stamp), { recursive: true }); writeFileSync(stamp, String(now)); } catch { /* cache is optional */ }
       if (res?.behind) {
-        console.log(C.yellow('\n⚠️  A newer version of the parity skill is available - run: rms-figma-code-parity --update (it did not update itself: local changes, another branch, or PARITY_NO_AUTO_UPDATE=1)'));
+        console.log(C.yellow('\n⚠️  A newer version of the engine is available - run: rms-design-system-engine --update (it did not update itself: local changes, another branch, or DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1)'));
       }
     }
   } catch { /* a version nudge must never break the audit */ }
@@ -4020,6 +4044,6 @@ function reportFull(label, items, shown) {
   // Anything the per-gate guards did not catch ends the run with one clear line, never a stack
   // trace alone, and never a pass.
   console.error(`\n❌ The audit stopped: ${e?.message ?? e}`);
-  if (process.env.PARITY_DEBUG) console.error(e?.stack ?? '');
+  if (envVar(process.env, 'DEBUG')) console.error(e?.stack ?? '');
   process.exit(1);
 });

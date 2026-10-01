@@ -33,8 +33,8 @@ export function runGate(gateFile, files = {}, args = []) {
   }
 }
 
-// A minimal parity-map.mjs. Most gates import it optionally; a few read specific exports.
-export const EMPTY_PARITY_MAP =
+// A minimal design-system-engine-map.mjs. Most gates import it optionally; a few read specific exports.
+export const EMPTY_ENGINE_MAP =
   'export const EXPLICIT={};export const SKIP_TOKENS=new Set();' +
   'export const COVERED=new Set();export const COVERED_PREFIX=[];';
 
@@ -84,7 +84,7 @@ export function normalise(text, dir) {
     .replace(/\(([0-9a-f]{7})\)/g, '(<HASH>)')
     .replace(/\d+h (old|ago)/g, '<AGE>h $1')
     .replace(/\d+ ?(day|days|hour|hours) ago/g, '<AGE> ago')
-    .replace(/^.*newer version of the parity skill.*\n/gm, '');
+    .replace(/^.*newer version of the engine.*\n/gm, '');
 }
 
 // The whole audit on a fresh copy, its output normalised.

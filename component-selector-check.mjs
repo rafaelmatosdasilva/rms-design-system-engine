@@ -19,13 +19,14 @@
 // Requires at project root:
 //   ds-config.json          - themeCSS + pluginCSS + optional knownStateExemptions[]
 //   structure-contract.mjs  - CONTRACT (for propertyMap-derived state selectors)
-//   parity-map.mjs          - SYSTEM_VARS (excluded from this check)
+//   design-system-engine-map.mjs          - SYSTEM_VARS (excluded from this check)
 //
 // Exit 0 = all state vars appear in matching state selectors.  Exit 1 = mismatches found.
 
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
+import { projectPath } from './names.mjs';
 
 const ROOT = process.cwd();
 
@@ -51,7 +52,7 @@ try {
 
 let SYSTEM_VARS = new Set();
 try {
-  const map = await import(pathToFileURL(join(ROOT, 'parity-map.mjs')).href);
+  const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   if (map.SYSTEM_VARS) SYSTEM_VARS = map.SYSTEM_VARS;
 } catch { /* optional */ }
 

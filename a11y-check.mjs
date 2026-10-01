@@ -69,6 +69,7 @@ import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './c
 import { loadLocator } from './component-locator.mjs';
 import { loadModes } from './mode-resolver.mjs';
 import { modeSwitch } from './code-capture.mjs';
+import { codeSnapshotPath } from './names.mjs';
 
 // ── Pure, unit-testable core (exported; importing this module runs NOTHING) ─────
 // Parse a computed-style color. Returns {r,g,b,a} or null when it is not an rgb()/rgba()
@@ -389,7 +390,7 @@ export function styleguideTarget(cfg, ROOT, exists = existsSync) {
   const abs = join(ROOT, rel);
   if (exists(abs)) return { label: rel, url: pathToFileURL(abs).href, styleguide: true };
   // Not built by the project yet: the code capture keeps its own copy, built from the same template.
-  const cap = join(ROOT, dirname(cfg?.codeReading?.out ?? '.parity-out/code.snapshot.json'), 'styleguide.html');
+  const cap = join(ROOT, dirname(codeSnapshotPath(cfg)), 'styleguide.html');
   return cfg?.styleguide?.template && exists(cap) ? { label: 'styleguide (built by the code capture)', url: pathToFileURL(cap).href, styleguide: true } : null;
 }
 
@@ -695,7 +696,7 @@ export function deepSweepExpression(roots, what) {
       const SEL = '[role=button],[role=link],[role=checkbox],[role=switch],[role=tab],[role=menuitem],[role=option],[role=radio]';
       const NATIVE = 'button,a[href],input,select,textarea,summary';
       return scope.filter(el => el.matches(SEL) && !el.matches(NATIVE) && vis(el) && el.getAttribute('aria-disabled') !== 'true').slice(0, 60)
-        .map((el, i) => { el.setAttribute('data-parity-kbd', String(i)); return { i, role: el.getAttribute('role'), desc: desc(el) }; });
+        .map((el, i) => { el.setAttribute('data-design-system-engine-kbd', String(i)); return { i, role: el.getAttribute('role'), desc: desc(el) }; });
     }
     if (what === 'composites') {
       // ARIA composite widgets move focus between their items with the arrow keys (radio groups,
@@ -704,7 +705,7 @@ export function deepSweepExpression(roots, what) {
       return scope.filter(el => ITEM[el.getAttribute('role')] && vis(el)).slice(0, 30).map((el, i) => {
         const items = [...el.querySelectorAll(ITEM[el.getAttribute('role')])].filter(x => vis(x) && !x.matches('input'));
         if (items.length < 2) return null;
-        el.setAttribute('data-parity-group', String(i));
+        el.setAttribute('data-design-system-engine-group', String(i));
         return { i, role: el.getAttribute('role'), desc: desc(el), items: items.length };
       }).filter(Boolean);
     }
@@ -783,7 +784,7 @@ export function fileFromTgz(buf, wanted) {
 async function fetchAxeSource(cfg = {}) {
   const looksLikeAxe = (s) => typeof s === 'string' && s.length > 100000 && s.includes('axe.run');
   if (cfg.a11y?.axePath) { try { const s = readFileSync(resolve(cfg.a11y.axePath), 'utf8'); if (looksLikeAxe(s)) return s; } catch { /* fall through */ } }
-  const cacheDir = join(homedir(), '.cache', 'rms-figma-code-parity');
+  const cacheDir = join(homedir(), '.cache', 'rms-design-system-engine');
   const cached = join(cacheDir, `axe-${AXE_VERSION}.min.js`);
   try { const s = readFileSync(cached, 'utf8'); if (axeIntact(s)) return s; } catch { /* not cached yet */ }
   const sources = [
@@ -836,7 +837,8 @@ async function main() {
   const STRICT = cfg.a11yStrict === true;
   const RUN_AXE = argv.includes('--axe') || cfg.a11y?.axe === true;   // broaden coverage with axe-core (opt-in)
   const RUN_STATES = argv.includes('--states') || cfg.a11y?.interactionStates === true;   // check :hover contrast (opt-in)
-  const skip = (msg) => { console.log(`⏭  [a11y] ${msg}`); process.exit(0); };
+  // With --json the reason is JSON too, so a reader never mistakes a page that was not checked for a clean one.
+  const skip = (msg) => { console.log(JSON_MODE ? JSON.stringify({ notChecked: msg }) : `⏭  [a11y] ${msg}`); process.exit(0); };
 
   const plugins = cfg.paths?.plugins ?? [];
   const pluginSrc = cfg.paths?.pluginCSS ?? [];
@@ -940,8 +942,10 @@ async function main() {
   process.on('exit', cleanup);
   const killTimer = setTimeout(() => { console.error('❌ [a11y] timed out (120s)'); cleanup(); process.exit(STRICT ? 1 : 0); }, 120000); killTimer.unref();
 
-  browser = await launchChrome(CHROME, { tmpPrefix: 'a11y-check-' }).catch(() => null);
-  if (!browser) skip('Chrome failed to start');
+  // A cold Chrome on a busy machine can take longer than one start allows: try once more before giving up.
+  let launchError = null;
+  for (let i = 0; i < 2 && !browser; i++) browser = await launchChrome(CHROME, { tmpPrefix: 'a11y-check-' }).catch((e) => { launchError = e; return null; });
+  if (!browser) skip(`Chrome failed to start (${String(launchError?.message ?? launchError).split('\n')[0]})`);
 
   const { send, close: closeCDP } = await connectCDP(browser.wsUrl);
 
@@ -1109,9 +1113,9 @@ async function main() {
     await step(async () => {
       // WCAG 1.4.12: the spacing a reader may set; only text that is newly cut off counts.
       const before = new Set((await evalv(deepSweepExpression(roots, 'clipped'))) ?? []);
-      await evalv(`(() => { const s = document.createElement('style'); s.id = '__parity_spacing'; s.textContent = '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }'; document.head.appendChild(s); })()`);
+      await evalv(`(() => { const s = document.createElement('style'); s.id = '__designSystemEngine_spacing'; s.textContent = '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }'; document.head.appendChild(s); })()`);
       for (const d of (await evalv(deepSweepExpression(roots, 'clipped'))) ?? []) if (!before.has(d)) findings.push({ kind: 'spacing', plugin: label, desc: d });
-      await evalv(`document.getElementById('__parity_spacing')?.remove()`);
+      await evalv(`document.getElementById('__designSystemEngine_spacing')?.remove()`);
     });
     if (cfg.a11y?.reflow === true) await step(async () => {
       await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 1, mobile: false }, sessionId);
@@ -1191,11 +1195,11 @@ async function main() {
     await step(async () => {
       // Composite widgets move with the arrow keys.
       for (const g of (await evalv(deepSweepExpression(roots, 'composites'))) ?? []) {
-        const started = await evalv(`(() => { const g = document.querySelector('[data-parity-group="${g.i}"]'); if (!g) return false; const items = [...g.querySelectorAll('[role=radio],[role=tab],[role=menuitem],[role=option]')]; const s = items.find((x) => x.tabIndex >= 0) || items[0]; s.focus(); window.__parityStart = s; return document.activeElement === s; })()`);
+        const started = await evalv(`(() => { const g = document.querySelector('[data-design-system-engine-group="${g.i}"]'); if (!g) return false; const items = [...g.querySelectorAll('[role=radio],[role=tab],[role=menuitem],[role=option]')]; const s = items.find((x) => x.tabIndex >= 0) || items[0]; s.focus(); window.__designSystemEngineStart = s; return document.activeElement === s; })()`);
         if (!started) continue;
         const vertical = ['menu', 'listbox'].includes(g.role);
         await pressKey(vertical ? 'ArrowDown' : 'ArrowRight', vertical ? 'ArrowDown' : 'ArrowRight', vertical ? 40 : 39);
-        const moved = await evalv(`(() => { const g = document.querySelector('[data-parity-group="${g.i}"]'); return !!g && document.activeElement !== window.__parityStart && g.contains(document.activeElement); })()`);
+        const moved = await evalv(`(() => { const g = document.querySelector('[data-design-system-engine-group="${g.i}"]'); return !!g && document.activeElement !== window.__designSystemEngineStart && g.contains(document.activeElement); })()`);
         if (!moved) findings.push({ kind: 'arrows', plugin: label, desc: `${g.desc} [role=${g.role}]` });
       }
     });
@@ -1205,14 +1209,14 @@ async function main() {
       for (const w of (await evalv(deepSweepExpression(roots, 'widgets'))) ?? []) {
         const keys = ['checkbox', 'switch', 'radio', 'option'].includes(w.role) ? [[' ', 'Space', 32, ' ']] : w.role === 'button' ? [['Enter', 'Enter', 13, '\r'], [' ', 'Space', 32, ' ']] : [['Enter', 'Enter', 13, '\r']];
         for (const [key, code, kc, text] of keys) {
-          const armed = await evalv(`(() => { const el = document.querySelector('[data-parity-kbd="${w.i}"]'); if (!el) return false;
+          const armed = await evalv(`(() => { const el = document.querySelector('[data-design-system-engine-kbd="${w.i}"]'); if (!el) return false;
             const aria = () => [...el.attributes].filter((a) => /^aria-(checked|pressed|selected|expanded)$/.test(a.name)).map((a) => a.name + '=' + a.value).join();
-            window.__parityHit = 0; window.__parityAria = aria; window.__parityWas = aria();
-            el.__parityOn = (e) => { window.__parityHit++; e.preventDefault(); e.stopImmediatePropagation(); };
-            el.addEventListener('click', el.__parityOn, true); el.focus(); return document.activeElement === el; })()`);
+            window.__designSystemEngineHit = 0; window.__designSystemEngineAria = aria; window.__designSystemEngineWas = aria();
+            el.__designSystemEngineOn = (e) => { window.__designSystemEngineHit++; e.preventDefault(); e.stopImmediatePropagation(); };
+            el.addEventListener('click', el.__designSystemEngineOn, true); el.focus(); return document.activeElement === el; })()`);
           if (!armed) break;   // not focusable: the keyboard check already reports it
           await pressKey(key, code, kc, text);
-          const hit = await evalv(`(() => { const el = document.querySelector('[data-parity-kbd="${w.i}"]'); if (!el) return true; el.removeEventListener('click', el.__parityOn, true); return window.__parityHit > 0 || window.__parityAria() !== window.__parityWas; })()`);
+          const hit = await evalv(`(() => { const el = document.querySelector('[data-design-system-engine-kbd="${w.i}"]'); if (!el) return true; el.removeEventListener('click', el.__designSystemEngineOn, true); return window.__designSystemEngineHit > 0 || window.__designSystemEngineAria() !== window.__designSystemEngineWas; })()`);
           if (!hit) { findings.push({ kind: 'activate', plugin: label, desc: `${w.desc} [role=${w.role}] (${code})` }); break; }
         }
       }
