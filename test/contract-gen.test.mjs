@@ -311,3 +311,12 @@ test('llms.txt stays small enough for an agent to read whole: past the limit the
   const few = built.slice(0, 3);
   assert.doesNotMatch(buildLlms(few, {}, 0, { rules: [], components: Object.fromEntries(few.map((b) => [b.name, { props: {} }])) }), /too long/);
 });
+
+test('llms.txt carries the owner\'s primitives table (I42), and nothing when there is none', async () => {
+  const { primitiveGuideLines } = await import('../primitives.mjs');
+  const { buildLlms } = await import('../contract-gen.mjs');
+  const primitives = primitiveGuideLines({ primitives: [{ component: 'Text', props: { size: 'small' }, when: { font: 'var(--body-small)' } }] });
+  const text = buildLlms([], {}, 0, null, { primitives });
+  assert.match(text, /## Primitives\n\nWrite the component, never a plain element \(div, span, p\) styled like it:\n- <Text size="small"> for an element styled with font: var\(--body-small\)\n/);
+  assert.doesNotMatch(buildLlms([], {}, 0, null), /Primitives/);
+});

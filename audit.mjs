@@ -3833,6 +3833,24 @@ function reportFull(label, items, shown) {
     } catch (e) { console.log(C.dim(`ℹ️  Workarounds around components not checked: ${e.message}`)); }
   }
 
+  // ── A primitive written by hand (I42, advisory) ─────────────────────────────
+  // A plain element styled as a primitive the owner declared in "primitives" (a <span> with the body text style
+  // and the secondary colour is <Text size="medium" color="secondary">). No token check sees it, its values are
+  // the system's own. Only with a declared table.
+  if (Array.isArray(cfg.primitives) && cfg.primitives.length) {
+    try {
+      const { projectPrimitives, primitiveLine } = await import('./primitives.mjs');
+      const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+      let found = projectPrimitives(ROOT, cfg);
+      if (_scopeNames.length) found = found.filter((f) => _scopeNames.some((n) => norm(n) === norm(f.primitive.component)));
+      if (found.length) {
+        console.log(C.yellow(`\n🧩 Primitives written by hand: ${found.length} plain element${found.length === 1 ? '' : 's'} styled as a primitive the design system has (primitives in ds-config.json). Use the component. Advisory.`));
+        for (const f of found.slice(0, 20)) console.log(C.yellow(`     ${primitiveLine(f, f.file)}`));
+        if (found.length > 20) console.log(C.yellow(`     and ${found.length - 20} more`));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Primitives written by hand not checked: ${e.message}`)); }
+  }
+
   // ── Tailwind arbitrary values (I65, advisory) ────────────────────────────────
   // rounded-[4px], bg-[#ff00aa]: a literal written into a class name, where no CSS rule and no literal check
   // sees it. Each is compared with the project's own @theme: the utility to write when a theme value is the

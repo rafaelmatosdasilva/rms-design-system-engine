@@ -90,3 +90,17 @@ test('the hook: a UI edit in a parity project, with an opt-out; everything else 
   const none = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ hook_event_name: 'PostToolUse', cwd: plain, tool_name: 'Write', tool_input: { file_path: join(plain, 'a.css'), content: '.x{color:#fff}' } }), encoding: 'utf8' });
   assert.equal(none.stdout, '');
 });
+
+test('a plain element the edit styled as a declared primitive (I42): the component to write, only on added lines', async () => {
+  const { primitiveTable } = await import('../primitives.mjs');
+  const primitives = primitiveTable({ primitives: [{ component: 'Text', props: { size: 'medium', color: 'secondary' }, when: { font: 'var(--body-medium)', color: 'var(--text-secondary)' } }] });
+  const p = { ...ctx, truth: steeringTruth({ catalog, cssVars: ['--body-medium', '--text-secondary'] }), primitives, rules: new Map([['hint', new Map([['font', 'var(--body-medium)'], ['color', 'var(--text-secondary)']])]]) };
+  const full = '<span class="hint">old</span>\n<p style="font: var(--body-medium); color: var(--text-secondary)">new</p>\n<span class="hint">new</span>';
+  const added = full.split('\n').slice(1);
+  assert.deepEqual(editFindings(added, full, p).map((f) => `${f.line}: ${f.text}`), [
+    '2: <p> styled by hand is the system\'s <Text size="medium" color="secondary">; use the component',
+    '3: <span> styled by hand is the system\'s <Text size="medium" color="secondary">; use the component',
+  ]);
+  assert.deepEqual(editFindings(added, full, { ...p, primitives: [] }), []);
+  assert.deepEqual(editFindings(['.hint { font: var(--body-medium) }'], '.hint { font: var(--body-medium) }', p, { sheet: true }), []);
+});

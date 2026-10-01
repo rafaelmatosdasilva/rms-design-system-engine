@@ -19,6 +19,7 @@ import { join, relative, resolve, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { steeringTruth, steeringFindings } from './steering-check.mjs';
 import { usesTailwind, themeValues, arbitraryFindings } from './tailwind-check.mjs';
+import { primitiveTable, projectClassRules, primitiveFindings, primitiveTag } from './primitives.mjs';
 import { codeSnapshotPath } from './names.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
@@ -89,12 +90,15 @@ export function editTruth(ROOT, cfg = {}) {
   const api = json(codeSnapshotPath(cfg)).api ?? {};
   const truth = steeringTruth({ catalog, api, cssVars });
   const tailwind = cfg.tailwind !== false && usesTailwind(theme, ROOT) ? themeValues(theme) : null;
-  return { truth, tokenByValue, tailwind, themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  // The owner's primitives table (I42), with the project's class rules to read a styled element by its classes.
+  const primitives = primitiveTable(cfg);
+  const rules = primitives.length ? projectClassRules(ROOT) : new Map();
+  return { truth, tokenByValue, tailwind, primitives, rules, themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, tailwind = null }, { isTheme = false, sheet = false } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, tailwind = null, primitives = [], rules = new Map() }, { isTheme = false, sheet = false } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -124,6 +128,13 @@ export function editFindings(added, fullText, { truth, tokenByValue, tailwind = 
       push(line, tokens.length
         ? `${m[0]} is written by hand; use var(${tokens[0]})${tokens.length > 1 ? ` (or ${tokens.slice(1, 3).map((t) => `var(${t})`).join(', ')})` : ''}`
         : `${m[0]} is not a design-system colour; use one of its colour tokens`);
+    }
+  }
+  // A plain element the edit added that is styled as a primitive the owner declared (I42).
+  if (primitives.length && !sheet) {
+    const addedAt = new Set(added.map(lineOf).filter(Boolean));
+    for (const f of primitiveFindings(fullText, primitives, { rules })) {
+      if (addedAt.has(f.line)) push(f.line, `<${f.tag}> styled by hand is the system's ${primitiveTag(f.primitive)}; use the component`);
     }
   }
   return out;
