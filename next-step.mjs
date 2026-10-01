@@ -53,15 +53,26 @@ export function dataStateLine({ refreshedFromApi = false, snapshots = [], cmd = 
   return `**Figma data was not refreshed in this run.** The audit used ${used}.${gap} To refresh them: ${cmd} --recipe refresh-figma.`;
 }
 
-export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null } = {}) {
+// only: { words, a11y: { static, browser } | null } when the run was --only: the summary says what ran, so a part
+// never reads as the whole system.
+export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null } = {}) {
   const lines = [];
   const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
   const debt = gates.filter((g) => g.baselined);
-  lines.push(`# Parity result${scope.length ? ` for ${scope.join(', ')}` : ''}`, '');
+  lines.push(`# ${only && !gates.length ? 'Accessibility result' : 'Parity result'}${scope.length ? ` for ${scope.join(', ')}` : ''}`, '');
   lines.push(verdict === 'baseline' ? `**Baseline written.** ${baselineWritten?.count ?? 0} failing item${baselineWritten?.count === 1 ? '' : 's'} recorded as accepted debt in ${baselineWritten?.file ?? 'design-system-engine-baseline.json'}; from now on only new ones fail.`
-    : verdict === 'failed' ? `**Not in parity.** ${failing.length} of ${gates.length} gates fail.`
+    : verdict === 'failed' ? `**Not in parity.** ${failing.length} of ${gates.length} gate${gates.length === 1 ? ' fails' : 's fail'}.`
     : verdict === 'debt' ? `**No regressions.** ${debt.length} gate${debt.length === 1 ? '' : 's'} carry accepted debt.`
+      : only && !gates.length ? '**Accessibility checked.** Its findings are advice: the report lists each with its fix.'
       : `**In parity.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}.`);
+  if (only) {
+    lines.push('', `Only ${only.words} ran in this run; nothing else was checked.`);
+    if (only.a11y) {
+      const n = (x) => (x == null ? null : `${x} finding${x === 1 ? '' : 's'}`);
+      const parts = [only.a11y.static != null ? `${n(only.a11y.static)} from the code` : null, only.a11y.browser != null ? `${n(only.a11y.browser)} in the browser` : 'the browser part did not run (no page or no Chrome)'].filter(Boolean);
+      lines.push(`Accessibility: ${parts.join(', ')}.`);
+    }
+  }
   if (data) lines.push('', data);
   for (const g of verdict === 'baseline' ? [] : failing) {
     const f = failLines(g);
