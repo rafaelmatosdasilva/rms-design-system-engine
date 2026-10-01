@@ -20,15 +20,42 @@ It keeps your code in parity with your design in Figma. It compares what was bui
 
 ```mermaid
 flowchart LR
-    F["🎨 Figma<br/>colours, sizes, fonts,<br/>components and states"] --> E{{"⚙️ rms-design-system-engine<br/>keeps design and code aligned"}}
-    C["💻 Code<br/>what was built,<br/>by people or by AI"] --> E
-    E --> D["📚 Style guide, docs and contracts<br/>that people and AI build from"]
-    E --> R["📋 A short report<br/>what matches, what is different,<br/>where and how to fix it"]
-    E --> A["♿ Accessibility<br/>contrast, labels, keyboard"]
-    R --> Y["✅ You, or your AI,<br/>fix what you choose"]
-    A --> Y
-    Y -.->|run it again| E
+    subgraph IN["Figma"]
+        FIG["🎨 Figma<br/>the design system,<br/>the source of truth"]
+        CAP["Capture<br/>tokens, components, states,<br/>props, icons, screens"]
+        SNAP["Snapshot<br/>the Figma facts, dated,<br/>so changes and old data show"]
+    end
+    subgraph CORE["The engine"]
+        CODE["💻 Code<br/>the design system as built,<br/>read live from the repo"]
+        ENG{{"⚙️ rms-design-system-engine<br/>checks the code against Figma,<br/>25 checks"}}
+        RULES["Matching rules<br/>the few things it cannot guess,<br/>written once in the project"]
+    end
+    subgraph OUT["What it gives you"]
+        RES["📋 Result<br/>pass or fail, in plain words,<br/>with where and how to fix"]
+        ADV["💡 Advice<br/>accessibility, AI readiness,<br/>drift and debt; never blocks"]
+        CON["📄 Contracts<br/>the facts, the spec,<br/>so AI never makes things up"]
+        INT["🧭 Intent<br/>the why: which component<br/>to use, and when"]
+        SG["📚 Style guide<br/>every component in every state,<br/>on one living page"]
+    end
+    FIG -->|"reads Figma, any plan"| CAP --> SNAP -->|Figma facts| ENG
+    CODE --> ENG
+    RULES --> ENG
+    ENG -.->|"fixes, when you ask"| CODE
+    ENG -->|verdict| RES
+    ENG --> ADV
+    ENG -->|writes| CON
+    ENG -->|writes| INT
+    ENG -.->|"writes (opt-in)"| SG
+    CON -->|reads| AI["🤖 AI coding agent<br/>builds UI from the real<br/>design system"]
+    INT -->|reads| AI
+    SG -->|read| PEOPLE["👩‍🎨 Designers and developers<br/>browse and test it"]
+    SG -->|renders against| A11Y["♿ Accessibility<br/>contrast, names, focus,<br/>keyboard (WCAG AA)"]
+    AI -->|generated UI| EV["🧪 Evals<br/>check what the AI built<br/>against the design system"]
+    CON -.->|reference| EV
+    INT -.->|guidance| EV
 ```
+
+The same flow is on a [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/Figma-to-Code-Parity---Flow?node-id=0-1).
 
 ## Get started
 
