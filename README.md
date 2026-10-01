@@ -27,11 +27,14 @@ flowchart LR
         SNAP["<b>SNAPSHOT</b><br/>JSON snapshots of tokens, components, props, geometry, icons, screens, HTML, and composition. Timestamped and versioned to detect changes and stale data."]
     end
     subgraph P2["PHASE 2 - COMPARE"]
+        direction TB
         CODE["<b>CODE</b><br/>The DS as built in the repo, read live, not from snapshots.<br/><br/>• ds-config.json says which files: the token CSS + component CSS + markup."]
         ENG["<b>PARITY ENGINE</b><br/>Checks the code against Figma.<br/><br/>• audit.mjs with 25 gates"]
         RULES["<b>MATCHING RULES</b><br/>The few things the parity can't guess. Written once, kept in the repo.<br/><br/>• ds-config.json: your settings (files, Figma link, modes, exceptions, and the Figma-to-code naming convention)<br/>• structure-contract.mjs: which CSS class each component is<br/>• contract.authored.json: name changes between Figma and code"]
+        CODE --> ENG
+        ENG -.->|"optional: --fix"| CODE
+        ENG --- RULES
     end
-    subgraph P3["PHASE 3 - OUTPUTS"]
         subgraph VERDICT[" "]
             RES["<b>PARITY OUTPUT</b><br/>The verdict: pass/fail, in the chat, in plain language.<br/><br/>• design-system-engine-history.json (records each run for the trend)"]
             ADV["<b>ADVISORIES</b><br/>Extra signals in the report. They inform, they never block.<br/><br/>• Accessibility: contrast, names, focus<br/>• AI-readiness scorecard: gate health, coverage, docs, guidance<br/>• Exemption debt: every #quot;ignore this#quot; + who owns it<br/>• Code not in Figma; contracts with no description<br/>• Drift: raw values, breaking/deprecated (+ who uses it)<br/>• Token layering<br/>Opt-in: tiers, closed vocabulary, multi-brand coverage"]
@@ -39,21 +42,18 @@ flowchart LR
         CON["<b>CONTRACTS</b><br/>The facts (the spec). Keeps AI from making things up.<br/><br/>• tokens.json contains DTCG token values<br/>• &lt;componentName&gt;.contract.json defines each component: props, slots, states, tokens, relationships (pairs-with / never-with), a usage example, and when not to use it<br/>• contract.schema.json checks they're valid<br/>• llms.txt helps AI find the right files"]
         INT["<b>INTENT</b><br/>The why. Helps AI choose the right component. Kept up to date automatically, every run.<br/><br/>• design-intent.json combines Figma annotations, component descriptions, code docs/notes, key structural facts (where each class is used), and your own external guidelines (e.g. a Notion extract)"]
         SG["<b>STYLE GUIDE</b><br/>The design system shown as one living page: every component in every state. Built automatically from the captured facts and the design intent, never hand-kept.<br/><br/>• apps/styleguide/index.html. People open it to browse; the accessibility check also renders against it."]
-    end
     AI["<b>AI CODING AGENT</b><br/>Reads both the facts and the why and generates UI from the real DS, without hallucinating."]
     HUM["<b>HUMANS</b><br/>Designers and devs. They open the styleguide to browse and test the DS."]
     A11Y["<b>ACCESSIBILITY</b><br/>Accessibility (WCAG AA), in plain language: contrast, names, visible focus and focus-ring visibility, state exposure, keyboard. Flags: --axe (non-text contrast, target size, labels, landmarks), --states (hover), --json (for an agent)."]
     EV["<b>EVALS</b><br/>Checks an agent's output against the DS for hardcoded values, made-up variables, and inline styles. Runs each case N times and tracks clean runs, with an optional LLM judge.<br/><br/>• evals-history.json records each run's metrics, including zero-fix rate, violations, inline styles, and generation time, for trend tracking."]
-    FIG -->|"Reads Figma. Works on any plan."| CAP --> SNAP -->|Figma facts| ENG
-    CODE --> ENG
-    RULES --> ENG
-    ENG -.->|"optional: --fix"| CODE
-    ENG -->|verdict| VERDICT
-    ENG -->|writes| CON
-    ENG -->|writes| INT
-    ENG -.->|"writes (opt-in)"| SG
+    FIG -->|"Reads Figma. Works on any plan."| CAP --> SNAP
+    P1 -->|Figma facts| P2
+    P2 -->|verdict| VERDICT
+    P2 -->|writes| CON
+    P2 -->|writes| INT
+    P2 -.->|"writes (opt-in)"| SG
     CON -->|reads| AI
-    INT --> AI
+    INT -->|reads| AI
     SG ---|read| HUM
     SG -->|renders against| A11Y
     AI -.->|generated output| EV
