@@ -8,10 +8,10 @@ It compares what was built (by a developer or by an AI) with what you designed i
 
 - **Catch differences early.** See when the code and Figma stop matching, before your users do.
 - **Exact fixes, not vague notes.** Every difference comes with the file, the line and the right token to use.
-- **Safer AI building.** When an AI builds screens, every change it makes is checked against your real components and tokens, and it is told how to fix what does not match.
+- **Safer AI building.** When an AI builds screens, every change it makes is checked against your real components and tokens, and for accessibility, and it is told how to fix what does not match.
 - **Accessibility included.** Text that is hard to read, buttons with no label, things you cannot reach with the keyboard.
 - **The same answer every time.** The checks are fixed rules, not opinions.
-- **You stay in control.** It never changes Figma, and it never changes your code unless you ask.
+- **You stay in control.** It never changes Figma, and it never changes your code unless you ask. An AI cannot accept a difference or switch a check off without asking you first.
 
 ## How it works
 

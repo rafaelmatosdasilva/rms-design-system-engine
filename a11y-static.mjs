@@ -15,7 +15,8 @@
 //   • a page with no lang, a viewport that blocks zoom (user-scalable=no, maximum-scale=1);
 //   • animations with no prefers-reduced-motion alternative anywhere in the project.
 // An element whose attributes are spread ({...props}, v-bind="$attrs") can receive them from outside: it is
-// never reported.
+// never reported. A finding that does not say its fix in `desc` carries it in `fix`, for the check of each edit
+// (edit-check.mjs, idea I74), which hands the fix back to the agent that wrote the line.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
 import { ENGINE_DIRS } from './names.mjs';
@@ -32,6 +33,17 @@ const ARIA = new Set(('activedescendant atomic autocomplete braillelabel braille
   'valuetext').split(' '));
 
 const lineAt = (text, i) => text.slice(0, i).split('\n').length;
+// The ARIA attribute a misspelt one meant: one letter added, missing, changed or two swapped.
+export function closestAria(name) {
+  const n = String(name ?? '').toLowerCase();
+  const near = (a, b) => {
+    if (Math.abs(a.length - b.length) > 1) return false;
+    let i = 0; while (i < a.length && a[i] === b[i]) i++;
+    if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+    return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+  };
+  return [...ARIA].find((a) => near(n, a)) ?? null;
+}
 // A name given inside the element: an image's alt, an svg <title>, an aria-label on a child.
 const innerName = (inner) => /<img\b[^>]*\balt\s*=\s*["'][^"']*\w[^"']*["']/i.test(inner) || /<title>\s*[^<\s][^<]*<\/title>/i.test(inner) || /\baria-label\s*=\s*["'][^"']*\w/i.test(inner);
 const visibleText = (inner) => inner.replace(/<[^>]*aria-hidden\s*=\s*["']?true["']?[^>]*>[\s\S]*?<\/[^>]+>/gi, '').replace(/<[^>]+>/g, '').trim();
@@ -47,17 +59,17 @@ export function markupFindings(text) {
     if (spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'title')) continue;
     if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
     if (/<\w+\b[^>]*\bid\s*=\s*["'][^"']+["'][^>]*>\s*<\//.test(inner)) continue;   // an empty element with an id: a script fills it
-    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside and no aria-label, aria-labelledby or title' });
+    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<what it does>"' });
   }
   for (const m of src.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const [, attrs, inner] = m;
     if (!has(attrs, 'href') || spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'title')) continue;
     if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
-    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside and no aria-label, aria-labelledby or title' });
+    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<where it goes>"' });
   }
   for (const m of src.matchAll(/<img\b([^>]*)>/gi)) {
     if (!spread(m[1]) && !has(m[1], 'alt') && !has(m[1], 'aria-label') && !has(m[1], 'aria-labelledby') && !/role\s*=\s*["']presentation|role\s*=\s*["']none/i.test(m[1]))
-      out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'an image with no alt (use alt="" when it is decorative)' });
+      out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'an image with no alt (use alt="" when it is decorative)', fix: 'add alt="<what it shows>"' });
     const alt = /\balt\s*=\s*["']([^"']+)["']/i.exec(m[1])?.[1];
     if (alt && /^[\w./-]+\.(png|jpe?g|gif|svg|webp|avif)$/i.test(alt.trim()))
       out.push({ line: lineAt(src, m.index), kind: 'name', desc: `an image whose alt is a file name ("${alt.trim()}"): describe the image, or use alt="" when it is decorative` });
@@ -68,7 +80,7 @@ export function markupFindings(text) {
     if (has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'id') || has(attrs, 'title')) continue;   // an id can be a label's for
     const before = src.slice(0, m.index), open = before.lastIndexOf('<label'), close = before.lastIndexOf('</label>');
     if (open > close) continue;   // inside a <label>
-    out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a text field with no label, aria-label or aria-labelledby' });
+    out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a text field with no label, aria-label or aria-labelledby', fix: 'give it a <label>, or aria-label="<what to type>"' });
   }
   for (const m of src.matchAll(/\btab[iI]ndex\s*=\s*\{?\s*["']?([1-9]\d*)/g))
     out.push({ line: lineAt(src, m.index), kind: 'keyboard', desc: `tabindex="${m[1]}": a positive tabindex breaks the order a keyboard moves in (use 0 or -1)` });
@@ -83,7 +95,7 @@ export function markupFindings(text) {
     if (!/(?:^|\s)aria-hidden\s*=\s*(\{\s*true\s*\}|["']true["'])/.test(attrs)) continue;
     const focusable = /^(button|input|select|textarea|summary)$/i.test(tag) || (/^a$/i.test(tag) && has(attrs, 'href')) || /\btab[iI]ndex\s*=\s*\{?\s*["']?(0|[1-9]\d*)\b/.test(attrs);
     if (focusable && !/\btab[iI]ndex\s*=\s*\{?\s*["']?-1\b/.test(attrs) && !/\bdisabled\b/.test(attrs))
-      out.push({ line: lineAt(src, m.index), kind: 'aria', desc: `aria-hidden="true" on a <${tag}> that takes focus: a keyboard reaches what a screen reader cannot see` });
+      out.push({ line: lineAt(src, m.index), kind: 'aria', desc: `aria-hidden="true" on a <${tag}> that takes focus: a keyboard reaches what a screen reader cannot see`, fix: 'take aria-hidden off, or take it out of the tab order with tabindex="-1"' });
   }
   // Only a page's own root: the document starts with <!doctype html> or <html> (an <html> in prose or a comment is not one).
   const root = /^\s*(?:<!doctype html[^>]*>\s*)?(<html\b([^>]*)>)/i.exec(src);
@@ -92,10 +104,10 @@ export function markupFindings(text) {
   for (const m of src.matchAll(/<meta\b[^>]*name\s*=\s*["']viewport["'][^>]*>/gi)) {
     const content = /content\s*=\s*["']([^"']*)["']/i.exec(m[0])?.[1] ?? '';
     if (/user-scalable\s*=\s*(no|0)\b|maximum-scale\s*=\s*1(\.0+)?\b(?!\.\d*[1-9])/i.test(content))
-      out.push({ line: lineAt(src, m.index), kind: 'zoom', desc: `the viewport blocks zoom (${content.trim()}): people who need larger text cannot zoom in` });
+      out.push({ line: lineAt(src, m.index), kind: 'zoom', desc: `the viewport blocks zoom (${content.trim()}): people who need larger text cannot zoom in`, fix: 'take out user-scalable=no and maximum-scale=1' });
   }
   for (const m of src.matchAll(/\baria-([a-z]+)\s*=/g))
-    if (!ARIA.has(m[1])) out.push({ line: lineAt(src, m.index), kind: 'aria', desc: `aria-${m[1]} is not an ARIA attribute` });
+    if (!ARIA.has(m[1])) { const near = closestAria(m[1]); out.push({ line: lineAt(src, m.index), kind: 'aria', desc: `aria-${m[1]} is not an ARIA attribute`, ...(near ? { fix: `write aria-${near}` } : {}) }); }
   return out;
 }
 
@@ -137,7 +149,7 @@ export function cssFindings(text, all = text) {
       if (onFocus && showsFocus(r.decls.replace(/outline[^;]*;?/gi, ''))) continue;   // replaced in the same rule
       const restored = every.some((x) => x.selectors.some((s) => /:focus/.test(s) && base(s) === b && (s !== sel)) && showsFocus(x.decls))
         || every.some((x) => x.selectors.some((s) => /:focus-within/.test(s) && sameFamily(b, base(s)) && base(s) !== b) && showsFocus(x.decls));
-      if (!restored) out.push({ line: lineAt(css, r.index), kind: 'focus', desc: `${sel} removes the focus outline and no focus style puts one back` });
+      if (!restored) out.push({ line: lineAt(css, r.index), kind: 'focus', desc: `${sel} removes the focus outline and no focus style puts one back`, fix: `add a ${b || sel}:focus-visible style that shows where focus is` });
     }
   }
   return out;
@@ -170,6 +182,13 @@ function walk(ROOT, exts, limit = 4000) {
   };
   go(ROOT, 0);
   return files;
+}
+
+// Every style file of the project as one text (a component file's <style> blocks only): a focus style put back in
+// another file counts.
+export function projectStyleText(ROOT) {
+  const read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return ''; } };
+  return walk(ROOT, STYLE).map((f) => (['.vue', '.svelte'].includes(extname(f)) ? styleOnly(read(f)) : read(f))).join('\n');
 }
 
 // The whole project: [{ file, line, kind, desc }], and how many files each side read.

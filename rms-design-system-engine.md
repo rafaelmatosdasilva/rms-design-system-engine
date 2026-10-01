@@ -116,11 +116,13 @@ refreshed anything and how old the snapshots are: repeat it as it is.
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
 `--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
 refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.json` edit, a commit, a push,
-applying the hand-back, or a code edit, unless the person's latest message asked for that change. After a UI edit
-they hand back what it added that the design system does not have (a colour written by hand, a variable declared
-nowhere, a prop value a component does not take): fix it in that file before going on. A request made
-with `/rms-design-system-engine` arrives already routed (the `ROUTE:` block above). When a hook refuses or asks, that is the answer: do not work around it (no other
-tool, no shell edit); tell the person what it said.
+applying the hand-back, accepting a difference (`--baseline` or the baseline file), an exception, replacing an
+approved reference picture, or a code edit, unless the person's latest message asked for that change. After a UI
+edit they hand back what it added that the design system does not have (a colour or size written by hand, a
+variable declared nowhere, a prop value a component does not take), an accessibility problem it added, and any
+comment that switches a check off: fix it in that file before going on. A request made with
+`/rms-design-system-engine` arrives already routed (the `ROUTE:` block above). When a hook refuses or asks, that is
+the answer: do not work around it (no other tool, no shell edit); tell the person what it said.
 
 **When someone pastes a GitLab or Notion link to their written guidelines into the chat**, run
 `rms-design-system-engine --guidelines <link>` (several links can be passed at once). Do not edit
