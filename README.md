@@ -30,29 +30,25 @@ flowchart LR
     Y -.->|run it again| E
 ```
 
-## Install
+## Get started
 
-You do this once per computer. You need [Claude Code](https://claude.com/claude-code), [Node.js](https://nodejs.org) (version 22 or newer) and Git.
+Two steps, both inside [Claude Code](https://claude.com/claude-code). You need [Node.js](https://nodejs.org) 22 or newer and Git on your computer.
 
-Open the Terminal app (on a Mac, press Cmd and Space, type Terminal, press Enter). Paste this line and press Enter.
+**1. Install it, once per computer.** Paste this line in Claude Code and press Enter. The `!` at the start runs it for you.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.sh | bash
+```
+! curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.sh | bash
 ```
 
-That's all. It adds the `/rms-design-system-engine` command to Claude Code and an `rms-design-system-engine` command to your terminal.
+Then close Claude Code and open it again, so it sees the new command.
 
-**It updates itself.** When you run it, it checks once a day for a newer version and updates on its own. You never download it again.
-
-## Set up a project
-
-You do this once per project. In Claude Code, open your project and type this, with your own Figma link.
+**2. Connect your project, once per project.** Open your project in Claude Code and type this, with your own Figma link.
 
 ```
 /rms-design-system-engine set up this project with https://www.figma.com/design/…
 ```
 
-Or, in the terminal, go to your project folder and run `rms-design-system-engine --init`. It asks for your Figma link.
+That's it. **It updates itself**: once a day it checks for a newer version and updates on its own, so you never install it again.
 
 ## Use it
 
@@ -110,10 +106,6 @@ Accessibility is checked beside the gates. Part of it reads the code directly, a
 - **Share the results with your team.** Commit the files it creates in your project, so everyone, and your automated builds, check against the same design.
 - **Figma stays as it is.** It only reads Figma. It tells you what to change there, and a person makes that change.
 - **More detail.** Everything for developers, every option and how each check works, is in [docs/details.md](docs/details.md).
-
-## Coming from rms-figma-code-parity?
-
-This is the same tool with a new name. Run it once, or run the install line again, and it moves itself to the new name. Your projects keep working as they are.
 
 ## License
 
