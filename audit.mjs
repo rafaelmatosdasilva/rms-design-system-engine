@@ -848,6 +848,13 @@ async function refreshIcons(libraryKey, token, outPath, opts = {}) {
   }
 }
 
+// A REST /nodes entry's instances name their component by id: id → the component's name (its set's, for a variant).
+function instanceNames(data) {
+  const out = {};
+  for (const [id, c] of Object.entries(data?.components ?? {})) out[id] = (c.componentSetId && data?.componentSets?.[c.componentSetId]?.name) || c.name;
+  return out;
+}
+
 async function refreshComponentValues(fileKey, token, outPath) {
   try {
     const csRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/component_sets`, {
@@ -874,7 +881,7 @@ async function refreshComponentValues(fileKey, token, outPath) {
         const name = sets[setId]?.name ?? data?.document?.name ?? setId;
         const nums = new Set(), colors = new Set();
         collectRawValues(data?.document, nums, colors, budget);
-        result[name] = { nums: [...nums].sort((a, b) => a - b), colors: [...colors].sort(), hygiene: hygieneOf(data?.document, sets[setId]?.description ?? data?.componentSets?.[setId]?.description, hygieneBudget) };
+        result[name] = { nums: [...nums].sort((a, b) => a - b), colors: [...colors].sort(), hygiene: hygieneOf(data?.document, sets[setId]?.description ?? data?.componentSets?.[setId]?.description, hygieneBudget, instanceNames(data)) };
       }
       if (budget.n <= 0) break;   // hit the node budget — stop rather than spin on a pathological tree
     }

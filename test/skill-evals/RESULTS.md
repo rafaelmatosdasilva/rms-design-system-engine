@@ -1,5 +1,40 @@
 # Skill evaluation results
 
+## 2026-09: renamed instances in the Figma hygiene record (idea I69)
+
+A fresh run of the adopted guide (the `cookbook` variant, the checkout) after the full-audit recipe's hygiene
+snippet learned to record an instance whose layer spells its component's name another way. Engine 51d0466. 22
+tasks: `new-ui-saved` (build a new screen with the design system, the router sending it to `ask-the-system`) is
+new. Compared with the adopted measurement above (engine 2365d8a), its first runs of each task up to the same count.
+
+Guide set measured: `8b6372801eb8`
+
+| | Adopted | This guide |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 40/40 | 40/40 |
+| Sonnet, the 21 common tasks | 104/105 | 105/105 |
+| Sonnet, mean cost / input per request, 21 tasks | $0.138 / 118k | $0.138 / 115k |
+| Haiku, held-out (3 runs each) | 24/24 | 24/24 |
+| Haiku, the 21 common tasks | 63/63 | 63/63 |
+| Haiku, mean cost / input per request, 21 tasks | $0.052 / 69k | $0.055 / 74k |
+| `new-ui-saved` (new) | | Sonnet 5/5 · Haiku 3/3 |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 1.5 | 1.6 |
+
+**Reading.** Every task passes on both models and no rule is broken. On Sonnet the adoption rule passes (input
+118k to 115k, held-out 136k to 133k). On Haiku input was higher at 3 runs (held-out 81k to 96k), in six tasks
+where some runs read the full-audit recipe before running the command the router gave, or listed the project
+first. The recipe grew by 545 bytes, so those six were run to 13 runs on both versions, the protocol I56 used:
+
+| Haiku, 13 runs each | Adopted | This guide |
+|---|---|---|
+| refresh-no-figma, pasted-steps, forbidden-green, private-statusbar, audit-all, visual-howto | 77/78 | 78/78 |
+| Mean input / cost per request on these six | 69k / $0.051 | 65k / $0.052 |
+
+With 13 runs the input is lower, not higher: the 3-run difference was which runs chose to read the recipe. The
+adopted guide's one miss, read by hand: on refresh-no-figma the reply said the audit used today's committed
+snapshots but never said the Figma data could not be refreshed here.
+
 ## 2026-09: change only what was asked, one named difference, and the guide for I62 to I68 (continuous evaluation)
 
 A fresh run of the adopted guide (the `cookbook` variant, the checkout) after guide changes: an Audit Rule to
