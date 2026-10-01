@@ -26,6 +26,7 @@ import { existsSync, readdirSync, readFileSync, statSync,
          symlinkSync, unlinkSync }                               from 'fs';
 import { join, dirname, resolve, relative }                     from 'path';
 import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
+import { readGateLabels, parseOnly, onlyWords, onlyHelp } from './only.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
 import { fileURLToPath, pathToFileURL }                         from 'url';
 import { makeFigmaFetch, byNodeId, budgetLine, unchangedSince }  from './figma-fetch.mjs';
@@ -97,6 +98,21 @@ function _argValues(flag) {
 }
 const SCOPE_COMPONENTS = [..._argValues('--component'), ..._argValues('--components')]
   .flatMap(v => v.split(',')).map(s => s.trim()).filter(Boolean);
+
+// ── --only: just the accessibility check, just the Figma checks (parity), or some gates by number or name ──
+// What was not asked is neither shown nor counted (only.mjs). A run that records the whole system (--baseline)
+// needs the whole run.
+const ONLY_GIVEN = process.argv.some((a) => a === '--only' || a.startsWith('--only='));
+const ONLY_LABELS = ONLY_GIVEN ? readGateLabels(join(SCRIPT_DIR, 'audit.mjs')) : [];
+const ONLY = ONLY_GIVEN ? parseOnly(_argValues('--only'), ONLY_LABELS) : null;
+if (ONLY && (ONLY.unknown.length || (!ONLY.a11y && !ONLY.gates.size))) {
+  console.log(onlyHelp(ONLY.unknown.length ? ONLY.unknown : ['(nothing named)'], ONLY_LABELS));
+  process.exit(2);
+}
+if (ONLY && process.argv.includes('--baseline')) {
+  console.log('--baseline records the whole run: run it without --only.\nNEXT: rms-design-system-engine --baseline');
+  process.exit(2);
+}
 
 // ── Non-interactive first-time setup (for agents / CI) ────────────────────────
 // First-time setup normally prompts on stdin, which an agent turn or CI job cannot
@@ -2657,7 +2673,7 @@ function reportFull(label, items, shown) {
     if (Array.isArray(r.lines)) r.lines = r.lines.map(legacyFree).filter((l) => !zeroCount(l));
     // planLimited gates are neutral - they don't block the audit
     if (!r.pass && !r.planLimited) anyFail = true;
-    gates.push({ label, ...r });
+    gates.push({ n: gates.length + 1, label, ...r });
   }
 
   // Inline gates - compute upfront so they can be combined
@@ -2700,7 +2716,7 @@ function reportFull(label, items, shown) {
   // Subprocess gates. The file-reading gates launch concurrently. The two browser gates each start a
   // Chrome, so they run one after the other, beside the rest: two browsers competing with thirty
   // processes for the CPU is what makes a slow machine time out.
-  const browserGates = (async () => [await runScriptAsync('rendered-check.mjs'), await runScriptAsync('a11y-check.mjs', a11yArgs)])();
+  const browserGates = (async () => [await runScriptAsync('rendered-check.mjs'), !ONLY || ONLY.a11y ? await runScriptAsync('a11y-check.mjs', a11yArgs) : null])();
   const [rParity, rStructure, rBound, rIsolation, rVisual, rState, rExemption, rMode, rNaming, rPseudo, rIcon, rStateBinding, rStateVar, rIconSlot, rComponentSlot, rFormControl, rHtmlStructure, rTransition, rIconFreshness, rCoverage, rMotion, rEffect, rContainment, rCompProp, rCompose, rTemplateCompose, rStateOpacity, rIconInv, rScreenEl, rDocsTruth, rReimpl, rCase] = await Promise.all([
     runScriptAsync('parity-check.mjs', ['--json']),
     runScriptAsync('structure-check.mjs'),
@@ -2831,6 +2847,14 @@ function reportFull(label, items, shown) {
   addGate('What this audit actually checked  (which DS components & states are covered)',
     parseGeneric(rCoverage, S['coverage-check.mjs']));
 
+  // --only: the gates the person asked for, under their own numbers; the rest neither shown nor counted.
+  if (ONLY) {
+    const keep = gates.filter((g) => ONLY.gates.has(g.n));
+    gates.length = 0;
+    gates.push(...keep);
+    anyFail = keep.some((g) => !g.pass && !g.planLimited) || (ONLY.a11y && cfg.a11yStrict === true && !!rA11y && rA11y.status === 1);
+  }
+
   // ── Adoption baseline / ratchet (feature #2) ────────────────────────────────────
   // Let a real (imperfect) codebase adopt the audit without either a wall of red or turning gates
   // off. The baseline records today's failing gates as ACCEPTED DEBT: they no longer fail the run,
@@ -2855,7 +2879,11 @@ function reportFull(label, items, shown) {
   } else if (!BASELINE_OFF) {
     const baseLabels = loadBaselineLabels(BASELINE_READ);
     if (baseLabels) {
-      const cls = classifyBaseline(gates, baseLabels, loadBaselineFindings(BASELINE_READ));
+      // With --only, the accepted debt of the gates that did not run is neither stale nor fixed: it is left out.
+      const inRun = (label) => !ONLY || gates.some((g) => g.label === label);
+      const inRunKey = (k) => !ONLY || gates.some((g) => String(k).startsWith(`${g.label.replace(/\s{2}\(.*$/, '').trim()} :: `));
+      const accepted = loadBaselineFindings(BASELINE_READ);
+      const cls = classifyBaseline(gates, baseLabels.filter(inRun), accepted ? accepted.filter(inRunKey) : accepted);
       baselineInfo = { mode: 'enforce', ...cls };
       // Re-derive the verdict: accepted debt no longer fails; only regressions do. Preserve the
       // one non-gate contribution (a11yStrict, folded into anyFail above).
@@ -2869,7 +2897,11 @@ function reportFull(label, items, shown) {
   // Everything the report prints from here is also kept, so the next run can say what changed.
   const _reportLines = [];
   const _log = console.log;
-  console.log = (...a) => { _reportLines.push(a.map(String).join(' ')); _log(...a); };
+  let _mute = false;
+  console.log = (...a) => { if (_mute) return; _reportLines.push(a.map(String).join(' ')); _log(...a); };
+  // --only: a section of the report shows only when its part was asked for (the system's advice, or accessibility).
+  const _section = (part) => { _mute = !!ONLY && !(part === 'a11y' ? ONLY.a11y : ONLY.parity); };
+  const _a11yCount = { static: null };
 
   // ── Final report ──────────────────────────────────────────────────────────────
   console.log('\n' + C.bold('─'.repeat(WIDTH)));
@@ -2879,15 +2911,19 @@ function reportFull(label, items, shown) {
     if (_autoAdded.length) console.log(C.dim(`  + nested components pulled in: ${[...new Set(_autoAdded)].join(', ')}`));
     console.log(C.dim('  Findings outside these components are hidden and do not fail the run.'));
   }
+  if (ONLY) {
+    console.log(C.bold(C.yellow(`  ONLY: ${onlyWords(ONLY, ONLY_LABELS)}`)));
+    console.log(C.dim('  Nothing else was checked in this run. Run without --only for the whole system.'));
+  }
   console.log(C.bold('─'.repeat(WIDTH)) + '\n');
 
   const planLimitedGates = [];
   gates.forEach((g, i) => {
     let icon;
-    if (g.planLimited) { icon = C.yellow('⏭ '); planLimitedGates.push(i + 1); }
+    if (g.planLimited) { icon = C.yellow('⏭ '); planLimitedGates.push(g.n); }
     else if (g.baselined) icon = C.yellow('⚠️ ');
     else icon = g.pass ? C.green('✅') : C.red('❌');
-    console.log(`${icon}  [${i + 1}] ${C.bold(g.label)}`);
+    console.log(`${icon}  [${g.n}] ${C.bold(g.label)}`);
     if (g.baselined) console.log(C.yellow('       baselined - accepted adoption debt (not a regression). Fix it, then re-run --baseline to lock it in.'));
     // A zero count on a fail line ("❌ FAIL  0") says nothing failed: it is left out.
     for (const line of g.lines || []) if (!ZERO_FAIL.test(String(line).replace(/\x1b\[[0-9;]*m/g, '').trim())) console.log(`       ${line}`);
@@ -2913,8 +2949,9 @@ function reportFull(label, items, shown) {
 
     // A props gate the project opted out of (frameworkComponents:false) shows no props table.
     const propsSkipped = cfg.frameworkComponents === false && !cfg.htmlRealization;
-    const props  = propsSkipped ? null : read('component-prop-result.json');
-    const parity = read(PROJECT.checkResult.now);
+    const shown = (name) => !ONLY || gates.some((g) => g.label.startsWith(name));
+    const props  = propsSkipped || !shown('Component props match Figma') ? null : read('component-prop-result.json');
+    const parity = shown('Token values') ? read(PROJECT.checkResult.now) : null;
     if (!props && !(parity?.fail?.length || parity?.aliasFail?.length || parity?.passList?.length)) return;
 
     console.log(C.bold('─'.repeat(WIDTH)));
@@ -2997,13 +3034,15 @@ function reportFull(label, items, shown) {
     const l = label.length > COL2 ? label.slice(0, COL2 - 1) + '…' : label.padEnd(COL2);
     return `  ${icon}  ${n}${l}${status}`;
   };
-  console.log(C.bold('─'.repeat(WIDTH)));
-  console.log(C.bold('  GATE SUMMARY'));
-  console.log(C.bold('─'.repeat(WIDTH)));
-  gates.forEach((g, i) => {
+  if (gates.length) {
+    console.log(C.bold('─'.repeat(WIDTH)));
+    console.log(C.bold('  GATE SUMMARY'));
+    console.log(C.bold('─'.repeat(WIDTH)));
+  }
+  gates.forEach((g) => {
     const result = g.notRun ? 'notrun' : g.planLimited ? 'plan' : g.baselined ? 'debt' : g.pass;
-    const plainLabel = GATE_PLAIN[i] ?? g.label;
-    console.log(tRow(i + 1, plainLabel, result));
+    const plainLabel = GATE_PLAIN[g.n - 1] ?? g.label;
+    console.log(tRow(g.n, plainLabel, result));
     if (g.notRun) console.log(C.yellow(`         Not verified: ${g.notRun}`));
     else if (g.why) console.log(C.yellow(`         ${g.why}`));
     else if (g.planLimited) {
@@ -3017,8 +3056,9 @@ function reportFull(label, items, shown) {
   // checked (from the coverage gate), so the report never over-claims. Wording only, no new checks.
   {
     const cov = (rCoverage?.stdout || '').match(/MODELLED\s+(\d+)\/(\d+)/);
-    const scope = cov ? `checked ${cov[1]} of ${cov[2]} DS components` : null;
-    console.log(C.dim(`  [verified] the ${gates.length} gates above are mechanically checked against Figma${scope ? `; ${scope} (see gate ${gates.length})` : ''}.`));
+    const total = ONLY ? ONLY_LABELS.length : gates.length;
+    const scope = cov && gates.some((g) => g.n === total) ? `checked ${cov[1]} of ${cov[2]} DS components` : null;
+    if (gates.length) console.log(C.dim(`  [verified] the ${gates.length} gate${gates.length === 1 ? '' : 's'} above ${gates.length === 1 ? 'is' : 'are'} mechanically checked against Figma${scope ? `; ${scope} (see gate ${total})` : ''}.`));
     console.log(C.dim('  [reported] the advisory notes below (exemption debt, code drift, accessibility, layering) are signals, not pass/fail.'));
     console.log();
   }
@@ -3050,19 +3090,22 @@ function reportFull(label, items, shown) {
 
   console.log('─'.repeat(WIDTH));
   if (anyFail) {
-    console.log(C.bold(C.red('\n  AUDIT FAILED - not in parity: see the ❌ lines above (fix them only when the person asks)\n')));
+    console.log(C.bold(C.red(`\n  AUDIT FAILED - not in parity: see the ❌ lines above (fix them only when the person asks)${ONLY ? `. Only ${onlyWords(ONLY, ONLY_LABELS)} ran` : ''}\n`)));
   } else if (baselineInfo?.mode === 'enforce' && baselineInfo.debt.length) {
     console.log(C.bold(C.yellow('\n  NO REGRESSIONS ✅  (adoption debt remains - see baseline above)\n')));
   } else {
     const nr = gates.filter((g) => g.notRun).length;
-    console.log(C.bold(C.green(nr ? `\n  EVERY GATE THAT RAN PASSES ✅  (${nr} not verified - see ⏭)\n` : '\n  ALL GATES PASS ✅\n')));
+    if (ONLY && !gates.length) console.log(C.bold('\n  ONLY THE ACCESSIBILITY CHECK RAN - its findings are under ♿ below (advice; a11yStrict makes them fail)\n'));
+    else if (ONLY) console.log(C.bold(C.green(`\n  EVERY CHECK ASKED FOR PASSES ✅  (only ${onlyWords(ONLY, ONLY_LABELS)}${nr ? `; ${nr} not verified - see ⏭` : ''})\n`)));
+    else console.log(C.bold(C.green(nr ? `\n  EVERY GATE THAT RAN PASSES ✅  (${nr} not verified - see ⏭)\n` : '\n  ALL GATES PASS ✅\n')));
   }
-  const refreshLimited = planLimitedGates.filter((n) => !gates[n - 1].notRun && !gates[n - 1].why);
+  const gateNo = (n) => gates.find((g) => g.n === n);
+  const refreshLimited = planLimitedGates.filter((n) => !gateNo(n).notRun && !gateNo(n).why);
   if (refreshLimited.length) {
     console.log(C.yellow('  ⏭  DATA NOT AUTO-REFRESHED - what this means:\n'));
     for (const n of refreshLimited) {
       const notes = [`Gate [${n}] ran against committed data; the live auto-refresh from Figma was not available this run.`];
-      console.log(C.yellow(`  [${n}] ${gates[n - 1].label}`));
+      console.log(C.yellow(`  [${n}] ${gateNo(n).label}`));
       for (const line of notes) console.log(C.yellow(`      ${line}`));
       console.log();
     }
@@ -3072,6 +3115,7 @@ function reportFull(label, items, shown) {
   // ── Write parity history ──────────────────────────────────────────────────────
   const histPath = join(ROOT, newPath('history'));
   let hist = [];
+  if (!ONLY) {
   try { hist = JSON.parse(readFileSync(join(ROOT, projectPath(ROOT, 'history')), 'utf8')); } catch {}
   hist.push({
     date:        today,
@@ -3084,12 +3128,14 @@ function reportFull(label, items, shown) {
   });
   if (hist.length > 100) hist = hist.slice(-100);
   try { writeFileSync(histPath, JSON.stringify(hist, null, 2) + '\n'); } catch {}
+  }
 
   // AI-readiness scorecard (I12) accumulates a few run signals as the advisory blocks below compute
   // them, then prints one R/Y/G summary at the end. Declared here, before the first writer.
   const _sc = { exempt: 0, contracts: null };
 
   // ── Exemption debt (advisory, never a gate) ─────────────────────────────────
+  _section('advice');
   // Every exemption / escape-hatch is a deliberate bypass — usually a missing token or a
   // real gap, not a free pass. Surface them each run so they stay visible and trend down,
   // never affecting pass/fail. Agnostic: any ds-config.json key matching /exempt|exception/i
@@ -3150,6 +3196,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Code → design drift (I24, advisory, never a gate) ───────────────────────
+  _section('advice');
   // A diagnostic layer must work BOTH directions (S19). The parity is design → code; this surfaces
   // the reverse: props that exist in CODE but not in Figma, so code-ahead-of-design is visible and
   // can be synced back to the design (or documented). Reuses the component-prop gate's already
@@ -3179,6 +3226,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── List duplication / single-source-of-truth (I21, advisory) ───────────────
+  _section('advice');
   // A DS list copied by hand into an agent-instruction file, a skill, or a doc drifts into a stale
   // parallel truth - exactly what makes an agent hallucinate. The engine already generates the
   // authoritative index (llms.txt + contracts); this flags hand-maintained surfaces that restate a
@@ -3232,15 +3280,17 @@ function reportFull(label, items, shown) {
   }
 
   // ── Accessibility (I18, advisory) ───────────────────────────────────────────
+  _section('a11y');
   // Relay the a11y gate's own report (WCAG AA contrast · accessible name/role · visible focus,
   // from the render). Advisory: a11yStrict already folded a failure into anyFail above; here we
   // just surface the detail (or a clean ⏭ when no browser). Run with --a11y to list every finding.
-  if (rA11y && (rA11y.stdout || '').trim()) {
+  if (rA11y && (rA11y.stdout || '').trim() && (!ONLY || ONLY.a11y)) {
     process.stdout.write(rA11y.stdout.replace(/\s+$/, '') + '\n');
     _reportLines.push(rA11y.stdout);
   }
 
   // ── Token layering (agnostic, descriptive — never a gate) ───────────────────
+  _section('advice');
   // No tier model is imposed: DSes tier differently or not at all. We only measure THIS DS's own
   // aliasing rate, and when references are clearly its norm (>=80% of color tokens alias), we
   // surface the few tokens that hold a raw value instead — a likely missed reference. A DS that
@@ -3272,6 +3322,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Token contrast (I28 + I14, advisory, no browser) ────────────────────────
+  _section('a11y');
   // Computes WCAG contrast from the DS's own token values, PER mode, and flags any text/bg pair below
   // AA. Pairs come from two places: DERIVED from the token names by convention (I14 - a component's
   // text/label/icon token paired with the background sharing its state/variant qualifier; on by
@@ -3368,6 +3419,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Token tiers (I10b, project-DECLARED, advisory) ──────────────────────────
+  _section('advice');
   // Runs ONLY when ds-config.json declares `tiers` (never imposes a tier model). Classifies each
   // token by the project's own regexes and flags a token that aliases a token in a tier its
   // `mayReference` list does not allow. Advisory: surfaces cross-tier references, never fails.
@@ -3402,6 +3454,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Right-to-left (opt-in: ds-config rtl: true, advisory) ────────────────────
+  _section('advice');
   // Physical properties that would not mirror in a right-to-left language, with the logical
   // property to use. Symmetric values mirror trivially and are not listed.
   if (cfg.rtl === true) {
@@ -3419,6 +3472,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Closed vocabulary / raw containers (I16, project-DECLARED, advisory) ────
+  _section('advice');
   // Runs only when ds-config declares `closedVocab: { bannedTags, surfaces, suggest? }`. Counts the raw
   // container tags the project chose to ban, in its declared surfaces. Advisory: surfaces the count so a
   // "typed primitive, not a raw div" convention can trend down; never fails, never imposed.
@@ -3444,6 +3498,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Multi-brand token coverage (I6, advisory) ───────────────────────────────
+  _section('advice');
   // Brands come from resolveBrands (declared > a captured collections manifest that marks a brand
   // collection > none-with-a-suggestion). Plan-agnostic: it reads the snapshot the any-plan capture
   // wrote; an Enterprise file with extended collections just yields a richer manifest to exploit. For a
@@ -3481,6 +3536,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── External guidelines: optional live capture (Phase-1-style) ──────────────
+  _section('advice');
   // Links in ds-config.json → guidelines.source (committed, NOT secret) are fetched and WRITTEN to their
   // committed files BEFORE intent-gen reads them, so the written guidelines reach the design intent.
   //   • notion: one page → guidelines.sources[0]              (token: NOTION_TOKEN in .env)
@@ -3520,6 +3576,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Design-intent (adopt-aware OUTPUT, not a gate) ──────────────────────────
+  _section('advice');
   // Aggregates this project's Figma annotations + code notes + facts + usage into
   // one private, merge-aware design-intent.json. Never affects pass/fail. This is
   // an AGNOSTIC engine, so the default adapts to the project instead of forcing a
@@ -3562,6 +3619,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Standard contract artifacts (auto OUTPUT, not a gate) ────────────────────
+  _section('advice');
   // Emits the DTCG token dictionary + per-component *.contract.json (standard schema)
   // + contract.schema.json from the just-audited snapshots. Captured fields refresh
   // each run; authored fields are preserved (merge-aware). NO gate reads these — they
@@ -3736,12 +3794,14 @@ function reportFull(label, items, shown) {
   }
 
   // ── Accessibility from the code, no browser (I34, advisory) ──────────────────
+  _section('a11y');
   // Always runs, with or without a page to open: names, focus styles, keyboard and aria mistakes read from the
   // markup and the CSS. The browser check below deepens it when it can run. Off with ds-config "a11yStatic": false.
   if (cfg.a11yStatic !== false) {
     try {
       const { staticA11y } = await import('./a11y-static.mjs');
       const { findings, files } = staticA11y(ROOT);
+      _a11yCount.static = findings.length;
       if (findings.length) {
         const count = (k) => findings.filter((f) => f.kind === k).length;
         const parts = [['name', 'with no accessible name'], ['focus', 'focus outline removed and not put back'], ['keyboard', 'keyboard'], ['aria', 'aria'],
@@ -3757,6 +3817,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Agent instruction files tell the truth (I57, advisory) ──────────────────
+  _section('advice');
   // AGENTS.md, CLAUDE.md, DESIGN.md, Cursor/Copilot rules and skills state design-system names from memory;
   // a wrong one makes every agent that reads it build the wrong thing. Each name they state is checked against
   // the catalog, the code API, the declared CSS variables and the tokens. Off with ds-config "steering": false.
@@ -3794,6 +3855,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── The Figma file's own hygiene (I23, advisory) ──────────────────────────────
+  _section('advice');
   // Values with no variable or style, detached instances, variants with no auto layout, components with no
   // description: read from the hygiene record the component-values sweep writes. For whoever keeps the Figma
   // file; the parity never changes Figma. Silent until the sweep carries the record. Off with "figmaHygiene": false.
@@ -3813,6 +3875,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── A workaround built around a component is a missing API (I59, advisory) ────
+  _section('advice');
   // A screen's own control laid over a design-system component (a clear button over a field, actions over a
   // row) is reported to the design-system side: the component is missing a slot or prop, the screen is not
   // wrong. Off with "workarounds": false.
@@ -3834,6 +3897,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── A primitive written by hand (I42, advisory) ─────────────────────────────
+  _section('advice');
   // A plain element styled as a primitive the owner declared in "primitives" (a <span> with the body text style
   // and the secondary colour is <Text size="medium" color="secondary">). No token check sees it, its values are
   // the system's own. Only with a declared table.
@@ -3852,6 +3916,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── Tailwind arbitrary values (I65, advisory) ────────────────────────────────
+  _section('advice');
   // rounded-[4px], bg-[#ff00aa]: a literal written into a class name, where no CSS rule and no literal check
   // sees it. Each is compared with the project's own @theme: the utility to write when a theme value is the
   // same, or "not a design-system value". Only in a project that uses Tailwind. Off with "tailwind": false.
@@ -3893,6 +3958,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── AI-readiness scorecard (I12, advisory, never a gate) ────────────────────
+  _section('advice');
   // A running R/Y/G measure across a few axes, aggregated from signals this run already produced.
   // Not a grade and it never blocks - a trend you watch move over time.
   {
@@ -3930,6 +3996,7 @@ function reportFull(label, items, shown) {
   }
 
   // ── What both sides last agreed on (I47) ────────────────────────────────────────
+  _section('advice');
   // Every fact that matches this run is recorded in design-system-engine-agreed.json (committed), so a later
   // difference can say which side moved. Never written inside a git hook: a commit must not change a
   // file it did not stage.
@@ -3971,6 +4038,7 @@ function reportFull(label, items, shown) {
   } catch { /* the record is a convenience: it never breaks the run */ }
 
   // ── Why the design changed (Figma side of I49) ─────────────────────────────────
+  _section('advice');
   // Figma keeps versions per file, not per node: one line with the latest named version.
   if (_figmaReason) {
     const { figmaReasonLine } = await import('./change-reason.mjs');
@@ -3981,7 +4049,7 @@ function reportFull(label, items, shown) {
   // The findings this run printed, against the ones the last run with the same scope printed.
   console.log = _log;
   let _burndownLines = [], _burndownNext = null;
-  try {
+  if (!ONLY) try {
     const { collectFindings, diffFindings, diffReport, burndown, burndownLines, componentOf } = await import('./run-diff.mjs');
     const ledgerPath = join(ROOT, OUT_DIR, 'last-findings.json');
     let ledger = {};
@@ -4035,7 +4103,10 @@ function reportFull(label, items, shown) {
     const { dataStateLine } = await import('./next-step.mjs');
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
     const data = dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
-    const summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data });
+    let a11yIssues = null;
+    try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
+    const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues } : null } : null;
+    const summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only });
     mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
     writeFileSync(join(ROOT, OUT_DIR, 'summary.md'), summary);
     console.log(`\n${C.bold(`─── SUMMARY (relay this in the chat as is; also in ${OUT_DIR}/summary.md) ───`)}\n\n${summary}`);

@@ -33,6 +33,18 @@ shared rule) belongs to the scope when its file mentions a component in scope. T
 of a scoped run counts only its components. Set a default in `ds-config.json → scopeComponents: ["ButtonPrimary"]` if a repo
 should always run scoped. Omit the flag to audit the whole DS.
 
+**Only part of the run.** `--only` runs the part asked for and nothing else; the report and the summary say what ran,
+so a part never reads as the whole system passing:
+```bash
+rms-design-system-engine --only accessibility             # the accessibility check alone (from the code, and in the browser when it can)
+rms-design-system-engine --only parity                    # every gate against Figma, without the accessibility check
+rms-design-system-engine --only 3                         # one gate by number (1 to 25), or by name: --only "token values", --only states,props
+rms-design-system-engine --component chip --only accessibility   # with a scope, as any run
+```
+A word it does not know prints the list of gates. `--baseline` needs the whole run, and the trend and the "since the
+last run" comparison are kept for whole runs only. The router turns "check the accessibility of the button", "without
+accessibility" or "only the token values gate" into the right `--only`.
+
 **Utility flags (no full audit - run the terminal command directly):**
 ```bash
 rms-design-system-engine --init                          # first-time setup only: scaffold config files, then exit
