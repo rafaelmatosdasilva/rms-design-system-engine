@@ -351,8 +351,13 @@ function collectRaw(node, nums, colors) {
   for (const child of node.children ?? []) collectRaw(child, nums, colors);
 }
 // The Figma file hygiene record (the same function as the engine's figma-hygiene.mjs).
-function hygieneOf(root, description, budget = { n: Infinity }) {
+function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
   const out = { raw: [], rawCount: 0, noAutoLayout: [], description: !!String(description ?? '').trim() };
+  const key = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const mainName = (n) => {
+    if (names[n.componentId]) return names[n.componentId];
+    try { const m = n.mainComponent; return m ? (m.parent && m.parent.type === 'COMPONENT_SET' ? m.parent.name : m.name) : null; } catch (e) { return null; }
+  };
   const has = (o, k) => { const v = o ? o[k] : null; return Array.isArray(v) ? v.some(Boolean) : !!v; };
   const bound = (n, k) => has(n.boundVariables, k);
   const styled = (n, kind) => has(n.styles, kind) || (typeof n[kind + 'StyleId'] === 'string' && n[kind + 'StyleId'] !== '');
@@ -367,7 +372,11 @@ function hygieneOf(root, description, budget = { n: Infinity }) {
   const walk = (n, at) => {
     if (!n || typeof n !== 'object' || budget.n <= 0) return;
     budget.n--;
-    if (n.type === 'INSTANCE') return;   // an instance, overrides included, reads as its own component's values
+    if (n.type === 'INSTANCE') {   // an instance, overrides included, reads as its own component's values
+      const main = mainName(n);
+      if (main && n.name !== main && key(n.name) === key(main)) { out.renamed = out.renamed || []; out.renamed.push({ at, layer: n.name, component: main }); }
+      return;
+    }
     if (n.detachedInfo !== undefined) { detached = detached || []; if (n.detachedInfo) detached.push(at); }
     if (!artwork.test(n.type)) {
       for (const [list, kind] of [['fills', 'fill'], ['strokes', 'stroke']]) {
