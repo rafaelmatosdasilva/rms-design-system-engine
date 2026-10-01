@@ -7,7 +7,6 @@
 set -e
 
 REPO="https://github.com/rafaelmatosdasilva/rms-design-system-engine"
-OLD_REPO="https://github.com/rafaelmatosdasilva/rms-figma-code-parity"   # until the repository is renamed
 CLONE_DIR="$HOME/.claude/skills/rms-design-system-engine"
 COMMANDS_DIR="$HOME/.claude/commands"
 BIN_DIR="$HOME/.local/bin"
@@ -33,7 +32,7 @@ if [ -d "$CLONE_DIR/.git" ]; then
 else
   echo "⬇  Installing to $CLONE_DIR"
   mkdir -p "$(dirname "$CLONE_DIR")"
-  git clone --depth 1 "$REPO" "$CLONE_DIR" 2>/dev/null || git clone --depth 1 "$OLD_REPO" "$CLONE_DIR"
+  git clone --depth 1 "$REPO" "$CLONE_DIR"
 fi
 
 # 2. Symlink the /rms-design-system-engine command to the clone (NOT a copy) so it tracks updates.
