@@ -19,39 +19,44 @@ It keeps your code in parity with your design in Figma. It compares what was bui
 ## How it works
 
 ```mermaid
-%%{init: {"themeCSS": ".nodeLabel, .nodeLabel p, .label div { text-align: left !important; }"}}%%
+%%{init: {"flowchart": {"wrappingWidth": 420}, "themeCSS": ".nodeLabel, .nodeLabel p, .label div { text-align: left !important; }"}}%%
 flowchart LR
-    subgraph IN["Figma"]
-        FIG["<b>Figma</b><br/>the design system,<br/>the source of truth"]
-        CAP["<b>Capture</b><br/>tokens, components, states,<br/>props, icons, screens"]
-        SNAP["<b>Snapshot</b><br/>the Figma facts, dated,<br/>so changes and old data show"]
+    subgraph P1["PHASE 1 - CAPTURE"]
+        FIG["<b>FIGMA</b><br/>Design system. You edit here. Source of truth."]
+        CAP["<b>CAPTURE</b><br/>Captures structure, tokens, bindings, states, props, geometry, screens, icons, visual screenshots, and component sets."]
+        SNAP["<b>SNAPSHOT</b><br/>JSON snapshots of tokens, components, props, geometry, icons, screens, HTML, and composition. Timestamped and versioned to detect changes and stale data."]
     end
-    subgraph CORE["The engine"]
-        CODE["<b>Code</b><br/>the design system as built,<br/>read live from the repo"]
-        ENG["<b>rms-design-system-engine</b><br/>checks the code against Figma,<br/>25 checks"]
-        RULES["<b>Matching rules</b><br/>the few things it cannot guess,<br/>written once in the project"]
+    subgraph P2["PHASE 2 - COMPARE"]
+        CODE["<b>CODE</b><br/>The DS as built in the repo, read live, not from snapshots.<br/><br/>• ds-config.json says which files: the token CSS + component CSS + markup."]
+        ENG["<b>PARITY ENGINE</b><br/>Checks the code against Figma.<br/><br/>• audit.mjs with 25 gates"]
+        RULES["<b>MATCHING RULES</b><br/>The few things the parity can't guess. Written once, kept in the repo.<br/><br/>• ds-config.json: your settings (files, Figma link, modes, exceptions, and the Figma-to-code naming convention)<br/>• structure-contract.mjs: which CSS class each component is<br/>• contract.authored.json: name changes between Figma and code"]
     end
-    subgraph OUT["What it gives you"]
-        RES["<b>Result</b><br/>pass or fail, in plain words,<br/>with where and how to fix"]
-        ADV["<b>Advice</b><br/>accessibility, AI readiness,<br/>drift and debt; never blocks"]
-        CON["<b>Contracts</b><br/>the facts, the spec,<br/>so AI never makes things up"]
-        INT["<b>Intent</b><br/>the why: which component<br/>to use, and when"]
-        SG["<b>Style guide</b><br/>every component in every state,<br/>on one living page"]
+    subgraph P3["PHASE 3 - OUTPUTS"]
+        subgraph VERDICT[" "]
+            RES["<b>PARITY OUTPUT</b><br/>The verdict: pass/fail, in the chat, in plain language.<br/><br/>• design-system-engine-history.json (records each run for the trend)"]
+            ADV["<b>ADVISORIES</b><br/>Extra signals in the report. They inform, they never block.<br/><br/>• Accessibility: contrast, names, focus<br/>• AI-readiness scorecard: gate health, coverage, docs, guidance<br/>• Exemption debt: every #quot;ignore this#quot; + who owns it<br/>• Code not in Figma; contracts with no description<br/>• Drift: raw values, breaking/deprecated (+ who uses it)<br/>• Token layering<br/>Opt-in: tiers, closed vocabulary, multi-brand coverage"]
+        end
+        CON["<b>CONTRACTS</b><br/>The facts (the spec). Keeps AI from making things up.<br/><br/>• tokens.json contains DTCG token values<br/>• &lt;componentName&gt;.contract.json defines each component: props, slots, states, tokens, relationships (pairs-with / never-with), a usage example, and when not to use it<br/>• contract.schema.json checks they're valid<br/>• llms.txt helps AI find the right files"]
+        INT["<b>INTENT</b><br/>The why. Helps AI choose the right component. Kept up to date automatically, every run.<br/><br/>• design-intent.json combines Figma annotations, component descriptions, code docs/notes, key structural facts (where each class is used), and your own external guidelines (e.g. a Notion extract)"]
+        SG["<b>STYLE GUIDE</b><br/>The design system shown as one living page: every component in every state. Built automatically from the captured facts and the design intent, never hand-kept.<br/><br/>• apps/styleguide/index.html. People open it to browse; the accessibility check also renders against it."]
     end
-    FIG -->|"reads Figma, any plan"| CAP --> SNAP -->|Figma facts| ENG
+    AI["<b>AI CODING AGENT</b><br/>Reads both the facts and the why and generates UI from the real DS, without hallucinating."]
+    HUM["<b>HUMANS</b><br/>Designers and devs. They open the styleguide to browse and test the DS."]
+    A11Y["<b>ACCESSIBILITY</b><br/>Accessibility (WCAG AA), in plain language: contrast, names, visible focus and focus-ring visibility, state exposure, keyboard. Flags: --axe (non-text contrast, target size, labels, landmarks), --states (hover), --json (for an agent)."]
+    EV["<b>EVALS</b><br/>Checks an agent's output against the DS for hardcoded values, made-up variables, and inline styles. Runs each case N times and tracks clean runs, with an optional LLM judge.<br/><br/>• evals-history.json records each run's metrics, including zero-fix rate, violations, inline styles, and generation time, for trend tracking."]
+    FIG -->|"Reads Figma. Works on any plan."| CAP --> SNAP -->|Figma facts| ENG
     CODE --> ENG
     RULES --> ENG
-    ENG -.->|"fixes, when you ask"| CODE
-    ENG -->|verdict| RES
-    ENG --> ADV
+    ENG -.->|"optional: --fix"| CODE
+    ENG -->|verdict| VERDICT
     ENG -->|writes| CON
     ENG -->|writes| INT
     ENG -.->|"writes (opt-in)"| SG
-    CON -->|reads| AI["<b>AI coding agent</b><br/>builds UI from the real<br/>design system"]
-    INT -->|reads| AI
-    SG -->|read| PEOPLE["<b>Designers and developers</b><br/>browse and test it"]
-    SG -->|renders against| A11Y["<b>Accessibility</b><br/>contrast, names, focus,<br/>keyboard (WCAG AA)"]
-    AI -->|generated UI| EV["<b>Evals</b><br/>check what the AI built<br/>against the design system"]
+    CON -->|reads| AI
+    INT --> AI
+    SG ---|read| HUM
+    SG -->|renders against| A11Y
+    AI -.->|generated output| EV
     CON -.->|reference| EV
     INT -.->|guidance| EV
 ```
