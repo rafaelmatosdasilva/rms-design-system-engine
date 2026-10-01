@@ -93,9 +93,9 @@ export function typeErrors(code, catalog, { ROOT = process.cwd(), dir = join(ROO
   mkdirSync(dir, { recursive: true });
   const prepared = prepare(code, catalog);
   const file = `${id.replace(/[^\w-]/g, '_')}.${ext === 'jsx' ? 'tsx' : ext}`;
-  writeFileSync(join(dir, 'parity-shim.d.ts'), compileShim(catalog));
+  writeFileSync(join(dir, 'design-system-engine-shim.d.ts'), compileShim(catalog));
   writeFileSync(join(dir, file), prepared);
-  writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: { noEmit: true, jsx: 'preserve', strict: false, noImplicitAny: false, skipLibCheck: true, target: 'es2022', module: 'esnext', moduleResolution: 'bundler', types: [], lib: ['es2022', 'dom'] }, files: ['parity-shim.d.ts', file] }, null, 2));
+  writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: { noEmit: true, jsx: 'preserve', strict: false, noImplicitAny: false, skipLibCheck: true, target: 'es2022', module: 'esnext', moduleResolution: 'bundler', types: [], lib: ['es2022', 'dom'] }, files: ['design-system-engine-shim.d.ts', file] }, null, 2));
   const r = spawnSync(tsc.cmd, [...tsc.args, '-p', join(dir, 'tsconfig.json'), '--pretty', 'false'], { encoding: 'utf8', timeout: 60000 });
   if (r.error) return { ran: false, why: `tsc did not run: ${r.error.message}` };
   const errors = parseTscOutput(`${r.stdout}\n${r.stderr}`, file);
