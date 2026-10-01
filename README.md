@@ -19,23 +19,24 @@ It keeps your code in parity with your design in Figma. It compares what was bui
 ## How it works
 
 ```mermaid
+%%{init: {"themeCSS": ".nodeLabel, .nodeLabel p, .label div { text-align: left !important; }"}}%%
 flowchart LR
     subgraph IN["Figma"]
-        FIG["🎨 Figma<br/>the design system,<br/>the source of truth"]
-        CAP["Capture<br/>tokens, components, states,<br/>props, icons, screens"]
-        SNAP["Snapshot<br/>the Figma facts, dated,<br/>so changes and old data show"]
+        FIG["<b>Figma</b><br/>the design system,<br/>the source of truth"]
+        CAP["<b>Capture</b><br/>tokens, components, states,<br/>props, icons, screens"]
+        SNAP["<b>Snapshot</b><br/>the Figma facts, dated,<br/>so changes and old data show"]
     end
     subgraph CORE["The engine"]
-        CODE["💻 Code<br/>the design system as built,<br/>read live from the repo"]
-        ENG{{"⚙️ rms-design-system-engine<br/>checks the code against Figma,<br/>25 checks"}}
-        RULES["Matching rules<br/>the few things it cannot guess,<br/>written once in the project"]
+        CODE["<b>Code</b><br/>the design system as built,<br/>read live from the repo"]
+        ENG["<b>rms-design-system-engine</b><br/>checks the code against Figma,<br/>25 checks"]
+        RULES["<b>Matching rules</b><br/>the few things it cannot guess,<br/>written once in the project"]
     end
     subgraph OUT["What it gives you"]
-        RES["📋 Result<br/>pass or fail, in plain words,<br/>with where and how to fix"]
-        ADV["💡 Advice<br/>accessibility, AI readiness,<br/>drift and debt; never blocks"]
-        CON["📄 Contracts<br/>the facts, the spec,<br/>so AI never makes things up"]
-        INT["🧭 Intent<br/>the why: which component<br/>to use, and when"]
-        SG["📚 Style guide<br/>every component in every state,<br/>on one living page"]
+        RES["<b>Result</b><br/>pass or fail, in plain words,<br/>with where and how to fix"]
+        ADV["<b>Advice</b><br/>accessibility, AI readiness,<br/>drift and debt; never blocks"]
+        CON["<b>Contracts</b><br/>the facts, the spec,<br/>so AI never makes things up"]
+        INT["<b>Intent</b><br/>the why: which component<br/>to use, and when"]
+        SG["<b>Style guide</b><br/>every component in every state,<br/>on one living page"]
     end
     FIG -->|"reads Figma, any plan"| CAP --> SNAP -->|Figma facts| ENG
     CODE --> ENG
@@ -46,11 +47,11 @@ flowchart LR
     ENG -->|writes| CON
     ENG -->|writes| INT
     ENG -.->|"writes (opt-in)"| SG
-    CON -->|reads| AI["🤖 AI coding agent<br/>builds UI from the real<br/>design system"]
+    CON -->|reads| AI["<b>AI coding agent</b><br/>builds UI from the real<br/>design system"]
     INT -->|reads| AI
-    SG -->|read| PEOPLE["👩‍🎨 Designers and developers<br/>browse and test it"]
-    SG -->|renders against| A11Y["♿ Accessibility<br/>contrast, names, focus,<br/>keyboard (WCAG AA)"]
-    AI -->|generated UI| EV["🧪 Evals<br/>check what the AI built<br/>against the design system"]
+    SG -->|read| PEOPLE["<b>Designers and developers</b><br/>browse and test it"]
+    SG -->|renders against| A11Y["<b>Accessibility</b><br/>contrast, names, focus,<br/>keyboard (WCAG AA)"]
+    AI -->|generated UI| EV["<b>Evals</b><br/>check what the AI built<br/>against the design system"]
     CON -.->|reference| EV
     INT -.->|guidance| EV
 ```
