@@ -42,10 +42,10 @@ Two steps, both inside [Claude Code](https://claude.com/claude-code). You need [
 
 Then close Claude Code and open it again, so it sees the new command.
 
-**2. Connect your project, once per project.** Open your project in Claude Code and type this, with your own Figma link.
+**2. Connect your project, once per project.** Open your project in Claude Code and type this. It asks you for your Figma link.
 
 ```
-/rms-design-system-engine set up this project with https://www.figma.com/design/…
+/rms-design-system-engine set up this project
 ```
 
 That's it. **It updates itself**: once a day it checks for a newer version and updates on its own, so you never install it again.
