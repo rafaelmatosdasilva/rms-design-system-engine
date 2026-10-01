@@ -46,9 +46,19 @@ export function crashed(out) {
 
 // ── A fixture design system audited end to end (demo-ds, harbor-ds) ─────────────────────────
 // A fresh copy of the fixture, every snapshot dated today, committed once so git blame has a commit to name.
-export function fixtureProject(fixture, prefix = 'ds-') {
+// `overlay`: a folder laid over the copy (test/fixtures/demo-primitives), its ds-config.patch.json merged into
+// ds-config.json, so a test can add to a fixture the skill evaluation runs on without changing it.
+export function fixtureProject(fixture, prefix = 'ds-', { overlay = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   cpSync(fixture, dir, { recursive: true, filter: (p) => !/expected-report/.test(p) });
+  if (overlay) {
+    cpSync(overlay, dir, { recursive: true, filter: (p) => !p.endsWith('ds-config.patch.json') });
+    const patch = join(overlay, 'ds-config.patch.json');
+    if (existsSync(patch)) {
+      const cfg = join(dir, 'ds-config.json');
+      writeFileSync(cfg, JSON.stringify({ ...JSON.parse(readFileSync(cfg, 'utf8')), ...JSON.parse(readFileSync(patch, 'utf8')) }, null, 2) + '\n');
+    }
+  }
   const today = new Date().toISOString();
   const walk = (d) => {
     for (const n of readdirSync(d)) {

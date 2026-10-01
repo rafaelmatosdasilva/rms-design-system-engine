@@ -33,6 +33,18 @@ shared rule) belongs to the scope when its file mentions a component in scope. T
 of a scoped run counts only its components. Set a default in `ds-config.json → scopeComponents: ["ButtonPrimary"]` if a repo
 should always run scoped. Omit the flag to audit the whole DS.
 
+**Only part of the run.** `--only` runs the part asked for and nothing else; the report and the summary say what ran,
+so a part never reads as the whole system passing:
+```bash
+rms-design-system-engine --only accessibility             # the accessibility check alone (from the code, and in the browser when it can)
+rms-design-system-engine --only parity                    # every gate against Figma, without the accessibility check
+rms-design-system-engine --only 3                         # one gate by number (1 to 25), or by name: --only "token values", --only states,props
+rms-design-system-engine --component chip --only accessibility   # with a scope, as any run
+```
+A word it does not know prints the list of gates. `--baseline` needs the whole run, and the trend and the "since the
+last run" comparison are kept for whole runs only. The router turns "check the accessibility of the button", "without
+accessibility" or "only the token values gate" into the right `--only`.
+
 **Utility flags (no full audit - run the terminal command directly):**
 ```bash
 rms-design-system-engine --init                          # first-time setup only: scaffold config files, then exit
@@ -480,7 +492,13 @@ there, never a failure.
   `tab`, `link`…) that does nothing on Enter (and Space for buttons, checkboxes and switches). The click is
   caught before the element's own handler, so the check never navigates or submits.
 - **Arrow keys** — a radio group, tab list, menu or list box whose items do not move with the arrow keys.
-- **Dialogs and Escape** — an open dialog that does not close on Escape.
+- **Dialogs and Escape** — an open dialog that does not close on Escape. Each control that opens a dialog, a
+  menu or a list (`aria-haspopup`, or `aria-expanded` with `aria-controls`; up to 8 a page) is opened, Escape
+  is pressed, and what it opened must close and give the focus back to that control. A link does not navigate
+  and a form does not submit while it runs.
+- **One main heading** — an app page (a `--url` page or a route found on its own, not the styleguide or a
+  story) has one `h1`, which a screen reader jumps to. The code part flags a page file with text and no `h1`,
+  or several.
 - **Zoom to 200% (1.4.4)** — text that becomes cut off when the page is shown at twice its size.
 - **Focus ring thickness (2.4.13, AAA, advisory)** — a focus ring thinner than 2 CSS pixels. The browser's
   own ring is not counted.

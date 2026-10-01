@@ -194,6 +194,17 @@ test('RESULTS.md records the guide set that is in the repository', async () => {
   assert.ok(measured.includes(now), `the guide, a recipe or a reference file changed since the last evaluation (RESULTS.md has ${measured.join(', ') || 'none'}, the repository has ${now}): run the skill evaluation and record the results with "Guide set measured: \`${now}\`"`);
 });
 
+// The project every run works on is part of the measurement: a change to the demo design system changes every
+// task, so it needs the version before measured again on it too, and the new hash in RESULTS.md.
+test('RESULTS.md records the project the evaluation runs on', async () => {
+  const { projectHash } = await import('./skill-evals/lib.mjs');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const results = readFileSync(join(root, 'test', 'skill-evals', 'RESULTS.md'), 'utf8');
+  const measured = [...results.matchAll(/Project measured: `([0-9a-f]{12})`/g)].map((m) => m[1]);
+  const now = projectHash();
+  assert.ok(measured.includes(now), `the demo design system the evaluation runs on changed since the last evaluation (RESULTS.md has ${measured.join(', ') || 'none'}, the repository has ${now}): measure the version before and this one on it, and record "Project measured: \`${now}\`"`);
+});
+
 test('new-ui-saved: no colour or variable the system does not have, and the confirmation or the gap said', async () => {
   const { readFileSync } = await import('node:fs');
   const { join, dirname } = await import('node:path');

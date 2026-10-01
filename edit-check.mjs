@@ -10,7 +10,15 @@
 //   • on a design-system component's tag, a prop value it does not take or a prop name written another way
 //     (the catalog and the code API, exactly as the steering check reads them);
 //   • in a Tailwind project, a class with a value in brackets (rounded-[4px]): the theme's utility when a theme
-//     value is the same, or that it is not a design-system value (tailwind-check.mjs).
+//     value is the same, or that it is not a design-system value (tailwind-check.mjs);
+//   • a comment that switches a check off (I73): eslint-disable, stylelint-disable, @ts-ignore, @ts-expect-error,
+//     @ts-nocheck, biome-ignore, oxlint-disable. It is a way round a finding, not a fix;
+//   • what the static accessibility check finds (I74, a11y-static.mjs) where the edit added the line, with its fix:
+//     a button or link with only an icon and no name, an image with no alt, a click handler on a div, a focus
+//     outline removed with none put back anywhere in the project, an aria-* that does not exist;
+//   • a size written by hand (I75): a padding, margin, gap, corner radius or font size in px or rem, with the token
+//     that has that value, or the nearest ones when none has it. Only a kind of size the theme names (no spacing
+//     tokens, no spacing finding); 0, 1px hairlines, a pill's 999px, negatives and calc() are left alone.
 // Silent when the edit added none of these. Precise before complete: component tags the catalog does not know
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
@@ -19,6 +27,8 @@ import { join, relative, resolve, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { steeringTruth, steeringFindings } from './steering-check.mjs';
 import { usesTailwind, themeValues, arbitraryFindings } from './tailwind-check.mjs';
+import { primitiveTable, projectClassRules, primitiveFindings, primitiveTag } from './primitives.mjs';
+import { markupFindings, cssFindings, styleOnly, projectStyleText } from './a11y-static.mjs';
 import { codeSnapshotPath } from './names.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
@@ -30,7 +40,63 @@ const NOT_COLOUR = /(href|to|src|action|xlink:href)\s*=\s*\{?\s*["'`]$|url\(\s*[
 // data table or a comment is data.
 const STYLE_PROP = /(colou?r|background|border|fill|stroke|shadow|outline|caret|accent|decoration)[\w-]*["'`]?\s*[:=]\s*\{?\s*[^;:=]*$/i;
 const COMMENT = /^\s*(\/\/|\/?\*|<!--)/;
+// A directive starts its comment (// eslint-disable-next-line, /* stylelint-disable */, {/* @ts-ignore */}); the
+// same words later in a comment are prose about it.
+const SILENCER = /(?:\/\/+|\/\*+|<!--)\s*(eslint-disable(?:-next-line|-line)?|stylelint-disable(?:-next-line|-line)?|oxlint-disable(?:-next-line|-line)?|biome-ignore(?:-all|-start)?|@ts-(?:ignore|expect-error|nocheck))(?![\w-])/;
 const normName = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// The kind of size a token holds, by its name, and the kind a style property takes (I75).
+const SIZE_KIND = [
+  ['radius', /radi|rounded|corner/],
+  ['font size', /font-?size|text-?size|type-?size|(^|-)fs(-|$)|^--text-(2xs|xs|sm|md|base|lg|xl|[2-9]xl)$|(body|heading|title|label|caption|display|headline)[\w-]*-size/],
+  ['spacing', /spac|gap|gutter|inset|padding|margin/],
+];
+const tokenKind = (name) => SIZE_KIND.find(([, re]) => re.test(String(name).toLowerCase()))?.[0] ?? null;
+const propKind = (prop) => (/radius/i.test(prop) ? 'radius' : /font-?size/i.test(prop) ? 'font size' : /^(padding|margin|gap|row-?gap|column-?gap)/i.test(prop) ? 'spacing' : null);
+const toPx = (n, unit) => +(Number(n) * (/rem/i.test(unit) ? 16 : 1)).toFixed(3);
+
+// The sizes the theme defines, by kind, in px (a rem is 16px): { spacing: Map(px → [token]), radius, 'font size' }.
+export function themeSizes(css) {
+  const out = { spacing: new Map(), radius: new Map(), 'font size': new Map() };
+  for (const m of String(css ?? '').matchAll(/(--[\w-]+)\s*:\s*(\d*\.?\d+)(px|rem)\s*(?:!important\s*)?(?=[;}\n]|$)/g)) {
+    const kind = tokenKind(m[1]);
+    if (!kind || m[1] === '--spacing') continue;   // Tailwind's --spacing is the step every spacing multiplies, not a value
+    const px = toPx(m[2], m[3]), list = out[kind].get(px) ?? [];
+    if (!list.includes(m[1])) list.push(m[1]);
+    out[kind].set(px, list);
+  }
+  return out;
+}
+
+const SIZE_CSS = /(?:^|[\s;{"'`(])((?:padding|margin)(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?|gap|row-gap|column-gap|border(?:-(?:top|bottom|start|end)-(?:left|right|start|end))?-radius|font-size)\s*:\s*([^;}"'`\n]+)/gi;
+const SIZE_JS = /(?:^|[\s{,(])((?:padding|margin)(?:Top|Right|Bottom|Left|Inline|Block|InlineStart|InlineEnd|BlockStart|BlockEnd)?|gap|rowGap|columnGap|border(?:TopLeft|TopRight|BottomLeft|BottomRight|StartStart|StartEnd|EndStart|EndEnd)?Radius|fontSize)\s*:\s*(?:(["'`])([^"'`]+)\2|(\d+(?:\.\d+)?)(?![\w.%]))/g;
+
+// → the text of each size written by hand on this line. `styled`: the line sets a style attribute, where a bare
+// number is px (React's style={{ padding: 12 }}).
+export function sizeFindings(line, sizes, { styled = false } = {}) {
+  const out = [];
+  const check = (prop, raw, values) => {
+    const kind = propKind(prop), table = sizes?.[kind];
+    if (!table?.size) return;   // the system names no sizes of this kind
+    for (const [text, px] of values) {
+      if (px <= 1) continue;
+      const names = table.get(px);
+      if (names) { out.push(`${prop}: ${text} is written by hand; use var(${names[0]})${names.length > 1 ? ` (or ${names.slice(1, 3).map((t) => `var(${t})`).join(', ')})` : ''}`); continue; }
+      if (px >= 999) continue;   // a pill's radius, when no token holds it
+      const all = [...table.keys()].sort((a, b) => a - b);
+      const below = all.filter((v) => v < px).pop(), above = all.find((v) => v > px);
+      const near = [below, above].filter((v) => v !== undefined).map((v) => `var(${table.get(v)[0]}) (${v}px)`);
+      out.push(`${prop}: ${text} is not a ${kind === 'spacing' ? 'spacing value' : kind} of the design system${near.length ? `; the nearest ${near.length > 1 ? 'are' : 'is'} ${near.join(' and ')}` : ''}`);
+    }
+  };
+  const lengths = (v) => (/calc\(|min\(|max\(|clamp\(/i.test(v) ? [] : [...v.matchAll(/(^|[\s,(])(\d*\.?\d+)(px|rem)\b/gi)].map((m) => [`${m[2]}${m[3]}`, toPx(m[2], m[3])]));
+  for (const m of String(line).matchAll(SIZE_CSS)) check(m[1], m[2], lengths(m[2]));
+  for (const m of String(line).matchAll(SIZE_JS)) {
+    if (m[3] !== undefined) check(m[1], m[3], lengths(m[3]));
+    else if (styled) check(m[1], m[4], [[m[4], Number(m[4])]]);
+  }
+  return out;
+}
 
 // A design-system component's tag on this line: <Chip>, <ButtonPrimary>, <hb-chip>. A lowercase single word
 // (<button>, <input>) is the HTML element, whose attributes are the platform's, never the system's props.
@@ -89,20 +155,32 @@ export function editTruth(ROOT, cfg = {}) {
   const api = json(codeSnapshotPath(cfg)).api ?? {};
   const truth = steeringTruth({ catalog, api, cssVars });
   const tailwind = cfg.tailwind !== false && usesTailwind(theme, ROOT) ? themeValues(theme) : null;
-  return { truth, tokenByValue, tailwind, themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  // The owner's primitives table (I42), with the project's class rules to read a styled element by its classes.
+  const primitives = primitiveTable(cfg);
+  const rules = primitives.length ? projectClassRules(ROOT) : new Map();
+  // The static accessibility rules (I74), with the project's styles read only when an edit removes an outline.
+  let styles = null;
+  const a11y = cfg.a11yStatic === false ? null : { styles: () => (styles ??= projectStyleText(ROOT)) };
+  return { truth, tokenByValue, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, tailwind = null }, { isTheme = false, sheet = false } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
   const lineOf = (l) => { const i = all.indexOf(l); return i >= 0 ? i + 1 : null; };
   const seen = new Set();
-  const push = (line, text) => { const k = `${line}|${text}`; if (!seen.has(k)) { seen.add(k); out.push({ line, text }); } };
+  const push = (line, text, extra = {}) => { const k = `${line}|${text}`; if (!seen.has(k)) { seen.add(k); out.push({ line, text, ...extra }); } };
   for (const l of added) {
     const line = lineOf(l);
+    const off = SILENCER.exec(l);
+    if (off) {
+      // The rules it names, so the agent knows what to fix (eslint's "-- why" and biome's ": why" are left out).
+      const rules = off[1].startsWith('@ts-') ? '' : l.slice(off.index + off[0].length).replace(/\*\/[\s\S]*|-->[\s\S]*|\s--\s[\s\S]*|:[\s\S]*/, '').trim().slice(0, 80);
+      push(line, `${off[1]}${rules ? ` ${rules}` : ''} switches a check off; fix what the check reports, or ask the person first`, { kind: 'silencer' });
+    }
     for (const f of steeringFindings(l, truth)) {
       if (f.kind === 'variable' && !declared.has(f.found)) push(line, `var(${f.found}) is not a declared CSS variable${f.want ? `; the system has ${f.want}` : ''}`);
       else if ((f.kind === 'prop value' || f.kind === 'prop name') && componentTagIn(l, truth.components)) {
@@ -125,6 +203,25 @@ export function editFindings(added, fullText, { truth, tokenByValue, tailwind = 
         ? `${m[0]} is written by hand; use var(${tokens[0]})${tokens.length > 1 ? ` (or ${tokens.slice(1, 3).map((t) => `var(${t})`).join(', ')})` : ''}`
         : `${m[0]} is not a design-system colour; use one of its colour tokens`);
     }
+    if (sizes) for (const f of sizeFindings(scan, sizes, { styled: /\bstyle\s*=/.test(l) })) push(line, f);   // MUI's sx={{ padding: 2 }} is a theme step, not 2px
+  }
+  // A plain element the edit added that is styled as a primitive the owner declared (I42).
+  if (primitives.length && !sheet) {
+    const addedAt = new Set(added.map(lineOf).filter(Boolean));
+    for (const f of primitiveFindings(fullText, primitives, { rules })) {
+      if (addedAt.has(f.line)) push(f.line, `<${f.tag}> styled by hand is the system's ${primitiveTag(f.primitive)}; use the component`);
+    }
+  }
+  // What the static accessibility check finds where the edit added the line (I74). A rule that removes the focus
+  // outline counts only when no style in the project puts focus back.
+  if (a11y) {
+    const addedAt = new Set(added.map(lineOf).filter(Boolean)), text = String(fullText ?? '');
+    const found = sheet ? [] : markupFindings(text);
+    if ((sheet || component) && /outline(-style)?\s*:\s*(none|0)\b/i.test(added.join('\n'))) {
+      const css = sheet ? text : styleOnly(text);
+      found.push(...cssFindings(css, `${css}\n${a11y.styles()}`));
+    }
+    for (const f of found) if (addedAt.has(f.line)) push(f.line, `${f.desc}${f.fix ? `; ${f.fix}` : ''}`, { kind: 'a11y' });
   }
   return out;
 }
@@ -142,10 +239,18 @@ export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
   if (!added.length) return null;
   const ctx = editTruth(root, cfg);
   let full = ''; try { full = existsSync(abs) ? readFileSync(abs, 'utf8') : ''; } catch { /* the edit's own text is enough */ }
-  const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs) });
+  const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs), component: /\.(vue|svelte)$/i.test(abs) });
   if (!found.length) return null;
   const lines = found.slice(0, 12).map((f) => `  ${basename(rel)}${f.line ? `:${f.line}` : ''}  ${f.text}`);
-  return `rms-design-system-engine checked this edit against the design system: ${found.length} thing${found.length === 1 ? '' : 's'} it added the system does not have.\n${lines.join('\n')}${found.length > 12 ? `\n  and ${found.length - 12} more` : ''}\nFix ${found.length === 1 ? 'it' : 'them'} in this file now. Not sure of a name? rms-design-system-engine --query <name>.`;
+  const n = found.length, them = n === 1 ? 'it' : 'them', count = (k) => found.filter((f) => f.kind === k).length;
+  const system = n - count('silencer') - count('a11y');
+  const title = system === n
+    ? `rms-design-system-engine checked this edit against the design system: ${n} thing${n === 1 ? '' : 's'} it added the system does not have.`
+    : `rms-design-system-engine checked this edit: ${n} thing${n === 1 ? '' : 's'} to fix.`;
+  const next = count('silencer') === n
+    ? `Take ${them} out and fix what the check reports. When that cannot be done, ask the person before switching a check off.`
+    : `Fix ${them} in this file now.${system ? ' Not sure of a name? rms-design-system-engine --query <name>.' : ''}${count('silencer') ? ' A comment that switches a check off comes out; when what it hides cannot be fixed, ask the person.' : ''}`;
+  return `${title}\n${lines.join('\n')}${n > 12 ? `\n  and ${n - 12} more` : ''}\n${next}`;
 }
 
 export function editHookOutput(reason) {

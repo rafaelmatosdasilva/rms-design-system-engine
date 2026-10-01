@@ -149,7 +149,7 @@ export function projectWorkarounds(ROOT, { names = [], classFor = () => null, co
   const read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return ''; } };
   const skipName = (f) => excludeFiles.some((p) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`).test(f.split('/').pop()));
   // A built file with its source beside it (ui.html from ui.src.html) is read once, from the source.
-  const built = (f) => existsSync(f.replace(/\.(html?)$/, '.src.$1'));
+  const built = (f) => /\.html?$/i.test(f) && existsSync(f.replace(/\.(html?)$/i, '.src.$1'));
   const markupFiles = walk(ROOT, MARKUP).filter((f) => !built(f) && !skipName(f) && !relative(ROOT, f).split('/').some((d) => excludeDirs.includes(d)));
   const styleFiles = walk(ROOT, STYLE);
   const styles = [...styleFiles.map(read), ...markupFiles.map((f) => [...read(f).matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join('\n'))];
