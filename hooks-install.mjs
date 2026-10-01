@@ -30,8 +30,8 @@ export function installHooks(ROOT, { engineDir = ENGINE, remove = false } = {}) 
   const before = JSON.stringify(settings);
   settings.hooks = { ...(settings.hooks ?? {}) };
   // PreToolUse holds the never-rules; UserPromptSubmit routes a request made with the command (I56);
-  // PostToolUse checks each UI edit when it is made (I62).
-  for (const [event, entry] of [['PreToolUse', { matcher: MATCHER }], ['UserPromptSubmit', {}], ['PostToolUse', { matcher: EDIT_MATCHER }]]) {
+  // PostToolUse checks each UI edit when it is made (I62); Stop checks the reply says what the route asked (I81).
+  for (const [event, entry] of [['PreToolUse', { matcher: MATCHER }], ['UserPromptSubmit', {}], ['PostToolUse', { matcher: EDIT_MATCHER }], ['Stop', {}]]) {
     const list = Array.isArray(settings.hooks[event]) ? settings.hooks[event] : [];
     const others = list.filter((h) => !(h?.hooks ?? []).some((x) => String(x?.command ?? '').includes(MARK)));
     const next = remove ? others : [...others, { ...entry, hooks: [{ type: 'command', command: guardCommand(engineDir) }] }];
@@ -61,12 +61,12 @@ export function hooksStatus(ROOT) {
   try { s = JSON.parse(readFileSync(file, 'utf8')); } catch { return { installed: false, file }; }
   const find = (event) => (s.hooks?.[event] ?? []).flatMap((h) => h?.hooks ?? []).map((x) => String(x?.command ?? '')).find((c) => c.includes(MARK));
   const cmd = find('PreToolUse');
-  if (!cmd || !find('UserPromptSubmit') || !find('PostToolUse')) return { installed: false, file, ...(cmd ? { partial: true } : {}) };
+  if (!cmd || !find('UserPromptSubmit') || !find('PostToolUse') || !find('Stop')) return { installed: false, file, ...(cmd ? { partial: true } : {}) };
   const path = cmd.match(/"([^"]+guard\.mjs)"/)?.[1];
   return { installed: true, file, command: cmd, exists: !!path && existsSync(path) };
 }
 
-// A project that installed the hooks before the router or the edit check existed gets them on its next run, so
+// A project that installed the hooks before the router, the edit check or the final check existed gets them on its next run, so
 // an update reaches every project that opted in. Never installs hooks where there were none, never on
 // CI, never with "hooks": false. Hooks whose engine is gone (an install moved to its new name) point at this
 // one again. Returns true when it upgraded.
