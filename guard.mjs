@@ -11,7 +11,11 @@
 //     when the person's latest message asks for it, and the record of what both sides last agreed on is the
 //     engine's alone, so an agent never makes a check pass by accepting its own differences;
 //   • reads the person's latest message (the hook's transcript_path, idea I56): a code edit or the hand-back
-//     apply passes when that message asks for a change, and asks first when it does not.
+//     apply passes when that message asks for a change, and asks first when it does not. A request made with a
+//     command is its words after the command, never the guide Claude Code expands it into.
+// As a Stop hook (I81), when the route gave sentences the person has to hear (the Figma snapshots were not
+// refreshed, this skill does not change Figma) and the agent's last reply leaves them out, it sends the agent back
+// once to add them.
 // As a UserPromptSubmit hook (I56), a request made with /rms-design-system-engine is routed by the engine before
 // the agent reads it: the route, the exact command and the sentences to say arrive with the request, so
 // picking them is never the agent's decision, even when it skips the router.
@@ -19,13 +23,13 @@
 // not have goes back to the agent with the right name (edit-check.mjs). "editCheck": false turns that part off.
 // Anything else, or any project without a ds-config.json, or one with "hooks": false, passes untouched.
 // The engine's own writes (node … audit.mjs, rms-design-system-engine) are never blocked.
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, basename, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { route, routeText, projectState } from './route.mjs';
+import { route, routeText, projectState, SAY } from './route.mjs';
 import { readDoc } from './skill-files.mjs';
 import { editCheck, editHookOutput } from './edit-check.mjs';
-import { PROJECT } from './names.mjs';
+import { PROJECT, OUT_DIR } from './names.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 
@@ -50,18 +54,72 @@ export function lastUserText(transcriptPath) {
   for (const line of readFileSync(transcriptPath, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     let e; try { e = JSON.parse(line); } catch { continue; }
-    if (e.type !== 'user' || e.message?.role !== 'user') continue;
+    // isMeta: what Claude Code adds itself (a command's guide, "already loaded"), never what the person typed.
+    if (e.type !== 'user' || e.message?.role !== 'user' || e.isMeta) continue;
     const c = e.message.content;
     const text = typeof c === 'string' ? c : Array.isArray(c) ? c.filter((x) => x?.type === 'text').map((x) => x.text).join('\n') : '';
+    // A command (/rms-design-system-engine audit the chip): the person's words are its arguments.
+    if (/<command-name>[^<]*<\/command-name>/.test(text)) { last = /<command-args>([\s\S]*?)<\/command-args>/.exec(text)?.[1]?.trim() ?? ''; continue; }
     if (text.trim()) last = text;
   }
   return last;
 }
 
+// The agent's last reply in the transcript, and whether it used a Figma tool in this session.
+function transcriptEntries(transcriptPath) {
+  if (!transcriptPath || !existsSync(transcriptPath)) return [];
+  return readFileSync(transcriptPath, 'utf8').split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+}
+const assistantBlocks = (entries) => entries.filter((e) => e.type === 'assistant').flatMap((e) => (Array.isArray(e.message?.content) ? e.message.content : []));
+export function figmaToolUsed(transcriptPath) {
+  return assistantBlocks(transcriptEntries(transcriptPath)).some((b) => b?.type === 'tool_use' && /figma/i.test(String(b.name ?? '')));
+}
+
+// What the person has to hear when the route gave a SAY line (I81): the reply says it, in the line's words or its
+// own. Checked by meaning, not by the exact sentence.
+const SAID = {
+  figma: {
+    test: /(can['’]?t|cannot|can not|won['’]?t|will not|do(es)?\s?n['’]?o?t|never)\s+(change|edit|modify|write to|update|touch)\b[^.]{0,40}\bfigma\b|\bonly reads (it|figma)\b|\bread-only\b/i,
+    what: 'that this skill does not change Figma',
+  },
+  noRefresh: {
+    test: /(could\s?n['’]?t|could not|cannot|can['’]?t|unable to|did\s?n['’]?t|did not|was\s?n['’]?t|were\s?n['’]?t|not able to)\s+(be\s+)?(refresh|re-?capture)|\bnot\s+(been\s+)?(refreshed|re-?captured)\b|\bno figma (tool|access|connection|token)\b|\bwithout (a |any )?figma (tool|access|connection)\b/i,
+    what: 'that the Figma snapshots were not refreshed in this run',
+    unless: (transcriptPath) => figmaToolUsed(transcriptPath),   // it did refresh: the line is not true
+  },
+};
+export const sayKind = (line) => (line === SAY.figma ? 'figma' : /^I couldn't refresh the Figma snapshots/.test(line) ? 'noRefresh' : null);
+const saidFile = (root) => join(root, OUT_DIR, 'said.json');
+
+// The UserPromptSubmit side: the sentences this prompt's route asks for, kept for the Stop check (or cleared).
+export function rememberSay(root, event, say = []) {
+  const file = saidFile(root);
+  const lines = say.map((text) => ({ text, check: sayKind(text) })).filter((x) => x.check);
+  try {
+    if (lines.length) { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, JSON.stringify({ session: event.session_id ?? null, prompt: event.prompt_id ?? null, say: lines }, null, 2) + '\n'); }
+    else if (existsSync(file)) unlinkSync(file);
+  } catch { /* the check is a help, never a blocker */ }
+}
+
+// The Stop side: the reason to send the agent back, or null. Once only (stop_hook_active), and only for the prompt
+// whose route asked for the lines.
+export function stopCheck(event, { root }) {
+  if (event?.stop_hook_active) return null;
+  let said; try { said = JSON.parse(readFileSync(saidFile(root), 'utf8')); } catch { return null; }
+  if (!said?.say?.length) return null;
+  if (said.session && event.session_id && said.session !== event.session_id) return null;
+  if (said.prompt && event.prompt_id && said.prompt !== event.prompt_id) return null;
+  const reply = String(event.last_assistant_message ?? '') || assistantBlocks(transcriptEntries(event.transcript_path)).filter((b) => b?.type === 'text').map((b) => b.text).pop() || '';
+  const missing = said.say.filter((s) => SAID[s.check] && !SAID[s.check].test.test(reply) && !SAID[s.check].unless?.(event.transcript_path));
+  if (!missing.length) return null;
+  return `rms-design-system-engine: your reply leaves out ${missing.map((s) => SAID[s.check].what).join(' and ')}. Reply again with your whole answer and ${missing.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${missing.map((s) => s.text).join('\n')}`;
+}
+export const stopOutput = (reason) => (reason ? JSON.stringify({ decision: 'block', reason }) : '');
+
 // The files where the system's decisions are recorded (I73), under the new names and the old ones. 'agreed' is
 // written by the engine only; the others change when the person asks.
 const ACCEPT_ASKED = /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit|\bbaseline|ratchet|lock (it |them )?in/i;   // the router's accept-debt words, or the baseline named
-const EXCEPTION_ASKED = /\b(exception|exempt|ignore|skip|mapping|map|exce[çc][õoã]|isen[çc]|ignor|mapa|mapeamento)\w*/i;
+const EXCEPTION_ASKED = /\b(exception|exempt|ignore|skip|mapping|map|exce[çc][õoã]|isen[çc]|ignor|mapa|mapeamento|set ?up|configur|install|init)\w*/i;   // setting the project up writes the map too
 const PICTURE_ASKED = /\b(approve|accept|update|aprov|aceit|atualiz)\w*\b[\s\S]{0,60}\b(pictures?|images?|screenshots?|references?|imagem|imagens|refer[eê]ncias?|capturas?)\b|\b(pictures?|images?|screenshots?|references?|imagem|imagens|refer[eê]ncias?|capturas?)\b[\s\S]{0,60}\b(approve|accept|update|aprov|aceit|atualiz)\w*/i;
 export function decisionFile(path, cfg = {}) {
   const p = String(path ?? '').replace(/\\/g, '/'), b = basename(p);
@@ -146,6 +204,7 @@ export function routePrompt(event, { root, engineDir = ENGINE, cfg = {}, env = p
   if (!text) return null;
   const state = projectState(root, { engineDir, env });
   const r = route(text, state);
+  rememberSay(root, event, r.say);
   let recipe = '';
   try { recipe = readDoc(engineDir, 'recipe', r.recipe) ?? ''; } catch { /* the pointer line still names it */ }
   return `The engine already routed this request (rms-design-system-engine's project hook); follow it and do not run --route again.\n${routeText(r, recipe, state.cmd, { maxRecipe: MAX_RECIPE })}`;
@@ -172,8 +231,14 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     if (event.hook_event_name === 'UserPromptSubmit') {
       let cfg = {};
       try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* no or broken config: route it anyway (setup) */ }
-      const out = promptOutput(routePrompt(event, { root, cfg }));
+      const context = routePrompt(event, { root, cfg });
+      if (!context) rememberSay(root, event, []);   // a new message the router did not take: nothing left to say
+      const out = promptOutput(context);
       if (out) process.stdout.write(out);
+    } else if (event.hook_event_name === 'Stop') {
+      let cfg = {};
+      try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* defaults */ }
+      if (cfg.hooks !== false) { const out = stopOutput(stopCheck(event, { root })); if (out) process.stdout.write(out); }
     } else if (event.hook_event_name === 'PostToolUse') {
       if (existsSync(cfgPath)) {
         let cfg = {};

@@ -5,7 +5,8 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { judge, asksForChange, lastUserText, routePrompt, MAX_RECIPE } from '../guard.mjs';
+import { judge, asksForChange, lastUserText, routePrompt, MAX_RECIPE, stopCheck, rememberSay } from '../guard.mjs';
+import { SAY } from '../route.mjs';
 import { installHooks, hooksStatus, upgradeHooks } from '../hooks-install.mjs';
 import { makeFixture } from './helpers.mjs';
 import { PROJECT } from '../names.mjs';
@@ -75,6 +76,7 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   assert.equal(s.hooks.PreToolUse.length, 2);
   assert.deepEqual(s.hooks.UserPromptSubmit, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the router (I56)
   assert.deepEqual(s.hooks.PostToolUse, [{ matcher: 'Edit|Write|MultiEdit', hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the edit check (I62)
+  assert.deepEqual(s.hooks.Stop, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the final check (I81)
   assert.equal(installHooks(dir, { engineDir: ENGINE }).changed, false);
   assert.equal(JSON.parse(readFileSync(r.file, 'utf8')).hooks.PreToolUse.length, 2);
   assert.deepEqual(hooksStatus(dir), { installed: true, file: r.file, command: `node "${join(ENGINE, 'guard.mjs')}"`, exists: true });
@@ -84,6 +86,7 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   assert.deepEqual(after.hooks.PreToolUse.map((h) => h.hooks[0].command), ['echo mine']);
   assert.equal(after.hooks.UserPromptSubmit, undefined);
   assert.equal(after.hooks.PostToolUse, undefined);
+  assert.equal(after.hooks.Stop, undefined);
   assert.equal(hooksStatus(dir).installed, false);
 });
 
@@ -174,6 +177,51 @@ test('lastUserText reads the latest message the person typed, not a tool result'
   ].map((e) => JSON.stringify(e)).join('\n') + '\n');
   assert.equal(lastUserText(t), 'agora corrige a altura no código');
   assert.equal(lastUserText(join(dir, 'missing.jsonl')), null);
+  // A request made with the command: its words, never the guide Claude Code expands it into (isMeta), which holds
+  // every word the rules listen for ("fix", "accept", "exception").
+  const c = join(dir, 'c.jsonl');
+  const guide = readFileSync(join(ENGINE, 'rms-design-system-engine.md'), 'utf8');
+  const cmd = (args) => ({ type: 'user', message: { role: 'user', content: `<command-message>rms-design-system-engine</command-message>\n<command-name>/rms-design-system-engine</command-name>\n<command-args>${args}</command-args>` } });
+  const meta = (text) => ({ type: 'user', isMeta: true, message: { role: 'user', content: [{ type: 'text', text }] } });
+  writeFileSync(c, [cmd('audit the chip'), meta(`${guide}\n\nARGUMENTS: audit the chip`), meta('Skill /rms-design-system-engine is already loaded above; instructions unchanged.')].map((e) => JSON.stringify(e)).join('\n'));
+  assert.equal(lastUserText(c), 'audit the chip');
+  assert.equal(judge({ tool_name: 'Edit', tool_input: { file_path: '/p/src/theme.css' } }, { userText: lastUserText(c) }).decision, 'ask');
+  assert.equal(judge({ tool_name: 'Bash', tool_input: { command: 'rms-design-system-engine --baseline' } }, { userText: lastUserText(c) }).decision, 'ask');
+  writeFileSync(c, [cmd(''), meta(guide)].map((e) => JSON.stringify(e)).join('\n'));
+  assert.equal(lastUserText(c), '');   // the command alone asks for nothing
+});
+
+test('the final check (I81): the reply says what the route asked the person to hear, once', () => {
+  const root = makeFixture({ 'ds-config.json': {} });
+  const t = join(root, 't.jsonl');
+  const ev = (reply, extra = {}) => ({ hook_event_name: 'Stop', session_id: 's1', prompt_id: 'p1', transcript_path: t, last_assistant_message: reply, stop_hook_active: false, ...extra });
+  writeFileSync(t, '');
+  rememberSay(root, { session_id: 's1', prompt_id: 'p1' }, [SAY.noRefresh('2026-01-01')]);
+  const r = stopCheck(ev('The design system is not in parity: 2 gates fail.'), { root });
+  assert.match(r, /leaves out that the Figma snapshots were not refreshed in this run/);
+  assert.match(r, /I couldn't refresh the Figma snapshots here: there is no Figma tool in this session\./);
+  assert.equal(stopCheck(ev('I couldn\'t refresh the Figma snapshots here. 2 gates fail.'), { root }), null);
+  assert.equal(stopCheck(ev('The snapshots were not refreshed in this run; 2 gates fail.'), { root }), null);   // its own words
+  assert.equal(stopCheck(ev('2 gates fail.', { stop_hook_active: true }), { root }), null);                      // once only
+  assert.equal(stopCheck(ev('2 gates fail.', { prompt_id: 'p2' }), { root }), null);                             // another message
+  // It did refresh with a Figma tool: the line is not true, nothing is asked.
+  writeFileSync(t, JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'mcp__figma__use_figma', input: {} }] } }) + '\n');
+  assert.equal(stopCheck(ev('Refreshed. 2 gates fail.'), { root }), null);
+  writeFileSync(t, '');
+  rememberSay(root, { session_id: 's1', prompt_id: 'p1' }, [SAY.figma]);
+  assert.match(stopCheck(ev('Done, the radius is 12px now.'), { root }), /leaves out that this skill does not change Figma/);
+  assert.equal(stopCheck(ev("I can't change Figma: this skill only reads it."), { root }), null);
+  rememberSay(root, { session_id: 's1', prompt_id: 'p3' }, []);   // a message with nothing to say clears it
+  assert.equal(stopCheck(ev('Done.', { prompt_id: 'p3' }), { root }), null);
+
+  // As hooks, the way Claude Code runs them: the route remembers, the Stop hook sends the agent back.
+  const run = (event) => spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ cwd: root, ...event }), encoding: 'utf8' }).stdout;
+  run({ hook_event_name: 'UserPromptSubmit', session_id: 's2', prompt_id: 'q1', prompt: '/rms-design-system-engine refresh the Figma snapshots, the design changed yesterday' });
+  const out = JSON.parse(run({ hook_event_name: 'Stop', session_id: 's2', prompt_id: 'q1', transcript_path: t, last_assistant_message: 'The audit fails on 2 gates.', stop_hook_active: false }));
+  assert.equal(out.decision, 'block');
+  assert.match(out.reason, /word for word/);
+  run({ hook_event_name: 'UserPromptSubmit', session_id: 's2', prompt_id: 'q2', prompt: 'thanks' });
+  assert.equal(run({ hook_event_name: 'Stop', session_id: 's2', prompt_id: 'q2', transcript_path: t, last_assistant_message: 'You are welcome.', stop_hook_active: false }), '');
 });
 
 test('the router as a hook: a request made with the command arrives already routed (I56)', () => {
@@ -217,6 +265,10 @@ test('a project with the older hooks gets the router on its next run; nothing is
   assert.equal(hooksStatus(router).partial, true);
   assert.equal(upgradeHooks(router, {}, { engineDir: ENGINE, env: {} }), true);
   assert.equal(JSON.parse(readFileSync(join(router, '.claude', 'settings.local.json'), 'utf8')).hooks.PostToolUse.length, 1);
+  // One with the router and the edit check but not the final check (before I81) gets the final check.
+  const edits = makeFixture({ '.claude/settings.local.json': { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: guard }] }], UserPromptSubmit: [{ hooks: [{ type: 'command', command: guard }] }], PostToolUse: [{ matcher: 'Edit', hooks: [{ type: 'command', command: guard }] }] } } });
+  assert.equal(upgradeHooks(edits, {}, { engineDir: ENGINE, env: {} }), true);
+  assert.equal(JSON.parse(readFileSync(join(edits, '.claude', 'settings.local.json'), 'utf8')).hooks.Stop.length, 1);
   const none = makeFixture({});
   assert.equal(upgradeHooks(none, {}, { engineDir: ENGINE, env: {} }), false);
   const optedOut = makeFixture({ '.claude/settings.local.json': { hooks: { PreToolUse: [{ hooks: [{ type: 'command', command: guard }] }] } } });
