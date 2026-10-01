@@ -43,7 +43,7 @@
        ⏭ no reimplementationSurfaces configured — skipped
 
 ✅  [11] Clean CSS  (no unused variables · no values that contradict Figma · safe containment)
-       ✅ 0 unused vars  (scanned 5 files; 0 known-unused exempted)
+       ✅ 0 unused vars  (scanned 4 files; 0 known-unused exempted)
        ✅ 0 undeclared vars  (every fallback-less var() resolves to a declaration)
        ✅ 0 dead CSS classes  (every rule matches something in the markup)
        ✅ Clean - no literal diverges from Figma
@@ -191,11 +191,8 @@
 ℹ️  Decision status: 1 experimental  (llms.txt tells agents which one won and why)
 ℹ️  Contract completeness: 4/4 have a description · 4/4 have semantics · 0/4 carry whenNotToUse/useInstead guidance. Advisory only.
 
-♿ Accessibility from the code (no browser needed): 1 finding in 4 markup and 1 style file (1 focus outline removed and not put back). Advisory.
+♿ Accessibility from the code (no browser needed): 1 finding in 3 markup and 1 style file (1 focus outline removed and not put back). Advisory.
      src/theme.css:70  .tp-field__input removes the focus outline and no focus style puts one back
-
-🧩 Primitives written by hand: 1 plain element styled as a primitive the design system has (primitives in ds-config.json). Use the component. Advisory.
-     <div> apps/gallery/Promo.jsx:3 is <Stack gap="s">, written by hand: use the component.
 
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
   ● Gate health      22/25 gates pass
@@ -207,7 +204,7 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: chip 4 · button 2 · field 1 · 2 not tied to a component
+📉 Burndown, open findings per component: chip 4 · button 2 · field 1 · 1 not tied to a component
    next up: chip. Run with --component chip, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .design-system-engine-out/summary.md) ───
@@ -229,7 +226,7 @@
   - chip/Icon: the code names it "icon" (letter case I → i)  (src/components/Chip.jsx)
   - chip/Label: the code names it "label" (letter case L → l)  (src/components/Chip.jsx)
 
-Burndown, open findings per component: chip 4 · button 2 · field 1 · 2 not tied to a component
+Burndown, open findings per component: chip 4 · button 2 · field 1 · 1 not tied to a component
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

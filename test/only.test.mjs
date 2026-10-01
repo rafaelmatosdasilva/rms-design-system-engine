@@ -88,7 +88,8 @@ test('the summary of a partial run says what ran, and accessibility on its own i
 });
 
 test('on the demo design system: one gate, the accessibility check alone, a word it does not know, and --baseline', { timeout: 600000 }, () => {
-  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'only-');
+  // With the primitive example laid over the demo (I42), so the parity part shows the system's own advice too.
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'only-', { overlay: join(ENGINE, 'test', 'fixtures', 'demo-primitives') });
   const audit = (...args) => {
     const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 300000 });
     const out = normalise((r.stdout ?? '') + (r.stderr ?? ''), dir);
@@ -112,7 +113,7 @@ test('on the demo design system: one gate, the accessibility check alone, a word
   const parity = audit('--only', 'parity');
   assert.equal(parity.gates.length, 25);
   assert.doesNotMatch(parity.out, /♿/);
-  assert.match(parity.out, /🧩 Primitives written by hand/);   // the system's advice is part of the parity
+  assert.match(parity.out, /🧩 Primitives written by hand: 1 plain element styled as a primitive the design system has \(primitives in ds-config\.json\)\. Use the component\. Advisory\.\n\s+<div> apps\/gallery\/Promo\.jsx:3 is <Stack gap="s">, written by hand: use the component\./);   // the system's advice is part of the parity
 
   const unknown = audit('--only', 'banana');
   assert.equal(unknown.code, 2);

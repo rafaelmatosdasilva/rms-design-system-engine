@@ -16,7 +16,7 @@ import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, ENGINE, DEMO } from './lib.mjs';
+import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, ENGINE, DEMO } from './lib.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
 import { HELDOUT } from './heldout.mjs';
@@ -39,8 +39,8 @@ const vr = variant(V, { ref: arg('ref', undefined) });
 const sha = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 const engineHash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ENGINE, encoding: 'utf8' }).trim() + (execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ENGINE, encoding: 'utf8' }).trim() ? '+dirty' : '');
 const cliVersion = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
-const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, model: MODEL, cliVersion };
-console.log(`${V} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · ${cliVersion}`);
+const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: projectHash(DEMO), model: MODEL, cliVersion };
+console.log(`${V} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · project ${meta.project} · ${cliVersion}`);
 if (DRY) { for (const t of tasks) console.log(`  ${t.set.padEnd(8)} ${t.id}`); process.exit(0); }
 
 const outFor = (t) => (t.private ? envVar(process.env, 'EVAL_PRIVATE_OUT') : join(HERE, 'results'));
@@ -53,7 +53,7 @@ for (const f of new Set(tasks.filter((t) => outFor(t)).map(resultsFile))) {
   const rows = readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   if (!rows.length) continue;
   if (!RESUME) { console.log(`✗ ${f} already has ${rows.length} rows: add --resume to carry on, or move it away to start again`); process.exit(2); }
-  const other = rows.find((r) => r.guideHash !== meta.guideHash || r.engineHash !== meta.engineHash);
+  const other = rows.find((r) => r.guideHash !== meta.guideHash || r.engineHash !== meta.engineHash || (r.project && r.project !== meta.project));
   if (other) { console.log(`✗ ${f} has rows from guide ${other.guideHash} / engine ${other.engineHash}, not ${meta.guideHash} / ${engineHash}: move it away to start again`); process.exit(2); }
   for (const r of rows) done.add(`${r.task}#${r.run}`);
 }

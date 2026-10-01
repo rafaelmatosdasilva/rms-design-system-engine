@@ -8,7 +8,7 @@ guide's file name and the files the engine keeps in a project have the new name 
 tasks, each run as `/rms-design-system-engine <task>`. Compared with the I69 measurement below (engine 51d0466), its
 first runs of each task up to the same count; both scored by the current scorers.
 
-Guide set measured: `eab10f44308d`
+Guide set measured: `eab10f44308d` · Project measured: `13d811a9d668` (recorded later, when the project's hash was added)
 
 | | I69 (adopted) | Renamed |
 |---|---|---|
