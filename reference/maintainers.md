@@ -118,6 +118,11 @@ node test/skill-evals/report.mjs --a baseline --b cookbook --model claude-sonnet
 - **Isolation.** Each run gets a fresh copy of the demo design system and a fresh `HOME` holding only the
   variant, no MCP servers, a fixed tool list, a turn limit and a budget, and none of the evaluating session's
   environment.
+- **The same project on both sides.** Each version is measured on its own checkout, so the demo design system
+  (`test/fixtures/demo-ds`) is part of what is measured: a change to it changes every task. Every run records
+  the project's hash, and `RESULTS.md` records it ("Project measured"). A test that needs more in the demo lays
+  a folder over its copy instead (`fixtureProject(…, { overlay })`, as `test/fixtures/demo-primitives` does);
+  when the demo itself has to change, the version before is measured again on the new one.
 - **Tasks.** `tasks.mjs` is the development set, used while writing recipes; `heldout.mjs` is the held-out
   set, not looked at while writing them. Adoption is decided on the held-out set. Private tasks
   (`DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_TASKS`) write only under `DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT`, never in the repository.

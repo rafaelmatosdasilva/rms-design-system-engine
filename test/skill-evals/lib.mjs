@@ -6,7 +6,8 @@
 // project's hooks installed), a fresh HOME holding only the variant's guide, the same engine for every
 // variant, a fixed tool list, a turn limit and a dollar budget. Only the guide differs between variants.
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
-import { join, dirname, basename } from 'node:path';
+import { join, dirname, basename, relative } from 'node:path';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -18,10 +19,21 @@ export const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
 export const TOOLS = 'Bash,Read,Edit,Write,Glob,Grep,Skill';
 const GIT_ENV = { GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.com', GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' };
 
+const NOT_PROJECT = /expected-report|\/\.design-system-engine-out(\/|$)|\/\.git(\/|$)|node_modules/;
+
+// The project every run works on, as a hash of what a run copies. Each version is measured on its own checkout,
+// so two versions compare only when this is the same: a change to the demo design system changes every task,
+// and the version before is measured again on it (test/skill-evals.test.mjs holds RESULTS.md to this hash).
+export function projectHash(source = DEMO) {
+  const h = createHash('sha256');
+  for (const f of walk(source).filter((p) => !NOT_PROJECT.test(p)).map((p) => relative(source, p)).sort()) h.update(`${f}\n`).update(readFileSync(join(source, f)));
+  return h.digest('hex').slice(0, 12);
+}
+
 // A fresh project from `source`, prepared by the task's setup, committed once, hooks installed.
 export function makeProject(source, setup) {
   const dir = mkdtempSync(join(tmpdir(), 'skill-eval-'));
-  cpSync(source, dir, { recursive: true, filter: (p) => !/expected-report|\/\.design-system-engine-out(\/|$)|\/\.git(\/|$)|node_modules/.test(p) });
+  cpSync(source, dir, { recursive: true, filter: (p) => !NOT_PROJECT.test(p) });
   const today = new Date().toISOString();
   for (const f of walk(dir).filter((p) => /\.snapshot\.json$/.test(p))) {
     writeFileSync(f, readFileSync(f, 'utf8').replace(/"_updated": "[^"]*"/, `"_updated": "${today}"`));
