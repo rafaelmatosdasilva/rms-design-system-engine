@@ -145,7 +145,7 @@ test('the remote keeps the old address while the new one does not answer (it red
 // README section for people coming from the old name, and in the record of past evaluations.
 const OLD = /rms-figma-code-parity|rms-parity\b|\.parity-out|\.parity-refs|parity-map|parity-baseline|parity-agreed|parity-history|parity-check-result|com\.rms\.parity|\bPARITY_[A-Z]/;
 const OLD_ALLOWED = new Set(['names.mjs', 'install.sh', 'self-update.mjs', 'skill-files.mjs', 'query.mjs', 'edit-check.mjs', 'audit.mjs',
-  'README.md', 'test/names.test.mjs', 'test/demo-ds.test.mjs', 'test/skill-evals/lib.mjs', 'test/skill-evals/RESULTS.md']);
+  'README.md', 'test/names.test.mjs', 'test/demo-ds.test.mjs', 'test/skill-evals/lib.mjs', 'test/skill-evals/rules.mjs', 'test/skill-evals/RESULTS.md']);   // the scorers read runs made before the rename
 test('the old names appear only where the move from them is handled', () => {
   const ROOT = join(import.meta.dirname, '..');
   const files = spawnSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' }).stdout.split('\n').filter(Boolean)

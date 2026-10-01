@@ -28,7 +28,7 @@ for (const file of process.argv.slice(2)) {
     const rules = globalChecks(ctx, t);
     const pass = [...checks, ...rules].every((c) => c.ok);
     if (pass !== r.pass) changed++;
-    return { ...r, checks, rules, pass, decisionPoints: decisionPoints(ctx), rescoredAt: new Date().toISOString() };
+    return { ...r, checks, rules, pass, changed: ctx.changed, decisionPoints: decisionPoints(ctx), rescoredAt: new Date().toISOString() };
   });
   writeFileSync(file, out.map((r) => JSON.stringify(r)).join('\n') + '\n');
   console.log(`${file}: ${rows.length} runs, ${changed} changed verdict`);

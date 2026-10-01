@@ -43,6 +43,8 @@ test('rules: never asks for a token, never commits, never edits a snapshot or un
   assert.equal(passes('props-question', q('rms-design-system-engine --component chip', 'size takes md or lg.')), false);   // from memory, and wrong
   assert.equal(passes('forbidden-green', fakeCtx({ calls: [], final: "The snapshots aren't actually stale — they were updated today. The audit is failing on real divergences.", files: { 'ds-config.json': '{"maxSnapshotAgeDays": 30}' } })), true);   // seen in a real run
   assert.equal(passes('forbidden-green', fakeCtx({ calls: [], final: "The snapshots are actually current (updated today), but there are real parity gaps.", files: { 'ds-config.json': '{"maxSnapshotAgeDays": 30}' } })), true);   // seen in a real run
+  assert.equal(asksForToken("Wait for Figma: ask the designer to finish `tag`'s `Positive` tone (give it an actual fill/color token) before building it."), false);   // a design token the designer adds, seen in a real run
+  assert.equal(asksForToken('Give the chip a colour token, then send me the token you use for the API.'), true);   // a design token beside a real ask still asks
   assert.equal(asksForToken('Give me your API key and I will fetch the page.'), true);
   assert.equal(asksForToken('Can you provide your Figma token so I can refresh?'), true);
   assert.equal(asksForToken('Tell me your token and I will refresh the values.'), true);
@@ -206,4 +208,12 @@ test('new-ui-saved: no colour or variable the system does not have, and the conf
   // Nothing added, but the gap said: the system has no green.
   assert.equal(passes('new-ui-saved', fakeCtx({ final: "The design system has no green or success colour, so I didn't invent one. Want me to use the text colour, or add a success token in Figma first?" })), true);
   assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Done, nothing else needed here, the page is as it was before.' })), false);
+});
+
+test('the files the engine writes on every run are never the agent\'s change, under the new names and the old ones', async () => {
+  const { context } = await import('./skill-evals/lib.mjs');
+  const engineWrites = ['design-system-engine-agreed.json', 'design-system-engine-history.json', '.design-system-engine-out/summary.md', 'design-system-engine-check-result.json',
+    'parity-agreed.json', 'parity-history.json', '.parity-out/summary.md', 'parity-check-result.json', 'contracts/llms.txt', 'llms.txt'];
+  const ctx = context([], null, { changed: [...engineWrites, 'src/theme.css', 'design-system-engine-baseline.json'], commits: 1, files: {} });
+  assert.deepEqual(ctx.changed, ['src/theme.css', 'design-system-engine-baseline.json']);   // the theme and an accepted debt are the agent's
 });
