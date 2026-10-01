@@ -837,7 +837,8 @@ async function main() {
   const STRICT = cfg.a11yStrict === true;
   const RUN_AXE = argv.includes('--axe') || cfg.a11y?.axe === true;   // broaden coverage with axe-core (opt-in)
   const RUN_STATES = argv.includes('--states') || cfg.a11y?.interactionStates === true;   // check :hover contrast (opt-in)
-  const skip = (msg) => { console.log(`⏭  [a11y] ${msg}`); process.exit(0); };
+  // With --json the reason is JSON too, so a reader never mistakes a page that was not checked for a clean one.
+  const skip = (msg) => { console.log(JSON_MODE ? JSON.stringify({ notChecked: msg }) : `⏭  [a11y] ${msg}`); process.exit(0); };
 
   const plugins = cfg.paths?.plugins ?? [];
   const pluginSrc = cfg.paths?.pluginCSS ?? [];
@@ -941,8 +942,10 @@ async function main() {
   process.on('exit', cleanup);
   const killTimer = setTimeout(() => { console.error('❌ [a11y] timed out (120s)'); cleanup(); process.exit(STRICT ? 1 : 0); }, 120000); killTimer.unref();
 
-  browser = await launchChrome(CHROME, { tmpPrefix: 'a11y-check-' }).catch(() => null);
-  if (!browser) skip('Chrome failed to start');
+  // A cold Chrome on a busy machine can take longer than one start allows: try once more before giving up.
+  let launchError = null;
+  for (let i = 0; i < 2 && !browser; i++) browser = await launchChrome(CHROME, { tmpPrefix: 'a11y-check-' }).catch((e) => { launchError = e; return null; });
+  if (!browser) skip(`Chrome failed to start (${String(launchError?.message ?? launchError).split('\n')[0]})`);
 
   const { send, close: closeCDP } = await connectCDP(browser.wsUrl);
 
