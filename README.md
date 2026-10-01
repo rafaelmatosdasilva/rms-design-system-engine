@@ -1,11 +1,14 @@
 # rms-design-system-engine
 
-Keeps your code in step with your design system in Figma.
+The engine that maintains your design system.
 
-It compares what was built (by a developer or by an AI) with what you designed in Figma: the colours, sizes, fonts, spacing, components and their states. When something is different, it tells you what, where, and how to fix it, in plain words. It also checks accessibility.
+It keeps designers, developers and the AI tools they use aligned on one design system. From your code and your guidelines it creates the styleguide, the documentation and the contracts they all work from, and it checks every change against them.
+
+It keeps your code in parity with your design in Figma. It compares what was built (by a developer or by an AI) with what you designed: the colours, sizes, fonts, spacing, components and their states. When something is different, it tells you what, where, and how to fix it, in plain words. It also checks accessibility.
 
 ## Why use it
 
+- **One system for everyone.** Designers, developers and AI tools work from the same styleguide, documentation and contracts, made from your code, so the design system stays one system.
 - **Catch differences early.** See when the code and Figma stop matching, before your users do.
 - **Exact fixes, not vague notes.** Every difference comes with the file, the line and the right token to use.
 - **Safer AI building.** When an AI builds screens, every change it makes is checked against your real components and tokens, and for accessibility, and it is told how to fix what does not match.
@@ -17,8 +20,9 @@ It compares what was built (by a developer or by an AI) with what you designed i
 
 ```mermaid
 flowchart LR
-    F["🎨 Figma<br/>colours, sizes, fonts,<br/>components and states"] --> E{{"rms-design-system-engine<br/>compares the two"}}
+    F["🎨 Figma<br/>colours, sizes, fonts,<br/>components and states"] --> E{{"⚙️ rms-design-system-engine<br/>keeps design and code aligned"}}
     C["💻 Code<br/>what was built,<br/>by people or by AI"] --> E
+    E --> D["📚 Styleguide, docs and contracts<br/>that people and AI build from"]
     E --> R["📋 A short report<br/>what matches, what is different,<br/>where and how to fix it"]
     E --> A["♿ Accessibility<br/>contrast, labels, keyboard"]
     R --> Y["✅ You, or your AI,<br/>fix what you choose"]
