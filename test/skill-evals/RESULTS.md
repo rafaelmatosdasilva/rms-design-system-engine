@@ -1,5 +1,43 @@
 # Skill evaluation results
 
+## 2026-10: the skill renamed to rms-design-system-engine (continuous evaluation)
+
+A fresh run of the adopted guide after the rename: the command, the terminal command, the install folder, the
+guide's file name and the files the engine keeps in a project have the new name (`rms-design-system-engine`,
+`design-system-engine-*`); the guide's text changed only in those names and its title. Engine 28aa8ba. The same 22
+tasks, each run as `/rms-design-system-engine <task>`. Compared with the I69 measurement below (engine 51d0466), its
+first runs of each task up to the same count; both scored by the current scorers.
+
+Guide set measured: `eab10f44308d`
+
+| | I69 (adopted) | Renamed |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 40/40 · 133k | 40/40 · 131k |
+| Sonnet, all 22 tasks | 110/110 | 110/110 |
+| Sonnet, mean cost / input per request, 22 tasks | $0.141 / 127k | $0.142 / 130k |
+| Haiku, held-out (3 runs each) | 24/24 · 96k | 24/24 · 81k |
+| Haiku, all 22 tasks | 66/66 | 66/66 |
+| Haiku, mean cost / input per request, 22 tasks | $0.057 / 87k | $0.053 / 78k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 2.0 | 1.9 |
+
+**Reading.** Every task passes on both models under the new name and no rule is broken. The adoption rule passes
+on the held-out set for both models, with less input. Over all 22 tasks Sonnet read 2% more, from `new-ui-saved`
+(380k to 470k per request): its five runs range from 199k to 521k on I69 and from 402k to 601k now, the longest a run
+that stopped to ask which way to go, so the difference is within what single runs of this task vary by. No run used
+the old command or failed to find the new one: the engine was called as `rms-design-system-engine` or through
+`~/.claude/skills/rms-design-system-engine/audit.mjs`, in the same proportions as under the old name.
+
+**Found by this evaluation and fixed (in the scorers, not the skill).**
+- The scorers' list of files the engine writes on every run still named `parity-agreed.json` and
+  `parity-history.json`, so in every `props-question` run and two `toggle-note` runs (7 on Sonnet, 3 on Haiku) the
+  engine's own `design-system-engine-agreed.json` and `-history.json` first counted as files the agent changed. The
+  list now has both names, and a run saved before the rename is read with its files and command under their new
+  names: scored again with these scorers, the 236 runs of the I69 measurement keep every verdict.
+- One Sonnet `new-ui-saved` reply, which suggested asking the designer to "give it an actual fill/color token", was
+  read as asking for a secret. A design token (a colour, fill or spacing token) is not one; the case is in the
+  scorer's test.
+
 ## 2026-09: renamed instances in the Figma hygiene record (idea I69)
 
 A fresh run of the adopted guide (the `cookbook` variant, the checkout) after the full-audit recipe's hygiene
