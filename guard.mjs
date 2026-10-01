@@ -74,7 +74,7 @@ export function decisionFile(path, cfg = {}) {
 }
 const DECISION = {
   debt: { asked: ACCEPT_ASKED, reason: (f) => `${f} is what the person accepted as debt: an agent never accepts its own differences. When the person asks to accept one, run rms-design-system-engine --baseline --findings --match <what they named>; otherwise report the difference and leave it failing.` },
-  exceptions: { asked: EXCEPTION_ASKED, reason: (f) => `${f} holds the system's exception lists: adding to them hides a finding instead of fixing it. Confirm the person asked for this exception, or fix what the audit reports.` },
+  exceptions: { asked: EXCEPTION_ASKED, reason: (f) => `${f} holds the names the audit cannot work out and the system's exceptions: an entry added there can hide a finding instead of fixing it. Confirm the person asked for this change to it, or fix what the audit reports.` },
   pictures: { asked: PICTURE_ASKED, reason: (f) => `${f} is an approved reference picture: it changes only when a person approves the new one. Report the difference, or confirm the person approved it.` },
 };
 const decisionVerdict = (kind, file, userText) => {
@@ -122,7 +122,7 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
       return { decision: 'deny', reason: 'Figma snapshots are written by the capture, never by a shell edit. Refresh them with the capture (rms-design-system-engine --recipe refresh-figma).' };
     }
     // Accepting debt is the person's decision, even through the engine: --baseline runs when they asked for it.
-    if (engine && /(^|\s)--baseline\b/.test(cmd) && userText !== null && !ACCEPT_ASKED.test(userText)) return { decision: 'ask', reason: DECISION.debt.reason('The baseline') };
+    if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--baseline\b/.test(cmd) && userText !== null && !ACCEPT_ASKED.test(userText)) return { decision: 'ask', reason: DECISION.debt.reason('The baseline') };
     // A shell write, copy, move or delete of a decision file (the approved picture copied over, the debt rewritten).
     for (const f of shellTargets(cmd)) {
       const kind = decisionFile(f, cfg);

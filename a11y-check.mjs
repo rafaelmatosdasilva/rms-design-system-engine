@@ -693,7 +693,7 @@ export function openerExpression(i, phase) {
       w.__dseExpanded = el.getAttribute('aria-expanded') === 'true';
       w.__dseNav = (e) => { if (e.target && e.target.closest && e.target.closest('a[href]')) e.preventDefault(); };
       w.__dseSubmit = (e) => e.preventDefault();
-      w.addEventListener('click', w.__dseNav); document.addEventListener('submit', w.__dseSubmit, true);
+      w.addEventListener('click', w.__dseNav, true); document.addEventListener('submit', w.__dseSubmit, true);   // before the page's own handlers, which still run
       el.focus(); el.click();
       return true;
     }
@@ -711,7 +711,7 @@ export function openerExpression(i, phase) {
       return { closed, back: a === el || el.contains(a), at: a && a !== document.body ? desc(a) : '' };
     }
     if (phase === 'close') el.click();
-    if (phase === 'close' || phase === 'done') { w.removeEventListener('click', w.__dseNav); document.removeEventListener('submit', w.__dseSubmit, true); }
+    if (phase === 'close' || phase === 'done') { w.removeEventListener('click', w.__dseNav, true); document.removeEventListener('submit', w.__dseSubmit, true); }
     return true;
   })()`;
 }

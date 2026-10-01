@@ -136,6 +136,8 @@ test('the system\'s decisions stay the person\'s: accepted debt, exception lists
   assert.equal(j(bash(debt), 'aceita o raio do chip como dívida'), 'pass');
   assert.equal(j(bash('rms-design-system-engine --baseline'), 'lock in the improvement'), 'pass');
   assert.equal(j(bash(debt)), 'pass');                                                            // no transcript: as before
+  assert.equal(j(bash(`cd /p && ${debt}`), fix), 'ask');                                          // wherever it sits in the command
+  assert.equal(j(bash('node ~/.claude/skills/rms-design-system-engine/audit.mjs --baseline'), fix), 'ask');
   assert.equal(j(bash('rms-design-system-engine --no-baseline'), fix), 'pass');
   // What both sides last agreed on is the engine's record alone.
   assert.equal(j(edit('/p/design-system-engine-agreed.json'), accept), 'deny');

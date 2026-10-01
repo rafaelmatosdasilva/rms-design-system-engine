@@ -128,7 +128,7 @@ test('a size written by hand (I75): the token with that value, or the nearest; o
   assert.deepEqual(run(['.card { padding: 10px; }'], { sheet: true, isTheme: true }), []);
   assert.deepEqual(editFindings(['.card { padding: 10px; }'], '.card { padding: 10px; }', { ...ctx, sizes: themeSizes(':root { --radius-md: 6px; }') }, { sheet: true }), []);   // no spacing token, no spacing finding
   // In markup: a style attribute (a bare number is px there) and a style object; an option that is not a style is left alone.
-  assert.deepEqual(run(['<div style={{ padding: 12, lineHeight: 1.5 }}>', "const s = { borderRadius: '5px' };", '<Chart options={{ padding: 12 }} />'], {}), [
+  assert.deepEqual(run(['<div style={{ padding: 12, lineHeight: 1.5 }}>', "const s = { borderRadius: '5px' };", '<Chart options={{ padding: 12 }} />', '<Box sx={{ padding: 2 }}>'], {}), [
     'padding: 12 is written by hand; use var(--space-3)',
     'borderRadius: 5px is not a radius of the design system; the nearest is var(--radius-md) (6px)',
   ]);

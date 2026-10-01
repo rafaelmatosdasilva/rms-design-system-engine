@@ -44,6 +44,7 @@ test('a page has one main heading (I79); an app shell its scripts fill and a com
   assert.deepEqual(kinds(markupFindings(page('<h1 class="sr-only">Orders</h1><p>x</p>'))), []);
   assert.deepEqual(kinds(markupFindings(page('<div role="heading" aria-level="1">Orders</div>'))), []);
   assert.deepEqual(kinds(markupFindings(page('<div id="root"></div>\n<script type="module" src="/main.js"></script>'))), []);   // an app shell
+  assert.deepEqual(kinds(markupFindings(page('<nav>Home</nav>\n{% block content %}{% endblock %}'))), []);                        // a template: its content comes from elsewhere
   assert.deepEqual(kinds(markupFindings('<button>Save</button>')), []);                                                          // a component
   assert.equal(markupFindings(page('<p>x</p>'))[0].fix, 'add one <h1> that names the page (it can be visually hidden)');
 });
