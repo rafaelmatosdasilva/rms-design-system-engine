@@ -492,7 +492,13 @@ there, never a failure.
   `tab`, `link`…) that does nothing on Enter (and Space for buttons, checkboxes and switches). The click is
   caught before the element's own handler, so the check never navigates or submits.
 - **Arrow keys** — a radio group, tab list, menu or list box whose items do not move with the arrow keys.
-- **Dialogs and Escape** — an open dialog that does not close on Escape.
+- **Dialogs and Escape** — an open dialog that does not close on Escape. Each control that opens a dialog, a
+  menu or a list (`aria-haspopup`, or `aria-expanded` with `aria-controls`; up to 8 a page) is opened, Escape
+  is pressed, and what it opened must close and give the focus back to that control. A link does not navigate
+  and a form does not submit while it runs.
+- **One main heading** — an app page (a `--url` page or a route found on its own, not the styleguide or a
+  story) has one `h1`, which a screen reader jumps to. The code part flags a page file with text and no `h1`,
+  or several.
 - **Zoom to 200% (1.4.4)** — text that becomes cut off when the page is shown at twice its size.
 - **Focus ring thickness (2.4.13, AAA, advisory)** — a focus ring thinner than 2 CSS pixels. The browser's
   own ring is not counted.

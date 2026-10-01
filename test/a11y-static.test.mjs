@@ -36,6 +36,18 @@ test('links, image alts, hidden focusable elements, the page language and zoom',
   assert.deepEqual(kinds(markupFindings('<meta name="viewport" content="width=device-width, user-scalable=no">\n<meta name="viewport" content="width=device-width, maximum-scale=5">')), [[1, 'zoom']]);
 });
 
+test('a page has one main heading (I79); an app shell its scripts fill and a component are not pages', () => {
+  const page = (body) => `<!doctype html>\n<html lang="en">\n<body>\n${body}\n</body>\n</html>`;
+  assert.deepEqual(kinds(markupFindings(page('<main><button>Save</button></main>'))), [[2, 'heading']]);
+  assert.deepEqual(kinds(markupFindings(page('<h1>Orders</h1>\n<h1>Again</h1>'))), [[5, 'heading']]);
+  assert.match(markupFindings(page('<h1>Orders</h1>\n<h1>Again</h1>'))[0].desc, /2 main headings/);
+  assert.deepEqual(kinds(markupFindings(page('<h1 class="sr-only">Orders</h1><p>x</p>'))), []);
+  assert.deepEqual(kinds(markupFindings(page('<div role="heading" aria-level="1">Orders</div>'))), []);
+  assert.deepEqual(kinds(markupFindings(page('<div id="root"></div>\n<script type="module" src="/main.js"></script>'))), []);   // an app shell
+  assert.deepEqual(kinds(markupFindings('<button>Save</button>')), []);                                                          // a component
+  assert.equal(markupFindings(page('<p>x</p>'))[0].fix, 'add one <h1> that names the page (it can be visually hidden)');
+});
+
 test('an animation needs a reduced-motion alternative somewhere in the project', () => {
   const run = (files) => staticA11y(makeFixture(files)).findings.filter((f) => f.kind === 'motion').map((f) => `${f.file}:${f.line}`);
   assert.deepEqual(run({ 'a.css': '.x { animation: none; }\n.m {\n  animation: pop 0.2s both;\n}' }), ['a.css:3']);

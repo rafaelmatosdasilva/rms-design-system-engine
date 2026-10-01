@@ -13,6 +13,8 @@
 //   • a link with no accessible name, an image whose alt is a file name;
 //   • aria-hidden="true" on an element that takes focus (a keyboard reaches what a screen reader cannot see);
 //   • a page with no lang, a viewport that blocks zoom (user-scalable=no, maximum-scale=1);
+//   • a page with no main heading, or several (I79): a document with text in its body has one h1 (an app shell
+//     its scripts fill has no text, and is not read);
 //   • animations with no prefers-reduced-motion alternative anywhere in the project.
 // An element whose attributes are spread ({...props}, v-bind="$attrs") can receive them from outside: it is
 // never reported. A finding that does not say its fix in `desc` carries it in `fix`, for the check of each edit
@@ -101,6 +103,13 @@ export function markupFindings(text) {
   const root = /^\s*(?:<!doctype html[^>]*>\s*)?(<html\b([^>]*)>)/i.exec(src);
   if (root && !has(root[2], 'lang') && !spread(root[2]))
     out.push({ line: lineAt(src, root.index + root[0].indexOf(root[1])), kind: 'language', desc: 'a page with no lang: a screen reader cannot pick the voice (add lang="en", or the page\'s language)' });
+  if (root) {
+    const body = /<body\b[^>]*>([\s\S]*?)(?:<\/body>|$)/i.exec(src)?.[1] ?? '';
+    const text = body.replace(/<(script|style|noscript|template)\b[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[#\w]+;/g, ' ').trim();
+    const h1 = [...src.matchAll(/<h1\b|<[a-z][\w-]*\b(?=[^>]*\brole\s*=\s*["']heading["'])(?=[^>]*\baria-level\s*=\s*["']1["'])[^>]*>/gi)];
+    if (text && !h1.length) out.push({ line: lineAt(src, root.index + root[0].indexOf(root[1])), kind: 'heading', desc: 'a page with no main heading (h1): a screen reader cannot jump to what the page is about', fix: 'add one <h1> that names the page (it can be visually hidden)' });
+    if (h1.length > 1) out.push({ line: lineAt(src, h1[1].index), kind: 'heading', desc: `a page with ${h1.length} main headings (h1): one names the page`, fix: 'keep one <h1> and make the others <h2> or below' });
+  }
   for (const m of src.matchAll(/<meta\b[^>]*name\s*=\s*["']viewport["'][^>]*>/gi)) {
     const content = /content\s*=\s*["']([^"']*)["']/i.exec(m[0])?.[1] ?? '';
     if (/user-scalable\s*=\s*(no|0)\b|maximum-scale\s*=\s*1(\.0+)?\b(?!\.\d*[1-9])/i.test(content))

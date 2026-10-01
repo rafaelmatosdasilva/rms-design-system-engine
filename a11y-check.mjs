@@ -205,6 +205,16 @@ export const A11Y_GUIDE = {
     why: 'People who use the keyboard expect Escape to close a dialog; without it they can get stuck.',
     fix: 'Close the dialog on Escape and return the focus to what opened it.',
   },
+  focusreturn: {
+    title: (n) => `${plural(n, 'dialog or menu leaves', 'dialogs or menus leave')} the focus elsewhere when Escape closes it`,
+    why: 'After Escape closes it, the focus is not back on the control that opened it, so someone using the keyboard or a screen reader loses their place.',
+    fix: 'When it closes, move the focus back to the control that opened it.',
+  },
+  heading: {
+    title: (n) => `${plural(n, 'page has', 'pages have')} no main heading, or several`,
+    why: 'A screen reader jumps to the main heading (h1) to learn what a page is about; with none, or several, it cannot.',
+    fix: 'Give each page one <h1> that names it (it can be visually hidden); make the other headings <h2> or below.',
+  },
   motion: {
     title: (n) => `${plural(n, 'thing still moves', 'things still move')} when the person asked for less motion`,
     why: 'The system setting "reduce motion" is on, but these still animate. Movement can make some people dizzy or sick.',
@@ -665,6 +675,47 @@ export function roleContractExpression(selector, role, { pressed = false } = {})
 //              inline links in running text and disabled controls are exempt.
 //   clipped(): text boxes whose content overflows a hidden/clipped box (for the 1.4.12 comparison).
 //   moving():  elements that still transition or animate (for the prefers-reduced-motion pass).
+// One trigger of a dialog or menu (I78), in three phases: 'open' clicks it (a link does not navigate, a form does
+// not submit), 'opened' says what appeared, 'after' (once Escape is pressed) says whether it closed and where the
+// focus is. 'close' clicks it again when Escape left it open.
+export function openerExpression(i, phase) {
+  return `(() => {
+    const vis = (el) => { const s = getComputedStyle(el); if (s.display==='none'||s.visibility==='hidden'||+s.opacity===0) return false; const r = el.getBoundingClientRect(); return r.width>0 && r.height>0; };
+    const desc = (el) => (el.tagName.toLowerCase() + (el.id?('#'+el.id):'') + ((el.className && typeof el.className==='string') ? '.'+el.className.trim().split(/\\s+/).join('.') : '')).slice(0,80);
+    const POP = 'dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true],[role=menu],[role=listbox]';
+    const el = document.querySelector('[data-design-system-engine-opener="${i}"]');
+    const w = window, phase = ${JSON.stringify(phase)};
+    if (!el) return null;
+    const ctl = () => { const id = el.getAttribute('aria-controls'); return id ? document.getElementById(id.split(/\\s+/)[0]) : null; };
+    if (phase === 'open') {
+      w.__dseBefore = new Set([...document.querySelectorAll(POP)].filter(vis));
+      w.__dseCtlShown = !!(ctl() && vis(ctl()));
+      w.__dseExpanded = el.getAttribute('aria-expanded') === 'true';
+      w.__dseNav = (e) => { if (e.target && e.target.closest && e.target.closest('a[href]')) e.preventDefault(); };
+      w.__dseSubmit = (e) => e.preventDefault();
+      w.addEventListener('click', w.__dseNav); document.addEventListener('submit', w.__dseSubmit, true);
+      el.focus(); el.click();
+      return true;
+    }
+    if (phase === 'opened') {
+      const pop = [...document.querySelectorAll(POP)].filter(vis).find((p) => !w.__dseBefore.has(p) && !p.contains(el));
+      const c = ctl(), shown = c && !w.__dseCtlShown && vis(c) ? c : null;
+      w.__dseOpened = pop || shown || null;
+      if (!w.__dseOpened && !(el.getAttribute('aria-expanded') === 'true' && !w.__dseExpanded)) return null;
+      return w.__dseOpened ? (w.__dseOpened.getAttribute('role') || w.__dseOpened.tagName.toLowerCase()) + ' ' + desc(w.__dseOpened) : 'what it controls';
+    }
+    if (phase === 'after') {
+      const o = w.__dseOpened;
+      const closed = (!o || !o.isConnected || !vis(o) || (o.tagName === 'DIALOG' && !o.open)) && el.getAttribute('aria-expanded') !== 'true';
+      const a = document.activeElement;
+      return { closed, back: a === el || el.contains(a), at: a && a !== document.body ? desc(a) : '' };
+    }
+    if (phase === 'close') el.click();
+    if (phase === 'close' || phase === 'done') { w.removeEventListener('click', w.__dseNav); document.removeEventListener('submit', w.__dseSubmit, true); }
+    return true;
+  })()`;
+}
+
 export function deepSweepExpression(roots, what) {
   return `(() => {
     const roots = ${JSON.stringify(roots)};
@@ -745,6 +796,13 @@ export function deepSweepExpression(roots, what) {
     }
     if (what === 'reflow') return { scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth };
     if (what === 'dialogs') return [...document.querySelectorAll('dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true]')].filter(vis).map(desc);
+    if (what === 'openers') {
+      // Controls that open a dialog, a menu or a list (I78): each is marked so Node can open it and press Escape.
+      const SEL = '[aria-haspopup]:not([aria-haspopup=false]),[aria-expanded=false][aria-controls]';
+      return scope.filter(el => el.matches(SEL) && vis(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true').slice(0, 8)
+        .map((el, i) => { el.setAttribute('data-design-system-engine-opener', String(i)); return { i, desc: desc(el) }; });
+    }
+    if (what === 'headings') return [...document.querySelectorAll('h1,[role=heading][aria-level="1"]')].filter(el => !el.closest('[hidden],[aria-hidden=true]') && getComputedStyle(el).display !== 'none').map(desc);
     if (what === 'active') {
       // A unique identity (position among all elements) plus a readable label: two links that look
       // alike are still two different stops.
@@ -884,7 +942,8 @@ async function main() {
   }
   let targets;
   if (urlList.length) {
-    targets = urlList.map((u) => ({ label: u, url: u }));
+    // An app page, not a story or a component's own page, is held to one main heading (I79).
+    targets = urlList.map((u) => ({ label: u, url: u, page: !/iframe\.html|[?&]path=\/(story|docs)\/|\/story\//i.test(u) }));
   } else if (sg) {
     targets = [sg];
     console.log(`ℹ️  [a11y] target: the generated styleguide — every component × state on one page, no dev server (${sg.label})`);
@@ -907,9 +966,10 @@ async function main() {
       }
     }
     if (base) {
-      const found = (await discoverStorybook(base)) || discoverRoutes(ROOT, base) || [base];
+      const stories = await discoverStorybook(base);
+      const found = stories || discoverRoutes(ROOT, base) || [base];
       const capped = found.slice(0, 40);
-      targets = capped.map((u) => ({ label: u.startsWith(base) ? (u.slice(base.length) || '/') : u, url: u }));
+      targets = capped.map((u) => ({ label: u.startsWith(base) ? (u.slice(base.length) || '/') : u, url: u, page: !stories }));
       console.log(`ℹ️  [a11y] ${found.length === 1 ? 'checking the base page' : `${found.length} page(s) found — checking ${capped.length}`} via ${base}`);
     }
   }
@@ -1221,6 +1281,27 @@ async function main() {
         }
       }
     });
+    await step(async () => {
+      // A dialog or menu opened from its trigger closes on Escape and gives the focus back to the trigger (I78).
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      for (const t of (await evalv(deepSweepExpression(roots, 'openers'))) ?? []) {
+        if (!(await evalv(openerExpression(t.i, 'open')))) continue;
+        await wait(200);
+        const what = await evalv(openerExpression(t.i, 'opened'));
+        if (!what) { await evalv(openerExpression(t.i, 'done')); continue; }   // nothing opened that the page shows: not judged
+        await pressKey('Escape', 'Escape', 27);
+        await wait(200);
+        const after = await evalv(openerExpression(t.i, 'after'));
+        if (after && !after.closed) { findings.push({ kind: 'escape', plugin: label, desc: `${what} (opened by ${t.desc})` }); await evalv(openerExpression(t.i, 'close')); continue; }
+        await evalv(openerExpression(t.i, 'done'));
+        if (after && !after.back) findings.push({ kind: 'focusreturn', plugin: label, desc: `${t.desc}: the focus goes to ${after.at || 'the page'}` });
+      }
+    });
+    if (target.page && !roots) await step(async () => {
+      // An app page names what it is about with one main heading (I79); a component page or a story does not have to.
+      const h1 = (await evalv(deepSweepExpression(null, 'headings'))) ?? [];
+      if (h1.length !== 1) findings.push({ kind: 'heading', plugin: label, desc: h1.length ? `${label}: ${h1.length} main headings (${h1.slice(0, 3).join(', ')})` : `${label}: no main heading (h1)` });
+    });
 
     if (axeSource) { const v = await runAxe(send, sessionId, axeSource, roots); if (v) for (const row of v) axeViolations.push(row); }
     await send('Target.closeTarget', { targetId });
@@ -1244,7 +1325,7 @@ async function main() {
   const keyboard = findings.filter((f) => f.kind === 'keyboard');
   const themes   = [...new Set(modes.map((m) => m.name))];
 
-  const more = ['target', 'tabtrap', 'tabindex', 'escape', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation'].map((k) => [k, findings.filter((f) => f.kind === k)]);
+  const more = ['target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation'].map((k) => [k, findings.filter((f) => f.kind === k)]);
   const buckets = [['contrast', contrast], ['hovercontrast', hoverCon], ['name', names], ['focus', focus], ['focuscontrast', focusCon], ['ariastate', state], ['keyboard', keyboard], ...more].filter(([, l]) => l.length);
   const total = buckets.reduce((n, [, l]) => n + l.length, 0);
   const inThemes = themes.length > 1 ? ` (checked in ${themes.length} themes)` : '';

@@ -20,7 +20,7 @@ test('semantics: the contract names a role by element or aria, and Chrome role n
   assert.deepEqual(contractSemantics(dir), { Chip: 'button', Menu: 'menu', Pic: 'img' });
   assert.equal(sameRole('image', 'img'), true);
   assert.equal(sameRole('generic', 'button'), false);
-  for (const k of ['target', 'tabtrap', 'tabindex', 'escape', 'motion', 'forcedfocus', 'spacing', 'reflow', 'semantics']) assert.ok(A11Y_GUIDE[k]?.fix, k);
+  for (const k of ['target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'motion', 'forcedfocus', 'spacing', 'reflow', 'semantics']) assert.ok(A11Y_GUIDE[k]?.fix, k);
 });
 
 test('token contrast: see-through text is blended, disabled pairs and see-through backgrounds are left out', () => {
@@ -84,6 +84,34 @@ test('page: target size, a positive tabindex, Escape, reduced motion, forced col
   assert.ok(kinds('forcedfocus').some((s) => /button/.test(s)), out);           // a shadow-only focus ring
   assert.ok(kinds('spacing').some((s) => /box/.test(s)), out);
   assert.deepEqual(d.issues.filter((i) => i.issue === 'semantics').map((i) => [i.rendered, i.contract]), [['generic', 'button']], out);
+});
+
+test('page: Escape closes what a trigger opened and gives the focus back to it (I78); an app page has one main heading (I79)', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>[hidden] { display: none; } body { font: 14px sans-serif; }</style></head><body><main>
+    <button id="good" aria-haspopup="dialog" aria-controls="dlg-good">Details</button>
+    <div role="dialog" id="dlg-good" aria-label="Details" hidden><button id="good-close">Close</button></div>
+    <button id="menu-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">Sort</button>
+    <ul role="menu" id="menu" hidden><li role="menuitem" tabindex="-1">Newest</li></ul>
+    <button id="stuck" aria-haspopup="dialog">Filters</button>
+    <div role="dialog" id="dlg-stuck" aria-label="Filters" hidden><button>Apply</button></div>
+  </main><script>
+    const $ = (id) => document.getElementById(id);
+    $('good').onclick = () => { $('dlg-good').hidden = false; $('good-close').focus(); };
+    $('dlg-good').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('dlg-good').hidden = true; $('good').focus(); } });
+    $('menu-btn').onclick = () => { $('menu').hidden = false; $('menu-btn').setAttribute('aria-expanded', 'true'); $('menu').querySelector('li').focus(); };
+    $('menu').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('menu').hidden = true; $('menu-btn').setAttribute('aria-expanded', 'false'); document.activeElement.blur(); } });
+    $('stuck').onclick = () => { $('dlg-stuck').hidden = false; $('dlg-stuck').querySelector('button').focus(); };
+  </script></body></html>`;
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
+  assert.deepEqual(kinds('focusreturn'), ['button#menu-btn: the focus goes to the page'], out);
+  assert.deepEqual(kinds('escape'), ['dialog div#dlg-stuck (opened by button#stuck)'], out);
+  assert.deepEqual(kinds('heading'), [`${pathToFileURL(join(dir, 'page.html')).href}: no main heading (h1)`], out);
+  assert.match(d.issues.find((i) => i.issue === 'focusreturn').fix, /back to the control that opened it/);
 });
 
 test('tints: same-colour token pairs are not comparable; a see-through background is blended over its backdrop', async () => {
