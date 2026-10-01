@@ -1,5 +1,66 @@
 # Skill evaluation results
 
+## 2026-10: primitives, --only, the agent kept from making a check pass, each edit read for accessibility and sizes, the final check of the reply (continuous evaluation)
+
+What changed since the rename (engine 28aa8ba): a primitive written by hand (I42); `--only` runs the
+accessibility check, the Figma checks or some gates, and the router sends "only the accessibility of the button"
+there; the hooks ask before the agent accepts a difference, adds an exception or replaces an approved picture, and
+hand back a comment that switches a check off (I73); each UI edit is also read for accessibility (I74) and for
+sizes written by hand (I75); the browser check opens dialogs and menus from their trigger and checks that Escape
+gives the focus back (I78), and an app page has one main heading (I79); a Stop hook sends the agent back once when
+its last reply leaves out a line the route asked the person to hear (I81, first part). The guide changed in the
+hooks paragraph of the main file, `reference/usage.md`, `reference/config.md`, `reference/maintainers.md` and
+`cookbook/ci-and-hooks.md`. Engine 98e474b, the same 22 tasks on the same project, compared with the rename's
+measurement; both scored by the current scorers.
+
+Guide set measured: `281780c63cb3` · Project measured: `13d811a9d668`
+
+| | Rename (adopted) | This version |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 40/40 · 131k | 40/40 · 135k |
+| Sonnet, all 22 tasks | 110/110 | 110/110 |
+| Sonnet, mean cost / input per request, 22 tasks | $0.142 / 130k | $0.142 / 131k |
+| Haiku, held-out (3 runs each) | 24/24 · 81k | 24/24 · 89k |
+| Haiku, all 22 tasks | 66/66 | 66/66 |
+| Haiku, mean cost / input per request, 22 tasks | $0.053 / 78k | $0.054 / 81k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Sonnet / Haiku) | 2.67 / 1.86 | 2.70 / 1.91 |
+
+Every task that read more, on both models, was run to 13 runs on both versions (mean input per request):
+
+| Task (13 runs each) | Rename | This version |
+|---|---|---|
+| Haiku `refresh-no-figma` (held-out) | 13/13 · 76k | 13/13 · 62k |
+| Haiku `pasted-steps` (held-out) | 13/13 · 110k | 13/13 · 62k |
+| Haiku `forbidden-green` (held-out) | 12/13 · 72k | 13/13 · 100k |
+| Haiku `private-badge-pt` (held-out) | 13/13 · 87k | 13/13 · 90k |
+| Haiku `audit-all`, `first-setup` | 13/13, 13/13 · 51k, 96k | 13/13, 13/13 · 57k, 97k |
+| Sonnet `pasted-steps` (held-out) | 13/13 · 122k | 13/13 · 154k |
+| Sonnet `forbidden-green` (held-out) | 13/13 · 102k | 13/13 · 102k |
+| Sonnet `private-statusbar` (held-out) | 13/13 · 98k | 13/13 · 117k |
+| Sonnet `toggle-note` | 10/13 · 65k | 13/13 · 91k |
+| Sonnet `visual-howto`, `disabled-hover` | 13/13, 13/13 · 31k, 111k | 13/13, 13/13 · 36k, 125k |
+
+**Reading.** Every task passes on both models, no rule is broken, and over the repeats no task passes less often
+(`toggle-note` on Sonnet and `forbidden-green` on Haiku pass more often). On the held-out set over all runs Haiku
+reads 4% less; Sonnet reads 2% more, all of it from `pasted-steps`. That task moves with the hour: the rename,
+unchanged, read 122k on 13 runs in the morning and 140k on 13 more in the evening, against 143k and 144k for this
+version in the evening (with its own guide, and with the rename's main file in place of its own). What remains is
+that on this engine Sonnet sometimes loads the skill again at its first step of that task (4 to 8 runs in 13,
+none on the rename); nothing it reads before that step differs. Adopted by the owner on these numbers, the 2% on
+Sonnet's held-out input noted.
+
+**Found by this evaluation and fixed.**
+- A first measurement (engine dd847e2) ran on another project: the I42 commit had added its example to the demo
+  every run works on, next to the page the UI tasks edit. The demo is back to the rename's project, the example is
+  laid over it only by the tests that need it, and every run and this file record the project's hash.
+- The guard read the person's message wrong in the most common session. A request made as
+  `/rms-design-system-engine <words>` reaches the transcript followed by the whole guide Claude Code expands it into,
+  and the guard took the guide for the message: it holds every word the rules listen for, so a code edit and
+  `--baseline` passed without asking. It now reads the command's words and skips what Claude Code adds.
+- In the second measurement (engine 1e906e5) two Haiku `refresh-no-figma` runs out of 13 never said the snapshots
+  were not refreshed. The Stop hook now checks the last reply says it, and sends the agent back once with the line.
+
 ## 2026-10: the skill renamed to rms-design-system-engine (continuous evaluation)
 
 A fresh run of the adopted guide after the rename: the command, the terminal command, the install folder, the
@@ -8,7 +69,7 @@ guide's file name and the files the engine keeps in a project have the new name 
 tasks, each run as `/rms-design-system-engine <task>`. Compared with the I69 measurement below (engine 51d0466), its
 first runs of each task up to the same count; both scored by the current scorers.
 
-Guide set measured: `eab10f44308d`
+Guide set measured: `eab10f44308d` · Project measured: `13d811a9d668` (recorded later, when the project's hash was added)
 
 | | I69 (adopted) | Renamed |
 |---|---|---|

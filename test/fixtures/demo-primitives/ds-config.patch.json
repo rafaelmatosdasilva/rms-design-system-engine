@@ -1,0 +1,15 @@
+{
+  "primitives": [
+    {
+      "component": "Stack",
+      "props": {
+        "gap": "s"
+      },
+      "when": {
+        "display": "flex",
+        "gap": "var(--gap-s)"
+      }
+    }
+  ],
+  "_primitivesNote": "Stack is a fictional layout primitive: apps/gallery/Promo.jsx builds it by hand with a flex div, which only the primitives table names. Laid over the demo design system by the tests that need it, so the project the skill evaluation runs on stays the same."
+}

@@ -62,6 +62,9 @@ const RULES = [
   // New UI to build ("add a Saved confirmation next to the Save button"): the names come from the system, never from
   // memory, and a value the system does not have is said, not invented (I62). Not a note, not Figma, not debt.
   ['ask-the-system', (t) => /\b(add|create|build|make|put|insert|show|acrescent\w*|adicion\w*|cria\w*|constr[oó]i\w*|p[oõ]e|coloca\w*|mostra\w*)\b/i.test(t) && /\b(confirmation|message|badge|banner|toast|button|link|label|page|screen|section|row|card|list|menu|modal|dialog|form|field|header|footer|empty state|tooltip|confirma[çc][ãa]o|mensagem|p[aá]gina|ecr[ãa]|sec[çc][ãa]o|linha|bot[ãa]o|cart[ãa]o|lista|formul[aá]rio|campo|estado vazio)s?\b/i.test(t) && !/figma|\bnotes?\b|\bnotas?\b|baseline|debt|d[ií]vida|config/i.test(t) && !QUESTION.test(t), 'build-ui'],
+  // Only a part of the run: the accessibility check, the Figma checks, or some gates (--only). Before the notes
+  // recipe: "check the accessibility of the button" asks for the check, "how do I note its role" for the recipe.
+  ['audit-component', (t) => onlyPart(t) != null, 'only'],
   ['a11y-notes', (t) => /\bnotes?\b|\bnotas?\b|annotat|anota|toggle|\brole\b|\baria\b|accessib|acessib|alt text|screen reader|leitor de ecr/i.test(t)],
   ['visual-diff', (t) => /\bimages?\b|imagem|imagens|visual|screenshot|pixel/i.test(t)],
   ['burndown', (t) => /fix first|first to fix|what first|primeiro|prioridad|priorit|work .{0,20}down|next up/i.test(t)],
@@ -117,6 +120,11 @@ function routeOnly(text, { hasConfig, components, cmd }) {
       notes.push('Do not raise maxSnapshotAgeDays or edit ds-config.json to go green: that hides drift. Say so, and run the audit to show what really fails.');
       return { recipe, question: false, run: [cmd], notes, kind };
     }
+    if (kind === 'only') {
+      const part = onlyPart(t);
+      notes.push(`Only ${part === 'accessibility' ? 'the accessibility check' : part === 'parity' ? 'the checks against Figma' : 'the gates asked for'} runs: report that part, and say the rest was not checked in this run.`);
+      return { recipe: named.length ? 'audit-component' : 'full-audit', question: false, run: [`${scoped} --only ${/\s/.test(part) ? `'${part}'` : part}`], notes };
+    }
     if (recipe === 'accept-debt') {
       // The difference the person named (the radius, not the rest): only the findings that name it are accepted.
       const match = debtWords(t);
@@ -151,6 +159,40 @@ function setupRun(t, cmd, notes) {
   const css = t.match(/[\w./-]+\.css\b/)?.[0];
   if (!figma) notes.push('Ask the person for the Figma file URL (and the token CSS file if the setup cannot find it), then run the command with it.');
   return [`${cmd} --init --figma-url='${figma ?? '<Figma file URL>'}'${css ? ` --theme-css='${css}'` : ''}`];
+}
+
+// A request for only part of the run → the --only value, or null. Accessibility asked for alone (or with "only"),
+// the parity without accessibility, or some gates named with "only" (by name or number).
+// Whole words, accents included (\b does not see "só" or "ícones" as words).
+const word = (src) => new RegExp(`(?<![\\p{L}\\p{N}_])(?:${src})(?![\\p{L}\\p{N}_])`, 'iu');
+const ONLY_WORD = word('only|just|solely|só|apenas|somente|unicamente');   // "só" with its accent: "so" is English
+const A11Y_WORD = /\b(accessib\w*|acessib\w*|a11y)\b/i;
+const NOTES_WORD = /\bnotes?\b|\bnotas?\b|annotat|anota|toggle|\brole\b|\baria\b|alt text|screen reader|leitor de ecr/i;
+const HOW_TO = /^\s*(how|why|what does|what is|what's|como|porqu[eê]|porque|o que (é|e|significa))\b/i;
+const NO_A11Y = word('(?:no|without|sem|except|exceto|menos)\\s+(?:the\\s+|a\\s+)?(?:accessib\\w*|acessib\\w*|a11y)');
+const BOTH = word('parity|paridade|figma|tokens?|everything|tudo|whole|todo o|all gates|includ\\w*|inclu[ií]\\w*|as well|tamb[eé]m|also|too');
+const GATE_WORDS = [
+  [word('token values?|valores? d[oe]s? tokens?'), 'token values'],
+  [word('states?|estados?'), 'states'],
+  [word('props?|propriedades?'), 'props'],
+  [word('structure|estrutura'), 'structure'],
+  [word('icons?|[ií]cones?'), 'icons'],
+  [word('markup'), 'markup'],
+  [word('shadows?|sombras?'), 'shadows'],
+  [word('motion|movimento'), 'motion'],
+  [word('transitions?|transi[çc][õo]es?'), 'transitions'],
+  [word('(?:dark|light) modes?|modes?|modos?'), 'mode'],
+];
+export function onlyPart(text) {
+  const t = String(text ?? '');
+  if (NOTES_WORD.test(t) || HOW_TO.test(t)) return null;   // a note to write, or how something works: the recipe, not a run
+  if (NO_A11Y.test(t)) return 'parity';
+  if (ONLY_WORD.test(t) && /\b(parity|paridade)\b/i.test(t) && !A11Y_WORD.test(t)) return 'parity';
+  if (A11Y_WORD.test(t) && !NOTES_WORD.test(t) && !HOW_TO.test(t) && (ONLY_WORD.test(t) || !BOTH.test(t))) return 'accessibility';
+  if (!ONLY_WORD.test(t)) return null;
+  const nums = [...t.matchAll(/\bgates?\s*#?\s*(\d{1,2})\b/gi)].map((m) => m[1]);
+  const named = GATE_WORDS.filter(([re]) => re.test(t)).map(([, w]) => w);
+  return nums.length || named.length ? [...new Set([...nums, ...named])].join(',') : null;
 }
 
 // Words a person uses for a kind of difference → what the audit's lines say for it. Only these, so the engine,
