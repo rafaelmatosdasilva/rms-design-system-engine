@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { judge, asksForChange, lastUserText, routePrompt, MAX_RECIPE } from '../guard.mjs';
 import { installHooks, hooksStatus, upgradeHooks } from '../hooks-install.mjs';
 import { makeFixture } from './helpers.mjs';
+import { PROJECT } from '../names.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const cfg = { paths: { snapshotVars: 'src/tokens-snap.json', themeCSS: 'src/theme.css' } };
@@ -114,6 +115,50 @@ test('the person\'s latest message decides a code edit and the hand-back apply (
   // The never-rules do not bend to a message.
   assert.equal(judge({ tool_name: 'Edit', tool_input: { file_path: '/p/src/figma-vars.snapshot.json' } }, { userText: 'fix the snapshot by hand' }).decision, 'deny');
   assert.equal(judge({ tool_name: 'Bash', tool_input: { command: 'git push' } }, { userText: 'fix it' }).decision, 'ask');
+});
+
+test('the system\'s decisions stay the person\'s: accepted debt, exception lists, approved pictures, the agreed record (I73)', () => {
+  const j = (e, userText = null, c = cfg) => judge(e, { cfg: c, userText })?.decision ?? 'pass';
+  const fix = 'fix the chip height in the code', accept = 'accept the radius of the chip as known debt';
+  // Accepted debt: a hand edit, a rewrite or a delete asks unless the person asked to accept, and asks with no transcript.
+  assert.equal(j(edit('/p/design-system-engine-baseline.json'), fix), 'ask');
+  assert.equal(j(edit('/p/design-system-engine-baseline.json'), accept), 'pass');
+  assert.equal(j(edit(`/p/${PROJECT.baseline.old}`, 'Write'), fix), 'ask');                    // the old name
+  assert.equal(j(edit('/p/design-system-engine-baseline.json')), 'ask');
+  assert.equal(j(bash('rm design-system-engine-baseline.json'), fix), 'ask');
+  assert.equal(j(bash("sed -i 's/radius//' design-system-engine-baseline.json"), fix), 'ask');
+  assert.equal(j(bash('git rm design-system-engine-baseline.json'), fix), 'ask');
+  assert.equal(j(bash('sed -n 1,5p design-system-engine-baseline.json'), fix), 'pass');   // reading is not writing
+  // The engine's --baseline accepts too: it runs when the person asked for it.
+  const debt = 'rms-design-system-engine --component chip --baseline --findings --match radi';
+  assert.equal(j(bash(debt), fix), 'ask');
+  assert.equal(j(bash(debt), accept), 'pass');
+  assert.equal(j(bash(debt), 'aceita o raio do chip como dívida'), 'pass');
+  assert.equal(j(bash('rms-design-system-engine --baseline'), 'lock in the improvement'), 'pass');
+  assert.equal(j(bash(debt)), 'pass');                                                            // no transcript: as before
+  assert.equal(j(bash('rms-design-system-engine --no-baseline'), fix), 'pass');
+  // What both sides last agreed on is the engine's record alone.
+  assert.equal(j(edit('/p/design-system-engine-agreed.json'), accept), 'deny');
+  assert.equal(j(bash(`echo {} > ${PROJECT.agreed.old}`), accept), 'deny');
+  // The exception lists.
+  assert.equal(j(edit('/p/design-system-engine-map.mjs'), fix), 'ask');
+  assert.equal(j(edit('/p/design-system-engine-map.mjs'), 'add the chip icon to the exceptions'), 'pass');
+  // The approved pictures, under the default folder or the configured one, the folder itself included: replaced or
+  // deleted only when asked. A picture saved where there was none is not an approved one yet.
+  const p = makeFixture({ '.design-system-engine-refs/components/chip.png': 'png', '.design-system-engine-refs/abc.png': 'png', '.design-system-engine-refs/abc.new.png': 'png', 'shots/components/chip.png': 'png' });
+  const inP = (e) => ({ ...e, cwd: p });
+  assert.equal(j(inP(edit(join(p, '.design-system-engine-refs/components/chip.png'), 'Write')), fix), 'ask');
+  assert.equal(j(inP(edit(join(p, '.design-system-engine-refs/components/badge.png'), 'Write')), fix), 'pass');
+  const accepted = inP(bash('mv .design-system-engine-refs/abc.new.png .design-system-engine-refs/abc.png'));
+  assert.equal(j(accepted, fix), 'ask');
+  assert.equal(j(accepted, 'approve the new screenshot of the chip'), 'pass');
+  assert.equal(j(inP(bash('cp /tmp/chip.png shots/components/chip.png')), fix, { ...cfg, visualRefs: 'shots' }), 'ask');
+  assert.equal(j(inP(bash('cp /tmp/badge.png .design-system-engine-refs/components/badge.png')), fix), 'pass');
+  assert.equal(j(inP(bash('rm -rf .design-system-engine-refs')), fix), 'ask');
+  // Reading them, and everything else, as before.
+  assert.equal(j(bash('cat design-system-engine-baseline.json && ls .design-system-engine-refs'), fix), 'pass');
+  assert.equal(j(edit('/p/src/theme.css'), fix), 'pass');
+  assert.equal(j(edit('/p/design-system-engine-baseline.json'), fix, { ...cfg, hooks: false }), 'pass');   // opt-out
 });
 
 test('lastUserText reads the latest message the person typed, not a tool result', () => {
