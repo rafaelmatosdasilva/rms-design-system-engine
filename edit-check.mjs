@@ -153,6 +153,11 @@ export function editTruth(ROOT, cfg = {}) {
     if (!list.includes(m[1])) list.push(m[1]);
     tokenByValue.set(k, list);
   }
+  // The colours a Figma component paints with no variable bound: Figma's own value, written as it is (the build sheet
+  // says so, and the audit's literal check accepts it), so not an invented colour.
+  const figmaRaw = new Set();
+  const walkRaw = (o) => { if (typeof o === 'string') { if (/^#[0-9a-f]{3,8}$/i.test(o)) figmaRaw.add(normHex(o)); } else if (o && typeof o === 'object') Object.values(o).forEach(walkRaw); };
+  walkRaw(json(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').components ?? {});
   const contracts = cfg.contracts?.out ?? 'contracts';
   const catalog = json(join(contracts, 'catalog.json'));
   const api = json(codeSnapshotPath(cfg)).api ?? {};
@@ -164,12 +169,12 @@ export function editTruth(ROOT, cfg = {}) {
   // The static accessibility rules (I74), with the project's styles read only when an edit removes an outline.
   let styles = null;
   const a11y = cfg.a11yStatic === false ? null : { styles: () => (styles ??= projectStyleText(ROOT)) };
-  return { truth, tokenByValue, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  return { truth, tokenByValue, figmaRaw, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -202,6 +207,7 @@ export function editFindings(added, fullText, { truth, tokenByValue, tailwind = 
       if (!sheet && !STYLE_PROP.test(scan.slice(0, m.index))) continue;
       if (/\.(fill|stroke|shadow)(Style|Color)\s*=\s*[^;]*$/.test(scan.slice(0, m.index))) continue;   // a canvas being painted, not the page
       const tokens = tokenByValue.get(normHex(m[0])) ?? [];
+      if (!tokens.length && figmaRaw.has(normHex(m[0]))) continue;   // Figma paints it raw: reported, not invented
       push(line, tokens.length
         ? `${m[0]} is written by hand; use var(${tokens[0]})${tokens.length > 1 ? ` (or ${tokens.slice(1, 3).map((t) => `var(${t})`).join(', ')})` : ''}`
         : `${m[0]} is not a design-system colour; use one of its colour tokens`);
