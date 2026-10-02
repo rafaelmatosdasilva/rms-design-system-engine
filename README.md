@@ -18,10 +18,12 @@ It keeps your code in parity with your design in Figma. It compares what was bui
 
 ## How it works
 
-A short view of the flow. A more detailed flow can be seen on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/Figma-to-Code-Parity---Flow?node-id=0-1) (Ctrl or Cmd click to open it in a new tab).
+A short view of the flow. A more detailed flow can be seen on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1) (Ctrl or Cmd click to open it in a new tab).
 
 ```mermaid
+%%{init: {"themeCSS": "[id*=L_P1_P3], [id*=L-P1-P3] { marker-end: none !important; }"}}%%
 flowchart LR
+    WHEN["<b>WHEN IT RUNS</b>"]
     subgraph P1["PHASE 1 - CAPTURE"]
         direction TB
         FIG["<b>FIGMA</b>"] --> CAP["<b>CAPTURE</b>"] --> SNAP["<b>SNAPSHOT</b>"]
@@ -29,7 +31,8 @@ flowchart LR
     subgraph P2["PHASE 2 - COMPARE"]
         direction TB
         CODE["<b>CODE</b>"] --> ENG["<b>PARITY ENGINE</b>"]
-        RULES["<b>MATCHING RULES</b>"] --- ENG
+        ENG -.-> CODE
+        RULES["<b>MATCHING RULES</b>"] --> ENG
     end
     subgraph P3["PHASE 3 - OUTPUTS"]
         direction TB
@@ -38,10 +41,20 @@ flowchart LR
         INT["<b>INTENT</b>"]
         SG["<b>STYLE GUIDE</b>"]
     end
+    A11Y["<b>ACCESSIBILITY</b>"]
+    HOOKS["<b>SKILL AND GUARD HOOKS</b>"]
+    AI["<b>AI CODING AGENT</b>"]
+    HUM["<b>HUMANS</b>"]
+    EV["<b>EVALS</b>"]
+    WHEN --> P2
     P1 --> P2 --> P3
-    P3 --> AI["<b>AI CODING AGENT</b>"]
-    P3 --> HUM["<b>HUMANS</b>"]
-    AI -.-> EV["<b>EVALS</b>"]
+    P1 <-.-> P3
+    P2 --> A11Y
+    P3 --> A11Y
+    P3 --> AI
+    P3 --> HUM
+    HOOKS --> AI
+    AI -.-> EV
 ```
 
 ## Get started
