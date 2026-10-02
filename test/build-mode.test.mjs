@@ -135,3 +135,11 @@ test('--query prints the build sheet for a component still to build', () => {
   assert.match(r.stdout, /State=Error → \.field\.field--error \{ border-color: var\(--field-border-error\) \}/);
   assert.match(r.stdout, /NEXT: build field as written above/);
 });
+
+test('the Figma-only Tidepool project: the first run passes and lists the tokens, then the components, to build', { timeout: 300000 }, () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-');
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0, r.stdout.split('\n').filter((l) => /❌/.test(l)).join('\n'));
+  assert.match(r.stdout, /TO BUILD {2}17 tokens .*; 3 components: button, chip, field\./);
+  assert.match(r.stdout, /NEXT: build the tokens: copy the declarations in .* into src\/styles\/tokens\.css/);
+});

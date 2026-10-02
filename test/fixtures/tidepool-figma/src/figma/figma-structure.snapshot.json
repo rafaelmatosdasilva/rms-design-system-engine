@@ -1,0 +1,157 @@
+{
+  "_updated": "2026-01-01T00:00:00.000Z",
+  "_note": "Tidepool, a fictional design system, as captured from its Figma file (b0LpOCBsaRgo8lUqbkQNaY) for the build evaluation. Every name is invented.",
+  "components": {
+    "button": {
+      "h": 32,
+      "paddingVar": {
+        "tb": "padding/xs",
+        "lr": "padding/m"
+      },
+      "gapVar": "gap/s",
+      "innerRadiusVar": "radii/button",
+      "fontSizeVar": "m",
+      "fontWeightVar": "m",
+      "strokeOnDefault": false,
+      "colors": {
+        "fill": {
+          "token": "button/background/color"
+        },
+        "text": {
+          "token": "button/text/color"
+        }
+      },
+      "defaultVariant": "State=Default, Disabled=False",
+      "variantOpacity": {
+        "Disabled=True": 0.5
+      },
+      "variants": {
+        "State=Default, Disabled=False": {
+          "h": 32
+        },
+        "State=Hover, Disabled=False": {
+          "h": 32,
+          "colors": {
+            "fill": {
+              "token": "button/background/hover/color"
+            }
+          }
+        },
+        "State=Default, Disabled=True": {
+          "h": 32
+        }
+      },
+      "nodeId": "3:8"
+    },
+    "chip": {
+      "h": 24,
+      "paddingVar": {
+        "tb": "padding/xs",
+        "lr": "padding/s"
+      },
+      "gapVar": "gap/s",
+      "innerRadiusVar": "radii/chip",
+      "fontSizeVar": "s",
+      "fontWeightVar": "s",
+      "strokeOnDefault": false,
+      "colors": {
+        "fill": {
+          "token": "chip/background/color"
+        },
+        "text": {
+          "token": "chip/text/color"
+        }
+      },
+      "defaultVariant": "Size=M, Icon=False",
+      "variants": {
+        "Size=M, Icon=False": {
+          "h": 24,
+          "layers": [
+            "Label"
+          ]
+        },
+        "Size=L, Icon=False": {
+          "h": 32,
+          "layers": [
+            "Label"
+          ]
+        },
+        "Size=L, Icon=True": {
+          "h": 32,
+          "layers": [
+            "Icon",
+            "Label"
+          ]
+        }
+      },
+      "nodeId": "3:16"
+    },
+    "field": {
+      "h": 36,
+      "paddingVar": {
+        "tb": "padding/s",
+        "lr": "padding/s"
+      },
+      "innerRadiusVar": "radii/field",
+      "fontSizeVar": "m",
+      "strokeOnDefault": true,
+      "colors": {
+        "stroke": {
+          "token": "field/border/color"
+        }
+      },
+      "defaultVariant": "State=Default",
+      "variants": {
+        "State=Default": {
+          "h": 36
+        },
+        "State=Error": {
+          "h": 36,
+          "colors": {
+            "stroke": {
+              "token": "field/border/error/color"
+            }
+          }
+        }
+      },
+      "nodeId": "3:21"
+    },
+    "tag": {
+      "h": 20,
+      "paddingVar": {
+        "tb": "padding/xs",
+        "lr": "padding/s"
+      },
+      "innerRadiusVar": "radii/chip",
+      "fontSizeVar": "s",
+      "fontWeightVar": "s",
+      "strokeOnDefault": false,
+      "colors": {
+        "fill": {
+          "token": "chip/background/color"
+        },
+        "text": {
+          "token": "chip/text/color"
+        }
+      },
+      "defaultVariant": "Tone=Neutral",
+      "variants": {
+        "Tone=Neutral": {
+          "h": 20
+        },
+        "Tone=Positive": {
+          "h": 20,
+          "colors": {
+            "fill": {
+              "hex": "#d6f5e3"
+            },
+            "text": {
+              "hex": "#136c3a"
+            }
+          }
+        }
+      },
+      "nodeId": "3:26"
+    }
+  }
+}
