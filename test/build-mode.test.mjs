@@ -183,3 +183,13 @@ test('the build sheet asks for a variant selector only when the variant changes 
   assert.match(r.stdout, /tag {2}\(\.tag\) {2}\[experimental\][\s\S]*to build\. Write it like this/);
   assert.match(r.stdout, /background-color #d6f5e3, color #136c3a: Figma binds no variable here\. Write the value as it is and tell the user it has no variable; never invent one/);
 });
+
+test('the edit check accepts a colour Figma paints with no variable, and still flags one Figma does not have', async () => {
+  const { editTruth, editFindings } = await import('../edit-check.mjs');
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-edit-');
+  const t = editTruth(dir, cfgOf(dir));
+  const css = '.tag.tag--positive { background-color: #d6f5e3; color: #136c3a; }\n.tag.tag--other { color: #123456; }';
+  const found = editFindings(css.split('\n'), css, t, { sheet: true }).map((f) => f.text);
+  assert.equal(found.filter((f) => /d6f5e3|136c3a/i.test(f)).length, 0, found.join('\n'));
+  assert.ok(found.some((f) => /#123456 is not a design-system colour/.test(f)), found.join('\n'));
+});

@@ -52,8 +52,8 @@ async function componentChecks(ctx, file, exportName, label, cases, a11y) {
   let r;
   try { r = await renderCases(ctx.dir, join(ctx.dir, file), exportName, cases, { label }); } catch (e) { return [check('it renders', false, e.message)]; }
   if (r.error) return [check('it renders', false, String(r.error))];
-  const out = [check('it renders', Object.values(r).every(Boolean))];
-  for (const c of cases) {
+  const out = [check('it renders', cases.filter((c) => !c.probe).every((c) => r[c.id]))];
+  for (const c of cases.filter((x) => !x.probe)) {
     const bad = r[c.id] ? compare(r[c.id], c.expect) : ['it did not render'];
     out.push(check(`${c.id} matches Figma`, !bad.length, bad.join(', ')));
   }
@@ -102,9 +102,12 @@ export const BUILD = [
       { id: 'size M', props: propsOf({ Label: 'Filter' }), expect: { height: 24, paddingTop: 4, paddingLeft: 8, radius: 16, bg: L['chip/background'], color: L['chip/text'], ...font(12, 16) } },
       { id: 'size L', props: propsOf({ Label: 'Filter', Size: 'L' }), expect: { height: 32 } },
       { id: 'size L with icon', props: propsOf({ Label: 'Filter', Size: 'L', Icon: 'True' }), expect: { height: 32, gap: 4 } },
+      // Figma's Icon is a variant whose values are the text "True" and "False": a component that keeps Figma's values
+      // as they are is rendered with them too.
+      { id: 'size L with icon, Figma values', probe: true, props: { Label: 'Filter', label: 'Filter', Size: 'L', size: 'L', Icon: 'True', icon: 'True' } },
       { id: 'dark', props: propsOf({ Label: 'Filter' }), dark: true, expectDark: (m) => sameColor(m, 'bg', D['chip/background']), expect: { bg: D['chip/background'], color: D['chip/text'] } },
     ], (r) => [
-      check('the icon variant shows an icon, the plain one does not', !!r['size L with icon'] && !!r['size L'] && (r['size L with icon'].hasIcon && !r['size L'].hasIcon || r['size L with icon'].nodes > r['size L'].nodes), `icon ${r['size L with icon']?.nodes} nodes, plain ${r['size L']?.nodes}`),
+      check('the icon variant shows an icon, the plain one does not', !!r['size L'] && ['size L with icon', 'size L with icon, Figma values'].some((k) => r[k] && (r[k].hasIcon && !r['size L'].hasIcon || r[k].nodes > r['size L'].nodes)), `icon ${r['size L with icon']?.nodes} (Figma values ${r['size L with icon, Figma values']?.nodes}) nodes, plain ${r['size L']?.nodes}`),
       check('it is a toggle button (Figma role: togglebutton): a button with aria-pressed', r['size M'] && (r['size M'].tag === 'button' || r['size M'].role === 'button') && r['size M'].ariaPressed != null, `${r['size M']?.tag} aria-pressed=${r['size M']?.ariaPressed}`),
     ]),
   },
