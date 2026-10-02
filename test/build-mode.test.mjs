@@ -2,7 +2,7 @@
 // order (tokens first, then each component after the ones it nests), never as a failure; once built it is compared.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -153,4 +153,33 @@ test('the build sheet says what markup a role asks for', async () => {
   const dir = figmaOnly();
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(r.stdout, /role: togglebutton, so write it as a <button type="button"> with aria-pressed/);
+});
+
+test('a component built into its own stylesheet is found, recorded as a theme file and checked', { timeout: 300000 }, () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-own-');
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  const run = () => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  let r = run();
+  assert.match(r.stdout, /Build mode: src\/components\/tag\.css holds a component's rules/);
+  assert.deepEqual(cfgOf(dir).paths.themeCSS, ['src/styles/tokens.css', 'src/components/tag.css']);
+  assert.equal(r.status, 0, r.stdout.split('\n').filter((l) => /❌/.test(l)).join('\n'));
+  // The raw colours Figma paints the Positive tone with are Figma's values, not foreign literals.
+  assert.doesNotMatch(r.stdout, /literal\(s\) with no matching Figma value/);
+  // Now that it is read, a wrong height fails.
+  writeFileSync(join(dir, 'src/components/tag.css'), readFileSync(join(dir, 'src/components/tag.css'), 'utf8').replace('height: 20px', 'height: 24px'));
+  r = run();
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /tag: CSS height is 24px - contract expects 20px/);
+});
+
+test('the build sheet asks for a variant selector only when the variant changes a style, and names raw colours', () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sheet-');
+  execFileSync('git', ['init', '-q'], { cwd: dir });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'chip', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.match(r.stdout, /Size=L → \.chip\.chip--l/);
+  assert.doesNotMatch(r.stdout, /chip--icon/, 'Icon=True only adds a layer, so it needs no CSS');
+  // tag is experimental: off the build list, but it gets its sheet when asked for.
+  assert.match(r.stdout, /tag {2}\(\.tag\) {2}\[experimental\][\s\S]*to build\. Write it like this/);
+  assert.match(r.stdout, /background-color #d6f5e3, color #136c3a: Figma binds no variable here\. Write the value as it is and tell the user it has no variable; never invent one/);
 });

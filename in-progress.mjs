@@ -23,9 +23,11 @@ async function sides(ROOT, cfg) {
   const struct = readJson(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
   const props = readJson(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {};
   const figma = new Set([...Object.keys(struct), ...Object.keys(props)].filter((n) => !n.startsWith('_')));
-  const css = [cfg.paths?.themeCSS ?? 'src/theme.css', ...(cfg.paths?.pluginCSS ?? [])].flat()
-    .map((p) => { try { return readFileSync(resolve(ROOT, p), 'utf8'); } catch { return ''; } }).join('\n');
   const locator = await loadLocator(ROOT, cfg);
+  // Build mode: a component's own stylesheet counts even before an audit records it in paths.pluginCSS.
+  const extra = cfg.build === true ? (await import('./build-list.mjs')).componentStylesheets(ROOT, cfg, [...figma].map((n) => locator.classFor(n))) : [];
+  const css = [cfg.paths?.themeCSS ?? 'src/theme.css', ...(cfg.paths?.pluginCSS ?? []), ...extra].flat()
+    .map((p) => { try { return readFileSync(resolve(ROOT, p), 'utf8'); } catch { return ''; } }).join('\n');
   const inCode = (name) => {
     const cls = locator.classFor(name);
     if (!cls) return false;

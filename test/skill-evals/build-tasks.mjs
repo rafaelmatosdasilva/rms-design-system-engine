@@ -104,7 +104,7 @@ export const BUILD = [
       { id: 'size L with icon', props: propsOf({ Label: 'Filter', Size: 'L', Icon: 'True' }), expect: { height: 32, gap: 4 } },
       { id: 'dark', props: propsOf({ Label: 'Filter' }), dark: true, expectDark: (m) => sameColor(m, 'bg', D['chip/background']), expect: { bg: D['chip/background'], color: D['chip/text'] } },
     ], (r) => [
-      check('the icon variant shows an icon', (r['size L with icon']?.children ?? 0) >= 2),
+      check('the icon variant shows an icon, the plain one does not', !!r['size L with icon'] && !!r['size L'] && (r['size L with icon'].hasIcon && !r['size L'].hasIcon || r['size L with icon'].nodes > r['size L'].nodes), `icon ${r['size L with icon']?.nodes} nodes, plain ${r['size L']?.nodes}`),
       check('it is a toggle button (Figma role: togglebutton): a button with aria-pressed', r['size M'] && (r['size M'].tag === 'button' || r['size M'].role === 'button') && r['size M'].ariaPressed != null, `${r['size M']?.tag} aria-pressed=${r['size M']?.ariaPressed}`),
     ]),
   },

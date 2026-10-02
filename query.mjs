@@ -112,7 +112,10 @@ async function main() {
   if (cfg.build === true && answers.some((a) => a.kind === 'component')) {
     const { componentsToBuild, projectDerivedContract, buildSheetLines } = await import('./build-list.mjs');
     const { loadLocator } = await import('./component-locator.mjs');
-    const toBuild = new Set(await componentsToBuild(ROOT, cfg));
+    const { inProgressList } = await import('./in-progress.mjs');
+    // Any component Figma has and the code does not gets its sheet when asked for, an experimental one too: it stays
+    // off the build list (Figma may still change it), but whoever builds it builds it from the same facts.
+    const toBuild = new Set([...await componentsToBuild(ROOT, cfg), ...(await inProgressList(ROOT, cfg)).filter((x) => x.figma && !x.code).map((x) => x.name)]);
     const loc = await loadLocator(ROOT, cfg);
     const d = projectDerivedContract(ROOT, cfg, (n) => loc.classFor(n), varOf);
     const read = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };

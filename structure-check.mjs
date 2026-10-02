@@ -138,12 +138,15 @@ const importedSources = (() => {
   return loadCssSources(ROOT, THEME_PATHS.filter(p => !isUrl(p))).files
     .filter(f => !own.has(f.abs)).map(f => ({ entry: f.file, text: f.text, ok: true, kind: 'import' }));
 })();
-let themeCSS = themeSources[0]?.ok ? themeSources[0].text : null;   // value gates read the first theme file
+// Value gates read the first theme file. In build mode every theme file counts: the components are built into their
+// own stylesheets, which the audit records as theme files after the token file (build-list.mjs).
+const ownTheme = cfg.build === true ? themeSources.filter(s => s.ok) : themeSources.slice(0, 1).filter(s => s.ok);
+let themeCSS = ownTheme.length ? ownTheme.map(s => s.text).join('\n') : null;
 const allCss = [...themeSources, ...importedSources, ...pluginSources].filter(s => s.ok).map(s => s.text).join('\n');
 // The CSS itself, for the rule index: an HTML entry contributes only its <style> blocks (never its
 // script text), and the theme counts with the files it @imports.
 const cssOnly = (s) => (/\.html?$/i.test(String(s.entry)) ? styleBlocksOf(s.text) : s.text);
-const themeRulesCSS = [...themeSources.slice(0, 1), ...importedSources].filter(s => s.ok).map(cssOnly).join('\n');
+const themeRulesCSS = [...ownTheme, ...importedSources].filter(s => s.ok).map(cssOnly).join('\n');
 const allRulesCSS   = [...themeSources, ...importedSources, ...pluginSources].filter(s => s.ok).map(cssOnly).join('\n');
 
 // Rule indexes, built once. Each selector maps to the declarations that WIN for it, the way the
