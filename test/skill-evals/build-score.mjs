@@ -76,7 +76,7 @@ function serve(dir) {
     if (url === '/__page.html') {
       const css = walk(dir).filter((p) => /\.css$/.test(p)).map((p) => `<link rel="stylesheet" href="/${relative(dir, p)}">`).join('\n');
       res.writeHead(200, { 'content-type': 'text/html' });
-      return res.end(`<!doctype html><html><head><meta charset="utf-8">${css}<style>body{margin:0;font-family:Inter,system-ui,sans-serif}</style></head><body><div id="root"></div></body></html>`);
+      return res.end(`<!doctype html><html><head><meta charset="utf-8">${css}<style>body{margin:0;font-family:Inter,system-ui,sans-serif}*,*::before,*::after{transition:none!important;animation:none!important}</style></head><body><div id="root"></div></body></html>`);
     }
     let p = join(dir, url);
     if (!existsSync(p)) { const hit = CODE_EXT.map((e) => p + e).concat(CODE_EXT.map((e) => join(p, 'index' + e))).find(existsSync); if (hit) p = hit; }
@@ -107,7 +107,7 @@ const MEASURE = `(sel, label) => {
   return { tag: el.tagName.toLowerCase(), role: el.getAttribute('role'), ariaPressed: el.getAttribute('aria-pressed'), disabled: el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true',
     height: r.height, width: r.width, paddingTop: cs.paddingTop, paddingLeft: cs.paddingLeft, gap: cs.columnGap, radius: cs.borderTopLeftRadius, bg: cs.backgroundColor, opacity: cs.opacity,
     borderWidth: cs.borderTopWidth, borderStyle: cs.borderTopStyle, borderColor: cs.borderTopColor, color: ts.color, fontSize: ts.fontSize, fontWeight: ts.fontWeight, lineHeight: ts.lineHeight,
-    children: el.children.length, hasInput: !!input, inputLabelled: !!input && (!!input.getAttribute('aria-label') || !!input.getAttribute('aria-labelledby') || !!input.closest('label') || (!!input.id && !!document.querySelector('label[for="' + input.id + '"]'))),
+    children: el.children.length, hasIcon: !!el.querySelector('svg,img,[class*=icon i],[data-icon]'), nodes: walk(el).length + walk(el).flatMap((n) => [...n.childNodes]).filter((c) => c.nodeType === 3 && c.textContent.trim()).length, hasInput: !!input, inputLabelled: !!input && (!!input.getAttribute('aria-label') || !!input.getAttribute('aria-labelledby') || !!input.closest('label') || (!!input.id && !!document.querySelector('label[for="' + input.id + '"]'))),
     rowGap: cs.rowGap, buttons: el.querySelectorAll('button,[role=button]').length + (el.matches('button,[role=button]') ? 1 : 0), inputs: el.querySelectorAll('input,textarea').length, text: el.textContent.replace(/\\s+/g, ' ').trim().slice(0, 200) };
 }`;
 

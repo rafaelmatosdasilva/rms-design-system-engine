@@ -6,8 +6,8 @@
 //     for the agent or a person to copy into the theme. Gate [3] then proves each one.
 //   • then the components, each after the ones it nests (a button before the card that holds it).
 // A component or token still to build is never a failure; once it is built it is compared as usual.
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { join, dirname, relative } from 'node:path';
 import { inProgressList } from './in-progress.mjs';
 import { OUT_DIR } from './names.mjs';
 
@@ -87,6 +87,51 @@ export function buildOrder(names, nesting = {}) {
   return out;
 }
 
+// Build mode: the stylesheets a component was built into (src/components/button.css, and so on), outside the theme and
+// the stylesheets ds-config.json already lists. Each holds a rule for the class of a component Figma has. The gates
+// look for a component's rules in the theme, so these are recorded as theme files after the token file; otherwise a
+// built component would stay to build and go unchecked.
+const SKIP_DIRS = /^(node_modules|\.git|dist|build|out|coverage|\.next|\.design-system-engine-out|\.claude|contracts)$/;
+export function componentStylesheets(ROOT, cfg, classes) {
+  const listed = new Set([cfg.paths?.themeCSS ?? 'src/theme.css', ...(cfg.paths?.pluginCSS ?? [])].flat().map(String));
+  const res = classes.filter(Boolean).map((c) => new RegExp(`\\.${String(c).replace(/^\./, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`));
+  const out = [];
+  const walk = (dir) => {
+    let entries = [];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.isDirectory()) { if (!SKIP_DIRS.test(e.name)) walk(join(dir, e.name)); continue; }
+      if (!/\.css$/i.test(e.name)) continue;
+      const rel = relative(ROOT, join(dir, e.name)).split('\\').join('/');
+      if (listed.has(rel)) continue;
+      let text = '';
+      try { text = readFileSync(join(dir, e.name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); } catch { continue; }
+      if (res.some((r) => r.test(text))) out.push(rel);
+    }
+  };
+  walk(ROOT);
+  return out.sort();
+}
+
+// Records the stylesheets componentStylesheets finds in ds-config.json → paths.themeCSS, after the token file (the
+// first theme file stays the one the token values are read from). Returns the ones added.
+export async function recordComponentStylesheets(ROOT, cfg) {
+  if (!isBuildMode(cfg)) return [];
+  const { loadLocator } = await import('./component-locator.mjs');
+  const read = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+  const names = new Set([...Object.keys(read(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').components ?? {}),
+    ...Object.keys(read(cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'))].filter((n) => !n.startsWith('_')));
+  const loc = await loadLocator(ROOT, cfg);
+  const found = componentStylesheets(ROOT, cfg, [...names].map((n) => loc.classFor(n)));
+  if (!found.length) return [];
+  const path = join(ROOT, 'ds-config.json');
+  const onDisk = JSON.parse(readFileSync(path, 'utf8'));
+  onDisk.paths = { ...(onDisk.paths ?? {}), themeCSS: [...[onDisk.paths?.themeCSS ?? 'src/theme.css'].flat(), ...found] };
+  writeFileSync(path, JSON.stringify(onDisk, null, 2) + '\n');
+  cfg.paths = { ...(cfg.paths ?? {}), themeCSS: onDisk.paths.themeCSS };
+  return found;
+}
+
 // The components still to build, in build order.
 export async function componentsToBuild(ROOT, cfg) {
   if (!isBuildMode(cfg)) return [];
@@ -146,6 +191,26 @@ export function comboSelector(base, variantKey, propertyMap = {}) {
 // { COMPONENT_CSS_SELECTORS, CONTRACT, CSS_HEIGHT_RULES, FIGMA_LAYOUT_TO_CSS, CSS_BASE_RULE_VARS } derived from the
 // Figma snapshots for every Figma component. classFor: (name) → its class (the locator's); varOf: (token) → its CSS
 // variable (the naming convention). struct: the structure snapshot's components; props: the props snapshot.
+// Does Figma's prop=value change a style (height, padding, colours, opacity)? Each variant with it is compared with the
+// variant that differs only in that prop (else the default variant). A value that changes only the layers (an icon
+// shown) is markup, so it asks for no CSS selector. Unknown variants (no per-variant data) count as styled.
+const parts = (key) => Object.fromEntries(String(key).split(/,\s*/).map((p) => p.split('=').map((x) => x.trim())));
+const looks = (v = {}) => JSON.stringify([v.h ?? null, v.paddingVar ?? null, v.colors ?? null]);
+function styled(s, prop, value) {
+  const variants = Object.entries(s.variants ?? {});
+  if (!variants.length) return true;
+  if (Object.keys(s.variantOpacity ?? {}).some((k) => k === `${prop}=${value}`)) return true;
+  const def = s.variants?.[s.defaultVariant];
+  const withIt = variants.filter(([k]) => parts(k)[prop] === value);
+  if (!withIt.length) return true;
+  return withIt.some(([k, v]) => {
+    const me = parts(k);
+    const sibs = variants.filter(([k2]) => { const o = parts(k2); return o[prop] !== value && Object.keys(me).every((p) => p === prop || o[p] === me[p]); });
+    const against = sibs.length ? sibs.map(([, x]) => x) : def ? [def] : [];
+    return !against.length || against.some((x) => looks(x) !== looks(v));
+  });
+}
+
 export function derivedContract(classFor, struct = {}, props = {}, varOf = () => null) {
   const SEL = {}, CONTRACT = {}, HEIGHT = {}, LAYOUT = {}, BASE = [];
   const names = new Set([...Object.keys(struct), ...Object.keys(props)].filter((n) => !n.startsWith('_')));
@@ -159,7 +224,8 @@ export function derivedContract(classFor, struct = {}, props = {}, varOf = () =>
     const propertyMap = {};
     for (const [key, d] of defs) {
       const prop = key.replace(/#.*$/, '');
-      propertyMap[prop] = Object.fromEntries(d.variantOptions.map((v) => [v, variantSelector(base, prop, v, d.defaultValue, { guardDisabled })]));
+      propertyMap[prop] = Object.fromEntries(d.variantOptions.filter((v) => styled(s, prop, v)).map((v) => [v, variantSelector(base, prop, v, d.defaultValue, { guardDisabled })]));
+      if (!Object.keys(propertyMap[prop]).length) delete propertyMap[prop];
     }
     const entry = {};
     for (const k of ['h', 'paddingVar', 'gapVar', 'innerRadiusVar', 'fontSizeVar', 'fontWeightVar', 'strokeOnDefault']) if (s[k] !== undefined) entry[k] = s[k];
@@ -216,6 +282,10 @@ export function roleMarkup(role) {
 // ── The build sheet: what --query prints for a component still to build ────────────────────────────────────────
 // Every line is something the engine checks once the component exists, written as the code must write it.
 // d: derivedContract(...) for the project; struct/props: the snapshots; nesting: the composition snapshot.
+// A component's colours that Figma paints with a raw value instead of a variable: ["background-color #d6f5e3", …].
+const COLOUR_PROP = { fill: 'background-color', text: 'color', stroke: 'border-color' };
+const rawColours = (colors = {}) => Object.entries(colors ?? {}).filter(([, c]) => c?.hex && !c.token).map(([k, c]) => `${COLOUR_PROP[k] ?? k} ${c.hex}`);
+
 export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}, file = null, typography = {} } = {}) {
   const sel = d.COMPONENT_CSS_SELECTORS[name]?.main;
   const c = d.CONTRACT[name] ?? {};
@@ -244,8 +314,12 @@ export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}
       const op = Object.entries(s.variantOpacity ?? {}).find(([k]) => k === `${prop}=${value}`)?.[1];
       if (op != null) extra.push(`opacity: ${op}`);
       lines.push(`    ${prop}=${value} → ${selector}${extra.length ? ` { ${extra.join('; ')} }` : ''}`);
+      const raw = rawColours(s.variants?.[`${prop}=${value}`]?.colors);
+      if (raw.length) lines.push(`      ${raw.join(', ')}: Figma binds no variable here. Write the value as it is and tell the user it has no variable; never invent one`);
     }
   }
+  const rawBase = rawColours(s.colors);
+  if (rawBase.length) lines.push(`    ${rawBase.join(', ')} on ${sel}: Figma binds no variable here. Write the value as it is and tell the user it has no variable; never invent one`);
   const role = (props[name]?.annotations ?? []).map((a) => /^role:\s*(.+)$/i.exec(a.label ?? '')?.[1]).find(Boolean);
   if (role) lines.push(`    role: ${role}, so write it as ${roleMarkup(role)}`);
   const nested = (nesting[name] ?? []).filter((n) => n !== name && !/^icon[-/ ]/i.test(n));

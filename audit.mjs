@@ -1291,6 +1291,13 @@ async function bootstrapConfig() {
     if (upgradeHooks(ROOT, cfg)) console.log(C.dim('ℹ️  Hooks updated: each /rms-design-system-engine request is now routed by the engine (.claude/settings.local.json). Off: --remove-hooks.'));
   } catch { /* never blocks a run */ }
 
+  // Build mode: a component built into its own stylesheet is read from then on (build-list.mjs).
+  try {
+    const { recordComponentStylesheets } = await import('./build-list.mjs');
+    const added = await recordComponentStylesheets(ROOT, cfg);
+    if (added.length) console.log(C.dim(`ℹ️  Build mode: ${added.join(', ')} ${added.length === 1 ? 'holds' : 'hold'} a component's rules, so ds-config.json → paths.themeCSS now lists ${added.length === 1 ? 'it' : 'them'} and every gate reads ${added.length === 1 ? 'it' : 'them'}.`));
+  } catch { /* never blocks a run */ }
+
   // THEMES: always an array - supports single string or array of paths
   const THEMES      = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();
   const THEME       = THEMES[0]; // primary path (for snapshot derivation, Gate 7)
@@ -2246,7 +2253,8 @@ function reportFull(label, items, shown) {
       const walkNums = (o) => {
         if (o == null) return;
         if (typeof o === 'number') { figmaNums.add(o); return; }
-        if (typeof o === 'string') { addNumTo(figmaNums, o); return; }
+        // A colour a component paints raw (no variable bound) is still Figma's value.
+        if (typeof o === 'string') { if (/^#[0-9a-f]{3,8}$/i.test(o)) { const h = normHex(o); if (h) figmaColors.add(h); } else addNumTo(figmaNums, o); return; }
         if (typeof o === 'object') for (const v of Object.values(o)) walkNums(v);
       };
       walkNums(struct.components ?? struct);

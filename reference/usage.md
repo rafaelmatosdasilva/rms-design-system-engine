@@ -94,8 +94,13 @@ checks each piece once it exists.
 - **Components.** `--query <name>` prints a component's build sheet: its class, height, padding, gap, radius and colours
   with their variables, the text style, the selector of each state and variant (a modifier class such as `.chip--l`,
   a pseudo-class for a state: `:hover:not(:disabled)`, `:active`, `:focus-visible`, `:disabled`), its role and the
-  components it nests. Every line is what the structure check compares once the component exists, so a component
-  built from the sheet needs no `structure-contract.mjs` entry; an entry the project writes always wins.
+  components it nests. A variant gets a selector only when it changes a style (one that only shows a layer, such as an
+  icon, is markup). A colour Figma paints with no variable is named with its value, to write as it is and report,
+  never as an invented variable. An experimental component gets its sheet when asked for, though it stays off the
+  build list. Every line is what the structure check compares once the component exists, so a component built from
+  the sheet needs no `structure-contract.mjs` entry; an entry the project writes always wins.
+- **Component stylesheets.** A component built into its own stylesheet (`src/components/button.css`) is found by its
+  class and added to `paths.themeCSS` after the token file, said once in the report, so every gate reads it.
 - **While building.** The edit check counts the tokens still to build as the system's own, so a component written
   before its tokens is still checked against them. Unused tokens are expected and do not fail.
 
