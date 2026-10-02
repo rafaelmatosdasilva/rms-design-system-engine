@@ -21,47 +21,27 @@ It keeps your code in parity with your design in Figma. It compares what was bui
 A short view of the flow. A more detailed flow can be seen on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/Figma-to-Code-Parity---Flow?node-id=0-1) (Ctrl or Cmd click to open it in a new tab).
 
 ```mermaid
-%%{init: {"flowchart": {"wrappingWidth": 260}, "themeCSS": ".nodeLabel, .nodeLabel p, .label div { text-align: left !important; }"}}%%
 flowchart LR
     subgraph P1["PHASE 1 - CAPTURE"]
         direction TB
-        FIG["<b>FIGMA</b><br/>Design system. You edit here. Source of truth."]
-        CAP["<b>CAPTURE</b><br/>Captures structure, tokens, bindings, states, props, geometry, screens, icons, visual screenshots, and component sets."]
-        SNAP["<b>SNAPSHOT</b><br/>JSON snapshots of tokens, components, props, geometry, icons, screens, HTML, and composition."]
+        FIG["<b>FIGMA</b>"] --> CAP["<b>CAPTURE</b>"] --> SNAP["<b>SNAPSHOT</b>"]
     end
     subgraph P2["PHASE 2 - COMPARE"]
         direction TB
-        CODE["<b>CODE</b><br/>The DS as built in the repo, read live, not from snapshots."]
-        ENG["<b>PARITY ENGINE</b><br/>Checks the code against Figma."]
-        RULES["<b>MATCHING RULES</b><br/>The few things the parity can't guess."]
-        CODE --> ENG
-        ENG -.->|"optional: --fix"| CODE
-        ENG --- RULES
+        CODE["<b>CODE</b>"] --> ENG["<b>PARITY ENGINE</b>"]
+        RULES["<b>MATCHING RULES</b>"] --- ENG
     end
-        subgraph VERDICT[" "]
-            RES["<b>PARITY OUTPUT</b><br/>The verdict: pass/fail, in the chat, in plain language."]
-            ADV["<b>ADVISORIES</b><br/>Extra signals in the report. They inform, they never block."]
-        end
-        CON["<b>CONTRACTS</b><br/>The facts (the spec). Keeps AI from making things up."]
-        INT["<b>INTENT</b><br/>The why. Helps AI choose the right component."]
-        SG["<b>STYLE GUIDE</b><br/>The design system shown as one living page: every component in every state."]
-    AI["<b>AI CODING AGENT</b><br/>Reads both the facts and the why and generates UI from the real DS, without hallucinating."]
-    HUM["<b>HUMANS</b><br/>Designers and devs. They open the styleguide to browse and test the DS."]
-    A11Y["<b>ACCESSIBILITY</b><br/>Accessibility (WCAG AA), in plain language: contrast, names, visible focus and focus-ring visibility, state exposure, keyboard."]
-    EV["<b>EVALS</b><br/>Checks an agent's output against the DS for hardcoded values, made-up variables, and inline styles."]
-    FIG -->|"Reads Figma. Works on any plan."| CAP --> SNAP
-    P1 -->|Figma facts| P2
-    P2 -->|verdict| VERDICT
-    P2 -->|writes| CON
-    P2 -->|writes| INT
-    P2 -.->|"writes (opt-in)"| SG
-    CON -->|reads| AI
-    INT -->|reads| AI
-    SG ---|read| HUM
-    SG -->|renders against| A11Y
-    AI -.->|generated output| EV
-    CON -.->|reference| EV
-    INT -.->|guidance| EV
+    subgraph P3["PHASE 3 - OUTPUTS"]
+        direction TB
+        RES["<b>VERDICT + ADVISORIES</b>"]
+        CON["<b>CONTRACTS</b>"]
+        INT["<b>INTENT</b>"]
+        SG["<b>STYLE GUIDE</b>"]
+    end
+    P1 --> P2 --> P3
+    P3 --> AI["<b>AI CODING AGENT</b>"]
+    P3 --> HUM["<b>HUMANS</b>"]
+    AI -.-> EV["<b>EVALS</b>"]
 ```
 
 ## Get started
