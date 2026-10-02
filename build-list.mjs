@@ -194,6 +194,25 @@ export function projectDerivedContract(ROOT, cfg, classFor, varOf = () => null) 
   return derivedContract(classFor, struct, props, varOf);
 }
 
+// The markup a role annotation asks for, as the accessibility check reads it.
+const ROLE_MARKUP = {
+  button: 'a <button type="button">',
+  togglebutton: 'a <button type="button"> with aria-pressed="true" or "false" (on or off)',
+  togglebuttons: 'a <button type="button"> with aria-pressed="true" or "false" (on or off)',
+  checkbox: 'an <input type="checkbox"> with a label (or role="checkbox" with aria-checked)',
+  switch: 'a <button type="button" role="switch"> with aria-checked="true" or "false"',
+  radio: 'an <input type="radio"> with a label (or role="radio" with aria-checked)',
+  link: 'an <a href="…">',
+  heading: 'a heading element, <h1> to <h6>',
+  tab: 'an element with role="tab" and aria-selected, inside a role="tablist"',
+  textbox: 'an <input> or <textarea> with a label',
+  dialog: 'an element with role="dialog", aria-modal="true" and a label',
+  img: 'an <img> with alt text (or role="img" with aria-label)',
+};
+export function roleMarkup(role) {
+  return ROLE_MARKUP[String(role).toLowerCase().replace(/[\s_-]+/g, '')] ?? `an element with role="${role}"`;
+}
+
 // ── The build sheet: what --query prints for a component still to build ────────────────────────────────────────
 // Every line is something the engine checks once the component exists, written as the code must write it.
 // d: derivedContract(...) for the project; struct/props: the snapshots; nesting: the composition snapshot.
@@ -228,7 +247,7 @@ export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}
     }
   }
   const role = (props[name]?.annotations ?? []).map((a) => /^role:\s*(.+)$/i.exec(a.label ?? '')?.[1]).find(Boolean);
-  if (role) lines.push(`    role: ${role} (the element a person and a screen reader meet)`);
+  if (role) lines.push(`    role: ${role}, so write it as ${roleMarkup(role)}`);
   const nested = (nesting[name] ?? []).filter((n) => n !== name && !/^icon[-/ ]/i.test(n));
   if (nested.length) lines.push(`    uses the system's own ${nested.join(', ')} inside it, never a copy`);
   lines.push(`    the component file${file ? `: ${file}` : ''} names its props exactly as above (Figma's names), or the project records the code's name in contract.authored.json`);

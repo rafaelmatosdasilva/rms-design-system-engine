@@ -143,3 +143,14 @@ test('the Figma-only Tidepool project: the first run passes and lists the tokens
   assert.match(r.stdout, /TO BUILD {2}17 tokens .*; 3 components: button, chip, field\./);
   assert.match(r.stdout, /NEXT: build the tokens: copy the declarations in .* into src\/styles\/tokens\.css/);
 });
+
+test('the build sheet says what markup a role asks for', async () => {
+  const { roleMarkup } = await import('../build-list.mjs');
+  assert.match(roleMarkup('togglebutton'), /<button type="button"> with aria-pressed/);
+  assert.match(roleMarkup('Toggle button'), /aria-pressed/);
+  assert.match(roleMarkup('button'), /^a <button/);
+  assert.equal(roleMarkup('treegrid'), 'an element with role="treegrid"');
+  const dir = figmaOnly();
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.match(r.stdout, /role: togglebutton, so write it as a <button type="button"> with aria-pressed/);
+});

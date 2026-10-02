@@ -26,3 +26,5 @@ plans/
 
 # Skill evaluation transcripts (large; the result rows are kept).
 test/skill-evals/results/transcripts/
+test/skill-evals/results/build/transcripts/
+test/skill-evals/results/build/smoke/
