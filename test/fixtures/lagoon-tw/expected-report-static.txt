@@ -212,6 +212,7 @@
   - badge/Tone: the code names it "tone" (letter case T → t)  (src/components/Badge.tsx)
 
 Burndown, open findings per component: badge 3 · 5 not tied to a component
+Fix first: badge. Run with --component badge, fix, run again.
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

@@ -82,13 +82,17 @@ const SAID = {
     test: /(can['’]?t|cannot|can not|won['’]?t|will not|do(es)?\s?n['’]?o?t|never)\s+(change|edit|modify|write to|update|touch)\b[^.]{0,40}\bfigma\b|\bonly reads (it|figma)\b|\bread-only\b/i,
     what: 'that this skill does not change Figma',
   },
+  noVariable: {
+    test: /\b(no|not a|without( a)?|lacks?( a)?|has no|have no|isn['’]?t a|is not a)\s+(design[- ]system\s+)?(variable|token)s?\b|\bnot (bound to|in) (a |any )?(variable|token)/i,
+    what: 'that Figma paints this component with colours the design system has no variable for',
+  },
   noRefresh: {
     test: /(could\s?n['’]?t|could not|cannot|can['’]?t|unable to|did\s?n['’]?t|did not|was\s?n['’]?t|were\s?n['’]?t|not able to)\s+(be\s+)?(refresh|re-?capture)|\bnot\s+(been\s+)?(refreshed|re-?captured)\b|\bno figma (tool|access|connection|token)\b|\bwithout (a |any )?figma (tool|access|connection)\b/i,
     what: 'that the Figma snapshots were not refreshed in this run',
     unless: (transcriptPath) => figmaToolUsed(transcriptPath),   // it did refresh: the line is not true
   },
 };
-export const sayKind = (line) => (line === SAY.figma ? 'figma' : /^I couldn't refresh the Figma snapshots/.test(line) ? 'noRefresh' : null);
+export const sayKind = (line) => (line === SAY.figma ? 'figma' : /^I couldn't refresh the Figma snapshots/.test(line) ? 'noRefresh' : /^Figma paints .* with colours that have no variable/.test(line) ? 'noVariable' : null);
 const saidFile = (root) => join(root, OUT_DIR, 'said.json');
 
 // The UserPromptSubmit side: the sentences this prompt's route asks for, kept for the Stop check (or cleared).

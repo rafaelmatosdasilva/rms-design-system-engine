@@ -120,6 +120,10 @@ export function burndownLines(b, { top = 8, scoped = false } = {}) {
   const fmt = (r) => `${r.name} ${r.open}${r.was != null && r.was !== r.open ? ` (was ${r.was})` : ''}`;
   const lines = [`Burndown, open findings per component: ${b.rows.slice(0, top).map(fmt).join(' · ') || 'none'}${b.rows.length > top ? ` · ${b.rows.length - top} more` : ''}${b.loose ? ` · ${b.loose} not tied to a component` : ''}`];
   if (b.done.length) lines.push(`   cleared since the last run: ${b.done.join(', ')}`);
-  if (b.rows.length && !scoped) lines.push(`   next up: ${b.rows[0].name}. Run with --component ${b.rows[0].name}, fix, run again.`);
+  if (b.rows.length && !scoped) {
+    // A tie is said, with how it was broken, so whoever reads it does not have to pick.
+    const tied = b.rows.slice(1).filter((r) => r.open === b.rows[0].open).map((r) => r.name);
+    lines.push(`   next up: ${b.rows[0].name}${tied.length ? ` (tied with ${tied.join(', ')} at ${b.rows[0].open}; a tie goes in name order)` : ''}. Run with --component ${b.rows[0].name}, fix, run again.`);
+  }
   return lines;
 }

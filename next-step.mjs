@@ -94,7 +94,11 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
     for (const t of measured.slice(0, 8)) lines.push(`- ${t.replace(/^⚠️\s*/, '')}`);
     if (measured.length > 8) lines.push(`- and ${measured.length - 8} more`);
   }
-  if (burndown.length) lines.push('', burndown[0].replace(/^📉\s*/, ''));
+  if (burndown.length) {
+    lines.push('', burndown[0].replace(/^📉\s*/, ''));
+    const up = burndown.find((l) => /^\s*next up:/.test(l));
+    if (up) lines.push(`Fix first: ${up.trim().replace(/^next up:\s*/, '')}`);
+  }
   if (toBuild) lines.push('', toBuild);
   if (next) lines.push('', next);
   return lines.join('\n') + '\n';

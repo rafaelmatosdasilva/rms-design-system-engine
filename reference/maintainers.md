@@ -138,3 +138,11 @@ node test/skill-evals/report.mjs --a baseline --b cookbook --model claude-sonnet
 Any change to the guide files needs a fresh evaluation run before it is merged. `test/guide-structure.test.mjs`
 keeps the split whole (index, recipe template, a 30 KB cap on the main file, no paragraph in two files, every
 pointer resolves, every recipe-check command runs on the demo).
+
+### Rendered assertions per mode
+
+**Every mode-varying token needs a rendered assertion per mode.** A `RENDERED_ASSERTIONS`
+entry pins one `colorScheme`. If the token resolves differently per mode and only one mode
+is asserted, the other is unguarded and will drift undetected - which is exactly how the
+light-mode hover colour in the refresh-figma recipe's real case went stale. When you add an assertion for a colour that
+varies by mode, add the sibling assertion for the other mode in the same commit.

@@ -25,6 +25,35 @@ rms-design-system-engine --summary
 ---
 
 
+## Read every mode
+
+A single-mode read is never enough. When someone hands you a Figma link and asks
+for the value behind it, `get_variable_defs` (and any Dev Mode read) resolves only the
+mode the frame is *currently* displaying. Acting on that one value silently guesses
+every other mode. Always resolve the variable across **all** modes of its collection,
+following the alias chain in each one - the same variable can alias different
+primitives per mode. Read it with the Plugin API rather than a Dev Mode value:
+
+```js
+const v    = await figma.variables.getVariableByIdAsync(varId);
+const coll = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+for (const m of coll.modes) { /* v.valuesByMode[m.modeId] - recurse on VARIABLE_ALIAS */ }
+```
+
+**Capture the metadata too, when you refresh.** Record each variable's own `description` into an
+optional `tokenMeta` sidecar in `figma-vars.snapshot.json` — `tokenMeta["<slashed/name>"] =
+{ description, deprecated }`, with `deprecated: true` when the description carries a `@deprecated`
+marker — and the component's `description` into the component-props snapshot. The contract emitter
+surfaces these as DTCG `$description` / `$deprecated` and the component `description`; when they are
+absent it falls back cleanly, never inventing them. (Figma component-property definitions carry no
+per-prop description, so a prop's `description` is authored in `contract.authored.json` under
+`components[name].propDescriptions`.)
+
+Real case (2026-07-30): `node/icon/hover/color` read from a dark frame returned
+`#b8b8b8`. It actually aliases `node/icon/selected/color`, which resolves to
+Neutral 300 in dark but Neutral **400** (`#595959`) in light. Patching from the
+single dark read would have left light on the old, unrelated value.
+
 ## Phase 1 - Step 1: Query live Figma values
 
 > **⚠️ Figma MCP 20 kb limit:** the `use_figma` tool silently truncates responses above ~20 kb. A single query for a large collection (>200 tokens) will be cut off mid-JSON with no error. **Always run the probe first to check the count, then decide whether to batch.**

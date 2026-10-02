@@ -4,8 +4,8 @@
 
 ## Steps
 
-1. Run `rms-design-system-engine`; its 📉 line counts open findings per component, most first, with a next-up line.
-2. Recommend the next-up component, then `rms-design-system-engine --component <name>`.
+1. Run `rms-design-system-engine`; its 📉 line counts open findings per component, most first, and the SUMMARY says `Fix first:` (a tie goes in name order, and says so).
+2. Recommend that component, as the engine names it, then `rms-design-system-engine --component <name>`.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 
