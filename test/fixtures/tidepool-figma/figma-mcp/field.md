@@ -37,3 +37,11 @@ Component descriptions:
 A one-line text input.
 
 Screenshot: field.png
+
+---
+
+# Figma MCP: get_variable_defs for node 3:21
+
+```json
+{"var(--text-primary)": "#1b2433", "m": "Font(family: \"Inter\", style: Medium, size: 14, weight: 500, lineHeight: 20, letterSpacing: 0)", "var(--padding-s)": "8", "var(--radii-field)": "6", "var(--stroke-default)": "1", "var(--field-border)": "#7d8799", "var(--field-border-error)": "#c4231b"}
+```

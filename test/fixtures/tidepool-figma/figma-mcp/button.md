@@ -42,3 +42,11 @@ The main action on a screen.
 Some elements have annotation data attributes. They provide extra information about how the element should be implemented. IMPORTANT: Do not ignore these annotation attributes. They should not appear in your final code.
 
 Screenshot: button.png
+
+---
+
+# Figma MCP: get_variable_defs for node 3:8
+
+```json
+{"var(--button-text)": "#ffffff", "m": "Font(family: \"Inter\", style: Medium, size: 14, weight: 500, lineHeight: 20, letterSpacing: 0)", "var(--gap-s)": "4", "var(--padding-m)": "12", "var(--padding-xs)": "4", "var(--radii-button)": "8", "var(--button-background)": "#1f5fd6", "var(--button-background-hover)": "#1849a8"}
+```
