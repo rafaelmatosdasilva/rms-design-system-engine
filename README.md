@@ -18,7 +18,7 @@ It keeps your code in parity with your design in Figma. It compares what was bui
 
 ## How it works
 
-A short view of the flow. The full version, with every detail, is on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/Figma-to-Code-Parity---Flow?node-id=0-1).
+A short view of the flow. A more detailed flow can be seen on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/Figma-to-Code-Parity---Flow?node-id=0-1) (Ctrl or Cmd click to open it in a new tab).
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 260}, "themeCSS": ".nodeLabel, .nodeLabel p, .label div { text-align: left !important; }"}}%%
