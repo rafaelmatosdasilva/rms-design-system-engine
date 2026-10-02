@@ -275,3 +275,9 @@ test('a project with the older hooks gets the router on its next run; nothing is
   assert.equal(upgradeHooks(optedOut, { hooks: false }, { engineDir: ENGINE, env: {} }), false);
   assert.equal(upgradeHooks(optedOut, {}, { engineDir: ENGINE, env: { CI: '1' } }), false);
 });
+
+test('asking to build, create or implement is asking for a change (English and Portuguese)', async () => {
+  const { asksForChange } = await import('../guard.mjs');
+  for (const t of ['build the button from Figma', 'create the tokens', 'implement the field', 'constrói o botão', 'cria os tokens', 'implementa o campo']) assert.equal(asksForChange(t), true, t);
+  assert.equal(asksForChange('how do I build the button?'), false);
+});

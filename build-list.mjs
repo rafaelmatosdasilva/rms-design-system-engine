@@ -104,3 +104,133 @@ export function buildLine({ tokens = 0, components = [] } = {}) {
   if (components.length) parts.push(`${components.length} component${components.length === 1 ? '' : 's'}: ${components.join(', ')}`);
   return `🧱 TO BUILD  ${parts.join('; ')}. Not failures: built from Figma, then checked.`;
 }
+
+// ── The build convention: how a component built from Figma is written, so the engine can check it ──────────
+// Without a structure-contract.mjs entry, a component built in build mode is found and compared through one plain
+// convention, the one --query prints in its build sheet:
+//   • its class: the component's locator class (ds-config.json → componentSelectors, else .componentName);
+//   • a variant value other than the default: a modifier class, .button--large (a True boolean: .chip--icon);
+//   • an interaction state: its pseudo-class, Hover → :hover, Pressed/Active → :active, Focus → :focus-visible,
+//     Disabled → :disabled.
+// An entry the project writes in structure-contract.mjs always wins over the derived one.
+const kebab = (s) => String(s).replace(/#.*$/, '').replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+const PSEUDO = { hover: ':hover', pressed: ':active', active: ':active', focus: ':focus-visible', focused: ':focus-visible', 'focus-visible': ':focus-visible' };
+
+export function variantSelector(base, prop, value, defaultValue, { guardDisabled = false } = {}) {
+  if (String(value) === String(defaultValue)) return base;
+  const v = kebab(value), p = kebab(prop);
+  if (p === 'disabled' && v === 'true') return `${base}:disabled`;
+  if (p === 'state' && v === 'disabled') return `${base}:disabled`;
+  if (/^(state|interaction|status)$/.test(p) && PSEUDO[v]) return `${base}${PSEUDO[v]}${guardDisabled && v !== 'focus' && v !== 'focused' && v !== 'focus-visible' ? ':not(:disabled)' : ''}`;
+  const cls = base.replace(/^\./, '');
+  if (v === 'true') return `${base}.${cls}--${p}`;
+  if (v === 'false') return base;
+  return `${base}.${cls}--${v}`;
+}
+
+// One variant combination ("State=Hover, Disabled=False") → its selector: the modifier classes, then the pseudo-classes.
+export function comboSelector(base, variantKey, propertyMap = {}) {
+  const classes = [], pseudos = [];
+  for (const part of String(variantKey).split(/,\s*/)) {
+    const [prop, value] = part.split('=');
+    const sel = propertyMap[prop?.trim()]?.[value?.trim()];
+    if (!sel || sel === base) continue;
+    const rest = sel.slice(base.length);
+    const m = /^((?:\.[\w-]+)*)(.*)$/.exec(rest);
+    if (m[1]) classes.push(m[1]);
+    if (m[2]) pseudos.push(m[2]);
+  }
+  return base + classes.join('') + pseudos.join('');
+}
+
+// { COMPONENT_CSS_SELECTORS, CONTRACT, CSS_HEIGHT_RULES, FIGMA_LAYOUT_TO_CSS, CSS_BASE_RULE_VARS } derived from the
+// Figma snapshots for every Figma component. classFor: (name) → its class (the locator's); varOf: (token) → its CSS
+// variable (the naming convention). struct: the structure snapshot's components; props: the props snapshot.
+export function derivedContract(classFor, struct = {}, props = {}, varOf = () => null) {
+  const SEL = {}, CONTRACT = {}, HEIGHT = {}, LAYOUT = {}, BASE = [];
+  const names = new Set([...Object.keys(struct), ...Object.keys(props)].filter((n) => !n.startsWith('_')));
+  for (const name of names) {
+    const base = classFor(name);
+    if (!base) continue;
+    SEL[name] = { main: base };
+    const s = struct[name] ?? {};
+    const defs = Object.entries(props[name]?.properties ?? {}).filter(([, d]) => d?.type === 'VARIANT' && Array.isArray(d.variantOptions));
+    const guardDisabled = defs.some(([k]) => kebab(k) === 'disabled') || defs.some(([, d]) => d.variantOptions.some((o) => kebab(o) === 'disabled'));
+    const propertyMap = {};
+    for (const [key, d] of defs) {
+      const prop = key.replace(/#.*$/, '');
+      propertyMap[prop] = Object.fromEntries(d.variantOptions.map((v) => [v, variantSelector(base, prop, v, d.defaultValue, { guardDisabled })]));
+    }
+    const entry = {};
+    for (const k of ['h', 'paddingVar', 'gapVar', 'innerRadiusVar', 'fontSizeVar', 'fontWeightVar', 'strokeOnDefault']) if (s[k] !== undefined) entry[k] = s[k];
+    if (s.strokeOnDefault) entry.strokeSides = 'all';
+    if (Object.keys(propertyMap).length) entry.propertyMap = propertyMap;
+    if (Object.keys(entry).length) CONTRACT[name] = entry;
+    if (typeof s.h === 'number') HEIGHT[name] = { selector: base, prop: 'height' };
+    for (const t of [s.paddingVar?.tb, s.paddingVar?.lr, s.gapVar, s.innerRadiusVar]) { const v = t && varOf(t); if (v) LAYOUT[t] = v; }
+    // Colours: the default variant's fill, text and stroke on the base rule; each other variant's on its selector.
+    const PROP = { fill: 'background-color', text: 'color', stroke: 'border-color' };
+    const colourRules = (colors, selector, label) => {
+      for (const [part, c] of Object.entries(colors ?? {})) {
+        const prop = PROP[part], v = c?.token && varOf(c.token);
+        if (prop && v) BASE.push({ key: `${name}/${label}/${part}`, selector, prop, expectedVar: v });
+      }
+    };
+    colourRules(s.colors, base, 'default');
+    for (const [vk, vv] of Object.entries(s.variants ?? {})) {
+      if (vk === s.defaultVariant || !vv?.colors) continue;
+      colourRules(vv.colors, comboSelector(base, vk, propertyMap), vk);
+    }
+  }
+  return { COMPONENT_CSS_SELECTORS: SEL, CONTRACT, CSS_HEIGHT_RULES: HEIGHT, FIGMA_LAYOUT_TO_CSS: LAYOUT, CSS_BASE_RULE_VARS: BASE };
+}
+
+// The derived contract for a project, read from its snapshots (empty outside build mode).
+export function projectDerivedContract(ROOT, cfg, classFor, varOf = () => null) {
+  if (!isBuildMode(cfg)) return { COMPONENT_CSS_SELECTORS: {}, CONTRACT: {}, CSS_HEIGHT_RULES: {}, FIGMA_LAYOUT_TO_CSS: {}, CSS_BASE_RULE_VARS: [] };
+  const read = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return null; } };
+  const struct = read(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
+  const props = read(cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {};
+  return derivedContract(classFor, struct, props, varOf);
+}
+
+// ── The build sheet: what --query prints for a component still to build ────────────────────────────────────────
+// Every line is something the engine checks once the component exists, written as the code must write it.
+// d: derivedContract(...) for the project; struct/props: the snapshots; nesting: the composition snapshot.
+export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}, file = null, typography = {} } = {}) {
+  const sel = d.COMPONENT_CSS_SELECTORS[name]?.main;
+  const c = d.CONTRACT[name] ?? {};
+  const s = struct[name] ?? {};
+  if (!sel) return [];
+  const lines = ['  to build. Write it like this; once it exists every line below is checked:'];
+  const vars = Object.fromEntries(Object.entries(d.FIGMA_LAYOUT_TO_CSS));
+  const v = (t) => (t && vars[t] ? `var(${vars[t]})` : null);
+  const base = [];
+  if (typeof c.h === 'number') base.push(`height: ${c.h}px`);
+  if (c.paddingVar) { const tb = v(c.paddingVar.tb), lr = v(c.paddingVar.lr); if (tb || lr) base.push(`padding: ${tb ?? '0'} ${lr ?? '0'}`); }
+  if (v(c.gapVar)) base.push(`gap: ${v(c.gapVar)}`);
+  if (v(c.innerRadiusVar)) base.push(`border-radius: ${v(c.innerRadiusVar)}`);
+  for (const a of d.CSS_BASE_RULE_VARS.filter((x) => x.selector === sel && x.key.startsWith(`${name}/`))) base.push(`${a.prop}: var(${a.expectedVar})`);
+  if (c.strokeOnDefault && !base.some((b) => b.startsWith('border-color'))) base.push('a border on every side');
+  lines.push(`    ${sel} { ${base.join('; ')} }`);
+  if (c.fontSizeVar || c.fontWeightVar) {
+    const t = typography[c.fontSizeVar] ?? {}, w = typography[c.fontWeightVar] ?? {};
+    const vals = [t.size && `font-size ${t.size}`, (w.weight ?? t.weight) && `font-weight ${w.weight ?? t.weight}`, t.lh && `line-height ${t.lh}`].filter(Boolean);
+    lines.push(`    text: the "${c.fontSizeVar ?? c.fontWeightVar}" text style${vals.length ? ` (${vals.join(', ')})` : ''}`);
+  }
+  for (const [prop, map] of Object.entries(c.propertyMap ?? {})) {
+    for (const [value, selector] of Object.entries(map)) {
+      if (selector === sel) continue;
+      const extra = d.CSS_BASE_RULE_VARS.filter((x) => x.selector === selector).map((x) => `${x.prop}: var(${x.expectedVar})`);
+      const op = Object.entries(s.variantOpacity ?? {}).find(([k]) => k === `${prop}=${value}`)?.[1];
+      if (op != null) extra.push(`opacity: ${op}`);
+      lines.push(`    ${prop}=${value} → ${selector}${extra.length ? ` { ${extra.join('; ')} }` : ''}`);
+    }
+  }
+  const role = (props[name]?.annotations ?? []).map((a) => /^role:\s*(.+)$/i.exec(a.label ?? '')?.[1]).find(Boolean);
+  if (role) lines.push(`    role: ${role} (the element a person and a screen reader meet)`);
+  const nested = (nesting[name] ?? []).filter((n) => n !== name && !/^icon[-/ ]/i.test(n));
+  if (nested.length) lines.push(`    uses the system's own ${nested.join(', ')} inside it, never a copy`);
+  lines.push(`    the component file${file ? `: ${file}` : ''} names its props exactly as above (Figma's names), or the project records the code's name in contract.authored.json`);
+  return lines;
+}

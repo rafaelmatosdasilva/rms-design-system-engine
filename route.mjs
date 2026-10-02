@@ -25,6 +25,7 @@ export function projectState(ROOT, { engineDir, env = process.env } = {}) {
   const onPath = String(env.PATH ?? '').split(':').some((d) => d && existsSync(join(d, 'rms-design-system-engine')));
   return {
     hasConfig,
+    build: conf.build === true,
     components: Object.keys(structure?.components ?? {}),
     snapshotDate: oldest ? oldest.toISOString().slice(0, 10) : null,
     cmd: onPath || !engineDir ? 'rms-design-system-engine' : `node ${join(engineDir, 'audit.mjs')}`,
@@ -51,8 +52,13 @@ const FIGMA_URL = /https?:\/\/(?:www\.)?figma\.com\/(?:design|file)\/[\w-]+\S*/i
 const STEP_LIST = /(^|\s)1[.)]\s[\s\S]*\s2[.)]\s/;
 
 // Each rule: [recipe, test, what to run, a note]. First match wins; the order is part of the contract (tested).
+const BUILD_VERB = /\b(build|create|implement|generate|code|constr[oó]i\w*|cria\w*|implementa\w*|gera\w*)\b/i;
+const TO_CODE = /\b(turn|convert|transforma\w*|converte\w*)\b[\s\S]{0,60}\b(into|in|em)\s+(real\s+)?(code|components?|c[oó]digo|componentes)\b/i;
 const RULES = [
   ['guidelines-links', (t) => LINK.test(t)],
+  // Building from Figma (a project that has only Figma, or a component Figma has and the code does not yet):
+  // the engine lists what to build and checks each piece; the agent writes it with the names and values it prints.
+  ['build-from-figma', (t, s) => (TO_CODE.test(t) || BUILD_VERB.test(t) && (/\bfrom (the )?(figma|design)\b|\bdo figma\b|design system|sistema de design|\btokens?\b|\b(components?|componentes?)\b|\binto code\b|em c[oó]digo/i.test(t) || (s.build && s.named.length > 0))) && !/\b(in|no|na)\s+figma\b/i.test(t)],
   ['fix-a-difference', (t) => /\b(change|set|make|update|muda|mudar|altera|alterar|p[oõ]e|coloca)\w*\b[\s\S]{0,60}\b(in|no|na)\s+figma\b|\bfigma\b[\s\S]{0,30}\b(to|para)\s+\d/i.test(t), 'figma'],
   ['refresh-figma', (t) => /maxSnapshotAgeDays|go(es)? green|fica(r)? verde|raise the (age|limit)/i.test(t), 'forbidden-green'],
   // Before accept-debt: "que valores aceita o size" asks what a prop accepts, it accepts no debt.
@@ -81,8 +87,8 @@ export const SAY = {
 };
 
 // route(text, { hasConfig, components, cmd, snapshotDate }) → { recipe, question, run: [commands], notes: [lines], say: [lines], sayIf }
-export function route(text, { hasConfig = true, components = [], cmd = 'rms-design-system-engine', snapshotDate = null } = {}) {
-  const r = routeOnly(text, { hasConfig, components, cmd });
+export function route(text, { hasConfig = true, components = [], cmd = 'rms-design-system-engine', snapshotDate = null, build = false } = {}) {
+  const r = routeOnly(text, { hasConfig, components, cmd, build });
   const say = [];
   let sayIf = null;
   if (r.kind === 'figma') say.push(SAY.figma);
@@ -95,7 +101,7 @@ export function route(text, { hasConfig = true, components = [], cmd = 'rms-desi
   return { ...r, say, sayIf };
 }
 
-function routeOnly(text, { hasConfig, components, cmd }) {
+function routeOnly(text, { hasConfig, components, cmd, build = false }) {
   const t = String(text ?? '');
   const question = QUESTION.test(t);
   const named = namedComponents(t, components);
@@ -110,7 +116,11 @@ function routeOnly(text, { hasConfig, components, cmd }) {
   if (!hasConfig && !LINK.test(t)) return { recipe: 'first-setup', question, run: setupRun(t, cmd, notes), notes };
 
   for (const [recipe, test, kind] of RULES) {
-    if (!test(t)) continue;
+    if (!test(t, { build, named })) continue;
+    if (recipe === 'build-from-figma') {
+      notes.push('Build from Figma: the engine says what to build, in order (tokens first, then each component after the ones it nests), and checks each piece. Write the code only with the names, classes and values the engine prints (--query for a component); write no value Figma does not have: use the closest one the system has and say so, or ask. After each piece, run the scoped check until it passes. Commit nothing unless asked.');
+      return { recipe, question, run: question ? [] : named.length ? [`${cmd} --query ${named.join(' ')}`] : [cmd], notes };
+    }
     if (recipe === 'guidelines-links') return { recipe, question, run: [`${cmd} --guidelines ${links(t).join(' ')}`], notes };
     if (kind === 'figma') {
       notes.push('Nothing is ever changed in Figma by the skill, and it never offers to. Run the audit, then tell the person what to change in Figma.');

@@ -94,3 +94,44 @@ test('setup on a project with no CSS at all starts in build mode', { timeout: 12
   assert.match(r.stdout, /Build mode/);
   assert.ok(!existsSync(join(dir, 'src/styles/tokens.css')), 'the engine writes no theme itself');
 });
+
+test('the edit check knows the tokens still to build, so a new component is checked against them', async () => {
+  const { editTruth } = await import('../edit-check.mjs');
+  const dir = figmaOnly();
+  spawnSync(process.execPath, [join(ENGINE, 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  const t = editTruth(dir, cfgOf(dir));
+  assert.ok(t.tokenByValue.get('#1f5fd6')?.includes('--button-background'));
+  const { build, ...plain } = cfgOf(dir);
+  assert.equal(editTruth(dir, plain).tokenByValue.get('#1f5fd6'), undefined);
+});
+
+test('a component built by the convention is checked: its height, spacing variables, colours and states', async () => {
+  const dir = figmaOnly();
+  spawnSync(process.execPath, [join(ENGINE, 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  const tokens = readFileSync(join(dir, TOKENS_TO_BUILD), 'utf8').replace(/^\/\*.*\*\/\n/, '');
+  const button = (h, gap, hover = true) => `${tokens}
+.button { height: ${h}; padding: var(--padding-xs) var(--padding-m); gap: ${gap}; border-radius: var(--radii-button); background: var(--button-background); color: var(--button-text); }
+${hover ? '.button:hover:not(:disabled) { background: var(--button-background-hover); }' : ''}
+.button:disabled { opacity: 0.5; }
+`;
+  const run = () => spawnSync(process.execPath, [join(ENGINE, 'structure-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  writeFileSync(join(dir, 'src/theme.css'), button('32px', 'var(--gap-s)'));
+  let r = run();
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, /PASS {2}1\/1 CSS height rules/);
+  writeFileSync(join(dir, 'src/theme.css'), button('36px', 'var(--padding-xs)', false));
+  r = run();
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /button: CSS height is 36px - contract expects 32px/);
+  assert.match(r.stdout, /button\/gap: expected var\(--gap-s\)/);
+  assert.match(r.stdout, /button\/State=Hover: "\.button:hover:not\(:disabled\)" not found/);
+});
+
+test('--query prints the build sheet for a component still to build', () => {
+  const dir = figmaOnly();
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.match(r.stdout, /to build\. Write it like this/);
+  assert.match(r.stdout, /\.field \{ height: 36px; padding: var\(--padding-s\) var\(--padding-s\); border-radius: var\(--radii-field\); border-color: var\(--field-border\) \}/);
+  assert.match(r.stdout, /State=Error → \.field\.field--error \{ border-color: var\(--field-border-error\) \}/);
+  assert.match(r.stdout, /NEXT: build field as written above/);
+});

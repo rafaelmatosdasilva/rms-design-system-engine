@@ -55,6 +55,24 @@ try {
   if (m.SURFACE_CONTAINERS)        SURFACE_CONTAINERS        = m.SURFACE_CONTAINERS;
   if (m.BUTTON_CLASS_RULES)        BUTTON_CLASS_RULES        = m.BUTTON_CLASS_RULES;
 } catch { /* optional - runs with empty contract */ }
+// Build mode (a project that starts from Figma): a component built without a structure-contract.mjs entry is
+// compared through the build convention (build-list.mjs), its facts taken from the Figma snapshot. The
+// project's own entries always win.
+if (cfg.build === true) {
+  const { projectDerivedContract } = await import('./build-list.mjs');
+  const loc = createLocator(cfg, { contractSelectors: COMPONENT_CSS_SELECTORS });
+  const naming = resolveNamingSpec(cfg);
+  const d = projectDerivedContract(ROOT, cfg, (n) => loc.classFor(n), (t) => tokenToVar(t, naming));
+  const unbuilt = await inProgressNames(ROOT, cfg);   // still to build: nothing to compare yet
+  const own = new Set(Object.keys(CONTRACT));   // the project's own entries win, whole
+  const built = (o) => Object.fromEntries(Object.entries(o).filter(([n]) => !unbuilt.has(n) && !own.has(n)));
+  CONTRACT = { ...built(d.CONTRACT), ...CONTRACT };
+  COMPONENT_CSS_SELECTORS = { ...built(d.COMPONENT_CSS_SELECTORS), ...COMPONENT_CSS_SELECTORS };
+  CSS_HEIGHT_RULES = { ...built(d.CSS_HEIGHT_RULES), ...CSS_HEIGHT_RULES };
+  FIGMA_LAYOUT_TO_CSS = { ...d.FIGMA_LAYOUT_TO_CSS, ...FIGMA_LAYOUT_TO_CSS };
+  const manual = new Set(CSS_BASE_RULE_VARS.map((a) => `${a.selector}|${a.prop}`));
+  CSS_BASE_RULE_VARS = [...d.CSS_BASE_RULE_VARS.filter((a) => { const n = a.key.split('/')[0]; return !unbuilt.has(n) && !own.has(n) && !manual.has(`${a.selector}|${a.prop}`); }), ...CSS_BASE_RULE_VARS];
+}
 
 // ── Load design-system-engine-map.mjs (EXPLICIT + SKIP_TOKENS for auto-derivation) ─────────
 let EXPLICIT = {}, SKIP_TOKENS = new Set();
@@ -524,6 +542,7 @@ function extractPropVarWithFallback(block, prop) {
   const v = extractPropVar(block, prop);
   if (v !== null) return v;
   if (prop === 'border-color') return extractPropVar(block, 'border');
+  if (prop === 'background-color') return extractPropVar(block, 'background');
   return null;
 }
 

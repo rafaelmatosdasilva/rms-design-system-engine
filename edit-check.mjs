@@ -22,6 +22,7 @@
 // Silent when the edit added none of these. Precise before complete: component tags the catalog does not know
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
+import { TOKENS_TO_BUILD } from './build-list.mjs';   // build mode: the tokens still to build
 import { readFileSync, existsSync } from 'node:fs';
 import { join, relative, resolve, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -141,7 +142,9 @@ export function editTruth(ROOT, cfg = {}) {
   const read = (p) => { try { return readFileSync(resolve(ROOT, p), 'utf8'); } catch { return ''; } };
   const json = (p) => { try { return JSON.parse(read(p)); } catch { return {}; } };
   const themePaths = [cfg.paths?.themeCSS ?? 'src/theme.css', ...[cfg.paths?.pluginCSS ?? []].flat()].flat();
-  const theme = themePaths.map(read).join('\n');
+  // Build mode: the tokens Figma defines and the theme does not declare yet (written by the token check) count as the
+  // system's own, so a component written before or alongside its tokens is still checked against them.
+  const theme = [...themePaths.map(read), cfg.build === true ? read(TOKENS_TO_BUILD) : ''].join('\n');
   const cssVars = [...new Set([...theme.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))];
   const tokenByValue = new Map();
   for (const m of theme.matchAll(/(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\b/g)) {
