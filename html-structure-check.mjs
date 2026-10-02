@@ -12,8 +12,8 @@
 //
 // Stored next to the theme CSS (e.g. src/html-structure.snapshot.json).
 
-import { readFileSync, existsSync, writeFileSync } from 'fs';
-import { join }                                     from 'path';
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname }                                       from 'path';
 import { fingerprint as fingerprintWith, markupClassSet } from './markup-source.mjs';
 
 const ROOT   = process.cwd();
@@ -63,6 +63,7 @@ for (let i = 0; i < plugins.length; i++) {
 // ── Accept mode: overwrite snapshot ──────────────────────────────────────────
 if (ACCEPT) {
   const snap = { _updated: new Date().toISOString().slice(0, 10), ...current };
+  mkdirSync(dirname(absSnap), { recursive: true });   // the theme's folder may not exist yet (a project that starts from Figma)
   writeFileSync(absSnap, JSON.stringify(snap, null, 2) + '\n');
   console.log(`✅ [15] html-structure.snapshot.json accepted - baseline updated`);
   process.exit(0);
@@ -71,6 +72,7 @@ if (ACCEPT) {
 // ── First run (no snapshot): write and pass ───────────────────────────────────
 if (!existsSync(absSnap) || !Object.keys(stored).length) {
   const snap = { _updated: new Date().toISOString().slice(0, 10), ...current };
+  mkdirSync(dirname(absSnap), { recursive: true });   // the theme's folder may not exist yet (a project that starts from Figma)
   writeFileSync(absSnap, JSON.stringify(snap, null, 2) + '\n');
   console.log(`✅ [15] No snapshot found - baseline written (${plugins.length} plugin(s))`);
   process.exit(0);
