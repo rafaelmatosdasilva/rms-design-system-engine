@@ -121,7 +121,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
   const out = {};
   try {
     const { sessionId } = await openPage(send, `http://127.0.0.1:${port}/__page.html`);
-    await waitForTrue(send, sessionId, 'document.readyState === "complete"');
+    await waitForTrue(send, sessionId, 'location.protocol === "http:" && document.readyState === "complete" && !!document.getElementById("root")', { attempts: 200 });
     await send('DOM.enable', {}, sessionId); await send('CSS.enable', {}, sessionId);
     const ev = async (expression) => {
       const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, sessionId);
@@ -199,7 +199,7 @@ export async function cssVariables(dir, names, expectDark = null) {
   const { send, close } = await connectCDP(chrome.wsUrl);
   try {
     const { sessionId } = await openPage(send, `http://127.0.0.1:${port}/__page.html`);
-    await waitForTrue(send, sessionId, 'document.readyState === "complete"');
+    await waitForTrue(send, sessionId, 'location.protocol === "http:" && document.readyState === "complete" && !!document.getElementById("root")', { attempts: 200 });
     const read = async (dm) => {
       await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: dm === 'media' ? 'dark' : 'light' }] }, sessionId);
       const r = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => { const h = document.documentElement; ${dm === 'data' ? "h.setAttribute('data-theme','dark');" : "h.removeAttribute('data-theme');"} h.classList.toggle('dark', ${dm === 'class'}); h.classList.toggle('theme-dark', ${dm === 'class'});
