@@ -125,14 +125,6 @@ comment that switches a check off: fix it in that file before going on. A reques
 `/rms-design-system-engine` arrives already routed (the `ROUTE:` block above). When a hook refuses or asks, that is
 the answer: do not work around it (no other tool, no shell edit); tell the person what it said.
 
-**When someone pastes a GitLab or Notion link to their written guidelines into the chat**, run
-`rms-design-system-engine --guidelines <link>` (several links can be passed at once). Do not edit
-`ds-config.json` by hand and do not fetch the page yourself: the command records the link, reads the page
-into its committed file right away, and says in plain words whether it worked. Relay that result. If it
-says the page could not be read, pass on the one fix it names (usually a token in `.env`), and **never ask
-the person to paste a token into the chat**. `--guidelines` with no link lists the links already set. From
-then on every run refreshes those pages and folds them into the design intent.
-
 **If the `rms-design-system-engine` command is not on PATH** (a plain `command not found`),
 do not stop and do not hand-simulate setup - the engine is a folder of scripts, so run it
 directly with `node ~/.claude/skills/rms-design-system-engine/audit.mjs <same flags>` (the install
@@ -231,38 +223,7 @@ Full parity workflow in one command: Phase 1 (live Figma refresh) runs before Ph
 
 > **When Phase 1 can run, prefer a fresh query** - a same-day snapshot from a *prior session or context window* may miss renames or additions. If you are resuming after a context summary, compaction, or a new conversation and a live refresh is available, re-query. If it is not available, proceed with the committed snapshot and say so - do not block or improvise.
 
-> **A single-mode read is never enough.** When someone hands you a Figma link and asks
-> for the value behind it, `get_variable_defs` (and any Dev Mode read) resolves only the
-> mode the frame is *currently* displaying. Acting on that one value silently guesses
-> every other mode. Always resolve the variable across **all** modes of its collection,
-> following the alias chain in each one - the same variable can alias different
-> primitives per mode. Read it with the Plugin API rather than a Dev Mode value:
->
-> ```js
-> const v    = await figma.variables.getVariableByIdAsync(varId);
-> const coll = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
-> for (const m of coll.modes) { /* v.valuesByMode[m.modeId] - recurse on VARIABLE_ALIAS */ }
-> ```
->
-> **Capture the metadata too, when you refresh.** Record each variable's own `description` into an
-> optional `tokenMeta` sidecar in `figma-vars.snapshot.json` — `tokenMeta["<slashed/name>"] =
-> { description, deprecated }`, with `deprecated: true` when the description carries a `@deprecated`
-> marker — and the component's `description` into the component-props snapshot. The contract emitter
-> surfaces these as DTCG `$description` / `$deprecated` and the component `description`; when they are
-> absent it falls back cleanly, never inventing them. (Figma component-property definitions carry no
-> per-prop description, so a prop's `description` is authored in `contract.authored.json` under
-> `components[name].propDescriptions`.)
->
-> Real case (2026-07-30): `node/icon/hover/color` read from a dark frame returned
-> `#b8b8b8`. It actually aliases `node/icon/selected/color`, which resolves to
-> Neutral 300 in dark but Neutral **400** (`#595959`) in light. Patching from the
-> single dark read would have left light on the old, unrelated value.
-
-> **Every mode-varying token needs a rendered assertion per mode.** A `RENDERED_ASSERTIONS`
-> entry pins one `colorScheme`. If the token resolves differently per mode and only one mode
-> is asserted, the other is unguarded and will drift undetected - which is exactly how the
-> light-mode hover colour above went stale. When you add an assertion for a colour that
-> varies by mode, add the sibling assertion for the other mode in the same commit.
+A Figma value is read in **every mode** of its collection, never from the one a frame shows (`--recipe refresh-figma`, *Read every mode*).
 
 ---
 

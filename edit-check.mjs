@@ -22,6 +22,7 @@
 // Silent when the edit added none of these. Precise before complete: component tags the catalog does not know
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
+import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
 import { TOKENS_TO_BUILD } from './build-list.mjs';   // build mode: the tokens still to build
 import { readFileSync, existsSync } from 'node:fs';
 import { join, relative, resolve, basename } from 'node:path';
@@ -158,6 +159,15 @@ export function editTruth(ROOT, cfg = {}) {
   const figmaRaw = new Set();
   const walkRaw = (o) => { if (typeof o === 'string') { if (/^#[0-9a-f]{3,8}$/i.test(o)) figmaRaw.add(normHex(o)); } else if (o && typeof o === 'object') Object.values(o).forEach(walkRaw); };
   walkRaw(json(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').components ?? {});
+  // Every CSS variable Figma's variables map to (the naming convention), so a token an edit invents is told apart from
+  // one the system has.
+  const figmaVars = new Set();
+  const vars = json(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
+  const spec = resolveNamingSpec(cfg);
+  const addName = (n) => { if (typeof n === 'string' && !n.startsWith('_')) { try { const v = tokenToVar(n, spec); if (v) figmaVars.add(v); } catch { /* a name the convention cannot map */ } } };
+  for (const mode of Object.values(vars.color ?? {})) Object.keys(mode ?? {}).forEach(addName);
+  for (const k of ['sizing', 'strings', 'booleans', 'primitives', 'typography', 'breakpoints']) Object.keys(vars[k] ?? {}).forEach(addName);
+  for (const c of Object.values(vars.modeVariants ?? {})) Object.keys(c?.vars ?? {}).forEach(addName);
   const contracts = cfg.contracts?.out ?? 'contracts';
   const catalog = json(join(contracts, 'catalog.json'));
   const api = json(codeSnapshotPath(cfg)).api ?? {};
@@ -169,12 +179,12 @@ export function editTruth(ROOT, cfg = {}) {
   // The static accessibility rules (I74), with the project's styles read only when an edit removes an outline.
   let styles = null;
   const a11y = cfg.a11yStatic === false ? null : { styles: () => (styles ??= projectStyleText(ROOT)) };
-  return { truth, tokenByValue, figmaRaw, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  return { truth, tokenByValue, figmaRaw, figmaVars, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -198,6 +208,15 @@ export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = 
       }
     }
     if (tailwind) for (const f of arbitraryFindings(l, tailwind)) push(line, `${f.cls} is outside the theme; ${f.fix ? `write ${f.fix}` : `${f.value} is not a design-system value`}`);
+    // A token the edit adds with a value of its own (a colour, a size) that Figma has no variable for: a value the
+    // system does not have, wherever it is declared. One that only points at the system's tokens is composition.
+    if (figmaVars?.size && declaredBefore && !COMMENT.test(l)) {
+      for (const d of l.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) {
+        const [, name, value] = d;
+        if (declaredBefore.has(name) || figmaVars.has(name) || !/#[0-9a-f]{3,8}\b|\b(rgb|hsl|oklch|lab)a?\(|\d(px|rem|em)\b/i.test(value) || /^\s*var\(/.test(value)) continue;
+        push(line, `${name} is a new token Figma has no variable for; use one of the system's tokens, or tell the person the system has no such value (rms-design-system-engine --query <name>)`);
+      }
+    }
     if (isTheme || /^\s*--[\w-]+\s*:/.test(l) || COMMENT.test(l)) continue;   // a token being defined, the theme's own values, a comment
     // A custom-property declaration anywhere on the line (a minified :root{--x: #fff;…}) defines a token.
     const scan = l.replace(/--[\w-]+\s*:[^;}]*/g, ' ').replace(/var\([^)]*\)/g, ' ').replace(/&#x?[0-9a-fA-F]+;/g, ' ');
@@ -248,7 +267,10 @@ export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
   if (!added.length) return null;
   const ctx = editTruth(root, cfg);
   let full = ''; try { full = existsSync(abs) ? readFileSync(abs, 'utf8') : ''; } catch { /* the edit's own text is enough */ }
-  const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs), component: /\.(vue|svelte)$/i.test(abs) });
+  // The tokens the file declared before this edit (its committed text, else the text the edit replaced).
+  const before = head ?? (event?.tool_name === 'Edit' ? String(event.tool_input?.old_string ?? '') : event?.tool_name === 'MultiEdit' ? (event.tool_input?.edits ?? []).map((e) => e.old_string).join('\n') : '');
+  const declaredBefore = new Set([...String(before).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+  const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs), component: /\.(vue|svelte)$/i.test(abs), declaredBefore });
   if (!found.length) return null;
   const lines = found.slice(0, 12).map((f) => `  ${basename(rel)}${f.line ? `:${f.line}` : ''}  ${f.text}`);
   const n = found.length, them = n === 1 ? 'it' : 'them', count = (k) => found.filter((f) => f.kind === k).length;
