@@ -85,6 +85,7 @@ reference it points to say, never from memory or from this table alone.
 | a note in Figma about what a component is or does (a toggle, a button, a heading, its label), accessibility notes, or an accessibility finding explained | `a11y-notes` |
 | components compared with their Figma images | `visual-diff` |
 | to know what to fix first, or to work a library down | `burndown` |
+| something in Figma built in code: the tokens, a component, the whole design system, or a screen from them | `build-from-figma` |
 | a component's props and values, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
 
@@ -151,10 +152,11 @@ node <install-dir>/audit.mjs --init \
   # --figma-source-url='<upstream DS URL>'   # optional: consumer/branded-fork files
 ```
 
-`--theme-css` may be omitted when the engine auto-detects a single token CSS file. If no
-`--theme-css` is given **and none is auto-detected**, setup exits with a clear error rather
-than writing a broken config - which is the signal that the DS declares no static token CSS
-(its token values are injected at runtime from a backend). The value gates resolve against a
+`--theme-css` may be omitted when the engine auto-detects a single token CSS file. A project
+with no CSS at all has only Figma: setup starts it in build mode (`--recipe build-from-figma`).
+If no `--theme-css` is given, none is auto-detected **and** the token values look loaded at
+runtime, setup exits with a clear error rather than writing a broken config - the signal that
+the DS declares no static token CSS (its token values are injected at runtime from a backend). The value gates resolve against a
 static `:root { --token: value }` file; a runtime-token DS has nothing local to compare
 against, so say so plainly instead of forcing a green run.
 

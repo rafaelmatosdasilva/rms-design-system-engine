@@ -79,6 +79,26 @@ node ~/.claude/skills/rms-design-system-engine/parity-check.mjs --fix           
 node ~/.claude/skills/rms-design-system-engine/setup-webhook.mjs --list                 # list registered Figma webhooks for this file
 ```
 
+### Build mode
+
+A project that has only Figma starts in **build mode** (`ds-config.json` → `"build": true`): setup chooses it when the
+project has no CSS at all, or when it runs with `--build`. The engine still writes no code; it says what to build and
+checks each piece once it exists.
+
+- **What is left to build, in order.** The report ends with a `🧱 TO BUILD` line: the tokens first, then each component
+  Figma has and the code does not yet, a component after the ones it nests. NEXT names the next item with its commands.
+  Something still to build is never a failure; once it exists it is compared like everything else.
+- **Tokens.** The token check writes every Figma variable the theme does not declare yet, exactly as the theme should
+  declare it (name, value, the block for each mode and breakpoint), to `.design-system-engine-out/handback/tokens-to-build.css`,
+  to copy into the theme file. A declared token with a wrong value still fails.
+- **Components.** `--query <name>` prints a component's build sheet: its class, height, padding, gap, radius and colours
+  with their variables, the text style, the selector of each state and variant (a modifier class such as `.chip--l`,
+  a pseudo-class for a state: `:hover:not(:disabled)`, `:active`, `:focus-visible`, `:disabled`), its role and the
+  components it nests. Every line is what the structure check compares once the component exists, so a component
+  built from the sheet needs no `structure-contract.mjs` entry; an entry the project writes always wins.
+- **While building.** The edit check counts the tokens still to build as the system's own, so a component written
+  before its tokens is still checked against them. Unused tokens are expected and do not fail.
+
 ### The design-intent layer (auto OUTPUT, never a gate)
 
 The design-intent layer is an **output**, not a verification — the same category as the
