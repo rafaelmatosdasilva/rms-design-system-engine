@@ -24,8 +24,9 @@ export function measuredLines(gates) {
     .filter((t) => /^⚠️\s+\S+ .*: Figma .*, rendered |while disabled \(/.test(t));
 }
 
-// state: { failing: [gate], scope: [names], handback: { code, figma }, burndownNext, baselineWritten: { count, file }, cmd }
-export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, cmd = 'rms-design-system-engine' } = {}) {
+// state: { failing: [gate], scope: [names], handback: { code, figma }, burndownNext, baselineWritten: { count, file },
+//         toBuild: { tokens, file, theme, components } (build mode), cmd }
+export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, toBuild = null, cmd = 'rms-design-system-engine' } = {}) {
   const rerun = scope.length ? `${cmd} --component ${scope.join(',')}` : cmd;
   if (baselineWritten) return `NEXT: tell the user ${baselineWritten.file} now holds the accepted debt; commit it only when they ask.`;
   if (failing.length) {
@@ -34,6 +35,12 @@ export function nextStep({ failing = [], scope = [], handback = {}, burndownNext
   }
   if (handback.code) return `NEXT: show the user ${handback.code}; apply it only when they ask (git apply ${handback.code}), then run ${rerun}.`;
   if (handback.figma) return `NEXT: show the user ${handback.figma}, the changes to make in Figma. Nothing is changed in Figma by the skill.`;
+  // Build mode: what is built matches; build the next thing, tokens first, then one component at a time.
+  if (toBuild?.tokens) return `NEXT: build the tokens: copy the declarations in ${toBuild.file} into ${toBuild.theme ?? 'the theme CSS'}, then run ${cmd}.`;
+  if (toBuild?.components?.length) {
+    const c = toBuild.components[0];
+    return `NEXT: build ${c}: run ${cmd} --query ${c} for what it needs, write it with those names, then run ${cmd} --component ${c} until it passes.`;
+  }
   if (burndownNext && !scope.length) return `NEXT: ${cmd} --component ${burndownNext}`;
   return 'NEXT: nothing to do. Parity holds for what was checked.';
 }
@@ -55,7 +62,7 @@ export function dataStateLine({ refreshedFromApi = false, snapshots = [], cmd = 
 
 // only: { words, a11y: { static, browser } | null } when the run was --only: the summary says what ran, so a part
 // never reads as the whole system.
-export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null } = {}) {
+export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null, toBuild = null } = {}) {
   const lines = [];
   const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
   const debt = gates.filter((g) => g.baselined);
@@ -64,6 +71,7 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
     : verdict === 'failed' ? `**Not in parity.** ${failing.length} of ${gates.length} gate${gates.length === 1 ? ' fails' : 's fail'}.`
     : verdict === 'debt' ? `**No regressions.** ${debt.length} gate${debt.length === 1 ? '' : 's'} carry accepted debt.`
       : only && !gates.length ? '**Accessibility checked.** Its findings are advice: the report lists each with its fix.'
+      : toBuild ? `**What is built matches Figma.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}; the rest is still to build.`
       : `**In parity.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}.`);
   if (only) {
     lines.push('', `Only ${only.words} ran in this run; nothing else was checked.`);
@@ -87,6 +95,7 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
     if (measured.length > 8) lines.push(`- and ${measured.length - 8} more`);
   }
   if (burndown.length) lines.push('', burndown[0].replace(/^📉\s*/, ''));
+  if (toBuild) lines.push('', toBuild);
   if (next) lines.push('', next);
   return lines.join('\n') + '\n';
 }

@@ -26,6 +26,7 @@ import { loadCssSources, rootTokens, blankComments, neverAppliedRootSelectors } 
 import { readFreshSnapshot } from './code-capture.mjs';
 import { colorHex, sameColor, sameValue } from './css-values.mjs';   // #fff = #ffffff, rgb()/hsl()/oklch() = hex, 0.5rem = 8px   // the cascade-aware theme reader (shared with the code capture)
 import { resolveNamingSpec, tokenToVar as toVar } from './naming-convention.mjs';   // shared Figma↔code naming convention
+import { isBuildMode, writeTokensToBuild } from './build-list.mjs';   // build mode: tokens still to build
 
 const ROOT     = process.cwd();
 import { pathToFileURL } from 'url';
@@ -411,7 +412,7 @@ for (let modeIdx = 0; modeIdx < MODES.length; modeIdx++) {
       if (usedVarsLower.has(cssVar.toLowerCase())) {
         SKIP.push({ dimension: 'color', token, cssVar, mode: modeMeta.name, reason: 'runtime-injected - used in code, not in static token CSS (backend stylesheet)' });
       } else {
-        FAIL.push({ dimension: 'color', token, cssVar, mode: modeMeta.name, issue: `CSS var not declared in token CSS`, fixHint: `Add ${cssVar} to ${THEME_LABEL}` });
+        FAIL.push({ dimension: 'color', token, cssVar, mode: modeMeta.name, issue: `CSS var not declared in token CSS`, fixHint: `Add ${cssVar} to ${THEME_LABEL}`, value: figmaHex, modeIdx });
       }
       continue;
     }
@@ -508,7 +509,7 @@ for (const [token, figmaVal] of Object.entries(snap.sizing ?? {})) {
     if (usedVarsLower.has(cssVar.toLowerCase())) {
       SKIP.push({ dimension: 'sizing', token, cssVar, mode: '-', reason: 'runtime-injected - used in code, not in static token CSS (backend stylesheet)' });
     } else {
-      FAIL.push({ dimension: 'sizing', token, cssVar, mode: '-', issue: 'CSS var not declared', fixHint: `Add ${cssVar}: ${figmaVal} to ${THEME_PATH}` });
+      FAIL.push({ dimension: 'sizing', token, cssVar, mode: '-', issue: 'CSS var not declared', fixHint: `Add ${cssVar}: ${figmaVal} to ${THEME_PATH}`, value: figmaVal });
     }
     continue;
   }
@@ -549,7 +550,7 @@ if (snap.typography && Object.keys(TYPO).length) {
       if (usedVarsLower.has(cssVar.toLowerCase())) {
         SKIP.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar, mode: '-', reason: 'runtime-injected - used in code, not in static token CSS (backend stylesheet)' });
       } else {
-        FAIL.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar, mode: '-', issue: 'CSS var not declared', fixHint: `Add ${cssVar}: ${figmaVal} to ${THEME_PATH}` });
+        FAIL.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar, mode: '-', issue: 'CSS var not declared', fixHint: `Add ${cssVar}: ${figmaVal} to ${THEME_PATH}`, value: figmaVal });
       }
       continue;
     }
@@ -625,7 +626,7 @@ for (const [tokenName, expected] of Object.entries(strSnap)) {
     if (usedVarsLower.has(cssVar.toLowerCase())) {
       SKIP.push({ dimension: 'strings', token: tokenName, cssVar, mode: '-', reason: 'runtime-injected - used in code, not in static token CSS (backend stylesheet)' });
     } else {
-      FAIL.push({ dimension: 'strings', token: tokenName, cssVar, mode: '-', issue: 'CSS var not declared', fixHint: `Add ${cssVar}: ${expected} to ${THEME_PATH}` });
+      FAIL.push({ dimension: 'strings', token: tokenName, cssVar, mode: '-', issue: 'CSS var not declared', fixHint: `Add ${cssVar}: ${expected} to ${THEME_PATH}`, value: expected });
     }
     continue;
   }
@@ -686,7 +687,7 @@ if (bpModeNames.length > 0) {
         const fix = modeIdx === 0
           ? `Add ${cssVar}: ${expected} to :root in ${THEME_PATH}`
           : `Add ${cssVar}: ${expected} inside @media (min-width: ${width}px) in ${THEME_PATH}`;
-        FAIL.push({ dimension: 'breakpoints', token: tokenName, cssVar, mode: modeName, issue: modeIdx === 0 ? 'CSS var not declared in :root' : `missing in @media (min-width: ${width}px)`, fixHint: fix });
+        FAIL.push({ dimension: 'breakpoints', token: tokenName, cssVar, mode: modeName, issue: modeIdx === 0 ? 'CSS var not declared in :root' : `missing in @media (min-width: ${width}px)`, fixHint: fix, value: expected, ...(modeIdx === 0 ? {} : { media: `(min-width: ${width}px)` }) });
       } else if (actual !== expected) {
         FAIL.push({ dimension: 'breakpoints', token: tokenName, cssVar, mode: modeName, figma: expected, css: actual, hint: `@media ${width}px: CSS has ${actual} but Figma says ${expected}` });
       } else {
@@ -821,6 +822,19 @@ if (FIX_MODE && autoFixes.length > 0 && THEME_PATHS.length > 1) {
 // engine used to document them), but no browser applies them: :root has no ancestor. Advisory.
 const NEVER_APPLIED = neverAppliedRootSelectors(TOKEN_SOURCES);
 
+// ── Build mode: a token not declared yet is to build, not a failure ──────────
+// A project that starts from Figma (ds-config.json → build: true) has tokens Figma defines and the theme does not
+// declare yet. They are written out, exactly, in the hand-back folder for the agent or a person to copy into the
+// theme; a declared token with a wrong value still fails.
+let TO_BUILD = [];
+if (isBuildMode(cfg)) {
+  const notDeclared = (f) => f.issue && /not declared|^missing in @media/.test(f.issue) && f.value != null;
+  TO_BUILD = FAIL.filter(notDeclared);
+  for (let i = FAIL.length - 1; i >= 0; i--) if (notDeclared(FAIL[i])) FAIL.splice(i, 1);
+  const w = writeTokensToBuild(ROOT, TO_BUILD, MODES, THEME_PATH);
+  if (w) console.log(`🧱 TO BUILD  ${w.count} token(s) Figma defines and ${THEME_PATH} does not declare yet: the exact declarations are in ${w.file}. Copy them into ${THEME_PATH}; this check then compares each one.`);
+}
+
 // ── Report ────────────────────────────────────────────────────────────────────
 const _extraDims = [
   Object.keys(strSnap).length  > 0 && 'font strings',
@@ -930,6 +944,6 @@ if (JSON_MODE) {
 }
 
 if (!parityMapBroken && FAIL.length === 0 && NEW_SKIP.length === 0 && ALIAS_FAIL.length === 0 && EFFECTS_FAIL.length === 0 && SCOPE_FAIL.length === 0) {
-  console.log('\nAll resolved CSS values match Figma snapshot. ✓\n');
+  console.log(TO_BUILD.length ? `\nEvery declared token matches the Figma snapshot. ✓ ${new Set(TO_BUILD.map((t) => t.cssVar)).size} still to build.\n` : '\nAll resolved CSS values match Figma snapshot. ✓\n');
   process.exit(0);
 } else { console.log(''); process.exit(1); }
