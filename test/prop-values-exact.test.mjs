@@ -68,3 +68,26 @@ test('the vocabulary: counterparts by meaning, never for the same name; rejected
   assert.ok(!('large' in r) && !('medium' in r));
   assert.equal(rightFor(r, 'LG'), 'large');
 });
+
+// A React component's destructured props, every one of them: `{ children, label, … }` used to lose every prop that
+// followed a plain one, because each match took the comma the next one starts with.
+const reactProject = (authored) => ({
+  'ds-config.json': { paths: { snapshotVars: 'figma-vars.snapshot.json' }, componentSrcDirs: ['src'] },
+  'figma-component-props.snapshot.json': { Button: { properties: {
+    'Label#3:4': { type: 'TEXT', defaultValue: 'Save' }, Disabled: { type: 'BOOLEAN', defaultValue: false } } } },
+  'src/Button.jsx': `export function Button({\n  children,\n  label,\n  disabled = false,\n  type = 'button',\n}) {\n  return <button className="button" type={type} disabled={disabled}>{children ?? label}</button>;\n}\n`,
+  ...(authored ? { 'contract.authored.json': { components: { Button: { bindings: authored } } } } : {}),
+});
+
+test('every destructured React prop is read, so label is found', async () => {
+  const { extractReact } = await import('../component-source.mjs');
+  assert.deepEqual([...extractReact('function A({ a, b, c = 1, d: e, f })')], ['a', 'b', 'c', 'd', 'f']);
+  const { out } = runGate(GATE, reactProject(null));
+  assert.doesNotMatch(out, /Figma property "Label" has no code prop/);
+  assert.match(out, /Button\/Label: the code names it "label"/);
+});
+
+test('a name recorded in contract.authored.json bindings is the agreed one, letter case included', () => {
+  const { code, out } = runGate(GATE, reactProject({ Label: { attribute: 'label' }, Disabled: { attribute: 'disabled' } }));
+  assert.equal(code, 0, out);
+});
