@@ -120,7 +120,7 @@
        ✅ MODELLED   3/3 DS components have at least one check
        ℹ️  NO RENDERED 3  (geometry/color only checked statically - no browser assertion)
        ℹ️  SINGLE-VARIANT 3  (no per-variant capture - sibling states invisible to the audit)
-       ℹ️  CODE CAPTURE tokens 17 (0 verified · 0 uncertain) · components 3/3 measured · props 5 on 2 component(s) (0 uncertain) · icons 0 · nesting 1 (source only)  - read by static CSS only
+       ℹ️  CODE CAPTURE tokens 17 (0 verified · 0 uncertain) · components 3/3 measured · props 7 on 2 component(s) (0 uncertain) · icons 0 · nesting 1 (source only)  - read by static CSS only
        ⚠️  CODE CAPTURE no styleguide configured (ds-config.json → styleguide.template)
        ✅ MODE COVERAGE  every mode-pinned rendered assertion covers all 2 modes (light/dark)
        ℹ️  IN PROGRESS 1  (not drift, never fails): tag (experimental, only in Figma)

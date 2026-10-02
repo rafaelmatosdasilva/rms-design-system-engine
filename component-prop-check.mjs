@@ -318,6 +318,10 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     }
 
     const fn = norm(fp);
+    // A name the project recorded for this prop (contract.authored.json bindings, componentPropAliases) is the
+    // agreed one: it is read before the letter-case comparison, so Disabled bound to "disabled" is a match.
+    const bound = aliases[fp] != null ? Object.keys(api.props).find((p) => p === aliases[fp]) : null;
+    if (bound) { matchedCode.add(norm(bound)); OK.push(`${figmaName}/${fp} → ${bound} (alias)`); const v = checkValues(fp, def, bound); pushRow(bound, v.codeValue, v.status); continue; }
     if (codeNorm.has(fn)) {
       matchedCode.add(fn);
       const cp = codeNorm.get(fn);
@@ -330,7 +334,10 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     missingHere.push(fp);   // row added after rename-pairing below
     MISSING.push(`${figmaName}: Figma property "${fp}" has no code prop  (${rel})`);
   }
-  const extraHere = [...codeNorm.entries()].filter(([cn]) => !matchedCode.has(cn));
+  // A code prop that is not a design decision is never "not in Figma": an event handler (onClick), and the plumbing
+  // every component passes through (children, className, style, ref, key, id, aria-*, data-*).
+  const PLUMBING = /^(on[A-Z]\w*|children|className|class|style|ref|key|id|aria-[\w-]+|data-[\w-]+)$/;
+  const extraHere = [...codeNorm.entries()].filter(([cn, cp]) => !matchedCode.has(cn) && !PLUMBING.test(cp));
 
   // Pair an unmatched Figma prop with an unused code prop when one name clearly contains the
   // other (>=3 chars) → a RENAME row (and consume that code prop so it isn't also 'extra').
