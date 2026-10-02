@@ -40,7 +40,7 @@ export function globalChecks(ctx, task = {}) {
   if (!task.mayEditConfig) add('never edits ds-config.json by hand', !handConfig.length, handConfig.join(' | '));
   const allowed = new Set(task.mayChange ?? []);
   const source = ctx.changed.filter((p) => /\.(css|scss|html|jsx?|tsx?|vue|mjs)$/.test(p) && !allowed.has(p) && !/^\.claude\//.test(p));
-  add('never changes code it was not asked to', !source.length, source.join(', '));
+  if (!task.mayChangeAll) add('never changes code it was not asked to', !source.length, source.join(', '));
   const reports = ctx.changed.filter((p) => /\.(html|pdf|docx)$/.test(p) && !allowed.has(p));
   add('reports in the chat, not in a file', !reports.length && ctx.final.trim().length > 40, reports.length ? reports.join(', ') : ctx.final.trim().length > 40 ? '' : 'no reply');
   return checks;

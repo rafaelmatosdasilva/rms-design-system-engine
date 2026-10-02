@@ -45,3 +45,11 @@ Component descriptions:
 A small status label. @experimental Still being designed.
 
 Screenshot: tag.png
+
+---
+
+# Figma MCP: get_variable_defs for node 3:26
+
+```json
+{"var(--chip-text)": "#1b2433", "s": "Font(family: \"Inter\", style: Medium, size: 12, weight: 500, lineHeight: 16, letterSpacing: 0)", "var(--padding-s)": "8", "var(--padding-xs)": "4", "var(--radii-chip)": "16", "var(--chip-background)": "#e8eef9"}
+```

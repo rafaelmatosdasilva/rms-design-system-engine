@@ -31,7 +31,9 @@ export function projectHash(source = DEMO) {
 }
 
 // A fresh project from `source`, prepared by the task's setup, committed once, hooks installed.
-export function makeProject(source, setup) {
+// engine: false (the build evaluation's MCP-only side) leaves out everything the skill gives a project: its config,
+// the Figma snapshots it captured, and its hooks.
+export function makeProject(source, setup, { engine = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'skill-eval-'));
   cpSync(source, dir, { recursive: true, filter: (p) => !NOT_PROJECT.test(p) });
   const today = new Date().toISOString();
@@ -39,9 +41,10 @@ export function makeProject(source, setup) {
     writeFileSync(f, readFileSync(f, 'utf8').replace(/"_updated": "[^"]*"/, `"_updated": "${today}"`));
   }
   setup?.(dir);
+  if (!engine) for (const p of ['ds-config.json', 'src/figma']) rmSync(join(dir, p), { recursive: true, force: true });
   const env = { ...process.env, ...GIT_ENV };
   execFileSync('git', ['init', '-q'], { cwd: dir, env });
-  if (existsSync(join(dir, 'ds-config.json'))) execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--install-hooks'], { cwd: dir, stdio: 'ignore' });
+  if (engine && existsSync(join(dir, 'ds-config.json'))) execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--install-hooks'], { cwd: dir, stdio: 'ignore' });
   execFileSync('git', ['add', '-A'], { cwd: dir, env });
   execFileSync('git', ['commit', '-qm', 'init'], { cwd: dir, env });
   return dir;
@@ -65,7 +68,8 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
   // never another checkout on the machine. A variant that installs its own skill folder there keeps it.
   mkdirSync(join(home, '.claude', 'skills'), { recursive: true });
   variant.install(home);
-  if (!existsSync(join(home, '.claude', 'skills', 'rms-design-system-engine'))) symlinkSync(ENGINE, join(home, '.claude', 'skills', 'rms-design-system-engine'));
+  if (variant.engine === false) cliOnPath = false;   // no skill, no engine: nothing of it on the machine
+  else if (!existsSync(join(home, '.claude', 'skills', 'rms-design-system-engine'))) symlinkSync(ENGINE, join(home, '.claude', 'skills', 'rms-design-system-engine'));
   const bin = join(home, 'bin');
   mkdirSync(bin, { recursive: true });
   if (cliOnPath) {

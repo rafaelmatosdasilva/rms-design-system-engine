@@ -142,3 +142,11 @@ A small status label. @experimental Still being designed.
 The main action on a screen.
 
 Screenshot: settings.png
+
+---
+
+# Figma MCP: get_variable_defs for node 3:28
+
+```json
+{"var(--text-primary)": "#1b2433", "m": "Font(family: \"Inter\", style: Medium, size: 14, weight: 500, lineHeight: 20, letterSpacing: 0)", "var(--padding-s)": "8", "var(--radii-field)": "6", "var(--stroke-default)": "1", "var(--field-border)": "#7d8799", "var(--chip-text)": "#1b2433", "s": "Font(family: \"Inter\", style: Medium, size: 12, weight: 500, lineHeight: 16, letterSpacing: 0)", "var(--gap-s)": "4", "var(--padding-xs)": "4", "var(--radii-chip)": "16", "var(--chip-background)": "#e8eef9", "var(--button-text)": "#ffffff", "var(--padding-m)": "12", "var(--radii-button)": "8", "var(--button-background)": "#1f5fd6", "var(--surface-page)": "#ffffff"}
+```

@@ -58,3 +58,11 @@ Images and SVGs will be stored as constants, e.g. const image = `${assetPathPref
 Some elements have annotation data attributes. They provide extra information about how the element should be implemented. IMPORTANT: Do not ignore these annotation attributes. They should not appear in your final code.
 
 Screenshot: chip.png
+
+---
+
+# Figma MCP: get_variable_defs for node 3:16
+
+```json
+{"var(--chip-text)": "#1b2433", "s": "Font(family: \"Inter\", style: Medium, size: 12, weight: 500, lineHeight: 16, letterSpacing: 0)", "var(--gap-s)": "4", "var(--padding-s)": "8", "var(--padding-xs)": "4", "var(--radii-chip)": "16", "var(--chip-background)": "#e8eef9"}
+```
