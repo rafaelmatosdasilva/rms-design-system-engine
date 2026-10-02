@@ -29,7 +29,7 @@ const normName = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 export function usesComponent(src, name, cls = null) {
   const c = String(cls ?? '').replace(/^\./, '');
   if (c) {
-    const esc = c.replace(/[.*+?^${}()|[\]\\]/g, '\\const isBenignDim = (d) => /^0(?:px|rem|em)$/.test(d);');
+    const esc = c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     if (new RegExp(`(?:^|[^\\w-])${esc}(?![\\w-])`).test(src)) return true;
   }
   const want = normName(name);

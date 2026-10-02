@@ -102,3 +102,9 @@ test('each component\'s classes against Figma: height, padding, corner and colou
   assert.deepEqual(utilityFindings({ structure, files: {}, varOf }), []);
   assert.deepEqual(utilityFindings({ structure, files: { button: '<button className="bg-action-primary">' }, varOf }), []);
 });
+
+test('a theme variable with a dot in its name is used through its utility', async () => {
+  const { usedByUtility } = await import('../tailwind-check.mjs');
+  assert.equal(usedByUtility('--spacing-0.5', '<div class="p-0.5">'), true);
+  assert.equal(usedByUtility('--spacing-0.5', '<div class="p-0x5">'), false);
+});
