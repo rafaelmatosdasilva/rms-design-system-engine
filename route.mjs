@@ -178,7 +178,10 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
     if (recipe === 'prototype') {
       notes.push('A prototype is made only of the design system\'s components with their own options, and the engine\'s layout pieces; never write HTML, CSS or a component for it, and never change the system\'s files. Write it as a composition in prototypes/<name>.json, run --prototype on it, and fix each ❌ line until it is drawn. A need nothing fits is a Missing box; tell the person every gap it lists, as written.');
       // "What can a prototype use?" is answered by the catalog itself; only a how-to is answered from the recipe alone.
-      return { recipe, question, run: question && /^\s*(how|why|como|porqu)/i.test(t) ? [] : [`${cmd} --prototype --catalog`], notes };
+      if (question && /^\s*(how|why|como|porqu)/i.test(t)) return { recipe, question, run: [], notes };
+      // "Are our prototype pages consistent?": every page against the others.
+      if (/\b(consisten\w*|coeren\w*|match(es|ing)?|same as|alinhad\w*|iguais)\b/i.test(t) && (question || /\b(check|compare|verif\w*|compar\w*)\b/i.test(t))) return { recipe, question, run: [`${cmd} --prototype --consistency`], notes };
+      return { recipe, question, run: [`${cmd} --prototype --catalog`], notes };
     }
     if (kind === 'figma') {
       notes.push('Nothing is ever changed in Figma by the skill, and it never offers to. Run the audit, then tell the person what to change in Figma.');

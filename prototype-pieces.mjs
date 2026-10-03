@@ -113,6 +113,9 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     if (pieces[node.component]) { if (node.component !== 'Text') (used[node.component] ??= []).push(node.id); continue; }
     if (p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: node.component, used: node.component, prototype: name, node: node.id });
     if (!catalog.components?.[node.component]) continue;   // checkUi already said so
+    // A component the team has retired is never put in a new screen: its replacement is.
+    const def = catalog.components[node.component];
+    if (/^(deprecated|removed|obsolete)$/i.test(def.status ?? '')) findings.push({ rule: 1, level: 'error', id: node.id, message: `${node.component} is ${def.status}${def.useInstead?.length ? `: use ${def.useInstead.join(' or ')} instead` : ': the team retired it, so it is not used in a new screen'}` });
     const v = drawable[node.component];
     if (!v) {
       gaps.push({ need: `${node.component} built in code`, kind: 'component', closest: null, used: null, prototype: name, node: node.id, note: 'in Figma, not built in the code yet: drawn as a labelled box' });
