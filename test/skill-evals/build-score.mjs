@@ -15,7 +15,10 @@ import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../../cdp.mjs';
 
-const ts = createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript');
+// TypeScript, from the global npm folder, loaded when a build is first transpiled: the scorer's other helpers (the
+// prototype scorer imports them) work on a machine that has none.
+let tsModule = null;
+const tsLib = () => (tsModule ??= createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript'));
 
 // ── The React stand-in: enough for a presentational component, nothing more ──────────────────────────────────
 const REACT_SHIM = `
@@ -64,6 +67,7 @@ function transpile(src, file) {
     .replace(/^\s*import\s+(\w+)\s+from\s+['"]([^'"]+\.module\.(css|scss))['"];?/gm, (_, n) => `const ${n} = new Proxy({}, { get: (_t, k) => String(k) });`)
     .replace(/^\s*import\s+['"][^'"]+\.(css|scss)['"];?/gm, '')
     .replace(/^\s*import\s+[^;]*?from\s+['"][^'"]+\.(css|scss|svg|png)['"];?/gm, '');
+  const ts = tsLib();
   const out = ts.transpileModule(code, { fileName: file, compilerOptions: { jsx: ts.JsxEmit.React, jsxFactory: '__h', jsxFragmentFactory: '__F', target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext } }).outputText;
   return `import { createElement as __h, Fragment as __F } from '/__react.js';\n${out.replace(/from\s+['"](react|react\/jsx-runtime)['"]/g, "from '/__react.js'")}`;
 }
