@@ -263,6 +263,8 @@ export function routePrompt(event, { root, engineDir = ENGINE, cfg = {}, env = p
   const state = projectState(root, { engineDir, env });
   const r = route(text, state);
   rememberSay(root, event, r.say);
+  // A prototype request is kept for the catalog, which puts what the person asked for against everything it knows.
+  if (r.recipe === 'prototype') { try { const f = join(root, OUT_DIR, 'prototypes', 'request.json'); mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, JSON.stringify({ at: new Date().toISOString(), text }, null, 2) + '\n'); } catch { /* a help, never a blocker */ } }
   let recipe = '';
   try { recipe = readDoc(engineDir, 'recipe', r.recipe) ?? ''; } catch { /* the pointer line still names it */ }
   return `The engine already routed this request (rms-design-system-engine's project hook); follow it and do not run --route again.\n${routeText(r, recipe, state.cmd, { maxRecipe: MAX_RECIPE })}`;

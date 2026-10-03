@@ -55,8 +55,8 @@ test('a gap is named when the thing and a word saying it is not there are close'
   assert.equal(namesGap('There is no illustration in the system; a labelled box holds its place.', 'illustrations?|images?'), true);
 });
 
-test('five prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
-  assert.deepEqual(PROTO.map((t) => t.id), ['proto-settings', 'proto-search', 'proto-empty', 'proto-profile', 'proto-dialog']);
+test('six prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
+  assert.deepEqual(PROTO.map((t) => t.id), ['proto-settings', 'proto-search', 'proto-empty', 'proto-profile', 'proto-dialog', 'proto-linked']);
   assert.ok(PROTO.every((t) => t.mayWriteHtml && t.mayChangeAll && typeof t.setup === 'function'));
 });
 
@@ -74,4 +74,11 @@ test('one button on the screen: a second one breaks the guidelines', async () =>
   const { oneButton } = await import('./skill-evals/proto-tasks.mjs');
   assert.equal(oneButton(ctx({ 'prototypes/d.json': JSON.stringify({ component: 'Page', children: [{ component: 'button', props: { Label: 'Delete' } }, { component: 'Missing', props: { need: 'a link for Cancel' } }] }) })).ok, true);
   assert.equal(oneButton(ctx({ 'src/screens/D.jsx': "import Button from '../components/Button.jsx';\nexport default function D() { return <div><Button Label='Delete' /><Button Label='Cancel' /></div>; }" })).ok, false);
+});
+
+test('a component the guidelines rule out for the request is found in a composition and in JSX', async () => {
+  const { avoids } = await import('./skill-evals/proto-tasks.mjs');
+  assert.equal(avoids(ctx({ 'prototypes/a.json': JSON.stringify({ component: 'Page', children: [{ component: 'Missing', props: { need: 'a toast confirming the save' } }] }) }), 'tag', 'x').ok, true);
+  assert.equal(avoids(ctx({ 'prototypes/a.json': JSON.stringify({ component: 'Page', children: [{ component: 'tag', props: { Label: 'Saved' } }] }) }), 'tag', 'x').ok, false);
+  assert.equal(avoids(ctx({ 'src/screens/A.jsx': "import Tag from '../components/Tag.jsx';\nexport default function A() { return <Tag Label='Saved' />; }" }), 'tag', 'x').ok, false);
 });

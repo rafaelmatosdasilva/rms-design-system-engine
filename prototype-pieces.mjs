@@ -92,7 +92,9 @@ function withoutNotes(ui) {
 
 // catalog: contracts/catalog.json · view: the style guide's agreed view (what can be drawn) · scales: systemScales().
 // Returns { ok, findings, counts, gaps, drawable: { name: component view }, pieces } (findings as checkUi's).
-export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [] } = {}) {
+// limits: the guidelines' "at most n <component> per screen" ([{ component, max, per, sentence, from }]).
+// breakpoints: the system's screen widths ([{ name, px }]); a Page.width that is none of them is a warning.
+export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [], limits = [], breakpoints = [] } = {}) {
   const systemNames = Object.keys(catalog.components ?? {});
   const pieces = pieceCatalog(scales, systemNames);
   const r = checkUi(withoutNotes(ui), { ...catalog, components: { ...catalog.components, ...pieces } });
@@ -125,6 +127,16 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const agreed = new Set((v.controls ?? []).flatMap((c) => [c.label, c.prop]));
     for (const k of Object.keys(p)) if (k !== 'standInFor' && !agreed.has(k)) findings.push({ rule: 2, level: 'warning', id: node.id, message: `${node.component}.${k} is not agreed between Figma and the code yet: drawn with its default` });
   }
+  // The team's written limits: a component used more often than its guidelines allow.
+  const count = new Map();
+  for (const node of nodes) count.set(node.component, (count.get(node.component) ?? 0) + 1);
+  for (const l of limits) {
+    const n = count.get(l.component) ?? 0;
+    if (n > l.max) findings.push({ rule: null, source: 'the team\'s guidelines', level: 'error', id: null, message: `${n} ${l.component} on this ${l.per}, and the guidelines allow ${l.max}: "${l.sentence}" (${l.from}). Keep ${l.max === 1 ? 'the main one' : `${l.max}`}; for the rest use what the guidelines name, or a Missing box when the system lacks it` });
+  }
+  const root = nodes.find((n) => n.component === 'Page');
+  const w = root?.props?.width != null ? Number(root.props.width) : null;
+  if (w && breakpoints.length && !breakpoints.some((b) => Math.abs(b.px - w) < 1)) findings.push({ rule: null, source: 'the system\'s screen widths', level: 'warning', id: root.id, message: `Page.width ${w} is none of the system's screen widths: ${breakpoints.map((b) => `${b.name} (${b.px})`).join(', ')}` });
   // Gaps written beside the composition (a screen's starting point carries what its screen used that the system lacks).
   for (const g of declared) if (g?.need) gaps.push({ need: String(g.need), kind: GAP_KINDS.includes(g.kind) ? g.kind : 'component', closest: g.closest ?? null, used: g.used ?? null, prototype: name, node: null, ...(g.note ? { note: g.note } : {}) });
   // The engine's layout pieces stand in for layout components the system does not have.
