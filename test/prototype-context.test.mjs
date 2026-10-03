@@ -175,6 +175,12 @@ test('the request: a component its documentation rules out is named as ruled out
   assert.ok(r.findings.some((x) => x.level === 'error' && /tag is not for "confirmation message": "Never a message that comes and goes/.test(x.message)));
 });
 
+test('a stand-in made of the engine\'s own Text is still a gap', () => {
+  const r = checkPrototype({ component: 'Page', children: [{ component: 'Text', props: { text: 'Changes saved', style: 's' }, standInFor: 'a confirmation that goes away' }] }, { catalog, view: { components: [] }, scales: { spacing: [], text: [{ name: 's', size: '12px', lh: '16px', weight: '500' }] } });
+  assert.equal(r.ok, true, JSON.stringify(r.findings));
+  assert.ok(r.gaps.some((g) => g.need === 'a confirmation that goes away' && g.used === "the engine's Text"));
+});
+
 // ── End to end on a built Tidepool with written guidelines ────────────────────────────────────────────────────────
 test('the catalog shows what each component is for and the product\'s pages; a drawn prototype is held to both', { timeout: 600000 }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'tp-context-'));

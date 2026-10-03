@@ -114,6 +114,8 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
       continue;
     }
     if (node.component === 'Page' && pieces.Page && p.width != null && !/^\d{2,4}$/.test(String(p.width))) findings.push({ rule: 2, level: 'error', id: node.id, message: `Page.width is the screen's width in px (like "820"), not ${JSON.stringify(p.width)}` });
+    // A stand-in is a gap whatever stands in, the engine's own Text included.
+    if (pieces[node.component] && p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: null, used: `the engine's ${node.component}`, prototype: name, node: node.id });
     if (pieces[node.component]) { if (node.component !== 'Text') (used[node.component] ??= []).push(node.id); continue; }
     if (p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: node.component, used: node.component, prototype: name, node: node.id });
     // A use the component's documentation rules out: never as a stand-in; as a label, worth a look.
