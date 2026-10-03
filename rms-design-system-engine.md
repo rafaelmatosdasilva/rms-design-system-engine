@@ -117,8 +117,8 @@ refreshed anything and how old the snapshots are: repeat it as it is.
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
 `--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
 refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.json` edit, a commit, a push,
-applying the hand-back, accepting a difference (`--baseline` or the baseline file), an exception, replacing an
-approved reference picture, or a code edit, unless the person's latest message asked for that change. After a UI
+applying the hand-back, accepting a difference (`--baseline` or the baseline file), an exception, a code name
+recorded for a Figma name (`contract.authored.json`), replacing an approved reference picture, or a code edit, unless the person's latest message asked for that change. After a UI
 edit they hand back what it added that the design system does not have (a colour or size written by hand, a
 variable declared nowhere, a prop value a component does not take), an accessibility problem it added, and any
 comment that switches a check off: fix it in that file before going on. A request made with
