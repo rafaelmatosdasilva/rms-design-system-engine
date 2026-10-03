@@ -303,7 +303,25 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     for (const a of [...(contract.RENDERED_ASSERTIONS ?? []), ...(contract.CROSS_PLUGIN_CONSISTENCY ?? [])]) if (a?.probe && a.selector) probeBySelector.set(a.selector.replace(/\s+/g, ' ').trim(), a.probe);
     const probes = {};
     for (const name of Object.keys(propsSnap)) { const sel = locator.selectorFor(name); const p = sel && probeBySelector.get(String(sel).replace(/\s+/g, ' ').trim()); if (p) probes[name] = p; }
-    const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg });
+    // The token check's own result: each token equal to Figma, with its CSS variable. Run it, read it, tidy up.
+    const checkFile = join(ROOT, 'design-system-engine-check-result.json');
+    const hadCheck = existsSync(checkFile);
+    spawnSync(process.execPath, [join(ENGINE_DIR, 'parity-check.mjs'), '--json'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+    const check = readJson('design-system-engine-check-result.json');
+    if (!hadCheck) { try { unlinkSync(checkFile); } catch { /* not written */ } }
+    // The project's own pages, where a component's real markup is (static HTML only).
+    // An app named in paths.plugins renders at apps/<app>/ui.html (built) or ui.src.html, as the code capture reads it.
+    const appPages = pluginHTML.flatMap((p) => (/\.html?$/i.test(p) ? [p] : [`apps/${p}/ui.html`, `apps/${p}/ui.src.html`]));
+    const pageFiles = [...appPages, ...(cfg.codeReading?.pages ?? [])].filter((p) => /\.html?$/i.test(p) && !/^https?:/.test(p));
+    const pages = pageFiles.map(readText).filter(Boolean);
+    const usage = (cfg.paths?.plugins ?? []).length ? usageMap(intent) : {};
+    const icons = (iconSheet().match(/<symbol\b[^>]*\bid\s*=\s*["']([^"']+)["']/g) ?? []).map((m) => m.match(/id\s*=\s*["']([^"']+)["']/)[1]);
+    let title = cfg.name ?? '';
+    if (!title) { try { title = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { /* no package.json */ } }
+    const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
+      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title,
+      propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).map(([n, c]) => [n, c.propertyMap])),
+      parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
   }
