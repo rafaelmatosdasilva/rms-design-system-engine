@@ -300,3 +300,21 @@ export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
 export function editHookOutput(reason) {
   return reason ? JSON.stringify({ decision: 'block', reason }) : '';
 }
+
+// Before the agent says it is done (the Stop hook, I81 second part): the same check over every UI file the session
+// changed against the last commit, so a value the system does not have that an edit left in place (the agent asked
+// the person instead of taking it out) is handed back once. → [lines] ('ui.html:12  #2d8659 is not …'), [] when clean.
+export function sessionLeftovers(root, cfg = {}) {
+  if (cfg.hooks === false || cfg.editCheck === false) return [];
+  const git = (args) => { try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return ''; } };
+  const changed = [...new Set([...git(['diff', '--name-only', 'HEAD']).split('\n'), ...git(['ls-files', '--others', '--exclude-standard']).split('\n')])]
+    .map((f) => f.trim()).filter((f) => f && UI.test(f) && !SKIP.test(f) && existsSync(join(root, f))).slice(0, 40);
+  const out = [];
+  for (const rel of changed) {
+    let now = ''; try { now = readFileSync(join(root, rel), 'utf8'); } catch { continue; }
+    const head = (() => { try { return execFileSync('git', ['show', `HEAD:${rel}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return null; } })();
+    const reason = editCheck({ tool_name: 'Write', tool_input: { file_path: join(root, rel), content: now } }, { root, cfg, headOf: () => head });
+    if (reason) out.push(...reason.split('\n').filter((l) => /^ {2}\S/.test(l)).map((l) => `  ${rel}${l.trim().replace(/^[^\s:]+/, '')}`));
+  }
+  return out;
+}

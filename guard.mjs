@@ -28,7 +28,7 @@ import { join, basename, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { route, routeText, projectState, SAY } from './route.mjs';
 import { readDoc } from './skill-files.mjs';
-import { editCheck, editHookOutput } from './edit-check.mjs';
+import { editCheck, editHookOutput, sessionLeftovers } from './edit-check.mjs';
 import { PROJECT, OUT_DIR } from './names.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
@@ -118,7 +118,8 @@ export function asksForSecret(text) {
 }
 const SECRET_LINE = 'A secret is never asked for in the chat: the person puts it in the project\'s .env file themselves (the engine names the variable), then asks you to run the command again.';
 
-export function stopCheck(event, { root }) {
+const readCfg = (root) => { try { return JSON.parse(readFileSync(join(root, 'ds-config.json'), 'utf8')); } catch { return null; } };
+export function stopCheck(event, { root, cfg = null }) {
   if (event?.stop_hook_active) return null;
   const reply = String(event?.last_assistant_message ?? '') || assistantBlocks(transcriptEntries(event?.transcript_path)).filter((b) => b?.type === 'text').map((b) => b.text).pop() || '';
   // Whatever the route: a reply that asks for a secret goes back once.
@@ -126,6 +127,12 @@ export function stopCheck(event, { root }) {
   let said; try { said = JSON.parse(readFileSync(saidFile(root), 'utf8')); } catch { said = null; }
   const forThisPrompt = said?.say?.length && !(said.session && event.session_id && said.session !== event.session_id) && !(said.prompt && event.prompt_id && said.prompt !== event.prompt_id);
   const missing = forThisPrompt ? said.say.filter((s) => SAID[s.check] && !SAID[s.check].test.test(reply) && !SAID[s.check].unless?.(event.transcript_path)) : [];
+  // What the session's edits left in place that the system does not have (the edit check, run once more over the files).
+  let left = [];
+  try { const c = cfg ?? readCfg(root); if (c) left = sessionLeftovers(root, c); } catch { /* the check is a help, never a blocker */ }
+  if (left.length) {
+    return `rms-design-system-engine: before you finish, the files you changed still hold what the design system does not have:\n${left.slice(0, 12).join('\n')}${left.length > 12 ? `\n  and ${left.length - 12} more` : ''}\nTake each out, or write the system's own value instead; when it has none, leave it out and tell the person. Then give your answer again${missing.length ? `, with ${missing.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${missing.map((s) => s.text).join('\n')}` : '.'}${secret ? ` ${SECRET_LINE}` : ''}`;
+  }
   if (secret && !missing.length) return `rms-design-system-engine: your reply asks the person for a secret in the chat. Reply again without asking for it. ${SECRET_LINE}`;
   if (!missing.length) return null;
   const lines = [...missing.map((s) => s.text), ...(secret ? [SECRET_LINE] : [])];
@@ -255,7 +262,7 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     } else if (event.hook_event_name === 'Stop') {
       let cfg = {};
       try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* defaults */ }
-      if (cfg.hooks !== false) { const out = stopOutput(stopCheck(event, { root })); if (out) process.stdout.write(out); }
+      if (cfg.hooks !== false) { const out = stopOutput(stopCheck(event, { root, cfg: existsSync(cfgPath) ? cfg : null })); if (out) process.stdout.write(out); }
     } else if (event.hook_event_name === 'PostToolUse') {
       if (existsSync(cfgPath)) {
         let cfg = {};
