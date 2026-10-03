@@ -148,3 +148,16 @@ test('in the browser: no script error, a control changes the real component, the
     close();
   } finally { c.kill(); }
 });
+
+test('"In use" shows the approved pictures of the system\'s own frames', { timeout: 300000 }, () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, frames: [{ name: 'Settings', nodeId: '5:1' }, { name: 'Missing', nodeId: '9:9' }] }));
+  mkdirSync(join(dir, '.design-system-engine-refs'), { recursive: true });
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  writeFileSync(join(dir, '.design-system-engine-refs', '5-1.png'), png);
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
+  const data = JSON.parse(readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8').match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
+  assert.deepEqual(data.screens.map((x) => x.caption), ['Settings']);
+  assert.match(data.screens[0].src, /^data:image\/png;base64,iVBOR/);
+});
