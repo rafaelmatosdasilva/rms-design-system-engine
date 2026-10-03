@@ -259,8 +259,21 @@ export async function componentSpecs(ROOT, cfg) {
     if (a?.probe && a.selector && !probes.has(a.selector)) probes.set(a.selector.replace(/\s+/g, ' ').trim(), a.probe);
   }
   const unbuilt = await inProgressNames(ROOT, cfg);
+  // A React component with no probe in the contract: its own JSX, read as markup (jsx-markup.mjs), so a component the
+  // pages do not show is drawn as the element it renders, with its children, not as a bare <div> of its class.
+  const { componentSourceFiles, resolveComponentFile, textReader } = await import('./component-source.mjs');
+  const { jsxMarkup } = await import('./jsx-markup.mjs');
+  let sourceFiles = null;
+  const read = textReader();
+  const jsxProbe = (name) => {
+    sourceFiles ??= componentSourceFiles(ROOT, cfg).filter((f) => /\.(jsx|tsx|js)$/.test(f));
+    const { file } = resolveComponentFile(name, { ROOT, cfg, files: sourceFiles, read, classFor: locator.classFor });
+    if (!file || !/\.(jsx|tsx|js)$/.test(file)) return null;
+    try { return jsxMarkup(read(file), locator.classFor(name)); } catch { return null; }
+  };
   return names.map((name) => {
     const selector = locator.selectorFor(name).replace(/\s+/g, ' ').trim();
+    if (!probes.has(selector) && !unbuilt.has(name)) { const p = jsxProbe(name); if (p && /^<[a-z]/.test(p)) probes.set(selector, p); }
     const states = [];
     for (const [figProp, mapping] of Object.entries(CONTRACT[name]?.propertyMap ?? {})) {
       if (!mapping || typeof mapping !== 'object') continue;

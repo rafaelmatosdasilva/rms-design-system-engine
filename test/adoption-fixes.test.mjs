@@ -133,3 +133,32 @@ test('a role is checked when every Figma prop is a state: a field with no real i
   assert.equal(r.status, 1);
   assert.match(r.stdout, /field: Figma's annotation says role textbox; the code needs an <input> or <textarea>/);
 });
+
+test('a React component is drawn as the JSX it returns: its element, its children, its default text', async () => {
+  const { jsxMarkup, propDefaults } = await import('../jsx-markup.mjs');
+  const tag = 'export function Tag({ Tone = "Neutral", Label = "New" }) {\n  return (\n    <span className={`tag ${Tone === "Positive" ? "tag--positive" : ""}`}>\n      {Label}\n    </span>\n  );\n}';
+  assert.equal(jsxMarkup(tag, '.tag'), '<span class="tag">New</span>');
+  const field = 'export function Field({ state = "Default", placeholder = "Ada", ...props }) {\n  const fieldClass = `field ${state === "Error" ? "field--error" : ""}`;\n  return (\n    <div className={fieldClass}>\n      <input type="text" placeholder={placeholder} aria-invalid={state === "Error"} {...props} />\n    </div>\n  );\n}';
+  assert.equal(jsxMarkup(field, 'field'), '<div class="field"><input type="text"></div>');
+  // A helper defined above the component is not the component; another component's tag is left out.
+  const chip = 'function ChipIcon() {\n  return (<svg className="chip__icon" />);\n}\nexport function Chip({ Label = "Filter" }) {\n  return (\n    <button type="button" className={["chip", x && "chip--l"].filter(Boolean).join(" ")} onClick={go}>\n      <ChipIcon />\n      <span className="chip__label">{Label}</span>\n    </button>\n  );\n}';
+  assert.equal(jsxMarkup(chip, 'chip'), '<button class="chip" type="button"><span class="chip__label">Filter</span></button>');
+  assert.deepEqual(propDefaults('export const Badge = ({ tone = "neutral", count = 3, on = false }) => <span />'), { tone: 'neutral', count: '3', on: 'false' });
+  assert.equal(jsxMarkup('export const x = 1;', 'x'), null);
+});
+
+test('a height the rule already sets but the drawn box does not keep says why: inline, or padding outside a content box', { timeout: 300000 }, () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-why-');
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx', 'src/components/field.css', 'src/components/Field.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  // The tag drops its display (a <span>, so inline); the field drops its box-sizing.
+  writeFileSync(join(dir, 'src/components/tag.css'), readFileSync(join(dir, 'src/components/tag.css'), 'utf8').replace('display: inline-flex; box-sizing: border-box; ', 'box-sizing: border-box; '));
+  writeFileSync(join(dir, 'src/components/field.css'), readFileSync(join(dir, 'src/components/field.css'), 'utf8').replace('box-sizing: border-box; ', ''));
+  const run = (c) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', c], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  let r = run('tag');
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /tag height: Figma 20, rendered \d+ .*→ the rule sets 20px, but the element is inline and ignores a height: give it display: inline-flex \(or block\)/);
+  r = run('field');
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /field height: Figma 36, rendered \d+ .*→ the rule sets 36px, but padding and border add to it: set box-sizing: border-box/);
+});

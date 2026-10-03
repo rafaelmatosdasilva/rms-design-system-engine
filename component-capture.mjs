@@ -50,7 +50,7 @@ export const TRACE = {
   letterSpacing: ['letter-spacing'],
   textTransform: ['text-transform'],
 };
-const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
+const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'boxSizing', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
 const COLOR_PROPS = new Set(['color', 'backgroundColor', 'borderTopColor']);
 const GUARD_PROPS = ['color', 'backgroundColor', 'borderTopColor', 'opacity'];
 const BREAKPOINT_PROPS = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'columnGap', 'rowGap', 'borderTopLeftRadius', 'fontSize', 'lineHeight'];
@@ -641,6 +641,8 @@ export async function captureComponents(ctx) {
         instance: { page: page.label, how: loc.how, count: loc.count, hasText: loc.hasText, ...(loc.stripped?.length ? { usageExtrasRemoved: loc.stripped } : {}) },
         confidence: loc.how === 'bare' ? 'low' : loc.how === 'hidden-copy' ? 'medium' : 'high',
         size: { height: base?.rect?.height, width: base?.rect?.width },
+        // How the box is laid out: an inline element ignores a height; content-box adds padding and border to it.
+        layout: { display: base?.cs?.display ?? null, boxSizing: base?.cs?.boxSizing ?? null },
         props, fill: bg && bg[3] > 0 ? 'direct' : beforeBg && beforeBg[3] > 0 ? 'before' : 'none', colors: colorsOf(perMode),
       };
       if (base?.before) entry.before = base.before;
