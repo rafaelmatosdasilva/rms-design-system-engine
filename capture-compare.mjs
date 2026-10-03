@@ -170,7 +170,13 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       const setsHeight = h?.rule && h.confidence !== 'default' && toNum(h.value) > 0 && !/min-height|max-height/.test(h.note ?? '');
       const setsMin = mh?.rule && mh.confidence !== 'default' && toNum(mh.value) > 0;
       if (setsHeight && c.size?.height != null) {
-        settle(Math.abs(c.size.height - f.h) < 0.5, { component: name, field: 'height', figma: f.h, code: c.size.height, rule: h.rule, at: h.at });
+        // The rule already says Figma's height and the drawn box is still another: say why, so the fix is not "set
+        // the height" again. An inline element ignores a height; with content-box sizing, padding and border add to it.
+        const display = String(c.layout?.display ?? ''), sizing = String(c.layout?.boxSizing ?? '');
+        const edges = ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((n, k) => n + (toNum(c.props?.[k]?.value) || 0), 0);
+        const why = Math.abs(toNum(h.value) - f.h) < 0.5 && Math.abs(c.size.height - f.h) >= 0.5
+          ? (display === 'inline' ? 'inline' : sizing === 'content-box' && edges > 0 ? 'content-box' : null) : null;
+        settle(Math.abs(c.size.height - f.h) < 0.5, { component: name, field: 'height', figma: f.h, code: c.size.height, rule: h.rule, at: h.at, ...(why ? { why } : {}) });
       } else if (setsMin) {
         settle(Math.abs(toNum(mh.value) - f.h) < 0.5, { component: name, field: 'min height', figma: f.h, code: toNum(mh.value), rule: mh.rule, at: mh.at });
       } else out.notComparable.push({ component: name, field: 'height', figma: f.h, why: 'the code height follows its content' });
@@ -528,6 +534,8 @@ export function measuredLine(d, moved = null) {
     + (d.confidence === 'single-source' ? '  [read from one source]' : '')
     + (moved === 'code-moved' ? `  → in Figma, set it to ${d.codeVar ? `the token behind ${d.codeVar}` : d.code}`
       : moved === 'both-moved' ? '  → decide which value wins'
+      : d.why === 'inline' ? `  → the rule sets ${want}, but the element is inline and ignores a height: give it display: inline-flex (or block)`
+      : d.why === 'content-box' ? `  → the rule sets ${want}, but padding and border add to it: set box-sizing: border-box`
       : reset && want ? `  → give ${d.component}'s own rule ${want} (not the reset)`
       : where && want ? `  → set ${want}` : '');
 }

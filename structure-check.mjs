@@ -55,6 +55,24 @@ try {
   if (m.SURFACE_CONTAINERS)        SURFACE_CONTAINERS        = m.SURFACE_CONTAINERS;
   if (m.BUTTON_CLASS_RULES)        BUTTON_CLASS_RULES        = m.BUTTON_CLASS_RULES;
 } catch { /* optional - runs with empty contract */ }
+// Build mode (a project that starts from Figma): a component built without a structure-contract.mjs entry is
+// compared through the build convention (build-list.mjs), its facts taken from the Figma snapshot. The
+// project's own entries always win.
+if (cfg.build === true) {
+  const { projectDerivedContract } = await import('./build-list.mjs');
+  const loc = createLocator(cfg, { contractSelectors: COMPONENT_CSS_SELECTORS });
+  const naming = resolveNamingSpec(cfg);
+  const d = projectDerivedContract(ROOT, cfg, (n) => loc.classFor(n), (t) => tokenToVar(t, naming));
+  const unbuilt = await inProgressNames(ROOT, cfg);   // still to build: nothing to compare yet
+  const own = new Set(Object.keys(CONTRACT));   // the project's own entries win, whole
+  const built = (o) => Object.fromEntries(Object.entries(o).filter(([n]) => !unbuilt.has(n) && !own.has(n)));
+  CONTRACT = { ...built(d.CONTRACT), ...CONTRACT };
+  COMPONENT_CSS_SELECTORS = { ...built(d.COMPONENT_CSS_SELECTORS), ...COMPONENT_CSS_SELECTORS };
+  CSS_HEIGHT_RULES = { ...built(d.CSS_HEIGHT_RULES), ...CSS_HEIGHT_RULES };
+  FIGMA_LAYOUT_TO_CSS = { ...d.FIGMA_LAYOUT_TO_CSS, ...FIGMA_LAYOUT_TO_CSS };
+  const manual = new Set(CSS_BASE_RULE_VARS.map((a) => `${a.selector}|${a.prop}`));
+  CSS_BASE_RULE_VARS = [...d.CSS_BASE_RULE_VARS.filter((a) => { const n = a.key.split('/')[0]; return !unbuilt.has(n) && !own.has(n) && !manual.has(`${a.selector}|${a.prop}`); }), ...CSS_BASE_RULE_VARS];
+}
 
 // ── Load design-system-engine-map.mjs (EXPLICIT + SKIP_TOKENS for auto-derivation) ─────────
 let EXPLICIT = {}, SKIP_TOKENS = new Set();
@@ -120,12 +138,15 @@ const importedSources = (() => {
   return loadCssSources(ROOT, THEME_PATHS.filter(p => !isUrl(p))).files
     .filter(f => !own.has(f.abs)).map(f => ({ entry: f.file, text: f.text, ok: true, kind: 'import' }));
 })();
-let themeCSS = themeSources[0]?.ok ? themeSources[0].text : null;   // value gates read the first theme file
+// Value gates read the first theme file. In build mode every theme file counts: the components are built into their
+// own stylesheets, which the audit records as theme files after the token file (build-list.mjs).
+const ownTheme = cfg.build === true ? themeSources.filter(s => s.ok) : themeSources.slice(0, 1).filter(s => s.ok);
+let themeCSS = ownTheme.length ? ownTheme.map(s => s.text).join('\n') : null;
 const allCss = [...themeSources, ...importedSources, ...pluginSources].filter(s => s.ok).map(s => s.text).join('\n');
 // The CSS itself, for the rule index: an HTML entry contributes only its <style> blocks (never its
 // script text), and the theme counts with the files it @imports.
 const cssOnly = (s) => (/\.html?$/i.test(String(s.entry)) ? styleBlocksOf(s.text) : s.text);
-const themeRulesCSS = [...themeSources.slice(0, 1), ...importedSources].filter(s => s.ok).map(cssOnly).join('\n');
+const themeRulesCSS = [...ownTheme, ...importedSources].filter(s => s.ok).map(cssOnly).join('\n');
 const allRulesCSS   = [...themeSources, ...importedSources, ...pluginSources].filter(s => s.ok).map(cssOnly).join('\n');
 
 // Rule indexes, built once. Each selector maps to the declarations that WIN for it, the way the
@@ -290,6 +311,15 @@ function findBlock(css, selector, index) {
     block.push(lines[i]);
   }
   return block.join('\n');
+}
+
+// A variant mapped as the base class plus a modifier (.tag.tag--positive) is also met by a rule on the modifier
+// alone (.tag--positive): the class is only ever on the component's element, so the two select the same thing.
+function modifierFound(selector) {
+  const parts = String(selector).trim().match(/^(\.[\w-]+)((?:\.[\w-]+)+)$/);
+  if (!parts) return false;
+  const rest = parts[2];
+  return findBlock(allCss, rest, allIndex) !== null;
 }
 
 function extractPropVar(block, prop) {
@@ -524,6 +554,7 @@ function extractPropVarWithFallback(block, prop) {
   const v = extractPropVar(block, prop);
   if (v !== null) return v;
   if (prop === 'border-color') return extractPropVar(block, 'border');
+  if (prop === 'background-color') return extractPropVar(block, 'background');
   return null;
 }
 
@@ -1329,9 +1360,9 @@ for (const [comp, contract] of Object.entries(CONTRACT)) {
     for (const [state, selector] of pairs) {
       if (!selector) continue;
       const label = state ? `${comp}/${propName}=${state}` : `${comp}/${propName}`;
-      const found = findBlock(allCss, selector, allIndex) !== null || allCss.includes(selector);
+      const found = findBlock(allCss, selector, allIndex) !== null || allCss.includes(selector) || modifierFound(selector);
       if (found) CPROP_PASS.push(label);
-      else CPROP_FAIL.push(`${label}: "${selector}" not found in CSS`);
+      else CPROP_FAIL.push(`${label}: "${selector}" not found in CSS: write a rule for ${selector} with what this option changes, and put the class on the element when ${propName} is ${state || 'on'}`);
     }
   }
 }
@@ -1842,8 +1873,16 @@ try {
     const { compareBreakpoints } = await import('./capture-compare.mjs');
     const bpr = compareBreakpoints(cap, snap?.components ?? {}, vars);
     r.match += bpr.match; r.differ.push(...bpr.differ);
-    // ds-config.json → renderedParityStrict: true makes these differences fail the gate.
-    const strictMeasured = cfg.renderedParityStrict === true;
+    // ds-config.json → renderedParityStrict: true makes these differences fail the gate. In build mode they fail by
+    // default (the code was just written from Figma), except a value the page could only read as the browser's
+    // default: the engine drew that instance from the CSS alone and may lack the child the code styles.
+    const buildStrict = cfg.build === true && cfg.renderedParityStrict !== false;
+    const strictMeasured = cfg.renderedParityStrict === true || buildStrict;
+    if (buildStrict && !(cfg.renderedParityStrict === true)) {
+      const soft = r.differ.filter((d) => d.confidence === 'default');
+      r.differ = r.differ.filter((d) => d.confidence !== 'default');
+      for (const d of soft) console.log(`   ⚠️  ${measuredLine(d)}  [read as the browser default: not failed]`);
+    }
     const mark = strictMeasured ? '❌' : '⚠️ ';
     if (r.differ.length) {
       console.log(`\n${mark} MEASURED ${r.differ.length}  (rendered in the browser, the component differs from Figma${strictMeasured ? '' : ' - advisory'})`);
@@ -1855,7 +1894,9 @@ try {
       const agreed = loadAgreed(ROOT);
       const toCode = [], toFigma = [];
       for (const d of r.differ) {
-        const kind = classify({ ...factOf(d), same: false }, agreed);
+        // Build mode: Figma leads; a component written from it that differs moves back to Figma, whatever the record says.
+        const seen = classify({ ...factOf(d), same: false }, agreed);
+        const kind = cfg.build === true && (seen === 'code-moved' || seen === 'both-moved') ? 'unknown' : seen;
         const moved = MOVED_LABEL[kind];
         console.log(`   ${mark} ${measuredLine(d, kind)}${moved ? `  [${moved}]` : ''}`);
         if (kind === 'code-moved' || kind === 'both-moved') toFigma.push({ d, moved: kind }); else toCode.push(d);

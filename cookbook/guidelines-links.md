@@ -6,6 +6,7 @@
 
 1. Run `rms-design-system-engine --guidelines <link>` (several links at once are fine). Never edit `ds-config.json` by hand and never fetch the page yourself.
 2. Relay what it says. If the page could not be read, pass on the one fix it names; never ask for a token in the chat.
+3. `--guidelines` with no link lists the links already set. Every run refreshes those pages and folds them into the design intent.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 

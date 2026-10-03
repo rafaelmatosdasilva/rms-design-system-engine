@@ -25,6 +25,35 @@ rms-design-system-engine --summary
 ---
 
 
+## Read every mode
+
+A single-mode read is never enough. When someone hands you a Figma link and asks
+for the value behind it, `get_variable_defs` (and any Dev Mode read) resolves only the
+mode the frame is *currently* displaying. Acting on that one value silently guesses
+every other mode. Always resolve the variable across **all** modes of its collection,
+following the alias chain in each one - the same variable can alias different
+primitives per mode. Read it with the Plugin API rather than a Dev Mode value:
+
+```js
+const v    = await figma.variables.getVariableByIdAsync(varId);
+const coll = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+for (const m of coll.modes) { /* v.valuesByMode[m.modeId] - recurse on VARIABLE_ALIAS */ }
+```
+
+**Capture the metadata too, when you refresh.** Record each variable's own `description` into an
+optional `tokenMeta` sidecar in `figma-vars.snapshot.json` — `tokenMeta["<slashed/name>"] =
+{ description, deprecated }`, with `deprecated: true` when the description carries a `@deprecated`
+marker — and the component's `description` into the component-props snapshot. The contract emitter
+surfaces these as DTCG `$description` / `$deprecated` and the component `description`; when they are
+absent it falls back cleanly, never inventing them. (Figma component-property definitions carry no
+per-prop description, so a prop's `description` is authored in `contract.authored.json` under
+`components[name].propDescriptions`.)
+
+Real case (2026-07-30): `node/icon/hover/color` read from a dark frame returned
+`#b8b8b8`. It actually aliases `node/icon/selected/color`, which resolves to
+Neutral 300 in dark but Neutral **400** (`#595959`) in light. Patching from the
+single dark read would have left light on the old, unrelated value.
+
 ## Phase 1 - Step 1: Query live Figma values
 
 > **⚠️ Figma MCP 20 kb limit:** the `use_figma` tool silently truncates responses above ~20 kb. A single query for a large collection (>200 tokens) will be cut off mid-JSON with no error. **Always run the probe first to check the count, then decide whether to batch.**
@@ -302,23 +331,24 @@ return {motion:motionOut,effects:effectsOut};
 > user explicitly asked you to fix or build. When you are merely **verifying a repository someone
 > handed you**, switch to *verify-and-report*: run every gate, produce the divergence report + the
 > table, and **propose** fixes (or `--fix` for mechanical value divergences) — but do **not** edit
-> their code, restructure their DS, impose the base-first model, or build components in, without an
+> their code, restructure their DS, move components into the system, or build components, without an
 > explicit go-ahead. A divergence in a consumer repo is often **intentional** (a brand override, a
 > consumer that deliberately lags the DS, an in-progress migration): surface it and let them decide.
 > `figmaSourceKey` (`⏳ PENDING FIGMA SYNC`), `visualRegression.mode: "advisory"` and the exemption
 > lists exist precisely to separate "the code is wrong" from "intentional consumer override".
 >
-> **Resolve, don't defer.** Every real difference found is reconciled *in the same run* into the
-> snapshot **and** the contract **and** the CSS - the point of parity is to *fix*, not to file a
-> question. Don't stop to ask for sign-off on a verified DS fact; implement it (Figma is truth).
+> **Resolve, don't defer.** A real difference is sent back the way it goes, in the same run: each one
+> says which side moved since the two last agreed (`design-system-engine-agreed.json`), and the
+> hand-back holds the code patch and the list of changes to make in Figma. Figma does not always win:
+> the side that moved leads, and where neither is known to lead, the person decides. Change the code
+> only for what the person asked; report the rest.
 >
 > **Build, don't park.** `knownUnimplementedComponents` is a temporary hold, and an **empty list
-> is the target**. Every DS component belongs in the **base** design system
-> (`theme.css` / `ui-shared.js`), never redefined per-plugin - so build any live DS component that
-> isn't yet implemented into the base (CSS + tokens + contract entry), then remove it from
-> `knownUnimplementedComponents`. Component geometry/identity pinned inside a plugin file
-> (`apps/*/ui.src.html`) is a smell: move it to the base and leave only genuine per-plugin layout
-> (sticky offsets, page composition) behind.
+> is the target**: when the person asks, build each listed component (`rms-design-system-engine
+> --recipe build-from-figma`), then take it off the list. Every design-system component is built
+> once, in the system's own files (its token CSS and component files), never redefined inside a
+> screen or a feature. A component's size or identity pinned in a screen's own styles is a smell:
+> move it to the system and leave only that screen's layout behind.
 
 Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the `State=Default` child (never the SET - its height equals all variants stacked), and extract structural facts:
 

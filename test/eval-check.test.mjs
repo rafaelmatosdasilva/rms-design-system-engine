@@ -72,3 +72,9 @@ test('I64: a candidate that does not use the component the case expects avoided 
   assert.equal(usesComponent('<MyFancyChip/>', 'chip'), false);
   assert.equal(usesComponent('<span class="chip-label">x</span>', 'chip', '.chip'), false);
 });
+
+test('a component class with a regex character is matched as written, not as a pattern', async () => {
+  const { usesComponent } = await import('../eval-check.mjs');
+  assert.equal(usesComponent('<a class="tp-btn+x">Go</a>', 'button', '.tp-btn+x'), true);
+  assert.equal(usesComponent('<a class="tp-btnnx">Go</a>', 'button', '.tp-btn.x'), false);
+});

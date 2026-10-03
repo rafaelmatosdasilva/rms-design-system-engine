@@ -76,11 +76,13 @@
        ✅ OK        0
        ❌ NAME      5   (the code names a Figma property differently: letter case, spaces)
        ℹ️ VALUE?    3   (could not read a code value to verify - advisory)
+         ❌ ROLE      1   (the markup does not hold what Figma's role annotation asks for)
          ❌ button/Disabled: the code names it "disabled" (letter case D → d)  (src/components/Button.jsx)
          ❌ button/Label: the code names it "label" (letter case L → l)  (src/components/Button.jsx)
          ❌ chip/Size: the code names it "size" (letter case S → s)  (src/components/Chip.jsx)
          ❌ chip/Icon: the code names it "icon" (letter case I → i)  (src/components/Chip.jsx)
          ❌ chip/Label: the code names it "label" (letter case L → l)  (src/components/Chip.jsx)
+         ❌ chip: Figma's annotation says role togglebutton; the code needs aria-pressed, written even when it is false  (src/components/Chip.jsx)
 
 ⏭   [16] Sub-components match Figma  (the sub-components Figma nests are the ones the code uses)
        ⏭ SKIPPED - snapshot not captured (opt-in). Run the Plugin API capture and commit it to enable.
@@ -120,7 +122,7 @@
        ✅ MODELLED   3/3 DS components have at least one check
        ℹ️  NO RENDERED 3  (geometry/color only checked statically - no browser assertion)
        ℹ️  SINGLE-VARIANT 3  (no per-variant capture - sibling states invisible to the audit)
-       ℹ️  CODE CAPTURE tokens 17 (0 verified · 0 uncertain) · components 3/3 measured · props 5 on 2 component(s) (0 uncertain) · icons 0 · nesting 1 (source only)  - read by static CSS only
+       ℹ️  CODE CAPTURE tokens 17 (0 verified · 0 uncertain) · components 3/3 measured · props 7 on 2 component(s) (0 uncertain) · icons 0 · nesting 1 (source only)  - read by static CSS only
        ⚠️  CODE CAPTURE no styleguide configured (ds-config.json → styleguide.template)
        ✅ MODE COVERAGE  every mode-pinned rendered assertion covers all 2 modes (light/dark)
        ℹ️  IN PROGRESS 1  (not drift, never fails): tag (experimental, only in Figma)
@@ -204,7 +206,7 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: chip 4 · button 2 · field 1 · 1 not tied to a component
+📉 Burndown, open findings per component: chip 5 · button 2 · field 1 · 1 not tied to a component
    next up: chip. Run with --component chip, fix, run again.
 
 ─── SUMMARY (relay this in the chat as is; also in .design-system-engine-out/summary.md) ───
@@ -225,8 +227,10 @@
   - chip/Size: the code names it "size" (letter case S → s)  (src/components/Chip.jsx)
   - chip/Icon: the code names it "icon" (letter case I → i)  (src/components/Chip.jsx)
   - chip/Label: the code names it "label" (letter case L → l)  (src/components/Chip.jsx)
+  - and 1 more
 
-Burndown, open findings per component: chip 4 · button 2 · field 1 · 1 not tied to a component
+Burndown, open findings per component: chip 5 · button 2 · field 1 · 1 not tied to a component
+Fix first: chip. Run with --component chip, fix, run again.
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

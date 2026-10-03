@@ -1,0 +1,3 @@
+.button { display: inline-flex; box-sizing: border-box; align-items: center; justify-content: center; gap: var(--gap-s); height: 32px; padding: var(--padding-xs) var(--padding-m); border: 0; border-radius: var(--radii-button); background-color: var(--button-background); color: var(--button-text); font: 500 14px/20px Inter, sans-serif; }
+.button:hover:not(:disabled) { background-color: var(--button-background-hover); }
+.button:disabled { opacity: 0.5; }

@@ -233,6 +233,7 @@
   - badge/Tone: code prop "tone" is missing Figma variant option(s) "Neutral" (the code writes it "neutral"), "Success" (the code writes it "success"), "Danger" (the code writes it "danger")  (components/HbBadge.vue)
 
 Burndown, open findings per component: badge 4 · iconButton 2 · 7 not tied to a component
+Fix first: badge. Run with --component badge, fix, run again.
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

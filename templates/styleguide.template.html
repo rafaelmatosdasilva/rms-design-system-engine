@@ -1,0 +1,532 @@
+<!doctype html>
+<!-- The engine's style guide template: ONE template for every design system that uses the engine. Edit it here and
+     every project gets the change on its next run. styleguide-gen.mjs fills the markers with each project's own data
+     (its tokens, components, icons, docs and apps); nothing project-specific is written in this file. The page shows
+     only what Figma and the code agree on: tokens the token check found equal, components drawn with the project's own
+     CSS and markup, controls for the props both sides have, labelled with Figma's names. A project can still point
+     ds-config.json → styleguide.template at a template of its own. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Living style guide</title>
+<style>
+/*{{THEME_CSS}}*/
+/*{{COMPONENT_CSS}}*/
+</style>
+<style>
+/* ── Style guide chrome: its own variables, never the design system's, so the page works for any system ──────── */
+:root {
+  --sg-bg: #ffffff; --sg-bg-2: #f5f5f5; --sg-surface: #ffffff; --sg-text: #1e1e1e; --sg-text-2: #5c5c5c; --sg-muted: #8c8c8c;
+  --sg-border: #e6e6e6; --sg-accent: #0d99ff; --sg-line: 1px solid var(--sg-border);
+  --sg-s: 11px; --sg-s-weight: 500; --sg-m: 12px; --sg-m-weight: 400; --sg-l: 14px; --sg-radius: 6px;
+  --sg-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 4px 12px rgba(16,24,40,0.05);
+  --sg-shadow-lift: 0 10px 28px rgba(16,24,40,0.12);
+  --sg-ease: 0.18s cubic-bezier(0.2, 0, 0, 1);
+  --sg-badge: #6aa1ff, #ff45c0, #0cbf78, #f5a623, #9b6bff, #ff6b6b;
+}
+html[data-sg-dark] { --sg-bg: #2c2c2c; --sg-bg-2: #383838; --sg-surface: #2c2c2c; --sg-text: #f5f5f5; --sg-text-2: #c7c7c7; --sg-muted: #9a9a9a; --sg-border: #444444; --sg-shadow: 0 1px 2px rgba(0,0,0,0.2); --sg-shadow-lift: 0 10px 28px rgba(0,0,0,0.35); }
+
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+.sg-page, .sg-page *, .sg-page *::before, .sg-page *::after { box-sizing: border-box; }
+.sg-page { margin: 0; }
+.sg-page h1, .sg-page h2, .sg-page h3, .sg-page p, .sg-page figure { margin: 0; }
+html, body.sg-page {
+  font-family: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--sg-bg); color: var(--sg-text); font-size: var(--sg-m); font-weight: var(--sg-m-weight); line-height: 1.5;
+}
+/* A scrolling document, not an app window: undo a theme's full-height body so the page scrolls. */
+html { overflow: visible; height: auto; }
+body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: block; padding: 0; }
+
+/* ── Page layout ─────────────────────────────────────────────────────────── */
+.sg-layout { display: flex; min-height: 100vh; }
+.sg-sidebar { width: 200px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: var(--sg-line); background: var(--sg-bg-2); display: flex; flex-direction: column; scrollbar-gutter: stable; }
+.sg-sidebar-header { padding: 20px 16px 12px; border-bottom: var(--sg-line); }
+.sg-sidebar-header h1 { font-size: 11px; font-weight: 700; color: var(--sg-text); letter-spacing: 0.02em; line-height: 1.3; }
+.sg-sidebar-header p { font-size: var(--sg-s); font-weight: 400; color: var(--sg-muted); margin-top: 3px; }
+.sg-nav { padding: 8px 0; flex: 1; }
+.sg-nav a { display: flex; align-items: center; gap: 6px; padding: 5px 16px; font-size: 11px; font-weight: 500; color: var(--sg-text-2); text-decoration: none; transition: background 0.1s, color 0.1s; line-height: 1.2; }
+.sg-nav a:hover { background: var(--sg-bg); color: var(--sg-text); }
+.sg-nav a.active { color: var(--sg-text); background: var(--sg-bg); box-shadow: inset 2px 0 0 var(--sg-text); }
+.sg-nav a span.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--sg-muted); flex-shrink: 0; }
+.sg-nav-label { font-size: 9px; letter-spacing: 0.08em; color: var(--sg-muted); padding: 14px 16px 4px; }
+.sg-main { flex: 1; min-width: 0; padding: 40px clamp(24px, 5vw, 72px) 80px; max-width: 1240px; margin: 0 auto; }
+
+/* ── The segmented control every switch on the page uses ────────────────── */
+.sg-seg { display: flex; width: 100%; padding: 2px; gap: 2px; border-radius: 8px; background: var(--sg-bg-2); border: var(--sg-line); }
+.sg-seg button { flex: 1 1 0; min-width: 0; font: inherit; font-size: var(--sg-s); font-weight: var(--sg-s-weight); padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--sg-text-2); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sg-seg button:hover { color: var(--sg-text); }
+.sg-seg button.selected { background: var(--sg-surface); color: var(--sg-text); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+.sg-seg button:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Modes ───────────────────────────────────────────────────────────────── */
+.sg-modes { display: flex; flex-direction: column; gap: 16px; }
+.sg-mode-ctl { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+#mode-controls { margin-top: 12px; }
+
+/* ── Section headings ────────────────────────────────────────────────────── */
+.sg-section { margin-bottom: 56px; scroll-margin-top: 16px; }
+.sg-section-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: var(--sg-s); font-weight: var(--sg-s-weight); background: color-mix(in srgb, var(--sg-muted) 12%, transparent); color: var(--sg-muted); letter-spacing: 0.04em; margin-bottom: 10px; }
+.sg-section h2 { font-size: 22px; font-weight: 700; color: var(--sg-text); letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 6px; }
+.sg-section > p { font-size: 12px; color: var(--sg-text-2); line-height: 1.6; margin-bottom: 28px; max-width: 560px; }
+.sg-subsection { margin-bottom: 36px; }
+.sg-subsection h3 { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--sg-muted); margin-bottom: 12px; padding-bottom: 8px; border-bottom: var(--sg-line); }
+.sg-hr { border: none; border-top: var(--sg-line); margin: 48px 0; }
+
+/* ── Overview ────────────────────────────────────────────────────────────── */
+.sg-hero { margin-bottom: 32px; }
+.sg-hero h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.03em; color: var(--sg-text); line-height: 1.15; margin-bottom: 10px; }
+.sg-hero p { font-size: 13px; color: var(--sg-text-2); line-height: 1.6; max-width: 500px; }
+.sg-pending { font-size: var(--sg-m); color: var(--sg-text); background: color-mix(in srgb, #f5a623 14%, transparent); border: 1px solid color-mix(in srgb, #f5a623 40%, transparent); border-radius: 8px; padding: 10px 12px; margin: 0 0 24px; max-width: 720px; }
+.sg-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 48px; }
+.sg-card { display: block; background: var(--sg-surface); border: var(--sg-line); border-radius: var(--sg-radius); padding: 20px; cursor: pointer; box-shadow: var(--sg-shadow); transition: border-color var(--sg-ease), box-shadow var(--sg-ease), transform var(--sg-ease); text-decoration: none; color: inherit; }
+.sg-card:hover { border-color: var(--sg-accent); box-shadow: var(--sg-shadow-lift); transform: translateY(-2px); }
+.sg-card-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); letter-spacing: 0.08em; margin-bottom: 6px; }
+.sg-card h3 { font-size: 15px; font-weight: 700; color: var(--sg-text); margin-bottom: 4px; }
+.sg-card p { font-size: 11px; color: var(--sg-text-2); line-height: 1.5; }
+.sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
+.sg-screen img { display: block; width: 100%; height: auto; }
+.sg-screen figcaption { padding: 10px 14px; font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); border-top: var(--sg-line); }
+
+/* ── Foundations ─────────────────────────────────────────────────────────── */
+.sg-demo { background: var(--sg-surface); border: var(--sg-line); border-radius: var(--sg-radius); padding: 24px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.sg-demo.sg-demo--col { flex-direction: column; align-items: stretch; gap: 8px; }
+.color-chip { display: flex; flex-direction: column; gap: 5px; width: 96px; }
+.color-chip-swatch { height: 36px; border-radius: 4px; border: var(--sg-line); }
+.color-chip-label { font-size: 9px; font-weight: 600; color: var(--sg-muted); line-height: 1.2; word-break: break-word; }
+.color-chip-value { font-size: 9px; color: var(--sg-muted); font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: 0.02em; word-break: break-all; }
+.type-specimen { display: flex; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: var(--sg-line); }
+.type-specimen:last-child { border-bottom: none; }
+.type-specimen-meta { width: 160px; flex-shrink: 0; font-size: 9px; font-weight: 600; color: var(--sg-muted); font-family: 'SF Mono', 'Fira Code', monospace; }
+.type-specimen-preview { flex: 1; color: var(--sg-text); }
+.spacing-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: var(--sg-line); }
+.spacing-row:last-child { border-bottom: none; }
+.spacing-bar-wrap { width: 120px; }
+.spacing-bar { height: 8px; background: var(--sg-accent); border-radius: 2px; min-width: 1px; }
+.spacing-meta { font-size: 9px; font-weight: 600; color: var(--sg-muted); font-family: 'SF Mono', 'Fira Code', monospace; flex: 1; }
+.spacing-name { color: var(--sg-text-2); font-size: 10px; }
+.radius-chip { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 96px; }
+.radius-chip-box { width: 48px; height: 48px; background: var(--sg-bg-2); border: var(--sg-line); }
+.radius-chip-label { font-size: 9px; font-weight: 600; color: var(--sg-muted); font-family: 'SF Mono', 'Fira Code', monospace; text-align: center; line-height: 1.3; word-break: break-all; }
+.icon-chip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 12px; min-width: 100px; }
+.icon-chip svg { width: 24px; height: 24px; color: var(--sg-text); }
+.token-pill { display: inline-block; font-size: 9px; font-weight: 600; font-family: 'SF Mono', 'Fira Code', monospace; padding: 1px 5px; border-radius: 3px; background: var(--sg-bg-2); color: var(--sg-muted); border: var(--sg-line); }
+
+/* ── Component playground ────────────────────────────────────────────────── */
+.pg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pg-head h2 { margin: 0; }
+.pg-usage { display: flex; gap: 6px; align-items: center; }
+.pg-badge { font-size: var(--sg-s); font-weight: var(--sg-s-weight); padding: 2px 8px; border-radius: 6px; border: var(--sg-line); color: var(--sg-text-2); background: var(--sg-bg-2); }
+.pg-badge.na { color: var(--sg-muted); }
+.pg-selector { font-size: var(--sg-s); color: var(--sg-muted); margin: 4px 0 12px; }
+.pg-note { display: flex; gap: 8px; font-size: var(--sg-m); line-height: 1.5; color: var(--sg-text-2); background: var(--sg-bg-2); border: var(--sg-line); border-radius: 8px; padding: 10px 12px; margin: 0 0 8px; }
+.pg-note b { color: var(--sg-text); font-weight: 600; white-space: nowrap; }
+.pg-note:last-child { margin-bottom: 14px; }
+.pg-header { position: sticky; top: 0; z-index: 5; background: var(--sg-bg); padding: 8px 0 12px; margin-bottom: 4px; }
+.pg-stage { display: flex; flex-direction: column; gap: 20px; }
+.pg-preview-card { display: grid; grid-template-columns: 1fr 240px; gap: 20px; align-items: stretch; border: var(--sg-line); border-radius: 12px; padding: 20px; background: var(--sg-bg); box-shadow: var(--sg-shadow); }
+.pg-preview { min-width: 0; min-height: 140px; padding: 24px; display: flex; align-items: center; align-content: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+  /* A transparency checkerboard over the system's own page surface: a transparent component shows it, an opaque one covers it. */
+  background-color: var(--sg-stage, var(--sg-bg));
+  --sg-checker: color-mix(in srgb, var(--sg-text) 7%, transparent);
+  background-image: linear-gradient(45deg, var(--sg-checker) 25%, transparent 25%, transparent 75%, var(--sg-checker) 75%), linear-gradient(45deg, var(--sg-checker) 25%, transparent 25%, transparent 75%, var(--sg-checker) 75%);
+  background-size: 16px 16px; background-position: 0 0, 8px 8px;
+  border-radius: 8px; position: relative; isolation: isolate; }
+.pg-panel { display: flex; flex-direction: column; gap: 16px; padding-left: 20px; }
+.pg-controls { display: flex; flex-direction: column; gap: 16px; }
+.pg-controls:empty { display: none; }
+.pg-ctl { display: flex; flex-direction: column; gap: 6px; }
+.pg-ctl-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+.pg-ctl-label code { font-weight: 400; margin-left: 6px; }
+.pg-ctl input[type="text"] { font: inherit; font-size: var(--sg-m); padding: 4px 8px; border: var(--sg-line); border-radius: 6px; background: var(--sg-surface); color: var(--sg-text); }
+.pg-empty { font-size: var(--sg-s); color: var(--sg-muted); }
+.pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; align-items: start; }
+.pg-inspect { border: var(--sg-line); border-radius: 10px; overflow: hidden; box-shadow: var(--sg-shadow); }
+.pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: 9px 12px; border-bottom: var(--sg-line); background: var(--sg-bg-2); }
+.pg-inspect table { width: 100%; border-collapse: collapse; }
+.pg-inspect td { font-size: var(--sg-m); padding: 6px 12px; border-bottom: var(--sg-line); vertical-align: top; }
+.pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
+.pg-inspect td:last-child { color: var(--sg-text); font-family: ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; }
+.pg-inspect tr:last-child td { border-bottom: none; }
+@media (max-width: 720px) {
+  .sg-layout { flex-direction: column; } .sg-sidebar { width: auto; height: auto; position: static; }
+  .pg-preview-card { grid-template-columns: 1fr; } .pg-panel { padding-left: 0; padding-top: 4px; }
+}
+</style>
+</head>
+<body class="sg-page">
+<!--{{ICON_SHEET}}-->
+<div class="sg-layout">
+  <nav class="sg-sidebar" aria-label="Design system navigation">
+    <div class="sg-sidebar-header">
+      <h1 id="sg-title">Design system</h1>
+      <p>Living style guide</p>
+      <div id="mode-controls"></div>
+    </div>
+    <div class="sg-nav" id="sg-nav"></div>
+  </nav>
+  <main class="sg-main" id="sg-main"></main>
+</div>
+<script type="application/json" id="sg-data">/*{{AGREED}}*/</script>
+<script>
+(function () {
+  var DATA = JSON.parse(document.getElementById('sg-data').textContent || '{}');
+  var TOKENS = DATA.tokens || { colors: [], spacing: [], radii: [], sizing: [], typography: [] };
+  var COMPONENTS = DATA.components || [];
+  var html = document.documentElement, main = document.getElementById('sg-main'), nav = document.getElementById('sg-nav');
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; a.innerHTML = '<span class="dot"></span>' + esc(label); (parent || nav).appendChild(a); }
+  function section(id, badge, title, lead) {
+    var s = document.createElement('section'); s.id = id; s.className = 'sg-section';
+    s.innerHTML = (badge ? '<div class="sg-section-badge">' + esc(badge) + '</div>' : '') + '<h2>' + esc(title) + '</h2>' + (lead ? '<p>' + esc(lead) + '</p>' : '');
+    main.appendChild(s); return s;
+  }
+  function hr() { var h = document.createElement('hr'); h.className = 'sg-hr'; main.appendChild(h); }
+  if (DATA.title) { document.getElementById('sg-title').textContent = DATA.title; document.title = DATA.title + ' · Living style guide'; }
+
+  /* ── Mode engine: the system's mode collections as axes ─────────────────────────────────────────────────────────
+     One entry per axis (DATA.modes). An attribute axis sets data-* on <html>, or on one preview when the axis is
+     scoped (its CSS nests, as a Figma mode does on a frame); a class axis toggles a class on <html>. The first value
+     is the base: choosing it clears the attribute so the :root defaults apply. */
+  var AXES = DATA.modes || [];
+  var SGModes = (function () {
+    function base(axis) { return axis.values[0].value; }
+    function apply(scope, axis, value) {
+      if (axis.classes) { axis.values.forEach(function (v) { if (v.value) scope.classList.remove(v.value); }); if (value) scope.classList.add(value); }
+      else if (!value) scope.removeAttribute(axis.attr); else scope.setAttribute(axis.attr, value);
+      if (scope === html && axis === AXES[0]) {
+        var chosen = axis.values.find(function (v) { return v.value === value; });
+        html.toggleAttribute('data-sg-dark', !!chosen && /dark|night/i.test(chosen.label));
+      }
+    }
+    function effective(axis, scope) {
+      if (axis.classes) { var on = axis.values.find(function (v) { return v.value && html.classList.contains(v.value); }); return on ? on.value : base(axis); }
+      var a = scope.closest('[' + axis.attr + ']');
+      return (a && a.getAttribute(axis.attr)) || base(axis);
+    }
+    function control(axis, scope, onChange) {
+      var wrap = document.createElement('div'); wrap.className = 'sg-mode-ctl';
+      wrap.innerHTML = '<span class="sg-mode-label">' + esc(axis.label) + '</span><div class="sg-seg">' +
+        axis.values.map(function (v) { return '<button type="button" data-v="' + esc(v.value) + '">' + esc(v.label) + '</button>'; }).join('') + '</div>';
+      wrap._sync = function () { var c = effective(axis, scope); wrap.querySelectorAll('button').forEach(function (b) { b.classList.toggle('selected', b.dataset.v === c); }); };
+      wrap._sync();
+      wrap.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(); }); });
+      return wrap;
+    }
+    function controls(scope, onChange, which) {
+      var box = document.createElement('div'); box.className = 'sg-modes'; var ctls = [];
+      AXES.forEach(function (a) { if (which(a)) { var w = control(a, scope, onChange); ctls.push(w); box.appendChild(w); } });
+      box._sync = function () { ctls.forEach(function (w) { w._sync(); }); };
+      return box;
+    }
+    var boxes = [];
+    return { controls: controls, register: function (b) { boxes.push(b); }, syncAll: function () { boxes.forEach(function (b) { b._sync(); }); } };
+  })();
+
+  // The stage behind each preview is the system's own page surface, so a dark mode reads as dark.
+  var FLAT = []; (TOKENS.colors || []).forEach(function (g) { FLAT = FLAT.concat(g.items); });
+  var surface = FLAT.find(function (t) { return /(surface|background|bg|canvas)/i.test(t.figma) && /(page|canvas|default|base|app|primary)/i.test(t.figma); });
+  if (surface) html.style.setProperty('--sg-stage', 'var(' + surface.var + ')');
+
+  /* ── Overview ─────────────────────────────────────────────────────────────────────────────────────────────── */
+  navLink('overview', 'overview');
+  var ov = document.createElement('section'); ov.id = 'overview'; ov.className = 'sg-section'; main.appendChild(ov);
+  ov.innerHTML = '<div class="sg-hero"><div class="sg-section-badge">Living style guide</div><h1>' + esc(DATA.title || 'Design system') + '</h1>' +
+    '<p>Every token and component here is the one the code really has, checked against Figma. Anything Figma and the code do not agree on yet is left out until it is decided.</p></div>';
+  if (DATA.notAgreed && (DATA.notAgreed.differences || (DATA.notAgreed.waiting || []).length)) { var pend = document.createElement('p'); pend.className = 'sg-pending'; pend.textContent = DATA.notAgreed.line; ov.appendChild(pend); }
+  var grid = document.createElement('div'); grid.className = 'sg-card-grid'; ov.appendChild(grid);
+  function card(id, label, title, sub) { var a = document.createElement('a'); a.className = 'sg-card'; a.href = '#' + id; a.innerHTML = '<div class="sg-card-label">' + esc(label) + '</div><h3>' + esc(title) + '</h3><p>' + esc(sub) + '</p>'; grid.appendChild(a); }
+  if (FLAT.length) card('colors', 'Foundations', 'Colors', FLAT.length + ' colour tokens, in every mode.');
+  if ((TOKENS.typography || []).length) card('typography', 'Foundations', 'Typography', TOKENS.typography.length + ' text styles.');
+  if ((TOKENS.spacing || []).length) card('spacing', 'Foundations', 'Spacing', TOKENS.spacing.length + ' gap and padding tokens.');
+  if ((TOKENS.radii || []).length) card('radii', 'Foundations', 'Radii', TOKENS.radii.length + ' radius tokens.');
+  if ((DATA.icons || []).length) card('icons', 'Foundations', 'Icons', DATA.icons.length + ' icons from the system\'s sheet.');
+  COMPONENTS.forEach(function (c) { card('c-' + c.name, 'Components', c.name, c.description ? c.description.replace(/@\w+/g, '').trim() : (c.controls || []).length + ' agreed props.'); });
+  if ((DATA.screens || []).length) {
+    hr(); navLink('in-use', 'in use');
+    var iu = section('in-use', 'In use', 'The system in use', 'Screens built with the system.');
+    var sc = document.createElement('div'); sc.className = 'sg-screens'; iu.appendChild(sc);
+    DATA.screens.forEach(function (s) { var f = document.createElement('figure'); f.className = 'sg-screen'; f.innerHTML = '<img alt="" src="' + esc(s.src) + '"><figcaption>' + esc(s.caption || '') + '</figcaption>'; sc.appendChild(f); });
+  }
+
+  /* ── Colors ───────────────────────────────────────────────────────────────────────────────────────────────── */
+  if (FLAT.length) {
+    hr(); navLink('colors', 'colors');
+    var cs = section('colors', 'Foundations', 'Colors', 'Each swatch is the CSS variable itself, so it follows the mode switch.');
+    TOKENS.colors.forEach(function (g) {
+      var sub = document.createElement('div'); sub.className = 'sg-subsection';
+      sub.innerHTML = '<h3>' + esc(g.group) + '</h3><div class="sg-demo">' + g.items.map(function (t) {
+        return '<div class="color-chip"><div class="color-chip-swatch" style="background:var(' + esc(t.var) + ')"></div><div class="color-chip-label">' + esc(t.figma) + '</div><div class="color-chip-value">' + esc(t.var) + '</div></div>';
+      }).join('') + '</div>';
+      cs.appendChild(sub);
+    });
+  }
+
+  /* ── Typography ───────────────────────────────────────────────────────────────────────────────────────────── */
+  if ((TOKENS.typography || []).length) {
+    hr(); navLink('typography', 'typography');
+    var ts = section('typography', 'Foundations', 'Typography', null);
+    var demo = document.createElement('div'); demo.className = 'sg-demo sg-demo--col'; ts.appendChild(demo);
+    TOKENS.typography.forEach(function (t) {
+      var style = [], meta = [];
+      [['size', 'font-size'], ['weight', 'font-weight'], ['lh', 'line-height'], ['family', 'font-family']].forEach(function (k) { if (t[k[0]]) { style.push(k[1] + ':var(' + t[k[0]].var + ')'); meta.push(t[k[0]].value); } });
+      var row = document.createElement('div'); row.className = 'type-specimen';
+      row.innerHTML = '<div class="type-specimen-meta">' + esc(t.scale) + '<br>' + esc(meta.join(' / ')) + '</div><div class="type-specimen-preview" style="' + esc(style.join(';')) + '">The quick brown fox jumps over the lazy dog</div>';
+      demo.appendChild(row);
+    });
+  }
+
+  /* ── Spacing, radii, other sizes ──────────────────────────────────────────────────────────────────────────── */
+  function spacing(id, title, list) {
+    if (!(list || []).length) return;
+    hr(); navLink(id, title.toLowerCase());
+    var s = section(id, 'Foundations', title, null);
+    var d = document.createElement('div'); d.className = 'sg-demo sg-demo--col'; s.appendChild(d);
+    d.innerHTML = list.map(function (t) {
+      return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + esc(t.var) + ' · ' + esc(t.value) + '</div></div>';
+    }).join('');
+  }
+  spacing('spacing', 'Spacing', TOKENS.spacing);
+  if ((TOKENS.radii || []).length) {
+    hr(); navLink('radii', 'radii');
+    var rs = section('radii', 'Foundations', 'Radii', null);
+    var rd = document.createElement('div'); rd.className = 'sg-demo'; rs.appendChild(rd);
+    rd.innerHTML = TOKENS.radii.map(function (t) {
+      return '<div class="radius-chip"><div class="radius-chip-box" style="border-radius:var(' + esc(t.var) + ')"></div><div class="radius-chip-label">' + esc(t.figma) + '<br>' + esc(t.value) + '</div></div>';
+    }).join('');
+  }
+  spacing('sizing', 'Other sizes', TOKENS.sizing);
+
+  /* ── Icons: every icon is a real one from the system's symbol sheet, referenced by id ───────────────────────── */
+  if ((DATA.icons || []).length) {
+    hr(); navLink('icons', 'icons');
+    var is = section('icons', 'Foundations', 'Icons', null);
+    var idm = document.createElement('div'); idm.className = 'sg-demo'; is.appendChild(idm);
+    idm.innerHTML = DATA.icons.map(function (id) { return '<div class="icon-chip"><svg aria-hidden="true"><use href="#' + esc(id) + '"/></svg><span class="color-chip-value">' + esc(id) + '</span></div>'; }).join('');
+  }
+
+  /* ── Token reverse lookup: the token behind each computed value, resolved live ──────────────────────────────
+     Every custom property the page declares is collected once; at inspect time an element's computed value is
+     matched against each one resolved in that element's own context, so it stays right in every mode. */
+  var VAR_NAMES = (function () {
+    var seen = {}, names = [];
+    function scan(rules) { for (var i = 0; i < rules.length; i++) { var r = rules[i]; if (r.style) for (var j = 0; j < r.style.length; j++) { var p = r.style[j]; if (p.slice(0, 2) === '--' && p.slice(0, 5) !== '--sg-' && !seen[p]) { seen[p] = 1; names.push(p); } } if (r.cssRules) scan(r.cssRules); } }
+    try { for (var s = 0; s < document.styleSheets.length; s++) { try { scan(document.styleSheets[s].cssRules); } catch (e) {} } } catch (e) {}
+    return names;
+  })();
+  function toRGBA(str) {
+    str = (str || '').trim(); if (!str) return null;
+    var cm = str.match(/^color\(\s*srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)/i);
+    if (cm) { var a = cm[4]; a = a == null ? 1 : (a.indexOf('%') >= 0 ? parseFloat(a) / 100 : parseFloat(a)); return [Math.round(cm[1] * 255), Math.round(cm[2] * 255), Math.round(cm[3] * 255), a]; }
+    if (str[0] === '#') { var h = str.length === 4 ? '#' + str[1] + str[1] + str[2] + str[2] + str[3] + str[3] : str; if (h.length < 7) return null; var n = parseInt(h.slice(1, 7), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1]; }
+    var m = str.match(/rgba?\(([^)]+)\)/i);
+    if (m) { var p = m[1].split(/[,\s\/]+/).filter(Boolean).map(parseFloat); return [Math.round(p[0]), Math.round(p[1]), Math.round(p[2]), p[3] == null ? 1 : p[3]]; }
+    return null;
+  }
+  function colorKey(str) { var c = toRGBA(str); return c ? c[0] + ',' + c[1] + ',' + c[2] : null; }
+  function norm(v, cat) { v = (v || '').trim(); return cat === 'color' ? (colorKey(v) || v) : v; }
+  function resolvedVar(el, name) { return getComputedStyle(el).getPropertyValue(name).trim(); }
+  // The kind of a token by its name, so a padding value is matched against padding tokens first.
+  var KIND = { pad: /padding|inset|space/i, gap: /gap|space/i, radius: /radi|corner/i, fontsize: /(font|text|type)?.*size|^--[a-z]+-size$/i };
+  function tokenName(el, value, cat, compName) {
+    if (!value || value === 'none' || value === 'normal' || value === '0px' || value === '0') return null;
+    var target = norm(value, cat); if (target == null) return null;
+    var hits = VAR_NAMES.filter(function (n) { return (cat === 'color' || !KIND[cat] || KIND[cat].test(n)) && norm(resolvedVar(el, n), cat) === target; });
+    if (!hits.length && cat !== 'color') hits = VAR_NAMES.filter(function (n) { return norm(resolvedVar(el, n), cat) === target; });
+    if (!hits.length) return null;
+    var own = compName ? '--' + String(compName).toLowerCase().replace(/[^a-z0-9]+/g, '-') : null;
+    function rank(n) { if (own && n.toLowerCase().indexOf(own + '-') === 0) return 0; if (/semantic|text|surface|background|border|content/.test(n)) return 1; if (/primitive|neutral|gray|grey|[0-9]{2,}/.test(n)) return 3; return 2; }
+    return hits.sort(function (a, b) { var d = rank(a) - rank(b); return d || (a.length - b.length); })[0];
+  }
+  function rgbToHex(c) { return '#' + [c[0], c[1], c[2]].map(function (n) { return ('0' + n.toString(16)).slice(-2); }).join(''); }
+  function tok(el, value, cat, compName) {
+    var t = tokenName(el, value, cat, compName);
+    if (cat === 'color') { var c = toRGBA(value); if (!c) return t || value; var hex = rgbToHex(c) + (c[3] < 0.999 ? ' ' + Math.round(c[3] * 100) + '%' : ''); return t ? t + '  ·  ' + hex : hex; }
+    return t ? t + '  ·  ' + value : value;
+  }
+  function sideTok(el, v, cat) { if (v === '0px' || v === '0') return '0'; var n = tokenName(el, v, cat); return n ? n + '  ·  ' + v : v; }
+  function padRows(el, cs) {
+    var t = cs.paddingTop, r = cs.paddingRight, b = cs.paddingBottom, l = cs.paddingLeft;
+    if (t === r && r === b && b === l) return [['padding', sideTok(el, t, 'pad')]];
+    if (t === b && l === r) return [['padding-top-bottom', sideTok(el, t, 'pad')], ['padding-left-right', sideTok(el, l, 'pad')]];
+    return [['padding-top', sideTok(el, t, 'pad')], ['padding-right', sideTok(el, r, 'pad')], ['padding-bottom', sideTok(el, b, 'pad')], ['padding-left', sideTok(el, l, 'pad')]];
+  }
+  function radiusRows(el, cs) {
+    var tl = cs.borderTopLeftRadius, tr = cs.borderTopRightRadius, br = cs.borderBottomRightRadius, bl = cs.borderBottomLeftRadius;
+    function one(v) { return (v === '0px' || v === '0') ? '0' : sideTok(el, v, 'radius'); }
+    if (tl === tr && tr === br && br === bl) return [['radius', one(tl)]];
+    return [['border-top-left-radius', one(tl)], ['border-top-right-radius', one(tr)], ['border-bottom-right-radius', one(br)], ['border-bottom-left-radius', one(bl)]];
+  }
+  function fontTok(el, cs) {
+    // The text style whose size and weight the element carries, named the way the typography section names it.
+    var style = (TOKENS.typography || []).find(function (t) { return t.size && resolvedVar(el, t.size.var) === cs.fontSize && (!t.weight || String(resolvedVar(el, t.weight.var)) === String(cs.fontWeight)); });
+    return (style ? style.scale + '  ·  ' : '') + cs.fontSize + ' / ' + cs.fontWeight;
+  }
+  function extraColorRows(el, preview, compName) {
+    var rows = [], seen = {};
+    function mark(node, v) { var t = tokenName(node, v, 'color', compName); if (t) seen[t] = 1; }
+    var rcs = getComputedStyle(el); mark(el, rcs.color); mark(el, rcs.backgroundColor); mark(el, rcs.borderTopColor);
+    var iconN = 0;
+    preview.querySelectorAll('svg').forEach(function (svg) {
+      var scs = getComputedStyle(svg);
+      var cands = [scs.color, scs.stroke, scs.fill].filter(function (v) { return v && v !== 'none' && v !== 'rgb(0, 0, 0)' && v !== 'rgba(0, 0, 0, 0)'; });
+      for (var i = 0; i < cands.length; i++) { var t = tokenName(svg, cands[i], 'color', compName); if (t && !seen[t]) { seen[t] = 1; iconN++; rows.push([iconN > 1 ? 'icon ' + iconN : 'icon', tok(svg, cands[i], 'color', compName)]); break; } }
+    });
+    preview.querySelectorAll('*').forEach(function (node) {
+      if (node === el || node.tagName.toLowerCase() === 'svg' || node.closest('svg')) return;
+      var ownText = false; for (var i = 0; i < node.childNodes.length; i++) if (node.childNodes[i].nodeType === 3 && node.childNodes[i].textContent.trim()) ownText = true;
+      if (!ownText) return;
+      var col = getComputedStyle(node).color, t = tokenName(node, col, 'color', compName);
+      if (t && !seen[t]) { seen[t] = 1; var cl = (typeof node.className === 'string' && node.className) ? node.className.split(' ')[0].replace(/^[a-zA-Z]+-/, '') : node.tagName.toLowerCase(); rows.push([(cl || 'text') + ' color', tok(node, col, 'color', compName)]); }
+    });
+    return rows;
+  }
+
+  /* ── Component playground ─────────────────────────────────────────────────────────────────────────────────
+     Each component is drawn from the project's own markup (the contract's probe, or the first instance in its own
+     pages), else the element its Figma role asks for. Its controls are the props Figma and the code agree on; an
+     option applies what the contract's propertyMap says it adds (a class, an attribute), a boolean shows or hides
+     the part it names. Below: the tokens behind the rendered result and its computed box. */
+  function baseElement(c) {
+    if (c.markup) { var t = document.createElement('template'); t.innerHTML = c.markup.trim(); var first = t.content.firstElementChild; if (first) return first; }
+    var e;
+    switch (c.role) {
+      case 'button': e = document.createElement('button'); e.type = 'button'; break;
+      case 'togglebutton': e = document.createElement('button'); e.type = 'button'; e.setAttribute('aria-pressed', 'false'); break;
+      case 'textbox': case 'textinput': e = document.createElement('input'); e.type = 'text'; e.setAttribute('aria-label', c.name); break;
+      case 'checkbox': case 'radio': e = document.createElement('input'); e.type = c.role; e.setAttribute('aria-label', c.name); break;
+      case 'switch': e = document.createElement('button'); e.type = 'button'; e.setAttribute('role', 'switch'); e.setAttribute('aria-checked', 'false'); break;
+      case 'link': e = document.createElement('a'); e.href = '#'; break;
+      default: e = document.createElement('span');
+    }
+    if (c.cls) e.classList.add(c.cls);
+    if (e.tagName !== 'INPUT') e.textContent = c.name.charAt(0).toUpperCase() + c.name.slice(1);
+    return e;
+  }
+  function applyEffect(e, effect, on) {
+    if (!effect) return;
+    (effect.add || []).forEach(function (k) { e.classList.toggle(k, on); });
+    Object.keys(effect.attrs || {}).forEach(function (a) { if (on) e.setAttribute(a, effect.attrs[a]); else e.removeAttribute(a); });
+  }
+  function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)) : []; } catch (x) { return []; } }
+  function textLeaf(e, sel) {
+    if (e.tagName === 'INPUT') return e;
+    var named = partsOf(e, sel).find(function (k) { return !k.closest('svg') && k.textContent.trim(); });
+    if (named) return named;
+    var leaf = e;
+    while (leaf.firstElementChild) { var next = Array.prototype.find.call(leaf.children, function (k) { return k.tagName.toLowerCase() !== 'svg' && k.textContent.trim(); }); if (!next) break; leaf = next; }
+    return leaf;
+  }
+  function usageBadges(c) {
+    var u = c.usage || [];
+    if (!u.length) return '';
+    var palette = getComputedStyle(html).getPropertyValue('--sg-badge').split(',').map(function (x) { return x.trim(); });
+    return u.map(function (k, i) { var col = palette[i % palette.length]; return '<span class="pg-badge" style="color:' + col + ';border-color:color-mix(in srgb, ' + col + ' 45%, transparent)">' + esc(k) + '</span>'; }).join('');
+  }
+  function rowsHTML(rows) { return rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>'; }).join(''); }
+
+  function buildCard(c) {
+    var props = c.controls || [];
+    var state = {};
+    props.forEach(function (p) { state[p.label] = p.type === 'BOOLEAN' ? !!p.default : (p.default == null ? '' : String(p.default)); });
+    var sec = document.createElement('section'); sec.id = 'c-' + c.name; sec.className = 'sg-section';
+    var doc = [c.description && c.description.replace(/@\w+/g, '').trim(), c.note].filter(Boolean).join(' ');
+    sec.innerHTML =
+      '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
+        '<div class="pg-head"><h2>' + esc(c.name) + '</h2><div class="pg-usage" aria-label="Used in">' + usageBadges(c) + '</div></div>' +
+        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') +
+        (doc ? '<div class="pg-note"><b>Documentation</b><span>' + esc(doc) + '</span></div>' : '') +
+      '</div>' +
+      '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview"></div><div class="pg-panel"><div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
+        '<div class="pg-inspect-grid"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
+        '<div class="pg-inspect"><div class="pg-inspect-head">Computed</div><table class="pg-computed"></table></div></div></div>';
+    var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls');
+    var tTokens = sec.querySelector('.pg-tokens'), tComputed = sec.querySelector('.pg-computed');
+    // Per-component mode controls: only the axes that nest, so this preview can differ from the page.
+    if (AXES.some(function (a) { return a.scoped; })) {
+      var modeRow = SGModes.controls(preview, function () { refresh(); }, function (a) { return a.scoped; });
+      sec.querySelector('.pg-modes-slot').appendChild(modeRow); SGModes.register(modeRow);
+    }
+    function refresh() {
+      preview.innerHTML = '';
+      var e = baseElement(c);
+      preview.appendChild(e);
+      props.forEach(function (p) {
+        var v = state[p.label];
+        if (p.type === 'VARIANT') (p.options || []).forEach(function (o) { applyEffect(e, o, o.label === v); });
+        else if (p.type === 'BOOLEAN') {
+          if (p.on) applyEffect(e, p.on, !!v);
+          else if (p.part && !v) partsOf(e, p.part).forEach(function (k) { if (k !== e) k.remove(); });
+        } else if (p.type === 'TEXT' && v) { var leaf = textLeaf(e, p.part); if (leaf.tagName === 'INPUT') leaf.placeholder = v; else leaf.textContent = v; }
+      });
+      var el = (c.cls && (e.classList.contains(c.cls) ? e : e.querySelector('.' + c.cls))) || e;
+      var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px';
+      tTokens.innerHTML = rowsHTML([].concat(
+        padRows(el, cs),
+        [['gap', hasGap ? tok(el, cs.gap, 'gap') : '-']],
+        [['background', (cs.backgroundColor === 'rgba(0, 0, 0, 0)') ? 'transparent' : tok(el, cs.backgroundColor, 'color', c.name)]],
+        [['border', bw === '0px' ? 'none' : (tok(el, cs.borderTopColor, 'color', c.name) + '  ·  ' + bw + ' ' + cs.borderTopStyle)]],
+        radiusRows(el, cs),
+        [['color', tok(el, cs.color, 'color', c.name)]],
+        extraColorRows(el, preview, c.name),
+        [['font', fontTok(el, cs)]]
+      ));
+      var box = el.getBoundingClientRect();
+      tComputed.innerHTML = rowsHTML([['width', Math.round(box.width) + 'px'], ['height', Math.round(box.height) + 'px']]);
+    }
+    sec._refresh = refresh;
+    // Every control is one segmented control showing the actual value: a boolean as false/true, a variant by its
+    // option names, a text prop as a field. An option the page cannot show (a live state such as :hover, or a
+    // markup-only switch) is offered but disabled.
+    props.forEach(function (p) {
+      var ctl = document.createElement('div'); ctl.className = 'pg-ctl';
+      var label = '<div class="pg-ctl-label">' + esc(p.label) + (p.prop !== p.label ? '<code>' + esc(p.prop) + '</code>' : '') + '</div>';
+      if (p.type === 'TEXT') {
+        ctl.innerHTML = label + '<input type="text">';
+        var field = ctl.querySelector('input'); field.value = state[p.label];
+        field.addEventListener('input', function () { state[p.label] = field.value; refresh(); });
+      } else {
+        var opts = p.type === 'VARIANT' ? (p.options || []).map(function (o) { return { v: o.label, off: o.live && !(o.add || []).length && !Object.keys(o.attrs || {}).length }; })
+          : [{ v: 'false' }, { v: 'true', off: !p.on && !p.part }];
+        ctl.innerHTML = label + '<div class="sg-seg">' + opts.map(function (o) { return '<button type="button" data-v="' + esc(o.v) + '"' + (o.off ? ' disabled title="Shown live, not as a style the page can set"' : '') + '>' + esc(o.v) + '</button>'; }).join('') + '</div>';
+        var sync = function () { ctl.querySelectorAll('button').forEach(function (b) { b.classList.toggle('selected', b.dataset.v === String(state[p.label])); }); };
+        ctl.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { state[p.label] = p.type === 'VARIANT' ? b.dataset.v : b.dataset.v === 'true'; sync(); refresh(); }); });
+        sync();
+      }
+      controlsEl.appendChild(ctl);
+    });
+    if (!props.length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = 'No agreed props yet.'; controlsEl.appendChild(none); }
+    return sec;
+  }
+
+  var refreshers = [];
+  if (COMPONENTS.length) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'Components'; nav.appendChild(lab); }
+  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
+    hr();
+    var cardEl = buildCard(c); main.appendChild(cardEl);
+    cardEl._refresh();   // measure after it is in the page: a detached node computes to nothing
+    refreshers.push(cardEl._refresh);
+    navLink('c-' + c.name, c.name);
+  });
+  if (!COMPONENTS.length && !FLAT.length) { var empty = document.createElement('p'); empty.className = 'pg-empty'; empty.textContent = 'Nothing agreed yet.'; main.appendChild(empty); }
+
+  // Global mode controls: every axis on <html>; a change re-reads every card and re-syncs the per-card controls.
+  var mount = document.getElementById('mode-controls');
+  if (mount && AXES.length) mount.appendChild(SGModes.controls(html, function () { refreshers.forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); }, function () { return true; }));
+
+  // The section in view is marked in the navigation.
+  var links = document.querySelectorAll('.sg-nav a'), sections = document.querySelectorAll('section[id]');
+  function onScroll() {
+    var y = window.scrollY + 80, current = '';
+    sections.forEach(function (s) { if (s.offsetTop <= y) current = s.id; });
+    links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href').slice(1) === current); });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+</body>
+</html>

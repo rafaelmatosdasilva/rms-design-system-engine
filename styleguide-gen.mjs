@@ -21,9 +21,15 @@
 //
 // Exit 0 on success. Never throws into the audit — callers wrap it.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname, resolve } from 'path';
-import { pathToFileURL } from 'url';
+import { pathToFileURL, fileURLToPath } from 'url';
+import { spawnSync } from 'child_process';
+import { OUT_DIR } from './names.mjs';
+
+const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
+// The engine's own template, used when the project has none (ds-config.json → styleguide.template wins).
+export const ENGINE_TEMPLATE = join(ENGINE_DIR, 'templates', 'styleguide.template.html');
 import { resolveNamingSpec, tokenToVar, DEFAULT_NAMING } from './naming-convention.mjs';
 
 // ── DS-derived colour-mode CSS ────────────────────────────────────────────────
@@ -178,8 +184,10 @@ export function appLabels(names) {
 
 export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const sh = cfg.styleguide || {};
-  const templatePath = resolve(ROOT, sh.template || 'apps/styleguide/styleguide.template.html');
-  const projectOut = resolve(ROOT, sh.out || 'apps/styleguide/index.html');
+  const ownDefault = resolve(ROOT, 'apps/styleguide/styleguide.template.html');
+  const templatePath = sh.template ? resolve(ROOT, sh.template) : existsSync(ownDefault) ? ownDefault : ENGINE_TEMPLATE;
+  const engineTemplate = templatePath === ENGINE_TEMPLATE;
+  const projectOut = resolve(ROOT, sh.out || (engineTemplate ? `${OUT_DIR}/styleguide/index.html` : 'apps/styleguide/index.html'));
   // opts.out writes the page somewhere else (the code capture keeps a private copy in .design-system-engine-out);
   // a <base> then keeps the template's relative links pointing where the project's page would be.
   const outPath = opts.out ? resolve(ROOT, opts.out) : projectOut;
@@ -258,11 +266,78 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     return usage;
   }
 
+  // What the agreed view and the component CSS share: the locator, Figma's props, and every stylesheet that holds a
+  // component's rules (the theme, pluginCSS, and a component's own file, as build mode finds them).
+  const readJson = (p) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return null; } };
+  const readText = (p) => { const abs = resolve(ROOT, p); return !/^https?:/.test(p) && existsSync(abs) ? readFileSync(abs, 'utf8') : ''; };
+  let ctx = null;
+  async function context() {
+    if (ctx) return ctx;
+    const { loadLocator } = await import('./component-locator.mjs');
+    const { componentStylesheets } = await import('./build-list.mjs');
+    const locator = await loadLocator(ROOT, cfg);
+    const propsSnap = readJson(cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {};
+    const names = Object.keys(propsSnap).filter((n) => !n.startsWith('_'));
+    const ownSheets = componentStylesheets(ROOT, cfg, names.map((n) => locator.classFor(n)));
+    const componentSheets = [...pluginCSS, ...ownSheets];
+    ctx = { locator, propsSnap, componentSheets, cssText: [...themeFiles, ...componentSheets].map(readText).join('\n') };
+    return ctx;
+  }
+
+  // ── AGREED — what Figma and the code agree on (styleguide-data.mjs) ──────────────────
+  async function agreed() {
+    const { agreedView } = await import('./styleguide-data.mjs');
+    const { loadAgreed } = await import('./agreed.mjs');
+    const { inProgressNames } = await import('./in-progress.mjs');
+    const { locator, propsSnap, cssText } = await context();
+    // Gate [15]'s per-prop rows: run it, read its result, and leave the project as it was.
+    const resultFile = join(ROOT, 'component-prop-result.json');
+    const had = existsSync(resultFile);
+    spawnSync(process.execPath, [join(ENGINE_DIR, 'component-prop-check.mjs')], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+    const rows = readJson('component-prop-result.json')?.rows ?? [];
+    if (!had) { try { unlinkSync(resultFile); } catch { /* not written */ } }
+    let contract = {};
+    const cp = resolve(ROOT, cfg.paths?.structureContract ?? 'structure-contract.mjs');
+    if (existsSync(cp)) { try { contract = await import(pathToFileURL(cp).href); } catch { /* optional */ } }
+    const probeBySelector = new Map();
+    for (const a of [...(contract.RENDERED_ASSERTIONS ?? []), ...(contract.CROSS_PLUGIN_CONSISTENCY ?? [])]) if (a?.probe && a.selector) probeBySelector.set(a.selector.replace(/\s+/g, ' ').trim(), a.probe);
+    const probes = {};
+    for (const name of Object.keys(propsSnap)) { const sel = locator.selectorFor(name); const p = sel && probeBySelector.get(String(sel).replace(/\s+/g, ' ').trim()); if (p) probes[name] = p; }
+    // The token check's own result: each token equal to Figma, with its CSS variable. Run it, read it, tidy up.
+    const checkFile = join(ROOT, 'design-system-engine-check-result.json');
+    const hadCheck = existsSync(checkFile);
+    spawnSync(process.execPath, [join(ENGINE_DIR, 'parity-check.mjs'), '--json'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+    const check = readJson('design-system-engine-check-result.json');
+    if (!hadCheck) { try { unlinkSync(checkFile); } catch { /* not written */ } }
+    // The project's own pages, where a component's real markup is (static HTML only).
+    // An app named in paths.plugins renders at apps/<app>/ui.html (built) or ui.src.html, as the code capture reads it.
+    const appPages = pluginHTML.flatMap((p) => (/\.html?$/i.test(p) ? [p] : [`apps/${p}/ui.html`, `apps/${p}/ui.src.html`]));
+    const pageFiles = [...appPages, ...(cfg.codeReading?.pages ?? [])].filter((p) => /\.html?$/i.test(p) && !/^https?:/.test(p));
+    const pages = pageFiles.map(readText).filter(Boolean);
+    const usage = (cfg.paths?.plugins ?? []).length ? usageMap(intent) : {};
+    const icons = (iconSheet().match(/<symbol\b[^>]*\bid\s*=\s*["']([^"']+)["']/g) ?? []).map((m) => m.match(/id\s*=\s*["']([^"']+)["']/)[1]);
+    let title = cfg.name ?? '';
+    if (!title) { try { title = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { /* no package.json */ } }
+    const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
+      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title,
+      propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).map(([n, c]) => [n, c.propertyMap])),
+      parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
+    agreedSummary = { components: view.components.length, line: view.notAgreed.line };
+    return JSON.stringify(view).replace(/</g, '\\u003c');
+  }
+  // The component rules outside the theme files: compiled component CSS and each component's own stylesheet.
+  async function componentCSS() {
+    return (await context()).componentSheets.map(readText).join('\n\n');
+  }
+
   // ── Fill the template ───────────────────────────────────────────────────────────
   const intent = designIntent();
   const { docs, code } = docsMaps(intent);
+  let agreedSummary = null;
   const fills = {
     THEME_CSS: () => themeCSS(),
+    COMPONENT_CSS: () => componentCSS(),
+    AGREED: () => agreed(),
     ICON_SHEET: () => iconSheet(),
     USAGE: () => JSON.stringify(usageMap(intent)),
     DOCS_CODE: () => JSON.stringify(code),
@@ -275,11 +350,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // comment. Replacing the wrapped form removes the wrapper entirely.
     const markers = [`<!--{{${key}}}-->`, `/*{{${key}}}*/`, `{{${key}}}`];
     let hit = false, value = null;
-    for (const m of markers) if (html.includes(m)) { if (value === null) value = fn(); html = html.split(m).join(value); hit = true; }
+    for (const m of markers) if (html.includes(m)) { if (value === null) value = await fn(); html = html.split(m).join(value); hit = true; }
     if (hit) filled.push(key);
   }
 
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html);
-  return { out: outPath, filled, bytes: html.length, components: Object.keys(intent.components || {}).length };
+  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null };
 }
