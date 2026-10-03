@@ -86,6 +86,7 @@ reference it points to say, never from memory or from this table alone.
 | components compared with their Figma images | `visual-diff` |
 | to know what to fix first, or to work a library down | `burndown` |
 | something in Figma built in code: the tokens, a component, the whole design system, or a screen from them | `build-from-figma` |
+| a prototype, mock-up or wireframe made with the design system | `prototype` |
 | a component's props and values, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
 
