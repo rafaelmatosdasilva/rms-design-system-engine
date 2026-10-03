@@ -10,7 +10,7 @@
 //
 // Pure: no I/O. prototype.mjs is the command.
 import { checkUi } from './ui-catalog.mjs';
-import { ruledOut } from './prototype-context.mjs';
+import { ruledOut, requestFindings } from './prototype-context.mjs';
 
 export const PIECES = ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'];
 export const GAP_KINDS = ['component', 'option', 'token', 'icon', 'layout', 'pattern'];
@@ -79,10 +79,10 @@ export function nodesOf(ui) {
 function withoutNotes(ui) {
   // A column count may be written as a number; the catalog lists it as text.
   const strip = (o) => {
-    const { standInFor, ...rest } = o;
+    const { standInFor, purpose, ...rest } = o;
     if (typeof rest.width === 'number') rest.width = String(rest.width);
     if (rest.props && typeof rest.props.width === 'number') rest.props = { ...rest.props, width: String(rest.props.width) };
-    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, ...p } = rest.props; rest.props = p; if (typeof p.count === 'number') p.count = String(p.count); }
+    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, ...p } = rest.props; rest.props = p; if (typeof p.count === 'number') p.count = String(p.count); }
     if (typeof rest.count === 'number') rest.count = String(rest.count);
     return rest;
   };
@@ -96,7 +96,8 @@ function withoutNotes(ui) {
 // limits: the guidelines' "at most n <component> per screen" ([{ component, max, per, sentence, from }]).
 // breakpoints: the system's screen widths ([{ name, px }]); a Page.width that is none of them is a warning.
 // context: prototype-context's view of the documentation, for the uses it rules out.
-export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [], limits = [], breakpoints = [], context = null } = {}) {
+// request: what the person asked for (the prompt hook keeps it), held against the composition.
+export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [], limits = [], breakpoints = [], context = null, request = null } = {}) {
   const systemNames = Object.keys(catalog.components ?? {});
   const pieces = pieceCatalog(scales, systemNames);
   const r = checkUi(withoutNotes(ui), { ...catalog, components: { ...catalog.components, ...pieces } });
@@ -137,7 +138,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const agreed = new Set((v.controls ?? []).flatMap((c) => [c.label, c.prop]));
     const optDefs = catalog.components[node.component]?.props ?? {};
     for (const k of Object.keys(p)) {
-      if (k === 'standInFor' || agreed.has(k)) continue;
+      if (k === 'standInFor' || k === 'purpose' || agreed.has(k)) continue;
       // A text or on/off option the code has no prop for is drawn on the part its name points to (prototype page).
       if (['text', 'boolean'].includes(optDefs[k]?.type) && drawnByName(k, optDefs[k], v.markup)) continue;
       if (optDefs[k]?.type === 'boolean' && (p[k] === true || /^true$/i.test(String(p[k])))) continue;   // shown, as it is drawn
@@ -154,6 +155,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const n = count.get(l.component) ?? 0;
     if (n > l.max) findings.push({ rule: null, source: 'the team\'s guidelines', level: 'error', id: null, message: `${n} ${l.component} on this ${l.per}, and the guidelines allow ${l.max}: "${l.sentence}" (${l.from}). Keep ${l.max === 1 ? 'the main one' : `${l.max}`}; for the rest use what the guidelines name, or a Missing box when the system lacks it` });
   }
+  if (context && request) findings.push(...requestFindings(context, request, nodes));
   const root = nodes.find((n) => n.component === 'Page');
   const w = root?.props?.width != null ? Number(root.props.width) : null;
   if (w && breakpoints.length && !breakpoints.some((b) => Math.abs(b.px - w) < 1)) findings.push({ rule: null, source: 'the system\'s screen widths', level: 'warning', id: root.id, message: `Page.width ${w} is none of the system's screen widths: ${breakpoints.map((b) => `${b.name} (${b.px})`).join(', ')}` });

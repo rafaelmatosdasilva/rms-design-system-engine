@@ -482,6 +482,11 @@ take; the format; and the prototypes already in `prototypes/`.
   or guidelines); and the closest page to start from, made already or designed in Figma.
 - **Rules the check holds.** A plain sentence in the guidelines, "one button per screen", "at most two fields on a
   page", is a limit: a prototype with more is not drawn, and the error quotes the sentence and its section.
+- **What the request asks for.** A component the request names (every word of its name is in it: "an empty state"
+  → emptyState) that the prototype does not use is a warning the reply owes: add it, or say why. A component the
+  documentation rules out for the request's words ("a message confirming…" and a tag that is never a message that comes
+  and goes), used anyway, is an error, unless the node says what else it is for in `"purpose"` (a note, like
+  `standInFor`, that the check reads and the drawing ignores).
 - **Uses the documentation rules out.** A sentence with never, not for, do not or avoid in a component's guidelines,
   notes or `whenNotToUse` rules out the words after it, up to the end of its clause ("it never submits anything" rules
   out submitting, not the rest of the sentence). A request word it names lists that component as ruled out, not as one

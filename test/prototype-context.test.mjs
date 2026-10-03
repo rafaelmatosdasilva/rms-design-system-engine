@@ -261,3 +261,18 @@ test('a request word many components\' notes share (the product\'s name) points 
   const f = requestFocus(contextFrom({ components: comps }, null, []), 'a Saved views screen for Atlas with an empty state', []);
   assert.deepEqual(f.components.map((c) => c.name), ['emptyState']);
 });
+
+test('the request: a component it names that the prototype leaves out is owed; one the documentation rules out for it is an error unless its purpose says otherwise', async () => {
+  const { requestFindings } = await import('../prototype-context.mjs');
+  const cat = { components: { emptyState: { description: 'Shown when a list has nothing.', props: {} }, listItem: { description: 'A row.', props: {} }, tag: { description: 'A small status label.', props: {} } } };
+  const ctx = contextFrom(cat, null, sectionsOf('## tag\nA status that does not change. Never a message that comes and goes, like a confirmation.'));
+  const asked = requestFindings(ctx, 'a Saved views screen: a list of saved views and an empty state for when there are none', [{ component: 'listItem', props: {} }]);
+  assert.deepEqual(asked.map((f) => [f.level, f.kind]), [['warning', 'request']]);
+  assert.match(asked[0].message, /the request asks for empty state and the system has emptyState, which is not in the prototype/);
+  const out = requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { Label: 'Changes saved' } }]);
+  assert.ok(out.some((f) => f.level === 'error' && /tag is ruled out for "message" in this request/.test(f.message)));
+  assert.deepEqual(requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { Label: 'Beta', purpose: 'marks the page as beta' } }]), [], 'another purpose, not ruled out');
+  assert.equal(requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { purpose: 'the confirmation message' } }]).length, 1, 'a purpose the documentation rules out too');
+  const r = checkPrototype({ component: 'Page', children: [{ component: 'tag', props: { purpose: 'marks the page as beta' } }] }, { catalog: cat, view: { components: [{ name: 'tag', controls: [] }] }, scales: { spacing: [], text: [] }, context: ctx, request: 'a message confirming the save' });
+  assert.equal(r.ok, true, JSON.stringify(r.findings));
+});
