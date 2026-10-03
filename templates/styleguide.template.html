@@ -1,0 +1,135 @@
+<!doctype html>
+<!-- The engine's default style guide (styleguide-gen.mjs fills the markers). A project's own template, set in
+     ds-config.json → styleguide.template, always wins. It shows only what Figma and the code agree on: each component
+     drawn with the project's own CSS, its controls the props both sides have, labelled with Figma's names. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Style guide</title>
+<style>
+/*{{THEME_CSS}}*/
+/*{{COMPONENT_CSS}}*/
+</style>
+<style>
+  .sg { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; color: #1d1d1f; }
+  .sg-page { background: #f6f6f7; }
+  .sg h1 { font-size: 24px; margin: 0 0 4px; }
+  .sg-note { margin: 0 0 24px; color: #5b5b62; }
+  .sg-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 24px; flex-wrap: wrap; }
+  .sg-bar button { font: inherit; padding: 4px 12px; border: 1px solid #c9c9ce; border-radius: 999px; background: #fff; color: #1d1d1f; cursor: pointer; }
+  .sg-bar button[aria-pressed="true"] { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+  .sg-pending { padding: 12px 16px; border-radius: 8px; background: #fff7e0; color: #5a4300; margin: 0 0 24px; }
+  .sg-card { background: #fff; border: 1px solid #e3e3e6; border-radius: 12px; margin: 0 0 24px; overflow: hidden; }
+  .sg-card header { padding: 16px 20px 0; }
+  .sg-card h2 { font-size: 18px; margin: 0; }
+  .sg-card p { margin: 4px 0 0; color: #5b5b62; }
+  .sg-stage { padding: 32px 20px; display: flex; justify-content: center; align-items: center; min-height: 80px; background: var(--sg-stage, transparent); }
+  .sg-controls { border-top: 1px solid #e3e3e6; padding: 12px 20px 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 24px; }
+  .sg-controls label { display: grid; gap: 4px; font-size: 13px; justify-items: start; align-content: start; }
+  .sg-controls select, .sg-controls input[type="text"] { justify-self: stretch; }
+  .sg-controls code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #6e6e75; }
+  .sg-controls select, .sg-controls input[type="text"] { font: inherit; padding: 4px 8px; border: 1px solid #c9c9ce; border-radius: 6px; }
+  .sg-empty { color: #6e6e75; font-size: 13px; padding: 12px 20px 16px; border-top: 1px solid #e3e3e6; }
+</style>
+</head>
+<body class="sg-page">
+<main class="sg">
+  <h1>Style guide</h1>
+  <p class="sg-note">What Figma and the code agree on. Labels are Figma's names, with the code's prop beside one the code names differently.</p>
+  <div class="sg-bar" id="sg-modes" aria-label="Colour mode"></div>
+  <p class="sg-pending" id="sg-pending" hidden></p>
+  <div id="sg-components"></div>
+</main>
+<script type="application/json" id="sg-data">/*{{AGREED}}*/</script>
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById('sg-data').textContent || '{}');
+  var root = document.documentElement;
+
+  // Colour modes: each switch is the attribute or class the project's CSS reads.
+  var modes = data.modes || [];
+  var bar = document.getElementById('sg-modes');
+  function clearModes() { modes.forEach(function (m) { if (m.attr) root.removeAttribute(m.attr); if (m.cls) root.classList.remove(m.cls); }); }
+  modes.forEach(function (m, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = m.name; b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+    b.addEventListener('click', function () {
+      clearModes();
+      if (m.attr) root.setAttribute(m.attr, m.value || '');
+      if (m.cls) root.classList.add(m.cls);
+      bar.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    });
+    bar.appendChild(b);
+  });
+  if (modes.length < 2) bar.hidden = true;
+
+  var pending = document.getElementById('sg-pending');
+  if (data.notAgreed && (data.notAgreed.differences || (data.notAgreed.waiting || []).length)) { pending.textContent = data.notAgreed.line; pending.hidden = false; }
+
+  // The element a component is drawn as: the contract's probe markup when the project wrote one, else the element its
+  // Figma role asks for, carrying the component's class.
+  function draw(c) {
+    if (c.probe) { var t = document.createElement('template'); t.innerHTML = c.probe.trim(); return t.content.firstElementChild; }
+    var el;
+    switch (c.role) {
+      case 'button': el = document.createElement('button'); el.type = 'button'; break;
+      case 'togglebutton': el = document.createElement('button'); el.type = 'button'; el.setAttribute('aria-pressed', 'false');
+        el.addEventListener('click', function () { el.setAttribute('aria-pressed', el.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); }); break;
+      case 'textbox': case 'textinput': el = document.createElement('input'); el.type = 'text'; el.setAttribute('aria-label', c.name); break;
+      case 'checkbox': case 'radio': el = document.createElement('input'); el.type = c.role; el.setAttribute('aria-label', c.name); break;
+      case 'switch': el = document.createElement('button'); el.type = 'button'; el.setAttribute('role', 'switch'); el.setAttribute('aria-checked', 'false'); break;
+      case 'link': el = document.createElement('a'); el.href = '#'; break;
+      default: el = document.createElement('span');
+    }
+    if (c.cls) el.classList.add(c.cls);
+    return el;
+  }
+  function setText(el, text) {
+    if (el.tagName === 'INPUT') { if (el.type === 'text') el.placeholder = text; return; }
+    var leaf = el; while (leaf.firstElementChild && !leaf.textContent.trim()) leaf = leaf.firstElementChild;
+    if (!el.firstElementChild || !el.textContent.trim()) el.textContent = text; else if (leaf !== el) leaf.textContent = text;
+  }
+
+  var list = document.getElementById('sg-components');
+  (data.components || []).forEach(function (c) {
+    var card = document.createElement('section'); card.className = 'sg-card';
+    var head = document.createElement('header');
+    var h = document.createElement('h2'); h.textContent = c.name; head.appendChild(h);
+    if (c.description) { var p = document.createElement('p'); p.textContent = c.description.replace(/@\w+/g, '').trim(); head.appendChild(p); }
+    card.appendChild(head);
+    var stage = document.createElement('div'); stage.className = 'sg-stage';
+    var el = draw(c); stage.appendChild(el); card.appendChild(stage);
+    var texts = c.controls.filter(function (x) { return x.type === 'TEXT'; });
+    if (!texts.length) setText(el, c.name.charAt(0).toUpperCase() + c.name.slice(1));
+
+    if (!c.controls.length) { var e = document.createElement('div'); e.className = 'sg-empty'; e.textContent = 'No agreed props yet.'; card.appendChild(e); list.appendChild(card); return; }
+    var box = document.createElement('div'); box.className = 'sg-controls';
+    c.controls.forEach(function (x) {
+      var lab = document.createElement('label');
+      var name = document.createElement('span'); name.textContent = x.label; if (x.prop !== x.label) { var code = document.createElement('code'); code.textContent = ' ' + x.prop; name.appendChild(code); } lab.appendChild(name);
+      var input;
+      if (x.type === 'VARIANT') {
+        input = document.createElement('select');
+        (x.options || []).forEach(function (o) { var opt = document.createElement('option'); opt.value = o.label; opt.textContent = o.label; if (o.label === x.default) opt.selected = true; input.appendChild(opt); });
+        var apply = function () { (x.options || []).forEach(function (o) { if (o.cls) el.classList.toggle(o.cls, o.label === input.value); }); };
+        input.addEventListener('change', apply); apply();
+      } else if (x.type === 'BOOLEAN') {
+        input = document.createElement('input'); input.type = 'checkbox'; input.checked = x.default === true || String(x.default) === 'true';
+        if (!x.attr && !x.cls) { input.disabled = true; input.title = 'Changes the markup, not a style: see it in the code'; }
+        var flip = function () { if (x.attr) el.toggleAttribute(x.attr, input.checked); else if (x.cls) el.classList.toggle(x.cls, input.checked); };
+        input.addEventListener('change', flip); flip();
+      } else if (x.type === 'TEXT') {
+        input = document.createElement('input'); input.type = 'text'; input.value = x.default || '';
+        var write = function () { setText(el, input.value); };
+        input.addEventListener('input', write); write();
+      } else { input = document.createElement('span'); input.textContent = String(x.default ?? ''); }
+      lab.appendChild(input); box.appendChild(lab);
+    });
+    card.appendChild(box); list.appendChild(card);
+  });
+  if (!(data.components || []).length) { var none = document.createElement('p'); none.className = 'sg-note'; none.textContent = 'Nothing agreed yet.'; list.appendChild(none); }
+})();
+</script>
+</body>
+</html>
