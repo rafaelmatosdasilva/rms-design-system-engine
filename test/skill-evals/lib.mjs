@@ -110,8 +110,10 @@ export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTu
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', ...(resume ? ['--resume', resume] : [])];
   return new Promise((resolve) => {
     // Real users have Chrome: the audit's browser reading and accessibility check run in every variant.
+    // A run that installs its own Playwright must not clean up the machine's shared browsers (its garbage collection
+    // removes every browser no installed copy links to, which leaves the scorer with no Chrome).
     const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
-    const child = spawn('claude', args, { cwd, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: chrome }), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('claude', args, { cwd, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '', err = '', timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
     child.stdout.on('data', (d) => { out += d; });
