@@ -460,8 +460,15 @@ the generation's quality score. Exit 1 on any error.
 #### Prototypes
 
 `rms-design-system-engine --prototype --catalog` prints everything a prototype may use: the catalog's components with
-their options (a component the code does not have is marked: it is drawn as a labelled box), the engine's layout pieces
-with the spacing tokens and text styles they take, the format, and the prototypes already in `prototypes/`.
+their options (a component the code does not have is marked: it is drawn as a labelled box), what each component is for,
+the team's rules for the product, how the product's pages are arranged, the engine's layout pieces with the spacing
+tokens and text styles they take, the format, and the prototypes already in `prototypes/`.
+
+What each component is for comes from everything the team wrote, read as the design intent reads it (`intent-gen.mjs`,
+nothing written): the Figma description and annotations (a `Role:` annotation is shown as its role), the code's notes
+and the comment above its CSS rule, the authored contract (`whenNotToUse`, `useInstead`, status) and the guidelines
+section named after it (`guidelines.sources`, Notion and GitLab links). The team's rules are the guidelines' general
+text and the authored layers of `design-intent.json` (patterns, templates, pages, flows).
 
 `rms-design-system-engine --prototype prototypes/<name>.json` checks a composition (the format `--check-ui` reads, nested
 or flat) and, when it holds, draws it as one page under `.design-system-engine-out/prototypes/<name>.html`: each
@@ -478,6 +485,18 @@ The rules are `--check-ui`'s, plus:
 - **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
   `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
   needed first. The Stop hook holds the reply to the gaps of the prototype just drawn.
+- **A retired component** (status deprecated) is an error that names its replacement.
+- **What the documentation says.** After drawing, each system component the prototype uses is listed beside what it
+  uses it for (its labels and stand-ins) and what the documentation says it is for, so a use it is not for stands out:
+  that use gets `standInFor`, or a Missing box, and the prototype is drawn again.
+- **The product's other pages.** A prototype is compared with the other prototypes in `prototypes/`: page padding, the
+  space between sections, the screen width, the page heading's text style, where the actions sit and how they line up,
+  and the answer given to each need the system lacks (a chip as a stand-in on one page and a Missing box on another is
+  a difference). A decision counts when two pages share it, or one screen a designer made in Figma (a starting point
+  from `--from-screens`), and no other value weighs as much; `prototypes/conventions.json` (`{ "page": { "padding":
+  … }, "heading": { "style": … }, "actions": { "at": "end", "justify": "end" }, "needs": { "<need>": "<answer>" } }`),
+  written by the team, wins. Each difference is listed with the pages it differs from, and the Stop hook holds the
+  reply to it like a gap. `rms-design-system-engine --prototype --consistency` compares every page with the others.
 - A composition with an error is not drawn (exit 1). A file `{ "prototype": …, "gaps": [...] }` adds the gaps written
   beside it.
 

@@ -55,7 +55,23 @@ test('a gap is named when the thing and a word saying it is not there are close'
   assert.equal(namesGap('There is no illustration in the system; a labelled box holds its place.', 'illustrations?|images?'), true);
 });
 
-test('three prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
-  assert.deepEqual(PROTO.map((t) => t.id), ['proto-settings', 'proto-search', 'proto-empty']);
+test('five prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
+  assert.deepEqual(PROTO.map((t) => t.id), ['proto-settings', 'proto-search', 'proto-empty', 'proto-profile', 'proto-dialog']);
   assert.ok(PROTO.every((t) => t.mayWriteHtml && t.mayChangeAll && typeof t.setup === 'function'));
+});
+
+test('arranged like the product\'s Settings page: read from a composition or from CSS', async () => {
+  const { matchesProduct } = await import('./skill-evals/proto-tasks.mjs');
+  const comp = (padding, style) => ctx({ 'prototypes/profile.json': JSON.stringify({ component: 'Page', props: { padding, gap: 'padding/m' }, children: [{ component: 'Text', props: { text: 'Profile', style, as: 'h1' } }] }) });
+  assert.equal(matchesProduct(comp('padding/m', 'm')).ok, true);
+  assert.match(matchesProduct(comp('padding/s', 'm')).detail, /padding padding\/s \(Settings: padding\/m\)/);
+  const css = (pad, size) => ctx({ 'src/screens/Profile.jsx': 'export default function Profile() { return <main className="profile"><h1 className="profile__title">Profile</h1></main>; }', 'src/screens/profile.css': `.profile { display: flex; flex-direction: column; padding: ${pad}; gap: var(--padding-m); }\n.profile__title { margin: 0; font: 500 ${size}/20px Inter, sans-serif; }` });
+  assert.equal(matchesProduct(css('var(--padding-m)', '14px')).ok, true, matchesProduct(css('var(--padding-m)', '14px')).detail);
+  assert.match(matchesProduct(css('24px', '22px')).detail, /padding 24px .*heading 22px/);
+});
+
+test('one button on the screen: a second one breaks the guidelines', async () => {
+  const { oneButton } = await import('./skill-evals/proto-tasks.mjs');
+  assert.equal(oneButton(ctx({ 'prototypes/d.json': JSON.stringify({ component: 'Page', children: [{ component: 'button', props: { Label: 'Delete' } }, { component: 'Missing', props: { need: 'a link for Cancel' } }] }) })).ok, true);
+  assert.equal(oneButton(ctx({ 'src/screens/D.jsx': "import Button from '../components/Button.jsx';\nexport default function D() { return <div><Button Label='Delete' /><Button Label='Cancel' /></div>; }" })).ok, false);
 });

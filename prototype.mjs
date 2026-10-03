@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
 import { checkPrototype, systemScales, nodesOf, mergeGaps, gapLine, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
+import { loadContext, purposeLines, ruleLines, usesAgainstPurpose } from './prototype-context.mjs';
+import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from './product-conventions.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 export const PROTOTYPE_TEMPLATE = join(ENGINE, 'templates', 'prototype.template.html');
@@ -54,7 +56,31 @@ async function systemFor(ROOT, cfg) {
   let figmaVars = {};
   try { figmaVars = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { /* no text styles */ }
   const scales = systemScales(parts.view, figmaVars, `${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`);
-  return { catalog, parts, scales };
+  // What the team wrote about each component and its product (descriptions, annotations, notes, guidelines, layers).
+  const context = await loadContext(ROOT, cfg, catalog);
+  const actionNames = Object.entries(context.components).filter(([, k]) => /^button$/i.test(k.role ?? '') || /\b(main )?action\b/i.test(k.purpose ?? '')).map(([n]) => n);
+  return { catalog, parts, scales, context, actionNames };
+}
+
+// The product's other pages: every prototype in prototypes/ but the one named, as page facts, and what the team wrote
+// in prototypes/conventions.json.
+export function productPages(ROOT, sys, except = null) {
+  const dir = join(ROOT, 'prototypes');
+  const pages = {};
+  let authored = {};
+  try { authored = JSON.parse(readFileSync(join(dir, 'conventions.json'), 'utf8')); } catch { /* none written */ }
+  let files = [];
+  try { files = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'conventions.json'); } catch { /* no prototypes yet */ }
+  for (const f of files) {
+    const name = f.replace(/\.json$/, '');
+    if (name === except) continue;
+    try {
+      const raw = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+      // A starting point read from a designed screen carries the designer's decisions.
+      pages[name] = { ...pageFacts(treeOf(raw?.prototype ?? raw), { actionNames: sys.actionNames }), designed: /^Starting point read from the screen/.test(raw?.$note ?? '') };
+    } catch { /* not a composition */ }
+  }
+  return { pages, authored };
 }
 
 // Check one prototype and, when it holds, draw it and keep its gaps. raw is the composition, or { prototype, gaps }.
@@ -62,6 +88,12 @@ function drawOne(ROOT, name, raw, sys) {
   const ui = raw?.prototype ?? raw;
   const declared = Array.isArray(raw?.gaps) ? raw.gaps : [];
   const r = checkPrototype(ui, { catalog: sys.catalog, view: sys.parts.view, scales: sys.scales, name, declared });
+  // The same decisions as the product's other pages (frame, heading, actions, the answer to each missing need).
+  const { pages, authored } = productPages(ROOT, sys, name);
+  const conventions = deriveConventions(pages, authored);
+  const differs = r.ok ? consistencyFindings(pageFacts(treeOf(ui), { actionNames: sys.actionNames }), conventions) : [];
+  // What the documentation says about each component this prototype uses, beside what it uses it for.
+  const uses = usesAgainstPurpose(sys.context, nodesOf(ui).nodes);
   const outDir = join(ROOT, OUT_DIR, 'prototypes');
   const gapsFile = join(outDir, 'gaps.json');
   let store = { byPrototype: {} };
@@ -74,15 +106,29 @@ function drawOne(ROOT, name, raw, sys) {
     page = join(outDir, `${name}.html`);
     const mine = mergeGaps({ [name]: r.gaps }).map(gapLine);
     // What the reply owes the person: every gap of the prototype just drawn (the Stop hook holds the reply to it).
-    writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name, pending: true, gaps: mergeGaps({ [name]: r.gaps }).map((g) => ({ need: g.need, kind: g.kind, line: gapLine(g) })) }, null, 2) + '\n');
+    writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name, pending: true, gaps: [...mergeGaps({ [name]: r.gaps }).map((g) => ({ need: g.need, kind: g.kind, line: gapLine(g) })), ...differs.map((d) => ({ need: `${d.what} ${d.product}`, kind: 'consistency', line: consistencyLine(d) }))] }, null, 2) + '\n');
     writeFileSync(page, prototypePage({ name, tree: treeOf(ui), parts: sys.parts, scales: sys.scales, gaps: mine, note: `${r.counts.components} parts · only the design system's own components${r.gaps.some((g) => g.kind === 'layout') ? ', with the engine\'s neutral layout' : ''}` }));
   }
-  return { ...r, page, used: [...new Set(nodesOf(ui).nodes.map((n) => n.component))] };
+  return { ...r, page, differs, uses, used: [...new Set(nodesOf(ui).nodes.map((n) => n.component))] };
+}
+
+// How the product's pages are arranged, for the catalog (only what at least two pages, or the team, agree on).
+export function conventionLines(conv) {
+  if (!conv) return [];
+  const LABEL = { padding: 'page padding', gap: 'space between sections', width: 'screen width', align: 'alignment' };
+  const src = (c) => (c.authored ? 'the team' : c.pages.join(', '));
+  const lines = [
+    ...Object.entries(conv.page ?? {}).map(([k, c]) => `${LABEL[k]} ${c.value} (${src(c)})`),
+    ...(conv.heading?.style ? [`page heading in ${conv.heading.style.value} (${src(conv.heading.style)})`] : []),
+    ...(conv.actions?.at ? [`actions at the ${conv.actions.at.value}${conv.actions.justify ? `, lined up ${conv.actions.justify.value}` : ''} (${src(conv.actions.at)})`] : []),
+    ...(conv.needs ?? []).map((n) => `"${n.need}" is ${n.answer} (${src(n)})`),
+  ];
+  return lines.length ? ['', 'How this product\'s pages are arranged (keep a new page the same):', ...lines.map((l) => `  ${l}`)] : [];
 }
 
 // --catalog: everything a prototype may use, in one screen: the system's components and options, the engine's pieces
 // with the tokens they take, the format, and the starting points already made.
-export function catalogText(sys, { cmd = CLI, starts = [] } = {}) {
+export function catalogText(sys, { cmd = CLI, starts = [], conventions = null } = {}) {
   const drawable = new Set((sys.parts.view.components ?? []).map((c) => c.name));
   const comps = Object.fromEntries(Object.entries(sys.catalog.components ?? {}).map(([n, c]) => [n, { ...c, ...(drawable.has(n) ? {} : { status: c.status ? `${c.status}, not built in code` : 'not built in code: drawn as a box' }) }]));
   const pieces = pieceCatalog(sys.scales, Object.keys(comps));
@@ -92,6 +138,9 @@ export function catalogText(sys, { cmd = CLI, starts = [] } = {}) {
     '',
     'The design system\'s components (name, options):',
     catalogTable({ components: comps }),
+    ...(() => { const l = purposeLines(sys.context ?? { components: {}, rules: [] }, Object.keys(comps)); return l.length ? ['', 'What each component is for (Figma descriptions and annotations, code notes, the team\'s guidelines); use it only for that:', ...l] : []; })(),
+    ...(() => { const l = ruleLines(sys.context ?? { components: {}, rules: [] }); return l.length ? ['', 'The team\'s rules for the product:', ...l] : []; })(),
+    ...conventionLines(conventions),
     '',
     'The engine\'s pieces (only where the system has none of its own):',
     ...pieceRows.map((r) => `  ${r}`),
@@ -145,6 +194,25 @@ async function fromScreens(ROOT, cfg, file, sys, { force = false } = {}) {
   return results.every((r) => r.ok) ? 0 : 1;
 }
 
+// --consistency: every page of the product against the others: where one decides differently.
+function consistencyReport(ROOT, sys) {
+  const { pages, authored } = productPages(ROOT, sys);
+  const names = Object.keys(pages);
+  console.log(`\nConsistency  ·  ${names.length} page(s) in prototypes/`);
+  if (names.length < 2 && !Object.keys(authored).length) { console.log('   ⏭  fewer than two pages and no prototypes/conventions.json: nothing to compare yet.\n'); return 0; }
+  let n = 0;
+  for (const name of names) {
+    const others = Object.fromEntries(Object.entries(pages).filter(([k]) => k !== name));
+    const d = consistencyFindings(pages[name], deriveConventions(others, authored));
+    n += d.length;
+    console.log(`   ${d.length ? '⚠️ ' : '✅'} ${name}${d.length ? '' : ': the same as the others'}`);
+    for (const x of d) console.log(`      • ${consistencyLine(x)}`);
+  }
+  for (const l of conventionLines(deriveConventions(pages, authored)).slice(1)) console.log(l.replace(/^/, ' '));
+  console.log(`\nNEXT: ${n ? 'bring each page marked ⚠️ in line with the others, or tell the person why it differs; the team can write a decision in prototypes/conventions.json.' : 'nothing to change.'}\n`);
+  return 0;
+}
+
 export async function runPrototype(ROOT, argv) {
   const args = argv.filter((a) => a !== '--prototype');
   const JSON_MODE = args.includes('--json');
@@ -154,9 +222,10 @@ export async function runPrototype(ROOT, argv) {
   let cfg = {};
   try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* defaults */ }
   const file = screensFile ?? input;
-  if (!args.includes('--catalog') && (!file || !existsSync(resolve(ROOT, file)))) {
+  if (!args.includes('--catalog') && !args.includes('--consistency') && (!file || !existsSync(resolve(ROOT, file)))) {
     console.log(`\nUsage: ${CLI} --prototype <composition.json>`);
     console.log(`       ${CLI} --prototype --from-screens <screen-capture.json>`);
+    console.log(`       ${CLI} --prototype --catalog | --consistency`);
     console.log('   The composition names the design system\'s components and their options, in the format --check-ui reads,');
     console.log('   plus the engine\'s layout pieces (Page, Stack, Row, Columns, Text) and Missing for a need nothing fits.');
     console.log('   A screen capture (screen-layout.mjs) turns each designed screen into a starting point.\n');
@@ -167,9 +236,11 @@ export async function runPrototype(ROOT, argv) {
   if (args.includes('--catalog')) {
     let starts = [];
     try { starts = readdirSync(join(ROOT, 'prototypes')).filter((f) => f.endsWith('.json')); } catch { /* none yet */ }
-    console.log('\n' + catalogText(sys, { starts }) + '\n');
+    const { pages, authored } = productPages(ROOT, sys);
+    console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored) }) + '\n');
     return 0;
   }
+  if (args.includes('--consistency')) return consistencyReport(ROOT, sys);
   if (screensFile) return fromScreens(ROOT, cfg, screensFile, sys, { force: args.includes('--force') });
 
   let raw;
@@ -192,13 +263,26 @@ export async function runPrototype(ROOT, argv) {
   console.log(`✅ drawn: ${page.replace(ROOT + '/', '')}`);
   const own = used.filter((u) => catalog.components?.[u]);
   if (own.length) console.log(`   the system's components: ${own.join(', ')}`);
+  if (r.uses.length) {
+    console.log('\n📓 WHAT THE DOCUMENTATION SAYS ABOUT WHAT THIS PROTOTYPE USES');
+    for (const u of r.uses) console.log(`   • ${u.component}${u.uses.length ? ` (used for ${u.uses.map((x) => JSON.stringify(x)).join(', ')})` : ''}: ${u.rule}`);
+  }
+  if (r.differs.length) {
+    console.log(`\n📐 DIFFERENT FROM THE PRODUCT'S OTHER PAGES  ${r.differs.length}`);
+    for (const d of r.differs) console.log(`   • ${consistencyLine(d)}`);
+  }
   const gaps = mergeGaps({ [name]: r.gaps });
   if (gaps.length) {
     console.log(`\n🧩 GAPS  ${gaps.length}  (what the design system would need; nothing was invented)`);
     for (const g of gaps) console.log(`   • ${gapLine(g)}`);
     console.log(`   every prototype's gaps: ${join(OUT_DIR, 'prototypes', 'gaps.json')}`);
   }
-  console.log(`\nNEXT: open ${page.replace(ROOT + '/', '')} to see it.${gaps.length ? ' Tell the person each gap above as it is written: the design team decides them; never build one.' : ''}\n`);
+  const next = [
+    r.uses.length ? 'Check each use above against what its component is for: a use the documentation rules out gets "standInFor" with the need, or a Missing box, and the prototype is drawn again.' : null,
+    r.differs.length ? 'Make each 📐 line match the other pages, or tell the person why this page differs.' : null,
+    gaps.length ? 'Tell the person each gap above as it is written: the design team decides them; never build one.' : null,
+  ].filter(Boolean);
+  console.log(`\nNEXT: open ${page.replace(ROOT + '/', '')} to see it.${next.length ? ` ${next.join(' ')}` : ''}\n`);
   return 0;
 }
 

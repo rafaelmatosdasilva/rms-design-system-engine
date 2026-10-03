@@ -1,14 +1,17 @@
 // test/skill-evals/proto-tasks.mjs - the prototype evaluation: a designer asks for a screen made with the design system,
 // to Claude alone and to Claude with the skill. Same project (Tidepool with its tokens and four components built), same
-// prompt, same model. Each request holds one thing the system does not have (a switch, an illustration) or none.
+// prompt, same model. Each request holds one thing the system does not have (a switch, an illustration) or none. Two
+// more ask what Figma alone does not say: a page for the same app as the Settings page already made (its frame and
+// heading kept), and a request one of the team's written guidelines changes (one button per screen).
 //
 // Scored without the engine, the same way whoever made it:
 //   • the design system is unchanged (no token, component or stylesheet of it edited, no new component added);
 //   • nothing is invented: no component defined for the prototype, no look of its own (a class styled with colour,
 //     border, radius, shadow or type other than one of the system's tokens), no colour or size the system does not have;
 //   • it is built from the system's components the request needs;
-//   • the reply says what the system lacks, when the request holds something it lacks.
-import { cpSync, readFileSync, readdirSync } from 'node:fs';
+//   • the reply says what the system lacks, when the request holds something it lacks;
+//   • the page is arranged like the product's other page, and follows the team's guidelines, where the task says so.
+import { cpSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { offSystemValues } from './build-score.mjs';
@@ -18,6 +21,16 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REF = join(HERE, 'build-reference');
 const check = (name, ok, detail = '') => ({ name, ok: !!ok, detail });
 const withSystem = (dir) => { cpSync(join(REF, 'src/styles'), join(dir, 'src/styles'), { recursive: true }); cpSync(join(REF, 'src/components'), join(dir, 'src/components'), { recursive: true }); };
+const FIX = join(HERE, 'proto-fixtures');
+// The product's Settings page, already made from its designed screen (both sides get the same file).
+const withSettingsPage = (dir) => { withSystem(dir); mkdirSync(join(dir, 'prototypes'), { recursive: true }); cpSync(join(FIX, 'settings.json'), join(dir, 'prototypes', 'settings.json')); };
+// The team's guidelines, kept in the project and listed in its config, the way a team keeps them.
+const withGuidelines = (dir) => {
+  withSystem(dir);
+  cpSync(join(FIX, 'guidelines.md'), join(dir, 'guidelines.md'));
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, guidelines: { sources: ['guidelines.md'] } }, null, 2) + '\n');
+};
 
 const DECLARED = new Set(Object.keys(TOKENS.light));
 // The classes the system's own CSS defines: a rule on any other class with a look of its own is a look invented here.
@@ -111,6 +124,47 @@ export function namesGap(text, thing) {
   return new RegExp(`(${thing})[\\s\\S]{0,160}${NOT}|${NOT}[\\s\\S]{0,160}(${thing})`, 'i').test(t);
 }
 
+// The made page's frame and heading, from a composition or from CSS: { padding, gap, heading } as spacing token or
+// text style names ('padding/m', 'm'), or the raw value when it is none of them.
+const SPACE = { 'padding/m': ['var(--padding-m)', '12px'], 'padding/s': ['var(--padding-s)', '8px'], 'padding/xs': ['var(--padding-xs)', '4px'] };
+const spaceName = (v) => { const t = String(v ?? '').trim().split(/\s+/); const n = Object.keys(SPACE).find((k) => SPACE[k].includes(t[0])); return n && t.every((x) => SPACE[n].includes(x)) ? n : (v ?? null); };
+export function pageOf(ctx) {
+  for (const f of made(ctx)) {
+    if (!/\.json$/.test(f.path) || /conventions|package/.test(f.path) || /prototypes\/settings\.json$/.test(f.path)) continue;
+    let j; try { j = JSON.parse(f.text); } catch { continue; }
+    const ui = j?.prototype ?? j;
+    const flat = Array.isArray(ui?.components) ? ui.components : null;
+    const root = flat ? flat.find((c) => c.id === (ui.root ?? flat[0]?.id)) : ui;
+    if (!root?.component) continue;
+    const all = []; const walk = (n) => { if (!n || typeof n !== 'object') return; all.push(n); (n.children ?? []).forEach((k) => walk(typeof k === 'object' ? k : flat?.find((c) => c.id === k))); };
+    walk(root);
+    const p = (n) => ({ ...n, ...(n.props ?? {}) });
+    const h = all.map(p).find((n) => n.component === 'Text' && n.as === 'h1') ?? all.map(p).find((n) => n.component === 'Text');
+    return { padding: p(root).padding ?? null, gap: p(root).gap ?? null, heading: h?.style ?? null };
+  }
+  const css = made(ctx).map(cssOf).join('\n');
+  const rs = rules(css);
+  const block = rs.find((r) => /^\.[a-zA-Z][\w-]*$/.test(r.selector) && !r.selector.includes('__') && !SYSTEM_CLASSES.has(r.selector.slice(1)) && r.decls.some(([p]) => p === 'padding'))
+    ?? rs.find((r) => r.selector === '.inline' && r.decls.some(([p]) => p === 'padding'));
+  const head = rs.find((r) => /(^|[\s.,_-])(h1|title|heading)\b/i.test(r.selector) && r.decls.some(([p]) => /^font(-size)?$/.test(p)));
+  const size = head?.decls.find(([p]) => p === 'font-size')?.[1] ?? head?.decls.find(([p]) => p === 'font')?.[1]?.match(/(\d+px)/)?.[1] ?? null;
+  return { padding: block ? spaceName(block.decls.find(([p]) => p === 'padding')[1]) : null, gap: block ? spaceName(block.decls.find(([p]) => p === 'gap')?.[1] ?? null) : null, heading: size === '14px' ? 'm' : size === '12px' ? 's' : size };
+}
+
+// The page is arranged as the product's Settings page: padding/m from the edge and between parts, heading in m.
+export function matchesProduct(ctx) {
+  const pg = pageOf(ctx);
+  const off = [['padding', 'padding/m'], ['gap', 'padding/m'], ['heading', 'm']].filter(([k, v]) => pg[k] !== v).map(([k, v]) => `${k} ${pg[k] ?? 'not set'} (Settings: ${v})`);
+  return check('arranged like the product\'s Settings page (padding/m, padding/m between parts, heading in text style m)', !off.length, off.join(', '));
+}
+
+// The guidelines' one button per screen: the system's button used once at most.
+export function oneButton(ctx) {
+  const text = made(ctx).map((f) => f.text).join('\n');
+  const n = (text.match(/<Button\b/g) ?? []).length + (text.match(/class(Name)?=["'{][^"'}]*(?<![\w-])button(?![\w-])/g) ?? []).length + (text.match(/"component"\s*:\s*"button"/gi) ?? []).length;
+  return check('one button on the screen, as the guidelines say (any other action is a link)', n <= 1, `${n} buttons`);
+}
+
 const base = { mayChangeAll: true, mayWriteHtml: true, setup: withSystem, source: TIDEPOOL };
 export const PROTO = [
   {
@@ -129,5 +183,18 @@ export const PROTO = [
     prompt: 'prototype an empty state for the projects list with our design system: a heading, one sentence saying there are no projects yet, an illustration, and a button to create a project.',
     score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['button']),
       check('says the system has no illustration', namesGap(ctx.final, 'illustrations?|images?|pictures?|artwork|graphic'))],
+  },
+  {
+    // Pages of the same product: the new page keeps the frame and heading of the one already made.
+    ...base, id: 'proto-profile', setup: withSettingsPage,
+    prompt: 'prototype a profile page with our design system, for the same app as our settings page: a heading, a field for the name, a field for the email, and a Save button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'button']), matchesProduct(ctx)],
+  },
+  {
+    // The team's documentation: a request that one of its rules changes.
+    ...base, id: 'proto-dialog', setup: withGuidelines,
+    prompt: 'prototype a delete project confirmation with our design system: a heading, one sentence warning that it cannot be undone, a Delete button and a Cancel button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['button']), oneButton(ctx),
+      check('says the system has no link for the other action', namesGap(ctx.final, 'links?'))],
   },
 ];

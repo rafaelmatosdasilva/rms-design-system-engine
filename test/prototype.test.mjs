@@ -231,6 +231,8 @@ test('a prototype request routes to the prototype recipe and its catalog, in Eng
     assert.deepEqual(r.run, ['rms-design-system-engine --prototype --catalog'], p);
   }
   assert.equal(route('how do I prototype with the engine?', s).run.length, 0, 'a how-to question runs nothing');
+  assert.deepEqual(route('are our prototype pages consistent?', s).run, ['rms-design-system-engine --prototype --consistency']);
+  assert.deepEqual(route('prototype a settings page that matches the others', s).run, ['rms-design-system-engine --prototype --catalog'], 'making a page reads the catalog, which holds the product\'s arrangement');
   assert.notEqual(route('change the prototype frame in figma to 8px', s).recipe, 'prototype');
 });
 
@@ -255,6 +257,18 @@ test('the reply owes the gaps of the prototype just drawn, once', async () => {
   assert.deepEqual(prototypeGapsOwed(root, ''), [], 'checked once only');
   write();
   assert.deepEqual(prototypeGapsOwed(root, 'It needs a toggle switch per channel and a row layout component.'), []);
+});
+
+test('a page that differs from the product\'s other pages owes that too, named as a difference', async () => {
+  const { stopCheck } = await import('../guard.mjs');
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const root = mkdtempSync(join(tmpdir(), 'proto-differs-'));
+  mkdirSync(join(root, '.design-system-engine-out', 'prototypes'), { recursive: true });
+  writeFileSync(join(root, '.design-system-engine-out', 'prototypes', 'last.json'), JSON.stringify({ at: new Date().toISOString(), pending: true, gaps: [{ need: 'page padding padding/m', kind: 'consistency', line: "page padding: padding/s here, padding/m on the product's other pages (settings)" }] }));
+  const reason = stopCheck({ last_assistant_message: 'The prototype is drawn.' }, { root, cfg: {} });
+  assert.match(reason, /where the prototype differs from the product's other pages/);
+  assert.match(reason, /- page padding: padding\/s here, padding\/m on the product's other pages \(settings\)/);
 });
 
 test('--prototype --catalog lists the system\'s components, the engine\'s pieces with their tokens, and the format', { timeout: 600000 }, () => {
