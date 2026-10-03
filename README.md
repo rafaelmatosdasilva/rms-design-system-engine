@@ -119,11 +119,13 @@ Open an empty project, set it up with your Figma link, and ask for what to build
 
 Claude writes the code; the engine gives it Figma's exact names and values first and checks every piece after.
 
-Measured on a small design system in Figma (tokens, four components and a screen), Claude with the Figma MCP alone built 16 of 30 pieces right with Sonnet and 4 of 18 with Haiku. With the engine it built all of them, on both models. The full results are in [test/skill-evals/RESULTS.md](test/skill-evals/RESULTS.md).
+Measured on a small design system in Figma (tokens, four components and a screen), Claude with the Figma MCP alone built 8 of 18 pieces right with Opus, 16 of 30 with Sonnet and 4 of 18 with Haiku. With the engine Opus and Sonnet built all of them, and Haiku 16 to 18 of 18. The [case study](CASE-STUDY.md) gathers every measurement in a few pages; the full log is in [test/skill-evals/RESULTS.md](test/skill-evals/RESULTS.md).
 
 ## Prototype with your design system
 
 A prototype here is made only of your design system's own components, with their own options. Nothing is invented and nothing in the system changes. When a screen needs something the system does not have, the prototype shows a labelled box and you get a list of what the system would need, for your design team to decide.
+
+Measured on six prototype requests, Claude alone made 13 of 18 right with Opus and 2 of 18 with Haiku; with the skill, 17 of 18 and 18 of 18 ([case study](CASE-STUDY.md)).
 
 | You want to | Type in Claude Code | Or in the terminal |
 |---|---|---|
