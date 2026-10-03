@@ -89,7 +89,7 @@ export function promptLeaks(cases, names) {
   for (const c of cases) {
     const p = String(c.prompt ?? '');
     for (const n of names) {
-      const hit = forms(n).some((f) => new RegExp(`(^|[^\\w-])${f.replace(/[.*+?^${}()|[\]\\]/g, '\\// LLM-JUDGE adapter').replace(/ /g, '[\\s-]+')}(?![\\w-])`, 'i').test(p));
+      const hit = forms(n).some((f) => new RegExp(`(^|[^\\w-])${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '[\\s-]+')}(?![\\w-])`, 'i').test(p));
       if (hit) { out.push({ id: c.id, name: n }); break; }
     }
   }

@@ -26,8 +26,7 @@ export function flattenTokens(tree, prefix = []) {
   const out = [];
   for (const [k, v] of Object.entries(tree ?? {})) {
     if (k.startsWith('$') || !v || typeof v !== 'object') continue;
-    // A contract written before the rename keeps its facts under the old extension name.
-    const ext = v.$extensions?.['com.rms.design-system-engine'] ?? v.$extensions?.['com.rms.parity'];
+    const ext = v.$extensions?.['com.rms.design-system-engine'];
     if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: ext?.modes ?? null, readableOn: ext?.readableOn ?? null, deprecated: v.$deprecated === true });
     else out.push(...flattenTokens(v, [...prefix, k]));
   }
@@ -78,7 +77,7 @@ export function answerLines(a) {
   return lines;
 }
 
-function main() {
+async function main() {
   const ROOT = process.cwd();
   const args = process.argv.slice(2).filter((a) => a !== '--query');
   const json = args.includes('--json');
@@ -107,11 +106,31 @@ function main() {
   const spec = resolveNamingSpec(cfg);
   const varOf = (p) => { try { return tokenToVar(p, spec); } catch { return null; } };
   const answers = terms.map((t) => answer(t, { catalog, tokens, varOf }));
-  if (json) console.log(JSON.stringify(answers, null, 2));
+  // Build mode: a component still to build gets its build sheet, the exact lines the engine then checks.
+  const sheets = {};
+  if (cfg.build === true && answers.some((a) => a.kind === 'component')) {
+    const { componentsToBuild, projectDerivedContract, buildSheetLines } = await import('./build-list.mjs');
+    const { loadLocator } = await import('./component-locator.mjs');
+    const { inProgressList } = await import('./in-progress.mjs');
+    // Any component Figma has and the code does not gets its sheet when asked for, an experimental one too: it stays
+    // off the build list (Figma may still change it), but whoever builds it builds it from the same facts.
+    const toBuild = new Set([...await componentsToBuild(ROOT, cfg), ...(await inProgressList(ROOT, cfg)).filter((x) => x.figma && !x.code).map((x) => x.name)]);
+    const loc = await loadLocator(ROOT, cfg);
+    const d = projectDerivedContract(ROOT, cfg, (n) => loc.classFor(n), varOf);
+    const read = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+    const struct = read(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').components ?? {};
+    const props = read(cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json');
+    const nesting = read('component-composition.snapshot.json');
+    const typography = read(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json').typography ?? {};
+    for (const a of answers) if (a.kind === 'component' && toBuild.has(a.name)) sheets[a.name] = buildSheetLines(a.name, d, { struct, props, nesting, typography, file: cfg.componentFiles?.[a.name] ?? null });
+  }
+  if (json) console.log(JSON.stringify(answers.map((a) => (sheets[a.name] ? { ...a, buildSheet: sheets[a.name] } : a)), null, 2));
   else {
     console.log('');
-    for (const a of answers) { for (const l of answerLines(a)) console.log(l); console.log(''); }
-    if (answers.some((a) => a.kind === 'component')) console.log('NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-design-system-engine --check-ui <file>\n');
+    for (const a of answers) { for (const l of [...answerLines(a), ...(sheets[a.name] ?? [])]) console.log(l); console.log(''); }
+    const first = Object.keys(sheets)[0];
+    if (first) console.log(`NEXT: build ${first} as written above, then run rms-design-system-engine --component ${first} until it passes\n`);
+    else if (answers.some((a) => a.kind === 'component')) console.log('NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-design-system-engine --check-ui <file>\n');
   }
   process.exit(answers.every((a) => a.kind !== 'none') ? 0 : 1);
 }

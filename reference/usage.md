@@ -62,6 +62,7 @@ rms-design-system-engine --prune                         # list prune candidates
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
 rms-design-system-engine --no-docs                       # skip the design-intent layer this run (emitted by default; local, gitignored)
+rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
@@ -79,6 +80,37 @@ node ~/.claude/skills/rms-design-system-engine/parity-check.mjs --fix           
 node ~/.claude/skills/rms-design-system-engine/setup-webhook.mjs --list                 # list registered Figma webhooks for this file
 ```
 
+### Build mode
+
+A project that has only Figma starts in **build mode** (`ds-config.json` → `"build": true`): setup chooses it when the
+project has no CSS at all, or when it runs with `--build`. The engine still writes no code; it says what to build and
+checks each piece once it exists.
+
+- **What is left to build, in order.** The report ends with a `🧱 TO BUILD` line: the tokens first, then each component
+  Figma has and the code does not yet, a component after the ones it nests. NEXT names the next item with its commands.
+  Something still to build is never a failure; once it exists it is compared like everything else.
+- **Tokens.** The token check writes every Figma variable the theme does not declare yet, exactly as the theme should
+  declare it (name, value, the block for each mode and breakpoint), to `.design-system-engine-out/handback/tokens-to-build.css`,
+  to copy into the theme file. A declared token with a wrong value still fails.
+- **Components.** `--query <name>` prints a component's build sheet: its class, height, padding, gap, radius and colours
+  with their variables, the text style, the selector of each state and variant (a modifier class such as `.chip--l`,
+  a pseudo-class for a state: `:hover:not(:disabled)`, `:active`, `:focus-visible`, `:disabled`), its role and the
+  components it nests. A variant gets a selector only when it changes a style (one that only shows a layer, such as an
+  icon, is markup). A colour Figma paints with no variable is named with its value, to write as it is and report,
+  never as an invented variable. An experimental component gets its sheet when asked for, though it stays off the
+  build list. Every line is what the structure check compares once the component exists, so a component built from
+  the sheet needs no `structure-contract.mjs` entry; an entry the project writes always wins.
+- **Component stylesheets.** A component built into its own stylesheet (`src/components/button.css`) is found by its
+  class and added to `paths.themeCSS` after the token file, said once in the report, so every gate reads it.
+- **A token an edit invents.** In any project, a custom property an edit adds with a value of its own (a colour, a size) that Figma has no variable for is handed back, in the theme too; one that only points at the system's tokens, or that Figma has, is not.
+- **A last check before the agent finishes.** The Stop hook runs the edit check once more over every UI file the session changed, against the last commit; a value the system does not have that an edit left in place goes back once, with the file and the line. Lines that were already in the commit do not count.
+- **Never a secret in the chat.** Whatever the request, the Stop hook sends back once a final reply that asks the person for a token, key or password: the person puts it in the project's `.env` themselves. A design token named in a question is not a secret.
+- **Measured differences fail.** In build mode a value the browser measures on the rendered component that differs from Figma (a height, a line height, a colour) fails Gate [13], and its direction is always back to Figma's value: the code was just written from it. A value the page could only read as the browser's default is shown, not failed. `renderedParityStrict: false` keeps them advisory.
+- **The role, even with only states.** Figma's role annotation is read in the markup of every component that has one, also when all its props are states (a field whose only prop is `State` still has to be a real `<input>`).
+- **The sentence owed.** Building a component Figma paints with a colour that has no variable, the route asks for one line in the reply saying so, and the Stop hook sends the agent back when the reply leaves it out: twice at most, so a first hand-back spent on something else does not lose it.
+- **While building.** The edit check counts the tokens still to build as the system's own, so a component written
+  before its tokens is still checked against them. Unused tokens are expected and do not fail.
+
 ### The design-intent layer (auto OUTPUT, never a gate)
 
 The design-intent layer is an **output**, not a verification — the same category as the
@@ -93,8 +125,8 @@ surprise file**. Once adopted it stays fresh **every run** (like the contracts),
 file is gitignored, so absent after checkout), set `docs.auto: true`. It is deliberately NOT a
 gate: a gate answers "does the code match Figma?", and generating documentation is neither a
 check nor something that decides the verdict. The heavier **styleguide HTML stays opt-in** — it
-builds only with an explicit `--docs` (alias `--intent`) or `ds-config.json → styleguide.auto:
-true`, and only when a styleguide template is configured.
+builds with `--styleguide`, an explicit `--docs` (alias `--intent`) or `ds-config.json → styleguide.auto:
+true`, from the engine's template unless the project names its own.
 
 It writes **one** merge-aware file, `<theme-css dir>/design-intent.json` (override with
 `ds-config.json → docs.out`) — a project's **intent layer**, organised as
@@ -172,24 +204,40 @@ commit it to a public repo, since it carries your Figma's internal annotations a
 Any consumer (an optional styleguide) reads this **one** JSON — single source, no
 re-derivation.
 
-#### The living styleguide (opt-in, generated by `--docs`)
+#### The living styleguide (opt-in: `--styleguide`, or `--docs`)
 
-When `ds-config.json → styleguide` is set, `--docs` **also generates the styleguide HTML** — a
-living styleguide — right after the design-intent, via `styleguide-gen.mjs`. It is a **generated
-view**, never hand-maintained: a private **template** (`styleguide.template.html` — the structure,
-CSS, and per-component render patterns for *this* DS) carries `{{markers}}`, and the generator
-fills each with data gathered **live from Figma + code**:
+`--styleguide` builds the styleguide HTML on its own; `--docs` builds it right after the design-intent. It is a
+**generated view** of what Figma and the code agree on, never hand-maintained. Every project fills **one
+template, the engine's** (`templates/styleguide.template.html`), so an improvement made there reaches every design
+system on its next run; `ds-config.json → styleguide.template` points a project at a template of its own instead.
+The output goes to `styleguide.out`, else `.design-system-engine-out/styleguide/index.html`.
 
+What the engine's template shows (`styleguide-data.mjs` decides it):
+
+- **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
+  when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; icons from
+  the icon sheet.
+- **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
+  own pages, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
+  matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
+  an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
+  Below it, the tokens behind what is drawn and its size; above it, the apps that use it and its documentation.
+- **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
+  and, where the CSS nests, for one component.
+- **Not agreed yet**: a prop on one side only, another default, a token that differs, a component not built yet:
+  left out and counted in one line at the top, for the person to decide.
+
+A project's own template is filled through markers:
+
+- `{{AGREED}}` ← the agreed view above, as JSON.
 - `{{ICON_SHEET}}` ← the DS icon `<symbol>` set, lifted from a built plugin `ui.html` (`styleguide.iconSource`).
 - `{{USAGE}}` ← which plugins reference each component's class (scanned from plugin source).
 - `{{DOCS}}` / `{{DOCS_CODE}}` ← Figma descriptions and code notes, from the design-intent JSON (hardcoded pixel dimensions are stripped — docs describe with tokens).
-- `{{THEME_CSS}}` *(optional)* ← the token CSS inlined verbatim, with its `@media (prefers-color-scheme: dark)` guarded to `:root:not([data-color])` so the manual light/dark toggle wins.
+- `{{THEME_CSS}}` ← the token CSS inlined verbatim, with its `@media (prefers-color-scheme: dark)` guarded to `:root:not([data-color])` so the manual light/dark toggle wins; `{{COMPONENT_CSS}}` ← the component stylesheets outside the theme.
 
-Config: `styleguide: { template, out, iconSource, plugins? }`. `plugins` is `[{ key, match }]`, a short usage label per app and a fragment of its source path; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
-DS actually contains, the styleguide can never invent or drift — the same guarantee Gate 20
-(docs-truth) checks on the output. Like the design-intent, it is **project-specific and private**:
-keep the template, the `out` HTML, and any screenshots **gitignored**, and back the template up
-privately (it carries your DS's render patterns). The engine ships only the generic generator.
+Config: `styleguide: { template?, out?, iconSource?, plugins? }`. `plugins` is `[{ key, match }]`, a short usage label per app and a fragment of its source path; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
+DS actually contains and agrees on, the styleguide can never invent or drift — the same guarantee Gate 20
+(docs-truth) checks on the output.
 
 #### The standard contract layer (emitted automatically each run)
 
@@ -318,9 +366,13 @@ capture with the browser.
 - **Components measured where they render.** Each component (found through `component-locator.mjs`) is
   measured in the generated styleguide or the built pages: a plain instance first, one that carries text
   next; a usage with extra classes or an id is copied into a neutral host without them (and the removed
-  extras are recorded); a hidden one is measured as a copy; else a probe from `structure-contract.mjs`; else
-  a bare element built from the selector, its contract children and the parts the selector map names
-  (lowest confidence, and never a height, since it has no content). The parts the contract names
+  extras are recorded); a hidden one is measured as a copy; else a probe from `structure-contract.mjs`; else,
+  for a React component, the markup its own JSX returns (`jsx-markup.mjs`: the element types, the classes
+  that are always there, string attributes and default text, so a `<span>` or an `<input>` is measured as
+  one); else a bare element built from the selector, its contract children and the parts the selector map
+  names (lowest confidence, and never a height, since it has no content). When the rule already sets Figma's
+  height and the drawn box is another, the fix names the cause: an inline element that ignores a height, or
+  padding and border outside a content box. The parts the contract names
   (`fontSel`, `radiusSel`, `gapSel`, `beforeSel`) and the first element holding text (what Figma's font
   fields describe) are measured too. Numbers are repeatable: fixed viewport and pixel ratio, fonts loaded,
   transitions off.

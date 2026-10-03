@@ -96,7 +96,8 @@ export function resolveComponentFile(name, { ROOT, cfg = {}, files, read, classF
 // properties fail, and extra code props are advisory).
 function idsFromDestructure(block) {
   const out = [];
-  for (const m of block.matchAll(/(?:^|[,{])\s*([A-Za-z_$][\w$]*)\s*(?::|=|,|\})/g)) {
+  // The terminator is looked at, not consumed: `{ a, b }` must leave the comma before b for b's own match.
+  for (const m of block.matchAll(/(?:^|[,{])\s*([A-Za-z_$][\w$]*)\s*(?=:|=|,|\}|$)/g)) {
     if (m[1] && m[1] !== 'props') out.push(m[1]);
   }
   return out;

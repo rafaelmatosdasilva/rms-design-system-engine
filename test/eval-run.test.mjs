@@ -174,3 +174,9 @@ test('--ci: a run worse than the last one fails (a drop of more than 5 points, o
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stdout, /Worse than the last run: zero-fix 100% → 0% \(--ci: failing\)/);
 });
+
+test('a component name with a regex character is found in a prompt as written', async () => {
+  const { promptLeaks } = await import('../eval-run.mjs');
+  assert.deepEqual(promptLeaks([{ id: 'a', prompt: 'build the c++ card' }], ['c++']), [{ id: 'a', name: 'c++' }]);
+  assert.deepEqual(promptLeaks([{ id: 'b', prompt: 'build the cxx card' }], ['c.x']), []);
+});

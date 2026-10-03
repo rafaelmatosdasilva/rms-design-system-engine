@@ -24,16 +24,32 @@ export function measuredLines(gates) {
     .filter((t) => /^⚠️\s+\S+ .*: Figma .*, rendered |while disabled \(/.test(t));
 }
 
-// state: { failing: [gate], scope: [names], handback: { code, figma }, burndownNext, baselineWritten: { count, file }, cmd }
-export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, cmd = 'rms-design-system-engine' } = {}) {
+// state: { failing: [gate], scope: [names], handback: { code, figma }, burndownNext, baselineWritten: { count, file },
+//         toBuild: { tokens, file, theme, components } (build mode), cmd }
+export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, toBuild = null, build = false, cmd = 'rms-design-system-engine' } = {}) {
   const rerun = scope.length ? `${cmd} --component ${scope.join(',')}` : cmd;
   if (baselineWritten) return `NEXT: tell the user ${baselineWritten.file} now holds the accepted debt; commit it only when they ask.`;
+  // Build mode, one component checked: it is being built from Figma, so a failure is part of building it, not a
+  // difference for the person to decide (a build run reported its tag's wrong height instead of fixing it).
+  if (failing.length && build && scope.length) {
+    const g = failing[0];
+    return `NEXT: you are building ${scope.join(', ')} from Figma: fix each ❌ line under "${gateName(g.label)}"${failing.length > 1 ? ` (and ${failing.length - 1} more failing gate${failing.length > 2 ? 's' : ''})` : ''} the way it says (Figma's value wins), then run ${rerun} again until it passes. Tell the person only what you could not fix.`;
+  }
   if (failing.length) {
     const g = failing[0];
     return `NEXT: tell the user what fails under "${gateName(g.label)}"${failing.length > 1 ? ` (and ${failing.length - 1} more failing gate${failing.length > 2 ? 's' : ''})` : ''} and the fix it names. Change the code only when they ask for that fix, then run ${rerun}. To accept a known difference instead: ${cmd} --baseline --findings (only when they ask).`;
   }
   if (handback.code) return `NEXT: show the user ${handback.code}; apply it only when they ask (git apply ${handback.code}), then run ${rerun}.`;
   if (handback.figma) return `NEXT: show the user ${handback.figma}, the changes to make in Figma. Nothing is changed in Figma by the skill.`;
+  // Build mode: what is built matches; build the next thing, tokens first, then one component at a time.
+  if (toBuild?.tokens) return `NEXT: build the tokens: copy the declarations in ${toBuild.file} into ${toBuild.theme ?? 'the theme CSS'}, then run ${cmd}.`;
+  if (toBuild?.components?.length) {
+    const c = toBuild.components[0];
+    // Only what the person asked for: once it is built, the next component waits for them to ask (a build evaluation
+    // run built every component when it was asked for the tokens, and ran out of turns before it answered).
+    const left = toBuild.components.join(', ');
+    return `NEXT: what is built matches Figma. If the person asked for ${c} (or for every component), build it: run ${cmd} --query ${c} for what it needs, write it with those names, then run ${cmd} --component ${c} until it passes. Otherwise stop here and tell them what is built and what is still to build (${left}).`;
+  }
   if (burndownNext && !scope.length) return `NEXT: ${cmd} --component ${burndownNext}`;
   return 'NEXT: nothing to do. Parity holds for what was checked.';
 }
@@ -55,7 +71,7 @@ export function dataStateLine({ refreshedFromApi = false, snapshots = [], cmd = 
 
 // only: { words, a11y: { static, browser } | null } when the run was --only: the summary says what ran, so a part
 // never reads as the whole system.
-export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null } = {}) {
+export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null, toBuild = null } = {}) {
   const lines = [];
   const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
   const debt = gates.filter((g) => g.baselined);
@@ -64,6 +80,7 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
     : verdict === 'failed' ? `**Not in parity.** ${failing.length} of ${gates.length} gate${gates.length === 1 ? ' fails' : 's fail'}.`
     : verdict === 'debt' ? `**No regressions.** ${debt.length} gate${debt.length === 1 ? '' : 's'} carry accepted debt.`
       : only && !gates.length ? '**Accessibility checked.** Its findings are advice: the report lists each with its fix.'
+      : toBuild ? `**What is built matches Figma.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}; the rest is still to build.`
       : `**In parity.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}.`);
   if (only) {
     lines.push('', `Only ${only.words} ran in this run; nothing else was checked.`);
@@ -86,7 +103,12 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
     for (const t of measured.slice(0, 8)) lines.push(`- ${t.replace(/^⚠️\s*/, '')}`);
     if (measured.length > 8) lines.push(`- and ${measured.length - 8} more`);
   }
-  if (burndown.length) lines.push('', burndown[0].replace(/^📉\s*/, ''));
+  if (burndown.length) {
+    lines.push('', burndown[0].replace(/^📉\s*/, ''));
+    const up = burndown.find((l) => /^\s*next up:/.test(l));
+    if (up) lines.push(`Fix first: ${up.trim().replace(/^next up:\s*/, '')}`);
+  }
+  if (toBuild) lines.push('', toBuild);
   if (next) lines.push('', next);
   return lines.join('\n') + '\n';
 }

@@ -22,6 +22,8 @@
 // Silent when the edit added none of these. Precise before complete: component tags the catalog does not know
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
+import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
+import { TOKENS_TO_BUILD } from './build-list.mjs';   // build mode: the tokens still to build
 import { readFileSync, existsSync } from 'node:fs';
 import { join, relative, resolve, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -32,7 +34,7 @@ import { markupFindings, cssFindings, styleOnly, projectStyleText } from './a11y
 import { codeSnapshotPath } from './names.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
-const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.design-system-engine-out|\.design-system-engine-refs|\.parity-out|\.parity-refs)\//;
+const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.design-system-engine-out|\.design-system-engine-refs)\//;
 const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g;
 const NOT_COLOUR = /(href|to|src|action|xlink:href)\s*=\s*\{?\s*["'`]$|url\(\s*["']?$|&$/i;   // #add in a link is a fragment
 // Outside a style sheet, a colour counts only where it styles something: after a colour-bearing property
@@ -141,7 +143,9 @@ export function editTruth(ROOT, cfg = {}) {
   const read = (p) => { try { return readFileSync(resolve(ROOT, p), 'utf8'); } catch { return ''; } };
   const json = (p) => { try { return JSON.parse(read(p)); } catch { return {}; } };
   const themePaths = [cfg.paths?.themeCSS ?? 'src/theme.css', ...[cfg.paths?.pluginCSS ?? []].flat()].flat();
-  const theme = themePaths.map(read).join('\n');
+  // Build mode: the tokens Figma defines and the theme does not declare yet (written by the token check) count as the
+  // system's own, so a component written before or alongside its tokens is still checked against them.
+  const theme = [...themePaths.map(read), cfg.build === true ? read(TOKENS_TO_BUILD) : ''].join('\n');
   const cssVars = [...new Set([...theme.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))];
   const tokenByValue = new Map();
   for (const m of theme.matchAll(/(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\b/g)) {
@@ -150,6 +154,31 @@ export function editTruth(ROOT, cfg = {}) {
     if (!list.includes(m[1])) list.push(m[1]);
     tokenByValue.set(k, list);
   }
+  // The colours a Figma component paints with no variable bound: Figma's own value, written as it is (the build sheet
+  // says so, and the audit's literal check accepts it), so not an invented colour.
+  const figmaRaw = new Set();
+  const walkRaw = (o) => { if (typeof o === 'string') { if (/^#[0-9a-f]{3,8}$/i.test(o)) figmaRaw.add(normHex(o)); } else if (o && typeof o === 'object') Object.values(o).forEach(walkRaw); };
+  walkRaw(json(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').components ?? {});
+  // Every CSS variable Figma's variables map to (the naming convention), so a token an edit invents is told apart from
+  // one the system has.
+  const figmaVars = new Set();
+  const vars = json(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
+  const spec = resolveNamingSpec(cfg);
+  // Both conventions the token check uses: colours drop their trailing segment (`button/background/color` →
+  // --button-background), sizing and other scalars keep every segment (`stroke/default` → --stroke-default).
+  const addName = (n) => {
+    if (typeof n !== 'string' || n.startsWith('_')) return;
+    for (const opts of [{}, { raw: true }]) { try { const v = tokenToVar(n, spec, opts); if (v) figmaVars.add(v); } catch { /* a name the convention cannot map */ } }
+  };
+  for (const mode of Object.values(vars.color ?? {})) Object.keys(mode ?? {}).forEach(addName);
+  for (const k of ['sizing', 'strings', 'booleans', 'primitives', 'typography', 'breakpoints']) Object.keys(vars[k] ?? {}).forEach(addName);
+  for (const c of Object.values(vars.modeVariants ?? {})) Object.keys(c?.vars ?? {}).forEach(addName);
+  // Build mode: every token the engine wrote out to build is Figma's, whatever the project's own mapping does.
+  if (cfg.build === true) for (const m of read(TOKENS_TO_BUILD).matchAll(/(--[\w-]+)\s*:/g)) figmaVars.add(m[1]);
+  // Figma's own values: a new name holding one of them is a rename at most, not a value the system lacks.
+  const figmaValues = new Set();
+  for (const mode of Object.values(vars.color ?? {})) for (const v of Object.values(mode ?? {})) if (/^#[0-9a-f]{3,8}$/i.test(String(v))) figmaValues.add(normHex(v));
+  for (const v of Object.values(vars.sizing ?? {})) if (typeof v === 'string') figmaValues.add(v.trim().toLowerCase());
   const contracts = cfg.contracts?.out ?? 'contracts';
   const catalog = json(join(contracts, 'catalog.json'));
   const api = json(codeSnapshotPath(cfg)).api ?? {};
@@ -161,12 +190,12 @@ export function editTruth(ROOT, cfg = {}) {
   // The static accessibility rules (I74), with the project's styles read only when an edit removes an outline.
   let styles = null;
   const a11y = cfg.a11yStatic === false ? null : { styles: () => (styles ??= projectStyleText(ROOT)) };
-  return { truth, tokenByValue, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -190,6 +219,17 @@ export function editFindings(added, fullText, { truth, tokenByValue, tailwind = 
       }
     }
     if (tailwind) for (const f of arbitraryFindings(l, tailwind)) push(line, `${f.cls} is outside the theme; ${f.fix ? `write ${f.fix}` : `${f.value} is not a design-system value`}`);
+    // A token the edit adds with a value of its own (a colour, a size) that Figma has no variable for: a value the
+    // system does not have, wherever it is declared. One that only points at the system's tokens is composition.
+    if (figmaVars?.size && declaredBefore && !COMMENT.test(l)) {
+      for (const d of l.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) {
+        const [, name, value] = d;
+        if (declaredBefore.has(name) || figmaVars.has(name) || !/#[0-9a-f]{3,8}\b|\b(rgb|hsl|oklch|lab)a?\(|\d(px|rem|em)\b/i.test(value) || /^\s*var\(/.test(value)) continue;
+        const v = value.trim().toLowerCase(), hex = /^#[0-9a-f]{3,8}$/.test(v) ? normHex(v) : null;
+        if (figmaValues.has(hex ?? v)) continue;   // one of Figma's own values under a name of the project's
+        push(line, `${name} is a new token Figma has no variable for; use one of the system's tokens, or tell the person the system has no such value (rms-design-system-engine --query <name>)`);
+      }
+    }
     if (isTheme || /^\s*--[\w-]+\s*:/.test(l) || COMMENT.test(l)) continue;   // a token being defined, the theme's own values, a comment
     // A custom-property declaration anywhere on the line (a minified :root{--x: #fff;…}) defines a token.
     const scan = l.replace(/--[\w-]+\s*:[^;}]*/g, ' ').replace(/var\([^)]*\)/g, ' ').replace(/&#x?[0-9a-fA-F]+;/g, ' ');
@@ -199,6 +239,7 @@ export function editFindings(added, fullText, { truth, tokenByValue, tailwind = 
       if (!sheet && !STYLE_PROP.test(scan.slice(0, m.index))) continue;
       if (/\.(fill|stroke|shadow)(Style|Color)\s*=\s*[^;]*$/.test(scan.slice(0, m.index))) continue;   // a canvas being painted, not the page
       const tokens = tokenByValue.get(normHex(m[0])) ?? [];
+      if (!tokens.length && figmaRaw.has(normHex(m[0]))) continue;   // Figma paints it raw: reported, not invented
       push(line, tokens.length
         ? `${m[0]} is written by hand; use var(${tokens[0]})${tokens.length > 1 ? ` (or ${tokens.slice(1, 3).map((t) => `var(${t})`).join(', ')})` : ''}`
         : `${m[0]} is not a design-system colour; use one of its colour tokens`);
@@ -239,7 +280,10 @@ export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
   if (!added.length) return null;
   const ctx = editTruth(root, cfg);
   let full = ''; try { full = existsSync(abs) ? readFileSync(abs, 'utf8') : ''; } catch { /* the edit's own text is enough */ }
-  const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs), component: /\.(vue|svelte)$/i.test(abs) });
+  // The tokens the file declared before this edit (its committed text, else the text the edit replaced).
+  const before = head ?? (event?.tool_name === 'Edit' ? String(event.tool_input?.old_string ?? '') : event?.tool_name === 'MultiEdit' ? (event.tool_input?.edits ?? []).map((e) => e.old_string).join('\n') : '');
+  const declaredBefore = new Set([...String(before).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+  const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs), component: /\.(vue|svelte)$/i.test(abs), declaredBefore });
   if (!found.length) return null;
   const lines = found.slice(0, 12).map((f) => `  ${basename(rel)}${f.line ? `:${f.line}` : ''}  ${f.text}`);
   const n = found.length, them = n === 1 ? 'it' : 'them', count = (k) => found.filter((f) => f.kind === k).length;
@@ -255,4 +299,22 @@ export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
 
 export function editHookOutput(reason) {
   return reason ? JSON.stringify({ decision: 'block', reason }) : '';
+}
+
+// Before the agent says it is done (the Stop hook, I81 second part): the same check over every UI file the session
+// changed against the last commit, so a value the system does not have that an edit left in place (the agent asked
+// the person instead of taking it out) is handed back once. → [lines] ('ui.html:12  #2d8659 is not …'), [] when clean.
+export function sessionLeftovers(root, cfg = {}) {
+  if (cfg.hooks === false || cfg.editCheck === false) return [];
+  const git = (args) => { try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return ''; } };
+  const changed = [...new Set([...git(['diff', '--name-only', 'HEAD']).split('\n'), ...git(['ls-files', '--others', '--exclude-standard']).split('\n')])]
+    .map((f) => f.trim()).filter((f) => f && UI.test(f) && !SKIP.test(f) && existsSync(join(root, f))).slice(0, 40);
+  const out = [];
+  for (const rel of changed) {
+    let now = ''; try { now = readFileSync(join(root, rel), 'utf8'); } catch { continue; }
+    const head = (() => { try { return execFileSync('git', ['show', `HEAD:${rel}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return null; } })();
+    const reason = editCheck({ tool_name: 'Write', tool_input: { file_path: join(root, rel), content: now } }, { root, cfg, headOf: () => head });
+    if (reason) out.push(...reason.split('\n').filter((l) => /^ {2}\S/.test(l)).map((l) => `  ${rel}${l.trim().replace(/^[^\s:]+/, '')}`));
+  }
+  return out;
 }

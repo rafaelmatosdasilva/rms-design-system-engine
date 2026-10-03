@@ -1,0 +1,104 @@
+{
+  "_updated": "2026-01-01T00:00:00.000Z",
+  "button": {
+    "nodeId": "3:8",
+    "properties": {
+      "State": {
+        "type": "VARIANT",
+        "defaultValue": "Default",
+        "variantOptions": [
+          "Default",
+          "Hover"
+        ]
+      },
+      "Disabled": {
+        "type": "VARIANT",
+        "defaultValue": "False",
+        "variantOptions": [
+          "False",
+          "True"
+        ]
+      },
+      "Label#3:0": {
+        "type": "TEXT",
+        "defaultValue": "Save"
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: button"
+      }
+    ],
+    "description": "The main action on a screen."
+  },
+  "chip": {
+    "nodeId": "3:16",
+    "properties": {
+      "Size": {
+        "type": "VARIANT",
+        "defaultValue": "M",
+        "variantOptions": [
+          "M",
+          "L"
+        ]
+      },
+      "Icon": {
+        "type": "VARIANT",
+        "defaultValue": "False",
+        "variantOptions": [
+          "False",
+          "True"
+        ]
+      },
+      "Label#3:4": {
+        "type": "TEXT",
+        "defaultValue": "Filter"
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: togglebutton"
+      }
+    ],
+    "description": "A filter people switch on and off."
+  },
+  "field": {
+    "nodeId": "3:21",
+    "properties": {
+      "State": {
+        "type": "VARIANT",
+        "defaultValue": "Default",
+        "variantOptions": [
+          "Default",
+          "Error"
+        ]
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: textbox"
+      }
+    ],
+    "description": "A one-line text input."
+  },
+  "tag": {
+    "nodeId": "3:26",
+    "description": "A small status label. @experimental Still being designed.",
+    "properties": {
+      "Tone": {
+        "type": "VARIANT",
+        "defaultValue": "Neutral",
+        "variantOptions": [
+          "Neutral",
+          "Positive"
+        ]
+      },
+      "Label#3:8": {
+        "type": "TEXT",
+        "defaultValue": "New"
+      }
+    },
+    "annotations": []
+  },
+  "_note": "Tidepool, a fictional design system, as captured from its Figma file (b0LpOCBsaRgo8lUqbkQNaY) for the build evaluation. Every name is invented."
+}

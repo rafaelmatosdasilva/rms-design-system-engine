@@ -28,7 +28,7 @@ import { join, basename, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { route, routeText, projectState, SAY } from './route.mjs';
 import { readDoc } from './skill-files.mjs';
-import { editCheck, editHookOutput } from './edit-check.mjs';
+import { editCheck, editHookOutput, sessionLeftovers } from './edit-check.mjs';
 import { PROJECT, OUT_DIR } from './names.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
@@ -39,7 +39,7 @@ const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 const CODE = /\.(css|scss|sass|less|js|jsx|mjs|cjs|ts|tsx|vue|svelte|html?)$/i;
 // A message that asks for a change: a change verb, and not a how/why question about one.
 // Only the form that asks: "the design changed" or "o design mudou" describes, it does not ask for a change.
-const CHANGE = /\b(fix|correct|change|update|apply|edit|set|repair|rename|replace|remove|add|make|corrig(e|ir|a)|corrij(a|am)|consert(a|ar|e)|mud(a|ar|e)|alter(a|ar|e)|aplic(a|ar|que)|atualiz(a|ar|e)|repar(a|ar|e)|substitu(i|ir|a)|remov(e|er|a)|acrescent(a|ar|e)|p[oõ]e|p[oô]r|coloc(a|ar|que))\b/i;
+const CHANGE = /\b(fix|correct|change|update|apply|edit|set|repair|rename|replace|remove|add|make|build|create|implement|write|generate|constr[oó]i\w*|cri(a|ar|e)|implement(a|ar|e)|escrev(e|er|a)|ger(a|ar|e)|corrig(e|ir|a)|corrij(a|am)|consert(a|ar|e)|mud(a|ar|e)|alter(a|ar|e)|aplic(a|ar|que)|atualiz(a|ar|e)|repar(a|ar|e)|substitu(i|ir|a)|remov(e|er|a)|acrescent(a|ar|e)|p[oõ]e|p[oô]r|coloc(a|ar|que))\b/i;
 const ASKING_HOW = /^\s*(how|why|what|where|which|can i|should i|como|porqu|o que|onde|qual|posso)\b/i;
 export function asksForChange(text) {
   const t = String(text ?? '').trim();
@@ -82,13 +82,17 @@ const SAID = {
     test: /(can['’]?t|cannot|can not|won['’]?t|will not|do(es)?\s?n['’]?o?t|never)\s+(change|edit|modify|write to|update|touch)\b[^.]{0,40}\bfigma\b|\bonly reads (it|figma)\b|\bread-only\b/i,
     what: 'that this skill does not change Figma',
   },
+  noVariable: {
+    test: /\b(no|not a|without( a)?|lacks?( a)?|has no|have no|isn['’]?t a|is not a)\s+(design[- ]system\s+)?(variable|token)s?\b|\bnot (bound to|in) (a |any )?(variable|token)/i,
+    what: 'that Figma paints this component with colours the design system has no variable for',
+  },
   noRefresh: {
     test: /(could\s?n['’]?t|could not|cannot|can['’]?t|unable to|did\s?n['’]?t|did not|was\s?n['’]?t|were\s?n['’]?t|not able to)\s+(be\s+)?(refresh|re-?capture)|\bnot\s+(been\s+)?(refreshed|re-?captured)\b|\bno figma (tool|access|connection|token)\b|\bwithout (a |any )?figma (tool|access|connection)\b/i,
     what: 'that the Figma snapshots were not refreshed in this run',
     unless: (transcriptPath) => figmaToolUsed(transcriptPath),   // it did refresh: the line is not true
   },
 };
-export const sayKind = (line) => (line === SAY.figma ? 'figma' : /^I couldn't refresh the Figma snapshots/.test(line) ? 'noRefresh' : null);
+export const sayKind = (line) => (line === SAY.figma ? 'figma' : /^I couldn't refresh the Figma snapshots/.test(line) ? 'noRefresh' : /^Figma paints .* with colours that have no variable/.test(line) ? 'noVariable' : null);
 const saidFile = (root) => join(root, OUT_DIR, 'said.json');
 
 // The UserPromptSubmit side: the sentences this prompt's route asks for, kept for the Stop check (or cleared).
@@ -103,30 +107,57 @@ export function rememberSay(root, event, say = []) {
 
 // The Stop side: the reason to send the agent back, or null. Once only (stop_hook_active), and only for the prompt
 // whose route asked for the lines.
-export function stopCheck(event, { root }) {
-  if (event?.stop_hook_active) return null;
-  let said; try { said = JSON.parse(readFileSync(saidFile(root), 'utf8')); } catch { return null; }
-  if (!said?.say?.length) return null;
-  if (said.session && event.session_id && said.session !== event.session_id) return null;
-  if (said.prompt && event.prompt_id && said.prompt !== event.prompt_id) return null;
-  const reply = String(event.last_assistant_message ?? '') || assistantBlocks(transcriptEntries(event.transcript_path)).filter((b) => b?.type === 'text').map((b) => b.text).pop() || '';
-  const missing = said.say.filter((s) => SAID[s.check] && !SAID[s.check].test.test(reply) && !SAID[s.check].unless?.(event.transcript_path));
+// A reply that asks the person for a secret (a token, a key, a password) in the chat. A design token named in a
+// question ("which colour token") is not one, nor a line that sends the secret to .env or says never to paste it.
+export function asksForSecret(text) {
+  return String(text ?? '').split(/(?<=[.!?\n])\s+/).some((s) =>
+    /\b(paste|share|send|give|provide|tell)\b[^.]{0,40}((?<!\b(?:colou?r|fill|design|spacing|size|radius|radii|typography|text|font|semantic|primitive|surface|border|shadow|motion|theme)[\s/-]{1,2})token|api key|access key|password|secret)\b(?!\s+values?\b)/i.test(s)
+    && !/\b(never|not|don['’]t|do not|won['’]t|will not|no need|without)\b|n['’]t ask/i.test(s)
+    && !/\b[\w-]+\/token\b|\btoken\s+(name\s+)?to use\b|\b(which|what)\s+([\w-]+\s+)?token\b/i.test(s)
+    && !/\.env\b|\benv(ironment)? var|\bexport\s+[A-Z_]+|\b(give|send|tell|provide|show|share with) you\b/i.test(s));
+}
+const SECRET_LINE = 'A secret is never asked for in the chat: the person puts it in the project\'s .env file themselves (the engine names the variable), then asks you to run the command again.';
+
+const readCfg = (root) => { try { return JSON.parse(readFileSync(join(root, 'ds-config.json'), 'utf8')); } catch { return null; } };
+export function stopCheck(event, { root, cfg = null }) {
+  const reply = String(event?.last_assistant_message ?? '') || assistantBlocks(transcriptEntries(event?.transcript_path)).filter((b) => b?.type === 'text').map((b) => b.text).pop() || '';
+  // Whatever the route: a reply that asks for a secret goes back once.
+  const secret = asksForSecret(reply);
+  let said; try { said = JSON.parse(readFileSync(saidFile(root), 'utf8')); } catch { said = null; }
+  const forThisPrompt = said?.say?.length && !(said.session && event.session_id && said.session !== event.session_id) && !(said.prompt && event.prompt_id && said.prompt !== event.prompt_id);
+  // At most two hand-backs for one request: a reply sent back for one reason (a value left in a file) may come back
+  // still without the line it owes, so the owed line gets one more. Without owed lines, once only, as before.
+  const backs = forThisPrompt ? (said.backs ?? 0) : 0;
+  if (event?.stop_hook_active && !(forThisPrompt && backs < 2)) return null;
+  const counted = (reason) => {
+    if (reason && forThisPrompt) { try { writeFileSync(saidFile(root), JSON.stringify({ ...said, backs: backs + 1 }, null, 2) + '\n'); } catch { /* a help, never a blocker */ } }
+    return reason;
+  };
+  const missing = forThisPrompt ? said.say.filter((s) => SAID[s.check] && !SAID[s.check].test.test(reply) && !SAID[s.check].unless?.(event.transcript_path)) : [];
+  // What the session's edits left in place that the system does not have (the edit check, run once more over the files).
+  let left = [];
+  try { const c = cfg ?? readCfg(root); if (c) left = sessionLeftovers(root, c); } catch { /* the check is a help, never a blocker */ }
+  if (left.length) {
+    return counted(`rms-design-system-engine: before you finish, the files you changed still hold what the design system does not have:\n${left.slice(0, 12).join('\n')}${left.length > 12 ? `\n  and ${left.length - 12} more` : ''}\nTake each out, or write the system's own value instead; when it has none, leave it out and tell the person. Then give your answer again${missing.length ? `, with ${missing.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${missing.map((s) => s.text).join('\n')}` : '.'}${secret ? ` ${SECRET_LINE}` : ''}`);
+  }
+  if (secret && !missing.length) return counted(`rms-design-system-engine: your reply asks the person for a secret in the chat. Reply again without asking for it. ${SECRET_LINE}`);
   if (!missing.length) return null;
-  return `rms-design-system-engine: your reply leaves out ${missing.map((s) => SAID[s.check].what).join(' and ')}. Reply again with your whole answer and ${missing.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${missing.map((s) => s.text).join('\n')}`;
+  const lines = [...missing.map((s) => s.text), ...(secret ? [SECRET_LINE] : [])];
+  return counted(`rms-design-system-engine: your reply leaves out ${missing.map((s) => SAID[s.check].what).join(' and ')}${secret ? ', and asks the person for a secret in the chat' : ''}. Reply again with your whole answer${secret ? ', asking for no secret,' : ''} and ${lines.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${lines.join('\n')}`);
 }
 export const stopOutput = (reason) => (reason ? JSON.stringify({ decision: 'block', reason }) : '');
 
-// The files where the system's decisions are recorded (I73), under the new names and the old ones. 'agreed' is
+// The files where the system's decisions are recorded (I73). 'agreed' is
 // written by the engine only; the others change when the person asks.
 const ACCEPT_ASKED = /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit|\bbaseline|ratchet|lock (it |them )?in/i;   // the router's accept-debt words, or the baseline named
 const EXCEPTION_ASKED = /\b(exception|exempt|ignore|skip|mapping|map|exce[çc][õoã]|isen[çc]|ignor|mapa|mapeamento|set ?up|configur|install|init)\w*/i;   // setting the project up writes the map too
 const PICTURE_ASKED = /\b(approve|accept|update|aprov|aceit|atualiz)\w*\b[\s\S]{0,60}\b(pictures?|images?|screenshots?|references?|imagem|imagens|refer[eê]ncias?|capturas?)\b|\b(pictures?|images?|screenshots?|references?|imagem|imagens|refer[eê]ncias?|capturas?)\b[\s\S]{0,60}\b(approve|accept|update|aprov|aceit|atualiz)\w*/i;
 export function decisionFile(path, cfg = {}) {
   const p = String(path ?? '').replace(/\\/g, '/'), b = basename(p);
-  if ([PROJECT.baseline.now, PROJECT.baseline.old, cfg.baseline?.path && basename(cfg.baseline.path)].includes(b)) return 'debt';
-  if (b === PROJECT.agreed.now || b === PROJECT.agreed.old) return 'agreed';
-  if (b === PROJECT.map.now || b === PROJECT.map.old) return 'exceptions';
-  const refs = [cfg.visualRefs, PROJECT.refs.now, PROJECT.refs.old].filter(Boolean).map((d) => String(d).replace(/^\.?\/+|\/+$/g, ''));
+  if ([PROJECT.baseline.now, cfg.baseline?.path && basename(cfg.baseline.path)].includes(b)) return 'debt';
+  if (b === PROJECT.agreed.now) return 'agreed';
+  if (b === PROJECT.map.now) return 'exceptions';
+  const refs = [cfg.visualRefs, PROJECT.refs.now].filter(Boolean).map((d) => String(d).replace(/^\.?\/+|\/+$/g, ''));
   if (refs.some((d) => p === d || p.endsWith(`/${d}`) || p.startsWith(`${d}/`) || p.includes(`/${d}/`))) return 'pictures';   // the folder itself too
   return null;
 }
@@ -238,7 +269,7 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     } else if (event.hook_event_name === 'Stop') {
       let cfg = {};
       try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* defaults */ }
-      if (cfg.hooks !== false) { const out = stopOutput(stopCheck(event, { root })); if (out) process.stdout.write(out); }
+      if (cfg.hooks !== false) { const out = stopOutput(stopCheck(event, { root, cfg: existsSync(cfgPath) ? cfg : null })); if (out) process.stdout.write(out); }
     } else if (event.hook_event_name === 'PostToolUse') {
       if (existsSync(cfgPath)) {
         let cfg = {};

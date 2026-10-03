@@ -39,23 +39,10 @@ import { frameworkGateSkipReason }                              from './componen
 import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-parse.mjs';
 import { ZERO_FAIL }                                             from './run-diff.mjs';
 import { loadBaselineLabels, loadBaselineFindings, classifyBaseline, writeBaseline } from './baseline.mjs';
-import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, gitignoreNewNames, moveOutDir, newPath, oldNameLines, projectPath } from './names.mjs';
+import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, newPath, projectPath } from './names.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT       = process.cwd();
-
-// An install under the old name (rms-figma-code-parity) moves to the new one, then this run starts again there.
-if (!process.env.CI) {
-  try {
-    const { migrateInstall } = await import('./self-update.mjs');
-    const moved = migrateInstall(SCRIPT_DIR);
-    if (moved) {
-      console.log(moved.line);
-      const r = spawnSync(process.execPath, [join(moved.to, 'audit.mjs'), ...process.argv.slice(2)], { stdio: 'inherit' });
-      process.exit(r.status ?? 1);
-    }
-  } catch { /* a move that fails leaves the install where it was */ }
-}
 
 // Load .env from project root if present (no dotenv dependency)
 const envPath = join(ROOT, '.env');
@@ -127,6 +114,9 @@ const INIT_FIGMA_URL      = _argValue('--figma-url') ?? _argValue('--figma-key')
 const INIT_THEME_CSS      = _argValue('--theme-css');
 const INIT_SOURCE_URL     = _argValue('--figma-source-url');
 const INIT_NONINTERACTIVE = INIT_FIGMA_URL != null;
+// Build mode: a project that has only Figma (no token CSS yet). Asked with --build, or chosen when the project has no CSS at all.
+const INIT_BUILD          = process.argv.includes('--build');
+const BUILD_THEME_DEFAULT = 'src/styles/tokens.css';
 
 // ── Easy updates: link the command to this folder, and pull latest ────────────
 // So people never have to re-download. `--link-command` points the global
@@ -445,6 +435,19 @@ if (process.argv.includes('--query')) {
   const passthrough = process.argv.slice(2).filter((a) => a !== '--query');
   const r = spawnSync(process.execPath, ['--import', pathToFileURL(join(SCRIPT_DIR, 'stdio-sync.mjs')).href, join(SCRIPT_DIR, 'query.mjs'), ...passthrough], { cwd: ROOT, stdio: 'inherit' });
   process.exit(r.status ?? 1);
+}
+
+// ── --styleguide: the style guide of what Figma and the code agree on (styleguide-gen.mjs) ──
+if (process.argv.includes('--styleguide')) {
+  let sgConfig = {};
+  try { sgConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  try {
+    const { generateStyleguide } = await import('./styleguide-gen.mjs');
+    const r = await generateStyleguide(ROOT, sgConfig, {});
+    console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${r.components} component${r.components === 1 ? '' : 's'} agreed · ${r.template === 'engine' ? "the engine's template" : "the project's template"})`);
+    if (r.notAgreed) console.log(`   ${r.notAgreed}`);
+    process.exit(0);
+  } catch (e) { console.error(`❌ style guide not built: ${e.message}`); process.exit(1); }
 }
 
 // ── --check-ui <file>: check a generated UI against the component catalog (ui-check.mjs) ──
@@ -1062,13 +1065,14 @@ async function bootstrapConfig() {
     return null;
   };
 
-  let figmaRaw, themeCSS, figmaSourceKey = '';
+  let figmaRaw, themeCSS, figmaSourceKey = '', buildMode = INIT_BUILD;
 
   if (INIT_NONINTERACTIVE) {
     console.log(C.dim('  Non-interactive setup (flags provided)'));
     figmaRaw = INIT_FIGMA_URL || '';
     themeCSS = resolveTheme(INIT_THEME_CSS);
     if (INIT_SOURCE_URL) figmaSourceKey = parseKey(INIT_SOURCE_URL);
+    if (themeCSS == null && (INIT_BUILD || !runtimeHints.length)) { themeCSS = BUILD_THEME_DEFAULT; buildMode = true; }
     if (themeCSS == null) {
       console.error(C.red('\n❌ No token CSS file: pass --theme-css=<path[,path]> (none was auto-detected).'));
       console.error(C.dim('   This DS may inject token values at runtime rather than declaring them in a static CSS file;'));
@@ -1086,8 +1090,9 @@ async function bootstrapConfig() {
     figmaRaw = (await ask('Figma file URL: ')).trim();
     const themeAns = defaultHint
       ? ((await ask(`Token CSS file(s) [${defaultHint}]: `)).trim() || defaultHint)
-      : (await ask('Token CSS file(s) (e.g. src/styles/theme.css): ')).trim();
+      : (await ask(`Token CSS file(s) (e.g. src/styles/theme.css; leave empty if you only have Figma and want to build from it): `)).trim();
     themeCSS = resolveTheme(themeAns);
+    if (themeCSS == null && (INIT_BUILD || !runtimeHints.length)) { themeCSS = BUILD_THEME_DEFAULT; buildMode = true; }
 
     const isConsumer = (await ask('Is this a Figma consumer file that uses an external DS library? (y/N): ')).trim().toLowerCase();
     if (isConsumer === 'y' || isConsumer === 'yes') {
@@ -1170,10 +1175,12 @@ async function bootstrapConfig() {
     webhook: { port: 3456, secret: 'YOUR_WEBHOOK_SECRET' },
     knownUnusedVars: [],
     knownHardcodedExceptions: [],
+    ...(buildMode ? { build: true } : {}),
   };
 
   writeFileSync(join(ROOT, 'ds-config.json'), JSON.stringify(generated, null, 2) + '\n');
   console.log(C.green('✅ ds-config.json written'));
+  if (buildMode) console.log(C.green(`✅ Build mode: this project starts from Figma. What Figma has and the code does not yet is listed as to build, never as a failure, and the tokens go in ${firstTheme}.`));
 
   // ── Save FIGMA_TOKEN to .env ──────────────────────────────────────────────────
   // (The `!envContent.includes('FIGMA_TOKEN')` guard below already prevents a duplicate, so no
@@ -1233,7 +1240,9 @@ async function bootstrapConfig() {
       console.log(C.green(`✅ Hooks installed in ${relative(ROOT, r.file)}`) + C.dim(' (never edit a Figma snapshot by hand; ask before commit, push, applying the hand-back or editing ds-config.json; route each /rms-design-system-engine request). Off: --remove-hooks.'));
     } catch (e) { console.log(C.yellow(`⚠️  Hooks not installed: ${e.message}`)); }
   }
-  console.log('NEXT: rms-design-system-engine   (the first run: it refreshes the Figma data when it can, then audits)\n');
+  console.log(buildMode
+    ? 'NEXT: rms-design-system-engine   (the first run: it refreshes the Figma data when it can, then lists what to build, tokens first)\n'
+    : 'NEXT: rms-design-system-engine   (the first run: it refreshes the Figma data when it can, then audits)\n');
 
   return generated;
 }
@@ -1266,20 +1275,18 @@ async function bootstrapConfig() {
     }
     cfg = await bootstrapConfig();
   }
-  // A project set up under the old name (rms-figma-code-parity): the output folder moves, the ignore list gets
-  // the new names, and each old file still read is said once, with the rename to make.
-  try {
-    const moved = moveOutDir(ROOT);
-    if (moved) console.log(C.dim(moved));
-    const added = gitignoreNewNames(ROOT);
-    if (added.length) console.log(C.dim(`ℹ️  Added ${added.join(', ')} to .gitignore (the new names of the engine's own files).`));
-    for (const l of oldNameLines(ROOT)) console.log(C.dim(l));
-  } catch { /* never blocks a run */ }
   logUsage(ROOT, { kind: 'run', args: process.argv.slice(2).filter((a) => a.startsWith('--') || !a.includes('/')) });
   // Hooks installed before the router existed get it now (I56): the update reaches every opted-in project.
   try {
     const { upgradeHooks } = await import('./hooks-install.mjs');
     if (upgradeHooks(ROOT, cfg)) console.log(C.dim('ℹ️  Hooks updated: each /rms-design-system-engine request is now routed by the engine (.claude/settings.local.json). Off: --remove-hooks.'));
+  } catch { /* never blocks a run */ }
+
+  // Build mode: a component built into its own stylesheet is read from then on (build-list.mjs).
+  try {
+    const { recordComponentStylesheets } = await import('./build-list.mjs');
+    const added = await recordComponentStylesheets(ROOT, cfg);
+    if (added.length) console.log(C.dim(`ℹ️  Build mode: ${added.join(', ')} ${added.length === 1 ? 'holds' : 'hold'} a component's rules, so ds-config.json → paths.themeCSS now lists ${added.length === 1 ? 'it' : 'them'} and every gate reads ${added.length === 1 ? 'it' : 'them'}.`));
   } catch { /* never blocks a run */ }
 
   // THEMES: always an array - supports single string or array of paths
@@ -1345,7 +1352,7 @@ function reportFull(label, items, shown) {
   const SCAN_EXCLUDE_FILENAMES = new Set([
     'figma-vars.snapshot.json', 'figma-structure.snapshot.json',
     'figma-component-props.snapshot.json',
-    'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', PROJECT.history.now, PROJECT.history.old, 'master-token-table.md',
+    'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', PROJECT.history.now, 'master-token-table.md',
     ...(cfg.scanExcludeFilenames ?? []),
   ]);
 
@@ -1811,6 +1818,8 @@ function reportFull(label, items, shown) {
   function computeGate5() {
     const existing = THEMES.filter(p => existsSync(join(ROOT, p)));
     if (!existing.length) {
+      // Build mode (a project that starts from Figma): no token CSS yet is the first thing to build, not a failure.
+      if (cfg.build === true) return { pass: true, lines: [C.dim(`🧱 ${THEME_LABEL} not built yet: Gate [3] lists the tokens to write into it`)] };
       return { pass: false, lines: [C.red(`token CSS not found at ${THEME_LABEL}`)] };
     }
     const themeText = readThemeCSS();
@@ -1931,12 +1940,15 @@ function reportFull(label, items, shown) {
       .map(([c, f]) => `.${c}  (${f})`);
 
     const deadStrict = cfg.deadCssStrict === true;
-    const pass   = unused.length === 0 && undeclared.length === 0 && (!deadStrict || deadClasses.length === 0);
+    // Build mode: tokens are declared before the components that use them are built, so an unused one is expected.
+    const unusedBlocks = unused.length > 0 && cfg.build !== true;
+    const pass   = !unusedBlocks && undeclared.length === 0 && (!deadStrict || deadClasses.length === 0);
     const scanned = allSourceFiles().length;
     const lines = [];
     lines.push(unused.length === 0
       ? `✅ 0 unused vars  (scanned ${scanned} files; ${KNOWN_UNUSED.size} known-unused exempted)`
-      : `❌ ${unused.length} unused (scanned ${scanned} files): ${unused.join(', ')}`);
+      : unusedBlocks ? `❌ ${unused.length} unused (scanned ${scanned} files): ${unused.join(', ')}`
+      : `🧱 ${unused.length} token(s) not used yet (build mode: used once the components are built)`);
     lines.push(undeclared.length === 0
       ? `✅ 0 undeclared vars  (every fallback-less var() resolves to a declaration)`
       : `❌ ${undeclared.length} undeclared var() usage(s) - renamed/deleted vars still referenced: ${undeclared.join(', ')}`);
@@ -2232,7 +2244,8 @@ function reportFull(label, items, shown) {
       const walkNums = (o) => {
         if (o == null) return;
         if (typeof o === 'number') { figmaNums.add(o); return; }
-        if (typeof o === 'string') { addNumTo(figmaNums, o); return; }
+        // A colour a component paints raw (no variable bound) is still Figma's value.
+        if (typeof o === 'string') { if (/^#[0-9a-f]{3,8}$/i.test(o)) { const h = normHex(o); if (h) figmaColors.add(h); } else addNumTo(figmaNums, o); return; }
         if (typeof o === 'object') for (const v of Object.values(o)) walkNums(v);
       };
       walkNums(struct.components ?? struct);
@@ -2711,7 +2724,7 @@ function reportFull(label, items, shown) {
 
   // Result files some gates write for the report tables. Removed first, so a gate that stops early
   // leaves no table rather than the previous run's rows.
-  for (const f of ['component-prop-result.json', PROJECT.checkResult.now, PROJECT.checkResult.old]) { try { unlinkSync(join(ROOT, f)); } catch { /* not there */ } }
+  for (const f of ['component-prop-result.json', PROJECT.checkResult.now]) { try { unlinkSync(join(ROOT, f)); } catch { /* not there */ } }
 
   // Subprocess gates. The file-reading gates launch concurrently. The two browser gates each start a
   // Chrome, so they run one after the other, beside the rest: two browsers competing with thirty
@@ -3603,14 +3616,14 @@ function reportFull(label, items, shown) {
       console.log(C.yellow('\n⚠️  design-intent generation failed (never fails the audit): ' + e.message));
     }
     // Living style guide — heavier artifact, kept OPT-IN: only on explicit --docs
-    // (or ds-config.json → styleguide.auto) AND when a styleguide template is
-    // configured. It reads the design-intent just written above. (`showroom` is the
+    // (or ds-config.json → styleguide.auto), from the project's template or, without one,
+    // the engine's. It reads the design-intent just written above. (`showroom` is the
     // older name of the same config block and is still read.)
     const sgCfg = cfg.styleguide ?? cfg.showroom;
-    if ((docsForced || sgCfg?.auto) && sgCfg?.template) {
+    if (docsForced || sgCfg?.auto) {
       try {
         const { generateStyleguide } = await import('./styleguide-gen.mjs');
-        const r = await generateStyleguide(ROOT, cfg.styleguide ? cfg : { ...cfg, styleguide: sgCfg }, {});
+        const r = await generateStyleguide(ROOT, cfg.styleguide || !sgCfg ? cfg : { ...cfg, styleguide: sgCfg }, {});
         console.log(`🖼  Styleguide → ${r.out.replace(ROOT + '/', '')}  (${r.components} components · filled ${r.filled.join(', ')})`);
       } catch (e) {
         console.log(C.yellow('\n⚠️  styleguide generation failed (never fails the audit): ' + e.message));
@@ -4098,7 +4111,15 @@ function reportFull(label, items, shown) {
     const hb = (f) => (existsSync(join(ROOT, outDir, 'handback', f)) ? join(outDir, 'handback', f) : null);
     const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
     const written = baselineInfo?.mode === 'write' ? { count: baselineInfo.written.length, file: relative(ROOT, baselineInfo.path) || newPath('baseline') } : null;
-    const next = nextStep({ failing, baselineWritten: written, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext });
+    // Build mode: what Figma has and the code does not yet, in order (tokens first), never a failure.
+    let toBuild = null, toBuildLine = null;
+    if (cfg.build === true) {
+      const { componentsToBuild, tokensToBuildCount, buildLine, TOKENS_TO_BUILD } = await import('./build-list.mjs');
+      toBuild = { tokens: tokensToBuildCount(ROOT), file: TOKENS_TO_BUILD, theme: [cfg.paths?.themeCSS].flat()[0], components: await componentsToBuild(ROOT, cfg) };
+      toBuildLine = buildLine(toBuild);
+      if (toBuildLine) console.log(`\n${toBuildLine}`);
+    }
+    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true });
     const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
     const { dataStateLine } = await import('./next-step.mjs');
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
@@ -4106,7 +4127,7 @@ function reportFull(label, items, shown) {
     let a11yIssues = null;
     try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
     const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues } : null } : null;
-    const summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only });
+    const summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine });
     mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
     writeFileSync(join(ROOT, OUT_DIR, 'summary.md'), summary);
     console.log(`\n${C.bold(`─── SUMMARY (relay this in the chat as is; also in ${OUT_DIR}/summary.md) ───`)}\n\n${summary}`);

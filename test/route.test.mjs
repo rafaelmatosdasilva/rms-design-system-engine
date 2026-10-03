@@ -123,3 +123,15 @@ test('a request for new UI asks the system for the names and builds with them (I
   assert.equal(r('make the button 32px in Figma').recipe, 'fix-a-difference');
   assert.equal(r('run the parity on the button').recipe, 'audit-component');
 });
+
+test('a request to build from Figma goes to the build recipe; new UI in a built system stays with the system query', () => {
+  const build = { ...P, build: true };
+  assert.deepEqual([r('build the button from Figma', build).recipe, r('build the button from Figma', build).run], ['build-from-figma', ['rms-design-system-engine --query button']]);
+  assert.deepEqual(r('turn my figma components into real code', build).run, ['rms-design-system-engine']);
+  assert.equal(r('constrói o design system a partir do figma', build).recipe, 'build-from-figma');
+  assert.equal(r('build the button', build).recipe, 'build-from-figma');
+  assert.equal(r('build the button', P).recipe, 'ask-the-system');
+  assert.equal(r('add a Saved confirmation next to the Save button', build).recipe, 'ask-the-system');
+  assert.equal(r('set the radius to 16 in Figma', build).recipe, 'fix-a-difference');
+  assert.deepEqual(r('how do I build components from figma?', build).run, []);
+});

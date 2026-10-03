@@ -50,7 +50,7 @@ export const TRACE = {
   letterSpacing: ['letter-spacing'],
   textTransform: ['text-transform'],
 };
-const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
+const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'boxSizing', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
 const COLOR_PROPS = new Set(['color', 'backgroundColor', 'borderTopColor']);
 const GUARD_PROPS = ['color', 'backgroundColor', 'borderTopColor', 'opacity'];
 const BREAKPOINT_PROPS = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'columnGap', 'rowGap', 'borderTopLeftRadius', 'fontSize', 'lineHeight'];
@@ -192,8 +192,11 @@ function locateExpression(specs) {
         if (p) { p.setAttribute('data-design-system-engine-part', ((p.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-' + kind).trim()); parts[kind] = true; }
       }
       // The first element that holds visible text: what Figma's font fields describe (the first TEXT node).
+      // A text field's text is its <input> or <textarea> value, not a text node: that element is the text part.
+      const field = el.matches('input,textarea') ? el : el.querySelector('input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=range]),textarea');
+      if (field) { field.setAttribute('data-design-system-engine-part', ((field.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; }
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-      for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+      for (let t = field ? null : walker.nextNode(); t; t = walker.nextNode()) {
         if (t.textContent.trim() && t.parentElement) { t.parentElement.setAttribute('data-design-system-engine-part', ((t.parentElement.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; break; }
       }
       return { i, how, count, stripped, parts, hasText: !!el.textContent.trim() };
@@ -638,6 +641,8 @@ export async function captureComponents(ctx) {
         instance: { page: page.label, how: loc.how, count: loc.count, hasText: loc.hasText, ...(loc.stripped?.length ? { usageExtrasRemoved: loc.stripped } : {}) },
         confidence: loc.how === 'bare' ? 'low' : loc.how === 'hidden-copy' ? 'medium' : 'high',
         size: { height: base?.rect?.height, width: base?.rect?.width },
+        // How the box is laid out: an inline element ignores a height; content-box adds padding and border to it.
+        layout: { display: base?.cs?.display ?? null, boxSizing: base?.cs?.boxSizing ?? null },
         props, fill: bg && bg[3] > 0 ? 'direct' : beforeBg && beforeBg[3] > 0 ? 'before' : 'none', colors: colorsOf(perMode),
       };
       if (base?.before) entry.before = base.before;

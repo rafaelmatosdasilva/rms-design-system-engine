@@ -6,6 +6,8 @@ It keeps designers, developers and the AI tools they use aligned on one design s
 
 It keeps your code in parity with your design in Figma. It compares what was built (by a developer or by an AI) with what you designed: the colours, sizes, fonts, spacing, components and their states. When something is different, it tells you what, where, and how to fix it, in plain words. It also checks accessibility.
 
+Have only Figma? It helps Claude build your design system in code from it, one piece at a time: it gives Claude the exact facts from Figma first (every token in every mode, the sizes, the variables, the role of each component) and checks each piece against Figma before Claude says it is done.
+
 ## Why use it
 
 - **One system for everyone.** Designers, developers and AI tools work from the same style guide, documentation and contracts, made from your code and Figma, so the design system stays one system.
@@ -91,6 +93,32 @@ The easiest way is to ask in Claude Code, in your own words, after `/rms-design-
 | Ask what the design system has | `/rms-design-system-engine which props does the badge take?` | `rms-design-system-engine --query badge` |
 
 You can mix them. `rms-design-system-engine --component button --only accessibility` checks only the accessibility of the button.
+
+### The style guide
+
+`rms-design-system-engine --styleguide` builds a living style guide of what Figma and the code agree on, in `.design-system-engine-out/styleguide/index.html`. Every project fills the same template, the one in the engine (`templates/styleguide.template.html`), with its own data, so an improvement made there reaches every design system on its next run.
+
+- **Foundations.** Colours, typography, spacing, radii and icons, each the CSS variable itself, shown only when the token check finds it equal to Figma in every mode.
+- **Components.** Each one drawn from your own markup (the first instance in your pages, or the contract's probe) with your own CSS. Its controls are the props both sides have, labelled with Figma's names; an option applies what your contract's propertyMap says it adds. Below it, the tokens behind what is drawn and its size.
+- **Modes.** A switch for each of your mode collections, for the whole page or one component.
+- **Not agreed yet.** A prop only one side has, another default, a token that differs or a component not built yet is left out and counted in one line at the top, so you decide each one before it appears.
+
+A project can still use a template of its own (`ds-config.json` → `styleguide.template`).
+
+### Start from Figma only
+
+Open an empty project, set it up with your Figma link, and ask for what to build. With no code yet, the engine starts in build mode: what Figma has and the code does not is listed as to build, in order, never as a failure.
+
+| You want to | Type in Claude Code |
+|---|---|
+| Build the tokens | `/rms-design-system-engine build the tokens from Figma` |
+| Build a component | `/rms-design-system-engine build the button from Figma` |
+| Build a screen from the components | `/rms-design-system-engine build the settings screen from Figma with our components` |
+| See what is left to build | `/rms-design-system-engine what is left to build?` |
+
+Claude writes the code; the engine gives it Figma's exact names and values first and checks every piece after.
+
+Measured on a small design system in Figma (tokens, four components and a screen), Claude with the Figma MCP alone built 16 of 30 pieces right with Sonnet and 4 of 18 with Haiku. With the engine it built all of them, on both models. The full results are in [test/skill-evals/RESULTS.md](test/skill-evals/RESULTS.md).
 
 You get a short summary back: what passes, what is different, and how to fix each thing. Nothing is changed until you ask for it.
 

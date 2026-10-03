@@ -126,7 +126,6 @@ test('the system\'s decisions stay the person\'s: accepted debt, exception lists
   // Accepted debt: a hand edit, a rewrite or a delete asks unless the person asked to accept, and asks with no transcript.
   assert.equal(j(edit('/p/design-system-engine-baseline.json'), fix), 'ask');
   assert.equal(j(edit('/p/design-system-engine-baseline.json'), accept), 'pass');
-  assert.equal(j(edit(`/p/${PROJECT.baseline.old}`, 'Write'), fix), 'ask');                    // the old name
   assert.equal(j(edit('/p/design-system-engine-baseline.json')), 'ask');
   assert.equal(j(bash('rm design-system-engine-baseline.json'), fix), 'ask');
   assert.equal(j(bash("sed -i 's/radius//' design-system-engine-baseline.json"), fix), 'ask');
@@ -144,7 +143,6 @@ test('the system\'s decisions stay the person\'s: accepted debt, exception lists
   assert.equal(j(bash('rms-design-system-engine --no-baseline'), fix), 'pass');
   // What both sides last agreed on is the engine's record alone.
   assert.equal(j(edit('/p/design-system-engine-agreed.json'), accept), 'deny');
-  assert.equal(j(bash(`echo {} > ${PROJECT.agreed.old}`), accept), 'deny');
   // The exception lists.
   assert.equal(j(edit('/p/design-system-engine-map.mjs'), fix), 'ask');
   assert.equal(j(edit('/p/design-system-engine-map.mjs'), 'add the chip icon to the exceptions'), 'pass');
@@ -191,7 +189,7 @@ test('lastUserText reads the latest message the person typed, not a tool result'
   assert.equal(lastUserText(c), '');   // the command alone asks for nothing
 });
 
-test('the final check (I81): the reply says what the route asked the person to hear, once', () => {
+test('the final check (I81): the reply says what the route asked the person to hear, at most twice', () => {
   const root = makeFixture({ 'ds-config.json': {} });
   const t = join(root, 't.jsonl');
   const ev = (reply, extra = {}) => ({ hook_event_name: 'Stop', session_id: 's1', prompt_id: 'p1', transcript_path: t, last_assistant_message: reply, stop_hook_active: false, ...extra });
@@ -202,7 +200,8 @@ test('the final check (I81): the reply says what the route asked the person to h
   assert.match(r, /I couldn't refresh the Figma snapshots here: there is no Figma tool in this session\./);
   assert.equal(stopCheck(ev('I couldn\'t refresh the Figma snapshots here. 2 gates fail.'), { root }), null);
   assert.equal(stopCheck(ev('The snapshots were not refreshed in this run; 2 gates fail.'), { root }), null);   // its own words
-  assert.equal(stopCheck(ev('2 gates fail.', { stop_hook_active: true }), { root }), null);                      // once only
+  assert.match(stopCheck(ev('2 gates fail.', { stop_hook_active: true }), { root }), /not refreshed/);            // still left out: once more
+  assert.equal(stopCheck(ev('2 gates fail.', { stop_hook_active: true }), { root }), null);                      // never a third time
   assert.equal(stopCheck(ev('2 gates fail.', { prompt_id: 'p2' }), { root }), null);                             // another message
   // It did refresh with a Figma tool: the line is not true, nothing is asked.
   writeFileSync(t, JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'mcp__figma__use_figma', input: {} }] } }) + '\n');
@@ -274,4 +273,10 @@ test('a project with the older hooks gets the router on its next run; nothing is
   const optedOut = makeFixture({ '.claude/settings.local.json': { hooks: { PreToolUse: [{ hooks: [{ type: 'command', command: guard }] }] } } });
   assert.equal(upgradeHooks(optedOut, { hooks: false }, { engineDir: ENGINE, env: {} }), false);
   assert.equal(upgradeHooks(optedOut, {}, { engineDir: ENGINE, env: { CI: '1' } }), false);
+});
+
+test('asking to build, create or implement is asking for a change (English and Portuguese)', async () => {
+  const { asksForChange } = await import('../guard.mjs');
+  for (const t of ['build the button from Figma', 'create the tokens', 'implement the field', 'constrói o botão', 'cria os tokens', 'implementa o campo']) assert.equal(asksForChange(t), true, t);
+  assert.equal(asksForChange('how do I build the button?'), false);
 });
