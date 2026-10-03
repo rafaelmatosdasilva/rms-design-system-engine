@@ -198,3 +198,18 @@ test('the edit check accepts a colour Figma paints with no variable, and still f
   assert.equal(found.filter((f) => /d6f5e3|136c3a/i.test(f)).length, 0, found.join('\n'));
   assert.ok(found.some((f) => /#123456 is not a design-system colour/.test(f)), found.join('\n'));
 });
+
+test('a variant written as its modifier class alone (.tag--positive) meets .tag.tag--positive; a missing one says how to add it', { timeout: 300000 }, () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-mod-');
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  const css = join(dir, 'src/components/tag.css');
+  const run = () => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  writeFileSync(css, readFileSync(css, 'utf8').replace('.tag.tag--positive', '.tag--positive'));
+  let r = run();
+  assert.equal(r.status, 0, r.stdout.split('\n').filter((l) => /❌/.test(l)).join('\n'));
+  writeFileSync(css, readFileSync(css, 'utf8').replace(/\.tag--positive \{[^}]*\}/, ''));
+  r = run();
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /"\.tag\.tag--positive" not found in CSS: write a rule for \.tag\.tag--positive with what this option changes, and put the class on the element when Tone is Positive/);
+});
