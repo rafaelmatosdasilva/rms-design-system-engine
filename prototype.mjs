@@ -111,7 +111,7 @@ export function productPages(ROOT, sys, except = null) {
 function drawOne(ROOT, name, raw, sys) {
   const ui = raw?.prototype ?? raw;
   const declared = Array.isArray(raw?.gaps) ? raw.gaps : [];
-  const r = checkPrototype(ui, { catalog: sys.catalog, view: sys.parts.view, scales: sys.scales, name, declared, limits: sys.context.limits, breakpoints: sys.context.breakpoints });
+  const r = checkPrototype(ui, { catalog: sys.catalog, view: sys.parts.view, scales: sys.scales, name, declared, limits: sys.context.limits, breakpoints: sys.context.breakpoints, context: sys.context });
   // The same decisions as the product's other pages (frame, heading, actions, the answer to each missing need).
   const { pages, authored } = productPages(ROOT, sys, name);
   const conventions = deriveConventions(pages, authored);

@@ -10,6 +10,7 @@
 //
 // Pure: no I/O. prototype.mjs is the command.
 import { checkUi } from './ui-catalog.mjs';
+import { ruledOut } from './prototype-context.mjs';
 
 export const PIECES = ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'];
 export const GAP_KINDS = ['component', 'option', 'token', 'icon', 'layout', 'pattern'];
@@ -94,7 +95,8 @@ function withoutNotes(ui) {
 // Returns { ok, findings, counts, gaps, drawable: { name: component view }, pieces } (findings as checkUi's).
 // limits: the guidelines' "at most n <component> per screen" ([{ component, max, per, sentence, from }]).
 // breakpoints: the system's screen widths ([{ name, px }]); a Page.width that is none of them is a warning.
-export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [], limits = [], breakpoints = [] } = {}) {
+// context: prototype-context's view of the documentation, for the uses it rules out.
+export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [], limits = [], breakpoints = [], context = null } = {}) {
   const systemNames = Object.keys(catalog.components ?? {});
   const pieces = pieceCatalog(scales, systemNames);
   const r = checkUi(withoutNotes(ui), { ...catalog, components: { ...catalog.components, ...pieces } });
@@ -114,6 +116,12 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     if (node.component === 'Page' && pieces.Page && p.width != null && !/^\d{2,4}$/.test(String(p.width))) findings.push({ rule: 2, level: 'error', id: node.id, message: `Page.width is the screen's width in px (like "820"), not ${JSON.stringify(p.width)}` });
     if (pieces[node.component]) { if (node.component !== 'Text') (used[node.component] ??= []).push(node.id); continue; }
     if (p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: node.component, used: node.component, prototype: name, node: node.id });
+    // A use the component's documentation rules out: never as a stand-in; as a label, worth a look.
+    if (context?.components?.[node.component]) {
+      for (const r of ruledOut(context.components[node.component], p.standInFor ?? '', node.component)) findings.push({ rule: null, source: 'the team\'s documentation', level: 'error', id: node.id, message: `${node.component} is not for "${p.standInFor}": "${r.sentence}". Show "${p.standInFor}" as a Missing box instead` });
+      const label = [p.Label, p.label, p.text].find((v) => typeof v === 'string' && v.trim());
+      if (!p.standInFor && label) for (const r of ruledOut(context.components[node.component], label, node.component)) findings.push({ rule: null, source: 'the team\'s documentation', level: 'warning', id: node.id, message: `${node.component} "${label}": its documentation says "${r.sentence}"; check this use, and use a Missing box if it is ruled out` });
+    }
     if (!catalog.components?.[node.component]) continue;   // checkUi already said so
     // A component the team has retired is never put in a new screen: its replacement is.
     const def = catalog.components[node.component];

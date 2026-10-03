@@ -482,6 +482,11 @@ take; the format; and the prototypes already in `prototypes/`.
   or guidelines); and the closest page to start from, made already or designed in Figma.
 - **Rules the check holds.** A plain sentence in the guidelines, "one button per screen", "at most two fields on a
   page", is a limit: a prototype with more is not drawn, and the error quotes the sentence and its section.
+- **Uses the documentation rules out.** A sentence with never, not for, do not or avoid in a component's guidelines,
+  notes or `whenNotToUse` rules out the words after it, up to the end of its clause ("it never submits anything" rules
+  out submitting, not the rest of the sentence). A request word it names lists that component as ruled out, not as one
+  the request points to; a stand-in it names is an error (show the need as a Missing box), and a label it names is a
+  warning.
 - **Templates in Figma** are `figma-templates.snapshot.json` (`templates` in `ds-config.json`): the components each
   template composes, in order. **Screen widths** are the Figma breakpoints; a `Page.width` that is none of them is a
   warning.

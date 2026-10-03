@@ -140,15 +140,18 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     const role = annotations.map((a) => a.match(/^role\s*:\s*(.+)$/i)?.[1]).find(Boolean) ?? null;
     const notes = [...annotations.filter((a) => !/^role\s*:/i.test(a)), clean(i.code?.note), clean(i.code?.cssComment), clean(i.authored)].filter(Boolean);
     const options = Object.entries(c.props ?? {}).filter(([, e]) => e.description).map(([p, e]) => `${p}: ${clean(e.description)}`);
+    const guidelines = clean(own.has(name) ? own.get(name).join(' ') : i.guidelines) || null;
+    const notFor = clean(c.whenNotToUse ?? i.guidance?.whenNotToUse) || null;
     components[name] = {
+      never: neverOf([guidelines, ...notes].filter(Boolean).join(' '), notFor),
       purpose: clean(c.description) || clean(i.design?.description) || null,
       role,
       notes: [...new Set(notes)],
       options,
-      notFor: clean(c.whenNotToUse ?? i.guidance?.whenNotToUse) || null,
+      notFor,
       useInstead: c.useInstead ?? i.guidance?.useInstead ?? null,
       status: c.status ?? (i.status?.state && i.status.state !== 'current' ? i.status.state : null),
-      guidelines: clean(own.has(name) ? own.get(name).join(' ') : i.guidelines) || null,
+      guidelines,
     };
   }
   // Without the sections themselves (an older caller), the intent's general block stands for them.
@@ -160,6 +163,28 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     if (text) rules.push({ title: `${L} (design intent)`, text, file: null });
   }
   return { components, rules, limits: limitsFrom(components, rules, names) };
+}
+
+// The sentences that rule a use out ("Never an on/off control", "not for navigation"), and the authored whenNotToUse.
+const NEVER = /\b(never|not for|not to be|don['’]t|do not|avoid|must not|no longer)\b/i;
+// Each keeps its sentence (shown) and the clause after the negation (matched): "People turn it on and off; it never
+// submits anything" rules out submitting, not turning on and off.
+export function neverOf(text, notFor = null) {
+  const out = [];
+  for (const sentence of String(text ?? '').split(/(?<=[.!?])\s+/).map((x) => x.trim())) {
+    const m = NEVER.exec(sentence);
+    if (m) out.push({ sentence, clause: sentence.slice(m.index).split(/[;:.!?]/)[0] });
+  }
+  if (notFor) { const t = `Not for ${notFor.replace(/^not for\s*/i, '')}`; out.push({ sentence: t, clause: t }); }
+  return out;
+}
+
+// A use the documentation rules out: the words of a stand-in or a label that one of the component's "never" sentences
+// names. Returns [{ sentence, words }].
+export function ruledOut(k, text, name = '') {
+  const w = wordsOf(text).filter((x) => x !== name.toLowerCase());
+  if (!k?.never?.length || !w.length) return [];
+  return k.never.map((n) => ({ sentence: n.sentence, words: w.filter((x) => wordsOf(n.clause).includes(x)) })).filter((r) => r.words.length);
 }
 
 // The rules a check can hold a prototype to, read from the guidelines as written: "one <component> per screen",
@@ -222,13 +247,14 @@ export function requestFocus(ctx, request, pages = []) {
     const inHead = hit(r.title), inBody = hit(r.text);
     return { ...r, score: inHead.length * 3 + inBody.length, matched: [...new Set([...inHead, ...inBody])] };
   }).filter((r) => r.score >= 2 || r.matched.length >= 2 || r.title === 'guidelines').sort((a, b) => (b.title === 'guidelines') - (a.title === 'guidelines') || b.score - a.score).slice(0, 5);
+  const positive = (k) => [k.purpose, k.role, ...k.options, ...(k.guidelines ?? '').split(/(?<=[.!?])\s+/), ...k.notes].filter((x) => x && !NEVER.test(x)).join(' ');
   const components = Object.entries(ctx.components).map(([name, k]) => {
     const byName = words.filter((w) => name.toLowerCase().includes(w) || w.includes(name.toLowerCase()));
-    const byDocs = hit([k.purpose, k.role, ...k.options, k.notFor, k.guidelines, ...k.notes].filter(Boolean).join(' '));
-    return { name, matched: [...new Set([...byName, ...byDocs])], purpose: k.purpose };
+    return { name, matched: [...new Set([...byName, ...hit(positive(k))])], purpose: k.purpose };
   }).filter((c) => c.matched.length);
+  const out = Object.entries(ctx.components).flatMap(([name, k]) => ruledOut(k, request, name).map((r) => ({ name, ...r })));
   const scored = pages.map((p) => ({ ...p, matched: [...new Set([...hit(p.name), ...hit(p.text ?? '')])] })).filter((p) => p.matched.length).sort((a, b) => b.matched.length - a.matched.length || b.designed - a.designed);
-  return { request: String(request).trim(), words, sections, components, pages: scored.slice(0, 3) };
+  return { request: String(request).trim(), words, sections, components, ruledOut: out, pages: scored.slice(0, 3) };
 }
 
 // The lines the catalog prints for a request.
@@ -237,6 +263,7 @@ export function focusLines(f) {
   const out = ['', `FOR THIS REQUEST  "${cut(f.request.replace(/\s+/g, ' '), 160)}"`];
   if (f.pages.length) out.push(`  start from: ${f.pages.map((p) => `${p.label}${p.file ? ` (${p.file})` : ''}`).join('; ')}`);
   if (f.components.length) out.push(`  components its words point to: ${f.components.map((c) => `${c.name} (${c.matched.join(', ')}${c.purpose ? `: ${cut(c.purpose, 80)}` : ''})`).join('; ')}`);
+  for (const r of f.ruledOut ?? []) out.push(`  ruled out by the documentation for "${r.words.join(', ')}": ${r.name}, "${cut(r.sentence, 200)}"; what the request needs there is a Missing box unless another component is for it`);
   if (f.sections.length) {
     out.push('  the team\'s guidelines that apply (follow them; say so when the request asks for something they rule out):');
     for (const s of f.sections) out.push(`    ${s.title}${s.file ? ` (${s.file})` : ''}: ${cut(s.text.replace(/\s+/g, ' '), 1200)}`);
