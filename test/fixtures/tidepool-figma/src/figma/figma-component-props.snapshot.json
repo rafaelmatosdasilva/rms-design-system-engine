@@ -74,7 +74,11 @@
         ]
       }
     },
-    "annotations": [],
+    "annotations": [
+      {
+        "label": "Role: textbox"
+      }
+    ],
     "description": "A one-line text input."
   },
   "tag": {

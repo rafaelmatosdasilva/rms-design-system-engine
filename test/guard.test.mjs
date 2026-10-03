@@ -191,7 +191,7 @@ test('lastUserText reads the latest message the person typed, not a tool result'
   assert.equal(lastUserText(c), '');   // the command alone asks for nothing
 });
 
-test('the final check (I81): the reply says what the route asked the person to hear, once', () => {
+test('the final check (I81): the reply says what the route asked the person to hear, at most twice', () => {
   const root = makeFixture({ 'ds-config.json': {} });
   const t = join(root, 't.jsonl');
   const ev = (reply, extra = {}) => ({ hook_event_name: 'Stop', session_id: 's1', prompt_id: 'p1', transcript_path: t, last_assistant_message: reply, stop_hook_active: false, ...extra });
@@ -202,7 +202,8 @@ test('the final check (I81): the reply says what the route asked the person to h
   assert.match(r, /I couldn't refresh the Figma snapshots here: there is no Figma tool in this session\./);
   assert.equal(stopCheck(ev('I couldn\'t refresh the Figma snapshots here. 2 gates fail.'), { root }), null);
   assert.equal(stopCheck(ev('The snapshots were not refreshed in this run; 2 gates fail.'), { root }), null);   // its own words
-  assert.equal(stopCheck(ev('2 gates fail.', { stop_hook_active: true }), { root }), null);                      // once only
+  assert.match(stopCheck(ev('2 gates fail.', { stop_hook_active: true }), { root }), /not refreshed/);            // still left out: once more
+  assert.equal(stopCheck(ev('2 gates fail.', { stop_hook_active: true }), { root }), null);                      // never a third time
   assert.equal(stopCheck(ev('2 gates fail.', { prompt_id: 'p2' }), { root }), null);                             // another message
   // It did refresh with a Figma tool: the line is not true, nothing is asked.
   writeFileSync(t, JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'mcp__figma__use_figma', input: {} }] } }) + '\n');

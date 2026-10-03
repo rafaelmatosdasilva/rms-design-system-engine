@@ -120,23 +120,30 @@ const SECRET_LINE = 'A secret is never asked for in the chat: the person puts it
 
 const readCfg = (root) => { try { return JSON.parse(readFileSync(join(root, 'ds-config.json'), 'utf8')); } catch { return null; } };
 export function stopCheck(event, { root, cfg = null }) {
-  if (event?.stop_hook_active) return null;
   const reply = String(event?.last_assistant_message ?? '') || assistantBlocks(transcriptEntries(event?.transcript_path)).filter((b) => b?.type === 'text').map((b) => b.text).pop() || '';
   // Whatever the route: a reply that asks for a secret goes back once.
   const secret = asksForSecret(reply);
   let said; try { said = JSON.parse(readFileSync(saidFile(root), 'utf8')); } catch { said = null; }
   const forThisPrompt = said?.say?.length && !(said.session && event.session_id && said.session !== event.session_id) && !(said.prompt && event.prompt_id && said.prompt !== event.prompt_id);
+  // At most two hand-backs for one request: a reply sent back for one reason (a value left in a file) may come back
+  // still without the line it owes, so the owed line gets one more. Without owed lines, once only, as before.
+  const backs = forThisPrompt ? (said.backs ?? 0) : 0;
+  if (event?.stop_hook_active && !(forThisPrompt && backs < 2)) return null;
+  const counted = (reason) => {
+    if (reason && forThisPrompt) { try { writeFileSync(saidFile(root), JSON.stringify({ ...said, backs: backs + 1 }, null, 2) + '\n'); } catch { /* a help, never a blocker */ } }
+    return reason;
+  };
   const missing = forThisPrompt ? said.say.filter((s) => SAID[s.check] && !SAID[s.check].test.test(reply) && !SAID[s.check].unless?.(event.transcript_path)) : [];
   // What the session's edits left in place that the system does not have (the edit check, run once more over the files).
   let left = [];
   try { const c = cfg ?? readCfg(root); if (c) left = sessionLeftovers(root, c); } catch { /* the check is a help, never a blocker */ }
   if (left.length) {
-    return `rms-design-system-engine: before you finish, the files you changed still hold what the design system does not have:\n${left.slice(0, 12).join('\n')}${left.length > 12 ? `\n  and ${left.length - 12} more` : ''}\nTake each out, or write the system's own value instead; when it has none, leave it out and tell the person. Then give your answer again${missing.length ? `, with ${missing.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${missing.map((s) => s.text).join('\n')}` : '.'}${secret ? ` ${SECRET_LINE}` : ''}`;
+    return counted(`rms-design-system-engine: before you finish, the files you changed still hold what the design system does not have:\n${left.slice(0, 12).join('\n')}${left.length > 12 ? `\n  and ${left.length - 12} more` : ''}\nTake each out, or write the system's own value instead; when it has none, leave it out and tell the person. Then give your answer again${missing.length ? `, with ${missing.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${missing.map((s) => s.text).join('\n')}` : '.'}${secret ? ` ${SECRET_LINE}` : ''}`);
   }
-  if (secret && !missing.length) return `rms-design-system-engine: your reply asks the person for a secret in the chat. Reply again without asking for it. ${SECRET_LINE}`;
+  if (secret && !missing.length) return counted(`rms-design-system-engine: your reply asks the person for a secret in the chat. Reply again without asking for it. ${SECRET_LINE}`);
   if (!missing.length) return null;
   const lines = [...missing.map((s) => s.text), ...(secret ? [SECRET_LINE] : [])];
-  return `rms-design-system-engine: your reply leaves out ${missing.map((s) => SAID[s.check].what).join(' and ')}${secret ? ', and asks the person for a secret in the chat' : ''}. Reply again with your whole answer${secret ? ', asking for no secret,' : ''} and ${lines.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${lines.join('\n')}`;
+  return counted(`rms-design-system-engine: your reply leaves out ${missing.map((s) => SAID[s.check].what).join(' and ')}${secret ? ', and asks the person for a secret in the chat' : ''}. Reply again with your whole answer${secret ? ', asking for no secret,' : ''} and ${lines.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${lines.join('\n')}`);
 }
 export const stopOutput = (reason) => (reason ? JSON.stringify({ decision: 'block', reason }) : '');
 

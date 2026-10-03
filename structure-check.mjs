@@ -1864,8 +1864,16 @@ try {
     const { compareBreakpoints } = await import('./capture-compare.mjs');
     const bpr = compareBreakpoints(cap, snap?.components ?? {}, vars);
     r.match += bpr.match; r.differ.push(...bpr.differ);
-    // ds-config.json → renderedParityStrict: true makes these differences fail the gate.
-    const strictMeasured = cfg.renderedParityStrict === true;
+    // ds-config.json → renderedParityStrict: true makes these differences fail the gate. In build mode they fail by
+    // default (the code was just written from Figma), except a value the page could only read as the browser's
+    // default: the engine drew that instance from the CSS alone and may lack the child the code styles.
+    const buildStrict = cfg.build === true && cfg.renderedParityStrict !== false;
+    const strictMeasured = cfg.renderedParityStrict === true || buildStrict;
+    if (buildStrict && !(cfg.renderedParityStrict === true)) {
+      const soft = r.differ.filter((d) => d.confidence === 'default');
+      r.differ = r.differ.filter((d) => d.confidence !== 'default');
+      for (const d of soft) console.log(`   ⚠️  ${measuredLine(d)}  [read as the browser default: not failed]`);
+    }
     const mark = strictMeasured ? '❌' : '⚠️ ';
     if (r.differ.length) {
       console.log(`\n${mark} MEASURED ${r.differ.length}  (rendered in the browser, the component differs from Figma${strictMeasured ? '' : ' - advisory'})`);
@@ -1877,7 +1885,9 @@ try {
       const agreed = loadAgreed(ROOT);
       const toCode = [], toFigma = [];
       for (const d of r.differ) {
-        const kind = classify({ ...factOf(d), same: false }, agreed);
+        // Build mode: Figma leads; a component written from it that differs moves back to Figma, whatever the record says.
+        const seen = classify({ ...factOf(d), same: false }, agreed);
+        const kind = cfg.build === true && (seen === 'code-moved' || seen === 'both-moved') ? 'unknown' : seen;
         const moved = MOVED_LABEL[kind];
         console.log(`   ${mark} ${measuredLine(d, kind)}${moved ? `  [${moved}]` : ''}`);
         if (kind === 'code-moved' || kind === 'both-moved') toFigma.push({ d, moved: kind }); else toCode.push(d);

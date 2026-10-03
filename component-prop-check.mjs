@@ -226,17 +226,19 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     .filter(([k, v]) => !isStateAxis(cleanFigmaProp(k), v))   // states are Gate 11's job, not props
     .map(([k, v]) => [cleanFigmaProp(k), v]));   // name -> {type, defaultValue, variantOptions}
   const figNames = [...figDefs.keys()].filter(Boolean);
-  if (!figNames.length) continue;
   if (KNOWN_UNIMPLEMENTED.has(figmaName)) continue;
+  const role = roleWord(entry.annotations);
+  if (!figNames.length && !role) continue;
 
   const { file, how } = resolveFile(figmaName);
-  // The role Figma's annotation declares, read in the component's own markup (role-markup.mjs).
-  if (file) {
-    const role = roleWord(entry.annotations);
-    if (role) { let src = ''; try { src = readFileSync(file, 'utf8'); } catch { /* unreadable: nothing to say */ }
-      const miss = roleMarkupFindings(src, role);
-      if (miss.length) ROLE_FAIL.push(`${figmaName}: Figma's annotation says role ${role}; the code needs ${miss.join(' and ')}  (${relative(ROOT, file)})`); }
+  // The role Figma's annotation declares, read in the component's own markup (role-markup.mjs). Checked even when
+  // every prop is a state (a field with only State=Default/Error still has to be a real input).
+  if (file && role) {
+    let src = ''; try { src = readFileSync(file, 'utf8'); } catch { /* unreadable: nothing to say */ }
+    const miss = roleMarkupFindings(src, role);
+    if (miss.length) ROLE_FAIL.push(`${figmaName}: Figma's annotation says role ${role}; the code needs ${miss.join(' and ')}  (${relative(ROOT, file)})`);
   }
+  if (!figNames.length) continue;
   if (!file) {
     NOFILE.push(`${figmaName}: has Figma properties [${figNames.join(', ')}] but no code component found (${how}) - set ds-config.json → componentFiles["${figmaName}"], or exempt via knownUnimplementedComponents`);
     for (const fp of figNames) rows.push({ component: figmaName, figmaProp: fp, figmaValue: figmaValueOf(figDefs.get(fp)), codeProp: 'not in code', codeValue: `(no code file: ${how})`, status: 'missing' });
