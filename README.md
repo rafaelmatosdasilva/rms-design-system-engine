@@ -120,6 +120,21 @@ Claude writes the code; the engine gives it Figma's exact names and values first
 
 Measured on a small design system in Figma (tokens, four components and a screen), Claude with the Figma MCP alone built 16 of 30 pieces right with Sonnet and 4 of 18 with Haiku. With the engine it built all of them, on both models. The full results are in [test/skill-evals/RESULTS.md](test/skill-evals/RESULTS.md).
 
+## Prototype with your design system
+
+A prototype here is made only of your design system's own components, with their own options. Nothing is invented and nothing in the system changes. When a screen needs something the system does not have, the prototype shows a labelled box and you get a list of what the system would need, for your design team to decide.
+
+| You want to | In the terminal |
+|---|---|
+| Draw a prototype | `rms-design-system-engine --prototype prototypes/settings.json` |
+| Start from the screens you designed in Figma | `rms-design-system-engine --prototype --from-screens <screen capture>` |
+
+- **What a prototype is.** A short file listing which components go where, with which options (`prototypes/<name>.json`). The engine checks it first; one that uses a component or an option the system lacks is not drawn, and each line says why.
+- **What you see.** One page with your real components and tokens, in light and dark, under `.design-system-engine-out/prototypes/`.
+- **Layout.** Where your system has no layout components, the engine lends neutral ones (a page, a stack, a row, columns) that only take your spacing tokens and your text styles, and puts layout components on the list.
+- **Your screens as starting points.** Each screen designed in Figma becomes a prototype with the same arrangement and your components in place. The capture is read from Figma and never changes it. What a screen uses that the system does not own (a local component, a container with its own look, a typed number) goes on the list too.
+- **The list.** Every prototype's gaps are kept in `.design-system-engine-out/prototypes/gaps.json`, the most needed first.
+
 You get a short summary back: what passes, what is different, and how to fix each thing. Nothing is changed until you ask for it.
 
 ## The checks

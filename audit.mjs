@@ -450,6 +450,12 @@ if (process.argv.includes('--styleguide')) {
   } catch (e) { console.error(`❌ style guide not built: ${e.message}`); process.exit(1); }
 }
 
+// ── --prototype <composition.json>: draw a prototype from the system's own components (prototype.mjs) ──
+if (process.argv.includes('--prototype')) {
+  const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'prototype.mjs'), ...process.argv.slice(2)], { cwd: ROOT, stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
+
 // ── --check-ui <file>: check a generated UI against the component catalog (ui-check.mjs) ──
 if (process.argv.includes('--check-ui')) {
   const passthrough = process.argv.slice(2).filter((a) => a !== '--check-ui');
