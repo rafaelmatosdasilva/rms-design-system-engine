@@ -276,3 +276,18 @@ test('the request: a component it names that the prototype leaves out is owed; o
   const r = checkPrototype({ component: 'Page', children: [{ component: 'tag', props: { purpose: 'marks the page as beta' } }] }, { catalog: cat, view: { components: [{ name: 'tag', controls: [] }] }, scales: { spacing: [], text: [] }, context: ctx, request: 'a message confirming the save' });
   assert.equal(r.ok, true, JSON.stringify(r.findings));
 });
+
+test('build mode: a text colour set on the component\'s text part counts; none at all fails the structure gate', { timeout: 600000 }, () => {
+  const make = (fieldCss) => {
+    const dir = mkdtempSync(join(tmpdir(), 'tp-textpart-'));
+    cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
+    const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+    cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
+    cpSync(join(ref, 'src', 'components'), join(dir, 'src', 'components'), { recursive: true });
+    if (fieldCss) writeFileSync(join(dir, 'src', 'components', 'field.css'), fieldCss);
+    return spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_FETCH: '1' }, timeout: 300000 }).stdout;
+  };
+  assert.doesNotMatch(make(null), /"color" not set in "\.field"/, 'the reference sets it on .field__input');
+  const none = readFileSync(join(ENGINE, 'test', 'skill-evals', 'build-reference', 'src', 'components', 'field.css'), 'utf8').replace(/ color: var\(--text-primary\);/, '');
+  assert.match(make(none), /field\/default\/text: "color" not set in "\.field"/);
+});
