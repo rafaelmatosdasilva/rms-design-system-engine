@@ -225,10 +225,10 @@ test('new-ui-saved: no colour or variable the system does not have, and the conf
   assert.equal(passes('new-ui-saved', fakeCtx({ final: 'Done, nothing else needed here, the page is as it was before.' })), false);
 });
 
-test('the files the engine writes on every run are never the agent\'s change, under the new names and the old ones', async () => {
+test('the files the engine writes on every run are never the agent\'s change', async () => {
   const { context } = await import('./skill-evals/lib.mjs');
   const engineWrites = ['design-system-engine-agreed.json', 'design-system-engine-history.json', '.design-system-engine-out/summary.md', 'design-system-engine-check-result.json',
-    'parity-agreed.json', 'parity-history.json', '.parity-out/summary.md', 'parity-check-result.json', 'contracts/llms.txt', 'llms.txt'];
+    'contracts/llms.txt', 'llms.txt'];
   const ctx = context([], null, { changed: [...engineWrites, 'src/theme.css', 'design-system-engine-baseline.json'], commits: 1, files: {} });
   assert.deepEqual(ctx.changed, ['src/theme.css', 'design-system-engine-baseline.json']);   // the theme and an accepted debt are the agent's
 });

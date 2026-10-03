@@ -34,7 +34,7 @@ import { markupFindings, cssFindings, styleOnly, projectStyleText } from './a11y
 import { codeSnapshotPath } from './names.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
-const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.design-system-engine-out|\.design-system-engine-refs|\.parity-out|\.parity-refs)\//;
+const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.design-system-engine-out|\.design-system-engine-refs)\//;
 const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g;
 const NOT_COLOUR = /(href|to|src|action|xlink:href)\s*=\s*\{?\s*["'`]$|url\(\s*["']?$|&$/i;   // #add in a link is a fragment
 // Outside a style sheet, a colour counts only where it styles something: after a colour-bearing property

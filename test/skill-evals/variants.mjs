@@ -12,8 +12,7 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, exist
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ENGINE } from './lib.mjs';
-import { skillMd, renamedGuide } from '../../skill-files.mjs';
-import { OLD_SKILL } from '../../names.mjs';
+import { skillMd, guideAtRef } from '../../skill-files.mjs';
 
 const GUIDE = 'rms-design-system-engine.md';
 const git = (...a) => execFileSync('git', a, { cwd: ENGINE, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -31,10 +30,11 @@ Not on PATH: \`node ~/.claude/skills/rms-design-system-engine/audit.mjs --route 
 If the request already came with a ROUTE block, follow that block instead. Report in the chat.
 `;
 
-// A ref from before the rename has the guide under the old name, speaking of the old command: read as the new one.
+// The guide at a ref, under the name the skill had then, read as the current one.
 export function guideAt(ref) {
-  try { return execFileSync('git', ['show', `${ref}:${GUIDE}`], { cwd: ENGINE, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }); }
-  catch { return renamedGuide(git('show', `${ref}:${OLD_SKILL}.md`)); }
+  const text = guideAtRef(ENGINE, ref);
+  if (text == null) throw new Error(`no guide at ${ref}`);
+  return text;
 }
 export function defaultBaselineRef() { try { git('rev-parse', '--verify', '-q', 'guide-monolith'); return 'guide-monolith'; } catch { return 'HEAD'; } }
 
