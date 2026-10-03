@@ -10,12 +10,12 @@
 //
 // Exit 0 = drawn. Exit 1 = the composition breaks a rule (nothing drawn). Exit 2 = no input, no catalog.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, resolve, basename, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { RULES } from './ui-catalog.mjs';
-import { checkPrototype, systemScales, nodesOf, mergeGaps, gapLine } from './prototype-pieces.mjs';
+import { RULES, catalogTable } from './ui-catalog.mjs';
+import { checkPrototype, systemScales, nodesOf, mergeGaps, gapLine, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
@@ -73,9 +73,37 @@ function drawOne(ROOT, name, raw, sys) {
     writeFileSync(gapsFile, JSON.stringify({ $description: `What the design system lacks, from every prototype drawn with ${CLI} --prototype. Generated; the design team decides each one.`, byPrototype: store.byPrototype, merged: mergeGaps(store.byPrototype) }, null, 2) + '\n');
     page = join(outDir, `${name}.html`);
     const mine = mergeGaps({ [name]: r.gaps }).map(gapLine);
+    // What the reply owes the person: every gap of the prototype just drawn (the Stop hook holds the reply to it).
+    writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name, pending: true, gaps: mergeGaps({ [name]: r.gaps }).map((g) => ({ need: g.need, kind: g.kind, line: gapLine(g) })) }, null, 2) + '\n');
     writeFileSync(page, prototypePage({ name, tree: treeOf(ui), parts: sys.parts, scales: sys.scales, gaps: mine, note: `${r.counts.components} parts · only the design system's own components${r.gaps.some((g) => g.kind === 'layout') ? ', with the engine\'s neutral layout' : ''}` }));
   }
   return { ...r, page, used: [...new Set(nodesOf(ui).nodes.map((n) => n.component))] };
+}
+
+// --catalog: everything a prototype may use, in one screen: the system's components and options, the engine's pieces
+// with the tokens they take, the format, and the starting points already made.
+export function catalogText(sys, { cmd = CLI, starts = [] } = {}) {
+  const drawable = new Set((sys.parts.view.components ?? []).map((c) => c.name));
+  const comps = Object.fromEntries(Object.entries(sys.catalog.components ?? {}).map(([n, c]) => [n, { ...c, ...(drawable.has(n) ? {} : { status: c.status ? `${c.status}, not built in code` : 'not built in code: drawn as a box' }) }]));
+  const pieces = pieceCatalog(sys.scales, Object.keys(comps));
+  const pieceRows = Object.entries(pieces).map(([n, d]) => `${n.padEnd(8)}  ${Object.entries(d.props).map(([k, e]) => `${k}=${e.type === 'enum' ? (e.values.length > 6 ? `<${k === 'style' ? 'text style' : 'spacing token'}>` : e.values.join('|')) : e.type === 'boolean' ? 'true|false' : `<${k === 'width' ? 'screen width in px' : k === 'need' ? 'what is needed' : k === 'closest' ? 'nearest system component' : 'text'}>`}`).join('  ')}`);
+  return [
+    'PROTOTYPE CATALOG  ·  everything a prototype may use; nothing else exists for it',
+    '',
+    'The design system\'s components (name, options):',
+    catalogTable({ components: comps }),
+    '',
+    'The engine\'s pieces (only where the system has none of its own):',
+    ...pieceRows.map((r) => `  ${r}`),
+    `Spacing tokens: ${sys.scales.spacing.map((t) => `${t.name} (${t.value})`).join(', ') || 'none'}`,
+    `Text styles: ${sys.scales.text.map((t) => `${t.name} (${t.size}/${t.lh} ${t.weight})`).join(', ') || 'none'}`,
+    '',
+    'Format: { "component": "Page", "props": { "padding": "<spacing token>" }, "children": [ { "component": "<name>", "props": { "<option>": "<value>" } } ] }',
+    'A system component used for a need it does not quite meet carries "standInFor": "<the need>" in its props; a need nothing fits is { "component": "Missing", "props": { "need": "…" } }.',
+    ...(starts.length ? ['', `Prototypes already here (starting points read from designed screens among them): ${starts.map((f) => `prototypes/${f}`).join(', ')}; copy the closest one`] : []),
+    '',
+    `NEXT: write prototypes/<name>.json with only the parts above, then run ${cmd} --prototype prototypes/<name>.json and fix each ❌ line until it is drawn.`,
+  ].join('\n');
 }
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'screen';
@@ -126,7 +154,7 @@ export async function runPrototype(ROOT, argv) {
   let cfg = {};
   try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* defaults */ }
   const file = screensFile ?? input;
-  if (!file || !existsSync(resolve(ROOT, file))) {
+  if (!args.includes('--catalog') && (!file || !existsSync(resolve(ROOT, file)))) {
     console.log(`\nUsage: ${CLI} --prototype <composition.json>`);
     console.log(`       ${CLI} --prototype --from-screens <screen-capture.json>`);
     console.log('   The composition names the design system\'s components and their options, in the format --check-ui reads,');
@@ -136,6 +164,12 @@ export async function runPrototype(ROOT, argv) {
   }
   const sys = await systemFor(ROOT, cfg);
   if (!sys) { console.log(`\n⏭  no catalog yet: run ${CLI} once to write it, then draw the prototype again.\n`); return 2; }
+  if (args.includes('--catalog')) {
+    let starts = [];
+    try { starts = readdirSync(join(ROOT, 'prototypes')).filter((f) => f.endsWith('.json')); } catch { /* none yet */ }
+    console.log('\n' + catalogText(sys, { starts }) + '\n');
+    return 0;
+  }
   if (screensFile) return fromScreens(ROOT, cfg, screensFile, sys, { force: args.includes('--force') });
 
   let raw;

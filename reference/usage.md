@@ -457,6 +457,40 @@ to the tree, or a child the design system never nests there is a warning. Findin
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
+#### Prototypes
+
+`rms-design-system-engine --prototype --catalog` prints everything a prototype may use: the catalog's components with
+their options (a component the code does not have is marked: it is drawn as a labelled box), the engine's layout pieces
+with the spacing tokens and text styles they take, the format, and the prototypes already in `prototypes/`.
+
+`rms-design-system-engine --prototype prototypes/<name>.json` checks a composition (the format `--check-ui` reads, nested
+or flat) and, when it holds, draws it as one page under `.design-system-engine-out/prototypes/<name>.html`: each
+component from its own markup (the contract's probe, a page instance, or its React source) with the project's CSS, in
+every mode the system has, with a switch for the colour modes and one that outlines the engine's pieces and stand-ins.
+The rules are `--check-ui`'s, plus:
+- **The engine's pieces** (Page, Stack, Row, Columns, Text) exist only where the system has no component of that name.
+  They carry no colour, border or font of their own: `gap` and `padding` take a spacing token, `Text.style` a text
+  style, `Page.width` the screen's width in px; `grow` takes the room a parent leaves. The page takes the system's own
+  page surface, text colour and font family. Each piece used is a layout gap.
+- **A need nothing fits** is `{ "component": "Missing", "props": { "need": "…", "kind": "…", "closest": "…" } }`, drawn
+  as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`.
+- **A prop Figma and the code do not agree on yet** is drawn with its default, with a warning.
+- **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
+  `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
+  needed first. The Stop hook holds the reply to the gaps of the prototype just drawn.
+- A composition with an error is not drawn (exit 1). A file `{ "prototype": …, "gaps": [...] }` adds the gaps written
+  beside it.
+
+`rms-design-system-engine --prototype --from-screens <capture.json>` turns designed screens into starting points:
+`prototypes/<screen>.json`, each drawn at once. The capture is `SCREEN_CAPTURE_JS` in `screen-layout.mjs`, a read-only
+Plugin API script run with the Figma MCP (`use_figma`) or figma-cli on the screens' node ids. Each screen keeps its
+arrangement (auto layout direction, gap and padding as spacing tokens, Fill as `grow`, alignment), the system's
+components with their options and what their slots hold; a local component that holds others (a whole screen made a
+component) is read as layout and listed as a template or component the system could own; a frame with its own fill,
+border or corner, a typed number, a text with no style, a shape and a component the catalog lacks are gaps. It ends with
+the spacing habits across the screens and the structures that repeat (template candidates). A starting point already
+in `prototypes/` is kept unless `--force`.
+
 #### Adoption baseline / ratchet (opt-in, gate-level)
 
 A real codebase is rarely 100% green on day one. Rather than a wall of red (ignored) or turning gates
