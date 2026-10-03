@@ -57,6 +57,9 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   assert.match(html, /--chip-background/, 'and the tokens');
   const data = JSON.parse(html.match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(data.components.map((c) => c.name).sort(), ['chip', 'tag']);
+  const tag = data.components.find((c) => c.name === 'tag');
+  assert.equal(tag.markupFrom, 'jsx', 'no page shows it: drawn from its own React source');
+  assert.equal(tag.markup, '<span class="tag">New</span>');
   assert.deepEqual(data.components.find((c) => c.name === 'tag').controls.find((c) => c.label === 'Tone').options, [{ label: 'Neutral' }, { label: 'Positive', add: ['tag--positive'], attrs: {} }]);
   assert.deepEqual(data.tokens.radii.map((t) => t.var), ['--radii-button', '--radii-chip', '--radii-field']);
   assert.deepEqual(data.modes, [{ label: 'Color', values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme' }]);

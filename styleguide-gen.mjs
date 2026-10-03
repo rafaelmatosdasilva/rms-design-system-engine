@@ -316,12 +316,23 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const pages = pageFiles.map(readText).filter(Boolean);
     const usage = (cfg.paths?.plugins ?? []).length ? usageMap(intent) : {};
     const icons = (iconSheet().match(/<symbol\b[^>]*\bid\s*=\s*["']([^"']+)["']/g) ?? []).map((m) => m.match(/id\s*=\s*["']([^"']+)["']/)[1]);
+    // A React component's own JSX, read as markup, for a component no page shows.
+    const { componentSourceFiles, resolveComponentFile, textReader } = await import('./component-source.mjs');
+    const { jsxMarkup } = await import('./jsx-markup.mjs');
+    const sourceFiles = componentSourceFiles(ROOT, cfg).filter((f) => /\.(jsx|tsx|js)$/.test(f));
+    const readSource = textReader();
+    const jsx = {};
+    for (const name of Object.keys(propsSnap).filter((n) => !n.startsWith('_'))) {
+      const { file } = resolveComponentFile(name, { ROOT, cfg, files: sourceFiles, read: readSource, classFor: locator.classFor });
+      if (!file || !/\.(jsx|tsx|js)$/.test(file)) continue;
+      try { const m = jsxMarkup(readSource(file), locator.classFor(name)); if (m && /^<[a-z]/.test(m)) jsx[name] = m; } catch { /* unreadable: the role draws it */ }
+    }
     let title = cfg.name ?? '';
     if (!title) { try { title = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { /* no package.json */ } }
     const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
       check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title,
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).map(([n, c]) => [n, c.propertyMap])),
-      parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
+      parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])), jsx });
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
   }
