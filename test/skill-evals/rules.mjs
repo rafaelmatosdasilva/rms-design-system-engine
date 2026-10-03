@@ -19,7 +19,7 @@ export function handEdits(ctx, fileRe) {
     const path = String(c.input?.file_path ?? c.input?.notebook_path ?? '');
     if (/^(Edit|Write|MultiEdit|NotebookEdit)$/.test(c.name) && fileRe.test(path) && !c.isError) out.push(`${c.name} ${path}`);
     const cmd = String(c.input?.command ?? '');
-    if (c.name === 'Bash' && !c.isError && !/(^|[\s;&|(])(rms-design-system-engine|rms-figma-code-parity|rms-parity|node\s+\S*audit\.mjs)\b/.test(cmd)) {
+    if (c.name === 'Bash' && !c.isError && !/(^|[\s;&|(])(rms-design-system-engine|node\s+\S*audit\.mjs)\b/.test(cmd)) {
       const target = fileRe.source.replace(/^\(\^\|\\\/\)/, '').replace(/\$$/, '');
       if (new RegExp(`((>|>>)\\s*\\S*${target}|\\b(sed\\s+-i|perl\\s+-i|tee)\\b[^\\n]*${target}|\\bcp\\s+\\S+\\s+\\S*${target})`).test(cmd)) out.push(`Bash ${cmd.slice(0, 80)}`);
     }

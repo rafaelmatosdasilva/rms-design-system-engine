@@ -126,7 +126,6 @@ test('the system\'s decisions stay the person\'s: accepted debt, exception lists
   // Accepted debt: a hand edit, a rewrite or a delete asks unless the person asked to accept, and asks with no transcript.
   assert.equal(j(edit('/p/design-system-engine-baseline.json'), fix), 'ask');
   assert.equal(j(edit('/p/design-system-engine-baseline.json'), accept), 'pass');
-  assert.equal(j(edit(`/p/${PROJECT.baseline.old}`, 'Write'), fix), 'ask');                    // the old name
   assert.equal(j(edit('/p/design-system-engine-baseline.json')), 'ask');
   assert.equal(j(bash('rm design-system-engine-baseline.json'), fix), 'ask');
   assert.equal(j(bash("sed -i 's/radius//' design-system-engine-baseline.json"), fix), 'ask');
@@ -144,7 +143,6 @@ test('the system\'s decisions stay the person\'s: accepted debt, exception lists
   assert.equal(j(bash('rms-design-system-engine --no-baseline'), fix), 'pass');
   // What both sides last agreed on is the engine's record alone.
   assert.equal(j(edit('/p/design-system-engine-agreed.json'), accept), 'deny');
-  assert.equal(j(bash(`echo {} > ${PROJECT.agreed.old}`), accept), 'deny');
   // The exception lists.
   assert.equal(j(edit('/p/design-system-engine-map.mjs'), fix), 'ask');
   assert.equal(j(edit('/p/design-system-engine-map.mjs'), 'add the chip icon to the exceptions'), 'pass');

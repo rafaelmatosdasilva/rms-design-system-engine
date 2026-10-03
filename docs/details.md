@@ -116,11 +116,3 @@ The engine makes the decisions, not the AI model, so it behaves the same on a sm
 ## The files it creates
 
 Commit the files it creates so your whole team and CI check against the same design. The deeper setup and every option live in the full guide.
-
-## Coming from rms-figma-code-parity?
-
-This is the same skill under a new name, `rms-design-system-engine`, because it now does more than compare code with Figma. Nothing to do by hand:
-
-- **Your install moves itself.** The next run from the old install (or `--update`, or the install line above) moves `~/.claude/skills/rms-figma-code-parity` to `~/.claude/skills/rms-design-system-engine`, links the `/rms-design-system-engine` command, and replaces the `rms-figma-code-parity` and `rms-parity` terminal commands with `rms-design-system-engine`. It says so in one line: open a new Claude Code session to use the new command.
-- **Your project keeps working.** The engine's files in a project have new names: `design-system-engine-map.mjs`, `design-system-engine-baseline.json`, `design-system-engine-agreed.json`, `design-system-engine-history.json`, `design-system-engine-check-result.json`, and the folders `.design-system-engine-out/` and `.design-system-engine-refs/`. A file under its old `parity-` name is still read, and each run says which ones to rename. The output folder `.parity-out/` is moved for you, and `.gitignore` gets the new names. The project's hooks point at the new install on the next run.
-- **Environment variables** are now `DESIGN_SYSTEM_ENGINE_*` (for example `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1`); the old `PARITY_*` ones still work.

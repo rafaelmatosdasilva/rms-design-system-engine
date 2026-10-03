@@ -39,23 +39,10 @@ import { frameworkGateSkipReason }                              from './componen
 import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-parse.mjs';
 import { ZERO_FAIL }                                             from './run-diff.mjs';
 import { loadBaselineLabels, loadBaselineFindings, classifyBaseline, writeBaseline } from './baseline.mjs';
-import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, gitignoreNewNames, moveOutDir, newPath, oldNameLines, projectPath } from './names.mjs';
+import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, newPath, projectPath } from './names.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT       = process.cwd();
-
-// An install under the old name (rms-figma-code-parity) moves to the new one, then this run starts again there.
-if (!process.env.CI) {
-  try {
-    const { migrateInstall } = await import('./self-update.mjs');
-    const moved = migrateInstall(SCRIPT_DIR);
-    if (moved) {
-      console.log(moved.line);
-      const r = spawnSync(process.execPath, [join(moved.to, 'audit.mjs'), ...process.argv.slice(2)], { stdio: 'inherit' });
-      process.exit(r.status ?? 1);
-    }
-  } catch { /* a move that fails leaves the install where it was */ }
-}
 
 // Load .env from project root if present (no dotenv dependency)
 const envPath = join(ROOT, '.env');
@@ -1275,15 +1262,6 @@ async function bootstrapConfig() {
     }
     cfg = await bootstrapConfig();
   }
-  // A project set up under the old name (rms-figma-code-parity): the output folder moves, the ignore list gets
-  // the new names, and each old file still read is said once, with the rename to make.
-  try {
-    const moved = moveOutDir(ROOT);
-    if (moved) console.log(C.dim(moved));
-    const added = gitignoreNewNames(ROOT);
-    if (added.length) console.log(C.dim(`ℹ️  Added ${added.join(', ')} to .gitignore (the new names of the engine's own files).`));
-    for (const l of oldNameLines(ROOT)) console.log(C.dim(l));
-  } catch { /* never blocks a run */ }
   logUsage(ROOT, { kind: 'run', args: process.argv.slice(2).filter((a) => a.startsWith('--') || !a.includes('/')) });
   // Hooks installed before the router existed get it now (I56): the update reaches every opted-in project.
   try {
@@ -1361,7 +1339,7 @@ function reportFull(label, items, shown) {
   const SCAN_EXCLUDE_FILENAMES = new Set([
     'figma-vars.snapshot.json', 'figma-structure.snapshot.json',
     'figma-component-props.snapshot.json',
-    'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', PROJECT.history.now, PROJECT.history.old, 'master-token-table.md',
+    'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', PROJECT.history.now, 'master-token-table.md',
     ...(cfg.scanExcludeFilenames ?? []),
   ]);
 
@@ -2733,7 +2711,7 @@ function reportFull(label, items, shown) {
 
   // Result files some gates write for the report tables. Removed first, so a gate that stops early
   // leaves no table rather than the previous run's rows.
-  for (const f of ['component-prop-result.json', PROJECT.checkResult.now, PROJECT.checkResult.old]) { try { unlinkSync(join(ROOT, f)); } catch { /* not there */ } }
+  for (const f of ['component-prop-result.json', PROJECT.checkResult.now]) { try { unlinkSync(join(ROOT, f)); } catch { /* not there */ } }
 
   // Subprocess gates. The file-reading gates launch concurrently. The two browser gates each start a
   // Chrome, so they run one after the other, beside the rest: two browsers competing with thirty

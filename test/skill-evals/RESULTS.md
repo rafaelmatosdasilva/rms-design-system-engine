@@ -136,8 +136,8 @@ the old command or failed to find the new one: the engine was called as `rms-des
 `~/.claude/skills/rms-design-system-engine/audit.mjs`, in the same proportions as under the old name.
 
 **Found by this evaluation and fixed (in the scorers, not the skill).**
-- The scorers' list of files the engine writes on every run still named `parity-agreed.json` and
-  `parity-history.json`, so in every `props-question` run and two `toggle-note` runs (7 on Sonnet, 3 on Haiku) the
+- The scorers' list of files the engine writes on every run still named the agreed record and the
+  history by their old names, so in every `props-question` run and two `toggle-note` runs (7 on Sonnet, 3 on Haiku) the
   engine's own `design-system-engine-agreed.json` and `-history.json` first counted as files the agent changed. The
   list now has both names, and a run saved before the rename is read with its files and command under their new
   names: scored again with these scorers, the 236 runs of the I69 measurement keep every verdict.
@@ -184,7 +184,7 @@ snapshots but never said the Figma data could not be refreshed here.
 
 A fresh run of the adopted guide (the `cookbook` variant, the checkout) after guide changes: an Audit Rule to
 change only what was asked, the `ask-the-system` recipe, `--match` in the accept-debt recipe (never narrow
-`parity-baseline.json` by hand), and the reference for the edit check (I62), the Figma call budget (I67), the
+the accepted-debt file by hand), and the reference for the edit check (I62), the Figma call budget (I67), the
 llms.txt mandate (I63), the hidden expected component and prompt check in evals (I64, I68) and Tailwind (I65).
 Engine 2365d8a: the hooks every run installs include the edit check. 21 tasks: `props-question` is new. Both
 this guide and the adopted one (engine c3fd998) are scored by the current scorers: the `accept-radius` scorer
@@ -300,7 +300,7 @@ only the asking forms of a change verb (fixed after this measurement).
 
 Same harness, tasks and scorers as the cookbook measurement below; every saved run of all variants scored again with
 the final scorers. I56 is the cookbook guide plus decisions moved from the model into the engine: `--route` picks the
-recipe and the exact command; the project's hook routes each `/rms-figma-code-parity` request before the agent reads
+recipe and the exact command; the project's hook routes each `/rms-design-system-engine` request before the agent reads
 it; `SAY:` lines give the exact words for what the skill cannot do (change Figma, refresh without a Figma tool); the
 SUMMARY says whether the Figma data was refreshed; the hooks read the person's latest message before a code edit or
 the hand-back apply; accepting debt is scoped to a named component, and a scoped `--baseline` keeps the rest of the
@@ -325,14 +325,14 @@ Haiku ran 13 times on the five tasks the earlier variants had re-run, so each co
 
 **Decision.** Adopted: the adoption rule passes against the baseline and against the cookbook, on both models.
 
-**Found by the evaluation and fixed along the way.** A scoped `--baseline` rewrote `parity-baseline.json` with only
+**Found by the evaluation and fixed along the way.** A scoped `--baseline` rewrote the accepted-debt file with only
 that component's findings, dropping every other accepted line; an accessibility check the browser was slow to answer
 disappeared from the report instead of being reported as not checked (seen as an intermittent demo failure under
 load). Five scorer misreads, each fixed with a case in `test/skill-evals.test.mjs`.
 
 ## 2026-09: the guide split into a main file, recipes and reference (idea I55)
 
-Isolated headless runs (`claude -p "/rms-figma-code-parity <task>"`), scored by code, every run scored again with
+Isolated headless runs (`claude -p "/rms-design-system-engine <task>"`), scored by code, every run scored again with
 the final scorers (`rescore.mjs`). Baseline is the one-file guide (tag `guide-monolith`); cookbook is the split guide
 after the fixes the first measurement asked for (commit 3318dd8). Same engine for both (6707623 for the engine code).
 Private held-out tasks run on a real library and are named A and B here.

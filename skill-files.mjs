@@ -11,7 +11,7 @@ import { readFileSync, existsSync, readdirSync, lstatSync, readlinkSync, writeFi
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { OLD_SKILL, OUT_DIR, SKILL, envVar } from './names.mjs';
+import { OUT_DIR, SKILL, envVar } from './names.mjs';
 
 export const KINDS = { recipe: 'cookbook', reference: 'reference' };
 export const GUIDE = 'rms-design-system-engine.md';
@@ -91,20 +91,20 @@ export function doctor({ engineDir, projectDir, home = process.env.HOME ?? '', n
   return rows;
 }
 
-// A guide from before the rename, speaking of the new command and terminal command.
-export const renamedGuide = (text) => text.split(OLD_SKILL).join(SKILL).replace(/\brms-parity\b/g, SKILL);
+// The guide at a git ref, speaking of the current command. A ref from before the skill took its current name keeps
+// its guide as the one top-level <skill>.md beside the README; its own name in the text reads as the current one.
+export function guideAtRef(engineDir, ref) {
+  const git = (...args) => execFileSync('git', args, { cwd: engineDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
+  try { return git('show', `${ref}:${GUIDE}`); } catch {}
+  try {
+    const file = git('ls-tree', '--name-only', ref).split('\n').find((f) => /^rms-[\w-]+\.md$/.test(f));
+    if (!file) return null;
+    return git('show', `${ref}:${file}`).split(file.replace(/\.md$/, '')).join(SKILL);
+  } catch { return null; }
+}
 
 // The classic guide, as it was before the split, from the engine's git history (a tag).
-export function classicGuide(engineDir, tag = CLASSIC_TAG) {
-  // The tag predates the rename: its guide has the old file name and speaks of the old command.
-  for (const file of [GUIDE, `${OLD_SKILL}.md`]) {
-    try {
-      const text = execFileSync('git', ['show', `${tag}:${file}`], { cwd: engineDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 16 * 1024 * 1024 });
-      return file === GUIDE ? text : renamedGuide(text);
-    } catch {}
-  }
-  return null;
-}
+export const classicGuide = (engineDir, tag = CLASSIC_TAG) => guideAtRef(engineDir, tag);
 
 // Writes it beside the engine (never tracked) and returns its path, or null when the tag is not there.
 // An install is a shallow clone (install.sh uses --depth 1), so the tag is usually not there: fetch just it.

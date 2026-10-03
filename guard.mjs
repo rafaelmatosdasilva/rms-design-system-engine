@@ -147,17 +147,17 @@ export function stopCheck(event, { root, cfg = null }) {
 }
 export const stopOutput = (reason) => (reason ? JSON.stringify({ decision: 'block', reason }) : '');
 
-// The files where the system's decisions are recorded (I73), under the new names and the old ones. 'agreed' is
+// The files where the system's decisions are recorded (I73). 'agreed' is
 // written by the engine only; the others change when the person asks.
 const ACCEPT_ASKED = /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit|\bbaseline|ratchet|lock (it |them )?in/i;   // the router's accept-debt words, or the baseline named
 const EXCEPTION_ASKED = /\b(exception|exempt|ignore|skip|mapping|map|exce[çc][õoã]|isen[çc]|ignor|mapa|mapeamento|set ?up|configur|install|init)\w*/i;   // setting the project up writes the map too
 const PICTURE_ASKED = /\b(approve|accept|update|aprov|aceit|atualiz)\w*\b[\s\S]{0,60}\b(pictures?|images?|screenshots?|references?|imagem|imagens|refer[eê]ncias?|capturas?)\b|\b(pictures?|images?|screenshots?|references?|imagem|imagens|refer[eê]ncias?|capturas?)\b[\s\S]{0,60}\b(approve|accept|update|aprov|aceit|atualiz)\w*/i;
 export function decisionFile(path, cfg = {}) {
   const p = String(path ?? '').replace(/\\/g, '/'), b = basename(p);
-  if ([PROJECT.baseline.now, PROJECT.baseline.old, cfg.baseline?.path && basename(cfg.baseline.path)].includes(b)) return 'debt';
-  if (b === PROJECT.agreed.now || b === PROJECT.agreed.old) return 'agreed';
-  if (b === PROJECT.map.now || b === PROJECT.map.old) return 'exceptions';
-  const refs = [cfg.visualRefs, PROJECT.refs.now, PROJECT.refs.old].filter(Boolean).map((d) => String(d).replace(/^\.?\/+|\/+$/g, ''));
+  if ([PROJECT.baseline.now, cfg.baseline?.path && basename(cfg.baseline.path)].includes(b)) return 'debt';
+  if (b === PROJECT.agreed.now) return 'agreed';
+  if (b === PROJECT.map.now) return 'exceptions';
+  const refs = [cfg.visualRefs, PROJECT.refs.now].filter(Boolean).map((d) => String(d).replace(/^\.?\/+|\/+$/g, ''));
   if (refs.some((d) => p === d || p.endsWith(`/${d}`) || p.startsWith(`${d}/`) || p.includes(`/${d}/`))) return 'pictures';   // the folder itself too
   return null;
 }

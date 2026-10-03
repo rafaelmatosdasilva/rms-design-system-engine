@@ -26,8 +26,7 @@ export function flattenTokens(tree, prefix = []) {
   const out = [];
   for (const [k, v] of Object.entries(tree ?? {})) {
     if (k.startsWith('$') || !v || typeof v !== 'object') continue;
-    // A contract written before the rename keeps its facts under the old extension name.
-    const ext = v.$extensions?.['com.rms.design-system-engine'] ?? v.$extensions?.['com.rms.parity'];
+    const ext = v.$extensions?.['com.rms.design-system-engine'];
     if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: ext?.modes ?? null, readableOn: ext?.readableOn ?? null, deprecated: v.$deprecated === true });
     else out.push(...flattenTokens(v, [...prefix, k]));
   }
