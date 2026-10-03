@@ -30,9 +30,14 @@ test('layout written with the system\'s spacing tokens is not an invention; a sy
   assert.equal(inventsNothing(c).ok, true, inventsNothing(c).detail);
 });
 
-test('an edited or added system file breaks the system', () => {
-  assert.equal(systemUnchanged(ctx({ 'src/components/Toggle.jsx': 'x', 'prototypes/a.json': '{}' })).ok, false);
+test('an edited system file breaks the system; a new file beside them is judged by what it holds', () => {
   assert.equal(systemUnchanged(ctx({ 'src/styles/tokens.css': 'x' })).ok, false);
+  assert.equal(systemUnchanged(ctx({ 'src/components/button.css': 'x' })).ok, false);
+  const screen = ctx({ 'src/components/Settings.jsx': "import Button from './Button.jsx';\nexport default function Settings() { return <Button Label='Save' />; }" });
+  assert.equal(systemUnchanged(screen).ok, true);
+  assert.equal(usesSystem(screen, ['button']).ok, true, 'a screen placed among the components is still read');
+  const look = ctx({ 'src/components/Switch.jsx': 'export function Switch() { return <span className="switch" />; }', 'src/components/switch.css': '.switch { background: var(--button-background); border-radius: 999px; }' });
+  assert.equal(inventsNothing(look).ok, false, 'a switch with a look of its own is an invention, even in the components folder');
 });
 
 test('a gap is named when the thing and a word saying it is not there are close', () => {
