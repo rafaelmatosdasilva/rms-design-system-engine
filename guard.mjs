@@ -136,7 +136,7 @@ export function stopCheck(event, { root, cfg = null }) {
   const missing = forThisPrompt ? said.say.filter((s) => SAID[s.check] && !SAID[s.check].test.test(reply) && !SAID[s.check].unless?.(event.transcript_path)) : [];
   // A prototype drawn for this request owes the person its gaps: each one the reply does not name is sent back, once.
   const owed = prototypeGapsOwed(root, reply);
-  if (owed.length) missing.push(...owed.map((g) => ({ text: `- ${g.line}`, check: g.kind === 'consistency' ? 'differs' : 'gap' })));
+  if (owed.length) missing.push(...owed.map((g) => ({ text: `- ${g.line}`, check: g.kind === 'consistency' ? 'differs' : g.kind === 'request' ? 'asked' : 'gap' })));
   // What the session's edits left in place that the system does not have (the edit check, run once more over the files).
   let left = [];
   try { const c = cfg ?? readCfg(root); if (c) left = sessionLeftovers(root, c); } catch { /* the check is a help, never a blocker */ }
@@ -146,7 +146,7 @@ export function stopCheck(event, { root, cfg = null }) {
   if (secret && !missing.length) return counted(`rms-design-system-engine: your reply asks the person for a secret in the chat. Reply again without asking for it. ${SECRET_LINE}`);
   if (!missing.length) return null;
   const lines = [...missing.map((s) => s.text), ...(secret ? [SECRET_LINE] : [])];
-  const what = [...new Set(missing.map((s) => (s.check === 'gap' ? 'what the design system would need for the prototype (its gaps)' : s.check === 'differs' ? 'where the prototype differs from the product\'s other pages' : SAID[s.check].what)))];
+  const what = [...new Set(missing.map((s) => (s.check === 'gap' ? 'what the design system would need for the prototype (its gaps)' : s.check === 'differs' ? 'where the prototype differs from the product\'s other pages' : s.check === 'asked' ? 'what the request asked for that the prototype leaves out' : SAID[s.check].what)))];
   return counted(`rms-design-system-engine: your reply leaves out ${what.join(' and ')}${secret ? ', and asks the person for a secret in the chat' : ''}. Reply again with your whole answer${secret ? ', asking for no secret,' : ''} and ${lines.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${lines.join('\n')}`);
 }
 // The gaps of the prototype the engine drew in the last half hour, not yet checked, that the reply does not name. A gap

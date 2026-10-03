@@ -297,6 +297,36 @@ export function usesAgainstPurpose(ctx, nodes) {
   });
 }
 
+// What the request asks for, held against the composition:
+//   • a component the request names (all the words of its name are in it: "an empty state" → emptyState, "a switch"
+//     → switch) that the composition does not use: a warning the reply owes;
+//   • a component the documentation rules out for the request's words ("a message confirming…" and a tag that is
+//     "never a message that comes and goes"), used anyway: an error, unless the node says in "purpose" what else it
+//     is for, and that purpose is not ruled out too.
+const nameWords = (n) => wordsOf(String(n).replace(/^[._]+/, ''));
+export function requestFindings(ctx, request, nodes) {
+  const out = [];
+  if (!request) return out;
+  const asked = wordsOf(request);
+  const used = new Set(nodes.map((n) => n.component));
+  for (const name of Object.keys(ctx.components)) {
+    const w = nameWords(name);
+    if (!w.length || used.has(name) || !w.every((x) => asked.includes(x))) continue;
+    out.push({ rule: null, source: 'the request', level: 'warning', id: null, said: `asked:${name}`, kind: 'request', message: `the request asks for ${w.join(' ')} and the system has ${name}, which is not in the prototype: add it, or say why it is left out` });
+  }
+  for (const n of nodes) {
+    const k = ctx.components[n.component];
+    if (!k || n.props?.standInFor) continue;   // a stand-in is judged by its own need
+    const hits = ruledOut(k, request, n.component);
+    if (!hits.length) continue;
+    const purpose = n.props?.purpose;
+    if (purpose && !ruledOut(k, purpose, n.component).length) continue;
+    out.push({ rule: null, source: 'the team\'s documentation', level: 'error', id: n.id, message: `${n.component} is ruled out for "${hits[0].words.join(', ')}" in this request: "${hits[0].sentence}". Show that need as a Missing box; if this ${n.component} is for something else, write it in "purpose"` });
+  }
+  const seen = new Set();
+  return out.filter((f) => { const key = f.said ?? f.message; return !seen.has(key) && seen.add(key); });
+}
+
 // The guidelines' limits a composition breaks: [{ component, max, count, sentence, from }].
 export function limitFindings(limits, nodes) {
   const count = new Map();
