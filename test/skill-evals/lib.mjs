@@ -156,8 +156,10 @@ export function context(events, dir, saved = null) {
   // hide its files from the scorer; the rules still count the commit itself).
   const root = saved ? '' : git('rev-list', '--max-parents=0', 'HEAD').trim().split('\n')[0];
   const committed = !saved && root ? git('diff', '--name-only', root, 'HEAD').split('\n').filter(Boolean) : [];
-  const changed = (saved ? saved.changed ?? [] : [...new Set([...git('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, '')), ...committed])])
-    .filter((p) => !ENGINE_WRITES.test(p));
+  // A file the project ignores (a drafts folder in its .gitignore) is still the run's work; installed packages and the
+  // engine's own output folder are not.
+  const changed = (saved ? saved.changed ?? [] : [...new Set([...git('status', '--porcelain', '--ignored', '--untracked-files=all').split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, '')), ...committed])])
+    .filter((p) => !ENGINE_WRITES.test(p) && !/(^|\/)(node_modules|\.design-system-engine-out)(\/|$)/.test(p));
   const nextLines = calls.flatMap((c) => String(c.result).split('\n')).map((l) => l.match(/^NEXT:\s*(.+)$/)?.[1]).filter(Boolean);
   const savedFiles = saved?.files ?? {};
   const read = (p) => { if (saved) return savedFiles[p] ?? null; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
