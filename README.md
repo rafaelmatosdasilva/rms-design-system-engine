@@ -101,6 +101,7 @@ You can mix them. `rms-design-system-engine --component button --only accessibil
 - **Foundations.** Colours, typography, spacing, radii and icons, each the CSS variable itself, shown only when the token check finds it equal to Figma in every mode.
 - **Components.** Each one drawn from your own markup (the contract's probe, the first instance in your pages, or what its React source returns) with your own CSS. Its controls are the props both sides have, labelled with Figma's names; an option applies what your contract's propertyMap says it adds. Below it, the tokens behind what is drawn and its size.
 - **Modes.** A switch for each of your mode collections, for the whole page or one component.
+- **In use.** The approved pictures of your Figma frames (the ones the frame check compares against), when there are any.
 - **Not agreed yet.** A prop only one side has, another default, a token that differs or a component not built yet is left out and counted in one line at the top, so you decide each one before it appears.
 
 A project can still use a template of its own (`ds-config.json` → `styleguide.template`).

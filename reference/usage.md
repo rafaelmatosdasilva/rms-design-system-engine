@@ -224,6 +224,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   Below it, the tokens behind what is drawn and its size; above it, the apps that use it and its documentation.
+- **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component.
 - **Not agreed yet**: a prop on one side only, another default, a token that differs, a component not built yet:
