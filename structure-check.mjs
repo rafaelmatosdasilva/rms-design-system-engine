@@ -313,6 +313,15 @@ function findBlock(css, selector, index) {
   return block.join('\n');
 }
 
+// A variant mapped as the base class plus a modifier (.tag.tag--positive) is also met by a rule on the modifier
+// alone (.tag--positive): the class is only ever on the component's element, so the two select the same thing.
+function modifierFound(selector) {
+  const parts = String(selector).trim().match(/^(\.[\w-]+)((?:\.[\w-]+)+)$/);
+  if (!parts) return false;
+  const rest = parts[2];
+  return findBlock(allCss, rest, allIndex) !== null;
+}
+
 function extractPropVar(block, prop) {
   const re = new RegExp('(?<![a-zA-Z-])' + prop + '\\s*:\\s*([^;\\n]+)');
   const m  = block?.match(re);
@@ -1351,9 +1360,9 @@ for (const [comp, contract] of Object.entries(CONTRACT)) {
     for (const [state, selector] of pairs) {
       if (!selector) continue;
       const label = state ? `${comp}/${propName}=${state}` : `${comp}/${propName}`;
-      const found = findBlock(allCss, selector, allIndex) !== null || allCss.includes(selector);
+      const found = findBlock(allCss, selector, allIndex) !== null || allCss.includes(selector) || modifierFound(selector);
       if (found) CPROP_PASS.push(label);
-      else CPROP_FAIL.push(`${label}: "${selector}" not found in CSS`);
+      else CPROP_FAIL.push(`${label}: "${selector}" not found in CSS: write a rule for ${selector} with what this option changes, and put the class on the element when ${propName} is ${state || 'on'}`);
     }
   }
 }
