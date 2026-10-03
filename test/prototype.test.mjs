@@ -71,7 +71,7 @@ test('a system component with the same name as an engine piece always wins', () 
 test('a prop Figma and the code do not agree on is drawn with its default, and said', () => {
   const r = checkPrototype({ component: 'button', props: { Label: 'Go', Disabled: 'True' } }, { catalog, view, scales });
   assert.equal(r.ok, true);
-  assert.ok(r.findings.some((f) => f.level === 'warning' && /button\.Disabled has no part of that name in the code yet: drawn without it/.test(f.message)));
+  assert.ok(r.findings.some((f) => f.level === 'warning' && /button\.Disabled=True: the system's CSS has no class for it: drawn without it/.test(f.message)));
 });
 
 test('gaps from every prototype merge by need, the most needed first', () => {

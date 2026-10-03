@@ -37,7 +37,10 @@ export function treeOf(ui) {
 // of that name.
 export function prototypePage({ name, tree, parts, scales, gaps, note = '', catalog = { components: {} } }) {
   const opts = (n, type) => Object.fromEntries(Object.entries(catalog.components?.[n]?.props ?? {}).filter(([, e]) => e.type === type).map(([k, e]) => [k, typeof e.default === 'string' ? e.default : '']));
-  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean') }]));
+  // The classes the system's CSS adds to a component's own class (.node.node-selected): what an option value can turn on.
+  const css = String(parts.componentCSS ?? '');
+  const modsOf = (cls) => { if (!cls) return []; const out = new Set(); for (const m of css.matchAll(new RegExp(`\\.${cls.replace(/[^\w-]/g, '')}((?:\\.[A-Za-z][\\w-]*)+)`, 'g'))) for (const k of m[1].split('.').filter(Boolean)) out.add(k); return [...out]; };
+  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean'), enumProps: opts(c.name, 'enum'), mods: modsOf(c.cls) }]));
   const data = { name, tree, components: drawable, scales, modes: parts.view.modes ?? [], pieces: ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'].filter((p) => !drawable[p]), gaps, note };
   return readFileSync(PROTOTYPE_TEMPLATE, 'utf8')
     .split('/*{{THEME_CSS}}*/').join(parts.themeCSS ?? '')
@@ -60,6 +63,19 @@ async function systemFor(ROOT, cfg) {
   let figmaVars = {};
   try { figmaVars = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { /* no text styles */ }
   const scales = systemScales(parts.view, figmaVars, `${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`);
+  // Every Figma colour whose variable the code declares (agreed or not): a surface or a text colour a designed screen
+  // binds to one is drawn with the code's variable, as building the screen would.
+  {
+    const { resolveNamingSpec, tokenToVar } = await import('./naming-convention.mjs');
+    const spec = resolveNamingSpec(cfg), declared = new Set([...`${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+    const have = new Set(scales.colors.map((t) => t.name));
+    for (const name of new Set(Object.values(figmaVars.color ?? {}).flatMap((m) => Object.keys(m ?? {})))) {
+      const short = name.replace(/\/colou?r$/, '');
+      if (have.has(short)) continue;
+      const v = [tokenToVar(name, spec), tokenToVar(short, spec)].find((x) => declared.has(x));
+      if (v) { scales.colors.push({ name: short, var: v }); have.add(short); }
+    }
+  }
   // What the team wrote about each component and its product (descriptions, annotations, notes, guidelines, layers).
   const context = await loadContext(ROOT, cfg, catalog, { fetchLinks: envVar(process.env, 'NO_FETCH') !== '1' });
   const actionNames = Object.entries(context.components).filter(([, k]) => /^button$/i.test(k.role ?? '') || /\b(main )?action\b/i.test(k.purpose ?? '')).map(([n]) => n);
@@ -67,7 +83,7 @@ async function systemFor(ROOT, cfg) {
   let designed = [];
   if (context.screens.length) {
     const { screenToPrototype } = await import('./screen-layout.mjs');
-    designed = context.screens.map((sc) => { try { return { name: slug(sc.name), label: sc.name, id: sc.id, prototype: screenToPrototype(sc, { catalog, scales }).prototype }; } catch { return null; } }).filter(Boolean);
+    designed = context.screens.map((sc) => { try { return { name: slug(sc.name), label: sc.name, id: sc.id, prototype: screenToPrototype(sc, { catalog, scales, drawable: new Set((parts.view.components ?? []).map((c) => c.name)) }).prototype }; } catch { return null; } }).filter(Boolean);
   }
   return { catalog, parts, scales, context, actionNames, designed };
 }
@@ -115,7 +131,7 @@ export function productPages(ROOT, sys, except = null) {
 function drawOne(ROOT, name, raw, sys) {
   const ui = raw?.prototype ?? raw;
   const declared = Array.isArray(raw?.gaps) ? raw.gaps : [];
-  const r = checkPrototype(ui, { catalog: sys.catalog, view: sys.parts.view, scales: sys.scales, name, declared, limits: sys.context.limits, breakpoints: sys.context.breakpoints, context: sys.context, request: sys.request ?? requestOf(ROOT, []) });
+  const r = checkPrototype(ui, { catalog: sys.catalog, view: sys.parts.view, scales: sys.scales, name, declared, limits: sys.context.limits, breakpoints: sys.context.breakpoints, context: sys.context, request: sys.request ?? requestOf(ROOT, []), css: sys.parts.componentCSS ?? '' });
   // The same decisions as the product's other pages (frame, heading, actions, the answer to each missing need).
   const { pages, authored } = productPages(ROOT, sys, name);
   const conventions = deriveConventions(pages, authored);
@@ -227,7 +243,7 @@ async function fromScreens(ROOT, cfg, file, sys, { force = false, browser = true
   const results = [];
   console.log(`\nScreens to prototypes  ·  ${screens.length} screen(s) from ${file}`);
   for (const sc of screens) {
-    const { prototype, gaps } = screenToPrototype(sc, { catalog: sys.catalog, scales: sys.scales });
+    const { prototype, gaps } = screenToPrototype(sc, { catalog: sys.catalog, scales: sys.scales, drawable: new Set((sys.parts.view.components ?? []).map((c) => c.name)) });
     const name = slug(sc.name);
     const target = join(ROOT, 'prototypes', `${name}.json`);
     const kept = existsSync(target) && !force;
@@ -238,6 +254,7 @@ async function fromScreens(ROOT, cfg, file, sys, { force = false, browser = true
     for (const f of r.findings.filter((x) => x.level === 'error')) console.log(`      ❌ ${f.message}`);
     const seen = await againstScreens(ROOT, cfg, name, kept ? JSON.parse(readFileSync(target, 'utf8')) : { prototype, gaps }, sys, r.page, { browser, screens });
     if (seen?.screen) for (const l of screenLines(seen.cmp, { ...seen, root: ROOT })) console.log(`      ${l}`);
+    else if (seen?.why) console.log(`      ⏭  not measured in the browser (${seen.why})`);
   }
   const h = layoutHabits(results);
   console.log('\n📐 HOW THESE SCREENS ARRANGE THINGS');

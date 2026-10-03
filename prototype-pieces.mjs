@@ -35,7 +35,9 @@ export function systemScales(view = {}, figmaVars = {}, cssText = '') {
   const best = (list, score) => list.map((t) => [t, score(t.figma.toLowerCase())]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   const surface = best(colours, (n) => (/(surface|background|\bbg\b|canvas)/.test(n) ? 2 : 0) && ((/surface/.test(n) ? 2 : 0) + (/(page|canvas|app)/.test(n) ? 3 : 0) + (/(base|default|low)/.test(n) ? 1 : 0) + 1));
   const ink = best(colours, (n) => (/(^|\/)(text|content|foreground|ink)\//.test(n) ? 1 : 0) && ((/primary|default|base/.test(n) ? 2 : 0) + 1));
-  return { spacing, text, surface: surface?.var ?? null, ink: ink?.var ?? null, family: text.find((t) => t.family)?.family ?? systemFamily(cssText) };
+  // Every colour token, for a surface or a text colour the screen binds to one of them.
+  const colors = (view.tokens?.colors ?? []).flatMap((g) => g.items).map((t) => ({ name: t.figma, var: t.var }));
+  return { spacing, text, colors, surface: surface?.var ?? null, ink: ink?.var ?? null, family: text.find((t) => t.family)?.family ?? systemFamily(cssText) };
 }
 
 // The engine's pieces as catalog entries, so one checker reads them with the system's components. A piece whose name
@@ -44,12 +46,13 @@ export function pieceCatalog(scales, systemNames = []) {
   const taken = new Set(systemNames.map((n) => n.toLowerCase()));
   const space = scales.spacing.map((t) => t.name);
   const spacing = space.length ? { type: 'enum', values: ['none', ...space] } : { type: 'enum', values: ['none'] };
+  const sides = { paddingTop: spacing, paddingRight: spacing, paddingBottom: spacing, paddingLeft: spacing };
   const defs = {
-    Page: { description: 'The engine\'s page: the system\'s page surface and text colour, its children one under another; width is the screen\'s, in px.', props: { padding: spacing, gap: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch'] }, width: { type: 'text' } } },
-    Stack: { description: 'The engine\'s vertical arrangement; grow takes the room its parent leaves.', props: { gap: spacing, padding: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch'] }, grow: { type: 'boolean' } } },
-    Row: { description: 'The engine\'s horizontal arrangement; grow takes the room its parent leaves.', props: { gap: spacing, padding: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch', 'baseline'] }, justify: { type: 'enum', values: ['start', 'center', 'end', 'between'] }, wrap: { type: 'boolean' }, grow: { type: 'boolean' } } },
-    Columns: { description: 'The engine\'s equal columns.', props: { count: { type: 'enum', values: ['2', '3', '4'] }, gap: spacing, grow: { type: 'boolean' } } },
-    Text: { description: 'Copy in one of the system\'s text styles.', props: { text: { type: 'text' }, style: { type: 'enum', values: scales.text.map((t) => t.name) }, as: { type: 'enum', values: ['h1', 'h2', 'h3', 'p', 'span'] } } },
+    Page: { description: 'The engine\'s page: the system\'s page surface and text colour, its children one under another; width and height are the screen\'s, in px; clip cuts what overflows; mode names the system\'s modes it is drawn in.', props: { padding: spacing, gap: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch'] }, width: { type: 'text' }, height: { type: 'text' }, clip: { type: 'boolean' }, mode: { type: 'text' }, ...sides } },
+    Stack: { description: 'The engine\'s vertical arrangement; grow takes the room its parent leaves; surface is a colour token\'s Figma name for its background.', props: { gap: spacing, padding: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch'] }, grow: { type: 'boolean' }, stretch: { type: 'boolean' }, clip: { type: 'boolean' }, ...sides, surface: { type: 'text' } } },
+    Row: { description: 'The engine\'s horizontal arrangement; grow takes the room its parent leaves; surface is a colour token\'s Figma name for its background.', props: { gap: spacing, padding: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch', 'baseline'] }, justify: { type: 'enum', values: ['start', 'center', 'end', 'between'] }, wrap: { type: 'boolean' }, grow: { type: 'boolean' }, stretch: { type: 'boolean' }, clip: { type: 'boolean' }, ...sides, surface: { type: 'text' } } },
+    Columns: { description: 'The engine\'s equal columns.', props: { count: { type: 'enum', values: ['2', '3', '4'] }, gap: spacing, grow: { type: 'boolean' }, stretch: { type: 'boolean' } } },
+    Text: { description: 'Copy in one of the system\'s text styles; color is a colour token\'s Figma name.', props: { text: { type: 'text' }, style: { type: 'enum', values: scales.text.map((t) => t.name) }, as: { type: 'enum', values: ['h1', 'h2', 'h3', 'p', 'span'] }, color: { type: 'text' } } },
     Missing: { description: 'A need the system has nothing for: a labelled empty box, and a line on the gaps list.', props: { need: { type: 'text' }, kind: { type: 'enum', values: GAP_KINDS }, closest: { type: 'text' } } },
   };
   if (!scales.text.length) delete defs.Text.props.style;
@@ -79,10 +82,11 @@ export function nodesOf(ui) {
 function withoutNotes(ui) {
   // A column count may be written as a number; the catalog lists it as text.
   const strip = (o) => {
-    const { standInFor, purpose, ...rest } = o;
-    if (typeof rest.width === 'number') rest.width = String(rest.width);
-    if (rest.props && typeof rest.props.width === 'number') rest.props = { ...rest.props, width: String(rest.props.width) };
-    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, ...p } = rest.props; rest.props = p; if (typeof p.count === 'number') p.count = String(p.count); }
+    // Notes the check reads and the drawing uses, never options: standInFor, purpose, content (the words a designed
+    // instance shows) and box (its size on the screen).
+    const { standInFor, purpose, content, box, textless, ...rest } = o;
+    for (const k of ['width', 'height']) if (typeof rest[k] === 'number') rest[k] = String(rest[k]);
+    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, ...p } = rest.props; rest.props = p; for (const k of ['width', 'height', 'count']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
     if (typeof rest.count === 'number') rest.count = String(rest.count);
     return rest;
   };
@@ -97,7 +101,7 @@ function withoutNotes(ui) {
 // breakpoints: the system's screen widths ([{ name, px }]); a Page.width that is none of them is a warning.
 // context: prototype-context's view of the documentation, for the uses it rules out.
 // request: what the person asked for (the prompt hook keeps it), held against the composition.
-export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [], limits = [], breakpoints = [], context = null, request = null } = {}) {
+export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [], limits = [], breakpoints = [], context = null, request = null, css = '' } = {}) {
   const systemNames = Object.keys(catalog.components ?? {});
   const pieces = pieceCatalog(scales, systemNames);
   const r = checkUi(withoutNotes(ui), { ...catalog, components: { ...catalog.components, ...pieces } });
@@ -138,7 +142,16 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const agreed = new Set((v.controls ?? []).flatMap((c) => [c.label, c.prop]));
     const optDefs = catalog.components[node.component]?.props ?? {};
     for (const k of Object.keys(p)) {
-      if (k === 'standInFor' || k === 'purpose' || agreed.has(k)) continue;
+      if (['standInFor', 'purpose', 'content', 'box', 'textless'].includes(k) || agreed.has(k)) continue;
+      // A value of a choice turns on the class the system's CSS adds for it (.node.node-selected); a default value
+      // needs none. One the CSS has no class for is drawn without it, and said.
+      if (optDefs[k]?.type === 'enum') {
+        if (String(p[k]) === String(optDefs[k].default ?? '') || /^(default|false|none|off|no|normal|rest)$/i.test(String(p[k]))) continue;
+        if (modifierFor(css, v.cls, /^true$/i.test(String(p[k])) ? k : p[k])) continue;
+        const saidV = `${node.component}.${k}=${p[k]}`;
+        if (!findings.some((f) => f.said === saidV)) findings.push({ rule: null, source: 'the code', level: 'warning', id: node.id, said: saidV, message: `${saidV}: the system's CSS has no class for it: drawn without it` });
+        continue;
+      }
       // A text or on/off option the code has no prop for is drawn on the part its name points to (prototype page).
       if (['text', 'boolean'].includes(optDefs[k]?.type) && drawnByName(k, optDefs[k], v.markup)) continue;
       if (optDefs[k]?.type === 'boolean' && (p[k] === true || /^true$/i.test(String(p[k])))) continue;   // shown, as it is drawn
@@ -159,12 +172,29 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
   const root = nodes.find((n) => n.component === 'Page');
   const w = root?.props?.width != null ? Number(root.props.width) : null;
   if (w && breakpoints.length && !breakpoints.some((b) => Math.abs(b.px - w) < 1)) findings.push({ rule: null, source: 'the system\'s screen widths', level: 'warning', id: root.id, message: `Page.width ${w} is none of the system's screen widths: ${breakpoints.map((b) => `${b.name} (${b.px})`).join(', ')}` });
+  // A surface or a text colour is one of the system's colour tokens, never a value of its own.
+  const tokenNames = new Set((scales.colors ?? []).map((t) => t.name));
+  for (const n of nodes) for (const k of ['surface', 'color']) {
+    const v = n.props?.[k];
+    if (v == null || !pieces[n.component]) continue;
+    if (!tokenNames.has(String(v))) findings.push({ rule: 2, level: 'error', id: n.id, message: `${n.component}.${k} "${v}" is not one of the system's colour tokens: name one of them by its Figma name, or leave it out` });
+  }
   // Gaps written beside the composition (a screen's starting point carries what its screen used that the system lacks).
   for (const g of declared) if (g?.need) gaps.push({ need: String(g.need), kind: GAP_KINDS.includes(g.kind) ? g.kind : 'component', closest: g.closest ?? null, used: g.used ?? null, prototype: name, node: null, ...(g.note ? { note: g.note } : {}) });
   // The engine's layout pieces stand in for layout components the system does not have.
   for (const [piece, ids] of Object.entries(used)) gaps.push({ need: `a ${piece} layout component`, kind: 'layout', closest: null, used: `the engine's ${piece}`, prototype: name, node: ids.join(', '), count: ids.length });
   const errors = findings.filter((f) => f.level === 'error').length;
   return { ok: errors === 0, findings, counts: { components: r.counts.components, errors, warnings: findings.length - errors }, gaps, drawable, pieces: Object.keys(pieces) };
+}
+
+// The class the system's CSS adds to a component's class for a value (the same reading the page does), or null.
+export function modifierFor(css, cls, value) {
+  if (!cls || !css) return null;
+  const word = String(value).replace(/^show[\s_-]*/i, '').replace(/[\s_-]*content$/i, '').replace(/[\s_-]+/g, '').toLowerCase();
+  if (word.length < 3) return null;
+  const mods = new Set();
+  for (const m of String(css).matchAll(new RegExp(`\\.${String(cls).replace(/[^\w-]/g, '')}((?:\\.[A-Za-z][\\w-]*)+)`, 'g'))) for (const k of m[1].split('.').filter(Boolean)) mods.add(k);
+  return [...mods].find((m) => { const w = m.toLowerCase().replace(/[^a-z0-9]/g, ''); return w === word || w.endsWith(word) || (word.length >= 4 && w.includes(word)); }) ?? null;
 }
 
 // Whether the prototype page can draw an option by its name (the same reading the page does): a class in the
