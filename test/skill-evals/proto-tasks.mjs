@@ -25,6 +25,18 @@ const SYSTEM_CLASSES = new Set(readdirSync(join(REF, 'src/components')).filter((
   .flatMap((f) => [...readFileSync(join(REF, 'src/components', f), 'utf8').matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1])));
 const LOOK = /^(background(-color)?|border(-(top|right|bottom|left))?(-(color|width|style))?|border-radius|color|box-shadow|outline|font(-(size|weight|family))?|line-height|opacity|fill|stroke)$/;
 const LAYOUT_SIZE = /^(width|max-width|min-width|height|max-height|min-height|flex|flex-basis|grid-template-columns|grid-template-rows)$/;
+// The declarations the system's own CSS writes (its type is written as a font shorthand, with no token), with the
+// shorthand's longhands: a rule repeating one of them uses the system's value.
+const norm = (p, v) => `${p}:${v.replace(/\s+/g, ' ').replace(/\s*,\s*/g, ',').trim().toLowerCase()}`;
+const SYSTEM_DECLS = new Set();
+for (const f of readdirSync(join(REF, 'src/components')).filter((n) => n.endsWith('.css'))) {
+  for (const m of readFileSync(join(REF, 'src/components', f), 'utf8').matchAll(/([a-z-]+)\s*:\s*([^;}]+)/g)) {
+    const [p, v] = [m[1], m[2].trim()];
+    SYSTEM_DECLS.add(norm(p, v));
+    const font = p === 'font' && v.match(/^(\d{3})\s+(\d+px)\/(\d+px)\s+(.+)$/);
+    if (font) [['font-weight', font[1]], ['font-size', font[2]], ['line-height', font[3]], ['font-family', font[4]]].forEach(([lp, lv]) => SYSTEM_DECLS.add(norm(lp, lv)));
+  }
+}
 // A look set with one of the system's own tokens and nothing else (a page surface, a text colour) is the system's look.
 const tokenOnly = (v) => { const m = v.replace(/\s*!important$/i, '').match(/^var\(\s*(--[\w-]+)\s*\)$/); return !!m && DECLARED.has(m[1]); };
 
@@ -73,6 +85,7 @@ export function inventsNothing(ctx) {
       const classes = [...r.selector.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1]);
       const own = r.selector === '.inline' || classes.some((c) => !SYSTEM_CLASSES.has(c)) || !classes.length;
       for (const [p, v] of r.decls) {
+        if (SYSTEM_DECLS.has(norm(p, v))) continue;
         if (own && LOOK.test(p) && !tokenOnly(v) && !/^(inherit|initial|unset|transparent|none|currentcolor)$/i.test(v)) { bad.push(`${f.path}: ${r.selector} sets ${p} (a look of its own)`); break; }
         if (/(?<![\w.-])(?!0px)\d*\.?\d+px\b/.test(v) && !LAYOUT_SIZE.test(p)) { bad.push(`${f.path}: ${p}: ${v} (a size the system does not have)`); break; }
       }

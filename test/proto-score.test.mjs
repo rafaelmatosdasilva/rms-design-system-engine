@@ -31,6 +31,9 @@ test('layout written with the system\'s spacing tokens is not an invention; a sy
   const surface = ctx({ 'src/screens/search.css': '.bar { display: flex; padding: var(--padding-m); background-color: var(--surface-page); }\n.bar__field { flex: 1 1 240px; }' });
   assert.equal(inventsNothing(surface).ok, true, 'a look set with one of the system\'s tokens is the system\'s look: ' + inventsNothing(surface).detail);
   assert.equal(inventsNothing(ctx({ 'src/screens/search.css': '.bar { background-color: #f4f5f7; }' })).ok, false);
+  const type = ctx({ 'src/screens/empty.css': '.empty__heading { margin: 0; font: 500 14px/20px Inter, sans-serif; }\n.empty__body { font-size: 12px; line-height: 16px; }' });
+  assert.equal(inventsNothing(type).ok, true, 'the system\'s own type, written as the system writes it: ' + inventsNothing(type).detail);
+  assert.equal(inventsNothing(ctx({ 'src/screens/empty.css': '.empty__heading { font: 700 22px/28px Inter, sans-serif; }' })).ok, false);
 });
 
 test('an edited system file breaks the system; a new file beside them is judged by what it holds', () => {
