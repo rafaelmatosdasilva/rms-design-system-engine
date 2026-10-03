@@ -149,7 +149,11 @@ export function context(events, dir, saved = null) {
   const git = (...a) => { if (saved) return ''; try { return execFileSync('git', a, { cwd: dir, encoding: 'utf8' }); } catch { return ''; } };
   // Files the engine writes on every run: never the agent's change. Applied to
   // a saved row too, so a run scored with an older list is scored with this one.
-  const changed = (saved ? saved.changed ?? [] : git('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, '')))
+  // What the run changed since the project was set up: the working tree, and anything it committed (a commit must not
+  // hide its files from the scorer; the rules still count the commit itself).
+  const root = saved ? '' : git('rev-list', '--max-parents=0', 'HEAD').trim().split('\n')[0];
+  const committed = !saved && root ? git('diff', '--name-only', root, 'HEAD').split('\n').filter(Boolean) : [];
+  const changed = (saved ? saved.changed ?? [] : [...new Set([...git('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, '')), ...committed])])
     .filter((p) => !ENGINE_WRITES.test(p));
   const nextLines = calls.flatMap((c) => String(c.result).split('\n')).map((l) => l.match(/^NEXT:\s*(.+)$/)?.[1]).filter(Boolean);
   const savedFiles = saved?.files ?? {};
