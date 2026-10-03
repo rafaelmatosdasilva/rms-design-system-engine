@@ -68,7 +68,7 @@ async function one({ t, run }) {
   const out = outFor(t);
   if (!out) throw new Error('private tasks need DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT');
   mkdirSync(join(out, 'transcripts'), { recursive: true });
-  const dir = makeProject(t.source ?? DEMO, t.setup, { engine: vr.engine !== false });
+  const dir = makeProject(t.source ?? DEMO, t.setup, { engine: vr.engine !== false, skillFiles: t.skillFiles ?? [] });
   const { home, path } = makeHome(vr, { cliOnPath: t.cliOnPath !== false });
   const events = [];
   let sessionId = null, error = null;
