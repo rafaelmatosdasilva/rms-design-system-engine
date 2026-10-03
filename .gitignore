@@ -18,6 +18,8 @@ plans/
 # Harbor and Lagoon, the other fictional design systems (test/harbor-ds.test.mjs, test/lagoon-tw.test.mjs).
 !test/fixtures/harbor-ds/ds-config.json
 !test/fixtures/harbor-ds/structure-contract.mjs
+# Tidepool, the Figma-only design system of the build evaluation (test/build-mode.test.mjs).
+!test/fixtures/tidepool-figma/ds-config.json
 !test/fixtures/lagoon-tw/ds-config.json
 
 # Local choice of guide and its extracted copy (--guide classic).
