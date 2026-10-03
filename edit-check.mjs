@@ -164,10 +164,21 @@ export function editTruth(ROOT, cfg = {}) {
   const figmaVars = new Set();
   const vars = json(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
   const spec = resolveNamingSpec(cfg);
-  const addName = (n) => { if (typeof n === 'string' && !n.startsWith('_')) { try { const v = tokenToVar(n, spec); if (v) figmaVars.add(v); } catch { /* a name the convention cannot map */ } } };
+  // Both conventions the token check uses: colours drop their trailing segment (`button/background/color` →
+  // --button-background), sizing and other scalars keep every segment (`stroke/default` → --stroke-default).
+  const addName = (n) => {
+    if (typeof n !== 'string' || n.startsWith('_')) return;
+    for (const opts of [{}, { raw: true }]) { try { const v = tokenToVar(n, spec, opts); if (v) figmaVars.add(v); } catch { /* a name the convention cannot map */ } }
+  };
   for (const mode of Object.values(vars.color ?? {})) Object.keys(mode ?? {}).forEach(addName);
   for (const k of ['sizing', 'strings', 'booleans', 'primitives', 'typography', 'breakpoints']) Object.keys(vars[k] ?? {}).forEach(addName);
   for (const c of Object.values(vars.modeVariants ?? {})) Object.keys(c?.vars ?? {}).forEach(addName);
+  // Build mode: every token the engine wrote out to build is Figma's, whatever the project's own mapping does.
+  if (cfg.build === true) for (const m of read(TOKENS_TO_BUILD).matchAll(/(--[\w-]+)\s*:/g)) figmaVars.add(m[1]);
+  // Figma's own values: a new name holding one of them is a rename at most, not a value the system lacks.
+  const figmaValues = new Set();
+  for (const mode of Object.values(vars.color ?? {})) for (const v of Object.values(mode ?? {})) if (/^#[0-9a-f]{3,8}$/i.test(String(v))) figmaValues.add(normHex(v));
+  for (const v of Object.values(vars.sizing ?? {})) if (typeof v === 'string') figmaValues.add(v.trim().toLowerCase());
   const contracts = cfg.contracts?.out ?? 'contracts';
   const catalog = json(join(contracts, 'catalog.json'));
   const api = json(codeSnapshotPath(cfg)).api ?? {};
@@ -179,12 +190,12 @@ export function editTruth(ROOT, cfg = {}) {
   // The static accessibility rules (I74), with the project's styles read only when an edit removes an outline.
   let styles = null;
   const a11y = cfg.a11yStatic === false ? null : { styles: () => (styles ??= projectStyleText(ROOT)) };
-  return { truth, tokenByValue, figmaRaw, figmaVars, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -214,6 +225,8 @@ export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = 
       for (const d of l.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) {
         const [, name, value] = d;
         if (declaredBefore.has(name) || figmaVars.has(name) || !/#[0-9a-f]{3,8}\b|\b(rgb|hsl|oklch|lab)a?\(|\d(px|rem|em)\b/i.test(value) || /^\s*var\(/.test(value)) continue;
+        const v = value.trim().toLowerCase(), hex = /^#[0-9a-f]{3,8}$/.test(v) ? normHex(v) : null;
+        if (figmaValues.has(hex ?? v)) continue;   // one of Figma's own values under a name of the project's
         push(line, `${name} is a new token Figma has no variable for; use one of the system's tokens, or tell the person the system has no such value (rms-design-system-engine --query <name>)`);
       }
     }

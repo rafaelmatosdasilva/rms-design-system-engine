@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { editCheck } from '../edit-check.mjs';
 import { fixtureProject } from './helpers.mjs';
 
@@ -41,4 +42,16 @@ test('a Figma variable declared for the first time (tokens copied from Figma) is
   const r = editCheck({ tool_name: 'Edit', tool_input: { file_path: join(dir, 'src/theme.css'), old_string: ':root {', new_string: `:root {\n  ${decl[0]}` } },
     { root: dir, cfg: cfgOf(dir), headOf: () => head });
   assert.doesNotMatch(r ?? '', /new token/);
+});
+
+test('build mode: copying the tokens the engine wrote out gives no finding, sizing tokens included', () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'newtok-tp-');
+  const cfg = cfgOf(dir);
+  spawnSync(process.execPath, [join(ENGINE, 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  const tokens = readFileSync(join(dir, '.design-system-engine-out/handback/tokens-to-build.css'), 'utf8').replace(/^\/\*.*\*\/\n/, '');
+  assert.match(tokens, /--stroke-default: 1px/);
+  const r = editCheck({ tool_name: 'Write', tool_input: { file_path: join(dir, 'src/styles/tokens.css'), content: tokens } }, { root: dir, cfg, headOf: () => null });
+  assert.doesNotMatch(r ?? '', /new token/, r ?? '');
+  const r2 = editCheck({ tool_name: 'Write', tool_input: { file_path: join(dir, 'src/styles/tokens.css'), content: `${tokens}\n:root { --success-background: #4caf50; }\n` } }, { root: dir, cfg, headOf: () => null });
+  assert.match(r2 ?? '', /--success-background is a new token Figma has no variable for/);
 });

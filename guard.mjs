@@ -107,16 +107,29 @@ export function rememberSay(root, event, say = []) {
 
 // The Stop side: the reason to send the agent back, or null. Once only (stop_hook_active), and only for the prompt
 // whose route asked for the lines.
+// A reply that asks the person for a secret (a token, a key, a password) in the chat. A design token named in a
+// question ("which colour token") is not one, nor a line that sends the secret to .env or says never to paste it.
+export function asksForSecret(text) {
+  return String(text ?? '').split(/(?<=[.!?\n])\s+/).some((s) =>
+    /\b(paste|share|send|give|provide|tell)\b[^.]{0,40}((?<!\b(?:colou?r|fill|design|spacing|size|radius|radii|typography|text|font|semantic|primitive|surface|border|shadow|motion|theme)[\s/-]{1,2})token|api key|access key|password|secret)\b(?!\s+values?\b)/i.test(s)
+    && !/\b(never|not|don['’]t|do not|won['’]t|will not|no need|without)\b|n['’]t ask/i.test(s)
+    && !/\b[\w-]+\/token\b|\btoken\s+(name\s+)?to use\b|\b(which|what)\s+([\w-]+\s+)?token\b/i.test(s)
+    && !/\.env\b|\benv(ironment)? var|\bexport\s+[A-Z_]+|\b(give|send|tell|provide|show|share with) you\b/i.test(s));
+}
+const SECRET_LINE = 'A secret is never asked for in the chat: the person puts it in the project\'s .env file themselves (the engine names the variable), then asks you to run the command again.';
+
 export function stopCheck(event, { root }) {
   if (event?.stop_hook_active) return null;
-  let said; try { said = JSON.parse(readFileSync(saidFile(root), 'utf8')); } catch { return null; }
-  if (!said?.say?.length) return null;
-  if (said.session && event.session_id && said.session !== event.session_id) return null;
-  if (said.prompt && event.prompt_id && said.prompt !== event.prompt_id) return null;
-  const reply = String(event.last_assistant_message ?? '') || assistantBlocks(transcriptEntries(event.transcript_path)).filter((b) => b?.type === 'text').map((b) => b.text).pop() || '';
-  const missing = said.say.filter((s) => SAID[s.check] && !SAID[s.check].test.test(reply) && !SAID[s.check].unless?.(event.transcript_path));
+  const reply = String(event?.last_assistant_message ?? '') || assistantBlocks(transcriptEntries(event?.transcript_path)).filter((b) => b?.type === 'text').map((b) => b.text).pop() || '';
+  // Whatever the route: a reply that asks for a secret goes back once.
+  const secret = asksForSecret(reply);
+  let said; try { said = JSON.parse(readFileSync(saidFile(root), 'utf8')); } catch { said = null; }
+  const forThisPrompt = said?.say?.length && !(said.session && event.session_id && said.session !== event.session_id) && !(said.prompt && event.prompt_id && said.prompt !== event.prompt_id);
+  const missing = forThisPrompt ? said.say.filter((s) => SAID[s.check] && !SAID[s.check].test.test(reply) && !SAID[s.check].unless?.(event.transcript_path)) : [];
+  if (secret && !missing.length) return `rms-design-system-engine: your reply asks the person for a secret in the chat. Reply again without asking for it. ${SECRET_LINE}`;
   if (!missing.length) return null;
-  return `rms-design-system-engine: your reply leaves out ${missing.map((s) => SAID[s.check].what).join(' and ')}. Reply again with your whole answer and ${missing.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${missing.map((s) => s.text).join('\n')}`;
+  const lines = [...missing.map((s) => s.text), ...(secret ? [SECRET_LINE] : [])];
+  return `rms-design-system-engine: your reply leaves out ${missing.map((s) => SAID[s.check].what).join(' and ')}${secret ? ', and asks the person for a secret in the chat' : ''}. Reply again with your whole answer${secret ? ', asking for no secret,' : ''} and ${lines.length > 1 ? 'these lines' : 'this line'} in it, word for word:\n${lines.join('\n')}`;
 }
 export const stopOutput = (reason) => (reason ? JSON.stringify({ decision: 'block', reason }) : '');
 

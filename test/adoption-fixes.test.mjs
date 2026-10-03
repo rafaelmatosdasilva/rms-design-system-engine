@@ -53,3 +53,21 @@ test('building a component Figma paints with a colour that has no variable: the 
   assert.equal(sayKind(r.say[0]), 'noVariable', r.say.join('\n'));
   assert.equal(route('build the button from our Figma design system', { components: Object.keys(struct), rawColours: raw, build: true }).say.length, 0);
 });
+
+test('a reply that asks the person for a secret goes back once, whatever the route; a design token is not a secret', async () => {
+  const { stopCheck, asksForSecret, rememberSay } = await import('../guard.mjs');
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const root = mkdtempSync(join(tmpdir(), 'secret-'));
+  assert.equal(asksForSecret('Once you provide the token, I can complete setting up the guidelines from that URL.'), true);
+  assert.equal(asksForSecret('Give me a hex/token to use, or confirm a green is fine.'), false);
+  assert.equal(asksForSecret('Put GITLAB_TOKEN in the project\'s .env, never paste it here.'), false);
+  const back = stopCheck({ session_id: 's', last_assistant_message: 'Saved the link. Once you provide the token, I can finish.' }, { root });
+  assert.match(back ?? '', /asks the person for a secret in the chat[\s\S]*\.env/);
+  assert.equal(stopCheck({ session_id: 's', stop_hook_active: true, last_assistant_message: 'Once you provide the token, I can finish.' }, { root }), null, 'once only');
+  assert.equal(stopCheck({ session_id: 's', last_assistant_message: 'Saved the link; the page could not be read yet.' }, { root }), null);
+  // With an owed line too, both go back in one message.
+  rememberSay(root, { session_id: 's', prompt_id: 'p' }, ['Figma paints tag (Tone=Positive #d6f5e3) with colours that have no variable: the code writes them as Figma has them, and the design system has no token for them yet.']);
+  const both = stopCheck({ session_id: 's', prompt_id: 'p', last_assistant_message: 'Built the tag. Please provide the token so I can refresh.' }, { root });
+  assert.match(both ?? '', /leaves out .*colours the design system has no variable for, and asks the person for a secret/);
+});
