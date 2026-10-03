@@ -79,15 +79,20 @@ function variantClass(cls, option, cssText) {
 // check: parity-check.mjs --json result · figmaVars: the vars snapshot · pages: the project's own HTML (text) ·
 // usage: { name: [app labels] } · notes: { name: the code's own note } · icons: the icon ids · title: the system's name.
 // propertyMaps: { name: the contract's propertyMap (Figma prop → option → selector) } · parts: { name: [{ name, selector }] }
-// from the contract's children.
+// from the contract's children. · jsx: { name: the markup a React component's own JSX returns (jsx-markup.mjs) }, used
+// when neither the contract nor a page has it.
 export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, classFor = () => null, cssText = '', probes = {}, unbuilt = [], cfg = {},
-  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, parts = {} } = {}) {
+  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, parts = {}, jsx = {}, alsoNames = [] } = {}) {
   const byComponent = new Map();
   for (const r of rows) { if (!byComponent.has(r.component)) byComponent.set(r.component, []); byComponent.get(r.component).push(r); }
   const components = [], waiting = [];
   let undecided = 0;
-  for (const [name, entry] of Object.entries(propsSnap)) {
+  // alsoNames: components the catalog has that Figma lists no props for (a prototype draws them as they are, when the
+  // code has their markup); they never count as waiting or undecided.
+  const extra = alsoNames.filter((n) => !(n in propsSnap)).map((n) => [n, { properties: {}, noProps: true }]);
+  for (const [name, entry] of [...Object.entries(propsSnap), ...extra]) {
     if (name.startsWith('_') || !entry || typeof entry !== 'object') continue;
+    if (entry.noProps && unbuilt.includes(name)) continue;
     const mine = byComponent.get(name) ?? [];
     if (unbuilt.includes(name) || mine.some((r) => /^\(no code file/.test(String(r.codeValue)))) { waiting.push(`${name} (not built yet)`); continue; }
     const cls = String(classFor(name) ?? '').replace(/^\./, '') || null;   // the class itself, without its dot
@@ -118,9 +123,11 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
       else if (d.type === 'TEXT') control.part = partFor(r.figmaProp, parts[name], 'label');
       controls.push(control);
     }
-    const markup = probes[name] ?? pages.map((h) => instanceMarkup(h, cls)).find(Boolean) ?? null;
+    const fromPage = probes[name] ? null : pages.map((h) => instanceMarkup(h, cls)).find(Boolean) ?? null;
+    const markup = probes[name] ?? fromPage ?? jsx[name] ?? null;
+    if (entry.noProps && !markup) continue;
     components.push({ name, cls, role: roleWord(entry.annotations), description: entry.description ?? '', note: notes[name.toLowerCase()] ?? notes[name] ?? '',
-      markup, markupFrom: probes[name] ? 'contract' : markup ? 'page' : 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls });
+      markup, markupFrom: probes[name] ? 'contract' : fromPage ? 'page' : jsx[name] ? 'jsx' : 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls });
   }
   // A recorded value that moved on one side since it was agreed is not agreed any more.
   for (const f of Object.values(agreedRecord.facts ?? {})) if (f && f.figma !== undefined && f.code !== undefined && String(f.figma) !== String(f.code)) undecided++;
