@@ -30,7 +30,8 @@ Guide set measured: `8f7981d52194` · Project measured: `13d811a9d668`
 adopts it (held-out input 83k a run against 89k). On Sonnet the one count against it is input on the held-out set,
 154k a run against 152k (1.3% more, most of it `refresh-no-figma`, 128k against 119k); it costs less a run and the
 agent made fewer choices of its own. The rule says do not adopt on Sonnet; the guide change is two reference files,
-so the call is the owner's.
+and 2k is less than one guide moves from one hour to the next (g9 read 136k, then 144k when run again, in an earlier
+entry). Adopted by the owner on these numbers.
 
 **Disclosed.** Four Sonnet runs (`toggle-note` twice, `change-figma`, `forbidden-green`) timed out after 15 minutes
 without a turn, the API not answering; they were run again and passed. The engine moved on after the guide runs (build mode's next steps, the build scorer, and a
