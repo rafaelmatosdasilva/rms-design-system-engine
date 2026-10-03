@@ -76,6 +76,9 @@ test('the next step builds the tokens first, then a component only when the pers
   const failing = [{ label: 'Token values', lines: ['❌ x'] }];
   const toBuild = { tokens: 3, file: TOKENS_TO_BUILD, theme: 'src/styles/tokens.css', components: ['button', 'card'] };
   assert.match(nextStep({ failing, toBuild }), /^NEXT: tell the user what fails/);
+  // One component checked in build mode: it is being built, so its failures are fixed, not reported for a decision.
+  assert.match(nextStep({ failing, toBuild, build: true, scope: ['tag'] }), /^NEXT: you are building tag from Figma: fix each ❌ line under "Token values" the way it says \(Figma's value wins\), then run rms-design-system-engine --component tag again until it passes/);
+  assert.match(nextStep({ failing, toBuild, build: true }), /^NEXT: tell the user what fails/, 'a whole-system run still reports');
   assert.match(nextStep({ toBuild }), /copy the declarations in .*tokens-to-build\.css into src\/styles\/tokens\.css/);
   const next = nextStep({ toBuild: { ...toBuild, tokens: 0 } });
   assert.match(next, /If the person asked for button \(or for every component\), build it: run rms-design-system-engine --query button .* --component button until it passes/);
