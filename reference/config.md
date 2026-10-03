@@ -155,6 +155,8 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 | `figma-vars.snapshot.json` | color (all modes), sizing, typography, `modeVariants` (per-collection, per-mode non-colour maps) | `paths.snapshotVars` |
 | `figma-structure.snapshot.json` | per-component State=Default structure | `paths.snapshotStructure` |
 | `component-values.snapshot.json` | per component: every raw number and colour its nodes use (scopes the literal check), and its Figma file hygiene | project root |
+| `figma-templates.snapshot.json` | per template frame (`templates`): the components it composes, in order; prototypes list them | `paths.snapshotTemplates`, else project root or beside the structure snapshot |
+| `figma-screen-layout.snapshot.json` | designed screens read with `SCREEN_CAPTURE_JS` (read only): prototypes take the product's page arrangement and a starting point from them | `paths.screenLayout`, else beside the structure snapshot |
 
 Both are machine-generated - never hand-edit. `component-state-tokens.json` and `bound-tokens.json` are produced by the Phase 1 Plugin API walks (which work on any plan) and **committed** - each carries an `_updated` stamp, Gate [1] tracks their freshness, and the consuming gates ([4], [10]) always run at full strength against the committed data.
 

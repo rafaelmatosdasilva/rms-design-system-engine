@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
 import { checkPrototype, systemScales, nodesOf, mergeGaps, gapLine, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
-import { loadContext, purposeLines, ruleLines, usesAgainstPurpose } from './prototype-context.mjs';
+import { loadContext, purposeLines, ruleLines, usesAgainstPurpose, requestFocus, focusLines, cut } from './prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from './product-conventions.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
@@ -57,9 +57,26 @@ async function systemFor(ROOT, cfg) {
   try { figmaVars = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { /* no text styles */ }
   const scales = systemScales(parts.view, figmaVars, `${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`);
   // What the team wrote about each component and its product (descriptions, annotations, notes, guidelines, layers).
-  const context = await loadContext(ROOT, cfg, catalog);
+  const context = await loadContext(ROOT, cfg, catalog, { fetchLinks: envVar(process.env, 'NO_FETCH') !== '1' });
   const actionNames = Object.entries(context.components).filter(([, k]) => /^button$/i.test(k.role ?? '') || /\b(main )?action\b/i.test(k.purpose ?? '')).map(([n]) => n);
-  return { catalog, parts, scales, context, actionNames };
+  // The screens designers made, read as compositions (a screen already in prototypes/ is read from there instead).
+  let designed = [];
+  if (context.screens.length) {
+    const { screenToPrototype } = await import('./screen-layout.mjs');
+    designed = context.screens.map((sc) => { try { return { name: slug(sc.name), label: sc.name, id: sc.id, prototype: screenToPrototype(sc, { catalog, scales }).prototype }; } catch { return null; } }).filter(Boolean);
+  }
+  return { catalog, parts, scales, context, actionNames, designed };
+}
+
+// The texts a composition shows (headings, labels, stand-ins), to match it with a request.
+const textsOf = (tree) => { const out = []; const walk = (n) => { if (!n) return; const p = n.props ?? {}; for (const k of ['text', 'Label', 'label', 'need', 'standInFor']) if (typeof p[k] === 'string') out.push(p[k]); (n.children ?? []).forEach(walk); }; walk(tree); return out.join(' '); };
+
+// The request the prototype is for: --for "<text>", or what the person asked in the last hour (the prompt hook keeps it).
+function requestOf(ROOT, args) {
+  const at = args.indexOf('--for');
+  if (at >= 0 && args[at + 1]) return args[at + 1];
+  try { const r = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'request.json'), 'utf8')); if (Date.now() - Date.parse(r.at) < 3600 * 1000) return r.text; } catch { /* none */ }
+  return null;
 }
 
 // The product's other pages: every prototype in prototypes/ but the one named, as page facts, and what the team wrote
@@ -77,8 +94,15 @@ export function productPages(ROOT, sys, except = null) {
     try {
       const raw = JSON.parse(readFileSync(join(dir, f), 'utf8'));
       // A starting point read from a designed screen carries the designer's decisions.
-      pages[name] = { ...pageFacts(treeOf(raw?.prototype ?? raw), { actionNames: sys.actionNames }), designed: /^Starting point read from the screen/.test(raw?.$note ?? '') };
+      const tree = treeOf(raw?.prototype ?? raw);
+      pages[name] = { ...pageFacts(tree, { actionNames: sys.actionNames }), designed: /^Starting point read from the screen/.test(raw?.$note ?? ''), label: name, text: textsOf(tree), file: `prototypes/${f}` };
     } catch { /* not a composition */ }
+  }
+  // A screen designed in Figma and not brought into prototypes/ yet still says how the product's pages look.
+  for (const d of sys.designed ?? []) {
+    if (pages[d.name] || d.name === except) continue;
+    const tree = treeOf(d.prototype);
+    pages[d.name] = { ...pageFacts(tree, { actionNames: sys.actionNames }), designed: true, label: `${d.label} (designed in Figma; ${CLI} --prototype --from-screens brings it into prototypes/)`, text: textsOf(tree), file: null };
   }
   return { pages, authored };
 }
@@ -87,7 +111,7 @@ export function productPages(ROOT, sys, except = null) {
 function drawOne(ROOT, name, raw, sys) {
   const ui = raw?.prototype ?? raw;
   const declared = Array.isArray(raw?.gaps) ? raw.gaps : [];
-  const r = checkPrototype(ui, { catalog: sys.catalog, view: sys.parts.view, scales: sys.scales, name, declared });
+  const r = checkPrototype(ui, { catalog: sys.catalog, view: sys.parts.view, scales: sys.scales, name, declared, limits: sys.context.limits, breakpoints: sys.context.breakpoints });
   // The same decisions as the product's other pages (frame, heading, actions, the answer to each missing need).
   const { pages, authored } = productPages(ROOT, sys, name);
   const conventions = deriveConventions(pages, authored);
@@ -112,6 +136,12 @@ function drawOne(ROOT, name, raw, sys) {
   return { ...r, page, differs, uses, used: [...new Set(nodesOf(ui).nodes.map((n) => n.component))] };
 }
 
+// What the context was read from, for the catalog: so the person sees what the prototype knows, and what is missing.
+export function sourceLines(ctx) {
+  if (!ctx?.sources?.length) return [];
+  return ['', 'Read from:', ...ctx.sources.map((s) => `  ${s.missing ? '⚠️ ' : '• '}${s.what}: ${s.detail}`)];
+}
+
 // How the product's pages are arranged, for the catalog (only what at least two pages, or the team, agree on).
 export function conventionLines(conv) {
   if (!conv) return [];
@@ -128,24 +158,29 @@ export function conventionLines(conv) {
 
 // --catalog: everything a prototype may use, in one screen: the system's components and options, the engine's pieces
 // with the tokens they take, the format, and the starting points already made.
-export function catalogText(sys, { cmd = CLI, starts = [], conventions = null } = {}) {
+export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, focus = null } = {}) {
   const drawable = new Set((sys.parts.view.components ?? []).map((c) => c.name));
   const comps = Object.fromEntries(Object.entries(sys.catalog.components ?? {}).map(([n, c]) => [n, { ...c, ...(drawable.has(n) ? {} : { status: c.status ? `${c.status}, not built in code` : 'not built in code: drawn as a box' }) }]));
   const pieces = pieceCatalog(sys.scales, Object.keys(comps));
   const pieceRows = Object.entries(pieces).map(([n, d]) => `${n.padEnd(8)}  ${Object.entries(d.props).map(([k, e]) => `${k}=${e.type === 'enum' ? (e.values.length > 6 ? `<${k === 'style' ? 'text style' : 'spacing token'}>` : e.values.join('|')) : e.type === 'boolean' ? 'true|false' : `<${k === 'width' ? 'screen width in px' : k === 'need' ? 'what is needed' : k === 'closest' ? 'nearest system component' : 'text'}>`}`).join('  ')}`);
   return [
     'PROTOTYPE CATALOG  ·  everything a prototype may use; nothing else exists for it',
+    ...sourceLines(sys.context),
+    ...focusLines(focus),
     '',
     'The design system\'s components (name, options):',
     catalogTable({ components: comps }),
     ...(() => { const l = purposeLines(sys.context ?? { components: {}, rules: [] }, Object.keys(comps)); return l.length ? ['', 'What each component is for (Figma descriptions and annotations, code notes, the team\'s guidelines); use it only for that:', ...l] : []; })(),
     ...(() => { const l = ruleLines(sys.context ?? { components: {}, rules: [] }); return l.length ? ['', 'The team\'s rules for the product:', ...l] : []; })(),
+    ...((sys.context?.limits ?? []).length ? ['', 'Rules the check holds every prototype to (read from the guidelines):', ...sys.context.limits.map((l) => `  at most ${l.max} ${l.component} per ${l.per}: "${cut(l.sentence, 160)}" (${l.from})`)] : []),
+    ...((sys.context?.templates ?? []).length ? ['', 'Templates in Figma (the components each composes, in order):', ...sys.context.templates.map((t) => `  ${t.name}: ${t.components.join(', ')}`)] : []),
     ...conventionLines(conventions),
     '',
     'The engine\'s pieces (only where the system has none of its own):',
     ...pieceRows.map((r) => `  ${r}`),
     `Spacing tokens: ${sys.scales.spacing.map((t) => `${t.name} (${t.value})`).join(', ') || 'none'}`,
     `Text styles: ${sys.scales.text.map((t) => `${t.name} (${t.size}/${t.lh} ${t.weight})`).join(', ') || 'none'}`,
+    ...((sys.context?.breakpoints ?? []).length ? [`Screen widths (Page.width): ${sys.context.breakpoints.map((b) => `${b.name} (${b.px})`).join(', ')}`] : []),
     '',
     'Format: { "component": "Page", "props": { "padding": "<spacing token>" }, "children": [ { "component": "<name>", "props": { "<option>": "<value>" } } ] }',
     'A system component used for a need it does not quite meet carries "standInFor": "<the need>" in its props; a need nothing fits is { "component": "Missing", "props": { "need": "…" } }.',
@@ -237,7 +272,9 @@ export async function runPrototype(ROOT, argv) {
     let starts = [];
     try { starts = readdirSync(join(ROOT, 'prototypes')).filter((f) => f.endsWith('.json')); } catch { /* none yet */ }
     const { pages, authored } = productPages(ROOT, sys);
-    console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored) }) + '\n');
+    const req = requestOf(ROOT, args);
+    const focus = req ? requestFocus(sys.context, req, Object.entries(pages).map(([name, p]) => ({ name, label: p.label ?? name, text: p.text, designed: !!p.designed, file: p.file }))) : null;
+    console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus }) + '\n');
     return 0;
   }
   if (args.includes('--consistency')) return consistencyReport(ROOT, sys);
@@ -254,7 +291,7 @@ export async function runPrototype(ROOT, argv) {
   if (JSON_MODE) { process.stdout.write(JSON.stringify({ ok: r.ok, page: page && page.replace(ROOT + '/', ''), findings: r.findings, counts: r.counts, gaps: r.gaps, used }, null, 2) + '\n'); return r.ok ? 0 : 1; }
 
   console.log(`\nPrototype  ·  ${name}  ·  ${r.counts.components} part(s)`);
-  for (const f of r.findings) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} ${f.message}${f.rule ? `  (rule ${f.rule}: ${RULES[f.rule - 1]})` : ''}`);
+  for (const f of r.findings) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} ${f.message}${f.rule ? `  (rule ${f.rule}: ${RULES[f.rule - 1]})` : f.source ? `  (${f.source})` : ''}`);
   if (!r.ok) {
     console.log(`\n❌ ${r.counts.errors} error(s): nothing drawn.`);
     console.log(`\nNEXT: fix each ❌ line in ${input} (only the system's components and their own options; Missing for a need nothing fits), then run ${CLI} --prototype ${input} again.\n`);

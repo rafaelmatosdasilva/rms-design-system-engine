@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { contextFrom, purposeLines, ruleLines, usesAgainstPurpose } from '../prototype-context.mjs';
+import { contextFrom, purposeLines, ruleLines, usesAgainstPurpose, sectionsOf, limitsFrom, requestFocus, focusLines, breakpointsOf } from '../prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from '../product-conventions.mjs';
 import { checkPrototype } from '../prototype-pieces.mjs';
 
@@ -36,13 +36,13 @@ test('the context gathers each component\'s purpose, role, notes, when not to us
   assert.equal(ctx.components.field.notFor, 'an on/off choice');
   assert.deepEqual(ctx.components.field.useInstead, ['chip']);
   assert.equal(ctx.components.badge.status, 'deprecated');
-  assert.deepEqual(ctx.rules.map((r) => r.title), ['guidelines', 'templates'], 'an empty layer says nothing');
+  assert.deepEqual(ctx.rules.map((r) => r.title), ['guidelines', 'templates (design intent)'], 'an empty layer says nothing');
   const lines = purposeLines(ctx, ['button', 'field', 'badge']).join('\n');
   assert.match(lines, /button {2}The main action on a screen\. Role button\./);
   assert.match(lines, /not for an on\/off choice; use chip/);
   assert.match(lines, /guidelines Only for typing text\./);
   assert.match(lines, /badge {3}Old status label\. \[deprecated: use tag\]/);
-  assert.match(ruleLines(ctx).join('\n'), /templates: Settings pages: heading, sections, actions at the end\./);
+  assert.match(ruleLines(ctx).join('\n'), /templates \(design intent\): Settings pages: heading, sections, actions at the end\./);
 });
 
 test('after drawing, each component used is shown beside what the prototype uses it for', () => {
@@ -102,6 +102,57 @@ test('a page that decides differently from the others is told each difference, w
   assert.deepEqual(consistencyFindings(pageFacts(page('padding/m', 'm'), { actionNames: A }), deriveConventions(others)), [], 'a page that matches has nothing to change');
 });
 
+test('guidelines: every section is kept with its file; one named after a component goes with it, the rest are the product\'s rules', () => {
+  const sections = sectionsOf('Every page opens with one heading.\n\n## button\nOne button per screen, for its main action.\n\n## Forms\nPut the Save action at the end.').map((x) => ({ ...x, file: 'guidelines/notion-style.md' }));
+  const ctx = contextFrom(catalog, null, sections);
+  assert.equal(ctx.components.button.guidelines, 'One button per screen, for its main action.');
+  assert.deepEqual(ctx.rules.map((r) => [r.title, r.file]), [['guidelines', 'guidelines/notion-style.md'], ['Forms', 'guidelines/notion-style.md']]);
+  assert.deepEqual(ctx.limits.map((l) => [l.component, l.max, l.per]), [['button', 1, 'screen']]);
+});
+
+test('limits are read only from a plain sentence: "one button per screen", "at most two fields on a page"; not "one primary button"', () => {
+  const comps = { button: { guidelines: null }, field: { guidelines: null } };
+  const rules = (t) => [{ title: 'x', text: t }];
+  assert.deepEqual(limitsFrom(comps, rules('Use at most two fields on a page.'), ['button', 'field']).map((l) => [l.component, l.max]), [['field', 2]]);
+  assert.deepEqual(limitsFrom(comps, rules('Show one primary button per screen.'), ['button', 'field']), [], 'a word between the number and the name: not read as a limit');
+  assert.deepEqual(limitsFrom({ button: { guidelines: 'One per screen. Short labels.' } }, [], ['button']).map((l) => l.max), [1], 'in the component\'s own section, "one per screen" is about it');
+});
+
+test('a composition with more of a component than the guidelines allow is not drawn; a width that is no breakpoint is a warning', () => {
+  const ctx = contextFrom(catalog, null, sectionsOf('## button\nOne button per screen.'));
+  const ui = { component: 'Page', props: { width: '500' }, children: [{ component: 'button', props: { Label: 'Delete' } }, { component: 'button', props: { Label: 'Cancel' } }] };
+  const r = checkPrototype(ui, { catalog, view: { components: [{ name: 'button', controls: [{ label: 'Label' }] }] }, scales: { spacing: [], text: [] }, limits: ctx.limits, breakpoints: breakpointsOf({ breakpoints: { mobile: '360px', desktop: 1280 } }) });
+  assert.equal(r.ok, false);
+  assert.ok(r.findings.some((f) => f.level === 'error' && /2 button on this screen, and the guidelines allow 1: "One button per screen\." \(guidelines, button\)/.test(f.message)));
+  assert.ok(r.findings.some((f) => f.level === 'warning' && /Page\.width 500 is none of the system's screen widths: mobile \(360\), desktop \(1280\)/.test(f.message)));
+});
+
+test('the request against everything known: the guidelines\' opening and the sections it touches, the components its words point to, the closest page', () => {
+  const ctx = contextFrom({ components: { ...catalog.components, chip: { description: 'A filter people switch on and off.', props: {} } } }, null,
+    sectionsOf('Every page opens with one heading.\n\n## Forms\nSettings save when Save is pressed, never on change.\n\n## Empty states\nNo illustration yet.'));
+  const f = requestFocus(ctx, 'prototype a notification settings page with a switch for email and a Save button', [
+    { name: 'settings', label: 'Settings (designed in Figma)', text: 'Settings Filter New Save', designed: true, file: null },
+    { name: 'search', label: 'search', text: 'Search', designed: false, file: 'prototypes/search.json' },
+  ]);
+  assert.deepEqual(f.sections.map((x) => x.title), ['guidelines', 'Forms'], 'the opening always, then Forms (settings, save); not Empty states');
+  assert.deepEqual(f.components.map((c) => c.name).sort(), ['button', 'chip']);
+  assert.ok(f.components.find((c) => c.name === 'chip').matched.includes('switch'));
+  assert.equal(f.pages[0].name, 'settings');
+  const lines = focusLines(f).join('\n');
+  assert.match(lines, /FOR THIS REQUEST {2}"prototype a notification settings page/);
+  assert.match(lines, /start from: Settings \(designed in Figma\)/);
+  assert.match(lines, /Forms: Settings save when Save is pressed, never on change\./);
+});
+
+test('a prototype request made with the command is kept for the catalog', async () => {
+  const { routePrompt } = await import('../guard.mjs');
+  const root = mkdtempSync(join(tmpdir(), 'proto-request-'));
+  cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), root, { recursive: true });
+  routePrompt({ prompt: '/rms-design-system-engine prototype a settings page with our components' }, { root, cfg: {} });
+  const r = JSON.parse(readFileSync(join(root, '.design-system-engine-out', 'prototypes', 'request.json'), 'utf8'));
+  assert.equal(r.text, 'prototype a settings page with our components');
+});
+
 // ── End to end on a built Tidepool with written guidelines ────────────────────────────────────────────────────────
 test('the catalog shows what each component is for and the product\'s pages; a drawn prototype is held to both', { timeout: 600000 }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'tp-context-'));
@@ -118,7 +169,8 @@ test('the catalog shows what each component is for and the product\'s pages; a d
   const cat = run('--prototype', '--catalog');
   assert.equal(cat.status, 0, cat.stdout);
   assert.match(cat.stdout, /field +A one-line text input\. Role textbox\.\n +guidelines Only for typing text\. Never as an on\/off control\./);
-  assert.match(cat.stdout, /guidelines: Every page opens with one heading\./);
+  assert.match(cat.stdout, /guidelines \(guidelines\.md\): Every page opens with one heading\./);
+  assert.match(cat.stdout, /Read from:\n(.*\n)*  • Figma: 1 designed screen \(src\/figma\/figma-screen-layout\.snapshot\.json\)\n(.*\n)*  • guidelines: guidelines\.md \(committed\)/);
   assert.match(cat.stdout, /page padding padding\/m \(settings\)/, 'the designed screen sets the product\'s frame');
   assert.ok(!existsSync(join(dir, 'src', 'styles', 'design-intent.json')), 'reading the intent writes nothing into the project');
 
@@ -140,4 +192,18 @@ test('the catalog shows what each component is for and the product\'s pages; a d
   assert.equal(c.status, 0);
   assert.match(c.stdout, /⚠️ {2}notify\n {6}• page padding: padding\/s here, padding\/m/);
   assert.match(c.stdout, /✅ settings: the same as the others/);
+});
+
+test('without importing anything, the designed screens set the product\'s pages and the request picks the closest one', { timeout: 600000 }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tp-focus-'));
+  cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
+  cpSync(join(ref, 'src', 'components'), join(dir, 'src', 'components'), { recursive: true });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--catalog', '--for', 'a notification settings page with a Save button'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, /FOR THIS REQUEST {2}"a notification settings page with a Save button"\n {2}start from: Settings \(designed in Figma; rms-design-system-engine --prototype --from-screens brings it into prototypes\/\)/);
+  assert.match(r.stdout, /components its words point to: button/);
+  assert.match(r.stdout, /page padding padding\/m \(settings\)/);
+  assert.ok(!existsSync(join(dir, 'prototypes')), 'nothing written into the project');
 });

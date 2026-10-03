@@ -161,7 +161,7 @@ from Notion, the person does three one-time things: (1) create a Notion **intern
 copy its secret; (2) **share the page** with that integration; (3) put the secret in the project's
 `.env` as `NOTION_TOKEN` (gitignored, so it is per-person and never committed). The page **link** in
 `ds-config.json` is not secret and is committed; the **token** stays in each person's `.env`. No token,
-page not shared, or offline → the audit keeps the committed `guidelines.md` and never fails. The fetch
+page not shared, or offline → the audit keeps the committed `guidelines.md` and never fails. A prototype's catalog refreshes a link whose file is missing or older than `guidelines.maxAgeHours` (24) the same way. The fetch
 reads one page and does not follow links inside it.
 
 **The easy way: paste the link into the chat.** The agent runs `rms-design-system-engine --guidelines <link>`,
@@ -459,16 +459,35 @@ the generation's quality score. Exit 1 on any error.
 
 #### Prototypes
 
-`rms-design-system-engine --prototype --catalog` prints everything a prototype may use: the catalog's components with
-their options (a component the code does not have is marked: it is drawn as a labelled box), what each component is for,
-the team's rules for the product, how the product's pages are arranged, the engine's layout pieces with the spacing
-tokens and text styles they take, the format, and the prototypes already in `prototypes/`.
+`rms-design-system-engine --prototype --catalog` prints everything a prototype may use, in this order: what it was read
+from (each Figma snapshot with its age, the code, the authored contract, each guidelines file with the Notion or GitLab
+link it came from, and a link not fetched yet); for this request, what applies to it; the catalog's components with
+their options (a component the code does not have is marked: it is drawn as a labelled box); what each component is for;
+the team's rules for the product; the rules the check holds every prototype to; the templates in Figma; how the
+product's pages are arranged; the engine's layout pieces with the spacing tokens, text styles and screen widths they
+take; the format; and the prototypes already in `prototypes/`.
 
-What each component is for comes from everything the team wrote, read as the design intent reads it (`intent-gen.mjs`,
-nothing written): the Figma description and annotations (a `Role:` annotation is shown as its role), the code's notes
-and the comment above its CSS rule, the authored contract (`whenNotToUse`, `useInstead`, status) and the guidelines
-section named after it (`guidelines.sources`, Notion and GitLab links). The team's rules are the guidelines' general
-text and the authored layers of `design-intent.json` (patterns, templates, pages, flows).
+- **What each component is for** comes from everything the team wrote, read as the design intent reads it
+  (`intent-gen.mjs`, nothing written): the Figma description and annotations (a `Role:` annotation is shown as its
+  role), each option's description, the code's notes and the comment above its CSS rule, the authored contract
+  (`whenNotToUse`, `useInstead`, status, notes) and the guidelines section named after it.
+- **The team's rules** are every other guidelines section, each with its file (`guidelines.sources`, and the files the
+  Notion and GitLab links are fetched into), and the authored layers of `design-intent.json` (system, foundations,
+  patterns, templates, pages, flows). A link whose file is missing or older than `guidelines.maxAgeHours` (24) is
+  fetched again first, as the audit does (`DESIGN_SYSTEM_ENGINE_NO_FETCH=1` skips it); with no token or no network the
+  committed file is kept, and a link never fetched is listed with ⚠️.
+- **For this request.** The request is the one made with the command in the last hour (the prompt hook keeps it in
+  `.design-system-engine-out/prototypes/request.json`), or `--for "<text>"`. Against it: the guidelines' opening text
+  and the sections its words touch, in full; the components its words point to (by name, description, options, notes
+  or guidelines); and the closest page to start from, made already or designed in Figma.
+- **Rules the check holds.** A plain sentence in the guidelines, "one button per screen", "at most two fields on a
+  page", is a limit: a prototype with more is not drawn, and the error quotes the sentence and its section.
+- **Templates in Figma** are `figma-templates.snapshot.json` (`templates` in `ds-config.json`): the components each
+  template composes, in order. **Screen widths** are the Figma breakpoints; a `Page.width` that is none of them is a
+  warning.
+- **Designed screens.** The screen capture (`paths.screenLayout`, or `figma-screen-layout.snapshot.json` beside the
+  Figma snapshots) is read even before `--from-screens` brings it into `prototypes/`: its screens count as the product's
+  pages and as places to start from.
 
 `rms-design-system-engine --prototype prototypes/<name>.json` checks a composition (the format `--check-ui` reads, nested
 or flat) and, when it holds, draws it as one page under `.design-system-engine-out/prototypes/<name>.html`: each
@@ -492,8 +511,8 @@ The rules are `--check-ui`'s, plus:
 - **The product's other pages.** A prototype is compared with the other prototypes in `prototypes/`: page padding, the
   space between sections, the screen width, the page heading's text style, where the actions sit and how they line up,
   and the answer given to each need the system lacks (a chip as a stand-in on one page and a Missing box on another is
-  a difference). A decision counts when two pages share it, or one screen a designer made in Figma (a starting point
-  from `--from-screens`), and no other value weighs as much; `prototypes/conventions.json` (`{ "page": { "padding":
+  a difference). A decision counts when two pages share it, or one screen a designer made in Figma (in the screen
+  capture, or a starting point from `--from-screens`), and no other value weighs as much; `prototypes/conventions.json` (`{ "page": { "padding":
   … }, "heading": { "style": … }, "actions": { "at": "end", "justify": "end" }, "needs": { "<need>": "<answer>" } }`),
   written by the team, wins. Each difference is listed with the pages it differs from, and the Stop hook holds the
   reply to it like a gap. `rms-design-system-engine --prototype --consistency` compares every page with the others.

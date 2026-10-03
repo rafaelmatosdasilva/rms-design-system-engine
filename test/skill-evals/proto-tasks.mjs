@@ -2,7 +2,8 @@
 // to Claude alone and to Claude with the skill. Same project (Tidepool with its tokens and four components built), same
 // prompt, same model. Each request holds one thing the system does not have (a switch, an illustration) or none. Two
 // more ask what Figma alone does not say: a page for the same app as the Settings page already made (its frame and
-// heading kept), and a request one of the team's written guidelines changes (one button per screen).
+// heading kept), a request one of the team's written guidelines changes (one button per screen), and the same with the
+// guidelines as they arrive from the team's GitLab and Notion links (a confirmation is not a tag).
 //
 // Scored without the engine, the same way whoever made it:
 //   • the design system is unchanged (no token, component or stylesheet of it edited, no new component added);
@@ -165,6 +166,28 @@ export function oneButton(ctx) {
   return check('one button on the screen, as the guidelines say (any other action is a link)', n <= 1, `${n} buttons`);
 }
 
+// The team's guidelines as they arrive from its links: the design team keeps them in GitLab and Notion, and ds-config
+// lists the links; the files they were fetched into are committed in guidelines/, as the engine writes them.
+const withLinkedGuidelines = (dir) => {
+  withSystem(dir);
+  mkdirSync(join(dir, 'guidelines'), { recursive: true });
+  cpSync(join(FIX, 'linked', 'gitlab-components.md'), join(dir, 'guidelines', 'gitlab-components.md'));
+  cpSync(join(FIX, 'linked', 'notion-voice.md'), join(dir, 'guidelines', 'notion-voice.md'));
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, guidelines: { source: {
+    gitlab: [{ url: 'https://gitlab.com/tidepool-ds/design/-/blob/main/docs/components.md', file: 'guidelines/gitlab-components.md' }],
+    notion: [{ url: 'https://www.notion.so/tidepool/Voice-and-layout-0123456789abcdef0123456789abcdef', file: 'guidelines/notion-voice.md' }],
+  } } }, null, 2) + '\n');
+};
+
+// A component the request tempts and the guidelines rule out, found in whatever the run made.
+export function avoids(ctx, name, why) {
+  const text = made(ctx).map((f) => f.text).join('\n');
+  const cap = name.charAt(0).toUpperCase() + name.slice(1);
+  const used = new RegExp(`<${cap}\\b`).test(text) || new RegExp(`class(Name)?=["'{][^"'}]*(?<![\\w-])${name}(?![\\w-])`).test(text) || new RegExp(`"component"\\s*:\\s*"${name}"`, 'i').test(text);
+  return check(`no ${name}, as the guidelines say (${why})`, !used, used ? `${name} used` : '');
+}
+
 const base = { mayChangeAll: true, mayWriteHtml: true, setup: withSystem, source: TIDEPOOL };
 export const PROTO = [
   {
@@ -196,5 +219,12 @@ export const PROTO = [
     prompt: 'prototype a delete project confirmation with our design system: a heading, one sentence warning that it cannot be undone, a Delete button and a Cancel button.',
     score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['button']), oneButton(ctx),
       check('says the system has no link for the other action', namesGap(ctx.final, 'links?'))],
+  },
+  {
+    // The team's documentation as it arrives from its GitLab and Notion links: a confirmation is not a tag.
+    ...base, id: 'proto-linked', setup: withLinkedGuidelines,
+    prompt: 'prototype an account settings page with our design system: a heading, a field for the display name, a Save button, and a message confirming the changes were saved.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'button']), avoids(ctx, 'tag', 'a tag is never a message that comes and goes'),
+      check('says the system has no toast or banner for the confirmation', namesGap(ctx.final, 'toasts?|banners?|snackbars?|notifications?|alerts?|confirmation (message|component)'))],
   },
 ];
