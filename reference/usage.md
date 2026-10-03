@@ -505,7 +505,11 @@ The rules are `--check-ui`'s, plus:
   page surface, text colour and font family. Each piece used is a layout gap.
 - **A need nothing fits** is `{ "component": "Missing", "props": { "need": "…", "kind": "…", "closest": "…" } }`, drawn
   as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`.
-- **A prop Figma and the code do not agree on yet** is drawn with its default, with a warning.
+- **An option Figma and the code do not share by name** is drawn on the part its name points to: a text option
+  (`TitleContent`) writes the element whose class says title, or the one holding Figma's default text, or the
+  component's own text for a label; an on/off option (`Show Description`) set off removes the part it names. A page
+  instance's own state (a `hidden` class, a position on its page) is taken off. An option with no such part is drawn
+  without it, with a warning once per component.
 - **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
   `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
   needed first. The Stop hook holds the reply to the gaps of the prototype just drawn.
@@ -515,7 +519,8 @@ The rules are `--check-ui`'s, plus:
   that use gets `standInFor`, or a Missing box, and the prototype is drawn again.
 - **The product's other pages.** A prototype is compared with the other prototypes in `prototypes/`: page padding, the
   space between sections, the screen width, the page heading's text style, where the actions sit and how they line up,
-  and the answer given to each need the system lacks (a chip as a stand-in on one page and a Missing box on another is
+  the frame (the containers at the top of the layout, a component holding other parts or named as a bar, panel, header,
+  window or nav, like an action bar and a side panel), and the answer given to each need the system lacks (a chip as a stand-in on one page and a Missing box on another is
   a difference). A decision counts when two pages share it, or one screen a designer made in Figma (in the screen
   capture, or a starting point from `--from-screens`), and no other value weighs as much; `prototypes/conventions.json` (`{ "page": { "padding":
   … }, "heading": { "style": … }, "actions": { "at": "end", "justify": "end" }, "needs": { "<need>": "<answer>" } }`),

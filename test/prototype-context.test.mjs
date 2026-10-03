@@ -235,3 +235,29 @@ test('without importing anything, the designed screens set the product\'s pages 
   assert.match(r.stdout, /page padding padding\/m \(settings\)/);
   assert.ok(!existsSync(join(dir, 'prototypes')), 'nothing written into the project');
 });
+
+test('the frame: containers a designed page holds at the top (a bar, a panel) are the product\'s; content is not', () => {
+  const ia = { component: 'Page', children: [{ component: 'actionBar', children: [{ component: 'input' }] }, { component: 'Row', children: [{ component: 'panel', children: [{ component: 'listItem' }] }, { component: 'Stack', children: [] }] }, { component: 'button' }] };
+  const f = pageFacts(ia);
+  assert.deepEqual(f.frame, ['actionBar', 'panel'], 'the button and the list item are content');
+  const conv = deriveConventions({ ia: { ...f, designed: true } });
+  assert.deepEqual(conv.frame.map((c) => c.component), ['actionBar', 'panel']);
+  const here = pageFacts({ component: 'Page', children: [{ component: 'Row', children: [{ component: 'panel', children: [{ component: 'listItem' }] }] }] });
+  assert.deepEqual(consistencyFindings(here, conv).map(consistencyLine), ["the page's frame: no actionBar here, actionBar on the product's other pages (ia)"]);
+});
+
+test('an option the code has no prop for is drawn on the part its name points to; the check says so only when there is none', async () => {
+  const { drawnByName } = await import('../prototype-pieces.mjs');
+  const markup = '<div class="listItem"><span class="listItem-title">x</span><span class="listItem-description">y</span></div>';
+  assert.equal(drawnByName('TitleContent', { type: 'text', default: 'Title' }, markup), true);
+  assert.equal(drawnByName('Show Description', { type: 'boolean' }, markup), true);
+  assert.equal(drawnByName('label-content', { type: 'text', default: 'label' }, '<button class="b"><svg></svg></button>'), true, 'a label goes where the component\'s text is');
+  assert.equal(drawnByName('number content', { type: 'text', default: '1' }, '<div class="dividerSection">x</div>'), false);
+});
+
+test('a request word many components\' notes share (the product\'s name) points to none of them', () => {
+  const comps = Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'].map((n) => [n, { description: `Part ${n} of Atlas.`, props: {} }]));
+  comps.emptyState = { description: 'Centred icon, title and description when there is nothing to show.', props: {} };
+  const f = requestFocus(contextFrom({ components: comps }, null, []), 'a Saved views screen for Atlas with an empty state', []);
+  assert.deepEqual(f.components.map((c) => c.name), ['emptyState']);
+});
