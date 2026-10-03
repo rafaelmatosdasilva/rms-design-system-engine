@@ -20,7 +20,7 @@ export function readFolder(dir) {
   return files.map(({ path, set }) => {
     const [variant, ...model] = basename(path).replace(/\.jsonl$/, '').split('.');
     const rows = readFileSync(path, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((r) => !/^private/.test(r.task));
-    return { set: set ?? rows[0]?.set ?? 'guide', variant, model: model.join('.'), rows };
+    return { set: set ?? 'guide', variant, model: model.join('.'), rows };
   }).filter((s) => s.rows.length);
 }
 
