@@ -324,6 +324,6 @@ export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}
   if (role) lines.push(`    role: ${role}, so write it as ${roleMarkup(role)}`);
   const nested = (nesting[name] ?? []).filter((n) => n !== name && !/^icon[-/ ]/i.test(n));
   if (nested.length) lines.push(`    uses the system's own ${nested.join(', ')} inside it, never a copy`);
-  lines.push(`    the component file${file ? `: ${file}` : ''} names its props exactly as above (Figma's names), or the project records the code's name in contract.authored.json`);
+  lines.push(`    the component file${file ? `: ${file}` : ''} names its props exactly as above (Figma's names), or, when the person decides so, contract.authored.json records the code's name`);
   return lines;
 }
