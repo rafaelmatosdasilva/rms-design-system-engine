@@ -162,3 +162,14 @@ test('a height the rule already sets but the drawn box does not keep says why: i
   assert.equal(r.status, 1);
   assert.match(r.stdout, /field height: Figma 36, rendered \d+ .*→ the rule sets 36px, but padding and border add to it: set box-sizing: border-box/);
 });
+
+test('the code names recorded for Figma names are the person\'s decision: an edit of contract.authored.json asks', async () => {
+  const { judge } = await import('../guard.mjs');
+  const edit = (f, t = 'Edit') => ({ tool_name: t, tool_input: { file_path: f } });
+  assert.equal(judge(edit('/p/contract.authored.json'), { userText: 'build the chip from our Figma design system' })?.decision, 'ask');
+  assert.match(judge(edit('/p/contract.authored.json'), { userText: 'build the tag' }).reason, /records which code name stands for each Figma name/);
+  assert.equal(judge(edit('/p/contract.authored.json'), { userText: 'record that the code calls the Figma prop State "variant"' }), null);
+  assert.equal(judge(edit('/p/docs/contract.json', 'Write'), { cfg: { contracts: { authored: 'docs/contract.json' } }, userText: 'fix the chip' })?.decision, 'ask');
+  assert.equal(judge({ tool_name: 'Bash', tool_input: { command: 'echo {} > contract.authored.json' } }, { userText: 'build the tag' })?.decision, 'ask');
+  assert.equal(judge(edit('/p/contract.authored.json'))?.decision, 'ask', 'no transcript: it asks, as the other decision files do');
+});
