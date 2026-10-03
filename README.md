@@ -94,6 +94,10 @@ The easiest way is to ask in Claude Code, in your own words, after `/rms-design-
 
 You can mix them. `rms-design-system-engine --component button --only accessibility` checks only the accessibility of the button.
 
+### The style guide
+
+`rms-design-system-engine --styleguide` builds a style guide of what Figma and the code agree on, in `.design-system-engine-out/styleguide/index.html`. Each component is drawn with your own CSS, in every colour mode, and its controls are the props both sides have, labelled with Figma's names. A prop only one side has, a different default, or a component not built yet is left out and counted in one line at the top, so you decide each one before it appears. If your project has its own template (`ds-config.json` → `styleguide.template`), that one is used instead.
+
 ### Start from Figma only
 
 Open an empty project, set it up with your Figma link, and ask for what to build. With no code yet, the engine starts in build mode: what Figma has and the code does not is listed as to build, in order, never as a failure.
