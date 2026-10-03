@@ -20,7 +20,7 @@ const clean = (s) => String(s ?? '').replace(/@(deprecated|experimental|status|u
 export const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : s);
 const LAYERS = ['system', 'foundations', 'patterns', 'templates', 'pages', 'flows'];
 const STOP = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'from', 'each', 'some', 'like', 'one', 'our', 'your', 'their', 'use', 'using', 'used', 'make', 'made', 'page', 'screen', 'prototype', 'prototyp', 'mock', 'wireframe', 'design', 'system', 'component', 'components', 'into', 'onto', 'when', 'what', 'which', 'there', 'them', 'they', 'then', 'than', 'have', 'has', 'are', 'was', 'were', 'will', 'can', 'not', 'all', 'any', 'only', 'also', 'its', 'it', 'a', 'an', 'to', 'of', 'on', 'in', 'or', 'is', 'be', 'by', 'as', 'at', 'up', 'new', 'show', 'shows', 'once', 'after', 'before', 'more', 'other']);
-export const wordsOf = (s) => [...new Set((String(s).toLowerCase().match(/[a-zà-ú][a-zà-ú0-9-]{2,}/g) ?? []).map((w) => w.replace(/(ies)$/, 'y').replace(/(es|s)$/, '')).filter((w) => w.length > 2 && !STOP.has(w)))];
+export const wordsOf = (s) => [...new Set((String(s).replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().match(/[a-zà-ú][a-zà-ú0-9]{2,}/g) ?? []).map((w) => w.replace(/(ies)$/, 'y').replace(/(es|s)$/, '')).filter((w) => w.length > 2 && !STOP.has(w)))];
 
 // Markdown into sections: the text before the first heading, then one per heading (any level).
 export function sectionsOf(text) {
@@ -248,10 +248,16 @@ export function requestFocus(ctx, request, pages = []) {
     return { ...r, score: inHead.length * 3 + inBody.length, matched: [...new Set([...inHead, ...inBody])] };
   }).filter((r) => r.score >= 2 || r.matched.length >= 2 || r.title === 'guidelines').sort((a, b) => (b.title === 'guidelines') - (a.title === 'guidelines') || b.score - a.score).slice(0, 5);
   const positive = (k) => [k.purpose, k.role, ...k.options, ...(k.guidelines ?? '').split(/(?<=[.!?])\s+/), ...k.notes].filter((x) => x && !NEVER.test(x)).join(' ');
-  const components = Object.entries(ctx.components).map(([name, k]) => {
-    const byName = words.filter((w) => name.toLowerCase().includes(w) || w.includes(name.toLowerCase()));
-    return { name, matched: [...new Set([...byName, ...hit(positive(k))])], purpose: k.purpose };
-  }).filter((c) => c.matched.length);
+  // A word many components' notes share (the product's name) points to none of them.
+  const docs = Object.entries(ctx.components).map(([name, k]) => [name, hit(positive(k))]);
+  const common = new Set(words.filter((w) => docs.filter(([, m]) => m.includes(w)).length > Math.max(2, docs.length / 4)));
+  // Ranked: a component the request names first, then one whose documentation shares two of its words or more.
+  const components = docs.map(([name, m]) => {
+    const byName = words.filter((w) => name.toLowerCase().includes(w) || (name.length >= 3 && w.includes(name.toLowerCase())));
+    const byDocs = m.filter((w) => !common.has(w) && !byName.includes(w));
+    const inPurpose = byDocs.filter((w) => wordsOf(ctx.components[name].purpose ?? '').includes(w));
+    return { name, matched: [...new Set([...byName, ...byDocs])], score: byName.length * 3 + inPurpose.length + byDocs.length, purpose: ctx.components[name].purpose };
+  }).filter((c) => c.score >= 2).sort((a, b) => b.score - a.score).slice(0, 6);
   const out = Object.entries(ctx.components).flatMap(([name, k]) => ruledOut(k, request, name).map((r) => ({ name, ...r })));
   const scored = pages.map((p) => ({ ...p, matched: [...new Set([...hit(p.name), ...hit(p.text ?? '')])] })).filter((p) => p.matched.length).sort((a, b) => b.matched.length - a.matched.length || b.designed - a.designed);
   return { request: String(request).trim(), words, sections, components, ruledOut: out, pages: scored.slice(0, 3) };

@@ -32,8 +32,11 @@ export function treeOf(ui) {
 }
 
 // The page itself: the engine's template filled with the system's CSS, its icons and the prototype.
-export function prototypePage({ name, tree, parts, scales, gaps, note = '' }) {
-  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, controls: c.controls }]));
+// catalog: each component's text and on/off options, drawn by the part their name points to when the code has no prop
+// of that name.
+export function prototypePage({ name, tree, parts, scales, gaps, note = '', catalog = { components: {} } }) {
+  const opts = (n, type) => Object.fromEntries(Object.entries(catalog.components?.[n]?.props ?? {}).filter(([, e]) => e.type === type).map(([k, e]) => [k, typeof e.default === 'string' ? e.default : '']));
+  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean') }]));
   const data = { name, tree, components: drawable, scales, modes: parts.view.modes ?? [], pieces: ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'].filter((p) => !drawable[p]), gaps, note };
   return readFileSync(PROTOTYPE_TEMPLATE, 'utf8')
     .split('/*{{THEME_CSS}}*/').join(parts.themeCSS ?? '')
@@ -131,7 +134,7 @@ function drawOne(ROOT, name, raw, sys) {
     const mine = mergeGaps({ [name]: r.gaps }).map(gapLine);
     // What the reply owes the person: every gap of the prototype just drawn (the Stop hook holds the reply to it).
     writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name, pending: true, gaps: [...mergeGaps({ [name]: r.gaps }).map((g) => ({ need: g.need, kind: g.kind, line: gapLine(g) })), ...differs.map((d) => ({ need: `${d.what} ${d.product}`, kind: 'consistency', line: consistencyLine(d) }))] }, null, 2) + '\n');
-    writeFileSync(page, prototypePage({ name, tree: treeOf(ui), parts: sys.parts, scales: sys.scales, gaps: mine, note: `${r.counts.components} parts · only the design system's own components${r.gaps.some((g) => g.kind === 'layout') ? ', with the engine\'s neutral layout' : ''}` }));
+    writeFileSync(page, prototypePage({ name, tree: treeOf(ui), parts: sys.parts, scales: sys.scales, gaps: mine, catalog: sys.catalog, note: `${r.counts.components} parts · only the design system's own components${r.gaps.some((g) => g.kind === 'layout') ? ', with the engine\'s neutral layout' : ''}` }));
   }
   return { ...r, page, differs, uses, used: [...new Set(nodesOf(ui).nodes.map((n) => n.component))] };
 }
@@ -151,6 +154,7 @@ export function conventionLines(conv) {
     ...Object.entries(conv.page ?? {}).map(([k, c]) => `${LABEL[k]} ${c.value} (${src(c)})`),
     ...(conv.heading?.style ? [`page heading in ${conv.heading.style.value} (${src(conv.heading.style)})`] : []),
     ...(conv.actions?.at ? [`actions at the ${conv.actions.at.value}${conv.actions.justify ? `, lined up ${conv.actions.justify.value}` : ''} (${src(conv.actions.at)})`] : []),
+    ...((conv.frame ?? []).length ? [`frame: ${conv.frame.map((c) => c.component).join(', ')} (${src(conv.frame[0])})`] : []),
     ...(conv.needs ?? []).map((n) => `"${n.need}" is ${n.answer} (${src(n)})`),
   ];
   return lines.length ? ['', 'How this product\'s pages are arranged (keep a new page the same):', ...lines.map((l) => `  ${l}`)] : [];

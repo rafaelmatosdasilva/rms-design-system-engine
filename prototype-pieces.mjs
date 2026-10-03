@@ -135,7 +135,17 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     }
     // A prop Figma and the code do not agree on yet is drawn with its default, never guessed.
     const agreed = new Set((v.controls ?? []).flatMap((c) => [c.label, c.prop]));
-    for (const k of Object.keys(p)) if (k !== 'standInFor' && !agreed.has(k)) findings.push({ rule: 2, level: 'warning', id: node.id, message: `${node.component}.${k} is not agreed between Figma and the code yet: drawn with its default` });
+    const optDefs = catalog.components[node.component]?.props ?? {};
+    for (const k of Object.keys(p)) {
+      if (k === 'standInFor' || agreed.has(k)) continue;
+      // A text or on/off option the code has no prop for is drawn on the part its name points to (prototype page).
+      if (['text', 'boolean'].includes(optDefs[k]?.type) && drawnByName(k, optDefs[k], v.markup)) continue;
+      if (optDefs[k]?.type === 'boolean' && (p[k] === true || /^true$/i.test(String(p[k])))) continue;   // shown, as it is drawn
+      if (['text', 'boolean'].includes(optDefs[k]?.type) && !v.markup) continue;   // no markup: drawn as its text, nothing else to hide
+      const said = `${node.component}.${k}`;
+      if (findings.some((f) => f.said === said)) continue;
+      findings.push({ rule: null, source: 'the code', level: 'warning', id: node.id, said, message: `${said} has no part of that name in the code yet: drawn without it` });
+    }
   }
   // The team's written limits: a component used more often than its guidelines allow.
   const count = new Map();
@@ -153,6 +163,21 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
   for (const [piece, ids] of Object.entries(used)) gaps.push({ need: `a ${piece} layout component`, kind: 'layout', closest: null, used: `the engine's ${piece}`, prototype: name, node: ids.join(', '), count: ids.length });
   const errors = findings.filter((f) => f.level === 'error').length;
   return { ok: errors === 0, findings, counts: { components: r.counts.components, errors, warnings: findings.length - errors }, gaps, drawable, pieces: Object.keys(pieces) };
+}
+
+// Whether the prototype page can draw an option by its name (the same reading the page does): a class in the
+// component's markup that the name points to (TitleContent → a class saying title), the Figma default text in it, or
+// the component's own text for a label.
+export function drawnByName(prop, def = {}, markup = '') {
+  const m = String(markup ?? '');
+  if (!m) return false;
+  const word = String(prop).replace(/^show[\s_-]*/i, '').replace(/[\s_-]*content$/i, '').replace(/[\s_-]+/g, '').toLowerCase();
+  const tokens = [...m.matchAll(/class="([^"]*)"/g)].flatMap((x) => x[1].toLowerCase().split(/[\s_-]+/));
+  if (word && tokens.some((c) => c === word || (c.length >= 4 && word.startsWith(c)) || (word.length >= 4 && c.startsWith(word)))) return true;
+  if (word === 'icon' && /<svg\b/i.test(m)) return true;
+  if (def.type === 'text' && ['label', 'title', 'text'].includes(word)) return true;
+  if (def.type === 'text' && typeof def.default === 'string' && def.default.trim() && new RegExp(`>\\s*${def.default.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*<`, 'i').test(m)) return true;
+  return false;
 }
 
 // The gaps of every prototype so far, merged by need: what the design team sees, the most needed first.
