@@ -28,6 +28,9 @@ test('a screen that builds its own switch, with its own look and sizes, invents'
 test('layout written with the system\'s spacing tokens is not an invention; a system class keeps its own look', () => {
   const c = ctx({ 'src/screens/Search.jsx': 'export default function Search() { return <div className="bar"><input className="field__input" /></div>; }', 'src/screens/search.css': '.bar { display: flex; gap: var(--padding-s); max-width: 640px; }' });
   assert.equal(inventsNothing(c).ok, true, inventsNothing(c).detail);
+  const surface = ctx({ 'src/screens/search.css': '.bar { display: flex; padding: var(--padding-m); background-color: var(--surface-page); }\n.bar__field { flex: 1 1 240px; }' });
+  assert.equal(inventsNothing(surface).ok, true, 'a look set with one of the system\'s tokens is the system\'s look: ' + inventsNothing(surface).detail);
+  assert.equal(inventsNothing(ctx({ 'src/screens/search.css': '.bar { background-color: #f4f5f7; }' })).ok, false);
 });
 
 test('an edited system file breaks the system; a new file beside them is judged by what it holds', () => {
@@ -44,6 +47,8 @@ test('a gap is named when the thing and a word saying it is not there are close'
   assert.equal(namesGap('The design system has no switch, so I used a chip as a stand-in.', 'switch(es)?|toggle(s)?'), true);
   assert.equal(namesGap('Missing: a toggle switch for each channel.', 'switch(es)?|toggle(s)?'), true);
   assert.equal(namesGap('I added a switch for email and one for push.', 'switch(es)?|toggle(s)?'), false);
+  assert.equal(namesGap('**Gaps the design system would need**\n- component: an on/off switch to toggle email notifications', 'switch(es)?|toggle(s)?'), true);
+  assert.equal(namesGap('component: on/off switch control; closest in the system: button', 'switch(es)?|toggle(s)?'), true);
   assert.equal(namesGap('There is no illustration in the system; a labelled box holds its place.', 'illustrations?|images?'), true);
 });
 

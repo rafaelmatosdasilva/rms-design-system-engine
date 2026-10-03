@@ -5,7 +5,7 @@
 // Scored without the engine, the same way whoever made it:
 //   • the design system is unchanged (no token, component or stylesheet of it edited, no new component added);
 //   • nothing is invented: no component defined for the prototype, no look of its own (a class styled with colour,
-//     border, radius, shadow or type that the system does not have), no colour or size the system does not have;
+//     border, radius, shadow or type other than one of the system's tokens), no colour or size the system does not have;
 //   • it is built from the system's components the request needs;
 //   • the reply says what the system lacks, when the request holds something it lacks.
 import { cpSync, readFileSync, readdirSync } from 'node:fs';
@@ -24,7 +24,9 @@ const DECLARED = new Set(Object.keys(TOKENS.light));
 const SYSTEM_CLASSES = new Set(readdirSync(join(REF, 'src/components')).filter((f) => f.endsWith('.css'))
   .flatMap((f) => [...readFileSync(join(REF, 'src/components', f), 'utf8').matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1])));
 const LOOK = /^(background(-color)?|border(-(top|right|bottom|left))?(-(color|width|style))?|border-radius|color|box-shadow|outline|font(-(size|weight|family))?|line-height|opacity|fill|stroke)$/;
-const LAYOUT_SIZE = /^(width|max-width|min-width|height|max-height|min-height|flex-basis|grid-template-columns|grid-template-rows)$/;
+const LAYOUT_SIZE = /^(width|max-width|min-width|height|max-height|min-height|flex|flex-basis|grid-template-columns|grid-template-rows)$/;
+// A look set with one of the system's own tokens and nothing else (a page surface, a text colour) is the system's look.
+const tokenOnly = (v) => { const m = v.replace(/\s*!important$/i, '').match(/^var\(\s*(--[\w-]+)\s*\)$/); return !!m && DECLARED.has(m[1]); };
 
 // The CSS a run wrote: stylesheets, <style> blocks, and style={{ … }} objects in JSX (camelCase keys made CSS names).
 function cssOf(file) {
@@ -71,7 +73,7 @@ export function inventsNothing(ctx) {
       const classes = [...r.selector.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1]);
       const own = r.selector === '.inline' || classes.some((c) => !SYSTEM_CLASSES.has(c)) || !classes.length;
       for (const [p, v] of r.decls) {
-        if (own && LOOK.test(p) && !/^(inherit|initial|unset|transparent|none|currentcolor)$/i.test(v)) { bad.push(`${f.path}: ${r.selector} sets ${p} (a look of its own)`); break; }
+        if (own && LOOK.test(p) && !tokenOnly(v) && !/^(inherit|initial|unset|transparent|none|currentcolor)$/i.test(v)) { bad.push(`${f.path}: ${r.selector} sets ${p} (a look of its own)`); break; }
         if (/(?<![\w.-])(?!0px)\d*\.?\d+px\b/.test(v) && !LAYOUT_SIZE.test(p)) { bad.push(`${f.path}: ${p}: ${v} (a size the system does not have)`); break; }
       }
     }
@@ -92,7 +94,7 @@ export function usesSystem(ctx, names) {
 // The reply names what the system lacks: the thing, near a word saying it is not there.
 export function namesGap(text, thing) {
   const t = String(text ?? '');
-  const NOT = "\\b(no|not|n['’]t|missing|lacks?|lacking|without|none|gap|doesn['’]t|does not|isn['’]t|is not|stand-?in|instead|placeholder|substitut\\w*)\\b";
+  const NOT = "\\b(no|not|n['’]t|missing|lacks?|lacking|without|none|gaps?|closest|would need|doesn['’]t|does not|isn['’]t|is not|stand-?in|instead|placeholder|substitut\\w*)\\b";
   return new RegExp(`(${thing})[\\s\\S]{0,160}${NOT}|${NOT}[\\s\\S]{0,160}(${thing})`, 'i').test(t);
 }
 
