@@ -179,17 +179,19 @@ html, body { margin: 0; }
     e.style.alignItems = { start: 'flex-start', end: 'flex-end', center: 'center', stretch: 'stretch', baseline: 'baseline' }[p.align] || (node.component === 'Columns' ? 'stretch' : 'flex-start');
     return e;
   }
-  function draw(node) {
+  // Each drawn node carries its place in the composition (data-pt-path), so the engine can measure it against Figma.
+  function draw(node, path) {
     var isPiece = (D.pieces || []).indexOf(node.component) >= 0;
     var e = isPiece ? piece(node) : systemComponent(node);
+    e.setAttribute('data-pt-path', path);
     // A system component's children go in its slot: the part its markup names slot, content or body, else itself.
     var into = e;
     // With no slot part, what the composition puts inside replaces the copy's own page content.
     if (!isPiece && (node.children || []).length) { var slot = e.querySelector('[class*="slot" i], [class*="content" i], [class*="body" i], [class*="main" i]'); if (slot) { slot.innerHTML = ''; into = slot; } else e.innerHTML = ''; }
-    (node.children || []).forEach(function (k) { into.appendChild(draw(k)); });
+    (node.children || []).forEach(function (k, i) { into.appendChild(draw(k, path + '.' + i)); });
     return e;
   }
-  if (D.tree) canvas.appendChild(draw(D.tree));
+  if (D.tree) canvas.appendChild(draw(D.tree, '0'));
 
   // The system's own modes (colour and size), as in the style guide.
   (D.modes || []).forEach(function (axis) {

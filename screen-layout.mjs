@@ -33,9 +33,16 @@ async function frameFacts(n) {
   return out;
 }
 async function kids(n, depth) { const out = []; if ('children' in n && depth < 14) for (const k of n.children) { const c = await walk(k, depth + 1); if (c) out.push(c); } return out; }
+// Where each node sits on its screen (x, y from the screen's top left corner), and whether it fills its parent.
+let origin = null;
+function placeOf(n) {
+  const b = n.absoluteBoundingBox;
+  if (!b || !origin) return {};
+  return { x: Math.round(b.x - origin.x), y: Math.round(b.y - origin.y) };
+}
 async function walk(n, depth) {
   if (!n || n.visible === false) return null;
-  const base = { name: n.name, w: Math.round(n.width), h: Math.round(n.height) };
+  const base = { name: n.name, w: Math.round(n.width), h: Math.round(n.height), ...placeOf(n), fillW: n.layoutSizingHorizontal === 'FILL', fillH: n.layoutSizingVertical === 'FILL', absolute: n.layoutPositioning === 'ABSOLUTE' };
   if (n.type === 'INSTANCE') {
     const main = await n.getMainComponentAsync();
     const set = main && main.parent && main.parent.type === 'COMPONENT_SET' ? main.parent : null;
@@ -70,7 +77,7 @@ function prune(o) {
   return out;
 }
 const screens = [];
-for (const id of SCREEN_IDS) { const node = await figma.getNodeByIdAsync(id); if (node) screens.push({ id, name: node.name, tree: prune(await walk(node, 0)) }); }
+for (const id of SCREEN_IDS) { const node = await figma.getNodeByIdAsync(id); if (node) { origin = node.absoluteBoundingBox; screens.push({ id, name: node.name, tree: prune(await walk(node, 0)) }); } }
 return { _captured: new Date().toISOString(), _note: 'Read-only capture of designed screens (screen-layout.mjs).', screens };
 `;
 

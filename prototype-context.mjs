@@ -260,7 +260,7 @@ export function requestFocus(ctx, request, pages = []) {
   }).filter((c) => c.score >= 2).sort((a, b) => b.score - a.score).slice(0, 6);
   const out = Object.entries(ctx.components).flatMap(([name, k]) => ruledOut(k, request, name).map((r) => ({ name, ...r })));
   const scored = pages.map((p) => ({ ...p, matched: [...new Set([...hit(p.name), ...hit(p.text ?? '')])] })).filter((p) => p.matched.length).sort((a, b) => b.matched.length - a.matched.length || b.designed - a.designed);
-  return { request: String(request).trim(), words, sections, components, ruledOut: out, pages: scored.slice(0, 3) };
+  return { request: String(request).trim(), words, sections, components, ruledOut: out, pages: scored.slice(0, 3), lacking: kindsLacking(ctx, request) };
 }
 
 // The lines the catalog prints for a request.
@@ -269,6 +269,7 @@ export function focusLines(f) {
   const out = ['', `FOR THIS REQUEST  "${cut(f.request.replace(/\s+/g, ' '), 160)}"`];
   if (f.pages.length) out.push(`  start from: ${f.pages.map((p) => `${p.label}${p.file ? ` (${p.file})` : ''}`).join('; ')}`);
   if (f.components.length) out.push(`  components its words point to: ${f.components.map((c) => `${c.name} (${c.matched.join(', ')}${c.purpose ? `: ${cut(c.purpose, 80)}` : ''})`).join('; ')}`);
+  for (const k of f.lacking ?? []) out.push(`  the system has no ${k}: a Missing box, or the closest component with "standInFor": "${k}"; the reply says the system has no ${k}`);
   for (const r of f.ruledOut ?? []) out.push(`  ruled out by the documentation for "${r.words.join(', ')}": ${r.name}, "${cut(r.sentence, 200)}"; what the request needs there is a Missing box unless another component is for it`);
   if (f.sections.length) {
     out.push('  the team\'s guidelines that apply (follow them; say so when the request asks for something they rule out):');
@@ -304,6 +305,18 @@ export function usesAgainstPurpose(ctx, nodes) {
 //     "never a message that comes and goes"), used anyway: an error, unless the node says in "purpose" what else it
 //     is for, and that purpose is not ruled out too.
 const nameWords = (n) => wordsOf(String(n).replace(/^[._]+/, ''));
+
+// The kinds of component a request can name. One the request names and no component of the system is named for (a
+// switch, when the system has a chip that people "switch on and off") is a gap: a Missing box, or a component used
+// with "standInFor", never a component passed off as it.
+const KINDS = ['switch', 'toggle', 'toast', 'snackbar', 'dialog', 'modal', 'tabs', 'checkbox', 'radio', 'slider', 'progress bar', 'spinner', 'tooltip', 'avatar',
+  'badge', 'table', 'menu', 'dropdown', 'select', 'stepper', 'accordion', 'banner', 'alert', 'breadcrumb', 'pagination', 'date picker', 'search field', 'empty state', 'divider'];
+export function kindsLacking(ctx, request) {
+  const asked = wordsOf(request);
+  const names = Object.keys(ctx.components ?? {}).map(nameWords);
+  return KINDS.filter((kind) => { const w = wordsOf(kind); return w.length && w.every((x) => asked.includes(x)) && !names.some((n) => w.every((x) => n.includes(x))); })
+    .filter((kind, i, all) => !all.some((o) => o !== kind && o.includes(kind) && all.includes(o)));   // a toggle switch is one need
+}
 export function requestFindings(ctx, request, nodes) {
   const out = [];
   if (!request) return out;
@@ -313,6 +326,13 @@ export function requestFindings(ctx, request, nodes) {
     const w = nameWords(name);
     if (!w.length || used.has(name) || !w.every((x) => asked.includes(x))) continue;
     out.push({ rule: null, source: 'the request', level: 'warning', id: null, said: `asked:${name}`, kind: 'request', message: `the request asks for ${w.join(' ')} and the system has ${name}, which is not in the prototype: add it, or say why it is left out` });
+  }
+  // A kind the request names and the system has none of: the composition says so (a Missing box, a stand-in), or the
+  // reply owes it.
+  for (const kind of kindsLacking(ctx, request)) {
+    const w = wordsOf(kind);
+    const named = nodes.some((n) => { const t = wordsOf(`${n.props?.standInFor ?? ''} ${n.component === 'Missing' ? n.props?.need ?? '' : ''}`); return w.every((x) => t.includes(x)); });
+    if (!named) out.push({ rule: null, source: 'the request', level: 'warning', id: null, said: `kind:${kind}`, kind: 'request', message: `the request asks for a ${kind} and the system has none: show it as a Missing box, or a component with "standInFor": "${kind}", and say the system has no ${kind}` });
   }
   for (const n of nodes) {
     const k = ctx.components[n.component];

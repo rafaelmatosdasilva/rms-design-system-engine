@@ -19,6 +19,7 @@ import { checkPrototype, systemScales, nodesOf, mergeGaps, gapLine, pieceCatalog
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
 import { loadContext, purposeLines, ruleLines, usesAgainstPurpose, requestFocus, focusLines, cut } from './prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from './product-conventions.mjs';
+import { screenFor, renderPrototype, compareWithScreen, screenLines, owedFromScreen } from './prototype-render.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 export const PROTOTYPE_TEMPLATE = join(ENGINE, 'templates', 'prototype.template.html');
@@ -196,8 +197,27 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'screen';
 
+// The drawn page in the browser: its picture, and against the designed screen it redraws or the product's closest one.
+// What differs in the page's own arrangement is added to what the reply owes the person (last.json). Without Chrome,
+// or with --no-browser, nothing is measured and the prototype stands as checked.
+async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true, screens = null } = {}) {
+  if (!browser || !page) return null;
+  const tree = treeOf(raw?.prototype ?? raw);
+  const pick = screenFor(name, raw, tree, screens ?? sys.context.screens ?? [], sys.catalog, slug);
+  const r = await renderPrototype(ROOT, cfg, page, { name, screen: pick?.screen ?? null, mode: pick?.mode ?? 'sibling' }).catch((e) => ({ why: String(e?.message ?? e).split('\n')[0] }));
+  if (r.why) return { why: r.why };
+  if (!pick) return { picture: r.picture, cmp: [] };
+  const cmp = compareWithScreen(tree, r.rendered, pick.screen, { mode: pick.mode, catalog: sys.catalog, drawn: new Set((sys.parts.view.components ?? []).map((c) => c.name)) });
+  const owed = owedFromScreen(cmp);
+  if (owed.length) {
+    const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
+    try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...owed.map((d) => ({ need: `${d.what} ${pick.screen.name}`, kind: 'screen', line: d.message }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
+  }
+  return { ...pick, cmp, picture: r.picture, visual: r.visual };
+}
+
 // --from-screens <capture.json>: each designed screen becomes a starting point in prototypes/, drawn at once.
-async function fromScreens(ROOT, cfg, file, sys, { force = false } = {}) {
+async function fromScreens(ROOT, cfg, file, sys, { force = false, browser = true } = {}) {
   const { screenToPrototype, layoutHabits } = await import('./screen-layout.mjs');
   let capture;
   try { capture = JSON.parse(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`\n❌ ${file} is not a screen capture (${String(e.message).split('\n')[0]}).\n`); return 1; }
@@ -216,6 +236,8 @@ async function fromScreens(ROOT, cfg, file, sys, { force = false } = {}) {
     results.push({ name: sc.name, prototype, ok: r.ok });
     console.log(`   ${r.ok ? '✅' : '❌'} ${sc.name} → prototypes/${name}.json${kept ? ' (kept as it was; --force replaces it)' : ''}${r.page ? ` · drawn ${r.page.replace(ROOT + '/', '')}` : ''}`);
     for (const f of r.findings.filter((x) => x.level === 'error')) console.log(`      ❌ ${f.message}`);
+    const seen = await againstScreens(ROOT, cfg, name, kept ? JSON.parse(readFileSync(target, 'utf8')) : { prototype, gaps }, sys, r.page, { browser, screens });
+    if (seen?.screen) for (const l of screenLines(seen.cmp, { ...seen, root: ROOT })) console.log(`      ${l}`);
   }
   const h = layoutHabits(results);
   console.log('\n📐 HOW THESE SCREENS ARRANGE THINGS');
@@ -265,6 +287,7 @@ export async function runPrototype(ROOT, argv) {
     console.log(`\nUsage: ${CLI} --prototype <composition.json>`);
     console.log(`       ${CLI} --prototype --from-screens <screen-capture.json>`);
     console.log(`       ${CLI} --prototype --catalog | --consistency`);
+    console.log('   --no-browser draws without measuring the page in Chrome against the designed screens.');
     console.log('   The composition names the design system\'s components and their options, in the format --check-ui reads,');
     console.log('   plus the engine\'s layout pieces (Page, Stack, Row, Columns, Text) and Missing for a need nothing fits.');
     console.log('   A screen capture (screen-layout.mjs) turns each designed screen into a starting point.\n');
@@ -283,7 +306,7 @@ export async function runPrototype(ROOT, argv) {
     return 0;
   }
   if (args.includes('--consistency')) return consistencyReport(ROOT, sys);
-  if (screensFile) return fromScreens(ROOT, cfg, screensFile, sys, { force: args.includes('--force') });
+  if (screensFile) return fromScreens(ROOT, cfg, screensFile, sys, { force: args.includes('--force'), browser: !args.includes('--no-browser') });
 
   let raw;
   try { raw = JSON.parse(readFileSync(resolve(ROOT, input), 'utf8')); }
@@ -293,7 +316,8 @@ export async function runPrototype(ROOT, argv) {
   const { catalog } = sys;
   const page = r.page;
   const used = r.used;
-  if (JSON_MODE) { process.stdout.write(JSON.stringify({ ok: r.ok, page: page && page.replace(ROOT + '/', ''), findings: r.findings, counts: r.counts, gaps: r.gaps, used }, null, 2) + '\n'); return r.ok ? 0 : 1; }
+  const seen = r.ok ? await againstScreens(ROOT, cfg, name, raw, sys, page, { browser: !args.includes('--no-browser') }) : null;
+  if (JSON_MODE) { process.stdout.write(JSON.stringify({ ok: r.ok, page: page && page.replace(ROOT + '/', ''), findings: r.findings, counts: r.counts, gaps: r.gaps, used, screen: seen?.screen ? { name: seen.screen.name, mode: seen.mode, differences: seen.cmp, picture: seen.picture.replace(ROOT + '/', ''), visual: seen.visual } : null, picture: seen?.picture ? seen.picture.replace(ROOT + '/', '') : null }, null, 2) + '\n'); return r.ok ? 0 : 1; }
 
   console.log(`\nPrototype  ·  ${name}  ·  ${r.counts.components} part(s)`);
   for (const f of r.findings) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} ${f.message}${f.rule ? `  (rule ${f.rule}: ${RULES[f.rule - 1]})` : f.source ? `  (${f.source})` : ''}`);
@@ -313,6 +337,10 @@ export async function runPrototype(ROOT, argv) {
     console.log(`\n📐 DIFFERENT FROM THE PRODUCT'S OTHER PAGES  ${r.differs.length}`);
     for (const d of r.differs) console.log(`   • ${consistencyLine(d)}`);
   }
+  if (seen?.screen) { console.log(''); for (const l of screenLines(seen.cmp, { ...seen, root: ROOT })) console.log(l); }
+  else if (seen?.picture) console.log(`\n   picture of the page: ${seen.picture.replace(ROOT + '/', '')}`);
+  else if (seen?.why) console.log(`\n   ⏭  not measured in the browser (${seen.why})`);
+  const placed = seen?.cmp ? owedFromScreen(seen.cmp) : [];
   const gaps = mergeGaps({ [name]: r.gaps });
   if (gaps.length) {
     console.log(`\n🧩 GAPS  ${gaps.length}  (what the design system would need; nothing was invented)`);
@@ -322,6 +350,8 @@ export async function runPrototype(ROOT, argv) {
   const next = [
     r.uses.length ? 'Check each use above against what its component is for: a use the documentation rules out gets "standInFor" with the need, or a Missing box, and the prototype is drawn again.' : null,
     r.differs.length ? 'Make each 📐 line match the other pages, or tell the person why this page differs.' : null,
+    placed.length ? `Make each ⚠️ line under 📏 match "${seen.screen.name}", or tell the person why this page differs from it.` : null,
+    seen?.picture ? `Look at ${seen.picture.replace(ROOT + '/', '')} before you answer.` : null,
     gaps.length ? 'Tell the person each gap above as it is written: the design team decides them; never build one.' : null,
   ].filter(Boolean);
   console.log(`\nNEXT: open ${page.replace(ROOT + '/', '')} to see it.${next.length ? ` ${next.join(' ')}` : ''}\n`);

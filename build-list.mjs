@@ -263,6 +263,7 @@ export function projectDerivedContract(ROOT, cfg, classFor, varOf = () => null) 
 // The markup a role annotation asks for, and its other obligations: one table (role-markup.mjs, I85).
 export { roleMarkup } from './role-markup.mjs';
 import { roleMarkup, roleSheetLines } from './role-markup.mjs';
+import { behaviourSheetLines, partSheetLines, partRolesOf } from './behaviour-contract.mjs';
 
 // ── The build sheet: what --query prints for a component still to build ────────────────────────────────────────
 // Every line is something the engine checks once the component exists, written as the code must write it.
@@ -307,7 +308,8 @@ export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}
   if (rawBase.length) lines.push(`    ${rawBase.join(', ')} on ${sel}: Figma binds no variable here. Write the value as it is and tell the user it has no variable; never invent one`);
   const role = (props[name]?.annotations ?? []).map((a) => /^role:\s*(.+)$/i.exec(a.label ?? '')?.[1]).find(Boolean);
   if (role) lines.push(`    role: ${role}, so write it as ${roleMarkup(role)}`);
-  if (role) for (const o of roleSheetLines(role)) lines.push(`      and ${o}`);
+  if (role) for (const o of [...roleSheetLines(role), ...behaviourSheetLines(role)]) lines.push(`      and ${o}`);
+  for (const l of partSheetLines(partRolesOf(props[name] ?? {}))) lines.push(`    ${l}`);
   const nested = (nesting[name] ?? []).filter((n) => n !== name && !/^icon[-/ ]/i.test(n));
   if (nested.length) lines.push(`    uses the system's own ${nested.join(', ')} inside it, never a copy`);
   lines.push(`    the component file${file ? `: ${file}` : ''} names its props exactly as above (Figma's names), or, when the person decides so, contract.authored.json records the code's name`);
