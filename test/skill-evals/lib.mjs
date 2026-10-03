@@ -47,7 +47,17 @@ export function makeProject(source, setup, { engine = true, skillFiles = [] } = 
   if (engine && existsSync(join(dir, 'ds-config.json'))) execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--install-hooks'], { cwd: dir, stdio: 'ignore' });
   execFileSync('git', ['add', '-A'], { cwd: dir, env });
   execFileSync('git', ['commit', '-qm', 'init'], { cwd: dir, env });
+  // The files the project ignores, as they were before the run: one the run leaves as it was is not its change.
+  const ignored = ignoredFiles(dir, execFileSync('git', ['status', '--porcelain', '--ignored', '--untracked-files=all'], { cwd: dir, encoding: 'utf8' }));
+  writeFileSync(join(dir, '.git', 'eval-ignored.json'), JSON.stringify(Object.fromEntries(ignored.map((p) => { try { return [p, createHash('sha1').update(readFileSync(join(dir, p))).digest('hex')]; } catch { return [p, null]; } }))));
   return dir;
+}
+
+// The ignored files git status lists (an ignored folder is one line: its files, without installed packages).
+function ignoredFiles(dir, status) {
+  return status.split('\n').filter((l) => l.startsWith('!! ')).map((l) => l.slice(3).replace(/^"|"$/g, ''))
+    .flatMap((p) => (p.endsWith('/') ? (existsSync(join(dir, p)) ? walk(join(dir, p)).map((f) => relative(dir, f)) : []) : [p]))
+    .filter((p) => !/(^|\/)node_modules(\/|$)/.test(p));
 }
 
 function walk(dir) {
@@ -158,7 +168,11 @@ export function context(events, dir, saved = null) {
   const committed = !saved && root ? git('diff', '--name-only', root, 'HEAD').split('\n').filter(Boolean) : [];
   // A file the project ignores (a drafts folder in its .gitignore) is still the run's work; installed packages and the
   // engine's own output folder are not.
-  const changed = (saved ? saved.changed ?? [] : [...new Set([...git('status', '--porcelain', '--ignored', '--untracked-files=all').split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, '')), ...committed])])
+  let before = {};
+  if (!saved) { try { before = JSON.parse(readFileSync(join(dir, '.git', 'eval-ignored.json'), 'utf8')); } catch { /* an older project */ } }
+  const same = (p) => { if (!(p in before)) return false; try { return createHash('sha1').update(readFileSync(join(dir, p))).digest('hex') === before[p]; } catch { return false; } };
+  const status = saved ? '' : git('status', '--porcelain', '--ignored', '--untracked-files=all');
+  const changed = (saved ? saved.changed ?? [] : [...new Set([...status.split('\n').filter((l) => l && !l.startsWith('!! ')).map((l) => l.slice(3).replace(/^"|"$/g, '')), ...ignoredFiles(dir, status).filter((p) => !same(p)), ...committed])])
     .filter((p) => !ENGINE_WRITES.test(p) && !/(^|\/)(node_modules|\.design-system-engine-out)(\/|$)/.test(p));
   const nextLines = calls.flatMap((c) => String(c.result).split('\n')).map((l) => l.match(/^NEXT:\s*(.+)$/)?.[1]).filter(Boolean);
   const savedFiles = saved?.files ?? {};
