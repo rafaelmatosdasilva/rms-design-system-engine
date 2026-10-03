@@ -62,6 +62,8 @@ rms-design-system-engine --prune                         # list prune candidates
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
 rms-design-system-engine --no-docs                       # skip the design-intent layer this run (emitted by default; local, gitignored)
+rms-design-system-engine --refresh-figma                 # read Figma the best way there is: design.json, figma-cli, else says how
+rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
@@ -218,10 +220,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; icons from
   the icon sheet.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
-  own pages, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
+  own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   Below it, the tokens behind what is drawn and its size; above it, the apps that use it and its documentation.
+- **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component.
 - **Not agreed yet**: a prop on one side only, another default, a token that differs, a component not built yet:
@@ -453,6 +456,40 @@ combine with), and every finding names the rule it breaks. A deprecated componen
 to the tree, or a child the design system never nests there is a warning. Findings are also written to
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
+
+#### Prototypes
+
+`rms-design-system-engine --prototype --catalog` prints everything a prototype may use: the catalog's components with
+their options (a component the code does not have is marked: it is drawn as a labelled box), the engine's layout pieces
+with the spacing tokens and text styles they take, the format, and the prototypes already in `prototypes/`.
+
+`rms-design-system-engine --prototype prototypes/<name>.json` checks a composition (the format `--check-ui` reads, nested
+or flat) and, when it holds, draws it as one page under `.design-system-engine-out/prototypes/<name>.html`: each
+component from its own markup (the contract's probe, a page instance, or its React source) with the project's CSS, in
+every mode the system has, with a switch for the colour modes and one that outlines the engine's pieces and stand-ins.
+The rules are `--check-ui`'s, plus:
+- **The engine's pieces** (Page, Stack, Row, Columns, Text) exist only where the system has no component of that name.
+  They carry no colour, border or font of their own: `gap` and `padding` take a spacing token, `Text.style` a text
+  style, `Page.width` the screen's width in px; `grow` takes the room a parent leaves. The page takes the system's own
+  page surface, text colour and font family. Each piece used is a layout gap.
+- **A need nothing fits** is `{ "component": "Missing", "props": { "need": "…", "kind": "…", "closest": "…" } }`, drawn
+  as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`.
+- **A prop Figma and the code do not agree on yet** is drawn with its default, with a warning.
+- **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
+  `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
+  needed first. The Stop hook holds the reply to the gaps of the prototype just drawn.
+- A composition with an error is not drawn (exit 1). A file `{ "prototype": …, "gaps": [...] }` adds the gaps written
+  beside it.
+
+`rms-design-system-engine --prototype --from-screens <capture.json>` turns designed screens into starting points:
+`prototypes/<screen>.json`, each drawn at once. The capture is `SCREEN_CAPTURE_JS` in `screen-layout.mjs`, a read-only
+Plugin API script run with the Figma MCP (`use_figma`) or figma-cli on the screens' node ids. Each screen keeps its
+arrangement (auto layout direction, gap and padding as spacing tokens, Fill as `grow`, alignment), the system's
+components with their options and what their slots hold; a local component that holds others (a whole screen made a
+component) is read as layout and listed as a template or component the system could own; a frame with its own fill,
+border or corner, a typed number, a text with no style, a shape and a component the catalog lacks are gaps. It ends with
+the spacing habits across the screens and the structures that repeat (template candidates). A starting point already
+in `prototypes/` is kept unless `--force`.
 
 #### Adoption baseline / ratchet (opt-in, gate-level)
 

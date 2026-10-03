@@ -220,3 +220,49 @@ test('--prototype --from-screens turns each designed screen into a drawn startin
   const again = run(dir, '--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json');
   assert.match(again.stdout, /kept as it was; --force replaces it/);
 });
+
+// ── Asking for a prototype in words ──────────────────────────────────────────────────────────────────────────────
+test('a prototype request routes to the prototype recipe and its catalog, in English and Portuguese', async () => {
+  const { route } = await import('../route.mjs');
+  const s = { components: ['button', 'chip', 'field', 'tag'], build: true };
+  for (const p of ['prototype a notification settings page with our components', 'mock up a checkout screen', 'faz um protótipo do ecrã de perfil', 'create a wireframe for the login']) {
+    const r = route(p, s);
+    assert.equal(r.recipe, 'prototype', p);
+    assert.deepEqual(r.run, ['rms-design-system-engine --prototype --catalog'], p);
+  }
+  assert.equal(route('how do I prototype with the engine?', s).run.length, 0, 'a how-to question runs nothing');
+  assert.notEqual(route('change the prototype frame in figma to 8px', s).recipe, 'prototype');
+});
+
+test('while prototyping, an edit outside prototypes/ asks first; the composition itself passes', async () => {
+  const { judge } = await import('../guard.mjs');
+  const ask = (file) => judge({ tool_name: 'Write', tool_input: { file_path: file } }, { userText: 'prototype a settings page with our components' });
+  assert.equal(ask('prototypes/settings.json'), null);
+  assert.equal(ask('src/components/Toggle.jsx')?.decision, 'ask');
+  assert.match(ask('src/styles/tokens.css').reason, /made only of the design system's components/);
+});
+
+test('the reply owes the gaps of the prototype just drawn, once', async () => {
+  const { prototypeGapsOwed } = await import('../guard.mjs');
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const root = mkdtempSync(join(tmpdir(), 'proto-owed-'));
+  mkdirSync(join(root, '.design-system-engine-out', 'prototypes'), { recursive: true });
+  const write = () => writeFileSync(join(root, '.design-system-engine-out', 'prototypes', 'last.json'), JSON.stringify({ at: new Date().toISOString(), pending: true, gaps: [{ need: 'a toggle switch for each channel', kind: 'component', line: 'component: a toggle switch for each channel' }, { need: 'a Row layout component', kind: 'layout', line: 'layout: a Row layout component' }] }));
+  write();
+  const owed = prototypeGapsOwed(root, 'Here is your prototype. The system has no toggle switch for each channel.');
+  assert.deepEqual(owed.map((g) => g.need), ['a Row layout component']);
+  assert.deepEqual(prototypeGapsOwed(root, ''), [], 'checked once only');
+  write();
+  assert.deepEqual(prototypeGapsOwed(root, 'It needs a toggle switch per channel and a row layout component.'), []);
+});
+
+test('--prototype --catalog lists the system\'s components, the engine\'s pieces with their tokens, and the format', { timeout: 600000 }, () => {
+  const dir = builtTidepool('tp-catalog-');
+  const r = run(dir, '--prototype', '--catalog');
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, /chip\s+Size=M\|L/);
+  assert.match(r.stdout, /Stack\s+gap=none\|gap\/s\|padding\/xs\|padding\/s\|padding\/m/);
+  assert.match(r.stdout, /Text\s+text=<text>\s+style=m\|s/);
+  assert.match(r.stdout, /NEXT: write prototypes\/<name>\.json with only the parts above/);
+});
