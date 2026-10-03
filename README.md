@@ -99,8 +99,9 @@ You can mix them. `rms-design-system-engine --component button --only accessibil
 `rms-design-system-engine --styleguide` builds a living style guide of what Figma and the code agree on, in `.design-system-engine-out/styleguide/index.html`. Every project fills the same template, the one in the engine (`templates/styleguide.template.html`), with its own data, so an improvement made there reaches every design system on its next run.
 
 - **Foundations.** Colours, typography, spacing, radii and icons, each the CSS variable itself, shown only when the token check finds it equal to Figma in every mode.
-- **Components.** Each one drawn from your own markup (the first instance in your pages, or the contract's probe) with your own CSS. Its controls are the props both sides have, labelled with Figma's names; an option applies what your contract's propertyMap says it adds. Below it, the tokens behind what is drawn and its size.
+- **Components.** Each one drawn from your own markup (the contract's probe, the first instance in your pages, or what its React source returns) with your own CSS. Its controls are the props both sides have, labelled with Figma's names; an option applies what your contract's propertyMap says it adds. Below it, the tokens behind what is drawn and its size.
 - **Modes.** A switch for each of your mode collections, for the whole page or one component.
+- **In use.** The approved pictures of your Figma frames (the ones the frame check compares against), when there are any.
 - **Not agreed yet.** A prop only one side has, another default, a token that differs or a component not built yet is left out and counted in one line at the top, so you decide each one before it appears.
 
 A project can still use a template of its own (`ds-config.json` → `styleguide.template`).
@@ -175,6 +176,7 @@ Accessibility is checked beside the gates. Part of it reads the code directly, a
 
 - **Share the results with your team.** Commit the files it creates in your project, so everyone, and your automated builds, check against the same design.
 - **Figma stays as it is.** It only reads Figma. It tells you what to change there, and a person makes that change.
+- **Reading Figma, the best way available.** `rms-design-system-engine --refresh-figma` picks it for you: a `design.json` newer than the saved data, then [figma-cli](https://github.com/silships/figma-cli) when Figma Desktop is connected to it (no API key, no rate limit, every mode), then the Figma tool of your Claude session, then the Figma API with a token. After you run `figma-cli snapshot`, the next check reads its `design.json` on its own; `--from-figma-cli` reads one directly.
 - **More detail.** Everything for developers, every option and how each check works, is in [docs/details.md](docs/details.md).
 
 ## License

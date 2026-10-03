@@ -62,6 +62,8 @@ rms-design-system-engine --prune                         # list prune candidates
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
 rms-design-system-engine --no-docs                       # skip the design-intent layer this run (emitted by default; local, gitignored)
+rms-design-system-engine --refresh-figma                 # read Figma the best way there is: design.json, figma-cli, else says how
+rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
@@ -218,10 +220,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; icons from
   the icon sheet.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
-  own pages, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
+  own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   Below it, the tokens behind what is drawn and its size; above it, the apps that use it and its documentation.
+- **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component.
 - **Not agreed yet**: a prop on one side only, another default, a token that differs, a component not built yet:
