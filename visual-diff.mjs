@@ -22,13 +22,14 @@ const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } ca
 const axes = (n) => String(n ?? '').toLowerCase().replace(/\s+/g, '');
 
 // Where the Figma image of a component comes from. Returns { file, from } or { why }.
-export async function figmaImage(ROOT, cfg, name, { nodeId, defaultVariant, version, token = process.env.FIGMA_TOKEN, fetchImpl = fetch, outDir = OUT_DIR } = {}) {
-  const ref = resolve(ROOT, cfg.visualRefs ?? projectPath(ROOT, 'refs'), 'components', `${safe(name)}.png`);
+// folder: components (a component's default variant) or screens (a designed screen, for the prototype check).
+export async function figmaImage(ROOT, cfg, name, { nodeId, defaultVariant, version, token = process.env.FIGMA_TOKEN, fetchImpl = fetch, outDir = OUT_DIR, folder = 'components' } = {}) {
+  const ref = resolve(ROOT, cfg.visualRefs ?? projectPath(ROOT, 'refs'), folder, `${safe(name)}.png`);
   if (existsSync(ref)) return { file: ref, from: 'reference' };
   if (!token) return { why: 'no reference image and no FIGMA_TOKEN' };
   if (!cfg.figmaFileKey) return { why: 'no reference image and no figmaFileKey in ds-config.json' };
   if (!nodeId) return { why: 'no reference image and no node id in the structure snapshot' };
-  const dir = resolve(ROOT, outDir, 'visual', 'figma'), file = join(dir, `${safe(name)}.png`), meta = join(dir, `${safe(name)}.json`);
+  const dir = resolve(ROOT, outDir, 'visual', folder === 'components' ? 'figma' : `figma-${folder}`), file = join(dir, `${safe(name)}.png`), meta = join(dir, `${safe(name)}.json`);
   const m = readJson(meta);
   if (existsSync(file) && m?.nodeId === nodeId && m?.version === (version ?? null)) return { file, from: 'figma (cached)' };
   const get = async (url) => {

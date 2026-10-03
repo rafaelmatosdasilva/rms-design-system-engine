@@ -70,6 +70,8 @@ import { loadLocator } from './component-locator.mjs';
 import { loadModes } from './mode-resolver.mjs';
 import { modeSwitch } from './code-capture.mjs';
 import { codeSnapshotPath } from './names.mjs';
+import { roleWord as roleWordOf } from './role-markup.mjs';
+import { partRoleOf, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression } from './behaviour-contract.mjs';
 
 // ── Pure, unit-testable core (exported; importing this module runs NOTHING) ─────
 // Parse a computed-style color. Returns {r,g,b,a} or null when it is not an rgb()/rgba()
@@ -269,6 +271,16 @@ export const A11Y_GUIDE = {
     title: (n) => `${plural(n, 'page scrolls', 'pages scroll')} sideways on a narrow screen`,
     why: 'At 320 pixels wide (a phone, or a page zoomed to 400%) the content does not fit, so people have to scroll in two directions to read it.',
     fix: 'Let the layout wrap or stack at narrow widths instead of keeping a fixed width.',
+  },
+  partrole: {
+    title: (n) => `${plural(n, 'part does', 'parts do')} not do what its Figma part role says`,
+    why: 'Figma marks an inner layer as the label, the error message, the indicator or a step button of its component. Each owes the control something: a label names it, an error message is linked while it shows, an indicator stays silent, a step button has a name.',
+    fix: 'Wire the part as the finding says (a <label for>, aria-describedby, aria-hidden="true", aria-label), or correct the annotation in Figma.',
+  },
+  behaviour: {
+    title: (n) => `${plural(n, 'component does', 'components do')} not behave as its role or its Figma note says`,
+    why: 'What a person can do with a component comes with its role: Space flips a toggle, a click opens a disclosure, a tab takes the selection, a text box takes typing. Figma notes can add more (Escape closes, the arrow keys move).',
+    fix: 'Make the component do it (the finding says what was tried and what happened), or record the person\'s exception with a link to its decision in contract.authored.json → behaviourExceptions.',
   },
   semantics: {
     title: (n) => `${plural(n, 'component is', 'components are')} announced as something else than the design system says`,
@@ -540,7 +552,7 @@ export function contractSemantics(ROOT, cfg = {}) {
 //   alt: A red chart          an image's text alternative
 // Composite roles from spec tooling are read as what they mean: togglebutton is a button with
 // aria-pressed, textinput a text box. Anything else stays a note for people.
-const ROLE_WORDS = { textinput: 'textbox', searchinput: 'searchbox', iconbutton: 'button' };
+const ROLE_WORDS = { textinput: 'textbox', searchinput: 'searchbox', iconbutton: 'button', disclosure: 'button', expander: 'button' };
 export function roleOf(word) {
   const w = String(word ?? '').trim().toLowerCase().replace(/["'“”]/g, '');
   if (w === 'togglebutton') return { role: 'button', pressed: true };
@@ -553,6 +565,7 @@ export function annotationFacts(annotations = []) {
   for (const c of clauses) {
     const kv = c.match(/^\s*([^:=]+?)\s*[:=]\s*(.+)$/);
     const key = kv ? kv[1].trim().toLowerCase() : '';
+    if (key === 'role' && partRoleOf(value(kv[2]))) { f.part = partRoleOf(value(kv[2])); continue; }   // a part's role (label, errormessage): behaviour-contract.mjs checks it
     if (key === 'role') { const r = roleOf(value(kv[2])); if (r.role) f.role = r.role; if (r.pressed) f.pressed = true; continue; }
     if (/^(aria-label|accessible name|screen reader label)$/.test(key)) { f.name = value(kv[2]); continue; }
     if (/^(alt|alt text)$/.test(key)) { f.name ??= value(kv[2]); f.role ??= 'img'; continue; }
@@ -1020,6 +1033,7 @@ async function main() {
   }
 
   const unrendered = [], unread = [], unfinished = [];
+  const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
   for (const target of targets) {
     const label = target.label;
     const { targetId, sessionId } = await openPage(send, target.url);
@@ -1233,6 +1247,7 @@ async function main() {
         }
         // A note on an inner layer is checked on the part the contract names the same way.
         for (const { layer, facts: lf } of layers) {
+          if (lf.part && !lf.role && !lf.name && !lf.level) continue;   // a part role: the part-role step below checks it
           const part = (contract[comp]?.children ?? []).find((c) => String(c.name ?? '').toLowerCase() === String(layer).toLowerCase());
           if (!part?.cssSelector) { findings.push({ kind: 'annotation', plugin: label, desc: `${comp} › ${layer}: not checked, the contract has no part named "${layer}" (add it to children with its cssSelector)` }); continue; }
           const got = await axOf(part.cssSelector);
@@ -1250,6 +1265,61 @@ async function main() {
         const sel = selOf(comp);
         if (!sel) continue;
         for (const problem of (await evalv(roleContractExpression(sel, r.role, { pressed: r.pressed }))) ?? []) findings.push({ kind: 'rolecontract', plugin: label, desc: `${comp} (${r.pressed ? 'toggle button' : r.role}): ${problem}` });
+      }
+    });
+    await step(async () => {
+      // Part roles and behaviours as contracts (I85, I92). A part's role comes from the annotation on its Figma layer; a
+      // behaviour from the component's role and its annotations. Behaviours need the component's own script: on the
+      // engine's style guide, which draws markup only, they are listed as not checked.
+      let snap = {};
+      try { snap = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { /* no annotations */ }
+      let authored = {};
+      try { authored = JSON.parse(readFileSync(resolve(ROOT, cfg.contracts?.authored ?? 'contract.authored.json'), 'utf8'))?.components ?? {}; } catch { /* none */ }
+      let contract = {};
+      try { contract = (await import(pathToFileURL(resolve(ROOT, cfg.paths?.structureContract ?? 'structure-contract.mjs')).href)).CONTRACT ?? {}; } catch { /* parts are optional */ }
+      const roles = Object.fromEntries(Object.entries(contractSemantics(ROOT, cfg)).map(([c, r]) => [c, r]));
+      for (const [c, v] of Object.entries(snap)) { const w = !c.startsWith('_') && roleWordOf(v?.annotations ?? []); if (w) roles[c] = w; }   // the role as Figma writes it (togglebutton, disclosure)
+      const names = [...new Set([...Object.keys(roles), ...Object.keys(snap).filter((k) => !k.startsWith('_'))])];
+      const KEY = { ' ': [' ', 'Space', 32, ' '], Enter: ['Enter', 'Enter', 13, '\r'], Escape: ['Escape', 'Escape', 27], ArrowRight: ['ArrowRight', 'ArrowRight', 39], ArrowDown: ['ArrowDown', 'ArrowDown', 40] };
+      let n = 0;
+      for (const comp of names) {
+        if (components.length && !components.includes(comp)) continue;
+        const sel = selOf(comp);
+        if (!sel) continue;
+        const entry = snap[comp] ?? {};
+        for (const { layer, part } of partRolesOf(entry)) {
+          const partSel = (contract[comp]?.children ?? []).find((c) => String(c.name ?? '').toLowerCase() === String(layer).toLowerCase())?.cssSelector ?? null;
+          for (const problem of (await evalv(partRoleExpression(sel, partSel, layer, part))) ?? []) findings.push({ kind: 'partrole', plugin: label, desc: `${comp}: ${problem}` });
+        }
+        const plan = behavioursFor(roles[comp] ?? '', entry.annotations ?? [], authored[comp]?.behaviourExceptions ?? {});
+        for (const w of plan.weak) findings.push({ kind: 'behaviour', plugin: label, desc: `${comp}: the exception for "${w.id}" gives no link to the decision (an ADR or a pull request), so it is still checked` });
+        if (!plan.rows.length) continue;
+        if (target.styleguide) { behavioursNotChecked.add(comp); continue; }
+        const mark = `b${n++}`;
+        if (!(await evalv(markInstanceExpression(sel, mark)))) continue;
+        for (const row of plan.rows) {
+          if (row.ifClickWorks) {
+            await evalv(behaviourExpression(mark, row, 'before'));
+            await evalv(`document.querySelector('[data-dse-control="${mark}"]').click()`);
+            const clicked = await evalv(behaviourExpression(mark, row, 'after'));
+            await evalv(behaviourExpression(mark, row, 'undo'));
+            if (!clicked?.ok) continue;
+          }
+          const tries = row.act.keys ? row.act.keys.map((k) => ({ keys: [k] })) : [row.act];
+          const results = [];
+          for (const t of tries) {
+            const before = await evalv(behaviourExpression(mark, row, 'before'));
+            if (!before) break;
+            if (t.click) await evalv(`document.querySelector('[data-dse-control="${mark}"]').click()`);
+            else if (t.type) await send('Input.insertText', { text: t.type }, sessionId);
+            else for (const k of t.keys) await pressKey(...KEY[k]);
+            results.push(await evalv(behaviourExpression(mark, row, 'after')));
+            await evalv(behaviourExpression(mark, row, 'undo'));
+          }
+          // Arrow keys: either direction will do. Every other key, and a click, must each work.
+          const ok = row.expect === 'focus-moves' ? results.some((r) => r?.ok) : results.length && results.every((r) => r?.ok);
+          if (!ok && results.length) findings.push({ kind: 'behaviour', plugin: label, desc: `${comp}: ${row.says} (${row.from}), but ${results.find((r) => !r?.ok)?.saw || 'nothing happened'}` });
+        }
       }
     });
     await step(async () => {
@@ -1313,6 +1383,7 @@ async function main() {
   if (unrendered.length) console.log(`⚠️  [a11y] not checked: ${unrendered.join(', ')} showed none of the design system's components within 10s`);
   if (unread.length) console.log(`⚠️  [a11y] partly not checked: the page could not be read in ${unread.join(', ')}; those results are missing, not clean`);
   if (unfinished.length) console.log(`⚠️  [a11y] partly not checked: ${unfinished.join('; ')}; those results are missing, not clean`);
+  if (behavioursNotChecked.size) console.log(`ℹ️  [a11y] behaviours not checked for ${[...behavioursNotChecked].join(', ')}: the style guide draws markup without the components' script. Point a11y.urls (or --url) at a page that runs them (Storybook, the app) to check them.`);
 
   // ── Report ────────────────────────────────────────────────────────────────────
   const contrast = groupSame(findings.filter((f) => f.kind === 'contrast' && !f.cannotCompute));
@@ -1325,7 +1396,7 @@ async function main() {
   const keyboard = findings.filter((f) => f.kind === 'keyboard');
   const themes   = [...new Set(modes.map((m) => m.name))];
 
-  const more = ['target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation'].map((k) => [k, findings.filter((f) => f.kind === k)]);
+  const more = ['target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'behaviour'].map((k) => [k, findings.filter((f) => f.kind === k)]);
   const buckets = [['contrast', contrast], ['hovercontrast', hoverCon], ['name', names], ['focus', focus], ['focuscontrast', focusCon], ['ariastate', state], ['keyboard', keyboard], ...more].filter(([, l]) => l.length);
   const total = buckets.reduce((n, [, l]) => n + l.length, 0);
   const inThemes = themes.length > 1 ? ` (checked in ${themes.length} themes)` : '';

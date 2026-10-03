@@ -483,7 +483,9 @@ take; the format; and the prototypes already in `prototypes/`.
 - **Rules the check holds.** A plain sentence in the guidelines, "one button per screen", "at most two fields on a
   page", is a limit: a prototype with more is not drawn, and the error quotes the sentence and its section.
 - **What the request asks for.** A component the request names (every word of its name is in it: "an empty state"
-  → emptyState) that the prototype does not use is a warning the reply owes: add it, or say why. A component the
+  → emptyState) that the prototype does not use is a warning the reply owes: add it, or say why. A kind of component
+  the request names that the system has none of (a switch, a toast, a dialog, a progress bar), shown neither as a Missing
+  box nor with `standInFor`, is a warning the reply owes too: the system has no such component, say so. A component the
   documentation rules out for the request's words ("a message confirming…" and a tag that is never a message that comes
   and goes), used anyway, is an error, unless the node says what else it is for in `"purpose"` (a note, like
   `standInFor`, that the check reads and the drawing ignores).
@@ -531,12 +533,24 @@ The rules are `--check-ui`'s, plus:
   … }, "heading": { "style": … }, "actions": { "at": "end", "justify": "end" }, "needs": { "<need>": "<answer>" } }`),
   written by the team, wins. Each difference is listed with the pages it differs from, and the Stop hook holds the
   reply to it like a gap. `rms-design-system-engine --prototype --consistency` compares every page with the others.
+- **The drawn page against the designed screens.** With Chrome, the drawn page is opened and measured: every part's
+  box, the page's padding, the space between its sections, each text's size. A prototype that redraws a designed screen
+  (same name) is compared with it part by part: each component and text in its place (the first from the page's corner,
+  each next one from the part before it, so a part drawn wider moves nothing after it into a finding) and at its size. A
+  new page is compared with the designed screen it started from, or the one sharing the most components: the page's
+  width, padding and spacing, and the size of each component the two share with the same options. A difference in the
+  page's own arrangement (padding, spacing, a part's place) is a ⚠️ line the Stop hook holds the reply to; a component
+  drawn at another size than Figma's is a • line for the audit, since it is the component's code. A picture of the page
+  is saved beside it (`<name>.png`), and Claude looks at it before answering. With a Figma image of the screen
+  (`.design-system-engine-refs/screens/<screen>.png`, at any scale, or FIGMA_TOKEN), the share of pixels that differ is
+  printed, with a diff image. `--no-browser` draws without measuring.
 - A composition with an error is not drawn (exit 1). A file `{ "prototype": …, "gaps": [...] }` adds the gaps written
   beside it.
 
 `rms-design-system-engine --prototype --from-screens <capture.json>` turns designed screens into starting points:
 `prototypes/<screen>.json`, each drawn at once. The capture is `SCREEN_CAPTURE_JS` in `screen-layout.mjs`, a read-only
-Plugin API script run with the Figma MCP (`use_figma`) or figma-cli on the screens' node ids. Each screen keeps its
+Plugin API script run with the Figma MCP (`use_figma`) or figma-cli on the screens' node ids; it records where each
+layer sits on its screen and whether it fills its parent (an older capture is placed by auto layout). Each screen keeps its
 arrangement (auto layout direction, gap and padding as spacing tokens, Fill as `grow`, alignment), the system's
 components with their options and what their slots hold; a local component that holds others (a whole screen made a
 component) is read as layout and listed as a template or component the system could own; a frame with its own fill,
@@ -647,6 +661,25 @@ there, never a failure.
 - **Figma accessibility annotations** — a note that states a role, a name, a heading level or alt text is
   checked against what the component renders (see *Writing accessibility notes in Figma* below). Other notes
   stay notes.
+- **Part roles (I85)** — a note `Role: label` (or `errormessage`, `description`, `indicator`, `increment`,
+  `decrement`, `placeholder`, `value`, `panel`; also `error`, `helper text`, `hint`, `icon`, `plus`, `minus`) on an
+  inner layer says what that part owes its control: a label names it (a `<label for>`, the control inside it, or
+  `aria-labelledby`), an error message is linked while it shows (`aria-describedby` or `aria-errormessage`, with
+  `aria-invalid="true"`), a description is linked with `aria-describedby`, an indicator stays silent
+  (`aria-hidden="true"`), a step button has a name with a word in it (a lone `-` is not one), a placeholder is not the
+  only name, a value is exposed by its spinbutton or slider, a panel is named by `aria-controls`. The part is the
+  contract's child of that name, else the element whose class ends with the layer's name. The build sheet lists
+  each part's duty.
+- **Behaviours (I92)** — what a person can do with a component comes with its role and runs in Chrome on the
+  first instance a page shows: Space flips a toggle button's `aria-pressed`; a click and Space flip a switch or a
+  checkbox; a click flips a disclosure's `aria-expanded` and shows or hides its panel; a click selects a tab and no
+  other; typing writes into a text box. A Figma note adds one: `Escape closes`, `arrow keys move`, `Enter and Space
+  activate`. A behaviour needs the component's own script, so it runs on a page that has it (`a11y.urls`, `--url`,
+  Storybook, the app); on the engine's style guide, which draws markup only, it is listed as not checked. An
+  exception is the person's: `contract.authored.json → components[name].behaviourExceptions` `{ "<behaviour id>":
+  "<why, with a link to the ADR or pull request>" }` (ids: `keys-toggle`, `click-toggle`, `click-expand`,
+  `click-select`, `types`, `escape-closes`, `arrows-move`, `keys-activate`). Without a link it is still checked, and
+  that is reported. The build sheet lists each role's behaviours.
 
 **Writing accessibility notes in Figma.** Use Figma's annotation tool on the component (the component set or
 a standalone component). A category such as "Accessibility" helps people find them; the skill reads the text.
