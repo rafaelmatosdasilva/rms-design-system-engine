@@ -6,6 +6,8 @@ It keeps designers, developers and the AI tools they use aligned on one design s
 
 It keeps your code in parity with your design in Figma. It compares what was built (by a developer or by an AI) with what you designed: the colours, sizes, fonts, spacing, components and their states. When something is different, it tells you what, where, and how to fix it, in plain words. It also checks accessibility.
 
+Have only Figma? It helps Claude build your design system in code from it, one piece at a time: it gives Claude the exact facts from Figma first (every token in every mode, the sizes, the variables, the role of each component) and checks each piece against Figma before Claude says it is done.
+
 ## Why use it
 
 - **One system for everyone.** Designers, developers and AI tools work from the same style guide, documentation and contracts, made from your code and Figma, so the design system stays one system.
@@ -91,6 +93,19 @@ The easiest way is to ask in Claude Code, in your own words, after `/rms-design-
 | Ask what the design system has | `/rms-design-system-engine which props does the badge take?` | `rms-design-system-engine --query badge` |
 
 You can mix them. `rms-design-system-engine --component button --only accessibility` checks only the accessibility of the button.
+
+### Start from Figma only
+
+Open an empty project, set it up with your Figma link, and ask for what to build. With no code yet, the engine starts in build mode: what Figma has and the code does not is listed as to build, in order, never as a failure.
+
+| You want to | Type in Claude Code |
+|---|---|
+| Build the tokens | `/rms-design-system-engine build the tokens from Figma` |
+| Build a component | `/rms-design-system-engine build the button from Figma` |
+| Build a screen from the components | `/rms-design-system-engine build the settings screen from Figma with our components` |
+| See what is left to build | `/rms-design-system-engine what is left to build?` |
+
+Claude writes the code; the engine gives it Figma's exact names and values first and checks every piece after.
 
 You get a short summary back: what passes, what is different, and how to fix each thing. Nothing is changed until you ask for it.
 

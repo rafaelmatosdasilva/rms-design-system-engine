@@ -1,5 +1,51 @@
 # Skill evaluation results
 
+## 2026-10: building from Figma, the misses made deterministic, a smaller main guide (continuous evaluation)
+
+What changed since g9 (engine 40906c4): build mode for a project that has only Figma, with its recipe
+(`build-from-figma`) and build sheets; the router names the file a request means ("the gallery page"); the summary
+says what to fix first, a tie included; the props check reads every destructured React prop, counts a name recorded
+in `contract.authored.json`, and checks the markup a Figma role annotation asks for (a toggle is a `<button>` with
+`aria-pressed`); the edit check hands back a token an edit invents and accepts a colour Figma itself paints with no
+variable; the Stop hook holds the reply to the sentence it owes (a colour with no variable), sends back a reply that
+asks for a secret, and runs the edit check once more over the files the session changed; the main guide file drops
+three paragraphs only one recipe each needs (25.4 KB, from 27.9 KB). Engine f475251, the same 20 tasks on the same
+project, compared with g9; both scored by the current scorers.
+
+Guide set measured: `c5b201920acc` · Project measured: `13d811a9d668`
+
+| | g9 (adopted) | This version |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 30/30 · 136k | 30/30 · 152k |
+| Sonnet, all 20 tasks (`fix-first` at 10 runs) | 105/105 | 105/105 |
+| Sonnet, mean cost / input per request | $0.140 / 34k | $0.140 / 33k |
+| Haiku, held-out (3 runs each) | 17/18 · 98k | 18/18 · 89k |
+| Haiku, all 20 tasks (`new-ui-saved` at 10 runs) | 65/67 | 67/67 |
+| Haiku, mean cost / input per request | $0.057 / 26k | $0.056 / 25k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Sonnet / Haiku) | 2.56 / 2.69 | 3.01 / 2.78 |
+
+g9 run again on Sonnet's held-out set at the hour this version was measured: 30/30, 144k a run, 35k a request,
+$0.168 a run; this version 30/30, 152k, 34k, $0.168.
+
+**Reading.** Every task passes as often or more often on both models, and no rule is broken. On Haiku the rule
+adopts it (held-out 18/18 against 17/18, less input). On Sonnet every task passes and the one count against it is
+input on the held-out set: 152k a run against 136k. g9, run again at the same hour, read 144k, so about half of that
+is the hour (as the rename's entry recorded for `pasted-steps`); the rest is two tasks where Sonnet ran one
+exploratory command more (`no-cli-on-path`, `pasted-steps`). It reads less per request and costs the same per run.
+Adopted by the owner on these numbers.
+
+**Found by this evaluation and fixed** (four rounds, each measured from the start):
+- Engine 0ce7b3d: Sonnet `fix-first` 9/10 (the burndown was a tie and the summary named no first); Haiku
+  `new-ui-saved` 8/10 (one run asked which file the gallery page is, one declared `--success-background` in the theme,
+  which the edit check did not read).
+- Engine 82d11ec: the new check for an invented token mapped sizing tokens with the colour convention, so a copied
+  `--stroke-default` looked invented and every build-tokens run deleted it; the scorer read "a hex/token to use" as a
+  request for a secret (both Sonnet `new-ui-saved` misses); one Haiku run asked the person to provide a GitLab token.
+- Engine da8f07c: a Haiku run got the edit check's warning about a green the system lacks, asked which colour to use,
+  and left the green in the page: the Stop hook now checks the changed files once more.
+- The eval transcripts do not record hook feedback; a short run confirmed the edit check reaches the model.
+
 ## 2026-10: primitives, --only, the agent kept from making a check pass, each edit read for accessibility and sizes, the final check of the reply (continuous evaluation)
 
 What changed since the rename (engine 28aa8ba): a primitive written by hand (I42); `--only` runs the
