@@ -182,6 +182,11 @@ export function appLabels(names) {
   return clash ? names.map((n) => [n, String(n)]) : short;
 }
 
+// The CSS inside an HTML page's <style> blocks.
+export function styleBlocks(html) {
+  return [...String(html ?? '').matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join('\n');
+}
+
 export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const sh = cfg.styleguide || {};
   const ownDefault = resolve(ROOT, 'apps/styleguide/styleguide.template.html');
@@ -302,7 +307,22 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const probeBySelector = new Map();
     for (const a of [...(contract.RENDERED_ASSERTIONS ?? []), ...(contract.CROSS_PLUGIN_CONSISTENCY ?? [])]) if (a?.probe && a.selector) probeBySelector.set(a.selector.replace(/\s+/g, ' ').trim(), a.probe);
     const probes = {};
-    for (const name of Object.keys(propsSnap)) { const sel = locator.selectorFor(name); const p = sel && probeBySelector.get(String(sel).replace(/\s+/g, ' ').trim()); if (p) probes[name] = p; }
+    const drawNames = [...new Set([...Object.keys(propsSnap), ...(opts.names ?? [])])];
+    for (const name of drawNames) { const sel = locator.selectorFor(name); const p = sel && probeBySelector.get(String(sel).replace(/\s+/g, ' ').trim()); if (p) probes[name] = p; }
+    // A React component the pages do not show: the markup its own JSX returns, as the code capture draws it.
+    const jsx = {};
+    try {
+      const { componentSourceFiles, resolveComponentFile, textReader } = await import('./component-source.mjs');
+      const { jsxMarkup } = await import('./jsx-markup.mjs');
+      const read = textReader();
+      const files = componentSourceFiles(ROOT, cfg).filter((f) => /\.(jsx|tsx|js)$/.test(f));
+      for (const name of drawNames) {
+        if (name.startsWith('_') || probes[name]) continue;
+        const { file } = resolveComponentFile(name, { ROOT, cfg, files, read, classFor: locator.classFor });
+        if (!file || !/\.(jsx|tsx|js)$/.test(file)) continue;
+        try { const m = jsxMarkup(read(file), locator.classFor(name)); if (m && /^<[a-z]/.test(m)) jsx[name] = m; } catch { /* not readable as JSX */ }
+      }
+    } catch { /* no component sources */ }
     // The token check's own result: each token equal to Figma, with its CSS variable. Run it, read it, tidy up.
     const checkFile = join(ROOT, 'design-system-engine-check-result.json');
     const hadCheck = existsSync(checkFile);
@@ -319,21 +339,25 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     let title = cfg.name ?? '';
     if (!title) { try { title = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { /* no package.json */ } }
     const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
-      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title,
+      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: opts.names ?? [],
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).map(([n, c]) => [n, c.propertyMap])),
       parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
   }
   // The component rules outside the theme files: compiled component CSS and each component's own stylesheet.
+  // An app page listed as a stylesheet (pluginCSS: ui.src.html) gives only its <style> blocks: its markup and scripts
+  // must never land inside the page's <style>.
   async function componentCSS() {
-    return (await context()).componentSheets.map(readText).join('\n\n');
+    return (await context()).componentSheets.map((p) => (/\.html?$/i.test(p) ? styleBlocks(readText(p)) : readText(p))).join('\n\n');
   }
 
   // ── Fill the template ───────────────────────────────────────────────────────────
   const intent = designIntent();
   const { docs, code } = docsMaps(intent);
   let agreedSummary = null;
+  // opts.partsOnly: what the page is made of, without writing it (a prototype draws with the same parts).
+  if (opts.partsOnly) return { themeCSS: themeCSS(), componentCSS: await componentCSS(), view: JSON.parse(await agreed()), iconSheet: iconSheet() };
   const fills = {
     THEME_CSS: () => themeCSS(),
     COMPONENT_CSS: () => componentCSS(),
