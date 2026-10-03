@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { contextFrom, purposeLines, ruleLines, usesAgainstPurpose, sectionsOf, limitsFrom, requestFocus, focusLines, breakpointsOf } from '../prototype-context.mjs';
+import { contextFrom, purposeLines, ruleLines, usesAgainstPurpose, sectionsOf, limitsFrom, requestFocus, focusLines, breakpointsOf, neverOf, ruledOut } from '../prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from '../product-conventions.mjs';
 import { checkPrototype } from '../prototype-pieces.mjs';
 
@@ -151,6 +151,28 @@ test('a prototype request made with the command is kept for the catalog', async 
   routePrompt({ prompt: '/rms-design-system-engine prototype a settings page with our components' }, { root, cfg: {} });
   const r = JSON.parse(readFileSync(join(root, '.design-system-engine-out', 'prototypes', 'request.json'), 'utf8'));
   assert.equal(r.text, 'prototype a settings page with our components');
+});
+
+test('a "never" in the documentation rules a use out by the words after it, not by the whole sentence', () => {
+  const chip = { never: neverOf('Filters a list. People turn it on and off; it never submits anything.') };
+  assert.deepEqual(ruledOut(chip, 'on/off switch for email', 'chip'), [], 'turning on and off is what a chip is for');
+  assert.equal(ruledOut(chip, 'submit the form', 'chip').length, 1);
+  const tag = { never: neverOf('A status that does not change. Never a message that comes and goes, like a confirmation or an error: Tidepool has no toast yet.', 'a message that disappears') };
+  assert.deepEqual(ruledOut(tag, 'confirmation message', 'tag').map((r) => r.words), [['confirmation', 'message'], ['message']]);
+  assert.deepEqual(ruledOut(tag, 'New', 'tag'), []);
+});
+
+test('the request: a component its documentation rules out is named as ruled out, never as one its words point to; as a stand-in it is an error', () => {
+  const cat = { components: { ...catalog.components, tag: { description: 'A small status label.', props: { Label: { type: 'text' } } } } };
+  const ctx = contextFrom(cat, null, sectionsOf('## tag\nA status that does not change. Never a message that comes and goes, like a confirmation: there is no toast yet.'));
+  const f = requestFocus(ctx, 'an account page with a Save button and a message confirming the save', []);
+  assert.ok(!f.components.some((c) => c.name === 'tag'), 'not pointed to by the sentence that rules it out');
+  assert.deepEqual(f.ruledOut.map((r) => [r.name, r.words]), [['tag', ['message']]]);
+  assert.match(focusLines(f).join('\n'), /ruled out by the documentation for "message": tag, "Never a message that comes and goes, like a confirmation: there is no toast yet\."/);
+  const ui = { component: 'Page', children: [{ component: 'tag', props: { Label: 'Saved', standInFor: 'confirmation message' } }] };
+  const r = checkPrototype(ui, { catalog: cat, view: { components: [{ name: 'tag', controls: [{ label: 'Label' }] }] }, scales: { spacing: [], text: [] }, context: ctx });
+  assert.equal(r.ok, false);
+  assert.ok(r.findings.some((x) => x.level === 'error' && /tag is not for "confirmation message": "Never a message that comes and goes/.test(x.message)));
 });
 
 // ── End to end on a built Tidepool with written guidelines ────────────────────────────────────────────────────────
