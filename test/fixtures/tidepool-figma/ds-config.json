@@ -1,0 +1,40 @@
+{
+  "_note": "Tidepool as a project that has only Figma: no code yet, in build mode. Used by the build evaluation (test/skill-evals). Every name is invented.",
+  "figmaFileKey": "b0LpOCBsaRgo8lUqbkQNaY",
+  "build": true,
+  "maxSnapshotAgeDays": 30,
+  "figma": {
+    "modes": [
+      {
+        "name": "Light",
+        "snapshotKey": "light",
+        "cssSelector": "root"
+      },
+      {
+        "name": "Dark",
+        "snapshotKey": "dark",
+        "cssSelector": "data:theme=dark"
+      }
+    ]
+  },
+  "paths": {
+    "themeCSS": "src/styles/tokens.css",
+    "snapshotVars": "src/figma/figma-vars.snapshot.json",
+    "snapshotStructure": "src/figma/figma-structure.snapshot.json",
+    "compPropsSnapshot": "src/figma/figma-component-props.snapshot.json",
+    "pluginCSS": []
+  },
+  "states": {
+    "hover": {
+      "prop": "State",
+      "value": "Hover"
+    },
+    "error": {
+      "prop": "State",
+      "value": "Error"
+    },
+    "disabled": {
+      "prop": "Disabled"
+    }
+  }
+}
