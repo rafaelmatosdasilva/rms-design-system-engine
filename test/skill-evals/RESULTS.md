@@ -1,5 +1,112 @@
 # Skill evaluation results
 
+## 2026-10: every build from Figma checked as it renders, one style guide template, the old name gone (continuous evaluation)
+
+What changed since the adopted version (engine f475251): in build mode a difference measured in the browser fails
+and its fix always goes back to Figma; Figma's role annotation is read even when every prop is a state (a field whose
+only prop is `State` still has to be an `<input>`); a component the pages do not show is drawn as the JSX it returns
+(`jsx-markup.mjs`), so a `<span>` or an `<input>` is measured as one; when the rule already sets Figma's height and
+the drawn box is another, the fix names the cause (an inline element, padding outside a content box); a path that
+holds "figma" (`figma-mcp/`) is no longer read as "in Figma"; the Stop hook can send an owed line back a second time
+when the first hand-back went to something else; `--styleguide` builds one style guide from the engine's template for
+every project, showing only what Figma and the code agree on; the engine no longer recognises its old name. The
+guide changed in `reference/usage.md` and `reference/config.md`. Engine b8145b9, the same 20 tasks on the same
+project, compared with the adopted version; both scored by the current scorers.
+
+Guide set measured: `8f7981d52194` · Project measured: `13d811a9d668`
+
+| | Adopted (f475251) | This version |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 30/30 · 152k | 30/30 · 154k |
+| Sonnet, all 20 tasks (`fix-first` at 10 runs) | 105/105 | 105/105 |
+| Sonnet, mean cost / input per request | $0.140 / 33k | $0.137 / 33k |
+| Haiku, held-out (3 runs each) | 18/18 · 89k | 18/18 · 83k |
+| Haiku, all 20 tasks (`new-ui-saved` at 10 runs) | 67/67 | 67/67 |
+| Haiku, mean cost / input per request | $0.056 / 26k | $0.055 / 26k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Sonnet / Haiku) | 3.01 / 2.78 | 2.64 / 2.73 |
+
+**Reading.** Every task passes on both models, as on the adopted version, and no rule is broken. On Haiku the rule
+adopts it (held-out input 83k a run against 89k). On Sonnet the one count against it is input on the held-out set,
+154k a run against 152k (1.3% more, most of it `refresh-no-figma`, 128k against 119k); it costs less a run and the
+agent made fewer choices of its own. The rule says do not adopt on Sonnet; the guide change is two reference files,
+so the call is the owner's.
+
+**Disclosed.** Four Sonnet runs (`toggle-note` twice, `change-figma`, `forbidden-green`) timed out after 15 minutes
+without a turn, the API not answering; they were run again and passed. The engine moved on after the guide runs (build mode's next steps, the build scorer, and a
+variant written as its modifier class alone); none of it can turn a pass into a fail, and every guide run passed.
+
+## 2026-10: building from Figma, Claude with the Figma MCP alone against Claude with the Figma MCP and the skill (build evaluation)
+
+A project that has only Figma: the Tidepool design system as a real Figma file (two colour modes, a sizing
+collection, two text styles, button, chip, field, tag, a Settings screen), no code. Six tasks, each asked in the same
+words on both sides: build the tokens, the button, the chip, the field, the tag, then the Settings screen from the
+components. Both sides get what the Figma MCP returns for the task (`get_design_context`, `get_variable_defs` and a
+screenshot, captured once from the file and handed to both, so both see the same design). The MCP side has nothing
+else: no skill, no engine, no snapshots, no hooks. The skill side has the skill, its hooks and the engine in build
+mode. The scorer is the same for both and does not use the engine: it renders each component in Chrome with React,
+measures every case (sizes, spacing, radius, colours in light and dark, hover, disabled, the element and its role)
+against Figma, reads the CSS for values and variables the system does not have, and reads the final reply where a
+task asks for a sentence.
+
+Skill side: engine d8fc435, Claude Code 2.1.288. MCP side: Claude Code 2.1.287 (no engine). Scored by
+`build-score.mjs` and `build-tasks.mjs`, every row rescored twice with no verdict changed.
+
+| Builds that pass | Figma MCP alone | Figma MCP and the skill |
+|---|---|---|
+| Sonnet, 6 tasks × 5 runs | 16/30 · $6.42 · 16 turns a run | 30/30 · $9.86 · 18 turns a run |
+| Haiku, 6 tasks × 3 runs | 4/18 · $0.86 · 10 turns a run | 18/18 · $2.02 · 14 turns a run |
+
+| Task | Sonnet, MCP alone | Sonnet, with the skill | Haiku, MCP alone | Haiku, with the skill |
+|---|---|---|---|---|
+| Tokens, light and dark | 0/5 | 5/5 | 0/3 | 3/3 |
+| Button (hover, disabled, dark) | 5/5 | 5/5 | 1/3 | 3/3 |
+| Chip (sizes, icon, toggle role) | 1/5 | 5/5 | 0/3 | 3/3 |
+| Field (error state, a real labelled input) | 3/5 | 5/5 | 0/3 | 3/3 |
+| Tag (a colour Figma has no variable for) | 2/5 | 5/5 | 0/3 | 3/3 |
+| Settings screen from the components | 5/5 | 5/5 | 3/3 | 3/3 |
+
+**Reading.** Without the skill no run built the dark mode right: the MCP's design-to-code tools return the light
+values only, so every dark colour was guessed. The skill's token list carries every mode. The other gaps are facts
+Figma holds and the MCP's code does not pass on: the chip's toggle role and the field's text box (annotations), the
+variables to use instead of literal colours, the tag's height. The skill side costs more and takes more turns: it
+reads the build sheet, builds, and runs the engine's check until it passes. With the skill every build passed on
+both models; the 30 Sonnet builds cost $9.86 against $6.42, the 18 Haiku builds $2.02 against $0.86.
+
+**Disclosed.** The field's Figma component had no role annotation, so nothing asked for a real `<input>`; "Role:
+textbox" was added to it in the Figma file and the fixture before the last round, the way the chip and the button
+already carried theirs. Both sides see the same Figma; the MCP's outputs carry no annotations either way.
+
+**Found by this evaluation and fixed** (each round measured from the start, every row rescored after each scorer fix):
+- The engine never read a component's own stylesheet: build mode now records each stylesheet that holds a
+  component's rules as a theme file.
+- The edit check flagged a colour Figma paints with no variable as invented; it is now Figma's own value.
+- The React prop reader lost every prop after a plain one, and a name recorded in `contract.authored.json` never
+  counted.
+- Engine f475251, Haiku 12/18: measured heights and line heights were advisory in build mode (now they fail, and the
+  fix goes back to Figma); the role check skipped a component whose only prop is a state (two fields with no input);
+  the router read the path `figma-mcp/` as "in Figma"; the owed sentence about the tag's colour was lost when the one
+  Stop hand-back went to leftover values.
+- Engine c3c4682, Haiku 16/18: the rendered check drew a component the pages do not show as a bare `<div>`, so a
+  `<span>` tag that ignores its height and a field `<input>` with line-height 1 passed; and the fix line repeated
+  "set 36px" while the rule already said 36px (one run tried four times, then reported the failure). Replayed on all
+  48 builds, the fixed engine fails exactly the builds the scorer fails.
+- Engine b8145b9, Haiku 15/18: two token runs went on to build every component and ran out of turns (the next step
+  now builds a component only when the person asks); the scorer measured the field's wrapper or label instead of its
+  input (fixed, both sides rescored).
+- Engine a802c65, Haiku 17/18: a tag build reported the failing check instead of fixing it; in build mode the next
+  step now says to fix each failing line and run again until it passes.
+- Engine 38e9aad, Haiku 17/18: the variant check wanted the selector exactly as the build sheet wrote it
+  (`.tag.tag--positive`) and failed `.tag--positive`, which selects the same element and which the browser measured
+  right; the run looped, wrote a demo page so the engine would see the class, and stopped with the check failing.
+  The modifier alone now counts, and a missing variant says how to add it.
+- Scorer: the chip's icon was missed next to plain text and when the component kept Figma's text values; a 0.2 s
+  colour transition was read mid-way.
+
+**Limits.** One fictional design system, six tasks, five and three runs. The Figma file is small and the tasks are
+built one at a time; a real system with many components and screens is the next test (a private run on the owner's
+file, its results kept out of this repository). The two sides ran on consecutive Claude Code releases.
+
 ## 2026-10: building from Figma, the misses made deterministic, a smaller main guide (continuous evaluation)
 
 What changed since g9 (engine 40906c4): build mode for a project that has only Figma, with its recipe
