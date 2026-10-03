@@ -71,3 +71,19 @@ test('a reply that asks the person for a secret goes back once, whatever the rou
   const both = stopCheck({ session_id: 's', prompt_id: 'p', last_assistant_message: 'Built the tag. Please provide the token so I can refresh.' }, { root });
   assert.match(both ?? '', /leaves out .*colours the design system has no variable for, and asks the person for a secret/);
 });
+
+test('before the agent finishes, a value the system does not have that an edit left in a changed file goes back once', async () => {
+  const { stopCheck } = await import('../guard.mjs');
+  const { execFileSync } = await import('node:child_process');
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'left-');
+  const git = (...a) => execFileSync('git', a, { cwd: dir, stdio: 'ignore' });
+  try { git('rev-parse', '--git-dir'); } catch { git('init', '-q'); }
+  git('add', '-A'); try { git('-c', 'user.email=a@b', '-c', 'user.name=a', 'commit', '-qm', 'init'); } catch { /* the fixture is committed already */ }
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  assert.equal(stopCheck({ session_id: 's', last_assistant_message: 'Done.' }, { root: dir, cfg }), null, 'nothing changed');
+  const page = join(dir, 'apps/gallery/ui.html');
+  writeFileSync(page, readFileSync(page, 'utf8').replace('</body>', '<span style="color: #2d8659">Saved</span>\n</body>'));
+  const back = stopCheck({ session_id: 's', last_assistant_message: 'The system has no green. Which colour should I use?' }, { root: dir, cfg });
+  assert.match(back ?? '', /files you changed still hold[\s\S]*apps\/gallery\/ui\.html[\s\S]*#2d8659 is not a design-system colour[\s\S]*leave it out and tell the person/);
+  assert.equal(stopCheck({ session_id: 's', stop_hook_active: true, last_assistant_message: 'x' }, { root: dir, cfg }), null, 'once only');
+});
