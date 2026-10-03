@@ -19,13 +19,13 @@ Six tasks. Build the tokens, the button, the chip, the field, the tag, then the 
 
 | Model | Claude alone | With the skill |
 |---|---|---|
-| Opus | 8 of 18 | 16 of 18 |
+| Opus | 8 of 18 | 18 of 18 |
 | Sonnet | 16 of 30 | 30 of 30 |
-| Haiku | 4 of 18 | 18 of 18 |
+| Haiku | 4 of 18 | 18 of 18, then 16 of 18 on the latest engine |
 
 - **Dark mode.** No run without the skill got the dark colours right, on any model (0 of 11). The MCP returns one mode, so every dark value was guessed. The skill reads every mode.
 - **What Figma knows and the code missed.** The chip's toggle role and the field's real text input come from Figma annotations. Variables replace literal colours, and the tag keeps its exact height. Without the skill these were missed or guessed.
-- **Opus with the skill missed twice on one bug.** An accessible name passed in by the caller was overwritten. The engine now catches that pattern in every edit.
+- **Every miss with the skill becomes a check.** Opus with the skill first passed 16 of 18. Both misses overwrote an accessible name passed in by the caller. The engine now catches that pattern in every edit, and the next run passed 18 of 18. Haiku's two misses on the latest engine were a field with no text colour and a second way of losing the accessible name, the next checks to add.
 
 ### 2. Prototyping with the design system
 
@@ -33,10 +33,9 @@ The designer asks for a screen. The rule is to use only the system's components,
 
 | Model | Claude alone | With the skill |
 |---|---|---|
-| Opus, three tasks | 4 of 9 | 9 of 9 |
-| Opus, six tasks, latest engine | 13 of 18 | 12 of 12 so far |
+| Opus, six tasks | 13 of 18 | 17 of 18 |
+| Haiku, six tasks | 2 of 18 | 18 of 18 |
 | Sonnet, three tasks | 2 of 15 | 6 of 6 |
-| Haiku, three tasks | 1 of 9 | 8 of 9 |
 
 - **Without the skill, every failure was an invention.** Opus built its own Switch component, drew its own illustration, and wrote colours and sizes the system does not have. Two Sonnet runs changed the system's own tokens file.
 - **With the skill nothing is invented.** A need the system cannot meet becomes a labelled box on the page and a line on the gap list for the design team, for example "on/off switch, closest in the system is the chip".
@@ -60,7 +59,7 @@ A rule violation is changing code nobody asked for, committing unasked, writing 
 2. **Nothing is invented, and gaps become visible.** Claude uses only what exists. Everything it needed and could not find goes on one list, counted across screens, so the design team sees the most needed missing pieces first.
 3. **The team's knowledge is used every time.** Figma descriptions and annotations, code notes, recorded decisions, and guidelines from Notion, GitLab or the repository are put in front of Claude for each request. The rules that can be checked are checked.
 4. **Pages of one product stay consistent.** A new page is compared with the designed screens and the pages already made.
-5. **A cheaper model does the job.** Haiku with the skill beat Opus alone at building from Figma (18 of 18 against 8 of 18, for $1.96 against $2.49) and at prototyping (8 of 9 against 4 of 9, for $0.54 against $1.91).
+5. **A cheaper model does the job.** Haiku with the skill beat Opus alone at building from Figma (18 of 18 against 8 of 18, for $1.96 against $2.49) and at prototyping (18 of 18 against 13 of 18, for $1.36 against $3.64).
 6. **It is safe to hand to anyone.** The system's files are never changed unasked. A commit, an accepted difference or a silenced check asks a person first. A secret is never asked for in the chat.
 7. **Every claim is checked.** The same scorers run on every version. Every run is saved, and a result can be summarized again from the records at any time.
 
@@ -71,16 +70,16 @@ Building from Figma costs more with the skill, because Claude checks its work an
 | Builds | Claude alone | With the skill | Per passing build, alone | Per passing build, with the skill |
 |---|---|---|---|---|
 | Sonnet, 30 builds | $6.42 | $9.86 | $0.40 | $0.33 |
-| Opus, 18 builds | $2.49 | $5.66 | $0.31 | $0.35 |
+| Opus, 18 builds | $2.49 | $5.68 | $0.31 | $0.32 |
 | Haiku, 18 builds | $0.86 | $2.02 | $0.22 | $0.11 |
 
-Prototyping costs less with the skill, because Claude does not explore and build components of its own ($1.69 against $1.91 for 9 Opus prototypes, $0.54 against $0.71 for 9 on Haiku). The cheapest way to a build that matches is Haiku with the skill, at about $0.11 for each one that passes.
+Prototyping costs about the same or less with the skill, because Claude does not explore and build components of its own ($3.70 against $3.64 for 18 Opus prototypes, $1.36 against $1.57 for 18 on Haiku). The cheapest way to a build that matches is Haiku with the skill, at about $0.11 for each one that passes.
 
 ## Limits
 
 - **One small system.** Tidepool has four components and one screen, so Claude alone can read all of it in a few steps. The skill should matter more on a real system with hundreds of components, documentation spread across tools and many screens. That test comes next, on a private system, with its results kept out of this repository.
 - **Opus alone is strong when the task is simple and the documentation is easy to find.** Most of the skill's measured gain on Opus is enforcement. It does not invent, it checks every mode, and it does not stop until the checks pass.
-- **Partial runs.** The latest six-task prototype run on Opus with the skill had 12 of 18 runs when this was written (all passed). The remaining runs and the Haiku runs on the latest engine are recorded in `RESULTS.md` when they finish.
+- **Not every run passes.** Opus with the skill missed one prototype (a tag used for a confirmation its guidelines rule out), and Haiku with the skill missed two builds and one of 67 everyday task runs (a green the system does not have). Each is recorded with its run.
 
 ## Reproduce
 
