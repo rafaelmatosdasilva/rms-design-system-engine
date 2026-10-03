@@ -118,6 +118,8 @@ Open an empty project, set it up with your Figma link, and ask for what to build
 
 Claude writes the code; the engine gives it Figma's exact names and values first and checks every piece after.
 
+Measured on a small design system in Figma (tokens, four components and a screen), Claude with the Figma MCP alone built 16 of 30 pieces right with Sonnet and 4 of 18 with Haiku. With the engine it built all of them, on both models. The full results are in [test/skill-evals/RESULTS.md](test/skill-evals/RESULTS.md).
+
 You get a short summary back: what passes, what is different, and how to fix each thing. Nothing is changed until you ask for it.
 
 ## The checks
