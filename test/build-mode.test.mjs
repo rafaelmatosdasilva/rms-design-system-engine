@@ -72,12 +72,14 @@ test('the token check lists the tokens to build, exactly, and does not fail; a w
   assert.match(r.stdout, /--radii-chip/);
 });
 
-test('the next step builds the tokens first, then one component at a time', () => {
+test('the next step builds the tokens first, then a component only when the person asked for it', () => {
   const failing = [{ label: 'Token values', lines: ['❌ x'] }];
   const toBuild = { tokens: 3, file: TOKENS_TO_BUILD, theme: 'src/styles/tokens.css', components: ['button', 'card'] };
   assert.match(nextStep({ failing, toBuild }), /^NEXT: tell the user what fails/);
   assert.match(nextStep({ toBuild }), /copy the declarations in .*tokens-to-build\.css into src\/styles\/tokens\.css/);
-  assert.match(nextStep({ toBuild: { ...toBuild, tokens: 0 } }), /build button: run rms-design-system-engine --query button .* --component button until it passes/);
+  const next = nextStep({ toBuild: { ...toBuild, tokens: 0 } });
+  assert.match(next, /If the person asked for button \(or for every component\), build it: run rms-design-system-engine --query button .* --component button until it passes/);
+  assert.match(next, /Otherwise stop here and tell them what is built and what is still to build \(button, card\)/);
   const line = buildLine({ tokens: 0, components: ['button'] });
   assert.match(buildSummary({ verdict: 'pass', gates: [], toBuild: line, next: 'NEXT: x' }), /What is built matches Figma[\s\S]*TO BUILD/);
   assert.equal(buildLine({ tokens: 0, components: [] }), null);

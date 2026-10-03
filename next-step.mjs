@@ -39,7 +39,10 @@ export function nextStep({ failing = [], scope = [], handback = {}, burndownNext
   if (toBuild?.tokens) return `NEXT: build the tokens: copy the declarations in ${toBuild.file} into ${toBuild.theme ?? 'the theme CSS'}, then run ${cmd}.`;
   if (toBuild?.components?.length) {
     const c = toBuild.components[0];
-    return `NEXT: build ${c}: run ${cmd} --query ${c} for what it needs, write it with those names, then run ${cmd} --component ${c} until it passes.`;
+    // Only what the person asked for: once it is built, the next component waits for them to ask (a build evaluation
+    // run built every component when it was asked for the tokens, and ran out of turns before it answered).
+    const left = toBuild.components.join(', ');
+    return `NEXT: what is built matches Figma. If the person asked for ${c} (or for every component), build it: run ${cmd} --query ${c} for what it needs, write it with those names, then run ${cmd} --component ${c} until it passes. Otherwise stop here and tell them what is built and what is still to build (${left}).`;
   }
   if (burndownNext && !scope.length) return `NEXT: ${cmd} --component ${burndownNext}`;
   return 'NEXT: nothing to do. Parity holds for what was checked.';

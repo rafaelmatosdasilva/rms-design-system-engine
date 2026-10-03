@@ -95,9 +95,12 @@ function serve(dir) {
 }
 
 // What the page measures for the element a case rendered: the root, and the element that holds the label text.
-const MEASURE = `(sel, label) => {
-  const host = document.querySelector(sel); const el = host && [...host.childNodes].find((n) => n.nodeType === 1);
-  if (!el) return null;
+// The component's own element: the root, or the element that carries the component's class when the root is not it
+// (a plain wrapper, or a fragment whose first element is a label: the field's input carries .field).
+const MEASURE = `(sel, label, cls) => {
+  const host = document.querySelector(sel); const top = host && [...host.childNodes].find((n) => n.nodeType === 1);
+  if (!top) return null;
+  const el = cls && !top.classList.contains(cls) && host.querySelector('.' + cls) || top;
   const cs = getComputedStyle(el);
   const walk = (n) => [n, ...[...n.children].flatMap(walk)];
   const textEl = walk(el).reverse().find((n) => label && n.textContent.trim() === label) || walk(el).reverse().find((n) => [...n.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())) || el;
@@ -113,6 +116,7 @@ const MEASURE = `(sel, label) => {
 
 // Render cases of one exported component and measure each. cases: [{ id, props, pseudo: ['hover'], dark: bool }]
 export async function renderCases(dir, file, exportName, cases, { label = null } = {}) {
+  const cls = String(exportName).toLowerCase();   // the component's class, as the build sheet and Figma name it
   const chromePath = process.env.CHROME_PATH || findChrome({ playwright: true });
   if (!chromePath) throw new Error('no Chrome to render with');
   const { server, port } = await serve(dir);
@@ -143,10 +147,11 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
           try { const node = window.__C(${JSON.stringify(c.props)}); host.append(node instanceof Node ? node : String(node ?? '')); return true; } catch (e) { host.textContent = 'ERROR ' + e.message; return false; } })()`);
         if (c.pseudo?.length) {
           const { root } = await send('DOM.getDocument', { depth: -1 }, sessionId);
-          const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: '#case > *' }, sessionId);
+          const own = await ev(`(() => { const t = document.querySelector('#case > *'); return !!(t && !t.classList.contains(${JSON.stringify(cls)}) && document.querySelector('#case .' + ${JSON.stringify(cls)})); })()`);
+          const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: own ? `#case .${cls}` : '#case > *' }, sessionId);
           if (nodeId) await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: c.pseudo }, sessionId);
         }
-        m = await ev(`(${MEASURE})('#case', ${JSON.stringify(label)})`);
+        m = await ev(`(${MEASURE})('#case', ${JSON.stringify(label)}, ${JSON.stringify(cls)})`);
         if (!c.dark || (m && c.expectDark && c.expectDark(m))) break;
       }
       out[c.id] = m;
