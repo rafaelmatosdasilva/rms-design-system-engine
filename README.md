@@ -125,10 +125,11 @@ Measured on a small design system in Figma (tokens, four components and a screen
 
 A prototype here is made only of your design system's own components, with their own options. Nothing is invented and nothing in the system changes. When a screen needs something the system does not have, the prototype shows a labelled box and you get a list of what the system would need, for your design team to decide.
 
-| You want to | In the terminal |
-|---|---|
-| Draw a prototype | `rms-design-system-engine --prototype prototypes/settings.json` |
-| Start from the screens you designed in Figma | `rms-design-system-engine --prototype --from-screens <screen capture>` |
+| You want to | Type in Claude Code | Or in the terminal |
+|---|---|---|
+| Make a prototype | `/rms-design-system-engine prototype a notification settings page with our components` | `rms-design-system-engine --prototype prototypes/settings.json` |
+| See what a prototype may use | `/rms-design-system-engine what can a prototype use?` | `rms-design-system-engine --prototype --catalog` |
+| Start from the screens you designed in Figma | `/rms-design-system-engine make prototypes from our Figma screens` | `rms-design-system-engine --prototype --from-screens <screen capture>` |
 
 - **What a prototype is.** A short file listing which components go where, with which options (`prototypes/<name>.json`). The engine checks it first; one that uses a component or an option the system lacks is not drawn, and each line says why.
 - **What you see.** One page with your real components and tokens, in light and dark, under `.design-system-engine-out/prototypes/`.
