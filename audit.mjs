@@ -437,6 +437,19 @@ if (process.argv.includes('--query')) {
   process.exit(r.status ?? 1);
 }
 
+// ── --styleguide: the style guide of what Figma and the code agree on (styleguide-gen.mjs) ──
+if (process.argv.includes('--styleguide')) {
+  let sgConfig = {};
+  try { sgConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  try {
+    const { generateStyleguide } = await import('./styleguide-gen.mjs');
+    const r = await generateStyleguide(ROOT, sgConfig, {});
+    console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${r.components} component${r.components === 1 ? '' : 's'} agreed · ${r.template === 'engine' ? "the engine's template" : "the project's template"})`);
+    if (r.notAgreed) console.log(`   ${r.notAgreed}`);
+    process.exit(0);
+  } catch (e) { console.error(`❌ style guide not built: ${e.message}`); process.exit(1); }
+}
+
 // ── --check-ui <file>: check a generated UI against the component catalog (ui-check.mjs) ──
 if (process.argv.includes('--check-ui')) {
   const passthrough = process.argv.slice(2).filter((a) => a !== '--check-ui');
@@ -3603,14 +3616,14 @@ function reportFull(label, items, shown) {
       console.log(C.yellow('\n⚠️  design-intent generation failed (never fails the audit): ' + e.message));
     }
     // Living style guide — heavier artifact, kept OPT-IN: only on explicit --docs
-    // (or ds-config.json → styleguide.auto) AND when a styleguide template is
-    // configured. It reads the design-intent just written above. (`showroom` is the
+    // (or ds-config.json → styleguide.auto), from the project's template or, without one,
+    // the engine's. It reads the design-intent just written above. (`showroom` is the
     // older name of the same config block and is still read.)
     const sgCfg = cfg.styleguide ?? cfg.showroom;
-    if ((docsForced || sgCfg?.auto) && sgCfg?.template) {
+    if (docsForced || sgCfg?.auto) {
       try {
         const { generateStyleguide } = await import('./styleguide-gen.mjs');
-        const r = await generateStyleguide(ROOT, cfg.styleguide ? cfg : { ...cfg, styleguide: sgCfg }, {});
+        const r = await generateStyleguide(ROOT, cfg.styleguide || !sgCfg ? cfg : { ...cfg, styleguide: sgCfg }, {});
         console.log(`🖼  Styleguide → ${r.out.replace(ROOT + '/', '')}  (${r.components} components · filled ${r.filled.join(', ')})`);
       } catch (e) {
         console.log(C.yellow('\n⚠️  styleguide generation failed (never fails the audit): ' + e.message));

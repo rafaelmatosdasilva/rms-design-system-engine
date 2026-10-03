@@ -380,7 +380,7 @@ if (snap.primitives && typeof snap.primitives === 'object') {
 const sourceSnap = snap.source ?? null;
 
 // ── Accumulators ──────────────────────────────────────────────────────────────
-const FAIL = [], PASS = [], SKIP = [], NEW_SKIP = [], ALIAS_FAIL = [], PENDING_FIGMA_SYNC = [], BOOL_INFO = [], TYPO_INFO = [], EFFECTS_FAIL = [], SCOPE_FAIL = [], FOCUS_INFO = [];
+const FAIL = [], PASS = [], PASS_VARS = [], SKIP = [], NEW_SKIP = [], ALIAS_FAIL = [], PENDING_FIGMA_SYNC = [], BOOL_INFO = [], TYPO_INFO = [], EFFECTS_FAIL = [], SCOPE_FAIL = [], FOCUS_INFO = [];
 const autoFixes = []; // { cssVar, newVal, line } - applied when --fix
 
 // ── 1. COLOR ──────────────────────────────────────────────────────────────────
@@ -443,7 +443,7 @@ for (let modeIdx = 0; modeIdx < MODES.length; modeIdx++) {
         });
       }
     } else {
-      PASS.push(`color ${token}:${modeMeta.snapshotKey}`);
+      PASS.push(`color ${token}:${modeMeta.snapshotKey}`); PASS_VARS.push({ dimension: 'color', token: tokenKey, cssVar: actualVar, mode: modeMeta.snapshotKey, value: cssHex });
 
       // Alias chain check - CSS var() chain must route through same primitive as Figma.
       // Same hex can pass value check while chain goes through a different primitive - still wrong.
@@ -533,7 +533,7 @@ for (const [token, figmaVal] of Object.entries(snap.sizing ?? {})) {
       if (line && varFileMap[actualVar] === THEME_PATH) autoFixes.push({ cssVar: actualVar, newVal: String(figmaVal).trim(), line });
     }
   } else {
-    PASS.push(`sizing ${token}`);
+    PASS.push(`sizing ${token}`); PASS_VARS.push({ dimension: 'sizing', token, cssVar: actualVar, value: cssVal });
   }
 }
 
@@ -572,7 +572,7 @@ if (snap.typography && Object.keys(TYPO).length) {
         if (line && varFileMap[actualVar] === THEME_PATH) autoFixes.push({ cssVar: actualVar, newVal: String(figmaVal).trim(), line });
       }
     } else {
-      PASS.push(`typography ${scale}/${prop}`);
+      PASS.push(`typography ${scale}/${prop}`); PASS_VARS.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar: actualVar, value: cssVal });
     }
   }
 } else if (!snap.typography) {
@@ -940,6 +940,7 @@ if (JSON_MODE) {
     boolInfo: BOOL_INFO, typoInfo: TYPO_INFO,
     effectsFail: EFFECTS_FAIL, focusInfo: FOCUS_INFO, scopeFail: SCOPE_FAIL,
     passList: PASS,
+    passVars: PASS_VARS,   // each matching token with its CSS variable (the style guide shows these)
   }, null, 2));
 }
 
