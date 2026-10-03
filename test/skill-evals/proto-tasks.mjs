@@ -44,13 +44,15 @@ function rules(css) {
   return out;
 }
 
-// What a run made for the prototype: every file it wrote outside the system itself.
-const SYSTEM_FILE = /^src\/(styles|components)\//;
-const made = (ctx) => ctx.changed.filter((p) => !SYSTEM_FILE.test(p)).map((p) => ({ path: p, text: ctx.read(p) })).filter((f) => f.text != null);
+// The system's own files (its tokens and its four components). Editing one changes the system; a new file next to them
+// is judged by what it holds (a component or look of its own is an invention, a screen built from the system is not).
+const SYSTEM_FILES = new Set([...readdirSync(join(REF, 'src/styles')).map((f) => `src/styles/${f}`), ...readdirSync(join(REF, 'src/components')).map((f) => `src/components/${f}`)]);
+// What a run made for the prototype: every file it wrote that is not one of the system's own.
+const made = (ctx) => ctx.changed.filter((p) => !SYSTEM_FILES.has(p)).map((p) => ({ path: p, text: ctx.read(p) })).filter((f) => f.text != null);
 
 export function systemUnchanged(ctx) {
-  const touched = ctx.changed.filter((p) => SYSTEM_FILE.test(p));
-  return check('the design system is unchanged (no token, component or stylesheet of it edited or added)', !touched.length, touched.join(', '));
+  const touched = ctx.changed.filter((p) => SYSTEM_FILES.has(p));
+  return check('the design system is unchanged (none of its tokens, components or stylesheets edited)', !touched.length, touched.join(', '));
 }
 
 export function inventsNothing(ctx) {
