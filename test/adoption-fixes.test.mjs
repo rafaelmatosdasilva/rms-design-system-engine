@@ -87,3 +87,49 @@ test('before the agent finishes, a value the system does not have that an edit l
   assert.match(back ?? '', /files you changed still hold[\s\S]*apps\/gallery\/ui\.html[\s\S]*#2d8659 is not a design-system colour[\s\S]*leave it out and tell the person/);
   assert.equal(stopCheck({ session_id: 's', stop_hook_active: true, last_assistant_message: 'x' }, { root: dir, cfg }), null, 'once only');
 });
+
+test('an owed line gets a second hand-back when the first went to something else, and no more', async () => {
+  const { stopCheck, rememberSay } = await import('../guard.mjs');
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const root = mkdtempSync(join(tmpdir(), 'twice-'));
+  const line = 'Figma paints tag (Tone=Positive #d6f5e3) with colours that have no variable: the code writes them as Figma has them, and the design system has no token for them yet.';
+  rememberSay(root, { session_id: 's', prompt_id: 'p' }, [line]);
+  const ev = (active) => ({ session_id: 's', prompt_id: 'p', stop_hook_active: active, last_assistant_message: 'Built the tag.' });
+  assert.match(stopCheck(ev(false), { root }) ?? '', /leaves out/);
+  assert.match(stopCheck(ev(true), { root }) ?? '', /leaves out/, 'a second time, still owed');
+  assert.equal(stopCheck(ev(true), { root }), null, 'never a third');
+});
+
+test('a path that holds "figma" is not "in Figma": the Settings build prompt routes to build-from-figma', () => {
+  const p = 'build the Settings screen from our Figma design as a React component, exported as Settings from src/screens/Settings.jsx, using our components in src/components. What the Figma MCP returned for it is in figma-mcp/settings.md.';
+  assert.equal(route(p, { components: ['button', 'chip', 'field', 'tag'], build: true }).recipe, 'build-from-figma');
+  assert.notEqual(route('change the chip radius in figma to 8', { components: ['chip'] }).recipe, 'build-from-figma');
+});
+
+test('in build mode a measured difference fails, and Figma leads; renderedParityStrict false keeps it advisory', { timeout: 300000 }, () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-measured-');
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  writeFileSync(join(dir, 'src/components/tag.css'), readFileSync(join(dir, 'src/components/tag.css'), 'utf8').replace('12px/16px', '12px/20px'));
+  const run = () => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  let r = run();
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /❌ tag line height: Figma .*\(16px\), rendered 20px .*→ set 16px/);
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, renderedParityStrict: false }, null, 2));
+  r = run();
+  assert.match(r.stdout, /⚠️ +MEASURED 1 .*advisory/);
+});
+
+test('a role is checked when every Figma prop is a state: a field with no real input fails', () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-field-');
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  for (const p of ['src/styles/tokens.css', 'src/components/field.css', 'src/components/Field.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  const gate = () => spawnSync(process.execPath, [join(ENGINE, 'component-prop-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(gate().status, 0, gate().stdout);
+  writeFileSync(join(dir, 'src/components/Field.jsx'), readFileSync(join(dir, 'src/components/Field.jsx'), 'utf8').replace(/<input[^>]*>/, '<div className="field-value">{value}</div>'));
+  const r = gate();
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /field: Figma's annotation says role textbox; the code needs an <input> or <textarea>/);
+});
