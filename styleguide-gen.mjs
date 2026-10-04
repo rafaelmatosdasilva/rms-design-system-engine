@@ -22,7 +22,7 @@
 // Exit 0 on success. Never throws into the audit — callers wrap it.
 
 import { appDir } from './code-roots.mjs';
-import { codeSizeCSS } from './styleguide-data.mjs';
+import { codeSizeCSS, modeRootCSS } from './styleguide-data.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
@@ -190,7 +190,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const snapPath = cfg.paths?.snapshotVars ? resolve(ROOT, cfg.paths.snapshotVars) : null;
       if (snapPath && existsSync(snapPath)) sizeCSS = codeSizeCSS(JSON.parse(readFileSync(snapPath, 'utf8')).modeVariants, css);
     } catch {}
-    return deriveModeCSS(css) + sizeCSS;
+    return deriveModeCSS(css) + sizeCSS + modeRootCSS(css);
   }
 
   // ── ICON_SHEET ───────────────────────────────────────────────────────────────

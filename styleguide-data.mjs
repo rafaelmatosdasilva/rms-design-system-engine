@@ -17,6 +17,20 @@ const cleanName = (k) => String(k).replace(/#[\d:]+$/, '');
 // cssSelector forms the capture reads), size from the sizing collection's own modes (vars snapshot modeVariants).
 // An axis is `scoped` when its CSS is an attribute block that nests ([data-color], [data-size]): then each component
 // can flip its own preview, as a Figma mode does on a frame. A :root-only switch is global.
+// The system's page text styles (its html and body rules' colour and font, the ones a component inherits) declared
+// again on every element that carries its own mode: an inherited value is resolved on the page, so without this a
+// component switched to Light on a Dark page would still inherit the Dark page's text colour.
+const INHERITED = /^(color|font|font-family|font-size|font-weight|line-height|letter-spacing)$/;
+export function modeRootCSS(css = '') {
+  const text = String(css ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const decls = {};
+  for (const m of text.matchAll(/(?:^|[}\s,])(html|body)\s*\{([^{}]*)\}/g)) {
+    for (const d of m[2].matchAll(/([\w-]+)\s*:\s*([^;]+);/g)) if (INHERITED.test(d[1]) && /var\(/.test(d[2])) decls[d[1]] = d[2].trim();
+  }
+  const body = Object.entries(decls).map(([k, v]) => `${k}: ${v};`).join(' ');
+  return body ? `\n\n  /* == The page's text styles on each element with its own mode (inherited values follow that mode) == */\n  [data-color], [data-size] { ${body} }\n` : '';
+}
+
 // The code's own breakpoint modes: each @media block (not a colour or contrast preference) that sets variables on
 // :root, with the base :root's values for the same variables. → [{ condition, decls, base, rules }]
 export function codeSizeBlocks(css = '') {
@@ -277,7 +291,13 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     // An instance hidden at rest (a hidden class or attribute, or an extra class whose own rule sets display: none, such
     // as a reset button that shows only once zoomed) would draw nothing: the next one is used when there is one.
     const shown = candidates.filter((c) => !hiddenAtRest(c.markup, cls, cssText));
-    const chosen = fullestMarkup(shown.length ? shown : candidates);
+    // Of those, the ones holding every part a prop shows, hides or writes (an icon, a label): an instance without the
+    // icon cannot show it when show-icon is on, and a bare text label cannot be hidden.
+    const named = controls.filter((k) => k.part && (k.type === 'BOOLEAN' || k.type === 'TEXT'));
+    const held = (m) => named.filter((k) => holdsPart(m, k.part)).length;
+    const pool = shown.length ? shown : candidates;
+    const most = Math.max(0, ...pool.map((c) => held(c.markup)));
+    const chosen = fullestMarkup(pool.filter((c) => held(c.markup) === most));
     const markup = chosen?.markup ?? null;
     // Every other markup the code shows for it, fullest first: a drawing picks the one that fits each instance's words.
     const markups = [...new Set(candidates.map((c) => c.markup).filter((m) => m && elementsIn(m) <= 30))].sort((a, b) => elementsIn(b) - elementsIn(a)).slice(0, 6);
@@ -349,6 +369,17 @@ export function agreedTokens(check = {}, figmaVars = {}) {
 // is markup and nothing else.
 // Whether a piece of markup's own element is hidden until something happens: a hidden attribute, an inline
 // display: none, a hidden class, or a class besides the component's own whose rule is display: none.
+// Whether markup holds a part a prop names: a tag (svg, span), a class (.label) or a class fragment ([class*="text"]),
+// any of a selector list, below the component's own element.
+export function holdsPart(markup, sel) {
+  const inner = String(markup ?? '').replace(/^<[^>]*>/, '');
+  return String(sel ?? '').split(',').map((x) => x.trim().split(/\s+/).pop()).some((x) => {
+    const tag = /^([a-z][\w-]*)/i.exec(x)?.[1], cls = /\.([\w-]+)/.exec(x)?.[1], frag = /\[class\*=["']?([\w-]+)["']?\]/.exec(x)?.[1];
+    const classes = [...inner.matchAll(/\bclass\s*=\s*["']([^"']*)["']/g)].map((m) => m[1]).join(' ');
+    return (tag ? new RegExp(`<${tag}\\b`, 'i').test(inner) : true) && (cls ? new RegExp(`(^|\\s)${cls}(\\s|$)`).test(classes) : true) && (frag ? classes.includes(frag) : true) && Boolean(tag || cls || frag);
+  });
+}
+
 export function hiddenAtRest(markup, cls, cssText = '') {
   const open = String(markup ?? '').match(/^<[a-zA-Z][\w-]*\b([^>]*)>/);
   if (!open) return false;
@@ -598,7 +629,9 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   for (const [role, v] of Object.entries(override ?? {})) if (typeof v === 'string' && v) { roles[role] = /^--/.test(v) ? `var(${v})` : v; from[role] = 'styleguide.chrome'; }
   const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 'font', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
   const missing = NEEDED.filter((r) => !roles[r]);
-  const css = Object.keys(roles).length ? `:root { ${Object.entries(roles).map(([k, v]) => `--sg-${k}: ${v};`).join(' ')} }` : '';
+  // Declared again on every element that carries its own mode, so a preview in Light on a Dark page resolves the
+  // page's roles with its own values (a variable is resolved where it is declared, then inherited as it is).
+  const css = Object.keys(roles).length ? `:root, [data-color], [data-size] { ${Object.entries(roles).map(([k, v]) => `--sg-${k}: ${v};`).join(' ')} }` : '';
   return { roles, from, missing, css };
 }
 
