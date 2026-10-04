@@ -2159,6 +2159,8 @@ function reportFull(label, items, shown) {
       if (/^\s*\/\//.test(codePart)) return true;
       // JSDoc / block-comment continuation lines (` * blah`)
       if (/^\s*\*/.test(codePart)) return true;
+      // A media, container or supports condition (a breakpoint width) is when a rule applies, not a value it sets
+      if (/^\s*@(media|container|supports)\b/.test(codePart)) return true;
       const stripped = codePart.replace(/\/\*[^*]*\*\//g, '');
       // Value wrapped in quotes/backticks → JS/Vue string, not a real CSS rule
       if (/[`"'][^`"']*:\s*[^`"']*[`"']/.test(codePart)) return true;
