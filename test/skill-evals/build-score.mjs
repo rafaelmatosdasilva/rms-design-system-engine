@@ -165,7 +165,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
     // Load the module once; find the component: the named export, the default, or any function export.
     const loaded = await ev(`import('/${relative(dir, file)}').then((m) => { const want = ${JSON.stringify(exportName)}.toLowerCase();
       const pick = Object.entries(m).find(([k, v]) => typeof v === 'function' && k.toLowerCase() === want) ?? (typeof m.default === 'function' ? ['default', m.default] : Object.entries(m).find(([, v]) => typeof v === 'function'));
-      window.__C = pick && pick[1]; return pick ? pick[0] : null; }).catch((e) => 'ERROR ' + e.message)`);
+      window.__C = pick && pick[1]; return import('/__react.js').then((r) => { window.__h = r.createElement; return pick ? pick[0] : null; }); }).catch((e) => 'ERROR ' + e.message)`);
     if (!loaded || String(loaded).startsWith('ERROR')) return { error: loaded ?? `no component exported from ${relative(dir, file)}` };
     for (const c of cases) {
       const darkModes = c.dark ? ['data', 'class', 'media'] : [null];
@@ -174,7 +174,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
         await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: dm === 'media' ? 'dark' : 'light' }] }, sessionId);
         await ev(`(() => { const h = document.documentElement; ${dm === 'data' ? "h.setAttribute('data-theme','dark');" : "h.removeAttribute('data-theme');"} h.classList.toggle('dark', ${dm === 'class'}); h.classList.toggle('theme-dark', ${dm === 'class'});
           const root = document.getElementById('root'); root.innerHTML = ''; const host = document.createElement('div'); host.id = 'case'; host.style.display = 'inline-block'; root.append(host);
-          try { const node = window.__C(${JSON.stringify(c.props)}); host.append(node instanceof Node ? node : String(node ?? '')); return true; } catch (e) { host.textContent = 'ERROR ' + e.message; return false; } })()`);
+          try { const node = window.__h(window.__C, ${JSON.stringify(c.props)}); host.append(node instanceof Node ? node : String(node ?? '')); return true; } catch (e) { host.textContent = 'ERROR ' + e.message; return false; } })()`);
         if (c.pseudo?.length) {
           const { root } = await send('DOM.getDocument', { depth: -1 }, sessionId);
           const own = await ev(`(() => { const t = document.querySelector('#case > *'); return !!(t && !t.classList.contains(${JSON.stringify(cls)}) && document.querySelector('#case .' + ${JSON.stringify(cls)})); })()`);

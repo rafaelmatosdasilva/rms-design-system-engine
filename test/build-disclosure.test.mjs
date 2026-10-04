@@ -28,6 +28,8 @@ const failing = (checks) => checks.filter((c) => !c.ok).map((c) => c.name);
 test('the reference disclosure passes every check, a click opening and closing it', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
   const checks = await task.score(project(readFileSync(join(REF, 'src/components/Disclosure.jsx'), 'utf8')));
   assert.deepEqual(failing(checks), [], JSON.stringify(checks.filter((c) => !c.ok)));
+  const opens = checks.find((c) => c.name.startsWith('a click opens it'));
+  assert.match(opens.detail ?? opens.note ?? '', /^aria-expanded=true, passage shown/, 'the click itself opens it, its own state kept between renders');
 });
 
 test('one that never opens, with a chevron that is read out, fails on those points only', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
