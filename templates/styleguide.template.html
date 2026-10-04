@@ -786,6 +786,8 @@ a.pg-usage-name { color: var(--sg-text); }
       var mine = lastCompound(p.part);
       var t = props.find(function (k) { return k.type === 'TEXT' && k.part && lastCompound(k.part).some(function (x) { return mine.indexOf(x) >= 0; }); });
       if (t) el.textContent = state[t.label] || t.default || '';
+      // A text part no text prop writes (Show Description alone) gets its own name, so showing it shows something.
+      else if (!/^(svg|img|input|hr|br)$/i.test(tag)) el.textContent = String(p.label || '').replace(/^show[\s-]+/i, '').replace(/^\w/, function (c) { return c.toUpperCase(); });
       // Beside the component's other text parts, in the order of its props (a title before its description).
       var rank = function (k) { return /title|heading/i.test(k.label) ? -1 : props.indexOf(k); };   // a title leads
       var me = rank(t || p), next = null, last = null;
