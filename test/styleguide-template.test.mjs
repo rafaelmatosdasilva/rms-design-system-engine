@@ -186,3 +186,10 @@ test('the template\'s heading and paragraph rules reach only its own chrome, nev
   const reaching = selectors.filter((s) => /(^|[\s(,])(h[1-6]|p|figure)\b/.test(s) && !/>\s*(:where\()?(h[1-6]|p|figure)\b/.test(s));
   assert.deepEqual(reaching, []);
 });
+
+test('the measuring page (?all) draws no card thumbnails; icons follow Figma, with no made-up size switch', () => {
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /function thumbOf\(c, src\) \{\n[^\n]*\|\| ALL\) return;/);
+  assert.doesNotMatch(tpl, /Own size|iconSizes/);
+  assert.match(tpl, /DATA\.iconFigma/);
+});

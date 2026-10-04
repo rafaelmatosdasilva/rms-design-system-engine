@@ -364,9 +364,10 @@ a.pg-usage-name { color: var(--sg-text); }
     return ps.length ? ps.slice(0, 3).join(', ') + (ps.length > 3 ? ' and ' + (ps.length - 3) + ' more' : '') + '.' : c.role ? 'A ' + c.role + '.' : 'No props yet.';
   };
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { card(cGrid, 'c-' + c.name, 'Components', c.name, about(c)); });
-  // A component's thumbnail is its own preview, drawn small and inert, once its section has drawn it.
+  // A component's thumbnail is its own preview, drawn small and inert, once its section has drawn it. Never with ?all:
+  // the engine measures that page, and a shrunken copy would be read as the component.
   function thumbOf(c, src) {
-    var at = THUMBS['c-' + c.name]; if (!at || !src) return;
+    var at = THUMBS['c-' + c.name]; if (!at || !src || ALL) return;
     at.innerHTML = ''; var k = src.cloneNode(true); k.classList.add('sg-thumb-live'); k.setAttribute('inert', ''); at.appendChild(k);
     fitThumb(at);
   }
@@ -475,20 +476,9 @@ a.pg-usage-name { color: var(--sg-text); }
   if ((DATA.icons || []).length) {
     hr(); navLink('icons', 'icons');
     var is = section('icons', 'Foundations', 'Icons', null);
-    // Each icon at its own size (its symbol's viewBox), or every icon at one of the sizes the components draw icons at.
-    var own = function (id) { var sym = document.getElementById(id), vb = sym && sym.getAttribute('viewBox'); return vb ? Number(vb.split(/[\s,]+/)[2]) || null : null; };
-    var sizes = (DATA.iconSizes || []).slice();
-    DATA.icons.forEach(function (id) { var n = own(id); if (n && sizes.indexOf(n) < 0) sizes.push(n); });
-    sizes.sort(function (a, b) { return a - b; });
-    var iconSize = '';
-    if (sizes.length > 1) {
-      var ictl = document.createElement('div'); ictl.className = 'sg-mode-ctl';
-      ictl.innerHTML = '<span class="sg-mode-label">Size</span>' + segHTML([{ v: '', label: 'Own size' }].concat(sizes.map(function (n) { return { v: String(n), label: n + 'px' }; })));
-      is.appendChild(ictl);
-      var isync = function () { segItems(ictl).forEach(function (b) { segSelect(b, b.dataset.v === iconSize); }); nudge(); };
-      segItems(ictl).forEach(function (b) { b.addEventListener('click', function () { iconSize = b.dataset.v; isync(); drawIcons(); }); });
-      isync();
-    }
+    // Each icon at the size Figma gives it, named as in Figma; the symbol's own viewBox when Figma does not list it.
+    var FIG = DATA.iconFigma || {};
+    var own = function (id) { if (FIG[id] && FIG[id].size) return FIG[id].size; var sym = document.getElementById(id), vb = sym && sym.getAttribute('viewBox'); return vb ? Number(vb.split(/[\s,]+/)[2]) || null : null; };
     var idm = document.createElement('div'); is.appendChild(idm);
     if ((TOKENS.iconStrokes || []).length) { var st = document.createElement('div'); st.className = 'sg-subsection'; st.innerHTML = '<h3>Stroke widths</h3><div class="sg-demo sg-demo--col">' + TOKENS.iconStrokes.map(function (t) { return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + esc(t.var) + ' · ' + esc(t.value) + '</div></div>'; }).join('') + '</div>'; is.appendChild(st); }
     // Grouped by each icon's own size (the small set, the large set), as the system draws them.
@@ -498,8 +488,8 @@ a.pg-usage-name { color: var(--sg-text); }
       order.sort(function (a, b) { return a - b; });
       idm.innerHTML = order.map(function (n) {
         return '<div class="sg-subsection">' + (order.length > 1 ? '<h3>' + (n ? n + 'px' : 'Other') + '</h3>' : '') + '<div class="sg-demo">' + groups[n].map(function (id) {
-          var at = iconSize ? Number(iconSize) : (n || '');
-          return '<div class="icon-chip"><svg aria-hidden="true"' + (at ? ' width="' + at + '" height="' + at + '" style="width:' + at + 'px;height:' + at + 'px"' : '') + '><use href="#' + esc(id) + '"/></svg><span class="color-chip-value">' + esc(id) + '</span></div>';
+          var at = n || '', name = FIG[id] && FIG[id].name;
+          return '<div class="icon-chip"><svg aria-hidden="true"' + (at ? ' width="' + at + '" height="' + at + '" style="width:' + at + 'px;height:' + at + 'px"' : '') + '><use href="#' + esc(id) + '"/></svg><span class="color-chip-value">' + esc(name || id) + '</span></div>';
         }).join('') + '</div></div>';
       }).join('');
     }
