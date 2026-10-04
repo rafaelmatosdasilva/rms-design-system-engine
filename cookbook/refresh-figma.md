@@ -386,7 +386,8 @@ Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the 
 //                 *Background*. Radius commonly sits on the frame for 'direct'/'none' fills
 //                 and on the Background rect for 'before' fills - checking only one location
 //                 produces false nulls.
-// strokeOnDefault  = node.strokes?.length > 0 on the State=Default variant's top-level frame
+// strokeOnDefault  = a visible stroke paint on the State=Default variant's top-level frame (a hidden
+//                    paint with a weight left on it draws nothing, so it is not a stroke)
 // strokeOnAnyState = true if a stroke exists ANYWHERE in ANY variant's subtree (deep walk).
 //                    Must walk recursively into children - many components put strokes on a
 //                    "Background" child rect rather than the component frame itself. Skip
@@ -535,7 +536,7 @@ Capture `strokeOnAnyState` with a **deep recursive walk** across all variants:
 ```js
 function deepHasStroke(node, depth = 0) {
   if (depth > 0 && node.type === 'INSTANCE' && /icon/i.test(node.name)) return false;   // an icon's outline, not a border
-  if ((node.strokes?.length ?? 0) > 0) return true;
+  if ((node.strokes ?? []).some(s => s.visible !== false)) return true;   // a hidden paint draws nothing
   if (depth < 4 && 'children' in node) {
     return node.children.some(c => deepHasStroke(c, depth + 1));
   }

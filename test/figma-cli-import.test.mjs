@@ -75,3 +75,9 @@ test('each collection\'s modes in Figma\'s own order, by snapshot key, for the s
   assert.deepEqual(Object.values(v.modeOrder)[0], col.modes.map(key));
   assert.ok(snapshotsFromDesign(design, tpCfg, {}, 'T').vars._modeOrder, 'written on the vars snapshot');
 });
+
+test('a hidden stroke paint is not a stroke', async () => {
+  const { structureFromComponent } = await import('../figma-cli-import.mjs');
+  assert.equal(structureFromComponent({ t: 'COMPONENT', h: 24, strokes: [{ type: 'SOLID', visible: false }] }).strokeOnDefault, false);
+  assert.equal(structureFromComponent({ t: 'COMPONENT', h: 24, strokes: [{ type: 'SOLID' }] }).strokeOnDefault, true);
+});

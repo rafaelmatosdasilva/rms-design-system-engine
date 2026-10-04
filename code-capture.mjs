@@ -217,8 +217,10 @@ export async function browserTokenReading(ROOT, { files, pages, modes, send, tmp
       writeFileSync(p, themePage(files));
       targets.push({ label: '(theme)', url: pathToFileURL(p).href, isTheme: true });
     }
-    // The generated style guide draws one view at a time for a person; ?all draws every view, as a capture needs.
-    for (const pg of pages) targets.push({ label: pg.label, url: /^https?:/.test(pg.path) ? pg.path : pathToFileURL(resolve(ROOT, pg.path)).href + (pg.generated ? '?all' : '') });
+    // The engine's style guide (the private copy, or the project's page built from it) draws one view at a time for a
+    // person, with shrunken card thumbnails; ?all draws every view and no thumbnail, as a capture needs. A page that
+    // is not the engine's ignores the query.
+    for (const pg of pages) targets.push({ label: pg.label, url: /^https?:/.test(pg.path) ? pg.path : pathToFileURL(resolve(ROOT, pg.path)).href + (pg.generated || pg.label === 'styleguide' ? '?all' : '') });
     for (const t of targets) {
       const { targetId, sessionId } = await openLoaded(send, t.url);
       if (!sessionId) { result.notRead.push(`${t.label}: page did not load`); continue; }
@@ -506,7 +508,7 @@ export async function captureCode(ROOT, cfg, { force = false, browser: wantBrows
         // Components: the styleguide first (every component and state on one page), then the apps;
         // the theme-only page last, as a clean place for probes and bare elements.
         const ordered = [...pages].sort((a, b) => (b.label === 'styleguide') - (a.label === 'styleguide'));
-        const compPages = ordered.map((p) => ({ label: p.label, generated: !!p.generated, url: /^https?:/.test(p.path) ? p.path : pathToFileURL(resolve(ROOT, p.path)).href + (p.generated ? '?all' : '') }));
+        const compPages = ordered.map((p) => ({ label: p.label, generated: !!p.generated, url: /^https?:/.test(p.path) ? p.path : pathToFileURL(resolve(ROOT, p.path)).href + (p.generated || p.label === 'styleguide' ? '?all' : '') }));
         if (!compPages.length && files.length) {
           const tp = join(tmpDir, 'theme-page.html');
           if (existsSync(tp)) compPages.push({ label: '(theme)', url: pathToFileURL(tp).href });

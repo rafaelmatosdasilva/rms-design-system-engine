@@ -348,3 +348,8 @@ browserTest('disabled wins: a state the user cannot reach is not a leak', async 
   const { snapshot } = await captureCode(dir, cfg, { force: true });
   assert.deepEqual(snapshot.components.btn.disabledGuard.map((g) => [g.force, g.unreachable]), [['hover', 'pointer-events: none'], ['active', 'pointer-events: none']]);
 });
+
+test("the project's own style guide page is opened with ?all, so its shrunken card thumbnails are never measured", async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../code-capture.mjs', import.meta.url), 'utf8');
+  assert.equal((src.match(/label === 'styleguide' \? '\?all' : ''/g) ?? []).length, 2);
+});
