@@ -349,6 +349,12 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
       else if (d.type === 'TEXT') control.part = partFor(r.figmaProp, parts[name], 'label');
       controls.push(control);
     }
+    // Figma's order, as its panel lists the props: the variants first, then the rest in the order Figma keeps them.
+    const figmaOrder = [...Object.keys(defs).filter((k) => defs[k].type === 'VARIANT'), ...Object.keys(defs).filter((k) => defs[k].type !== 'VARIANT')];
+    const at = (label) => { const i = figmaOrder.indexOf(label); return i < 0 ? figmaOrder.length : i; };
+    controls.forEach((k) => { k.at = at(k.label); });
+    propsNotBuilt.forEach((k) => { k.at = at(k.label); });
+    controls.sort((a, b) => a.at - b.at);
     // Its markup: the fullest of the contract's probes, its instances in the project's pages, what the pages' scripts
     // build and what its React source returns.
     const candidates = [

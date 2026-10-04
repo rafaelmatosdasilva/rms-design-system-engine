@@ -70,7 +70,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-mode-ctl { display: flex; flex-direction: column; align-items: stretch; gap: var(--sg-space-xs); }
 .sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-footer { display: flex; flex-direction: column; gap: var(--sg-space-m); margin-top: var(--sg-space-xl); }
-.pg-updated { display: grid; gap: var(--sg-space-xxs); margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }
+.pg-updated { display: grid; gap: var(--sg-space-l); margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }   /* each section of the documentation clearly apart */
 .pg-updated > div { display: grid; grid-template-columns: 140px 1fr; gap: var(--sg-space-s); }
 .pg-updated dt { font-weight: var(--sg-heading-weight); color: var(--sg-text-2); }
 .pg-updated dd { margin: 0; }
@@ -670,7 +670,10 @@ a.pg-usage-name { color: var(--sg-text); }
     if (e.tagName === 'INPUT') return e;
     // The part the prop names, even an empty one (a label the product fills at run time), never the component itself.
     var parts = partsInOrder(e, sel).filter(function (k) { return k !== e && !k.closest('svg') && !(used && used.indexOf(k) >= 0); });
-    var named = parts.find(function (k) { return k.tagName !== 'INPUT' && k.textContent.trim(); }) || parts.find(function (k) { return k.tagName === 'INPUT' || !k.children.length; });
+    // The part whose own words they are (a label beside an icon), before a wrapper that only holds it.
+    var own = function (k) { return Array.prototype.some.call(k.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); }); };
+    var named = parts.find(function (k) { return k.tagName !== 'INPUT' && own(k); }) || parts.find(function (k) { return k.tagName !== 'INPUT' && k.textContent.trim() && !k.children.length; }) ||
+      parts.find(function (k) { return k.tagName === 'INPUT' || !k.children.length; }) || parts.find(function (k) { return k.tagName !== 'INPUT' && k.textContent.trim(); });
     if (named) return named;
     var leaf = e;
     while (leaf.firstElementChild) { var next = Array.prototype.find.call(leaf.children, function (k) { return k.tagName.toLowerCase() !== 'svg' && k.textContent.trim() && !(used && used.some(function (u) { return u === k || k.contains(u); })); }); if (!next) break; leaf = next; }
@@ -846,6 +849,17 @@ a.pg-usage-name { color: var(--sg-text); }
       classes.forEach(function (k) { el.classList.add(k); });
       var mine = lastCompound(p.part);
       var t = props.find(function (k) { return k.type === 'TEXT' && k.part && lastCompound(k.part).some(function (x) { return mine.indexOf(x) >= 0; }); });
+      // A part the code draws as a shape (a priority dot: its own CSS gives it a size while empty) is no text part:
+      // it stays empty and comes before the component's words, as a leading mark does.
+      if (!t) {
+        e.appendChild(el); var box = el.getBoundingClientRect(); el.remove();
+        if (box.width > 0 && box.height > 0) {
+          var first = props.find(function (k) { return k.type === 'TEXT' && k.part; }), at = first && textLeaf(e, first.part);
+          var words = at && at !== e && Array.prototype.find.call(at.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); });
+          if (words) at.insertBefore(el, words); else if (at && at !== e) at.parentNode.insertBefore(el, at); else e.insertBefore(el, e.firstChild);
+          return;
+        }
+      }
       if (t) el.textContent = state[t.label] || t.default || '';
       // A text part no text prop writes (Show Description alone) gets its own name, so showing it shows something.
       else if (!/^(svg|img|input|hr|br)$/i.test(tag)) el.textContent = String(p.label || '').replace(/^show[\s-]+/i, '').replace(/^\w/, function (c) { return c.toUpperCase(); });
@@ -927,18 +941,14 @@ a.pg-usage-name { color: var(--sg-text); }
       AXES.forEach(function (a) { if (a.attr && preview.hasAttribute(a.attr)) wrap.setAttribute(a.attr, preview.getAttribute(a.attr)); });
       o.layers.forEach(function (z) { var d = document.createElement('div'); d.className = z; wrap.appendChild(d); });
       var card = src.cloneNode(true); if (!card.getAttribute('role')) card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', c.name);
-      // It opens inside the playground, over the checkered area and centred there, not over the whole page: the
-      // system's container keeps its own look, only its placement is the stage's.
-      wrap.style.position = 'absolute'; wrap.style.inset = '0';
-      var stagePos = preview.style.position; preview.style.position = 'relative';
-      src.style.visibility = 'hidden';
-      wrap.appendChild(card); preview.appendChild(wrap);
+      // It opens as in a product: over the whole browser window, in the system's own container.
+      wrap.appendChild(card); document.body.appendChild(wrap);
       var closing = false;
       function key(e) { if (e.key === 'Escape') close(); }
       function close() {
         if (closing) return; closing = true; document.removeEventListener('keydown', key, true);
         if (o.closing) wrap.classList.add(o.closing);
-        setTimeout(function () { wrap.remove(); src.style.visibility = ''; preview.style.position = stagePos; trigger.focus(); }, o.closing ? playTime(wrap) + 30 : 0);
+        setTimeout(function () { wrap.remove(); trigger.focus(); }, o.closing ? playTime(wrap) + 30 : 0);
       }
       wrap.addEventListener('click', function (e) { if (e.target === wrap || o.layers.some(function (z) { return e.target.classList.contains(z); }) || e.target.closest('button, a')) close(); });
       document.addEventListener('keydown', key, true);
@@ -956,7 +966,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // option names, a text prop as a field. An option the page cannot show (a live state such as :hover, or a
     // markup-only switch) is offered but disabled.
     props.forEach(function (p) {
-      var ctl = document.createElement('div'); ctl.className = 'pg-ctl';
+      var ctl = document.createElement('div'); ctl.className = 'pg-ctl'; if (p.at != null) ctl.dataset.at = p.at;
       var label = '<div class="pg-ctl-label">' + esc(p.label) + (p.prop !== p.label ? '<code>' + esc(p.prop) + '</code>' : '') + '</div>';
       if (p.type === 'TEXT') {
         ctl.innerHTML = label + (DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text">');
@@ -979,10 +989,13 @@ a.pg-usage-name { color: var(--sg-text); }
     });
     // Figma's props the code does not build yet: listed with the rest, offered but not drawn.
     (c.unbuilt || []).forEach(function (u) {
-      var ctl = document.createElement('div'); ctl.className = 'pg-ctl';
+      var ctl = document.createElement('div'); ctl.className = 'pg-ctl'; if (u.at != null) ctl.dataset.at = u.at;
       ctl.innerHTML = '<div class="pg-ctl-label">' + esc(u.label) + '</div>' + segHTML([{ v: '', label: 'Not in the code yet', off: true, title: 'Figma has this prop; the code does not build it yet' }]);
       controlsEl.appendChild(ctl);
     });
+    // In Figma's order (its panel's: variants first, then the rest as Figma lists them), built or not.
+    Array.prototype.slice.call(controlsEl.children).map(function (k, i) { return { k: k, at: k.dataset.at === undefined ? 1e6 + i : +k.dataset.at }; })
+      .sort(function (a, b) { return a.at - b.at; }).forEach(function (x) { controlsEl.appendChild(x.k); });
     if (!props.length && !(c.unbuilt || []).length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = 'No agreed props yet.'; controlsEl.appendChild(none); }
     return sec;
   }
