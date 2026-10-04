@@ -37,7 +37,7 @@ function declarations(css) {
 
 // The look roles the page still leaves to the browser: the last value each --sg-* role gets is one of the template's
 // fallbacks (Canvas, CanvasText, GrayText, AccentColor, inherit, the browser's text sizes, rem spaces, 0 radii).
-const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 'font', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
+const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
 const FALLBACK = /^(Canvas|CanvasText|GrayText|AccentColor|inherit|smaller|small|medium|large|0|[\d.]+rem)$/i;
 export function missingRoles(html) {
   const last = {};
@@ -45,16 +45,40 @@ export function missingRoles(html) {
   return NEEDED.filter((r) => last[r] === undefined || FALLBACK.test(last[r]));
 }
 
+// The classes the page puts on its own buttons and links (in its markup and in the strings its script writes).
+export function controlClasses(html) {
+  const out = new Set();
+  for (const m of String(html).matchAll(/<(?:a|button)\b[^>]*?\bclass\s*=\s*["']([^"'+]+)["']/gi)) m[1].split(/\s+/).forEach((c) => c && out.add(c));
+  for (const m of String(html).matchAll(/createElement\(\s*['"](?:a|button)['"]\s*\)[^;]*;\s*\w+\.className\s*=\s*['"]([^'"]+)['"]/g)) m[1].split(/\s+/).forEach((c) => c && out.add(c));
+  return out;
+}
+
+// A button or link the page draws itself: a rule of its own that gives one a box (a fill, a border, a corner radius
+// or a raised shadow). The system's own button draws it, or the browser's plain one.
+const BOX = /^(background(-color)?|border(-(top|right|bottom|left))?(-(width|style|color))?|border-radius|box-shadow)$/;
+function drawsControl(d, classes) {
+  if (!BOX.test(d.property) || /^(none|0|0px|transparent|inherit|initial|unset)$/i.test(d.value) || /\.pg-preview\b/.test(d.selector)) return false;
+  if (d.property === 'box-shadow' && /\binset\b/.test(d.value)) return false;   // a line marking the current item
+  return d.selector.split(',').some((part) => {
+    const subject = part.trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
+    const tag = /^(a|button)(?![\w-])/i.test(subject);
+    const cls = [...subject.matchAll(/\.([\w-]+)/g)].some((m) => classes.has(m[1]));
+    return tag || cls;
+  });
+}
+
 export function checkStyleguidePage(html, { missing = missingRoles(html) } = {}) {
   const found = [];
   const add = (d, why) => found.push({ selector: d.selector, property: d.property, value: d.value, why });
+  const classes = controlClasses(html);
   for (const d of declarations(pageOwnCss(html))) {
     const { property: p } = d;
+    if (drawsControl(d, classes)) { add(d, 'a button or link the page draws itself: use the system\'s own button, or the browser\'s plain one'); continue; }
     // The role defaults (--sg-*: Canvas, CanvasText, the browser's sizes) are the fallback, not the look.
     if (p.startsWith('--')) continue;
     const v = d.value.replace(/var\([^()]*(?:\([^()]*\)[^()]*)*\)/g, 'VAR');
     if (COLOUR.test(v)) { add(d, 'a colour that is not one of the system\'s tokens'); continue; }
-    if (p === 'font-family' && !/^(VAR|inherit)$/i.test(v)) add(d, 'a font that is not the system\'s');
+    if (p === 'font-family' && !/^inherit$/i.test(v)) add(d, 'a font of the page\'s own: its text inherits the font the system sets on its page, with its fallbacks');
     else if (p === 'font-size' && LENGTH.test(v)) add(d, 'a text size that is not one of the system\'s text styles');
     else if (p === 'font-weight' && /\d/.test(v)) add(d, 'a weight that is not one of the system\'s text styles');
     else if (p === 'line-height' && /\d/.test(v) && v !== '0') add(d, 'a line height that is not one of the system\'s text styles');

@@ -152,7 +152,8 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
 // (:hover, :focus). '.chip.chip--l' over '.chip' adds chip--l; '.button:disabled' sets disabled.
 export function optionEffect(baseSelector, optionSelector) {
   if (!optionSelector) return null;
-  const last = String(optionSelector).trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
+  // A class inside :not() is one the option must not have, never one it adds.
+  const last = (String(optionSelector).trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '').replace(/:not\([^()]*\)/g, '');
   const baseClasses = new Set((String(baseSelector ?? '').match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1)));
   const add = (last.match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1)).filter((c) => !baseClasses.has(c));
   const attrs = {};
@@ -210,7 +211,8 @@ function booleanSelector(base, sel, cssText) {
   const inCss = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(cssText);
   if (compounds.length === 1) return modifier.length && modifier.every(inCss) ? { on: { add: modifier, attrs: {} } } : null;
   const part = compounds[compounds.length - 1];
-  if (modifier.length && modifier.every(inCss) && /^(no|hide|without)[-_]/.test(modifier[0])) return { off: { add: modifier, attrs: {} } };
+  // The part too, so a part no instance holds can still be drawn when the prop turns it on.
+  if (modifier.length && modifier.every(inCss) && /^(no|hide|without)[-_]/.test(modifier[0])) return { off: { add: modifier, attrs: {} }, part };
   return { part };
 }
 export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}, realizations = {}, cssText = '', parts = [] }) {
@@ -648,11 +650,8 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
     if (l.weight?.var) roles['heading-weight'] = `var(${l.weight.var})`;
     if (m.lh?.var) roles.lh = `var(${m.lh.var})`;
   }
-  // The font: a family variable the theme declares, else the family the theme sets on its page.
-  const famVar = /(--[\w-]*font[\w-]*family[\w-]*)\s*:/i.exec(themeCss) ?? /(--[\w-]*family[\w-]*)\s*:/i.exec(themeCss);
-  const famDecl = /(?:^|[{;\s])(?:html|body|:root)[^{]*\{[^}]*?font-family\s*:\s*([^;}]+)/i.exec(themeCss);
-  if (famVar) { roles.font = `var(${famVar[1]})`; from.font = famVar[1]; }
-  else if (famDecl) { roles.font = famDecl[1].trim(); from.font = 'the theme\'s page font'; }
+  // No font role: the page's text inherits the font the system sets on its own page, with its fallbacks, as its
+  // components do. A family variable alone (Inter) would fall to the browser's serif where that font is not installed.
   // Radii and spacing: the system's own scale, nearest to each step the layout uses.
   const px = (t) => parseFloat(String(t.value));
   const nearest = (list, want) => list.filter((t) => Number.isFinite(px(t))).sort((a, b) => Math.abs(px(a) - want) - Math.abs(px(b) - want) || px(a) - px(b))[0];
@@ -669,7 +668,7 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   }
   if (icons.size) { roles.icon = `${icons.size}px`; from.icon = 'the size of the system\'s icons'; }
   for (const [role, v] of Object.entries(override ?? {})) if (typeof v === 'string' && v) { roles[role] = /^--/.test(v) ? `var(${v})` : v; from[role] = 'styleguide.chrome'; }
-  const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 'font', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
+  const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
   const missing = NEEDED.filter((r) => !roles[r]);
   // Declared again on every element that carries its own mode, so a preview in Light on a Dark page resolves the
   // page's roles with its own values (a variable is resolved where it is declared, then inherited as it is).
@@ -706,7 +705,9 @@ export function segmentedUi(components = []) {
     const score = (/(segment|toggle|tabs?|switcher|picker|chooser)/i.test(c.name) ? 0 : 10) + (items[0].tag === 'button' ? 0 : 2);
     const base = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(rootAttrs)?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
     // The control itself, without the modifiers one product gave it (full-width, compact): only its own class.
-    found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected });
+    // Its decoration too (an empty aria-hidden part, as a sliding pill the system's script places).
+    const deco = [...inner.matchAll(/<span\b[^>]*aria-hidden\s*=\s*["']true["'][^>]*>\s*<\/span>/gi)].map((d) => d[0]).join('');
+    found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>${deco}`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected });
   }
   const best = found.sort((a, b) => a.score - b.score)[0];
   if (!best) return null;
@@ -717,6 +718,81 @@ export function segmentedUi(components = []) {
 // The system's own text field, for the page's text inputs: a component's markup holding a text <input> (role
 // textbox, or a name that says input or field, preferred), cut to its root and the input, each keeping only the
 // classes the system's own CSS defines (a product's extra classes stay out). → { from, markup } or null.
+// The system's own text button, for the links the page shows (each component's products): a component whose role is a
+// button or a link, with a text label, and a class the system's CSS styles. The quietest one wins (a link, then a
+// tertiary or ghost button, then a secondary one; a primary or destructive one last); an icon-only button never.
+// ds-config.json → styleguide.ui.button names one instead. → { from, cls, label: { tag, cls } } | null
+// How a component moves, read from the system's own CSS, so the style guide can play it: an entry animation on its
+// own rule, the modifiers that play an exit (.toast.toast-out), and, for a component shown inside an overlay, the
+// container, its open and closing classes and its other layers (.modal.is-open, .modal.is-closing, .modal-overlay).
+// A looping animation (a spinner) always plays and needs no button. → { entry, exits, overlay } | null
+export function motionUi(cls = '', css = '') {
+  if (!cls || /^#/.test(cls)) return null;
+  const text = String(css).replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...text.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sels: m[1].split(',').map((x) => x.trim().replace(/\s+/g, ' ')), body: m[2] }));
+  const esc = (c) => c.replace(/[-]/g, '\\-');
+  const me = esc(cls);
+  const moves = (b) => /(^|;)\s*animation(-name)?\s*:/.test(b) && !/\binfinite\b/.test(b) && !/animation(-name)?\s*:\s*none/.test(b);
+  let entry = false; const exits = new Set(), states = new Map();
+  for (const r of rules) {
+    if (!moves(r.body)) continue;
+    for (const sel of r.sels) {
+      if (new RegExp(`^\\.${me}$`).test(sel)) entry = true;
+      let m = new RegExp(`^\\.${me}\\.([\\w-]+)$`).exec(sel);
+      if (m) exits.add(m[1]);
+      m = new RegExp(`^\\.([\\w-]+)\\.([\\w-]+) \\.${me}$`).exec(sel);
+      if (m) { if (!states.has(m[1])) states.set(m[1], new Set()); states.get(m[1]).add(m[2]); }
+    }
+  }
+  let overlay = null;
+  for (const [container, st] of states) {
+    const c = esc(container);
+    const open = rules.flatMap((r) => r.sels.map((sel) => [sel, r.body])).map(([sel, body]) => [new RegExp(`^\\.${c}\\.([\\w-]+)$`).exec(sel), body])
+      .find(([m, body]) => m && /display\s*:\s*(?!none)[\w-]+/.test(body))?.[0]?.[1];
+    if (!open) continue;
+    const layers = new Set();
+    for (const r of rules) for (const sel of r.sels) { const m = new RegExp(`^\\.${c}(?:\\.[\\w-]+)? (?:> )?\\.([\\w-]+)$`).exec(sel); if (m && m[1] !== cls) layers.add(m[1]); }
+    overlay = { container, open, closing: [...st].find((x) => x !== open) ?? null, layers: [...layers] };
+    break;
+  }
+  if (!entry && !exits.size && !overlay) return null;
+  return { entry, exits: [...exits], overlay };
+}
+
+export function buttonUi(components = [], systemCss = '', prefer = null) {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  const found = [];
+  for (const c of components) {
+    const m = /^\s*<(button|a)\b([^>]*)>([\s\S]*)<\/\1>\s*$/i.exec(c.markup ?? '');
+    if (!m || !(prefer ? c.name === prefer : ['button', 'link'].includes(c.role) || m[1].toLowerCase() === 'a')) continue;
+    const cls = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(m[2])?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
+    if (!cls || !defined(cls)) continue;
+    // Its label part, even one a product fills at run time (an empty span); only the classes the system styles.
+    const lab = /<(span|strong|b|em)\b([^>]*)>([^<]*)<\/\1>/i.exec(m[3]);
+    const bare = m[3].replace(/<svg[\s\S]*?<\/svg>/gi, '').replace(/<[^>]+>/g, '').trim();
+    if (!lab && !bare) continue;   // icon only
+    const labelCls = lab ? (/\bclass\s*=\s*["']([^"']*)["']/i.exec(lab[2])?.[1] ?? '').split(/\s+/).filter((k) => k && defined(k)).join(' ') : '';
+    const rank = c.role === 'link' || m[1].toLowerCase() === 'a' ? 0 : /(link|tertiary|ghost|subtle|plain|text)/i.test(c.name) ? 1 : /(secondary|outline)/i.test(c.name) ? 2 : /(primary|danger|destructive|cta)/i.test(c.name) ? 5 : 3;
+    found.push({ rank, from: c.name, cls, label: lab ? { tag: lab[1].toLowerCase(), cls: labelCls } : null });
+  }
+  const best = found.sort((a, b) => a.rank - b.rank)[0];
+  if (!best) return null;
+  const { rank, ...ui } = best;
+  return ui;
+}
+
+// The system's own card, for the overview's links to each section: a component named card or tile whose root class the
+// system's CSS styles. → { from, cls } | null
+export function cardUi(components = [], systemCss = '') {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  for (const c of components) {
+    if (!/(^|[^a-z])(card|tile)$/i.test(c.name) && !/^(card|tile)/i.test(c.name)) continue;
+    const cls = (/^\s*<[a-z][\w-]*\b[^>]*\bclass\s*=\s*["']([^"']*)["']/i.exec(c.markup ?? '')?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
+    if (cls && defined(cls)) return { from: c.name, cls };
+  }
+  return null;
+}
+
 export function fieldUi(components = [], systemCss = '') {
   const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
   const keep = (attrs) => (/\bclass\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1] ?? '').split(/\s+/).filter((c) => c && defined(c));

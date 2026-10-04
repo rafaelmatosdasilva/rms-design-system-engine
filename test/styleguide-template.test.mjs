@@ -71,6 +71,7 @@ test('what an option adds comes from the contract\'s selector: a class, an attri
   assert.deepEqual(optionEffect('.button', '.button:disabled'), { add: [], attrs: { disabled: '' } });
   assert.deepEqual(optionEffect('.tab', '.tab[aria-selected="true"]'), { add: [], attrs: { 'aria-selected': 'true' } });
   assert.deepEqual(optionEffect('.button', '.button:hover'), { live: true });
+  assert.deepEqual(optionEffect('.field', '.field:not(.field--readonly):hover'), { live: true }, 'a class inside :not() is never added');
   assert.deepEqual(optionEffect('.button', '.button'), {});
   const v = agreedView({ propsSnap: { badge: { properties: { State: { type: 'VARIANT', defaultValue: 'neutral', variantOptions: ['neutral', 'positive'] } } } },
     rows: [row('badge', 'State', 'state', 'match')], classFor: () => '.badge', propertyMaps: { badge: { State: { neutral: '.badge.none', positive: '.badge.low' } } } });

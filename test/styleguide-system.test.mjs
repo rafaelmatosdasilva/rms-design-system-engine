@@ -2,8 +2,8 @@
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines } from '../styleguide-data.mjs';
-import { checkStyleguidePage, failures, missingRoles } from '../styleguide-check.mjs';
+import { realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi } from '../styleguide-data.mjs';
+import { checkStyleguidePage, failures, missingRoles, controlClasses } from '../styleguide-check.mjs';
 import { differences, differencesMarkdown } from '../run-diff.mjs';
 import { appDir } from '../code-roots.mjs';
 
@@ -55,7 +55,7 @@ test('the page\'s look is the system\'s: its page colours, a shared token before
   assert.equal(roles['text-2'], 'var(--text-2)');
   assert.equal(roles.border, 'var(--border)', 'a shared group before a component\'s');
   assert.notEqual(roles.muted, 'var(--badge-text)', 'a component\'s own token is never the page\'s look');
-  assert.equal(roles.font, 'var(--font-family)');
+  assert.equal(roles.font, undefined, 'no font of the page\'s own: its text inherits the system\'s page font and fallbacks');
   assert.deepEqual([roles.s, roles.m, roles.l], ['var(--s-size)', 'var(--m-size)', 'var(--l-size)']);
   assert.equal(roles.radius, 'var(--radius-card)');
   assert.equal(roles['space-s'], 'var(--gap-m)');
@@ -138,4 +138,45 @@ test('a component is dated from its own CSS rules and its contract and config en
   assert.deepEqual(entryLines(contract, 'chip'), [2, 3, 4]);
   assert.deepEqual(entryLines('{ "input": { "chip": { "x": 1 } } }', 'chip'), [], 'only an entry that starts its own line');
   assert.deepEqual(entryLines('{\n  "chip": {\n    "x": 1\n  }\n}', 'chip'), [2, 3, 4]);
+});
+
+test('a show prop that hides its part with a no- class still names the part, so the page can draw one no instance has', () => {
+  const r = realizedControls({ name: 'badge', defs: { 'Show Icon': { type: 'BOOLEAN', defaultValue: true } }, cls: 'badge', cssText: '.badge{} .badge.no-icon svg{display:none}', realizations: { 'Show Icon': '.badge.no-icon svg' } });
+  assert.deepEqual(r.controls[0].off, { add: ['no-icon'], attrs: {} });
+  assert.equal(r.controls[0].part, 'svg');
+});
+
+test('the page\'s buttons and cards are the system\'s own: the quietest text button, never an icon-only one, and its card', () => {
+  const css = '.bPrimary{} .bTertiary{} .bQuaternary{} .card{} .label{}';
+  const comps = [
+    { name: 'bPrimary', role: 'button', markup: '<button class="bPrimary"><span>Scan</span></button>' },
+    { name: 'bQuaternary', role: 'button', markup: '<button class="bQuaternary"><svg></svg></button>' },
+    { name: 'bTertiary', role: 'button', markup: '<button class="bTertiary" disabled><span class="frame-name label"></span><svg></svg></button>' },
+    { name: 'card', markup: '<div class="card"><span>x</span></div>' },
+  ];
+  assert.deepEqual(buttonUi(comps, css), { from: 'bTertiary', cls: 'bTertiary', label: { tag: 'span', cls: 'label' } }, 'a label a product fills at run time still counts; only the system\'s classes');
+  assert.equal(buttonUi(comps, css, 'bPrimary').from, 'bPrimary', 'the config can name one');
+  assert.equal(buttonUi([comps[1]], css), null, 'an icon-only button never holds a label');
+  assert.deepEqual(cardUi(comps, css), { from: 'card', cls: 'card' });
+  const seg = segmentedUi([{ name: 'seg', markup: '<div class="seg"><span class="pill" aria-hidden="true"></span><button class="selected">A</button><button>B</button></div>' }]);
+  assert.equal(seg.open, '<div class="seg"><span class="pill" aria-hidden="true"></span>', 'its decoration, for the system\'s script to place');
+});
+
+test('how a component moves, from the system\'s CSS: its entry, its exit, the overlay it opens in; a spinner needs no button', () => {
+  const css = `.toast { animation: toast-in .2s; } .toast.toast-out { animation: toast-out .2s forwards; }
+    .modal { display: none; } .modal.is-open { display: flex; } .modal-overlay { background: var(--o); }
+    .modal.is-closing .modal-overlay { animation: bg-out .2s; } .modal-card { animation: in .2s both; } .modal.is-closing .modal-card { animation: out .2s both; }
+    .spin { animation: spin 1s linear infinite; }`;
+  assert.deepEqual(motionUi('toast', css), { entry: true, exits: ['toast-out'], overlay: null });
+  assert.deepEqual(motionUi('modal-card', css), { entry: true, exits: [], overlay: { container: 'modal', open: 'is-open', closing: 'is-closing', layers: ['modal-overlay'] } });
+  assert.equal(motionUi('spin', css), null);
+  assert.equal(motionUi('#tt', css), null);
+});
+
+test('the style guide check: a button or link the page draws itself fails; a font of its own fails; inherit passes', () => {
+  const page = (css, body) => `<html lang="en"><head><style>${css}</style></head><body><main><h1>S</h1>${body}</main></body></html>`;
+  const body = '<a class="chip-link" href="#">A</a><script>var b = document.createElement(\'button\'); b.className = \'mine\';</script>';
+  assert.deepEqual([...controlClasses(body)].sort(), ['chip-link', 'mine']);
+  const bad = failures(checkStyleguidePage(page('.chip-link { background: var(--sg-bg-2); border-radius: var(--sg-radius); } .mine { border: var(--sg-line); } .sg-nav a.active { box-shadow: inset 2px 0 0 var(--sg-text); } .x { font-family: var(--font); } .y { font-family: inherit; }', body)));
+  assert.deepEqual(bad.map((f) => `${f.selector} ${f.property}`), ['.chip-link background', '.chip-link border-radius', '.mine border', '.x font-family'], 'an inset line marking the current link is not a button');
 });
