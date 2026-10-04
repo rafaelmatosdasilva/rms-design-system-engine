@@ -20,6 +20,9 @@ const FORBIDDEN = new Set([
   'd1d40828ba0a9a71', '3ed4ed1073d30d61',
 ]);
 const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
+// The one public page that may be named: the owner's design system went public, and its living style guide, built by
+// this engine, is the README's example of the output. Only this exact address is allowed, nothing else of that project.
+const PUBLIC_EXAMPLE = 'https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/';
 
 // Every word run of 1 to 4 words, joined with "-" and with nothing, so "Some Name", "some-name",
 // "some_name" and "someName" all normalise to the same candidates.
@@ -42,7 +45,7 @@ test('no private test-bed names anywhere in the engine repo', () => {
   const offenders = [];
   for (const f of files) {
     let text; try { text = readFileSync(join(ROOT, f), 'utf8'); } catch { continue; }
-    const n = forbiddenHits(text);
+    const n = forbiddenHits(text.split(PUBLIC_EXAMPLE).join(' '));
     if (n) offenders.push(`${f} (${n})`);
   }
   assert.deepEqual(offenders, [], 'private test-bed names found in: ' + offenders.join(', '));
@@ -50,4 +53,9 @@ test('no private test-bed names anywhere in the engine repo', () => {
 
 test('the matcher normalises spacing, case and separators', () => {
   assert.equal(forbiddenHits('a perfectly generic sentence about buttons and tokens'), 0);
+});
+
+test('the public example page is the only address of the owner\'s design system allowed', () => {
+  assert.equal(forbiddenHits(PUBLIC_EXAMPLE.split(PUBLIC_EXAMPLE).join(' ')), 0);
+  assert.ok(forbiddenHits(PUBLIC_EXAMPLE.replace('.github.io', '.example.com')) > 0, 'the same name anywhere else is still found');
 });
