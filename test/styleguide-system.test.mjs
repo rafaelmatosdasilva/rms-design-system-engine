@@ -1,0 +1,101 @@
+// The style guide is the system's own: its controls come from what the code realizes, its look from the system's
+// tokens and components, and the page is checked against the system it shows.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { realizedControls, chromeRoles, segmentedUi, fieldUi } from '../styleguide-data.mjs';
+import { checkStyleguidePage, failures, missingRoles } from '../styleguide-check.mjs';
+import { differences, differencesMarkdown } from '../run-diff.mjs';
+import { appDir } from '../code-roots.mjs';
+
+const defs = {
+  'Label Content': { type: 'TEXT', defaultValue: 'Label' },
+  'Show Label': { type: 'BOOLEAN', defaultValue: true },
+  'Show Icon': { type: 'BOOLEAN', defaultValue: true },
+  Type: { type: 'VARIANT', defaultValue: 'negative', variantOptions: ['negative', 'warning', 'positive', 'neutral'] },
+  Filled: { type: 'VARIANT', defaultValue: 'True', variantOptions: ['False', 'True'] },
+  'Icon Content': { type: 'INSTANCE_SWAP', defaultValue: '1:2' },
+  Size: { type: 'VARIANT', defaultValue: 'M', variantOptions: ['M', 'L'] },
+};
+const css = '.badge{} .badge.high{} .badge.medium{} .badge.low{} .badge.none{} .badge.no-label .badge-label{display:none} .badge.empty{}';
+
+test('an HTML system: a Figma prop is a control when the code realizes it, through the contract, the config or a class', () => {
+  const r = realizedControls({ name: 'badge', defs, cls: 'badge', cssText: css,
+    propertyMap: { State: { negative: '.badge.high', warning: '.badge.medium', positive: '.badge.low', neutral: '.badge.none' }, 'Show Label': '.badge.no-label .badge-label', Filled: { True: '.badge', False: '.badge.empty' } },
+    realizations: { 'Label Content': '.badge-label', 'Show Icon': '.badge svg' } });
+  const by = Object.fromEntries(r.controls.map((c) => [c.label, c]));
+  assert.deepEqual(by.Type.options.map((o) => [o.label, o.add]), [['negative', ['high']], ['warning', ['medium']], ['positive', ['low']], ['neutral', ['none']]], 'the contract spells it State: found by its options');
+  assert.deepEqual(by['Show Label'].off, { add: ['no-label'], attrs: {} }, 'a no- modifier hides the part when false');
+  assert.equal(by['Show Icon'].part, 'svg');
+  assert.equal(by['Label Content'].part, '.badge-label');
+  assert.deepEqual(by.Filled, { label: 'Filled', prop: 'Filled', type: 'BOOLEAN', default: true, off: { add: ['empty'], attrs: {} } });
+  assert.equal(by['Icon Content'], undefined, 'an instance swap is not a control');
+  assert.deepEqual(r.unrealized, ['Size'], 'a prop nothing in the code realizes is counted, not shown');
+});
+
+const tokens = {
+  colors: [
+    { group: 'semantic', items: [{ figma: 'semantic/surface/elevationHigh', var: '--surface-high' }, { figma: 'semantic/surface/elevationMedium', var: '--bg' }, { figma: 'semantic/surface/elevationLow', var: '--bg-low' }, { figma: 'semantic/content/primary', var: '--text' }, { figma: 'semantic/content/secondary', var: '--text-2' }, { figma: 'semantic/warning', var: '--warn' }] },
+    { group: 'badge', items: [{ figma: 'badge/text/default', var: '--badge-text' }] },
+    { group: 'dividerLine', items: [{ figma: 'dividerLine/border', var: '--border' }] },
+  ],
+  typography: [{ scale: 'm', size: { var: '--m-size', value: '11px' }, weight: { var: '--m-weight' }, lh: { var: '--m-lh' } }, { scale: 's', size: { var: '--s-size', value: '10px' } }, { scale: 'l', size: { var: '--l-size', value: '13px' }, weight: { var: '--l-weight' } }],
+  radii: [{ figma: 'radii/card', var: '--radius-card', value: '12px' }, { figma: 'radii/checkbox', var: '--radius-s', value: '4px' }, { figma: 'radii/pill', var: '--radius-full', value: '24px' }],
+  spacing: [{ figma: 'gap/s', var: '--gap-s', value: '4px' }, { figma: 'gap/m', var: '--gap-m', value: '8px' }, { figma: 'padding/l', var: '--padding-l', value: '16px' }],
+};
+
+test('the page\'s look is the system\'s: its page colours, a shared token before a component\'s, its text styles, radii and spaces', () => {
+  const { roles, missing, css: out } = chromeRoles({ tokens, componentNames: ['badge'], themeCss: ':root { --font-family: Inter; } body { color: var(--text); background: var(--bg); }', icons: { size: 16 } });
+  assert.equal(roles.bg, 'var(--bg)', 'the background the system\'s own page uses');
+  assert.equal(roles.text, 'var(--text)');
+  assert.equal(roles.surface, 'var(--surface-high)');
+  assert.equal(roles['bg-2'], 'var(--bg-low)');
+  assert.equal(roles['text-2'], 'var(--text-2)');
+  assert.equal(roles.border, 'var(--border)', 'a shared group before a component\'s');
+  assert.notEqual(roles.muted, 'var(--badge-text)', 'a component\'s own token is never the page\'s look');
+  assert.equal(roles.font, 'var(--font-family)');
+  assert.deepEqual([roles.s, roles.m, roles.l], ['var(--s-size)', 'var(--m-size)', 'var(--l-size)']);
+  assert.equal(roles.radius, 'var(--radius-card)');
+  assert.equal(roles['space-s'], 'var(--gap-m)');
+  assert.equal(roles.icon, '16px', 'the size the system\'s icons are drawn at');
+  assert.deepEqual(missing, []);
+  assert.match(out, /^:root \{ --sg-bg: var\(--bg\);/);
+  assert.deepEqual(chromeRoles({ tokens, override: { accent: '--brand' } }).roles.accent, 'var(--brand)', 'styleguide.chrome names one by hand');
+});
+
+test('the page\'s switches and text fields are the system\'s own components, read from their markup', () => {
+  const seg = segmentedUi([{ name: 'card', markup: '<div class="card"><button>A</button></div>' },
+    { name: 'segmentedControl', markup: '<div class="segmented-control full-width"><span class="seg-pill"></span><button class="selected"><span class="tab-label">A</span></button><button><span class="tab-label">B</span></button></div>' }]);
+  assert.deepEqual(seg, { from: 'segmentedControl', open: '<div class="segmented-control">', close: '</div>', item: { tag: 'button', classes: [], label: 'tab-label' }, selected: { add: ['selected'], attrs: {} } });
+  assert.equal(segmentedUi([{ name: 'x', markup: '<div><button>A</button><button>B</button></div>' }]), null, 'no selected state, not a segmented control');
+  const field = fieldUi([{ name: 'input', markups: ['<div class="fieldWrap product-x"><input type="number" class="fieldInput"></div>', '<div class="fieldWrap"><svg></svg><input type="text" class="fieldInput extra" value="v"></div>'] }], '.fieldWrap{} .fieldInput{}');
+  assert.deepEqual(field, { from: 'input', markup: '<div class="fieldWrap"><input type="text" aria-label="Value" class="fieldInput"></div>' });
+});
+
+test('the style guide check: only the system\'s tokens on the page; a role with no token is a warning; the page\'s own accessibility', () => {
+  const page = (css, body = '<main><h1>System</h1></main>') => `<html lang="en"><head><style data-system>.x{color:#f00}</style><style>${css}</style></head><body>${body}</body></html>`;
+  const clean = page(':root { --sg-bg: Canvas; } :root { --sg-bg: var(--bg); } .a { color: var(--sg-text); padding: var(--sg-space-s) 1px; font-size: var(--sg-s); }');
+  assert.deepEqual(failures(checkStyleguidePage(clean)), [], 'the system\'s own CSS (data-system) is not the page\'s');
+  const bad = failures(checkStyleguidePage(page('.a { color: #333; font-size: 12px; font-family: Arial; border-radius: 6px; padding: 12px; }')));
+  assert.deepEqual(bad.map((f) => f.property), ['color', 'font-size', 'font-family', 'border-radius', 'padding']);
+  assert.ok(missingRoles(clean).includes('text'), 'a role never filled is left to the browser');
+  assert.ok(checkStyleguidePage(clean).some((f) => f.warning && f.property === '--sg-text'));
+  assert.ok(failures(checkStyleguidePage(page('', '<main><img src="a.png"></main>'))).some((f) => f.property === 'accessibility'));
+});
+
+test('one list of differences: grouped by component, marked new, the data\'s freshness and accessibility left out', () => {
+  const now = ['Structure :: badge height: Figma 20, rendered 24', 'Token values :: ❌ [sizing] padding/s → --padding-s: 8px vs 10px', 'Data is up to date :: ⚠️ a snapshot is old', 'Accessibility :: no label', 'Structure :: gate fails', 'Figma file hygiene :: badge has no description'];
+  const d = differences(now, ['badge'], ['Structure :: badge height: Figma 20, rendered 24']);
+  assert.equal(d.total, 3);
+  assert.equal(d.fresh, 2);
+  assert.deepEqual(d.groups.map((g) => [g.component, g.items.length]), [['badge', 2], [null, 1]]);
+  assert.equal(d.groups[0].items.find((x) => x.check === 'Figma file hygiene').side, 'figma');
+  const md = differencesMarkdown(d, { handback: { code: 'out/handback/code-changes.diff' } });
+  assert.match(md, /^# Differences between Figma and the code\n\n3 open, 2 new since the last run/);
+  assert.match(md, /## badge \(2\)/);
+  assert.match(md, /## The whole system \(1\)\n\n- \*\*new\*\* Token values: \[sizing\] padding\/s/);
+});
+
+test('an app lives where pluginDirs says, else apps/<app>', () => {
+  assert.equal(appDir({ pluginDirs: { gallery: '../gallery-app/' } }, 'gallery'), '../gallery-app');
+  assert.equal(appDir({}, 'gallery'), 'apps/gallery');
+});

@@ -23,6 +23,7 @@
 //
 // Skips gracefully (exit 0, ⏭ lines) when Chrome is not installed or assertions are empty.
 
+import { appDir } from './code-roots.mjs';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -51,7 +52,7 @@ const _pluginSrc   = cfg.paths?.pluginCSS ?? [];
 function builtUiPath(plugin) {
   const i = _pluginNames.indexOf(plugin);
   const src = i >= 0 ? _pluginSrc[i] : null;
-  return join(ROOT, src ? src.replace(/\.src\.html$/, '.html') : `apps/${plugin}/ui.html`);
+  return join(ROOT, src ? src.replace(/\.src\.html$/, '.html') : `${appDir(cfg, plugin)}/ui.html`);
 }
 
 // #2 element-geometry auto-expand: a FRAME_GEOMETRY_MAP entry maps a CSS selector to a
