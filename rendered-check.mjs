@@ -20,6 +20,8 @@
 //   ];
 // prop is a camelCase computed-style key (height, paddingLeft, columnGap, minHeight…).
 // expected is compared as an exact string against getComputedStyle(el)[prop].
+// pseudo: '::before' or '::after' reads that layer instead (a component that draws its background or
+// its lines as their own layers, as Figma does): getComputedStyle(el, pseudo)[prop].
 //
 // Skips gracefully (exit 0, ⏭ lines) when Chrome is not installed or assertions are empty.
 
@@ -145,7 +147,7 @@ try {
     for (const [prop, expected] of Object.entries(byProp)) {
       if (expected == null) continue;   // tier without this facet (e.g. auto line-height)
       expanded.push({
-        plugin: a.plugin, selector: a.selector, probe: a.probe, colorScheme: a.colorScheme,
+        plugin: a.plugin, selector: a.selector, probe: a.probe, colorScheme: a.colorScheme, pseudo: a.pseudo,
         prop, expected: String(expected),
         note: `${a.note ?? 'DS text style ' + a.textStyle} (${prop})`,
       });
@@ -265,7 +267,7 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] }, sessionId);
     const group = indexed.filter(x => schemeOf(x.a) === scheme);
     const expr = `(() => {
-      const asserts = ${JSON.stringify(group.map(x => ({ selector: x.a.selector, probe: x.a.probe, prop: x.a.prop })))};
+      const asserts = ${JSON.stringify(group.map(x => ({ selector: x.a.selector, probe: x.a.probe, prop: x.a.prop, pseudo: x.a.pseudo ?? null })))};
       // Probes render inside an absolutely-positioned host so the app shell's own
       // flex/grid layout (e.g. body { display:flex; height:100vh }) cannot stretch
       // or shrink them - computed values must reflect the component's own rules.
@@ -278,7 +280,7 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
           probeHost.insertAdjacentHTML('beforeend', a.probe);
           el = probeHost.querySelector(a.selector) ?? document.querySelector(a.selector);
         }
-        return el ? getComputedStyle(el)[a.prop] : '(selector not found)';
+        return el ? getComputedStyle(el, a.pseudo)[a.prop] : '(selector not found)';
       });
       probeHost.remove(); // isolate probe markup between scheme groups
       return out;
@@ -290,7 +292,7 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
 
   asserts.forEach((a, i) => {
     if (a.forcePseudo) return; // handled below via CSS.forcePseudoState
-    const label = `${plugin} ${a.selector} → ${a.prop}`;
+    const label = `${plugin} ${a.selector}${a.pseudo ?? ''} → ${a.prop}`;
     if (got[i] === a.expected) PASS.push(label);
     else FAIL.push(`${label}: rendered "${got[i]}" ≠ expected "${a.expected}"${a.note ? `  [${a.note}]` : ''}`);
   });

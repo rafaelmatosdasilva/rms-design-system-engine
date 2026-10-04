@@ -128,7 +128,8 @@ export function structureFromComponent(node) {
   if (firstBound(bv.itemSpacing)) s.gapVar = firstBound(bv.itemSpacing);
   const radius = firstBound(bv.topLeftRadius) ?? firstBound(bv.cornerRadius);
   if (radius) s.innerRadiusVar = radius;
-  s.strokeOnDefault = Array.isArray(v.strokes) && v.strokes.length > 0;
+  // A hidden stroke paint (a weight left on with its paint turned off) draws nothing, so it is not a stroke.
+  s.strokeOnDefault = Array.isArray(v.strokes) && v.strokes.some((p) => p?.visible !== false);
   const colors = {};
   const fill = colourOf(v, 'fills'); if (fill) colors.fill = fill;
   if (s.strokeOnDefault) { const stroke = colourOf(v, 'strokes'); if (stroke) colors.stroke = stroke; }
