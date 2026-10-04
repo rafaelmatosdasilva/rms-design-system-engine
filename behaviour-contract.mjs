@@ -147,7 +147,7 @@ export function behaviourExpression(mark, row, phase) {
       else if (row.expect === 'expanded') { ok = flipped('expanded') && (!panel() || now.panel !== was.panel); saw = !flipped('expanded') ? 'aria-expanded stayed ' + (now.expanded ?? 'unset') : !panel() ? '' : 'the panel it controls did not ' + (was.panel ? 'hide' : 'show'); if (flipped('expanded') && !panel() && !c.getAttribute('aria-controls')) { ok = true; } }
       else if (row.expect === 'selected') { ok = now.selected === 'true' && now.others === 0; saw = now.selected !== 'true' ? 'aria-selected is ' + (now.selected ?? 'unset') : now.others + ' other tab(s) still selected'; }
       else if (row.expect === 'value') { ok = now.value !== was.value; saw = 'its value did not change'; }
-      else if (row.expect === 'valuenow') { ok = Number(now.valuenow) > Number(was.valuenow) || (c.tagName === 'INPUT' && c.type === 'number'); saw = 'aria-valuenow stayed ' + (now.valuenow ?? 'unset'); }
+      else if (row.expect === 'valuenow') { const max = c.getAttribute('aria-valuemax') ?? c.getAttribute('max'); ok = Number(now.valuenow) > Number(was.valuenow) || (c.tagName === 'INPUT' && c.type === 'number') || (max != null && max !== '' && Number(was.valuenow) >= Number(max)); saw = 'aria-valuenow stayed ' + (now.valuenow ?? 'unset'); }
       else if (row.expect === 'hidden') { ok = !now.shown || c.getAttribute('aria-expanded') === 'false'; saw = 'it is still shown'; }
       else if (row.expect === 'focus-moves') { ok = now.focus !== was.focus && el.contains(now.focus); saw = 'the focus did not move to another of its items'; }
       else if (row.expect === 'activates') { ok = w.__dseClicks > 0 || ['pressed', 'checked', 'expanded', 'selected'].some(flipped); saw = 'nothing happened'; }
@@ -207,6 +207,21 @@ export function partRoleExpression(selector, partSelector, layer, part) {
         const b = p.matches('button,[role=button]') ? p : p.querySelector('button,[role=button]');
         if (!b) say('is not a button');
         else if (!named(b)) say('has no spoken name: add aria-label');
+        // It stops at the end of the range: pressed past aria-valuemin (or aria-valuemax), the value stays inside it,
+        // or the button turns disabled. Its own element is found again after each press (the page may draw it anew).
+        const spinSel = '[role=spinbutton],[role=slider],input[type=number],input[type=range]';
+        const spin = el.querySelector(spinSel);
+        const lim = spin && (part === 'decrement' ? (spin.getAttribute('aria-valuemin') ?? spin.getAttribute('min')) : (spin.getAttribute('aria-valuemax') ?? spin.getAttribute('max')));
+        const now = () => { const sp = el.querySelector(spinSel); return sp ? Number(sp.getAttribute('aria-valuenow') ?? sp.value) : NaN; };
+        if (b && lim != null && lim !== '' && Number.isFinite(now())) {
+          const index = [...el.querySelectorAll('button,[role=button]')].indexOf(b);
+          const start = now(), end = Number(lim);
+          for (let i = 0; i < Math.min(60, Math.abs(start - end) + 3); i++) { const k = [...el.querySelectorAll('button,[role=button]')][index]; if (!k || k.disabled || k.getAttribute('aria-disabled') === 'true') break; k.click(); }
+          const got = now();
+          if (part === 'decrement' ? got < end : got > end) say('goes past the ' + (part === 'decrement' ? 'minimum' : 'maximum') + ': pressed from ' + start + ', the value reached ' + got + ' (aria-' + (part === 'decrement' ? 'valuemin' : 'valuemax') + ' ' + end + '). Stop at it, or disable the button there');
+          // Back to where it was, with the other step button, so the checks after this one start from the same value.
+          for (let i = 0; i < 60 && now() !== start; i++) { const all = [...el.querySelectorAll('button,[role=button]')]; const o = index === 0 ? all[all.length - 1] : all[0]; if (!o || o === all[index] || o.disabled) break; o.click(); }
+        }
         continue;
       }
       if (!c) { say('belongs to no control inside the component'); continue; }
