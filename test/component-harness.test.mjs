@@ -63,3 +63,14 @@ export function Stepper({ Value = '1' }) {
   assert.match(says, /behaviour stepper: ArrowUp steps it up \(role spinbutton\), but aria-valuenow stayed 1/);
   assert.match(says, /name .*spinbutton/i);
 });
+
+test('build mode: a stepper whose Decrement goes below its minimum is caught, and the check after it starts from the same value', { skip: ready, timeout: 300000 }, () => {
+  const below = `import { useState } from 'react';
+import './stepper.css';
+export function Stepper({ Value = '1', ...rest }) {
+  const [v, setV] = useState(Number(Value));
+  return (<div className="stepper"><button type="button" aria-label="Decrease" className="stepper__step" onClick={() => setV(v - 1)}><svg aria-hidden="true" width="12" height="12"><rect x="1" y="5" width="10" height="2" /></svg></button><span className="stepper__value" role="spinbutton" tabIndex={0} aria-label={rest['aria-label']} aria-valuenow={v} aria-valuemin={0} aria-valuemax={10} onKeyDown={(e) => { if (e.key === 'ArrowUp') setV(Math.min(10, v + 1)); }}>{v}</span><button type="button" aria-label="Increase" className="stepper__step" onClick={() => setV(Math.min(10, v + 1))}><svg aria-hidden="true" width="12" height="12"><rect x="5" y="1" width="2" height="10" /></svg></button></div>);
+}`;
+  const says = check(tidepool(below)).issues.filter((i) => /stepper/.test(i.selector)).map((i) => `${i.issue} ${i.selector}`);
+  assert.deepEqual(says, ['partrole stepper: its "Decrement" part (decrement) goes past the minimum: pressed from 1, the value reached -3 (aria-valuemin 0). Stop at it, or disable the button there']);
+});
