@@ -28,7 +28,7 @@ test('a prop both sides agree on is a control with Figma\'s label and the code\'
   assert.deepEqual(chip.controls[0].options, [{ label: 'M' }, { label: 'L', add: ['chip--l'], attrs: {} }]);   // a class only where the CSS has it
   assert.equal(chip.controls[1].part, 'svg, [class*="icon"]', 'a switch with no class shows or hides the part it names');
   const button = v.components.find((c) => c.name === 'button');
-  assert.deepEqual(button.controls, [{ label: 'Disabled', prop: 'disabled', type: 'BOOLEAN', default: false, on: { add: [], attrs: { disabled: '' } } }]);   // Tone differs: not shown
+  assert.deepEqual(button.controls, [{ label: 'Disabled', prop: 'disabled', type: 'BOOLEAN', default: false, on: { add: [], attrs: { disabled: '' } }, at: 1 }]);   // Tone differs: not shown; Tone, a variant, leads Figma's order
   assert.equal(v.components.some((c) => c.name === 'field'), false, 'a component not built yet is not shown');
   assert.equal(v.notAgreed.differences, 2);   // the chip prop only the code has, the button's other default
   assert.equal(v.notAgreed.line, 'Left off this page until Figma and the code agree: 2 values where Figma and the code differ and 1 component the code does not have yet (field). Each one is in the To do list, with who does it and what to do.');
@@ -237,4 +237,22 @@ test('on a phone the documentation is one column, each name above its text', () 
   const phone = tpl.slice(tpl.indexOf('@media (max-width: 720px)'));
   const block = phone.slice(0, phone.indexOf('</style>'));
   assert.match(block, /\.pg-updated > div \{ grid-template-columns: 1fr;/);
+});
+
+test('the controls follow Figma\'s panel: variants first, then the rest in Figma\'s order, a prop not built yet in its place', () => {
+  const snap = { card: { properties: { 'Title#1:0': { type: 'TEXT', defaultValue: 'T' }, 'Show Icon#2:0': { type: 'BOOLEAN', defaultValue: true }, Size: { type: 'VARIANT', defaultValue: 'M', variantOptions: ['M', 'L'] } } } };
+  const rows = [row('card', 'Title', 'title', 'match'), row('card', 'Show Icon', 'showIcon', 'match'), row('card', 'Size', 'size', 'match')];
+  const v = agreedView({ propsSnap: snap, rows, classFor: () => '.card', cssText: '.card{}' });
+  assert.deepEqual(v.components[0].controls.map((c) => [c.label, c.at]), [['Size', 0], ['Title', 1], ['Show Icon', 2]]);
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /if \(u\.at != null\) ctl\.dataset\.at = u\.at;/);   // a prop not built yet takes its Figma place too
+});
+
+test('a text goes to the part whose own words they are; a shape part stays empty and leads; an overlay opens over the whole window; the documentation sections stand apart', () => {
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /var named = parts\.find\(function \(k\) \{ return k\.tagName !== 'INPUT' && own\(k\); \}\)/);
+  assert.match(tpl, /if \(box\.width > 0 && box\.height > 0\) \{/);
+  assert.match(tpl, /wrap\.appendChild\(card\); document\.body\.appendChild\(wrap\);/);
+  assert.doesNotMatch(tpl, /preview\.appendChild\(wrap\)/);
+  assert.match(tpl, /\.pg-updated \{ display: grid; gap: var\(--sg-space-l\);/);
 });
