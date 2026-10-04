@@ -19,6 +19,7 @@
 // conditions wins, so a more specific primitive beats a looser one. Only plain HTML elements are read: a
 // component tag (<Text>, <ds-text>) is already the system.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { codeRoots } from './code-roots.mjs';
 import { join, extname, relative } from 'node:path';
 import { ENGINE_DIRS } from './names.mjs';
 
@@ -141,7 +142,7 @@ function walk(ROOT, exts, limit = 4000) {
       else if (exts.has(extname(n).toLowerCase()) && st.size < 1024 * 1024) files.push(abs);
     }
   };
-  go(ROOT, 0);
+  for (const root of codeRoots(ROOT)) go(root, 0);
   return files;
 }
 
