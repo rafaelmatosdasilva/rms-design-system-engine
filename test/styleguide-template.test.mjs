@@ -263,3 +263,9 @@ test('a title in the style guide has no line under it; each type style lists its
   assert.doesNotMatch(h3, /border-bottom/);
   for (const k of ['Family', 'Size', 'Weight', 'Line height', 'Letter spacing']) assert.match(tpl, new RegExp("\\['" + k + "', "));
 });
+
+test('a component has no Computed box: the tokens behind what is drawn, and its own tokens, are what sits below it', () => {
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  assert.doesNotMatch(tpl, /pg-computed|>Computed</);
+  assert.match(tpl, /<div class="pg-inspect-head">Tokens<\/div>/);
+});

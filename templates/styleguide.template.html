@@ -744,7 +744,6 @@ a.pg-usage-name { color: var(--sg-text); }
         ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '') +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview"></div><div class="pg-panel"><div class="pg-actions"></div><div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
         '<div class="pg-inspect-grid"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
-        '<div class="pg-inspect"><div class="pg-inspect-head">Computed</div><table class="pg-computed"></table></div>' +
         (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>' +
         '<div class="pg-footer">' +
         (docRows ? '<div class="pg-doc"><h3>Documentation</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
@@ -753,7 +752,7 @@ a.pg-usage-name { color: var(--sg-text); }
           (c.updated.figmaRead ? '<div><dt>Figma read</dt><dd>' + esc(when(c.updated.figmaRead)) + '</dd></div>' : '') + '</dl>' : '') +
         '</div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls');
-    var tTokens = sec.querySelector('.pg-tokens'), tComputed = sec.querySelector('.pg-computed'), tOwn = sec.querySelector('.pg-own');
+    var tTokens = sec.querySelector('.pg-tokens'), tOwn = sec.querySelector('.pg-own');
     // Every token named after this component (its colours and sizes), with the value in the mode it is shown in.
     function ownRows() {
       if (!tOwn) return;
@@ -823,20 +822,6 @@ a.pg-usage-name { color: var(--sg-text); }
         cs.opacity !== '1' ? [['opacity', cs.opacity]] : [],
         partRows(el, c.name)
       ));
-      var box = el.getBoundingClientRect();
-      // Its size in each mode of a size axis, in the order of the modes (measured with the preview switched to it).
-      var sizeAxis = AXES.find(function (a) { return a.scoped && a.attr && a.attr !== 'data-color'; }), perMode = [];
-      if (sizeAxis) {
-        var had = preview.getAttribute(sizeAxis.attr), now = SGModes.effective(sizeAxis, preview);
-        sizeAxis.values.forEach(function (v) {
-          if (v.notInCode) return;
-          if (v.value) preview.setAttribute(sizeAxis.attr, v.value); else preview.removeAttribute(sizeAxis.attr);
-          var b = el.getBoundingClientRect();
-          perMode.push([v.label + (v.value === now ? ' (shown)' : ''), Math.round(b.width) + ' × ' + Math.round(b.height) + 'px']);
-        });
-        if (had == null) preview.removeAttribute(sizeAxis.attr); else preview.setAttribute(sizeAxis.attr, had);
-      }
-      tComputed.innerHTML = rowsHTML(perMode.length ? perMode : [['width', Math.round(box.width) + 'px'], ['height', Math.round(box.height) + 'px']]);
       ownRows();
       nudge();
     }
