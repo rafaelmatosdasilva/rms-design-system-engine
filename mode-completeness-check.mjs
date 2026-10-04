@@ -44,6 +44,7 @@ const THEME_PATHS = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();
 // ── Load design-system-engine-map.mjs ───────────────────────────────────────────────────────
 let EXPLICIT = {}, SKIP_TOKENS = new Set();
 let NL = {}, ND = {}, NEUTRAL_MAPS = null, NEUTRAL_VAR_RE = /^--neutral-(\d+)$/;
+let EXPLICIT_SIZING = {}, SIZING_SKIP = new Map();
 try {
   const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   if (map.EXPLICIT)        EXPLICIT        = map.EXPLICIT;
@@ -52,6 +53,8 @@ try {
   if (map.NEUTRAL_DARK)    ND              = map.NEUTRAL_DARK;
   if (map.NEUTRAL_MAPS)    NEUTRAL_MAPS    = map.NEUTRAL_MAPS;
   if (map.NEUTRAL_VAR_RE)  NEUTRAL_VAR_RE  = map.NEUTRAL_VAR_RE;
+  if (map.EXPLICIT_SIZING) EXPLICIT_SIZING = map.EXPLICIT_SIZING;
+  if (map.SIZING_SKIP)     SIZING_SKIP     = map.SIZING_SKIP;
 } catch { /* optional */ }
 
 // ── Resolver over EVERY mode across every axis/collection ──────────────────────
@@ -85,7 +88,9 @@ const cssText = rawCss.map((f) => (typeof f === 'string' ? f : f?.text ?? f?.css
 const NOT_IMPLEMENTED = [];
 for (const [name, section] of Object.entries(snap.modeVariants ?? {})) {
   if (COLLECTIONS.some((c) => c.name === name) || name === cfg.figma?.colorCollection || !Array.isArray(section?.modes) || section.modes.length < 2) continue;
-  const vars = Object.keys(section.vars ?? {}).map((t) => nonColorTokenToVar({}, t)).filter(Boolean);
+  // The map's sizing names and skips (design-system-engine-map.mjs EXPLICIT_SIZING, SIZING_SKIP) hold here too.
+  const auto = { explicit: EXPLICIT_SIZING, skip: [...(SIZING_SKIP instanceof Map ? SIZING_SKIP.keys() : Object.keys(SIZING_SKIP ?? {}))] };
+  const vars = Object.keys(section.vars ?? {}).map((t) => nonColorTokenToVar(auto, t)).filter(Boolean);
   const sets = (body) => vars.some((v) => new RegExp(`${v.replace(/[-]/g, '\\-')}\\s*:`).test(body));
   const blocks = [];
   for (const m of cssText.matchAll(/@media\s*([^{]+)\{((?:[^{}]|\{[^{}]*\})*)\}/g)) if (!/prefers-color-scheme|prefers-contrast/.test(m[1]) && sets(m[2])) blocks.push({ selector: `media:${m[1].trim().replace(/\s+/g, ' ')}`, words: [] });
@@ -104,10 +109,10 @@ for (const [name, section] of Object.entries(snap.modeVariants ?? {})) {
     return { ...m, cssSelector: hit?.selector ?? null };
   });
   for (const m of modes.filter((x) => !x.cssSelector)) {
-    const owed = Object.entries(section.vars ?? {}).filter(([, v]) => v?.values?.[m.snapshotKey] != null && String(v.values[m.snapshotKey]) !== String(v.values[modes[0].snapshotKey]));
-    NOT_IMPLEMENTED.push({ collection: name, mode: m.name, base: modes[0].name, owed: owed.map(([t, v]) => ({ token: t, cssVar: nonColorTokenToVar({}, t), base: v.values[modes[0].snapshotKey], value: v.values[m.snapshotKey] })) });
+    const owed = Object.entries(section.vars ?? {}).filter(([t, v]) => nonColorTokenToVar(auto, t) && v?.values?.[m.snapshotKey] != null && String(v.values[m.snapshotKey]) !== String(v.values[modes[0].snapshotKey]));
+    NOT_IMPLEMENTED.push({ collection: name, mode: m.name, base: modes[0].name, owed: owed.map(([t, v]) => ({ token: t, cssVar: nonColorTokenToVar(auto, t), base: v.values[modes[0].snapshotKey], value: v.values[m.snapshotKey] })) });
   }
-  COLLECTIONS.push({ name, kind: 'scalar', modes: modes.filter((x) => x.cssSelector), auto: true });
+  COLLECTIONS.push({ name, kind: 'scalar', modes: modes.filter((x) => x.cssSelector), auto: true, ...auto });
 }
 const { resolve, resolveRaw } = buildResolver(rawCss, [...allModes(cfg), ...COLLECTIONS.filter((c) => c.auto).flatMap((c) => c.modes)], { NL, ND, NEUTRAL_MAPS, NEUTRAL_VAR_RE });
 

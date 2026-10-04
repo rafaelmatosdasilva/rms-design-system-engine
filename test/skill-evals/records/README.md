@@ -22,5 +22,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-04-a11y-and-figma-changed` | Two new builds (a stepper with part roles, a Figma change to the built chip) on Opus and Haiku with and without the skill (engines 8998271, 1108c3b, 9fee7af, rescored on 27b2d1f), the disclosure and field with the skill, and the 20 guide tasks on Haiku (27b2d1f) | "accessibility tried on the components' own code, what the design owes, a task the Figma MCP alone cannot finish" |
 | `2026-10-04-figma-edits` | The 20 guide tasks and the new `figma-roles` on Haiku (engine 64f93b1) | "Figma brought in line with the code, by the engine, once the person says yes" |
 | `2026-10-04-sibling-repos` | The 21 guide tasks on Haiku (engine 7765e76) | "Products in their own repositories, read as the project's code" |
+| `2026-10-04-styleguide-system` | The 21 guide tasks on Haiku (engine 681ecf6) | "the style guide is the system's own and is checked against it" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

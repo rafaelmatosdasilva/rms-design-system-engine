@@ -83,7 +83,7 @@ test('the style guide check: only the system\'s tokens on the page; a role with 
 });
 
 test('one list of differences: grouped by component, marked new, the data\'s freshness and accessibility left out', () => {
-  const now = ['Structure :: badge height: Figma 20, rendered 24', 'Token values :: ❌ [sizing] padding/s → --padding-s: 8px vs 10px', 'Data is up to date :: ⚠️ a snapshot is old', 'Accessibility :: no label', 'Structure :: gate fails', 'Figma file hygiene :: badge has no description'];
+  const now = ['Structure :: badge height: Figma 20, rendered 24', 'Token values :: ❌ [sizing] padding/s → --padding-s: 8px vs 10px', 'Data is up to date :: ⚠️ a snapshot is old', 'Accessibility :: no label', 'Token contrast :: a on b 2:1', 'Structure :: gate fails', 'Figma file hygiene :: badge has no description'];
   const d = differences(now, ['badge'], ['Structure :: badge height: Figma 20, rendered 24']);
   assert.equal(d.total, 3);
   assert.equal(d.fresh, 2);

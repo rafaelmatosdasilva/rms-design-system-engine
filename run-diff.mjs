@@ -135,7 +135,7 @@ export function burndownLines(b, { top = 8, scoped = false } = {}) {
 // accessibility note), grouped by the component it names, else under "the whole system", each marked new when the
 // last run did not have it. Written to <out>/differences.md and differences.json; the style guide reads the JSON, so
 // a component's page lists its own open differences, and the hand-back files say how each side would change.
-const NOT_A_DIFFERENCE = /^(Data is up to date|Accessibility[^:]*|What this audit actually checked) :: /;
+const NOT_A_DIFFERENCE = /^(Data is up to date|Accessibility[^:]*|Token contrast|What this audit actually checked) :: /;
 export function differences(findings = [], names = [], prev = null) {
   const old = new Set(prev ?? []);
   const items = findings.filter((f) => !NOT_A_FINDING.test(f) && !NOT_A_DIFFERENCE.test(f) && !/ :: gate fails$/.test(f)).map((f) => {
