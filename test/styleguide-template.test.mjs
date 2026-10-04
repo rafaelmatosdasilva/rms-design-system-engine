@@ -270,3 +270,19 @@ test('a component has no Computed box: the tokens behind what is drawn, and its 
   assert.doesNotMatch(tpl, /pg-computed|>Computed</);
   assert.match(tpl, /<div class="pg-inspect-head">Tokens<\/div>/);
 });
+
+test('typography follows Figma: its text styles in Figma\'s order, each value named by the Figma variable it binds', () => {
+  const check = { passVars: [['m', '11px'], ['l', '13px']].flatMap(([k, v]) => [{ dimension: 'typography', token: `${k}/size`, cssVar: `--${k}-size`, value: v }]) };
+  const vars = { typography: { l: { size: '13px' }, m: { size: '11px' } }, sizing: { 'typography/l/font-size': '13px', 'typography/m/font-size': '11px' }, strings: { 'font-family': 'inter' } };
+  const t = agreedTokens(check, vars).typography;
+  assert.deepEqual(t.map((x) => x.scale), ['l', 'm']);
+  assert.equal(t[1].size.figma, 'typography/m/font-size');
+  assert.deepEqual(t[0].family, { figma: 'font-family', value: 'inter' });
+});
+
+test('the search covers every part of the page and, while it has words, only its results show below the field', () => {
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  for (const kind of ['Component', 'Colour', 'Type style', 'Icon', 'Section']) assert.match(tpl, new RegExp("add\\('" + kind));
+  assert.match(tpl, /nav\.hidden = !!words\.length; results\.hidden = !words\.length;/);
+  assert.match(tpl, /sMount\.parentNode\.insertBefore\(results, sMount\.nextSibling\);/);
+});
