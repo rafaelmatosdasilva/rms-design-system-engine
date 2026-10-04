@@ -425,7 +425,12 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
      option applies what the contract's propertyMap says it adds (a class, an attribute), a boolean shows or hides
      the part it names. Below: the tokens behind the rendered result and its computed box. */
   function baseElement(c) {
-    if (c.markup) { var t = document.createElement('template'); t.innerHTML = c.markup.trim(); var first = t.content.firstElementChild; if (first) return first; }
+    if (c.markup) {
+      var t = document.createElement('template'); t.innerHTML = c.markup.trim(); var first = t.content.firstElementChild;
+      // The instance as the component is at rest: a state, a hidden flag or a layout the product gave this one copy is
+      // dropped, so the props decide (a Disabled option puts disabled back).
+      if (first) { ['disabled', 'aria-disabled', 'hidden', 'style'].forEach(function (a) { first.removeAttribute(a); }); return first; }
+    }
     var e;
     switch (c.role) {
       case 'button': e = document.createElement('button'); e.type = 'button'; break;
@@ -448,11 +453,19 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
   function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)) : []; } catch (x) { return []; } }
   function textLeaf(e, sel) {
     if (e.tagName === 'INPUT') return e;
-    var named = partsOf(e, sel).find(function (k) { return !k.closest('svg') && k.textContent.trim(); });
+    // The part the prop names, even an empty one (a label the product fills at run time), never the component itself.
+    var parts = partsOf(e, sel).filter(function (k) { return k !== e && !k.closest('svg') && k.tagName !== 'INPUT'; });
+    var named = parts.find(function (k) { return k.textContent.trim(); }) || parts.find(function (k) { return !k.children.length; });
     if (named) return named;
     var leaf = e;
     while (leaf.firstElementChild) { var next = Array.prototype.find.call(leaf.children, function (k) { return k.tagName.toLowerCase() !== 'svg' && k.textContent.trim(); }); if (!next) break; leaf = next; }
     return leaf;
+  }
+  // Writes a text prop without wiping what else the element holds (an icon beside the words).
+  function setText(el, v) {
+    if (!el.children.length) { el.textContent = v; return; }
+    var node = Array.prototype.find.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); });
+    if (node) node.textContent = v; else el.insertBefore(document.createTextNode(v), el.firstChild);
   }
   function hasPart(c, sel) { var e = baseElement(c); return partsOf(e, sel).some(function (k) { return k !== e; }); }
   // Where the component is used: each product by its full name, linked when the config gives its page.
@@ -498,7 +511,7 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
         else if (p.type === 'BOOLEAN') {
           if (p.on || p.off) { applyEffect(e, p.on, !!v); applyEffect(e, p.off, !v); }
           else if (p.part && !v) partsOf(e, p.part).forEach(function (k) { if (k !== e) k.remove(); });
-        } else if (p.type === 'TEXT' && v) { var leaf = textLeaf(e, p.part); if (leaf.tagName === 'INPUT') leaf.placeholder = v; else leaf.textContent = v; }
+        } else if (p.type === 'TEXT' && v) { var leaf = textLeaf(e, p.part); if (leaf.tagName === 'INPUT') leaf.placeholder = v; else setText(leaf, v); }
       });
       var el = (c.cls && (e.classList.contains(c.cls) ? e : e.querySelector('.' + c.cls))) || e;
       var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px';
@@ -528,8 +541,8 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
         field.addEventListener('input', function () { state[p.label] = field.value; refresh(); });
       } else {
         var opts = p.type === 'VARIANT' ? (p.options || []).map(function (o) { return { v: o.label, off: o.live && !(o.add || []).length && !Object.keys(o.attrs || {}).length }; })
-          : [{ v: 'false' }, { v: 'true', off: !p.on && !p.off && !(p.part && hasPart(c, p.part)) }];   // a part the markup does not hold cannot be shown
-        ctl.innerHTML = label + segHTML(opts.map(function (o) { return { v: o.v, label: o.v, off: o.off, title: 'Shown live, not as a style the page can set' }; }));
+          : [{ v: 'false' }, { v: 'true', off: !p.on && !p.off && !(p.part && hasPart(c, p.part)), missing: true }];   // a part the markup does not hold cannot be shown
+        ctl.innerHTML = label + segHTML(opts.map(function (o) { return { v: o.v, label: o.v, off: o.off, title: o.missing ? 'No instance in the code has this part yet' : 'Shown live, not as a style the page can set' }; }));
         var sync = function () { segItems(ctl).forEach(function (b) { segSelect(b, b.dataset.v === String(state[p.label])); }); };
         segItems(ctl).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; state[p.label] = p.type === 'VARIANT' ? b.dataset.v : b.dataset.v === 'true'; sync(); refresh(); }); });
         sync();

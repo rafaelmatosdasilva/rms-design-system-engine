@@ -24,6 +24,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { pruneCandidates } from './prune-check.mjs';
+import { withTextScaleKeys } from './naming-convention.mjs';
 import { resolveStatus, parseStatusTags, lintStatusFields, statusFindings, statusLine } from './decision-status.mjs';
 import { buildCatalog, catalogTable } from './ui-catalog.mjs';
 import { loadLocator } from './component-locator.mjs';
@@ -602,7 +603,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   const paths = cfg.paths || {};
   const vars = readJSON(resolve(ROOT, paths.snapshotVars || 'figma-vars.snapshot.json'));
   if (!vars) throw new Error(`vars snapshot not found (${paths.snapshotVars})`);
-  const structure = readJSON(resolve(ROOT, paths.snapshotStructure || 'figma-structure.snapshot.json'))?.components || {};
+  const structure = withTextScaleKeys(readJSON(resolve(ROOT, paths.snapshotStructure || 'figma-structure.snapshot.json'))?.components || {});
   const props = readJSON(resolve(ROOT, paths.compPropsSnapshot || 'figma-component-props.snapshot.json')) || {};
   // Optional composition snapshot ({ "<Component>": ["Child", ...] }) drives relationships.composesWith.
   // Absent → relationships are simply omitted (additive, never an error).

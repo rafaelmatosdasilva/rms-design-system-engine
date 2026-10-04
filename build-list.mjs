@@ -10,6 +10,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 
 import { join, dirname, relative } from 'node:path';
 import { inProgressList } from './in-progress.mjs';
 import { OUT_DIR } from './names.mjs';
+import { withTextScaleKeys } from './naming-convention.mjs';
 
 export const isBuildMode = (cfg) => cfg?.build === true;
 export const TOKENS_TO_BUILD = `${OUT_DIR}/handback/tokens-to-build.css`;
@@ -255,7 +256,7 @@ export function derivedContract(classFor, struct = {}, props = {}, varOf = () =>
 export function projectDerivedContract(ROOT, cfg, classFor, varOf = () => null) {
   if (!isBuildMode(cfg)) return { COMPONENT_CSS_SELECTORS: {}, CONTRACT: {}, CSS_HEIGHT_RULES: {}, FIGMA_LAYOUT_TO_CSS: {}, CSS_BASE_RULE_VARS: [] };
   const read = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return null; } };
-  const struct = read(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
+  const struct = withTextScaleKeys(read(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {});
   const props = read(cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {};
   return derivedContract(classFor, struct, props, varOf);
 }
