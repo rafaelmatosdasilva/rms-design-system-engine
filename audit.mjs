@@ -3925,6 +3925,20 @@ function reportFull(label, items, shown) {
     } catch { /* no component-values.snapshot.json: nothing to read */ }
   }
 
+  // ── Accessibility the design owes (design-a11y.mjs, advisory) ─────────────────
+  // An interactive component with no focus state, an error state with no message, a control under 24px: read from
+  // the props and structure snapshots, for whoever keeps the Figma file. Off with "designA11y": false.
+  if (cfg.designA11y !== false && (!ONLY || ONLY.a11y)) {
+    try {
+      const { designA11yFindings, designA11yBlock } = await import('./design-a11y.mjs');
+      const props = JSON.parse(readFileSync(join(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8'));
+      let struct = {};
+      try { struct = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {}; } catch { /* heights unknown */ }
+      const lines = designA11yBlock(designA11yFindings(props, struct, { only: _scopeNames.length ? _scopeNames : null }));
+      if (lines.length) { console.log(C.yellow(`\n${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(l)); }
+    } catch { /* no props snapshot: nothing to read */ }
+  }
+
   // ── A workaround built around a component is a missing API (I59, advisory) ────
   _section('advice');
   // A screen's own control laid over a design-system component (a clear button over a field, actions over a

@@ -199,6 +199,9 @@
      iconButton: Default has no auto layout
      iconButton: no description
 
+♿ Accessibility in the Figma file: 1 thing the design owes (for whoever keeps the Figma file; the parity never changes Figma):
+   • iconButton has no focus state in Figma, so the code invents the focus ring and no one designs it: add a focus state (a visible ring, at least 3:1 against what is behind it)
+
 🧩 Built around a component: 2 places where a screen lays its own control over a component. The component may be missing a slot or prop: send it to the design system, the screen is not wrong. Advisory.
      badge: .hb-badge-remove laid over it (pages/index.html:7). The component may be missing a slot or prop for this action.
      a text field (.hb-search-input): .hb-search-clear laid over it (pages/index.html:10). The design system's field may be missing this action.
