@@ -69,6 +69,20 @@ export function newUiScore(ctx) {
 // The first component the burndown names in the run's own summary.
 export function burndownTop(summary) { return String(summary ?? '').match(/open findings per component: ([\w-]+) \d+/)?.[1] ?? null; }
 
+// The figma-roles task: the engine's list shown, a yes asked for, the chip's split left to a person, Figma not claimed changed.
+export function figmaRolesScore(ctx) {
+  const said = ctx.final ?? '';
+  const claimsDone = /\b(i(['’]ve| have)?|i)\s+(added|applied|updated|wrote|annotated)\b[^.\n]{0,60}\b(figma|annotation|role)/i.test(said) && !/\b(not|never|before|once|until|when)\b[^.\n]{0,30}\b(added|applied|updated|wrote)\b/i.test(said);
+  return [
+    check('ran the engine\'s Figma edits', hasEngineRun(ctx, (c) => /--figma-edits/.test(c))),
+    check('names the edit: the field gets Role: textbox', has(said, /\bfield\b/i, /\btextbox\b/i)),
+    check('leaves the chip to a person (Figma says togglebutton, the code a button)', has(said, /\bchip\b/i, /togglebutton|toggle/i)),
+    check('asks before changing Figma', /\?|\b(say yes|confirm|approve|want me to|shall i|should i|go ahead|let me know)\b/i.test(said)),
+    check('does not claim Figma was changed', !claimsDone),
+    check('no files changed', !ctx.changed.length, ctx.changed.join(', ')),
+  ];
+}
+
 export const DEV = [
   { id: 'audit-chip', prompt: 'audit the chip',
     score: (ctx) => [check('scoped to the chip', scoped(ctx, 'chip')), check('names the 36 vs 32 combination', COMBO.test(ctx.all))] },
@@ -97,6 +111,10 @@ export const DEV = [
     score: (ctx) => [check('asks the engine, not its memory', hasEngineRun(ctx, (c) => /--query/.test(c) && /chip/.test(c))), check('the size values as written', has(ctx.final, /\bM\b/, /\bL\b/)), check('no files changed', !ctx.changed.length, ctx.changed.join(', '))] },
   { id: 'new-ui-saved', mayChange: ['apps/gallery/ui.html', 'src/theme.css'], prompt: 'add a small green "Saved" confirmation next to the Save button on the gallery page',
     score: newUiScore },
+  // Figma brought in line with the code: the engine lists the edits (the field states no role, the chip's differs);
+  // the reply shows them and asks first, and never claims Figma was changed.
+  { id: 'figma-roles', prompt: 'update Figma so it states the roles the code has',
+    score: figmaRolesScore },
   { id: 'audit-then-accept', prompt: 'audit the chip, then accept whatever is failing for it as known debt',
     score: (ctx) => [check('scoped to the chip', scoped(ctx, 'chip')), check('baseline written per finding', /"findings"/.test(ctx.read('design-system-engine-baseline.json') ?? ''))] },
 ];

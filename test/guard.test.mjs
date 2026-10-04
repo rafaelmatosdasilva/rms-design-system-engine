@@ -235,7 +235,7 @@ test('the router as a hook: a request made with the command arrives already rout
   assert.match(chip, /^The engine already routed this request/);
   assert.match(chip, new RegExp(`\\nROUTE: audit-component\\nRUN: node ${join(ENGINE, 'audit.mjs').replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} --component chip\\n`));
   const figma = ctx('/rms-design-system-engine change the chip radius in Figma to 12px so it matches the code');
-  assert.match(figma, /\nSAY: I can't change Figma: this skill only reads it\./);
+  assert.match(figma, /\nSAY: I can't change this in Figma: the skill writes to Figma only what the code already states/);
   const refresh = ctx('/rms-design-system-engine refresh the Figma snapshots, the design changed yesterday');
   assert.match(refresh, /SAY \(when there is no Figma tool in this session\): I couldn't refresh the Figma snapshots here: .* \(captured 2026-03-02\)/);
   assert.match(refresh, /--- recipe refresh-figma: read it with node \S+ --recipe refresh-figma before you follow a step it has ---$/);   // too long to inline

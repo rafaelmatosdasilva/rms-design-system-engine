@@ -40,6 +40,7 @@ import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-pa
 import { ZERO_FAIL }                                             from './run-diff.mjs';
 import { loadBaselineLabels, loadBaselineFindings, classifyBaseline, writeBaseline } from './baseline.mjs';
 import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, newPath, projectPath } from './names.mjs';
+import { codeRoots } from './code-roots.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT       = process.cwd();
@@ -471,6 +472,24 @@ if (process.argv.includes('--styleguide')) {
     if (r.notAgreed) console.log(`   ${r.notAgreed}`);
     process.exit(0);
   } catch (e) { console.error(`❌ style guide not built: ${e.message}`); process.exit(1); }
+}
+
+// ── --figma-edits: the Figma side of the hand-back, written by the engine, applied only when a person says yes ──
+if (process.argv.includes('--figma-edits')) {
+  let feConfig = {};
+  try { feConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  try {
+    const { figmaEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const { generateStyleguide } = await import('./styleguide-gen.mjs');
+    let propsSnap = {};
+    try { propsSnap = JSON.parse(readFileSync(resolve(ROOT, feConfig.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { console.error('❌ no Figma component snapshot: refresh Figma first (rms-design-system-engine --refresh-figma).'); process.exit(1); }
+    const parts = await generateStyleguide(ROOT, feConfig, { partsOnly: true, names: Object.keys(propsSnap).filter((k) => !k.startsWith('_')) });
+    const edits = figmaEdits(propsSnap, parts.view?.components ?? []);
+    const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits);
+    for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null })) console.log(l);
+    if (edits.length) console.log(`   (${relative(ROOT, files.json)} · ${relative(ROOT, files.script)})`);
+    process.exit(0);
+  } catch (e) { console.error(`❌ Figma edits not listed: ${e.message}`); process.exit(1); }
 }
 
 // ── --prototype <composition.json>: draw a prototype from the system's own components (prototype.mjs) ──
@@ -1418,7 +1437,8 @@ function reportFull(label, items, shown) {
   // Lazily collected once and reused across gates.
   let _allSourceFiles = null;
   function allSourceFiles() {
-    if (!_allSourceFiles) _allSourceFiles = collectSourceFiles();
+    // The project and the sibling folders ds-config.json names (code-roots.mjs).
+    if (!_allSourceFiles) { _allSourceFiles = []; for (const root of codeRoots(ROOT, cfg)) collectSourceFiles(root, _allSourceFiles); }
     return _allSourceFiles;
   }
 
@@ -1905,16 +1925,29 @@ function reportFull(label, items, shown) {
     // audit. Narrowing usage to the scan set produces confident false positives; on the
     // project this was built for it wrongly condemned classes used by a style guide.
     const usageOnlyFiles = [];
+    const ENGINE_FILES = new Set(['history', 'checkResult', 'baseline', 'agreed'].map((k) => PROJECT[k].now));
     (function walkAll(dir) {
       let entries;
       try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
       for (const e of entries) {
-        if (/^(node_modules|\.git|dist|build|coverage)$/.test(e.name) || e.name.startsWith('.parity-')) continue;
+        // The engine's own output (its folders and the records it writes) is never usage: a finding that names a class
+        // would make that class "used" on the next run.
+        if (/^(node_modules|\.git|dist|build|coverage)$/.test(e.name) || ENGINE_DIRS.includes(e.name) || ENGINE_FILES.has(e.name)) continue;
         const full = join(dir, e.name);
         if (e.isDirectory()) walkAll(full);
         else if (/\.(html|js|mjs|cjs|jsx|ts|tsx|vue|svelte|json|md)$/.test(e.name)) usageOnlyFiles.push(full);
       }
     })(ROOT);
+    for (const root of codeRoots(ROOT, cfg).slice(1)) (function walkAll(dir) {
+      let entries;
+      try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (/^(node_modules|\.git|dist|build|coverage)$/.test(e.name) || e.name.startsWith('.')) continue;
+        const full = join(dir, e.name);
+        if (e.isDirectory()) walkAll(full);
+        else if (/\.(html|js|mjs|cjs|jsx|ts|tsx|vue|svelte|json|md)$/.test(e.name)) usageOnlyFiles.push(full);
+      }
+    })(root);
 
     for (const f of allSourceFiles()) {
       let text;

@@ -17,6 +17,7 @@
 // disagree on the default or the allowed values - a reading problem, never a design difference).
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { codeRoots } from './code-roots.mjs';
 import { join, resolve, dirname, extname, relative } from 'node:path';
 import { createRequire } from 'node:module';
 import { norm, SKIP_DIR, componentSourceFiles, textReader, resolveComponentFile, textComponentApi } from './component-source.mjs';
@@ -146,7 +147,7 @@ function codeConnectFiles(ROOT) {
       else if (/\.figma\.[jt]sx?$/.test(e.name)) out.push(p);
     }
   };
-  walk(ROOT);
+  for (const root of codeRoots(ROOT)) walk(root);
   return out;
 }
 

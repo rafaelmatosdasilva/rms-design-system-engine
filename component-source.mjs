@@ -14,6 +14,7 @@
 // Pure except for the file reads; no network, no browser.
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { codeRoots } from './code-roots.mjs';
 import { join, extname, basename } from 'node:path';
 import { ENGINE_DIRS } from './names.mjs';
 
@@ -41,6 +42,7 @@ export function componentSourceFiles(ROOT, cfg = {}) {
   const out = [];
   for (const d of (cfg.componentSrcDirs ?? ['src', 'components', 'app', 'lib', 'packages']).map((x) => join(ROOT, x))) if (existsSync(d)) walk(d, out);
   if (!out.length) walk(ROOT, out);
+  for (const root of codeRoots(ROOT, cfg).slice(1)) walk(root, out);   // sibling folders the config names
   return out;
 }
 

@@ -8,6 +8,7 @@
 // recipe, a pasted step list followed or asked about). Here it is a fixed table, tested, the same on any
 // model, in English and Portuguese. route() is pure: projectState() reads the project for it.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { codeRoots } from './code-roots.mjs';
 import { join, relative } from 'node:path';
 
 // What the router needs from the project: is there a config, which components, when the snapshots were
@@ -62,7 +63,7 @@ export function uiFiles(ROOT, limit = 400) {
       else if (UI_FILE.test(e.name) && !/\.(test|spec|stories)\./.test(e.name)) out.push(relative(ROOT, join(dir, e.name)).split('\\').join('/'));
     }
   };
-  walk(ROOT);
+  for (const root of codeRoots(ROOT)) walk(root);
   return out.sort();
 }
 
@@ -103,12 +104,16 @@ const TO_CODE = /\b(turn|convert|transforma\w*|converte\w*)\b[\s\S]{0,60}\b(into
 // A prototype ("prototype a settings page", "mock up a checkout with our components"): made only of the system's
 // components, checked and drawn by the engine; what the system lacks is listed, never invented.
 export const PROTOTYPE = /\b(prototyp\w*|mock[\s-]?ups?|wireframes?|prot[oó]tipos?|maquet\w*)\b/i;
+export const FIGMA_EDITS = /\b(update|align|sync|bring|make|annotat\w*|atualiz\w*|alinh\w*|sincroniz\w*|p[oõ]e)\b[^.\n]{0,20}\bfigma\b[^.\n]{0,60}\b(code|c[oó]digo)\b|\bfigma\b[^.\n]{0,30}\b(match(es)?|in line with|up to date with|aligned with|igual ao|alinhado com)\s+(the\s+|o\s+)?(code|c[oó]digo)\b|\b(add|write|put|set|acrescent\w*|adicion\w*|p[oõ]e|coloca\w*)\b[^.\n]{0,30}\b(the\s+|os?\s+|as?\s+)?(roles?|pap[eé]is|annotations?|anota[çc][õo]es)\b[^.\n]{0,20}\b(in|to|into|no|na|ao)\s+figma\b|--figma-edits/i;
 const RULES = [
   ['guidelines-links', (t) => LINK.test(t)],
   ['prototype', (t) => PROTOTYPE.test(t) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
   // Building from Figma (a project that has only Figma, or a component Figma has and the code does not yet):
   // the engine lists what to build and checks each piece; the agent writes it with the names and values it prints.
   ['build-from-figma', (t, s) => (TO_CODE.test(t) || BUILD_VERB.test(t) && (/\bfrom (the )?(figma|design)\b|\bdo figma\b|design system|sistema de design|\btokens?\b|\b(components?|componentes?)\b|\binto code\b|em c[oó]digo/i.test(t) || (s.build && s.named.length > 0))) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
+  // Figma brought in line with what the code already states (a component's role): the engine lists the edits and
+  // writes the script; it runs once the person says yes. A value to change in Figma stays the person's (next rule).
+  ['figma-edits', (t) => FIGMA_EDITS.test(t) && !/\b\d+(\.\d+)?\s*(px|rem|%|pt)?\b|#[0-9a-f]{3,8}\b/i.test(t)],
   ['fix-a-difference', (t) => /\b(change|set|make|update|muda|mudar|altera|alterar|p[oõ]e|coloca)\w*\b[\s\S]{0,60}\b(in|no|na)\s+figma(?![-\w/.])|\bfigma\b[\s\S]{0,30}\b(to|para)\s+\d/i.test(t), 'figma'],
   ['refresh-figma', (t) => /maxSnapshotAgeDays|go(es)? green|fica(r)? verde|raise the (age|limit)/i.test(t), 'forbidden-green'],
   // Before accept-debt: "que valores aceita o size" asks what a prop accepts, it accepts no debt.
@@ -132,7 +137,7 @@ const RULES = [
 
 // Sentences the agent says as written, so what it can and cannot do is never its own wording.
 export const SAY = {
-  figma: 'I can\'t change Figma: this skill only reads it. A person makes that change in the Figma editor; the audit below shows the Figma value and the code value.',
+  figma: 'I can\'t change this in Figma: the skill writes to Figma only what the code already states (a component\'s role), and only once you approve it. A person makes this change in the Figma editor; the audit below shows the Figma value and the code value.',
   noVariable: (name, list) => `Figma paints ${name} (${list.join('; ')}) with colours that have no variable: the code writes them as Figma has them, and the design system has no token for them yet.`,
   noRefresh: (date) => `I couldn't refresh the Figma snapshots here: there is no Figma tool in this session. The audit below uses the committed snapshots${date ? ` (captured ${date})` : ''}, so a change made in Figma after that is not in it. To refresh them, connect the Figma MCP server to Claude Code, or set FIGMA_TOKEN in the project's .env file; never paste a token in the chat.`,
 };
@@ -174,6 +179,10 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
       notes.push('Build from Figma: the engine says what to build, in order (tokens first, then each component after the ones it nests), and checks each piece. Write the code only with the names, classes and values the engine prints (--query for a component); write no value Figma does not have: use the closest one the system has and say so, or ask. After each piece, run the scoped check until it passes. Commit nothing unless asked.');
       return { recipe, question, run: question ? [] : named.length ? [`${cmd} --query ${named.join(' ')}`] : [cmd], notes };
     }
+    if (recipe === 'figma-edits') {
+      notes.push('The engine lists every Figma edit and writes the script for it; show the person the list and ask. Only when they say yes, run .design-system-engine-out/handback/figma-apply.js with the Figma MCP\'s use_figma, unchanged, and report what it returns. Never write a Figma script of your own; what needs a person (descriptions, missing components, layout) is listed for the design team.');
+      return { recipe, question: false, run: [`${cmd} --figma-edits`], notes };
+    }
     if (recipe === 'guidelines-links') return { recipe, question, run: [`${cmd} --guidelines ${links(t).join(' ')}`], notes };
     if (recipe === 'prototype') {
       notes.push('A prototype is made only of the design system\'s components with their own options, and the engine\'s layout pieces; never write HTML, CSS or a component for it, and never change the system\'s files. Write it as a composition in prototypes/<name>.json, run --prototype on it, and fix each ❌ line until it is drawn. A need nothing fits is a Missing box; tell the person every gap it lists, as written.');
@@ -184,7 +193,7 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
       return { recipe, question, run: [`${cmd} --prototype --catalog`], notes };
     }
     if (kind === 'figma') {
-      notes.push('Nothing is ever changed in Figma by the skill, and it never offers to. Run the audit, then tell the person what to change in Figma.');
+      notes.push('Nothing is changed in Figma for this request, and never offer to: a value in Figma is the person\'s change in the Figma editor (the skill writes to Figma only what the code already states, through --figma-edits). Run the audit, then tell the person what to change in Figma.');
       return { recipe, question, run: [scoped], notes, kind };
     }
     if (kind === 'forbidden-green') {

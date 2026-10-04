@@ -20,6 +20,7 @@
 // never reported. A finding that does not say its fix in `desc` carries it in `fix`, for the check of each edit
 // (edit-check.mjs, idea I74), which hands the fix back to the agent that wrote the line.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { codeRoots } from './code-roots.mjs';
 import { join, relative, extname } from 'node:path';
 import { ENGINE_DIRS } from './names.mjs';
 
@@ -219,7 +220,7 @@ function walk(ROOT, exts, limit = 4000) {
       else if (exts.has(extname(n).toLowerCase()) && st.size < 512 * 1024) files.push(abs);
     }
   };
-  go(ROOT, 0);
+  for (const root of codeRoots(ROOT)) go(root, 0);
   return files;
 }
 

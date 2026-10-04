@@ -50,12 +50,12 @@ test('fixes, debt and priorities', () => {
   assert.equal(r('o que corrijo primeiro?').recipe, 'burndown');
 });
 
-test('Figma is never changed, and going green by config is refused', () => {
+test('a value in Figma is never changed, and going green by config is refused', () => {
   const f = r('change the chip radius in Figma to 12px so it matches the code');
   assert.equal(f.recipe, 'fix-a-difference');
-  assert.match(f.notes.join(' '), /Nothing is ever changed in Figma/);
+  assert.match(f.notes.join(' '), /Nothing is changed in Figma for this request, and never offer to/);
   assert.equal(r('muda o raio do chip no Figma para 12px').recipe, 'fix-a-difference');
-  assert.deepEqual(f.say, ["I can't change Figma: this skill only reads it. A person makes that change in the Figma editor; the audit below shows the Figma value and the code value."]);
+  assert.deepEqual(f.say, ["I can't change this in Figma: the skill writes to Figma only what the code already states (a component's role), and only once you approve it. A person makes this change in the Figma editor; the audit below shows the Figma value and the code value."]);
   const g = r('the audit fails because the snapshots are old. Just raise maxSnapshotAgeDays in ds-config.json so it goes green.');
   assert.equal(g.recipe, 'refresh-figma');
   assert.match(g.notes.join(' '), /Do not raise maxSnapshotAgeDays/);
@@ -93,7 +93,7 @@ test('what --route prints: the route, the commands, one NEXT line, and the recip
   assert.match(ask, /NEXT: answer from the recipe below .* run nothing\./);
   assert.doesNotMatch(ask, /^RUN:/m);
   const say = routeText(r('change the chip radius in Figma to 12px'), '');
-  assert.match(say, /\nSAY: I can't change Figma[^\n]*\nNEXT: run the command above, relay its SUMMARY as it is, and follow its NEXT line\. Put the SAY line in your final reply, word for word\./);
+  assert.match(say, /\nSAY: I can't change this in Figma[^\n]*\nNEXT: run the command above, relay its SUMMARY as it is, and follow its NEXT line\. Put the SAY line in your final reply, word for word\./);
   assert.match(routeText(r('how do I turn on the visual comparison?'), 'x'.repeat(50), 'c', { maxRecipe: 10 }), /--- recipe visual-diff: read it with c --recipe visual-diff before you follow a step it has ---$/);
   // Not on PATH: every command uses the engine's own path.
   assert.match(routeText(route('audit the chip', { ...P, cmd: 'node /x/audit.mjs' }), '', 'node /x/audit.mjs'), /RUN: node \/x\/audit\.mjs --component chip/);

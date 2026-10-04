@@ -1,5 +1,62 @@
 # Skill evaluation results
 
+## 2026-10: products in their own repositories, read as the project's code (continuous evaluation)
+
+What changed since the entry below (engine 7765e76): a design system whose products live in their own repositories,
+checked out beside it, names those folders in `ds-config.json` (`pluginDirs`, or `codeRoots` for any other folder),
+and every source scan reads their code as the project's own, so a variable or class only a product uses is no longer
+listed as unused. The audit no longer reads its own output files (the history, the check result) as usage, which had
+made a class named only in the engine's findings count as used. The guide changed in `reference/config.md`.
+
+Guide set measured: `83f140fd6d10` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7765e76 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.055 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Every task passes and no rule is broken; the guide change is two lines of configuration reference.
+
+**Also measured, outside the evaluation.** On a private design system split into one repository per product, the audit
+from the design system's repository read 74 source files instead of 23 and gave the same 25 gate results as before the
+split; its results are kept out of this repository. Records: `records/2026-10-04-sibling-repos`.
+
+## 2026-10: Figma brought in line with the code, by the engine, once the person says yes (continuous evaluation)
+
+What changed since the entry below (engine 27b2d1f): `--figma-edits` reads each component's role from what the code
+renders (every instance it shows, the role most of them have) and lists the Figma components that state none, each
+with the annotation it adds and why; a role that differs between Figma and code is listed for a person, never applied.
+It writes the Figma plugin script for those edits, which the agent runs with the Figma MCP only after the person says
+yes; the project hooks refuse any other script that writes to Figma. The router sends "update Figma to match the code"
+to the new `figma-edits` recipe; a value to change in Figma stays the person's. A guide task, `figma-roles`, asks for it
+on the demo project (the field states no role, the chip is a toggle in Figma and a plain button in code). The guide
+changed in `rms-design-system-engine.md`, `cookbook/figma-edits.md`, `cookbook/fix-a-difference.md`,
+`cookbook/ci-and-hooks.md`, `cookbook/full-audit.md` and `reference/usage.md`.
+
+Guide set measured: `f4cb303c881e` · Project measured: `13d811a9d668`
+
+| Haiku, engine 64f93b1 | Entry below | This version |
+|---|---|---|
+| The 20 guide tasks (`new-ui-saved` at 10 runs) | 67/67 | 67/67 |
+| `figma-roles` (new) | | 3/3 |
+| Mean cost a run | $0.056 | $0.058 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Every task passes. In each `figma-roles` run Claude ran the engine's list, showed the field's annotation
+and the chip's decision as printed, and asked before changing anything; it wrote no Figma script of its own.
+
+**Found by this evaluation and fixed.** On engine 40360ec `figma-roles` failed 3 of 3: the router read the word
+"states" in "update Figma so it states the roles the code has" and sent it to the states recipe, so the list never
+ran. The router now matches a request to update, align or sync Figma with the code whatever words sit between (64f93b1);
+every row above was run again on that engine.
+
+**Also measured, outside the evaluation.** The generated script was run on the Tidepool Figma file: it added the
+listed annotation to a component set, skipped a component that already states a role, reported a node that does not
+exist, and the change was undone after. On a private design system the engine listed 7 roles the code proves and left
+out a modal whose code has no dialog role and two components the code does not build yet; its results are kept out of
+this repository. Records: `records/2026-10-04-figma-edits`.
+
 ## 2026-10: accessibility tried on the components' own code, what the design owes, a task the Figma MCP alone cannot finish (build evaluation and continuous evaluation)
 
 What changed since the entry below (engine b8145b9 for the guide, 48bdb04 for the builds): the accessibility check
