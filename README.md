@@ -23,7 +23,7 @@ Have only Figma? It helps Claude build your design system in code from it, one p
 A short view of the flow. A more detailed flow can be seen on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1) (Ctrl or Cmd click to open it in a new tab).
 
 ```mermaid
-%%{init: {"themeCSS": "[id*=L_P1_P3], [id*=L-P1-P3] { marker-end: none !important; }"}}%%
+%%{init: {"themeCSS": "[id*=L_P1_P3], [id*=L-P1-P3], [id*=L_CODE_AI], [id*=L-CODE-AI], [id*=L_PROTO_AI], [id*=L-PROTO-AI] { marker-end: none !important; }"}}%%
 flowchart LR
     WHEN["<b>WHEN IT RUNS</b>"]
     subgraph P1["PHASE 1 - CAPTURE"]
@@ -42,6 +42,7 @@ flowchart LR
         CON["<b>CONTRACTS</b>"]
         INT["<b>INTENT</b>"]
         SG["<b>STYLE GUIDE</b>"]
+        PROTO["<b>PROTOTYPES</b>"]
     end
     A11Y["<b>ACCESSIBILITY</b>"]
     HOOKS["<b>SKILL AND GUARD HOOKS</b>"]
@@ -56,6 +57,8 @@ flowchart LR
     P3 --> AI
     P3 --> HUM
     HOOKS --> AI
+    CODE <--> AI
+    PROTO <--> AI
     AI -.-> EV
 ```
 

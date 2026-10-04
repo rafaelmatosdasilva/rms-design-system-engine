@@ -1,5 +1,66 @@
 # Skill evaluation results
 
+## 2026-10: accessibility tried on the components' own code, what the design owes, a task the Figma MCP alone cannot finish (build evaluation and continuous evaluation)
+
+What changed since the entry below (engine b8145b9 for the guide, 48bdb04 for the builds): the accessibility check
+renders a React design system's components from their own code (`component-harness.mjs`), with no dev server, in
+build mode or when there is no page to open, and tries each one in its Figma variants with the keyboard; a part's role
+(a stepper's Decrement and Increment) and its behaviour (a step button stops at the end of the range) are contracts
+checked in the browser; `design-a11y.mjs` lists what the Figma file itself owes (no focus state, an error shown by
+colour alone, a control under 24px), in the audit for whoever keeps the file and in the build sheet for the agent; in
+build mode the accessibility lines are part of the next step. A prototype is drawn from what the code really shows
+(the markup its scripts build, the theme's classes for each state, the colours its comments name, the font the design
+is set in). The guide changed in `cookbook/a11y-notes.md`, `reference/usage.md` and `reference/config.md`.
+
+Guide set measured: `43140f3f410f` · Project measured: `13d811a9d668`
+
+### Two new build tasks, Claude with the Figma MCP alone against Claude with the Figma MCP and the skill
+
+- **Stepper.** A component whose parts carry roles in Figma's annotations (a spinbutton, a Decrement and an Increment
+  button): the scorer presses each part, reads its spoken name, tries the arrow keys and the range ends.
+- **Figma changed.** The chip is already built; a designer then changed its colours in Figma. Both sides get the new
+  MCP output and the request "Figma changed, update the chip". The MCP returns the light values only, so the dark
+  mode has to come from somewhere else.
+
+| Task | Opus alone | Opus with the skill | Haiku alone | Haiku with the skill |
+|---|---|---|---|---|
+| Stepper | 3/3 · $0.50 | 3/3 · $1.24 | 0/3 · $0.15 | 3/3 · $0.72 |
+| Figma changed | 0/3 · $0.42 | 3/3 · $0.80 | 0/3 · $0.20 | 2/3 · $0.27 |
+
+| Builds with the skill, new engine | Opus | Haiku |
+|---|---|---|
+| Disclosure (part roles, expanded state) | 3/3 | 3/3 |
+| Field (error state, a labelled input) | 3/3 | 3/3 |
+
+**Reading.** Figma changed is the task the skill wins on every model: without it no run updated the dark mode, on Opus
+or Haiku, since the MCP output has no dark values and the old ones stayed. The skill's capture holds every mode and its
+fix lines name each colour per mode. Opus alone builds an accessible stepper; Haiku alone does not (no spoken names on
+the step buttons, no arrow keys). Haiku with the skill went from 0/3 to 3/3 once the build sheet listed the
+accessibility lines and the check tried the stepper from its own code (engine 8998271, then 1108c3b). The one Haiku
+miss on Figma changed kept one old dark colour.
+
+### The guide tasks on this engine
+
+| | Entry below | This version |
+|---|---|---|
+| Haiku, all 20 guide tasks (`new-ui-saved` at 10 runs) | 66/67 (baeeefe) | 67/67 (27b2d1f) |
+| Haiku, mean cost a run | $0.057 | $0.056 |
+| Rule violations | 1 (`guidelines-link`) | 0 |
+
+**Reading.** Every guide task passes on Haiku, `guidelines-link` included (the run in the entry below asked for the
+GitLab token in its first answer; none did here), and no rule is broken. The guide change is three files of
+accessibility notes; the main guide is the same.
+
+**Disclosed.** Two scorer bugs were found and fixed during the round, and every row was rescored after each. The
+stepper scorer measured the floor of a stepper whose value its parent holds on the path for one that holds its own,
+so Opus alone read 0/3 instead of 3/3 and two Opus runs with the skill failed falsely. The rescore read only the files
+a run saved, so a Figma changed run that left `Chip.jsx` as it was read as "did not write Chip.jsx". The new tasks ran
+on engines 8998271 (both sides), 1108c3b (Haiku stepper, disclosure and field with the skill) and 9fee7af (Opus
+stepper with the skill); the runs without the skill do not use the engine. The prototype drawing was measured on a
+private system, its results kept out of this repository. Records: `records/2026-10-04-a11y-and-figma-changed`.
+
+**Limits.** One fictional design system, three runs a task, two models. Sonnet was not measured this round.
+
 ## 2026-10: prototyping with the design system, and the guide that adds it (prototype evaluation and continuous evaluation)
 
 What changed since the adopted version (engine b8145b9): `--prototype` checks a composition made only of the system's
