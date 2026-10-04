@@ -1,5 +1,143 @@
 # Skill evaluation results
 
+## 2026-10: accessibility tried on the components' own code, what the design owes, a task the Figma MCP alone cannot finish (build evaluation and continuous evaluation)
+
+What changed since the entry below (engine b8145b9 for the guide, 48bdb04 for the builds): the accessibility check
+renders a React design system's components from their own code (`component-harness.mjs`), with no dev server, in
+build mode or when there is no page to open, and tries each one in its Figma variants with the keyboard; a part's role
+(a stepper's Decrement and Increment) and its behaviour (a step button stops at the end of the range) are contracts
+checked in the browser; `design-a11y.mjs` lists what the Figma file itself owes (no focus state, an error shown by
+colour alone, a control under 24px), in the audit for whoever keeps the file and in the build sheet for the agent; in
+build mode the accessibility lines are part of the next step. A prototype is drawn from what the code really shows
+(the markup its scripts build, the theme's classes for each state, the colours its comments name, the font the design
+is set in). The guide changed in `cookbook/a11y-notes.md`, `reference/usage.md` and `reference/config.md`.
+
+Guide set measured: `43140f3f410f` · Project measured: `13d811a9d668`
+
+### Two new build tasks, Claude with the Figma MCP alone against Claude with the Figma MCP and the skill
+
+- **Stepper.** A component whose parts carry roles in Figma's annotations (a spinbutton, a Decrement and an Increment
+  button): the scorer presses each part, reads its spoken name, tries the arrow keys and the range ends.
+- **Figma changed.** The chip is already built; a designer then changed its colours in Figma. Both sides get the new
+  MCP output and the request "Figma changed, update the chip". The MCP returns the light values only, so the dark
+  mode has to come from somewhere else.
+
+| Task | Opus alone | Opus with the skill | Haiku alone | Haiku with the skill |
+|---|---|---|---|---|
+| Stepper | 3/3 · $0.50 | 3/3 · $1.24 | 0/3 · $0.15 | 3/3 · $0.72 |
+| Figma changed | 0/3 · $0.42 | 3/3 · $0.80 | 0/3 · $0.20 | 2/3 · $0.27 |
+
+| Builds with the skill, new engine | Opus | Haiku |
+|---|---|---|
+| Disclosure (part roles, expanded state) | 3/3 | 3/3 |
+| Field (error state, a labelled input) | 3/3 | 3/3 |
+
+**Reading.** Figma changed is the task the skill wins on every model: without it no run updated the dark mode, on Opus
+or Haiku, since the MCP output has no dark values and the old ones stayed. The skill's capture holds every mode and its
+fix lines name each colour per mode. Opus alone builds an accessible stepper; Haiku alone does not (no spoken names on
+the step buttons, no arrow keys). Haiku with the skill went from 0/3 to 3/3 once the build sheet listed the
+accessibility lines and the check tried the stepper from its own code (engine 8998271, then 1108c3b). The one Haiku
+miss on Figma changed kept one old dark colour.
+
+### The guide tasks on this engine
+
+| | Entry below | This version |
+|---|---|---|
+| Haiku, all 20 guide tasks (`new-ui-saved` at 10 runs) | 66/67 (baeeefe) | 67/67 (27b2d1f) |
+| Haiku, mean cost a run | $0.057 | $0.056 |
+| Rule violations | 1 (`guidelines-link`) | 0 |
+
+**Reading.** Every guide task passes on Haiku, `guidelines-link` included (the run in the entry below asked for the
+GitLab token in its first answer; none did here), and no rule is broken. The guide change is three files of
+accessibility notes; the main guide is the same.
+
+**Disclosed.** Two scorer bugs were found and fixed during the round, and every row was rescored after each. The
+stepper scorer measured the floor of a stepper whose value its parent holds on the path for one that holds its own,
+so Opus alone read 0/3 instead of 3/3 and two Opus runs with the skill failed falsely. The rescore read only the files
+a run saved, so a Figma changed run that left `Chip.jsx` as it was read as "did not write Chip.jsx". The new tasks ran
+on engines 8998271 (both sides), 1108c3b (Haiku stepper, disclosure and field with the skill) and 9fee7af (Opus
+stepper with the skill); the runs without the skill do not use the engine. The prototype drawing was measured on a
+private system, its results kept out of this repository. Records: `records/2026-10-04-a11y-and-figma-changed`.
+
+**Limits.** One fictional design system, three runs a task, two models. Sonnet was not measured this round.
+
+## 2026-10: prototyping with the design system, and the guide that adds it (prototype evaluation and continuous evaluation)
+
+What changed since the adopted version (engine b8145b9): `--prototype` checks a composition made only of the system's
+components and the engine's neutral layout pieces, draws it with the components' own markup and CSS in every mode, and
+lists what the system lacks; it can be asked for in words (the router and the `prototype` recipe), starts from the
+screens designed in Figma (`--from-screens`), and puts everything the engine knows in front of Claude (Figma
+descriptions and annotations, code notes, recorded decisions, guidelines from Notion, GitLab or the repository, the
+templates, the designed screens), with what applies to the request. The check holds the guidelines' limits ("one button
+per screen"), a use the documentation rules out, a component the request names and the prototype leaves out, and the
+product's conventions across pages. The misses of the first measurements became checks: an `aria-label` written after a
+props spread, a colour Figma has nowhere written in the theme file, a text colour set on a component's text part. The
+guide changed in `rms-design-system-engine.md`, `cookbook/prototype.md` and `reference/usage.md`.
+
+Guide set measured: `ad79498aa649` · Project measured: `13d811a9d668`
+
+### Prototypes, Claude alone against Claude with the skill
+
+Six requests on Tidepool, each asked in the same words on both sides: a notification settings page (a switch the
+system lacks), a search page, an empty state, a profile page that must match the designed Settings screen, a dialog
+whose guidelines allow one button, and a page whose guidelines come from GitLab and Notion links (a tag is never a
+confirmation). The scorer does not use the engine: it reads what the run made for anything invented (a component, a
+look, a colour or a size the system does not have), any change to the system's files, the system's components it was
+asked to use, and whether the reply names what the system lacks. Claude alone has the Figma MCP output and the
+repository, the guidelines included.
+
+| Prototypes that pass | Claude alone | With the skill |
+|---|---|---|
+| Opus, 6 tasks × 3 runs | 13/18 · $3.64 · 5.4 turns a run | 18/18 · $3.61 · 3.8 turns a run |
+| Haiku, 6 tasks × 3 runs | 2/18 · $1.57 · 19.4 turns a run | 17/18 · $1.27 · 5.6 turns a run |
+| Sonnet, the first 3 tasks (engine a425870) | 2/15 · $5.92 | 6/6 · $0.92 |
+
+| Task | Opus alone | Opus with the skill | Haiku alone | Haiku with the skill |
+|---|---|---|---|---|
+| Settings page (no switch in the system) | 0/3 | 3/3 | 0/3 | 2/3 |
+| Search page | 3/3 | 3/3 | 0/3 | 3/3 |
+| Empty state | 1/3 | 3/3 | 0/3 | 3/3 |
+| Profile, like the designed Settings screen | 3/3 | 3/3 | 2/3 | 3/3 |
+| Dialog, one button by the guidelines | 3/3 | 3/3 | 0/3 | 3/3 |
+| Guidelines from GitLab and Notion links | 3/3 | 3/3 | 0/3 | 3/3 |
+
+**Reading.** Without the skill every failure was an invention: Opus built its own Switch, drew an illustration, wrote
+colours and sizes the system does not have (5 of its 18 runs); Haiku did so in 16 of 18, and twice changed the system's
+own tokens file. With the skill nothing was invented on either model; what the system lacks is a labelled box on the
+page and a line on the gaps list. Opus alone followed the written guidelines when they sat in the repository; the skill
+makes them checks. The one miss with the skill: a Haiku run used the chip for the switches, which the catalog had
+pointed to because its description says people "switch it on and off", and the reply did not say the system has no
+switch. The skill side cost the same on Opus and less on Haiku, in far fewer turns.
+
+### Builds and the guide tasks on the same engine
+
+| | Earlier on this branch | This version |
+|---|---|---|
+| Builds, Opus with the skill (6 tasks × 3) | 18/18 (acb7808) | 18/18 · $5.65 (48bdb04) |
+| Builds, Haiku with the skill (6 tasks × 3) | 16/18 (acb7808) | 18/18 · $1.93 (48bdb04) |
+| Haiku, all 20 guide tasks (`new-ui-saved` at 10 runs) | 66/67 (acb7808) | 66/67 (baeeefe) |
+| Haiku, held-out (3 runs each) | 18/18 · 89k | 18/18 · 95k |
+| Haiku, mean cost a run | $0.057 | $0.057 |
+| Rule violations | 0 | 1 (`guidelines-link`) |
+
+The adopted version measured 67/67 and held-out 18/18 at 83k on Haiku (the entry below).
+
+**Reading.** Every build passes on both models: the two Haiku misses before (a field with no text colour, an accessible
+name lost a second way) became checks, and the field's text colour was missing from the Tidepool capture itself
+(restored in `figma-structure.snapshot.json`). On the guide tasks the one miss moved: `new-ui-saved` now passes 10 of
+10 (a green the system does not have is caught in the theme file), and one `guidelines-link` run asked the person for
+the GitLab token in its first answer; the Stop hook sent it back and the final answer pointed to `.env`, but the person
+would have read the first one, so it counts. Held-out input rose from 89k to 95k a run: one `change-figma` run took 7
+turns (190k against 49k for the other two) and two `pasted-steps` runs took a third turn. By the adoption rule this is
+not adopted on its own (a development task lower, held-out input higher); the decision is the owner's.
+
+**Disclosed.** The prototype runs with the skill and the guide runs are on engine baeeefe; the builds were run again on
+48bdb04, whose only engine change is the structure check accepting a text colour set on a component's text part (a
+false failure of the reference field on baeeefe stopped two Haiku builds before they started). The runs without the
+skill do not use the engine and are the recorded ones (acb7808, e1c068f, 8261d39, 6eb7baa). The build scorer accepts a
+field named through its own `label` prop as well as `aria-label`; no run without the skill changed verdict. Records:
+`records/2026-10-03-misses-made-checks`.
+
 ## 2026-10: every build from Figma checked as it renders, one style guide template, the old name gone (continuous evaluation)
 
 What changed since the adopted version (engine f475251): in build mode a difference measured in the browser fails

@@ -1,0 +1,4 @@
+.disclosure { display: flex; flex-direction: column; gap: var(--gap-s); width: 240px; color: var(--text-primary); }
+.disclosure__trigger { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-s); padding: var(--padding-s); background: var(--surface-page); color: var(--text-primary); border: var(--stroke-default) solid var(--field-border); border-radius: var(--radii-field); font: 500 14px/20px Inter, sans-serif; text-align: left; }
+.disclosure__panel { padding: var(--padding-s); font: 500 12px/16px Inter, sans-serif; }
+.disclosure__panel[hidden] { display: none; }

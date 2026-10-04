@@ -338,10 +338,16 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const icons = (iconSheet().match(/<symbol\b[^>]*\bid\s*=\s*["']([^"']+)["']/g) ?? []).map((m) => m.match(/id\s*=\s*["']([^"']+)["']/)[1]);
     let title = cfg.name ?? '';
     if (!title) { try { title = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { /* no package.json */ } }
-    const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
+    const probeList = [...new Set([...probeBySelector.values()])];
+    const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, probeList, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
       check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: opts.names ?? [],
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).map(([n, c]) => [n, c.propertyMap])),
       parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
+    // "In use": the approved pictures of the system's own frames (Gate [2]'s references), embedded, six at most.
+    const refsDir = resolve(ROOT, cfg.visualRefs ?? '.design-system-engine-refs');
+    view.screens = (cfg.frames ?? []).filter((f) => f?.nodeId).map((f) => ({ f, file: join(refsDir, `${String(f.nodeId).replace(/[:\/]/g, '-')}.png`) }))
+      .filter(({ file }) => existsSync(file) && readFileSync(file).length <= 2_000_000).slice(0, 6)
+      .map(({ f, file }) => ({ src: `data:image/png;base64,${readFileSync(file).toString('base64')}`, caption: f.name ?? f.nodeId }));
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
   }
@@ -356,13 +362,20 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const intent = designIntent();
   const { docs, code } = docsMaps(intent);
   let agreedSummary = null;
+  // The system's own scripts (ds-config.json → systemScripts): what builds or wires its components at run time (a
+  // segmented control made by script, a toggle's click). Inlined after the page's own drawing, each in its own
+  // <script>, so the page behaves as the product does and the accessibility check can try its behaviours.
+  const systemScripts = () => (Array.isArray(cfg.systemScripts) ? cfg.systemScripts : []).map((p) => {
+    try { return `<script data-system-script="${String(p).replace(/"/g, '')}">\n${readFileSync(resolve(ROOT, p), 'utf8').replace(/<\/script/gi, '<\\/script')}\n</script>`; } catch { return `<!-- systemScripts: ${String(p).replace(/--/g, '')} not found -->`; }
+  }).join('\n');
   // opts.partsOnly: what the page is made of, without writing it (a prototype draws with the same parts).
-  if (opts.partsOnly) return { themeCSS: themeCSS(), componentCSS: await componentCSS(), view: JSON.parse(await agreed()), iconSheet: iconSheet() };
+  if (opts.partsOnly) return { themeCSS: themeCSS(), componentCSS: await componentCSS(), view: JSON.parse(await agreed()), iconSheet: iconSheet(), scripts: systemScripts() };
   const fills = {
     THEME_CSS: () => themeCSS(),
     COMPONENT_CSS: () => componentCSS(),
     AGREED: () => agreed(),
     ICON_SHEET: () => iconSheet(),
+    SYSTEM_SCRIPTS: () => systemScripts(),
     USAGE: () => JSON.stringify(usageMap(intent)),
     DOCS_CODE: () => JSON.stringify(code),
     DOCS: () => JSON.stringify(docs),

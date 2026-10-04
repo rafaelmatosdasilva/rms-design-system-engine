@@ -100,5 +100,91 @@
     },
     "annotations": []
   },
-  "_note": "Tidepool, a fictional design system, as captured from its Figma file (b0LpOCBsaRgo8lUqbkQNaY) for the build evaluation. Every name is invented."
+  "disclosure": {
+    "nodeId": "15:14",
+    "properties": {
+      "Label#15:0": {
+        "type": "TEXT",
+        "defaultValue": "Details"
+      },
+      "Content#15:3": {
+        "type": "TEXT",
+        "defaultValue": "Shipping takes two business days."
+      },
+      "Expanded": {
+        "type": "VARIANT",
+        "defaultValue": "False",
+        "variantOptions": [
+          "False",
+          "True"
+        ]
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: disclosure"
+      }
+    ],
+    "layerAnnotations": [
+      {
+        "layer": "Chevron",
+        "annotations": [
+          {
+            "label": "Role: indicator"
+          }
+        ]
+      },
+      {
+        "layer": "Panel",
+        "annotations": [
+          {
+            "label": "Role: panel"
+          }
+        ]
+      }
+    ],
+    "description": "Shows or hides a short passage under its label."
+  },
+  "_note": "Tidepool, a fictional design system, as captured from its Figma file (b0LpOCBsaRgo8lUqbkQNaY) for the build evaluation. Every name is invented.",
+  "stepper": {
+    "nodeId": "17:2",
+    "properties": {
+      "Value#17:0": {
+        "type": "TEXT",
+        "defaultValue": "1"
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: spinbutton"
+      }
+    ],
+    "layerAnnotations": [
+      {
+        "layer": "Decrement",
+        "annotations": [
+          {
+            "label": "Role: decrement"
+          }
+        ]
+      },
+      {
+        "layer": "Value",
+        "annotations": [
+          {
+            "label": "Role: value"
+          }
+        ]
+      },
+      {
+        "layer": "Increment",
+        "annotations": [
+          {
+            "label": "Role: increment"
+          }
+        ]
+      }
+    ],
+    "description": "Picks a whole number from 0 to 10 by stepping it down or up."
+  }
 }

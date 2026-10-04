@@ -167,13 +167,16 @@
 
 ────────────────────────────────────────────────────────────
 
-⏭  [a11y] no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.
+⏭  [a11y] no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing. The components were not rendered from their code either: no TypeScript to read the components' JSX (the project's own, or a global one: npm i -g typescript).
 
 📐 Contracts → contracts  (3 components · 13 DTCG tokens)
 ℹ️  Figma prop types → contracts/figma-props.d.ts: type a component's props with its <Name>FigmaProps so tsc shows prop drift.
 ℹ️  Contract completeness: 3/3 have a description · 3/3 have semantics · 0/3 carry whenNotToUse/useInstead guidance. Advisory only.
 
 ♿ Accessibility from the code (no browser needed): nothing found in 3 markup and 1 style file.
+
+♿ Accessibility in the Figma file: 1 thing the design owes (for whoever keeps the Figma file; the parity never changes Figma):
+   • iconButton has no focus state in Figma, so the code invents the focus ring and no one designs it: add a focus state (a visible ring, at least 3:1 against what is behind it)
 
 🎯 Tailwind classes against Figma: 1 measure in 2 components differs from what Figma states. Advisory.
      badge: corner, Figma radius/control (6px), the code writes rounded-[4px]; write rounded-control

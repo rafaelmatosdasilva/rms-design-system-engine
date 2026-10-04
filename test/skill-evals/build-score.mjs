@@ -15,7 +15,10 @@ import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../../cdp.mjs';
 
-const ts = createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript');
+// TypeScript, from the global npm folder, loaded when a build is first transpiled: the scorer's other helpers (the
+// prototype scorer imports them) work on a machine that has none.
+let tsModule = null;
+const tsLib = () => (tsModule ??= createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript'));
 
 // ── The React stand-in: enough for a presentational component, nothing more ──────────────────────────────────
 const REACT_SHIM = `
@@ -23,7 +26,7 @@ const BOOL = new Set(['disabled','checked','readonly','required','hidden','selec
 export function createElement(type, props, ...children) {
   props = props || {};
   const kids = children.flat(Infinity).filter((c) => c != null && c !== false && c !== true);
-  if (typeof type === 'function') return type({ ...props, children: kids.length <= 1 ? kids[0] : kids });
+  if (typeof type === 'function') return mount(type, { ...props, children: kids.length <= 1 ? kids[0] : kids });
   if (type === Fragment) { const f = document.createDocumentFragment(); kids.forEach((c) => f.append(c instanceof Node ? c : String(c))); return f; }
   const el = document.createElement(type);
   for (const [k, v] of Object.entries(props)) {
@@ -40,12 +43,38 @@ export function createElement(type, props, ...children) {
   return el;
 }
 export const Fragment = Symbol('Fragment');
-export const useState = (v) => [typeof v === 'function' ? v() : v, () => {}];
-export const useEffect = () => {}; export const useLayoutEffect = () => {}; export const useRef = (v) => ({ current: v ?? null });
-export const useMemo = (f) => f(); export const useCallback = (f) => f; export const useId = () => 'id' + Math.random().toString(36).slice(2, 8);
+// A function component keeps its hooks between renders: a state change renders it again in place, so a component
+// that opens on a click (a disclosure, a toggle) can be tried. One that never sets state renders once, as before.
+let CURRENT = null, IDS = 0;
+function mount(type, props) {
+  const inst = { hooks: [], i: 0, nodes: [] };
+  const render = () => {
+    const prev = CURRENT; CURRENT = inst; inst.i = 0;
+    let out; try { out = type(props); } finally { CURRENT = prev; }
+    const node = out instanceof Node ? out : document.createTextNode(String(out ?? ''));
+    const nodes = node.nodeType === 11 ? [...node.childNodes] : [node];
+    const old = inst.nodes.filter((n) => n.parentNode);
+    if (old.length) { old[0].before(...nodes); old.forEach((n) => n.remove()); inst.nodes = nodes; return null; }
+    inst.nodes = nodes;
+    return node;
+  };
+  inst.render = render;
+  return render();
+}
+export const useState = (v) => {
+  const inst = CURRENT;
+  if (!inst) return [typeof v === 'function' ? v() : v, () => {}];
+  const i = inst.i++;
+  if (!(i in inst.hooks)) inst.hooks[i] = typeof v === 'function' ? v() : v;
+  return [inst.hooks[i], (x) => { inst.hooks[i] = typeof x === 'function' ? x(inst.hooks[i]) : x; inst.render(); }];
+};
+const keep = (make) => { const inst = CURRENT; if (!inst) return make(); const i = inst.i++; if (!(i in inst.hooks)) inst.hooks[i] = make(); return inst.hooks[i]; };
+export const useReducer = (r, init) => { const [s, set] = useState(init); return [s, (a) => set((x) => r(x, a))]; };
+export const useEffect = () => {}; export const useLayoutEffect = () => {}; export const useRef = (v) => keep(() => ({ current: v ?? null }));
+export const useMemo = (f) => f(); export const useCallback = (f) => f; export const useId = () => keep(() => ':r' + (IDS++).toString(36) + ':');
 export const forwardRef = (f) => (p) => f(p, null); export const memo = (f) => f;
 export const createContext = (v) => ({ Provider: ({ children }) => children, _v: v }); export const useContext = (c) => c?._v;
-export default { createElement, Fragment, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, useId, forwardRef, memo, createContext, useContext };
+export default { createElement, Fragment, useState, useReducer, useEffect, useLayoutEffect, useRef, useMemo, useCallback, useId, forwardRef, memo, createContext, useContext };
 `;
 
 const CODE_EXT = ['.jsx', '.tsx', '.js', '.ts', '.mjs'];
@@ -64,6 +93,7 @@ function transpile(src, file) {
     .replace(/^\s*import\s+(\w+)\s+from\s+['"]([^'"]+\.module\.(css|scss))['"];?/gm, (_, n) => `const ${n} = new Proxy({}, { get: (_t, k) => String(k) });`)
     .replace(/^\s*import\s+['"][^'"]+\.(css|scss)['"];?/gm, '')
     .replace(/^\s*import\s+[^;]*?from\s+['"][^'"]+\.(css|scss|svg|png)['"];?/gm, '');
+  const ts = tsLib();
   const out = ts.transpileModule(code, { fileName: file, compilerOptions: { jsx: ts.JsxEmit.React, jsxFactory: '__h', jsxFragmentFactory: '__F', target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext } }).outputText;
   return `import { createElement as __h, Fragment as __F } from '/__react.js';\n${out.replace(/from\s+['"](react|react\/jsx-runtime)['"]/g, "from '/__react.js'")}`;
 }
@@ -114,6 +144,10 @@ const MEASURE = `(sel, label, cls) => {
     rowGap: cs.rowGap, buttons: el.querySelectorAll('button,[role=button]').length + (el.matches('button,[role=button]') ? 1 : 0), inputs: el.querySelectorAll('input,textarea').length, text: el.textContent.replace(/\\s+/g, ' ').trim().slice(0, 200) };
 }`;
 
+// Pictures of each rendered case, for the gallery (gallery.mjs): set a store, and every case renders into it too.
+let SHOTS = null;
+export function capturePictures(store) { SHOTS = store; }
+
 // Render cases of one exported component and measure each. cases: [{ id, props, pseudo: ['hover'], dark: bool }]
 export async function renderCases(dir, file, exportName, cases, { label = null } = {}) {
   const cls = String(exportName).toLowerCase();   // the component's class, as the build sheet and Figma name it
@@ -135,7 +169,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
     // Load the module once; find the component: the named export, the default, or any function export.
     const loaded = await ev(`import('/${relative(dir, file)}').then((m) => { const want = ${JSON.stringify(exportName)}.toLowerCase();
       const pick = Object.entries(m).find(([k, v]) => typeof v === 'function' && k.toLowerCase() === want) ?? (typeof m.default === 'function' ? ['default', m.default] : Object.entries(m).find(([, v]) => typeof v === 'function'));
-      window.__C = pick && pick[1]; return pick ? pick[0] : null; }).catch((e) => 'ERROR ' + e.message)`);
+      window.__C = pick && pick[1]; return import('/__react.js').then((r) => { window.__h = r.createElement; return pick ? pick[0] : null; }); }).catch((e) => 'ERROR ' + e.message)`);
     if (!loaded || String(loaded).startsWith('ERROR')) return { error: loaded ?? `no component exported from ${relative(dir, file)}` };
     for (const c of cases) {
       const darkModes = c.dark ? ['data', 'class', 'media'] : [null];
@@ -144,17 +178,25 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
         await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: dm === 'media' ? 'dark' : 'light' }] }, sessionId);
         await ev(`(() => { const h = document.documentElement; ${dm === 'data' ? "h.setAttribute('data-theme','dark');" : "h.removeAttribute('data-theme');"} h.classList.toggle('dark', ${dm === 'class'}); h.classList.toggle('theme-dark', ${dm === 'class'});
           const root = document.getElementById('root'); root.innerHTML = ''; const host = document.createElement('div'); host.id = 'case'; host.style.display = 'inline-block'; root.append(host);
-          try { const node = window.__C(${JSON.stringify(c.props)}); host.append(node instanceof Node ? node : String(node ?? '')); return true; } catch (e) { host.textContent = 'ERROR ' + e.message; return false; } })()`);
+          try { const node = window.__h(window.__C, ${JSON.stringify(c.props)}); host.append(node instanceof Node ? node : String(node ?? '')); return true; } catch (e) { host.textContent = 'ERROR ' + e.message; return false; } })()`);
         if (c.pseudo?.length) {
           const { root } = await send('DOM.getDocument', { depth: -1 }, sessionId);
           const own = await ev(`(() => { const t = document.querySelector('#case > *'); return !!(t && !t.classList.contains(${JSON.stringify(cls)}) && document.querySelector('#case .' + ${JSON.stringify(cls)})); })()`);
           const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: own ? `#case .${cls}` : '#case > *' }, sessionId);
           if (nodeId) await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: c.pseudo }, sessionId);
         }
-        m = await ev(`(${MEASURE})('#case', ${JSON.stringify(label)}, ${JSON.stringify(cls)})`);
+        m = await ev(c.script ? `(${c.script})('#case')` : `(${MEASURE})('#case', ${JSON.stringify(label)}, ${JSON.stringify(cls)})`);
         if (!c.dark || (m && c.expectDark && c.expectDark(m))) break;
       }
       out[c.id] = m;
+      if (SHOTS && !c.probe) {
+        const box = await ev(`(() => { const e = document.getElementById('case'); document.body.style.background = getComputedStyle(document.documentElement).getPropertyValue('--surface-page') || ''; const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; })()`).catch(() => null);
+        if (box && box.w > 0 && box.h > 0) {
+          const pad = 12;
+          const { data } = await send('Page.captureScreenshot', { format: 'png', clip: { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.w + pad * 2, height: box.h + pad * 2, scale: 2 } }, sessionId);
+          SHOTS[c.id] = `data:image/png;base64,${data}`;
+        }
+      }
     }
   } finally { close(); chrome.kill(); server.close(); }
   return out;

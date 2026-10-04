@@ -437,6 +437,29 @@ if (process.argv.includes('--query')) {
   process.exit(r.status ?? 1);
 }
 
+// ── --from-figma-cli [design.json] · --refresh-figma: read Figma the best way there is (figma-source.mjs) ──
+if (process.argv.includes('--from-figma-cli') || process.argv.includes('--refresh-figma')) {
+  let fcConfig = {};
+  try { fcConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const src = await import('./figma-source.mjs');
+  try {
+    if (process.argv.includes('--from-figma-cli')) {
+      const i = process.argv.indexOf('--from-figma-cli'), file = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : src.designJsonPath(fcConfig);
+      console.log(`✅ ${src.importLine(await src.importDesign(ROOT, fcConfig, file))}`);
+      console.log('NEXT: rms-design-system-engine (the audit, on the refreshed snapshots)');
+      process.exit(0);
+    }
+    const route = await src.chooseFigmaSource(ROOT, fcConfig);
+    console.log(`Figma source: ${route.route} (${route.why})`);
+    if (route.route === 'design-json') console.log(`✅ ${src.importLine(await src.importDesign(ROOT, fcConfig, route.file))}`);
+    else if (route.route === 'figma-cli') console.log(`✅ ${src.importLine(await src.refreshFromFigmaCli(ROOT, fcConfig))}`);
+    else if (route.route === 'rest') { console.log('NEXT: rms-design-system-engine (it refreshes from the Figma API as it runs)'); process.exit(0); }
+    else { console.log('NEXT: rms-design-system-engine --recipe refresh-figma (read the variables and components with the Figma tool of this session)'); process.exit(0); }
+    console.log('NEXT: rms-design-system-engine (the audit, on the refreshed snapshots)');
+    process.exit(0);
+  } catch (e) { console.error(`❌ Figma not read: ${e.message}`); process.exit(1); }
+}
+
 // ── --styleguide: the style guide of what Figma and the code agree on (styleguide-gen.mjs) ──
 if (process.argv.includes('--styleguide')) {
   let sgConfig = {};
@@ -2500,6 +2523,14 @@ function reportFull(label, items, shown) {
     };
   }
 
+  // ── A design.json newer than the snapshots: the person ran `figma-cli snapshot`, so read it first (I84) ──
+  let _figmaCliRead = null;
+  try {
+    const src = await import('./figma-source.mjs');
+    const route = await src.chooseFigmaSource(ROOT, cfg, { which: () => null });   // only the file here: figma-cli itself runs on --refresh-figma
+    if (route.route === 'design-json') { _figmaCliRead = await src.importDesign(ROOT, cfg, route.file); console.log(C.dim(`ℹ️  ${src.importLine(_figmaCliRead)}`)); }
+  } catch (e) { console.log(C.yellow(`⚠️  design.json not read: ${e.message}`)); }
+
   // ── Refresh Figma snapshots (requires FIGMA_TOKEN) ───────────────────────────
   const figmaToken   = process.env.FIGMA_TOKEN;
   const figmaFileKey = cfg.figmaFileKey;
@@ -2705,7 +2736,8 @@ function reportFull(label, items, shown) {
   // audit's a11y advisory covers the same components the user scoped the run to.
   const A11Y_JSON = join(ROOT, OUT_DIR, 'a11y.json');
   try { unlinkSync(A11Y_JSON); } catch { /* not there */ }
-  const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') ? ['--a11y'] : []), '--json-out', A11Y_JSON];
+  // Building a component: every accessibility line is listed element by element, as it is part of building it.
+  const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') || (cfg.build === true && SCOPE_COMPONENTS.length) ? ['--a11y'] : []), '--json-out', A11Y_JSON];
 
   // Code capture: the code side read once per run (code-capture.mjs), the mirror of the Figma
   // capture. Cached by content, so an unchanged project reuses it at once. Gates that need facts
@@ -3893,6 +3925,20 @@ function reportFull(label, items, shown) {
     } catch { /* no component-values.snapshot.json: nothing to read */ }
   }
 
+  // ── Accessibility the design owes (design-a11y.mjs, advisory) ─────────────────
+  // An interactive component with no focus state, an error state with no message, a control under 24px: read from
+  // the props and structure snapshots, for whoever keeps the Figma file. Off with "designA11y": false.
+  if (cfg.designA11y !== false && (!ONLY || ONLY.a11y)) {
+    try {
+      const { designA11yFindings, designA11yBlock } = await import('./design-a11y.mjs');
+      const props = JSON.parse(readFileSync(join(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8'));
+      let struct = {};
+      try { struct = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {}; } catch { /* heights unknown */ }
+      const lines = designA11yBlock(designA11yFindings(props, struct, { only: _scopeNames.length ? _scopeNames : null }));
+      if (lines.length) { console.log(C.yellow(`\n${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(l)); }
+    } catch { /* no props snapshot: nothing to read */ }
+  }
+
   // ── A workaround built around a component is a missing API (I59, advisory) ────
   _section('advice');
   // A screen's own control laid over a design-system component (a clear button over a field, actions over a
@@ -4125,11 +4171,13 @@ function reportFull(label, items, shown) {
       toBuildLine = buildLine(toBuild);
       if (toBuildLine) console.log(`\n${toBuildLine}`);
     }
-    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true });
+    let a11yFound = null;
+    try { a11yFound = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
+    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true, a11y: a11yFound });
     const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
     const { dataStateLine } = await import('./next-step.mjs');
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
-    const data = dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
+    const data = dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
     let a11yIssues = null;
     try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
     const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues } : null } : null;
