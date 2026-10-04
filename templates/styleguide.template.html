@@ -110,6 +110,11 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 #sg-search { margin-top: var(--sg-space-m); }
 #sg-search > input { font: inherit; width: 100%; }
 .sg-search-none { font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-xs) var(--sg-space-l); }
+.sg-results { margin: var(--sg-space-s) calc(-1 * var(--sg-space-l)) 0; padding-bottom: 0; }   /* just below the field, the width of the sidebar */
+.sg-result { display: flex; flex-direction: column; min-width: 0; }
+.sg-result > span:first-child { overflow-wrap: anywhere; }
+.sg-result-kind { font-size: var(--sg-xs); color: var(--sg-muted); }
+.sg-found { outline: var(--sg-line); outline-color: var(--sg-accent); outline-offset: var(--sg-space-xxs); }
 .sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xs); }
 .sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-l); }
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
@@ -123,9 +128,10 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .color-chip-swatch { height: 36px; border-radius: var(--sg-radius-s); border: var(--sg-line); }
 .color-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); line-height: var(--sg-lh); word-break: break-word; }
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: break-all; }
-.type-specimen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 360px); align-items: start; gap: var(--sg-space-l); padding: var(--sg-space-m) 0; border-bottom: var(--sg-line); }
+.type-specimen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 460px); align-items: start; gap: var(--sg-space-l); padding: var(--sg-space-m) 0; border-bottom: var(--sg-line); }
 .type-specimen:last-child { border-bottom: none; }
 .type-specimen-preview { color: var(--sg-text); min-width: 0; overflow-wrap: anywhere; }
+.type-specimen .pg-inspect td:last-child { word-break: normal; overflow-wrap: anywhere; }   /* a name and its value wrap between words, never inside one */
 @media (max-width: 720px) { .type-specimen { grid-template-columns: 1fr; } }   /* on a phone the table goes under the sample */
 .spacing-row { display: flex; align-items: center; gap: var(--sg-space-m); padding: var(--sg-space-xs) 0; border-bottom: var(--sg-line); }
 .spacing-row:last-child { border-bottom: none; }
@@ -442,8 +448,9 @@ a.pg-usage-name { color: var(--sg-text); }
         // Every property of the style as the browser draws it in this mode, as a component's token table: the property,
         // then the variable it comes from and its value.
         var cs = getComputedStyle(row.firstElementChild);
-        var val = function (k, v) { return t[k] ? t[k].var + ' · ' + v : v; };
-        var family = (t.family && (live(demo, t.family.var) || t.family.value)) || cs.fontFamily.split(',')[0].replace(/["']/g, '').trim();
+        // Named as in Figma first (the variable the text style binds), then the code's variable, then the value drawn.
+        var val = function (k, v) { var x = t[k]; return x ? [x.figma, x.var, v].filter(Boolean).join(' · ') : v; };
+        var family = cs.fontFamily.split(',')[0].replace(/["']/g, '').trim() || (t.family && t.family.value);
         var lines = [['family', val('family', family)], ['size', val('size', cs.fontSize)], ['weight', val('weight', cs.fontWeight)], ['line height', val('lh', cs.lineHeight === 'normal' ? 'auto' : cs.lineHeight)],
           ['letter spacing', val('ls', cs.letterSpacing === 'normal' ? '0' : cs.letterSpacing)]];
         if (cs.textTransform && cs.textTransform !== 'none') lines.push(['case', cs.textTransform]);
@@ -1043,27 +1050,66 @@ a.pg-usage-name { color: var(--sg-text); }
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.body.classList.contains('sg-nav-open')) open(false); });
   })();
 
-  // Search: the system's own text field in the sidebar; typing narrows the components (their sections, links and
-  // overview cards) to the ones whose name or description has the words. Escape clears it.
+  // Search: the system's own text field in the sidebar, over everything the page holds (components with their
+  // descriptions, annotations and props, every token by its Figma name and variable, type styles, icons, to-dos and
+  // sections). While it has words, only the results show, just below it, in place of the navigation. Escape clears it.
   var sMount = document.getElementById('sg-search');
-  if (sMount && COMPONENTS.length) {
+  if (sMount) {
     sMount.innerHTML = DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text">';
-    var q = sMount.querySelector('input'); q.type = 'search'; q.placeholder = 'Search components'; q.setAttribute('aria-label', 'Search components'); q.removeAttribute('value');
-    var none = document.createElement('p'); none.className = 'sg-search-none'; none.hidden = true; none.setAttribute('role', 'status'); nav.appendChild(none);
-    var filter = function () {
-      var words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean), shown = 0;
+    var q = sMount.querySelector('input'); q.type = 'search'; q.placeholder = 'Search'; q.setAttribute('aria-label', 'Search the style guide'); q.removeAttribute('value');
+    var results = document.createElement('div'); results.className = 'sg-nav sg-results'; results.id = 'sg-results'; results.hidden = true; results.setAttribute('role', 'region'); results.setAttribute('aria-label', 'Search results');
+    sMount.parentNode.insertBefore(results, sMount.nextSibling);
+    q.setAttribute('aria-controls', 'sg-results');
+    var INDEX = null;
+    var index = function () {
+      if (INDEX) return INDEX;
+      INDEX = [];
+      var add = function (kind, label, href, find, more) { INDEX.push({ kind: kind, label: label, href: href, find: find || null, hay: [kind, label].concat(more || []).join(' ').toLowerCase() }); };
+      Array.prototype.forEach.call(nav.querySelectorAll('a'), function (a) { var h = a.getAttribute('href'); if (!/^#c-/.test(h)) add('Section', a.textContent.trim(), h); });
       COMPONENTS.forEach(function (c) {
-        var hay = (c.name + ' ' + (c.description || '') + ' ' + (c.role || '')).toLowerCase(), on = words.every(function (w) { return hay.indexOf(w) >= 0; });
-        var id = 'c-' + c.name, sec = document.getElementById(id); if (on) shown++;
-        // One view at a time: the links and cards narrow (the open view stays); with ?all the sections themselves too.
-        [ALL ? sec : null, ALL && sec && sec.previousElementSibling && sec.previousElementSibling.classList.contains('sg-hr') ? sec.previousElementSibling : null, nav.querySelector('a[href="#' + id + '"]'), ov.querySelector('a.sg-card[href="#' + id + '"]')].forEach(function (el) { if (el) el.hidden = !on; });
+        add('Component', c.name, '#c-' + c.name, null, [c.description, c.role, c.cls, c.note].concat(c.annotations || [], (c.controls || []).map(function (k) { return k.label + ' ' + (k.options || []).map(function (o) { return o.label; }).join(' '); }), (c.unbuilt || []).map(function (u) { return u.label; }), (c.slots || []).map(function (x) { return x.name; })));
+        ((c.ownTokens && c.ownTokens.colors) || []).concat((c.ownTokens && c.ownTokens.sizes) || []).forEach(function (t) { add('Token in ' + c.name, t.figma, '#c-' + c.name, t.figma, [t.var, t.value]); });
       });
-      none.hidden = !(words.length && !shown); none.textContent = 'No component matches ' + q.value.trim() + '.';
+      FLAT.forEach(function (t) { add('Colour', t.figma, '#colors', t.figma, [t.var]); });
+      [['spacing', 'Spacing'], ['radii', 'Radius']].forEach(function (k) { (TOKENS[k[0]] || []).forEach(function (t) { add(k[1], t.figma, '#' + k[0], t.figma, [t.var, t.value]); }); });
+      (TOKENS.typography || []).forEach(function (t) { add('Type style', t.scale, '#typography', null, ['size', 'weight', 'lh', 'family'].map(function (k) { return t[k] ? [t[k].figma, t[k].var, t[k].value].join(' ') : ''; })); });
+      (TOKENS.iconStrokes || []).forEach(function (t) { add('Icon stroke', t.figma, '#icons', t.figma, [t.var, t.value]); });
+      var FIGI = DATA.iconFigma || {};
+      (DATA.icons || []).forEach(function (id) { var n = (FIGI[id] && FIGI[id].name) || id, px = FIGI[id] && FIGI[id].size; add('Icon' + (px ? ' ' + px + 'px' : ''), n, '#icons', n, [id]); });
+      TODO.forEach(function (t) { add('To do ' + t.no, t.say, '#todo', null, [t.todo, t.comp]); });
+      return INDEX;
     };
-    q.addEventListener('input', filter);
+    var pending = null;
+    // A token, icon or style found: its own place on the page is brought into view and marked for a moment.
+    var reveal = function () {
+      if (!pending) return; var f = pending; pending = null;
+      var sec = document.getElementById(f.href.slice(1)); if (!sec || !f.find) return;
+      var el = Array.prototype.find.call(sec.querySelectorAll('*'), function (k) { return !k.children.length && k.textContent.trim() === f.find; });
+      if (!el) return;
+      var box = el.closest('.color-chip, .icon-chip, .spacing-row, .radius-chip, tr') || el;
+      box.scrollIntoView({ block: 'center' }); box.classList.add('sg-found'); setTimeout(function () { box.classList.remove('sg-found'); }, 1600);
+    };
+    window.addEventListener('hashchange', function () { setTimeout(reveal, 0); });
+    var go = function (r) {
+      pending = r;
+      if (location.hash === r.href) setTimeout(reveal, 0); else location.hash = r.href;
+      if (document.body.classList.contains('sg-nav-open')) { document.body.classList.remove('sg-nav-open'); document.getElementById('sg-menu').setAttribute('aria-expanded', 'false'); }
+    };
+    var found = [];
+    var search = function () {
+      var words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      nav.hidden = !!words.length; results.hidden = !words.length;
+      if (!words.length) { results.innerHTML = ''; found = []; return; }
+      found = index().filter(function (r) { return words.every(function (w) { return r.hay.indexOf(w) >= 0; }); })
+        .sort(function (a, b) { var p = function (r) { var l = r.label.toLowerCase(); return l === words.join(' ') ? 0 : l.indexOf(words[0]) === 0 ? 1 : l.indexOf(words[0]) >= 0 ? 2 : 3; }; return p(a) - p(b); }).slice(0, 60);
+      results.innerHTML = found.length ? found.map(function (r, n) { return '<a href="' + esc(r.href) + '" data-n="' + n + '"><span class="dot"></span><span class="sg-result"><span>' + esc(r.label) + '</span><span class="sg-result-kind">' + esc(r.kind) + '</span></span></a>'; }).join('')
+        : '<p class="sg-search-none" role="status">Nothing matches ' + esc(q.value.trim()) + '.</p>';
+    };
+    results.addEventListener('click', function (e) { var a = e.target.closest('a[data-n]'); if (!a) return; e.preventDefault(); go(found[+a.dataset.n]); });
+    q.addEventListener('input', search);
     q.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { q.value = ''; filter(); }
-      if (e.key === 'Enter') { var first = Array.prototype.find.call(nav.querySelectorAll('a[href^="#c-"]'), function (a) { return !a.hidden; }); if (first) { location.hash = first.getAttribute('href'); if (document.body.classList.contains('sg-nav-open')) { document.body.classList.remove('sg-nav-open'); document.getElementById('sg-menu').setAttribute('aria-expanded', 'false'); } } }
+      if (e.key === 'Escape') { q.value = ''; search(); }
+      if (e.key === 'Enter' && found.length) { e.preventDefault(); go(found[0]); }
     });
   }
 
