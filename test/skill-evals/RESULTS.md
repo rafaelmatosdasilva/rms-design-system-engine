@@ -1,5 +1,27 @@
 # Skill evaluation results
 
+## 2026-10: products in their own repositories, read as the project's code (continuous evaluation)
+
+What changed since the entry below (engine 7765e76): a design system whose products live in their own repositories,
+checked out beside it, names those folders in `ds-config.json` (`pluginDirs`, or `codeRoots` for any other folder),
+and every source scan reads their code as the project's own, so a variable or class only a product uses is no longer
+listed as unused. The audit no longer reads its own output files (the history, the check result) as usage, which had
+made a class named only in the engine's findings count as used. The guide changed in `reference/config.md`.
+
+Guide set measured: `83f140fd6d10` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7765e76 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.055 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Every task passes and no rule is broken; the guide change is two lines of configuration reference.
+
+**Also measured, outside the evaluation.** On a private design system split into one repository per product, the audit
+from the design system's repository read 74 source files instead of 23 and gave the same 25 gate results as before the
+split; its results are kept out of this repository. Records: `records/2026-10-04-sibling-repos`.
+
 ## 2026-10: Figma brought in line with the code, by the engine, once the person says yes (continuous evaluation)
 
 What changed since the entry below (engine 27b2d1f): `--figma-edits` reads each component's role from what the code
