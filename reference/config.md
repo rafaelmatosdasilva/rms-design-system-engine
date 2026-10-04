@@ -64,7 +64,7 @@ Once `ds-config.json` exists, extract:
 - `figma.sizingCollection` - name of the sizing collection, if any (e.g. `"Sizing"`)
 - `figma.modes` - array of `{ name, snapshotKey, cssSelector }` defining the DS **colour** modes
   - OR legacy: `figma.darkMode` / `figma.lightMode` (two-mode shorthand)
-- `figma.collections` *(optional)* - OTHER typed collections whose values change across their OWN mode axis, independent of colour (a sizing collection that changes per breakpoint, a string collection per locale). Each: `{ name, kind, modes: [{ name, snapshotKey, cssSelector }], explicit?, skip? }`.
+- `figma.collections` *(optional)* - OTHER typed collections whose values change across their OWN mode axis, independent of colour (a sizing collection that changes per breakpoint, a string collection per locale). Each: `{ name, kind, modes: [{ name, snapshotKey, cssSelector }], explicit?, skip? }`. Without it, every collection the capture finds with two or more modes (`modeVariants` in the vars snapshot) is still checked by Gate [5]: its first mode is the base, each other mode is where the theme CSS sets that collection's variables (an `@media` block, a `[data-…]` or class block), and a mode with no such block fails as not implemented, with every value it changes.
   - `kind` - `"color"` | `"scalar"` (px/number) | `"string"`. Decides how a resolved value is compared (hex vs literal).
   - `modes` - this collection's own modes, each with its own `cssSelector`. Use `"media:(min-width: 768px)"` for breakpoint layers (`root` for the base/smallest, media overrides for the rest - mobile-first).
   - `explicit` *(optional)* - `{ token: "--css-var" | null }` overrides for tokens whose var name isn't the default `--token/path→--token-path` (null = documented no-CSS-var skip).
@@ -200,6 +200,12 @@ sweep finishes with a representative sample, logging `walk capped at N nodes`. N
 are far under the cap and are collected in full.
 
 **Audit history** is appended to `design-system-engine-history.json` at project root after every run. View trend: `rms-design-system-engine --trend`.
+
+**Every difference in one list.** Each full audit writes `.design-system-engine-out/differences.md` (and
+`differences.json`): every difference between Figma and the code it found, grouped by the component it names, else
+under the whole system, each marked new when the last run did not have it, with where the hand-back says how each
+side would change. It is written whether or not there is a style guide; the summary names it, and the style guide,
+when there is one, shows each component's own differences from it.
 
 **Which side moved.** Every run records, for each compared fact that matches (a token in each mode, a
 padding, gap, radius, colour, height, visible layer…), the value on each side in `design-system-engine-agreed.json` at

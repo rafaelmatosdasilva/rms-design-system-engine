@@ -21,6 +21,7 @@
 //
 // Exit 0 on success. Never throws into the audit — callers wrap it.
 
+import { appDir } from './code-roots.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
@@ -258,7 +259,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   function usageMap(intent) {
     // Usage label per app: ds-config.json → styleguide.plugins [{ key, match }] (a short label and a
     // path fragment), else each configured app (paths.plugins) with a short label made from its name.
-    const PLUGS = (cfg.styleguide?.plugins) || appLabels(cfg.paths?.plugins ?? []).map(([n, key]) => ({ key, match: n }));
+    // Each product: { key, match, name?, href? } (styleguide.plugins); its full name, else the app's name in words.
+    const words = (n) => String(n).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const PLUGS = ((cfg.styleguide?.plugins) || appLabels(cfg.paths?.plugins ?? []).map(([n, key]) => ({ key, match: n }))).map((g) => ({ ...g, name: g.name ?? words(g.match ?? g.key) }));
     const sources = pluginHTML.concat(pluginCSS).map((p) => ({ p, m: PLUGS.find((g) => p.includes(g.match)), txt: (() => { const abs = resolve(ROOT, p); return existsSync(abs) ? readFileSync(abs, 'utf8') : ''; })() })).filter((s) => s.m);
     const usage = {};
     for (const name of Object.keys(intent.components || {})) {
@@ -266,7 +269,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const bare = cls.replace(/^\./, '');
       const found = new Set();
       for (const s of sources) if (s.txt.includes(cls) || s.txt.includes('"' + bare) || s.txt.includes(bare + ' ')) found.add(s.m.key);
-      usage[name] = [...found];
+      usage[name] = [...found].map((key) => { const g = PLUGS.find((x) => x.key === key); return { key, name: g?.name ?? key, ...(typeof g?.href === 'string' && /^https?:\/\//.test(g.href) ? { href: g.href } : {}) }; });
     }
     return usage;
   }
@@ -331,7 +334,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     if (!hadCheck) { try { unlinkSync(checkFile); } catch { /* not written */ } }
     // The project's own pages, where a component's real markup is (static HTML only).
     // An app named in paths.plugins renders at apps/<app>/ui.html (built) or ui.src.html, as the code capture reads it.
-    const appPages = pluginHTML.flatMap((p) => (/\.html?$/i.test(p) ? [p] : [`apps/${p}/ui.html`, `apps/${p}/ui.src.html`]));
+    const appPages = pluginHTML.flatMap((p, i) => (/\.html?$/i.test(p) ? [p] : (() => { const src = /\.src\.html$/.test(pluginCSS[i] ?? '') ? pluginCSS[i] : null; return src ? [src.replace(/\.src\.html$/, '.html'), src] : [`${appDir(cfg, p)}/ui.html`, `${appDir(cfg, p)}/ui.src.html`]; })()));
     const pageFiles = [...appPages, ...(cfg.codeReading?.pages ?? [])].filter((p) => /\.html?$/i.test(p) && !/^https?:/.test(p));
     const pages = pageFiles.map(readText).filter(Boolean);
     const usage = (cfg.paths?.plugins ?? []).length ? usageMap(intent) : {};
@@ -340,7 +343,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     if (!title) { try { title = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { /* no package.json */ } }
     const probeList = [...new Set([...probeBySelector.values()])];
     const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, probeList, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
-      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: opts.names ?? [],
+      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: opts.names ?? [], themeCss: themeFiles.map(readText).join('\n'),
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).map(([n, c]) => [n, c.propertyMap])),
       parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
     // "In use": the approved pictures of the system's own frames (Gate [2]'s references), embedded, six at most.
@@ -348,6 +351,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     view.screens = (cfg.frames ?? []).filter((f) => f?.nodeId).map((f) => ({ f, file: join(refsDir, `${String(f.nodeId).replace(/[:\/]/g, '-')}.png`) }))
       .filter(({ file }) => existsSync(file) && readFileSync(file).length <= 2_000_000).slice(0, 6)
       .map(({ f, file }) => ({ src: `data:image/png;base64,${readFileSync(file).toString('base64')}`, caption: f.name ?? f.nodeId }));
+    // The one list of differences the last full audit wrote: each component shows its own open ones.
+    try {
+      const { OUT_DIR } = await import('./names.mjs');
+      const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8'));
+      const by = new Map((d.groups ?? []).map((g) => [g.component, g.items ?? []]));
+      for (const c of view.components) { const list = by.get(c.name); if (list?.length) c.differences = list.map((x) => ({ check: x.check, what: x.what, new: !!x.new })); }
+      view.differences = { total: d.total ?? 0, at: d.at ?? null, file: `${OUT_DIR}/differences.md` };
+    } catch { /* no full audit yet: nothing to list */ }
+    const { segmentedUi, fieldUi } = await import('./styleguide-data.mjs');
+    view.ui = { segmented: segmentedUi(view.components), field: fieldUi(view.components, themeFiles.map(readText).join('\n')) };
+    lastView = view;
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
   }
@@ -361,7 +375,20 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   // ── Fill the template ───────────────────────────────────────────────────────────
   const intent = designIntent();
   const { docs, code } = docsMaps(intent);
-  let agreedSummary = null;
+  let agreedSummary = null, lastView = null, chrome = null;
+  // ── CHROME — the page's own look, from the system's tokens (styleguide-data.mjs chromeRoles) ──────────────────────
+  async function chromeCSS() {
+    if (!lastView) lastView = JSON.parse(await agreed());
+    const { chromeRoles } = await import('./styleguide-data.mjs');
+    const { propsSnap } = await context();
+    // The system's icon size: the width most of its icons are drawn at in Figma (their viewBox), else in its icon sheet.
+    const boxes = [...Object.values(readJson(cfg.paths?.snapshotIcons ?? '') ?? {}).map((i) => i?.viewBox), ...(iconSheet().match(/viewBox="[^"]+"/g) ?? []).map((v) => v.slice(9, -1))]
+      .map((v) => parseFloat(String(v ?? '').trim().split(/[\s,]+/)[2])).filter((n) => n > 0);
+    const count = {}; for (const b of boxes) count[b] = (count[b] ?? 0) + 1;
+    const size = Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0];
+    chrome = chromeRoles({ tokens: lastView.tokens, themeCss: themeFiles.map(readText).join('\n'), componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome });
+    return chrome.css;
+  }
   // The system's own scripts (ds-config.json → systemScripts): what builds or wires its components at run time (a
   // segmented control made by script, a toggle's click). Inlined after the page's own drawing, each in its own
   // <script>, so the page behaves as the product does and the accessibility check can try its behaviours.
@@ -374,6 +401,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     THEME_CSS: () => themeCSS(),
     COMPONENT_CSS: () => componentCSS(),
     AGREED: () => agreed(),
+    CHROME: () => chromeCSS(),
     ICON_SHEET: () => iconSheet(),
     SYSTEM_SCRIPTS: () => systemScripts(),
     USAGE: () => JSON.stringify(usageMap(intent)),
@@ -393,5 +421,5 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
 
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html);
-  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null };
+  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
 }

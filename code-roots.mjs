@@ -20,3 +20,10 @@ export function codeRoots(ROOT, cfg = null) {
   if (!cfg) cache.set(root, roots);
   return roots;
 }
+
+// The folder an app of the design system lives in: ds-config.json pluginDirs names it (a sibling repository, a folder
+// of its own), else apps/<app>.
+export function appDir(cfg, app) {
+  const d = cfg?.pluginDirs?.[app];
+  return typeof d === 'string' && d ? d.replace(/\/+$/, '') : `apps/${app}`;
+}
