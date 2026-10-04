@@ -120,3 +120,10 @@ test('a value set only by a global reset: the fix goes on the component, never o
   assert.equal(p.patched, 0);
   assert.equal(p.manual.length, 1);
 });
+
+test('a measured fraction of a pixel with no variable behind it is listed for a person, never patched', async () => {
+  const { wantOf } = await import('../handback.mjs');
+  assert.equal(wantOf({ figma: 78.79 }), null, 'a frame that hugs its content measures 78.79: not a design value');
+  assert.equal(wantOf({ figma: 32 }), '32px');
+  assert.equal(wantOf({ expectedVar: '--thickness', figma: 1.5 }), 'var(--thickness)', 'a variable is always the answer');
+});

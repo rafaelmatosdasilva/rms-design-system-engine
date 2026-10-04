@@ -96,6 +96,7 @@ test('one list of differences: grouped by component, marked new, the data\'s fre
   const md = differencesMarkdown(d, { handback: { code: 'out/handback/code-changes.diff' } });
   assert.match(md, /^# Differences between Figma and the code\n\n3 open, 2 new since the last run/);
   assert.match(md, /## badge \(2\)/);
+  assert.match(differencesMarkdown({ ...d, notChecked: [{ check: 'Figma frame unchanged', why: 'FIGMA_TOKEN not set' }] }), /Not checked this run, so a difference there would not show: Figma frame unchanged \(FIGMA_TOKEN not set\)\./, 'a check that did not run is named, never mistaken for a pass');
   assert.match(md, /## The whole system \(1\)\n\n- \*\*new\*\* Token values: \[sizing\] padding\/s/);
 });
 

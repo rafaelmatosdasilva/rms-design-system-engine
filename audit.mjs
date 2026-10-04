@@ -4204,6 +4204,10 @@ function reportFull(label, items, shown) {
       const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
       const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_') && n.length > 2);
       const d = differences(now, names, prev?.findings ?? null);
+      // The checks that did not run: a difference there would not show, so the list says so rather than look clean.
+      const plain = (l) => String(l ?? '').replace(/\x1b\[[0-9;]*m/g, '').trim();
+      d.notChecked = gates.filter((g) => g.notRun || g.planLimited || (g.pass && (g.lines ?? []).map(plain).filter(Boolean).length && (g.lines ?? []).map(plain).filter(Boolean).every((l) => /^⏭/.test(l))))
+        .map((g) => ({ check: g.label.replace(/\s{2,}\(.*\)\s*$/, ''), why: ((g.lines ?? []).map(plain).find(Boolean) ?? 'not run').replace(/^⏭\s*/, '').replace(/^(skipped|SKIPPED)\b\s*[-:–—]?\s*/, '').replace(/\s*[-–—]\s*skipped\.?$/i, '').replace(/\.?\s*skipped\.?$/i, '').replace(/\s*\([^()]*\)\s*$/, '').replace(/\.$/, '') }));
       const hbDir = join(dirname(codeSnapshotPath(cfg)), 'handback');
       const hb = (f) => (existsSync(join(ROOT, hbDir, f)) ? join(hbDir, f) : null);
       mkdirSync(join(ROOT, OUT_DIR), { recursive: true });

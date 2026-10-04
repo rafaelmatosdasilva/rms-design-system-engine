@@ -14,9 +14,12 @@ import { join, resolve } from 'node:path';
 export function wantOf(d) {
   if (d.expectedVar) return `var(${d.expectedVar})`;
   if (d.suggestVar) return `var(${d.suggestVar})`;
-  if (d.figmaValue != null && typeof d.figmaValue !== 'object') return String(d.figmaValue);
-  if (typeof d.figma === 'number') return `${d.figma}px`;
-  if (/^-?[\d.]+(px|%)?$/.test(String(d.figma))) return String(d.figma);
+  // A fraction of a pixel with no variable behind it is a measured frame (one that hugs its content, 78.79), not a
+  // value the design sets: it is listed for a person, never written as a patch.
+  const measured = (v) => /^-?\d+\.\d+(px)?$/.test(String(v));
+  if (d.figmaValue != null && typeof d.figmaValue !== 'object') return measured(d.figmaValue) ? null : String(d.figmaValue);
+  if (typeof d.figma === 'number') return measured(d.figma) ? null : `${d.figma}px`;
+  if (/^-?[\d.]+(px|%)?$/.test(String(d.figma))) return measured(d.figma) ? null : String(d.figma);
   return null;
 }
 
