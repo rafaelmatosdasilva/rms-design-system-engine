@@ -214,3 +214,20 @@ test('choosing the option already set does nothing, and a slot is documented wit
   assert.match(tpl, /<dt>Slots<\/dt>/);
   assert.match(tpl, /<dt>From Figma<\/dt>/);
 });
+
+test('using the component in the playground sets its props: a box ticked, a switch flipped, a value typed', () => {
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const src = tpl.slice(tpl.indexOf('function effectHolds'), tpl.indexOf('function partsOf'));
+  const effectHolds = new Function(src + 'return effectHolds;')();
+  const el = (cls = [], props = {}, attrs = {}) => ({ classList: { contains: (k) => cls.includes(k) }, getAttribute: (a) => attrs[a] ?? null, matches: () => false, querySelector: () => null, ...props });
+  const input = el([], { checked: true });
+  const root = { ...el(['switch']), querySelector: (s) => (s === '.switch-input' ? input : s === '.switch-track' ? {} : null) };
+  assert.equal(effectHolds(root, { add: [], attrs: { checked: '' }, target: '.switch-input' }), true);
+  input.checked = false;
+  assert.equal(effectHolds(root, { add: [], attrs: { checked: '' }, target: '.switch-input' }), false);
+  assert.equal(effectHolds(root, { add: ['switch-track'], attrs: {} }), null);          // a class that names a part: not readable
+  assert.equal(effectHolds(root, { state: 'hover' }), null);                             // a live state: not readable
+  assert.equal(effectHolds(el(['chip', 'chip--on']), { add: ['chip--on'] }), true);
+  assert.match(tpl, /\['click', 'change', 'input'\]\.forEach\(function \(t\) \{ preview\.addEventListener\(t, function \(\) \{ setTimeout\(readBack, 0\); \}\); \}\);/);
+  assert.match(tpl, /if \(next !== v\) \{ state\[p\.label\] = next; changed = true; if \(syncs\[p\.label\]\) syncs\[p\.label\]\(\); \}/);
+});
