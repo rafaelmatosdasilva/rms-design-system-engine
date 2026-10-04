@@ -154,6 +154,24 @@ if (PLUGIN_OVERRIDE.length) {
   console.log('');
 }
 
+// ── Figma's names ─────────────────────────────────────────────────────────────
+// A token the map points at a variable of another name (semantic/content/primary → --text, radii/button →
+// --radius-full) traces back, but the code does not use Figma's name for it. Each one is listed with the name the
+// convention gives it, so the code can take it. ds-config.json → "figmaNames": "strict" makes them fail.
+const OTHER_NAME = [];
+const sizingTokens = new Set(Object.keys(snap.sizing ?? {}));
+for (const [token, cssVar] of [...Object.entries(EXPLICIT), ...Object.entries(EXPLICIT_SIZING)]) {
+  if (!cssVar || SKIP_TOKENS.has(token) || !figmaTokens.has(token)) continue;
+  const own = sizingTokens.has(token) ? tokenToVar(token, NAMING, { raw: true }) : conventionVar(token);
+  if (own !== cssVar) OTHER_NAME.push({ token, cssVar, own });
+}
+const STRICT_NAMES = cfg.figmaNames === 'strict';
+if (OTHER_NAME.length) {
+  console.log(`\n${STRICT_NAMES ? '❌' : '⚠️ '} NOT FIGMA'S NAME (${OTHER_NAME.length}) - the code calls these tokens by another name:`);
+  for (const { token, cssVar, own } of OTHER_NAME) console.log(`     ${token}  →  ${cssVar}   (Figma's name: ${own})`);
+  console.log(`   Rename each variable to Figma's name (where two tokens share one variable, give each its own, as Figma does).${STRICT_NAMES ? '' : ' Set "figmaNames": "strict" in ds-config.json to make this fail.'}\n`);
+}
+
 // ── SYSTEM_VARS staleness ─────────────────────────────────────────────────────
 // Entries in SYSTEM_VARS that no longer appear as declarations in any CSS file.
 // These are phantom exemptions - if a var is re-added later, the stale entry would
@@ -194,7 +212,7 @@ if (CONTRACT_KEYS.size) {
   }
 }
 
-if (UNKNOWN.length || PLUGIN_OVERRIDE.length || selectorFails) {
+if (UNKNOWN.length || PLUGIN_OVERRIDE.length || selectorFails || (STRICT_NAMES && OTHER_NAME.length)) {
   process.exit(1);
 } else {
   console.log('\nAll CSS vars trace back to a Figma token or documented system var. ✓\n');

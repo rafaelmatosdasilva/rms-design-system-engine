@@ -128,11 +128,9 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .color-chip-swatch { height: 36px; border-radius: var(--sg-radius-s); border: var(--sg-line); }
 .color-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); line-height: var(--sg-lh); word-break: break-word; }
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: break-all; }
-.type-specimen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 460px); align-items: start; gap: var(--sg-space-l); padding: var(--sg-space-m) 0; border-bottom: var(--sg-line); }
-.type-specimen:last-child { border-bottom: none; }
-.type-specimen-preview { color: var(--sg-text); min-width: 0; overflow-wrap: anywhere; }
-.type-specimen .pg-inspect td:last-child { word-break: normal; overflow-wrap: anywhere; }   /* a name and its value wrap between words, never inside one */
-@media (max-width: 720px) { .type-specimen { grid-template-columns: 1fr; } }   /* on a phone the table goes under the sample */
+.type-list { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-m); }
+.type-specimen-preview { color: var(--sg-text); padding: var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* the sample on one row, under the style's name */
+.type-specimen.pg-inspect td:last-child { word-break: normal; overflow-wrap: break-word; }   /* a name and its value wrap between words, never inside one */
 .spacing-row { display: flex; align-items: center; gap: var(--sg-space-m); padding: var(--sg-space-xs) 0; border-bottom: var(--sg-line); }
 .spacing-row:last-child { border-bottom: none; }
 .spacing-bar-wrap { width: 120px; }
@@ -293,8 +291,6 @@ a.pg-usage-name { color: var(--sg-text); }
       var items = axis.values.map(function (v) { return { v: v.value, label: v.label, off: !!v.notInCode, title: v.notInCode ? v.label + ' is in Figma, not in the code yet' : '' }; });
       if (auto) items.unshift({ v: '__auto', label: 'Auto', title: 'Follows this device\'s setting' });
       wrap.innerHTML = '<span class="sg-mode-label">' + esc(axis.label) + '</span>' + segHTML(items);
-      var autoNote = null;
-      if (auto) { autoNote = document.createElement('p'); autoNote.className = 'sg-mode-diff'; autoNote.setAttribute('aria-live', 'polite'); wrap.appendChild(autoNote); }
       // On the page's own switch, what the chosen mode changes in the code (axis.changes, from the theme's own values).
       var diff = null;
       if (scope === html && axis.changes) { diff = document.createElement('p'); diff.className = 'sg-mode-diff'; diff.setAttribute('aria-live', 'polite'); wrap.appendChild(diff); }
@@ -303,7 +299,6 @@ a.pg-usage-name { color: var(--sg-text); }
         segItems(wrap).forEach(function (b) {
           segSelect(b, b.dataset.v === on);
         });
-        if (autoNote) { var lab = axis.values.find(function (v) { return v.value === base(axis); }); autoNote.textContent = lab ? 'This device ' + lab.label : ''; autoNote.hidden = on !== '__auto'; }
         nudge();
         if (!diff) return;
         var list = axis.changes[c] || [], on = axis.values.find(function (v) { return v.value === c; });
@@ -435,21 +430,22 @@ a.pg-usage-name { color: var(--sg-text); }
   if ((TOKENS.typography || []).length) {
     hr(); navLink('typography', 'typography');
     var ts = section('typography', 'Foundations', 'Typography', null);
-    var demo = document.createElement('div'); demo.className = 'sg-demo sg-demo--col';
+    var demo = document.createElement('div'); demo.className = 'type-list';   // no frame around the list: each style is its own card
     var drawType = function () {
       demo.innerHTML = '';
       TOKENS.typography.forEach(function (t) {
         var style = [];
         // The family is the system's page font, which every text inherits (with its fallbacks): named, never set again here.
         [['size', 'font-size'], ['weight', 'font-weight'], ['lh', 'line-height']].forEach(function (k) { if (t[k[0]]) style.push(k[1] + ':var(' + t[k[0]].var + ')'); });
-        var row = document.createElement('div'); row.className = 'type-specimen';
-        row.innerHTML = '<div class="type-specimen-preview" style="' + esc(style.join(';')) + '">The quick brown fox jumps over the lazy dog</div><div class="pg-inspect"><div class="pg-inspect-head"></div><table></table></div>';
+        var row = document.createElement('div'); row.className = 'type-specimen pg-inspect';
+        row.innerHTML = '<div class="pg-inspect-head"></div><div class="type-specimen-preview" style="' + esc(style.join(';')) + '">The quick brown fox jumps over the lazy dog</div><table></table>';
         demo.appendChild(row);
         // Every property of the style as the browser draws it in this mode, as a component's token table: the property,
         // then the variable it comes from and its value.
-        var cs = getComputedStyle(row.firstElementChild);
+        var cs = getComputedStyle(row.querySelector('.type-specimen-preview'));
         // Named as in Figma first (the variable the text style binds), then the code's variable, then the value drawn.
-        var val = function (k, v) { var x = t[k]; return x ? [x.figma, x.var, v].filter(Boolean).join(' · ') : v; };
+        // The code's variable only when its name is not Figma's own (typography/m/font-size is --typography-m-font-size).
+        var val = function (k, v) { var x = t[k]; if (!x) return v; var same = x.figma && x.var === '--' + x.figma.replace(/[\/\s]+/g, '-'); return [x.figma, same ? null : x.var, v].filter(Boolean).join(' · '); };
         var family = cs.fontFamily.split(',')[0].replace(/["']/g, '').trim() || (t.family && t.family.value);
         var lines = [['family', val('family', family)], ['size', val('size', cs.fontSize)], ['weight', val('weight', cs.fontWeight)], ['line height', val('lh', cs.lineHeight === 'normal' ? 'auto' : cs.lineHeight)],
           ['letter spacing', val('ls', cs.letterSpacing === 'normal' ? '0' : cs.letterSpacing)]];
