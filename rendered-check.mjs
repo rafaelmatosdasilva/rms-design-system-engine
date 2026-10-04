@@ -262,6 +262,9 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
   // assertions (height/padding/gap) sit in the default group and are unaffected.
   const schemeOf = a => a.colorScheme ?? DEFAULT_SCHEME;
   const got = new Array(asserts.length);
+  // Transitions off before any group is measured: switching the colour scheme between groups otherwise leaves a
+  // transitioned property (an input's border-color 0.15s) mid-way, read as the previous scheme's value.
+  await send('Runtime.evaluate', { expression: `(() => { if (document.getElementById('__designSystemEngine_no_transitions__')) return; const s = document.createElement('style'); s.id = '__designSystemEngine_no_transitions__'; s.textContent = '*,*::before,*::after{transition:none !important;animation:none !important}'; document.head.appendChild(s); })()` }, sessionId);
   const indexed = asserts.map((a, i) => ({ a, i })).filter(x => !x.a.forcePseudo);
   for (const scheme of [...new Set(indexed.map(x => schemeOf(x.a)))]) {
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] }, sessionId);
