@@ -162,3 +162,107 @@ export function differencesMarkdown(d, { at = '', handback = {} } = {}) {
   }
   return out.join('\n') + '\n';
 }
+
+// ── A difference in plain English, for people (the style guide) ───────────────────────────────────────────────────
+// The audit's lines are written for the engine and an agent ("modal.fontSizeVar: contract=null  Figma=\"l\""). Each
+// kind is said again as a sentence a designer or developer reads at once; a line no rule knows is kept as it is.
+const FIELD = {
+  h: 'height', w: 'width', fontSizeVar: 'text size', fontWeightVar: 'text weight', lineHeightVar: 'line height',
+  fillStructure: 'fill', strokeOnDefault: 'border at rest', strokeOnAnyState: 'border', innerRadiusVar: 'inner corner radius',
+  radiusVar: 'corner radius', gapVar: 'space between its items', paddingVar: 'padding', 'paddingVar.lr': 'padding on the left and right',
+  'paddingVar.tb': 'padding on the top and bottom', minHeight: 'minimum height',
+};
+const unq = (v) => String(v ?? '').trim().replace(/^"(.*)"$/, '$1');
+function plainValue(field, raw) {
+  const v = unq(raw);
+  if (v === 'null' || v === '') return 'none';
+  if (/uncontracted/.test(v)) return null;   // the contract does not describe the part
+  if (/no longer bound/.test(v)) return 'no token any more';
+  if (field === 'fillStructure') return { none: 'no fill', direct: 'a fill on the component itself', before: 'a fill on a layer behind its content' }[v] ?? v;
+  if (/^stroke/.test(field)) return v === 'true' ? 'a border' : v === 'false' ? 'no border' : v;
+  if (/^(fontSize|fontWeight|lineHeight)Var$/.test(field)) return `the ${v} text style`;
+  if (field === 'h' || field === 'w' || field === 'minHeight') return /^\d/.test(v) ? `${v}px` : v;
+  if (/^\{/.test(v)) { try { const o = JSON.parse(v); return [o.tb && `${o.tb} on the top and bottom`, o.lr && `${o.lr} on the left and right`].filter(Boolean).join(' and ') || 'none'; } catch { return v; } }
+  return v;
+}
+const WHERE = (s) => (s ? s.replace(/^\(|\)$/g, '').split(' · ').pop() : '');
+export function plainDifference(what = '') {
+  const s = String(what).trim();
+  let m;
+  // A contract field against Figma: "modal.children.header.gapVar: contract=… Figma=…"
+  if ((m = /^([\w-]+)\.(.+?):\s*contract=(.+?)\s{1,}Figma=(.+)$/.exec(s))) {
+    const [, comp, path, c, f] = m;
+    const part = /^children\.(.+)\.([\w.]+)$/.exec(path);
+    const field = part ? part[2] : path;
+    const name0 = FIELD[field] ?? field.replace(/Var$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+    const name = (part ? name0.replace(/ its items$/, ' the items') : name0) + (part ? ` in its ${part[1]} part` : '');
+    const fv = plainValue(field, f), cv = plainValue(field, c);
+    const has = field === 'fillStructure' || /^stroke/.test(field);   // "has no fill", "has a border"
+    const say = (v) => (has ? `it has ${v}` : v === 'none' ? `no ${name} is set` : v === 'no token any more' ? `the ${name} no longer uses a token` : `the ${name} is ${v}`);
+    if (cv === null) return `In Figma the ${name} is ${fv}; the code's contract (its written spec) does not describe that part yet.`;
+    return `In Figma ${say(fv)}; the code's contract (its written spec) says ${say(cv)}.`;
+  }
+  // A measured value: "node font size: Figma m (11px), rendered 13px via --l-size  (.var-name · file:75)  → set …  [code moved, Figma is behind]"
+  if ((m = /^([\w-]+) (.+?)(?: \(([^)]*=[^)]*)\))?: Figma (.+?), rendered (.+?)(?:\s+\(([^()]*(?:\([^()]*\))?[^()]*)\))?(?:\s+→\s+(.+?))?(?:\s+\[(.+?)\])?$/.exec(s))) {
+    const [, , prop, combo, f, r, where, fix, lead] = m;
+    const when = combo ? `When ${combo.replace(/=/g, ' is ').replace(/,\s*/g, ' and ')}, the` : 'The';
+    let say;
+    if (/^paints a background$/.test(f) || f === 'paints a background') say = 'Figma has a background; the code draws none.';
+    else if (/^no background$/.test(f)) say = 'Figma has no background; the code draws one.';
+    else if (/^border on /.test(f)) say = `Figma has a ${f.replace(/^border on /, 'border on the ')}; the code shows none.`;
+    else {
+      const sized = !/weight/i.test(prop);
+      const px = (v) => (sized && /^\d+(\.\d+)?$/.test(v) ? `${v}px` : /^[a-z]{1,3} \(.+\)$/i.test(v) && /font|line/i.test(prop) ? v.replace(/^(\w+) \((.+)\)$/, 'the $1 text style ($2)') : v);
+      const p2 = prop.replace(/\(left\/right\)/, 'on the left and right').replace(/\(top\/bottom\)/, 'on the top and bottom');
+      say = `${when} ${p2} is ${px(f)} in Figma and ${px(r).replace(/ via (--[\w-]+)/, ' (from $1)')} in the code.`;
+    }
+    const file = WHERE(where);
+    const leadSay = lead ? /code moved/.test(lead) ? ' The code changed last, so Figma should follow it.' : /Figma moved/.test(lead) ? ' Figma changed last, so the code should follow it.' : '' : '';
+    // The fix itself is said once, as the action (plainAction), not here again.
+    return `${say}${leadSay}`.replace(/\.\.(\s|$)/g, '.$1') + (file ? ` (${file})` : '');
+  }
+  // Something the products lay over the component: "node: .a, .b laid over it (file). The component may be missing …"
+  if ((m = /^(?:[\w-]+|(a [\w\s]+? \([^)]+\))): (.+?) laid over it \((.+?)\)\. (.+)$/.exec(s))) return `In a product, ${m[2]} ${/,/.test(m[2]) ? 'are' : 'is'} placed on top of ${m[1] ?? 'it'} (${m[3]}). ${m[4]}`;
+  // A stroke the code draws that Figma does not have.
+  if ((m = /^[\w-]+: "([^"]+)" has `([^`]+)` - Figma has no stroke/.exec(s))) return `The code draws a border (${m[2]} on ${m[1]}); Figma has no border in any variant.`;
+  // Contrast: "x [State=Hover · light]: 1.23:1 (needs 4.5:1)  #e8e8e8 (--a) on #ffffff (--b)  (file)"
+  if ((m = /^[\w-]+ \[(.+?)\]: ([\d.]+):1 \(needs ([\d.]+):1\)\s+(#\w+) \((--[\w-]+)\) on (#\w+) \((--[\w-]+)\)/.exec(s))) {
+    const state = m[1].split(' · ').map((x) => x.replace(/^State=/, '').replace(/^default$/, 'at rest')).join(', in ').replace(/, in (light|dark)$/, ', in $1 mode');
+    return `${state[0].toUpperCase()}${state.slice(1)}, its text (${m[5]}) on its background (${m[7]}) has a contrast of ${m[2]} to 1; it needs ${m[3]} to 1 to be read easily.`;
+  }
+  // Token layering: "· overlay/color"
+  if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return `In Figma, ${m[1].trim()} holds a raw colour instead of pointing at another token, as most of the system's tokens do.`;
+  return s;
+}
+
+// ── What to do about a difference, and who does it ────────────────────────────────────────────────────────────────
+// → { who: 'figma' | 'code' | 'both', todo }. Figma leads unless the engine measured that the code changed last; a
+// fix the audit names is said as it is, else the one way to make the two sides agree.
+export function plainAction(what = '', component = '') {
+  const s = String(what).trim();
+  const name = component || (s.match(/^([\w-]+)/) ?? [])[1] || 'the component';
+  let m;
+  if ((m = /^([\w-]+)\.(.+?):\s*contract=(.+?)\s{1,}Figma=(.+)$/.exec(s))) {
+    const f = unq(m[4]);
+    if (/no longer bound/.test(f)) return { who: 'both', todo: `Decide which side is right: bind a token there again in Figma, or tell me to take it out of the code's contract (structure-contract.mjs).` };
+    return { who: 'code', todo: `Update the code's contract (structure-contract.mjs) for ${name} to say what Figma says. Tell me to do it.` };
+  }
+  // A measured value: the property it names ("actionBar min height"), the fix said for that property.
+  const measured = /^([\w-]+) (.+?)(?: \([^)]*=[^)]*\))?: Figma .+?, rendered /.exec(s);
+  const what2 = measured ? `the ${measured[1]} ${measured[2].replace(/\(left\/right\)/, 'on the left and right').replace(/\(top\/bottom\)/, 'on the top and bottom')}` : name;
+  const fixFor = (fix) => (/^(in Figma, )?set (it to )?/.test(fix) ? `set ${what2} to ${fix.replace(/^(in Figma, )?set (it to )?/, '')}` : fix);
+  if ((m = /\[(code moved, Figma is behind|Figma moved, code is behind)\]/.exec(s))) {
+    const fix = (/→\s+(.+?)\s+\[/.exec(s) ?? [])[1];
+    if (/code moved/.test(m[1])) return { who: 'figma', todo: fix ? `In Figma, ${fixFor(fix)}.` : `In Figma, change ${what2} to match the code.` };
+    return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. Tell me to do it.` : `Make ${what2} in the code match Figma. Tell me to do it.` };
+  }
+  if (measured) {
+    const fix = (/→\s+(.+?)(?:\s+\[|$)/.exec(s) ?? [])[1];
+    return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. Tell me to do it.` : `Make ${what2} in the code match Figma. Tell me to do it.` };
+  }
+  if (/ has `[^`]+` - Figma has no stroke/.test(s)) return { who: 'both', todo: `Decide: tell me to remove the border from the code, or add it to ${name} in Figma.` };
+  if (/: [\d.]+:1 \(needs [\d.]+:1\)/.test(s)) return { who: 'both', todo: `Pick colours with more contrast for ${name}: change them in Figma, then tell me to update the code.` };
+  if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return { who: 'figma', todo: `In Figma, point ${m[1].trim()} at another token instead of a raw colour.` };
+  if (/ laid over it /.test(s)) return { who: 'both', todo: `Decide: add a slot or prop for this action to ${name} in Figma (then tell me to build it), or tell me to leave it as the product's own.` };
+  return { who: 'both', todo: 'Look at it in the differences file and tell me which side is right.' };
+}

@@ -31,7 +31,7 @@ test('a prop both sides agree on is a control with Figma\'s label and the code\'
   assert.deepEqual(button.controls, [{ label: 'Disabled', prop: 'disabled', type: 'BOOLEAN', default: false, on: { add: [], attrs: { disabled: '' } } }]);   // Tone differs: not shown
   assert.equal(v.components.some((c) => c.name === 'field'), false, 'a component not built yet is not shown');
   assert.equal(v.notAgreed.differences, 2);   // the chip prop only the code has, the button's other default
-  assert.equal(v.notAgreed.line, 'Not shown until agreed, 2 differences between Figma and the code and 1 component not built yet (field). Run the audit to see them and decide each one.');
+  assert.equal(v.notAgreed.line, 'Left off this page until Figma and the code agree: 2 values where Figma and the code differ and 1 component the code does not have yet (field). Each one is in the To do list, with who does it and what to do.');
 });
 
 test('a recorded value that moved on one side is not agreed; nothing left says so', () => {
@@ -39,7 +39,7 @@ test('a recorded value that moved on one side is not agreed; nothing left says s
   const moved = agreedView({ propsSnap: { button: propsSnap.button }, rows, agreedRecord: { facts: { 'button/height': { figma: '32px', code: '36px' } } } });
   assert.equal(moved.notAgreed.differences, 1);
   const clean = agreedView({ propsSnap: { button: { properties: { Disabled: propsSnap.button.properties.Disabled } } }, rows, agreedRecord: { facts: { 'button/height': { figma: '32px', code: '32px' } } } });
-  assert.equal(clean.notAgreed.line, 'Everything Figma and the code have is agreed.');
+  assert.equal(clean.notAgreed.line, 'Figma and the code agree on everything this page shows.');
 });
 
 test('--styleguide with no template of the project\'s own builds the engine\'s, from the components that are built', { timeout: 300000 }, () => {
@@ -49,7 +49,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Style guide → \.design-system-engine-out\/styleguide\/index\.html {2}\(2 components agreed · the engine's template\)/);
-  assert.match(r.stdout, /not built yet \(button, field, disclosure, stepper\)/);
+  assert.match(r.stdout, /components the code does not have yet \(button, field, disclosure and stepper\)/);
   assert.equal(existsSync(join(dir, 'component-prop-result.json')), false, 'the project is left as it was');
   const html = readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8');
   assert.doesNotMatch(html, /\{\{[A-Z_]+\}\}/, 'every marker filled');
@@ -71,6 +71,7 @@ test('what an option adds comes from the contract\'s selector: a class, an attri
   assert.deepEqual(optionEffect('.button', '.button:disabled'), { add: [], attrs: { disabled: '' } });
   assert.deepEqual(optionEffect('.tab', '.tab[aria-selected="true"]'), { add: [], attrs: { 'aria-selected': 'true' } });
   assert.deepEqual(optionEffect('.button', '.button:hover'), { live: true });
+  assert.deepEqual(optionEffect('.field', '.field:not(.field--readonly):hover'), { live: true }, 'a class inside :not() is never added');
   assert.deepEqual(optionEffect('.button', '.button'), {});
   const v = agreedView({ propsSnap: { badge: { properties: { State: { type: 'VARIANT', defaultValue: 'neutral', variantOptions: ['neutral', 'positive'] } } } },
     rows: [row('badge', 'State', 'state', 'match')], classFor: () => '.badge', propertyMaps: { badge: { State: { neutral: '.badge.none', positive: '.badge.low' } } } });
@@ -80,7 +81,7 @@ test('what an option adds comes from the contract\'s selector: a class, an attri
 test('the mode axes: colour from the config, size from the sizing collection, nesting only where the CSS nests', () => {
   const vars = { modeVariants: { sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { kind: 'scalar', values: { desktop: '12px', phone: '16px' } } } } } };
   assert.deepEqual(modeAxes({}, vars), [
-    { label: 'Color', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true },
+    { label: 'Color', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true, media: '(prefers-color-scheme: dark)', mediaValue: 'dark', restValue: 'light' },
     { label: 'Size', attr: 'data-size', scoped: true, values: [{ label: 'Desktop', value: '' }, { label: 'Phone', value: 'phone', notInCode: true }] },
   ]);
   // A mode the code has CSS for (a [data-…] block, or an @media that sets the collection's variables) is drawn.
@@ -126,7 +127,7 @@ test('the demo design system: its real markup from its page, and props named dif
   assert.equal(button.markupFrom, 'page');
   assert.equal(button.markup, '<button class="tp-button" type="button">Save</button>');
   assert.deepEqual(button.controls, [], 'Disabled is "disabled" in the code: a difference to decide, not a control');
-  assert.match(data.notAgreed.line, /differences between Figma and the code/);
+  assert.match(data.notAgreed.line, /where Figma and the code differ/);
 });
 
 test('in the browser: no script error, a control changes the real component, the tokens behind it are named', { timeout: 300000 }, async (t) => {
@@ -144,6 +145,13 @@ test('in the browser: no script error, a control changes the real component, the
     const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}`);
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
+    // One view at a time: the overview, with each component's thumbnail, and a component drawn when it is opened.
+    assert.equal(await run(`document.querySelectorAll('main > section[id^="c-"]').length`), 0, 'no component drawn before it is opened');
+    assert.equal(await run(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`), 'overview');
+    assert.equal(await run(`!!document.querySelector('a.sg-card[href="#c-chip"] .sg-thumb .chip')`), true, 'the card shows the component itself');
+    await run(`location.hash = '#c-chip'`);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(await run(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`), 'c-chip');
     assert.equal(await run(`document.querySelectorAll('.pg-preview').length`), 1);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').getBoundingClientRect().height`), 24);
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);

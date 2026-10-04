@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: the modes in Figma's order: the capture records each collection's order (continuous evaluation)
+
+What changed since the entry below (engine 8082467): Evaluation 70/70 on Haiku, recorded by the new command; the README names the checks that did not run; Style guide: a component's own mode is independent of the page's, and its props show and hide its parts; Style guide: every boolean prop shows and hides its part, every text lands in its own; Style guide: every component starts in the device's mode and shows when it last changed; Style guide: components work as in a product, and nothing on the page is drawn by the page; Style guide: modes in Figma's order with Auto, thumbnails and search, the primitive ramp, a phone menu; Style guide: a size mode is switched on each component and section, not for the page. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `9d43017cacae` · Project measured: `13d811a9d668`
+
+| Haiku, engine 3191dd5 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 113k | 114k |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below, 1 rule violation. Failed: guidelines-link #0: never asks for a token in chat (the reply asks for a secret). Records: `records/2026-10-04-style-guide-a-size-mode`.
+
 ## 2026-10: a stroked icon is not a border, a bound typography variable reads as its scale, the evaluation recorded in one command (continuous evaluation)
 
 What changed since the entry below (engine 681ecf6): Evaluation 70/70 on Haiku; the differences list leaves out token contrast; Gate 5 reads the map's sizing names and skips; The differences list holds differences only, not the lines that point at them; The style guide finds a component's controls under the contract name it is mapped by; The style guide's own heading rules no longer reach the components it previews; A breakpoint mode in the CSS is read as a mode, not as a value or as the base; The style guide switches a breakpoint mode with the code's own values and says what it changes; A stroked icon is not a border, and a bound typography variable reads as its text scale; The differences list names the checks that did not run; a measured height is never patched; The evaluation a guide change needs is one command, recorded automatically. The guide changed in `cookbook/refresh-figma.md`, `reference/maintainers.md`.

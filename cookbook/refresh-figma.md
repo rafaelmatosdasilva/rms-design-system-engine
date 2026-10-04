@@ -161,7 +161,8 @@ for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c
 const WEIGHT={'Thin':100,'Extra Light':200,'Light':300,'Regular':400,'Medium':500,'Semi Bold':600,'Bold':700,'Extra Bold':800,'Black':900};
 const styles=await figma.getLocalTextStylesAsync(); const typo={};
 for(const st of styles){const key=st.name.trim().toLowerCase().split('/').pop();const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
-return {color:colorOut,aliases:aliasesOut,sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut};
+const _modeOrder={};for(const c of collections){if(c.modes.length<2)continue;const key=m=>(c.name===COLOR_COLLECTION?(MODES.find(x=>x.name===m.name)||{}).snapshotKey:null)||m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');_modeOrder[c.name===COLOR_COLLECTION?'color':c.name]=c.modes.map(key);} // Figma's own order of each collection's modes
+return {color:colorOut,aliases:aliasesOut,sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder};
 ```
 
 ---
@@ -260,7 +261,8 @@ for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c
 const WEIGHT={'Thin':100,'Extra Light':200,'Light':300,'Regular':400,'Medium':500,'Semi Bold':600,'Bold':700,'Extra Bold':800,'Black':900};
 const styles=await figma.getLocalTextStylesAsync(); const typo={};
 for(const st of styles){const key=st.name.trim().toLowerCase().split('/').pop();const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
-return {sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut};
+const _modeOrder={};for(const c of collections){if(c.modes.length<2)continue;const key=m=>m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');_modeOrder[c.name===COLOR_COLLECTION?'color':c.name]=c.modes.map(key);} // Figma's own order of each collection's modes
+return {sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder};
 ```
 
 **Final assembly** (after all calls complete):
@@ -965,7 +967,7 @@ For every changed or new token:
 
 ## Phase 1 - Step 5: Update snapshots
 
-Write fresh live data to both files. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] the data is fresh.
+Write fresh live data to both files, with `_modeOrder` (each collection's modes in Figma's own order, which the style guide lists them in) on the vars snapshot. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] the data is fresh.
 
 > **Also stamp `_figmaVersion` on the vars snapshot.** Fetch it with
 > `GET /v1/files/{key}?depth=1` (the `version` field) and write it alongside `_updated`.

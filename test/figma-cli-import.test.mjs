@@ -65,3 +65,13 @@ test('the command writes the snapshots ds-config names, and the audit reads them
   assert.equal(a.status, 0, a.stdout.split('\n').filter((l) => /❌/.test(l)).join('\n'));
   assert.match(a.stdout, /TO BUILD {2}17 tokens/);
 });
+
+test('each collection\'s modes in Figma\'s own order, by snapshot key, for the style guide to list them so', () => {
+  const design = tidepoolDesign();
+  const col = (design.variables ?? []).find((c) => (c.modes ?? []).length > 1);
+  col.modes = [...col.modes].reverse();
+  const v = varsFromDesign(design, tpCfg);
+  const key = (name) => (tpCfg.figma?.modes ?? []).find((m) => m.name === name)?.snapshotKey ?? name.toLowerCase();
+  assert.deepEqual(Object.values(v.modeOrder)[0], col.modes.map(key));
+  assert.ok(snapshotsFromDesign(design, tpCfg, {}, 'T').vars._modeOrder, 'written on the vars snapshot');
+});

@@ -73,7 +73,11 @@ export function varsFromDesign(design, cfg = {}) {
       else if (v.type === 'BOOLEAN' && value != null) booleans[v.name] = String(value);
     }
   }
-  return { color, aliases, sizing, strings, booleans };
+  // Figma's own order of each collection's modes (Dark before Light when the file has it so), by snapshot key, so a
+  // page that lists the modes lists them as Figma does.
+  const keyOf = (name) => modes.find((m) => m.name === name)?.snapshotKey ?? name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const modeOrder = Object.fromEntries(cols.filter((c) => (c.modes ?? []).length > 1).map((c) => [c === colourCol ? 'color' : c.name, c.modes.map(keyOf)]));
+  return { color, aliases, sizing, strings, booleans, modeOrder };
 }
 
 // Every component set (and lone component) in design.json's page trees.
@@ -141,7 +145,7 @@ export function snapshotsFromDesign(design, cfg = {}, existing = {}, now = new D
   const source = `figma-cli design.json${design.meta?.file ? ` (${design.meta.file})` : ''}`;
   const t = varsFromDesign(design, cfg);
   const prevVars = existing.vars ?? {};
-  const vars = { ...prevVars, _updated: now, _source: source, color: t.color, aliases: t.aliases, sizing: t.sizing,
+  const vars = { ...prevVars, _updated: now, _source: source, _modeOrder: t.modeOrder, color: t.color, aliases: t.aliases, sizing: t.sizing,
     strings: { ...(prevVars.strings ?? {}), ...t.strings }, booleans: { ...(prevVars.booleans ?? {}), ...t.booleans } };
   for (const k of ['typography', 'breakpoints', 'animation', 'primitives']) vars[k] = prevVars[k] ?? {};
   const props = { ...(existing.props ?? {}), _updated: now, _source: source };

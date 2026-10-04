@@ -31,6 +31,41 @@ export function modeRootCSS(css = '') {
   return body ? `\n\n  /* == The page's text styles on each element with its own mode (inherited values follow that mode) == */\n  [data-color], [data-size] { ${body} }\n` : '';
 }
 
+// The lines of a component's own CSS rules (every rule whose selector names its class, or its id when the selector
+// is one, as #tt), 1-based, in a stylesheet.
+export function ruleLines(css = '', cls = '') {
+  if (!cls) return [];
+  const token = /^[.#]/.test(cls) ? cls : `.${cls}`;
+  const text = String(css), want = new RegExp(`${token.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?![\\w-])`), out = [];
+  const lineAt = (i) => text.slice(0, i).split('\n').length;
+  let depth = 0, start = 0, ruleStart = -1, ruleDepth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '{') { if (ruleStart < 0 && want.test(text.slice(start, i).replace(/\/\*[\s\S]*?\*\//g, ''))) { ruleStart = lineAt(start + text.slice(start, i).search(/\S/)); ruleDepth = depth; } depth++; start = i + 1; }
+    else if (ch === '}') { depth--; if (ruleStart > 0 && depth === ruleDepth) { for (let l = ruleStart; l <= lineAt(i); l++) out.push(l); ruleStart = -1; } start = i + 1; }
+    else if (ch === ';' && depth === 0) start = i + 1;
+  }
+  return [...new Set(out)];
+}
+
+// The lines of every object entry keyed by a component's name (badge: { … } or "badge": { … }), 1-based, in a
+// contract or config file, so a change to its contract dates the component as a change to its CSS does.
+export function entryLines(text = '', key = '') {
+  if (!key) return [];
+  const src = String(text), lines = src.split('\n'), out = [];
+  const head = new RegExp(`^\\s*["']?${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*:\\s*\\{`);
+  lines.forEach((l, i) => {
+    if (!head.test(l)) return;
+    let depth = 0;
+    for (let j = i; j < lines.length; j++) {
+      for (const ch of lines[j].replace(/\/\/.*$/, '')) { if (ch === '{') depth++; else if (ch === '}') depth--; }
+      out.push(j + 1);
+      if (depth <= 0) break;
+    }
+  });
+  return [...new Set(out)];
+}
+
 // The code's own breakpoint modes: each @media block (not a colour or contrast preference) that sets variables on
 // :root, with the base :root's values for the same variables. → [{ condition, decls, base, rules }]
 export function codeSizeBlocks(css = '') {
@@ -85,13 +120,22 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
   for (const m of modes) {
     const sel = m.cssSelector ?? 'root';
     if (sel === 'root') colour.values.push({ label: m.name, value: '' });
-    else if (sel === 'dark-media') { colour.attr = 'data-color'; colour.scoped = true; colour.values.push({ label: m.name, value: 'dark' }); }
+    else if (sel === 'dark-media') { colour.attr = 'data-color'; colour.scoped = true; colour.values.push({ label: m.name, value: 'dark' }); Object.assign(colour, { media: '(prefers-color-scheme: dark)', mediaValue: 'dark' }); }
     else if (sel.startsWith('data:')) { const [a, v = ''] = sel.slice(5).split('='); colour.attr = colour.attr ?? (a.startsWith('data-') ? a : `data-${a}`); colour.values.push({ label: m.name, value: v }); }
     else if (sel.startsWith('class:')) { colour.classes = true; colour.values.push({ label: m.name, value: sel.slice(6) }); }
     // other media modes (breakpoints, contrast) are not a switch on one page
   }
+  // In Figma's own order of the collection's modes when the snapshot records it (Dark before Light, as the file has it).
+  const figmaOrder = figmaVars._modeOrder?.color;
+  if (Array.isArray(figmaOrder)) {
+    const keyOf = (label) => modes.find((m) => m.name === label)?.snapshotKey ?? String(label).toLowerCase();
+    const at = (v) => { const i = figmaOrder.indexOf(keyOf(v.label)); return i < 0 ? 99 : i; };
+    colour.values.sort((a, b) => at(a) - at(b));
+  }
   // The derived [data-color] blocks name the light mode too, so a scoped preview can go back to light inside a dark page.
   if (colour.attr === 'data-color') colour.values = colour.values.map((v) => (v.value === '' ? { ...v, value: 'light' } : v));
+  // The mode the page rests on when the device's media query does not match: the root one, wherever Figma lists it.
+  if (colour.media) colour.restValue = colour.values.find((v) => v.value !== colour.mediaValue)?.value ?? '';
   if (colour.values.length > 1) axes.push(colour);
   for (const def of Object.values(figmaVars.modeVariants ?? {})) {
     const ms = def?.modes ?? [];
@@ -106,6 +150,7 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
     const code = codeSizeMode(def, themeCss);
     const axis = { label: 'Size', attr: 'data-size', scoped: true, values: ms.map((m, i) => ({ label: m.name ?? m.snapshotKey, value: i === 0 ? (code ? String(m.snapshotKey) : '') : m.snapshotKey, ...(i > 0 && !inCode(m) ? { notInCode: true } : {}) })) };
     if (code) Object.assign(axis, { media: code.block.condition, mediaValue: code.mode });   // the device or window the code draws it on
+    if (code) axis.restValue = axis.values.find((v) => v.value !== code.mode && !v.notInCode)?.value ?? axis.values[0].value;
     if (code) axis.changes = { [code.mode]: Object.entries(code.block.decls).filter(([k, v]) => code.block.base[k] != null && code.block.base[k] !== v).map(([k, v]) => ({ name: code.names[k] ?? k, from: code.block.base[k], to: v })) };
     axes.push(axis);
     break;
@@ -117,7 +162,8 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
 // (:hover, :focus). '.chip.chip--l' over '.chip' adds chip--l; '.button:disabled' sets disabled.
 export function optionEffect(baseSelector, optionSelector) {
   if (!optionSelector) return null;
-  const last = String(optionSelector).trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
+  // A class inside :not() is one the option must not have, never one it adds.
+  const last = (String(optionSelector).trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '').replace(/:not\([^()]*\)/g, '');
   const baseClasses = new Set((String(baseSelector ?? '').match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1)));
   const add = (last.match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1)).filter((c) => !baseClasses.has(c));
   const attrs = {};
@@ -135,7 +181,10 @@ function partFor(propName, list = [], fallback = null) {
   const named = (list ?? []).find((p) => String(p.name).toLowerCase() === word) ?? (list ?? []).find((p) => String(p.name).toLowerCase().includes(word));
   if (named) return String(named.selector).trim().split(/\s+/).pop();
   const kind = /icon|glyph|symbol/.test(word) ? 'icon' : /label|text|title|value/.test(word) ? 'label' : fallback;
-  return kind === 'icon' ? 'svg, [class*="icon"]' : kind === 'label' ? '[class*="label"], [class*="text"], span' : null;
+  // The prop's own word first (a title is a title class or a heading before it is any label), in the order to search.
+  const own = /^[a-z]+$/.test(word) && !/^(label|text|icon)$/.test(word) ? `[class*="${word}"], ` : '';
+  const heading = /title|heading/.test(word) ? 'h1, h2, h3, h4, ' : '';
+  return kind === 'icon' ? 'svg, [class*="icon"]' : kind === 'label' ? `${own}${heading}[class*="label"], [class*="text"], span` : null;
 }
 
 // The class a variant option would carry in the code, only when the project's CSS has that selector.
@@ -172,7 +221,8 @@ function booleanSelector(base, sel, cssText) {
   const inCss = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(cssText);
   if (compounds.length === 1) return modifier.length && modifier.every(inCss) ? { on: { add: modifier, attrs: {} } } : null;
   const part = compounds[compounds.length - 1];
-  if (modifier.length && modifier.every(inCss) && /^(no|hide|without)[-_]/.test(modifier[0])) return { off: { add: modifier, attrs: {} } };
+  // The part too, so a part no instance holds can still be drawn when the prop turns it on.
+  if (modifier.length && modifier.every(inCss) && /^(no|hide|without)[-_]/.test(modifier[0])) return { off: { add: modifier, attrs: {} }, part };
   return { part };
 }
 export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}, realizations = {}, cssText = '', parts = [] }) {
@@ -196,7 +246,9 @@ export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}
         if (off && (off.add?.length || Object.keys(off.attrs ?? {}).length)) found.off = off;
         if (!found.on && !found.off) found = null;
       } else if (typeof pm === 'string') found = booleanSelector(base, pm, cssText);
-      if (!found && typeof hr === 'string') found = booleanSelector(base, hr, cssText) ?? { part: hr };
+      // A realization names a part (".listItem-icon"), never a class to put on the component itself; only a no- or
+      // hide- modifier that hides the part (".x.no-icon svg") is a class.
+      if (!found && typeof hr === 'string') { const b = booleanSelector(base, hr, cssText); found = b?.off ? b : { part: String(hr).trim().split(/\s+/).pop() }; }
       if (!found && /^(is)?disabled$/i.test(label) && cls && new RegExp(`\\.${cls}[^{,]*:disabled`).test(cssText)) found = { on: { add: [], attrs: { disabled: '' } } };
       if (!found) { const c = variantClass(cls, label, cssText); if (c) found = { on: { add: [c], attrs: {} } }; }
       if (!found) { unrealized.push(label); continue; }
@@ -248,12 +300,14 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     if (unbuilt.includes(name) || mine.some((r) => /^\(no code file/.test(String(r.codeValue)))) { waiting.push(`${name} (not built yet)`); continue; }
     const cls = String(classFor(name) ?? '').replace(/^\./, '') || null;   // the class itself, without its dot
     const defs = Object.fromEntries(Object.entries(entry.properties ?? {}).map(([k, d]) => [cleanName(k), d]));
-    const controls = [];
+    const controls = [], propsNotBuilt = [];
     // An HTML and CSS system has no code props for Gate [15] to pair: what the code realizes is what agrees.
     if (!mine.length && (cfg.frameworkComponents === false || !rows.length)) {
       const r = realizedControls({ name, defs, cls, propertyMap: propertyMaps[name] ?? {}, realizations: cfg.htmlRealizations?.[name] ?? {}, cssText, parts: parts[name] ?? [] });
       controls.push(...r.controls);
       unrealized += r.unrealized.length;
+      // Figma's props the code does not build: shown in the panel as such, never drawn with Figma's look.
+      propsNotBuilt.push(...r.unrealized.map((label) => ({ label, type: defs[label]?.type ?? 'BOOLEAN' })));
     }
     for (const r of mine) {
       if (r.status !== 'match') { undecided++; continue; }   // missing, renamed, another value, or a prop only the code has
@@ -303,18 +357,63 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     const markups = [...new Set(candidates.map((c) => c.markup).filter((m) => m && elementsIn(m) <= 30))].sort((a, b) => elementsIn(b) - elementsIn(a)).slice(0, 6);
     if (entry.noProps && !markup) continue;
     components.push({ name, cls, role: roleWord(entry.annotations), description: entry.description ?? '', note: notes[name.toLowerCase()] ?? notes[name] ?? '',
-      markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls });
+      markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls, ...(propsNotBuilt.length ? { unbuilt: propsNotBuilt } : {}) });
   }
   // A recorded value that moved on one side since it was agreed is not agreed any more.
   for (const f of Object.values(agreedRecord.facts ?? {})) if (f && f.figma !== undefined && f.code !== undefined && String(f.figma) !== String(f.code)) undecided++;
   const tokens = check ? agreedTokens(check, figmaVars) : null;
   undecided += tokens?.differences ?? 0;
   const said = [];
-  if (undecided) said.push(`${undecided} difference${undecided === 1 ? '' : 's'} between Figma and the code`);
-  if (unrealized) said.push(`${unrealized} Figma propert${unrealized === 1 ? 'y' : 'ies'} the code does not realize yet (no contract propertyMap, htmlRealizations entry or modifier class)`);
-  if (waiting.length) said.push(`${waiting.length} component${waiting.length === 1 ? '' : 's'} not built yet (${waiting.map((w) => w.replace(/ \(not built yet\)$/, '')).join(', ')})`);
-  const line = said.length ? `Not shown until agreed, ${said.join(' and ')}. Run the audit to see them and decide each one.` : 'Everything Figma and the code have is agreed.';
+  if (undecided) said.push(`${undecided} value${undecided === 1 ? '' : 's'} where Figma and the code differ`);
+  if (unrealized) said.push(`${unrealized} Figma propert${unrealized === 1 ? 'y' : 'ies'} the code does not build yet`);
+  if (waiting.length) said.push(`${waiting.length} component${waiting.length === 1 ? '' : 's'} the code does not have yet (${waiting.map((w) => w.replace(/ \(not built yet\)$/, '')).join(', ')})`);
+  const line = said.length ? `Left off this page until Figma and the code agree: ${said.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Each one is in the To do list, with who does it and what to do.` : 'Figma and the code agree on everything this page shows.';
   return { title, components, tokens, icons, notAgreed: { differences: undecided, unrealized, waiting, line }, modes: modeAxes(cfg, figmaVars, themeCss) };
+}
+
+// The primitive colours (Figma's primitives/… ramp) the theme declares with Figma's value in every mode, for the ramp
+// the style guide shows first. A primitive is named by the convention (primitives/Neutral 100 → --neutral-100) and
+// read from the theme's own blocks: :root for the root mode, the dark media block, or a [data-…] / class block.
+// → { group: 'primitives', items: [{ figma, var, values }] } | null
+export function primitiveColours(figmaVars = {}, themeCss = '', cfg = {}) {
+  const prim = figmaVars.primitives ?? {};
+  const prefix = cfg.figma?.primitivePrefix ?? 'primitives/';
+  const modes = cfg.figma?.modes?.length ? cfg.figma.modes : [{ snapshotKey: 'light', cssSelector: 'root' }, { snapshotKey: 'dark', cssSelector: 'dark-media' }];
+  const css = String(themeCss).replace(/\/\*[\s\S]*?\*\//g, '');
+  const decls = (body) => Object.fromEntries([...String(body).matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim().toLowerCase()]));
+  const block = (re) => { let out = {}; for (const m of css.matchAll(re)) out = { ...out, ...decls(m[1]) }; return out; };
+  // The theme's top-level :root blocks, and the :root blocks inside its dark media blocks.
+  const media = [], top = [];
+  for (let i = 0, depth = 0, start = 0, head = ''; i < css.length; i++) {
+    if (css[i] === '{') { if (depth === 0) { head = css.slice(start, i).trim(); start = i + 1; } depth++; }
+    else if (css[i] === '}') { depth--; if (depth === 0) { (/^@media/.test(head) ? media : top).push([head, css.slice(start, i)]); start = i + 1; } }
+  }
+  const root = Object.assign({}, ...top.filter(([h]) => /(^|,)\s*:root\s*$/.test(h)).map(([, b]) => decls(b)));
+  const dark = Object.assign({}, ...media.filter(([h]) => /prefers-color-scheme:\s*dark/.test(h)).map(([, b]) => decls((b.match(/:root\s*\{([^{}]*)\}/) ?? [])[1] ?? '')));
+  const of = (m) => {
+    const sel = m.cssSelector ?? 'root';
+    if (sel === 'root') return root;
+    if (sel === 'dark-media') return { ...root, ...dark };
+    const [a, v = ''] = sel.replace(/^(data|class):/, '').split('=');
+    const re = sel.startsWith('class:') ? new RegExp(`\\.${a}\\s*\\{([^{}]*)\\}`, 'g') : new RegExp(`\\[(?:data-)?${a.replace(/^data-/, '')}=["']?${v}["']?\\]\\s*\\{([^{}]*)\\}`, 'g');
+    return { ...root, ...block(re) };
+  };
+  const names = [...new Set(Object.values(prim).flatMap((m) => Object.keys(m ?? {})))];
+  const items = [];
+  for (const name of names) {
+    const v = `--${name.slice(name.startsWith(prefix) ? prefix.length : 0).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+    const values = {};
+    let ok = true;
+    for (const m of modes) {
+      const want = prim[m.snapshotKey]?.[name];
+      if (want == null) continue;
+      const have = of(m)[v];
+      if (!have || have !== String(want).toLowerCase()) { ok = false; break; }
+      values[m.snapshotKey] = want;
+    }
+    if (ok && Object.keys(values).length) items.push({ figma: name.slice(name.startsWith(prefix) ? prefix.length : 0), var: v, values });
+  }
+  return items.length ? { group: 'primitives', items } : null;
 }
 
 // ── Tokens: only the ones the token check found equal to Figma (parity-check.mjs --json → passVars) ─────────────
@@ -606,11 +705,8 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
     if (l.weight?.var) roles['heading-weight'] = `var(${l.weight.var})`;
     if (m.lh?.var) roles.lh = `var(${m.lh.var})`;
   }
-  // The font: a family variable the theme declares, else the family the theme sets on its page.
-  const famVar = /(--[\w-]*font[\w-]*family[\w-]*)\s*:/i.exec(themeCss) ?? /(--[\w-]*family[\w-]*)\s*:/i.exec(themeCss);
-  const famDecl = /(?:^|[{;\s])(?:html|body|:root)[^{]*\{[^}]*?font-family\s*:\s*([^;}]+)/i.exec(themeCss);
-  if (famVar) { roles.font = `var(${famVar[1]})`; from.font = famVar[1]; }
-  else if (famDecl) { roles.font = famDecl[1].trim(); from.font = 'the theme\'s page font'; }
+  // No font role: the page's text inherits the font the system sets on its own page, with its fallbacks, as its
+  // components do. A family variable alone (Inter) would fall to the browser's serif where that font is not installed.
   // Radii and spacing: the system's own scale, nearest to each step the layout uses.
   const px = (t) => parseFloat(String(t.value));
   const nearest = (list, want) => list.filter((t) => Number.isFinite(px(t))).sort((a, b) => Math.abs(px(a) - want) - Math.abs(px(b) - want) || px(a) - px(b))[0];
@@ -627,7 +723,7 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   }
   if (icons.size) { roles.icon = `${icons.size}px`; from.icon = 'the size of the system\'s icons'; }
   for (const [role, v] of Object.entries(override ?? {})) if (typeof v === 'string' && v) { roles[role] = /^--/.test(v) ? `var(${v})` : v; from[role] = 'styleguide.chrome'; }
-  const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 'font', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
+  const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
   const missing = NEEDED.filter((r) => !roles[r]);
   // Declared again on every element that carries its own mode, so a preview in Light on a Dark page resolves the
   // page's roles with its own values (a variable is resolved where it is declared, then inherited as it is).
@@ -664,7 +760,9 @@ export function segmentedUi(components = []) {
     const score = (/(segment|toggle|tabs?|switcher|picker|chooser)/i.test(c.name) ? 0 : 10) + (items[0].tag === 'button' ? 0 : 2);
     const base = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(rootAttrs)?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
     // The control itself, without the modifiers one product gave it (full-width, compact): only its own class.
-    found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected });
+    // Its decoration too (an empty aria-hidden part, as a sliding pill the system's script places).
+    const deco = [...inner.matchAll(/<span\b[^>]*aria-hidden\s*=\s*["']true["'][^>]*>\s*<\/span>/gi)].map((d) => d[0]).join('');
+    found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>${deco}`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected });
   }
   const best = found.sort((a, b) => a.score - b.score)[0];
   if (!best) return null;
@@ -675,6 +773,96 @@ export function segmentedUi(components = []) {
 // The system's own text field, for the page's text inputs: a component's markup holding a text <input> (role
 // textbox, or a name that says input or field, preferred), cut to its root and the input, each keeping only the
 // classes the system's own CSS defines (a product's extra classes stay out). → { from, markup } or null.
+// The system's own text button, for the links the page shows (each component's products): a component whose role is a
+// button or a link, with a text label, and a class the system's CSS styles. The quietest one wins (a link, then a
+// tertiary or ghost button, then a secondary one; a primary or destructive one last); an icon-only button never.
+// ds-config.json → styleguide.ui.button names one instead. → { from, cls, label: { tag, cls } } | null
+// How a component moves, read from the system's own CSS, so the style guide can play it: an entry animation on its
+// own rule, the modifiers that play an exit (.toast.toast-out), and, for a component shown inside an overlay, the
+// container, its open and closing classes and its other layers (.modal.is-open, .modal.is-closing, .modal-overlay).
+// A looping animation (a spinner) always plays and needs no button. → { entry, exits, overlay } | null
+export function motionUi(cls = '', css = '') {
+  if (!cls || /^#/.test(cls)) return null;
+  const text = String(css).replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...text.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sels: m[1].split(',').map((x) => x.trim().replace(/\s+/g, ' ')), body: m[2] }));
+  const esc = (c) => c.replace(/[-]/g, '\\-');
+  const me = esc(cls);
+  const moves = (b) => /(^|;)\s*animation(-name)?\s*:/.test(b) && !/\binfinite\b/.test(b) && !/animation(-name)?\s*:\s*none/.test(b);
+  let entry = false; const exits = new Set(), states = new Map();
+  for (const r of rules) {
+    if (!moves(r.body)) continue;
+    for (const sel of r.sels) {
+      if (new RegExp(`^\\.${me}$`).test(sel)) entry = true;
+      let m = new RegExp(`^\\.${me}\\.([\\w-]+)$`).exec(sel);
+      if (m) exits.add(m[1]);
+      m = new RegExp(`^\\.([\\w-]+)\\.([\\w-]+) \\.${me}$`).exec(sel);
+      if (m) { if (!states.has(m[1])) states.set(m[1], new Set()); states.get(m[1]).add(m[2]); }
+    }
+  }
+  let overlay = null;
+  for (const [container, st] of states) {
+    const c = esc(container);
+    const open = rules.flatMap((r) => r.sels.map((sel) => [sel, r.body])).map(([sel, body]) => [new RegExp(`^\\.${c}\\.([\\w-]+)$`).exec(sel), body])
+      .find(([m, body]) => m && /display\s*:\s*(?!none)[\w-]+/.test(body))?.[0]?.[1];
+    if (!open) continue;
+    const layers = new Set();
+    for (const r of rules) for (const sel of r.sels) { const m = new RegExp(`^\\.${c}(?:\\.[\\w-]+)? (?:> )?\\.([\\w-]+)$`).exec(sel); if (m && m[1] !== cls) layers.add(m[1]); }
+    overlay = { container, open, closing: [...st].find((x) => x !== open) ?? null, layers: [...layers] };
+    break;
+  }
+  if (!entry && !exits.size && !overlay) return null;
+  return { entry, exits: [...exits], overlay };
+}
+
+export function buttonUi(components = [], systemCss = '', prefer = null) {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  const found = [];
+  for (const c of components) {
+    const m = /^\s*<(button|a)\b([^>]*)>([\s\S]*)<\/\1>\s*$/i.exec(c.markup ?? '');
+    if (!m || !(prefer ? c.name === prefer : ['button', 'link'].includes(c.role) || m[1].toLowerCase() === 'a')) continue;
+    const cls = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(m[2])?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
+    if (!cls || !defined(cls)) continue;
+    // Its label part, even one a product fills at run time (an empty span); only the classes the system styles.
+    const lab = /<(span|strong|b|em)\b([^>]*)>([^<]*)<\/\1>/i.exec(m[3]);
+    const bare = m[3].replace(/<svg[\s\S]*?<\/svg>/gi, '').replace(/<[^>]+>/g, '').trim();
+    if (!lab && !bare) continue;   // icon only
+    const labelCls = lab ? (/\bclass\s*=\s*["']([^"']*)["']/i.exec(lab[2])?.[1] ?? '').split(/\s+/).filter((k) => k && defined(k)).join(' ') : '';
+    const rank = c.role === 'link' || m[1].toLowerCase() === 'a' ? 0 : /(link|tertiary|ghost|subtle|plain|text)/i.test(c.name) ? 1 : /(secondary|outline)/i.test(c.name) ? 2 : /(primary|danger|destructive|cta)/i.test(c.name) ? 5 : 3;
+    found.push({ rank, from: c.name, cls, label: lab ? { tag: lab[1].toLowerCase(), cls: labelCls } : null });
+  }
+  const best = found.sort((a, b) => a.rank - b.rank)[0];
+  if (!best) return null;
+  const { rank, ...ui } = best;
+  return ui;
+}
+
+// The system's own card, for the overview's links to each section: a component named card or tile whose root class the
+// system's CSS styles. → { from, cls } | null
+// The system's own icon-only button (an svg and no label), for the page's menu and close buttons on a phone.
+// → { from, cls } | null
+export function iconButtonUi(components = [], systemCss = '') {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  for (const c of components) {
+    const m = /^\s*<button\b([^>]*)>([\s\S]*)<\/button>\s*$/i.exec(c.markup ?? '');
+    if (!m || (c.role && c.role !== 'button') || !/<svg\b/i.test(m[2])) continue;
+    if (m[2].replace(/<svg[\s\S]*?<\/svg>/gi, '').replace(/<[^>]+>/g, '').trim()) continue;   // it has a label
+    if (/<(span|strong|b|em)\b[^>]*>\s*<\/\1>/i.test(m[2].replace(/<svg[\s\S]*?<\/svg>/gi, ''))) continue;   // an empty label holder
+    const cls = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(m[1])?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
+    if (cls && defined(cls)) return { from: c.name, cls };
+  }
+  return null;
+}
+
+export function cardUi(components = [], systemCss = '') {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  for (const c of components) {
+    if (!/(^|[^a-z])(card|tile)$/i.test(c.name) && !/^(card|tile)/i.test(c.name)) continue;
+    const cls = (/^\s*<[a-z][\w-]*\b[^>]*\bclass\s*=\s*["']([^"']*)["']/i.exec(c.markup ?? '')?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
+    if (cls && defined(cls)) return { from: c.name, cls };
+  }
+  return null;
+}
+
 export function fieldUi(components = [], systemCss = '') {
   const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
   const keep = (attrs) => (/\bclass\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1] ?? '').split(/\s+/).filter((c) => c && defined(c));

@@ -327,11 +327,71 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { OUT_DIR } = await import('./names.mjs');
       const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8'));
       const by = new Map((d.groups ?? []).map((g) => [g.component, g.items ?? []]));
-      for (const c of view.components) { const list = by.get(c.name); if (list?.length) c.differences = list.map((x) => ({ check: x.check, what: x.what, new: !!x.new })); }
+      const { plainDifference, plainAction } = await import('./run-diff.mjs');
+      // Each difference said in plain English, with who acts (Figma or the code) and exactly what to do.
+      for (const c of view.components) { const list = by.get(c.name); if (list?.length) c.differences = list.map((x) => ({ check: x.check, what: x.what, plain: plainDifference(x.what), ...plainAction(x.what, c.name), new: !!x.new })); }
       view.differences = { total: d.total ?? 0, at: d.at ?? null, file: `${OUT_DIR}/differences.md` };
     } catch { /* no full audit yet: nothing to list */ }
-    const { segmentedUi, fieldUi } = await import('./styleguide-data.mjs');
-    view.ui = { segmented: segmentedUi(view.components), field: fieldUi(view.components, themeFiles.map(readText).join('\n')) };
+    // When each component last changed: the latest commit on its own CSS rules and its contract and config entries (git
+    // blame on their lines), and the day Figma was last read for it (the props snapshot). A line not committed yet says so.
+    try {
+      const { codeReason } = await import('./change-reason.mjs');
+      const { ruleLines, entryLines } = await import('./styleguide-data.mjs');
+      const sheets = [...new Set([...themeFiles, ...(ctx?.componentSheets ?? [])])].map((f) => [f, readText(f)]).filter(([, t]) => t);
+      // its entries in the contract and config files (structure-contract.mjs, contract.authored.json, ds-config.json)
+      const entries = ['structure-contract.mjs', 'contract.authored.json', 'ds-config.json'].map((f) => [f, readText(f)]).filter(([, t]) => t);
+      const figmaRead = String(ctx?.propsSnap?._updated ?? '').slice(0, 10) || null;
+      for (const c of view.components) {
+        let latest = null, uncommitted = false;
+        const at = [...sheets.flatMap(([f, t]) => ruleLines(t, c.cls).map((l) => `${f}:${l}`)), ...entries.flatMap(([f, t]) => entryLines(t, c.name).map((l) => `${f}:${l}`))];
+        for (const a of at) {
+          const r = codeReason(ROOT, a);
+          if (r?.uncommitted) uncommitted = true;
+          else if (r?.time && (!latest || r.time > latest.time)) latest = r;
+        }
+        if (latest || uncommitted || figmaRead) c.updated = { ...(latest ? { code: latest } : {}), ...(uncommitted ? { uncommitted: true } : {}), ...(figmaRead ? { figmaRead } : {}) };
+      }
+    } catch { /* outside git: no dates */ }
+    const { segmentedUi, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
+    const systemCss = themeFiles.map(readText).join('\n');
+    // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
+    // every mode), the semantic roles, then each component's own.
+    // What belongs to one component is shown in that component, not in the foundations: a colour group or a size
+    // named after it (badge/…, button/… for every button) goes to the component's own view. Icon strokes go to the
+    // icons, the text sizes stay with the text styles, and the rest of the sizes join the spacing.
+    if (view.tokens) {
+      const owners = (prefix) => view.components.filter((c) => { const a = c.name.toLowerCase(), b = String(prefix).toLowerCase(); return a === b || a.startsWith(b); });
+      const keepColours = [];
+      for (const g of view.tokens.colors ?? []) {
+        const own = /^(primitives|semantic|color)$/i.test(g.group) ? [] : owners(g.group);
+        if (!own.length) { keepColours.push(g); continue; }
+        for (const c of own) (c.ownTokens ??= { colors: [], sizes: [] }).colors.push(...g.items);
+      }
+      view.tokens.colors = keepColours;
+      const iconStrokes = [], general = [];
+      for (const t of view.tokens.sizing ?? []) {
+        const prefix = t.figma.split('/')[0];
+        if (/^typography$/i.test(prefix)) continue;
+        if (/^icons?$/i.test(prefix)) { iconStrokes.push(t); continue; }
+        const own = owners(prefix);
+        if (own.length) { for (const c of own) (c.ownTokens ??= { colors: [], sizes: [] }).sizes.push(t); continue; }
+        general.push(t);
+      }
+      view.tokens.spacing = [...(view.tokens.spacing ?? []), ...general];
+      view.tokens.iconStrokes = iconStrokes;
+      view.tokens.sizing = [];
+    }
+    if (view.tokens?.colors) {
+      const prim = primitiveColours(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, systemCss, cfg);
+      const rest = view.tokens.colors.filter((g) => g.group !== 'primitives');
+      view.tokens.colors = [...(prim ? [prim] : []), ...rest.filter((g) => /^semantic/i.test(g.group)), ...rest.filter((g) => !/^semantic/i.test(g.group))];
+    }
+    // How each component moves (an entry, an exit, an overlay it opens in), so its preview can play it.
+    const allCss = [systemCss, ...(ctx?.componentSheets ?? []).map(readText)].join('\n');
+    for (const c of view.components) { const m = motionUi(c.cls, allCss); if (m) c.motion = m; }
+    // The sizes the system's components draw icons at (each svg's width in their markup), for the icon size switch.
+    view.iconSizes = [...new Set(view.components.flatMap((c) => [c.markup, ...(c.markups ?? [])]).flatMap((mk) => [...String(mk ?? '').matchAll(/<svg\b[^>]*?(?<![\w-])width\s*=\s*["']?(\d+(?:\.\d+)?)/gi)].map((m) => Number(m[1]))))].sort((a, b) => a - b);
+    view.ui = { segmented: segmentedUi(view.components), field: fieldUi(view.components, systemCss), button: buttonUi(view.components, systemCss, sh.ui?.button ?? null), card: cardUi(view.components, systemCss), iconButton: iconButtonUi(view.components, systemCss), overlay: view.components.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
     lastView = view;
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
