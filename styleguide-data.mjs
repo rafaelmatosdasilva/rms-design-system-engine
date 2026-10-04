@@ -473,13 +473,28 @@ export function agreedTokens(check = {}, figmaVars = {}) {
     if (!scales.has(scale)) scales.set(scale, { scale });
     scales.get(scale)[prop] = { var: p.cssVar, value: p.value };
   }
+  // Each value by the name of the Figma variable its text style binds (typography/m/font-size, font-family), and the
+  // styles in Figma's own order.
+  const FIG_PROP = { size: 'font-size', lh: 'line-height', weight: 'font-weight', ls: 'letter-spacing' };
+  const sized = new Set(Object.keys(figmaVars.sizing ?? {}));
+  for (const t of scales.values()) {
+    for (const [prop, v] of Object.entries(t)) {
+      if (prop === 'scale' || !v) continue;
+      const name = `typography/${t.scale}/${FIG_PROP[prop] ?? prop}`;
+      if (sized.has(name)) v.figma = name;
+    }
+    const fam = Object.keys(figmaVars.strings ?? {}).find((k) => /(^|\/)font-?family$/i.test(k));
+    if (fam && !t.family) t.family = { figma: fam, value: figmaVars.strings[fam] };
+  }
+  const typeOrder = Object.keys(figmaVars.typography ?? {});
+  const typeAt = (t) => { const i = typeOrder.indexOf(t.scale); return i < 0 ? typeOrder.length : i; };
   const differences = (check.fail ?? []).length + (check.aliasFail ?? []).length;
   return {
     colors: [...groups].map(([group, items]) => ({ group, items })),
     spacing: sizes.filter((t) => isSpace(t) && !isRadius(t)),
     radii: sizes.filter(isRadius),
     sizing: sizes.filter((t) => !isSpace(t) && !isRadius(t)),
-    typography: [...scales.values()],
+    typography: [...scales.values()].sort((a, b) => typeAt(a) - typeAt(b)),
     differences,
   };
 }
