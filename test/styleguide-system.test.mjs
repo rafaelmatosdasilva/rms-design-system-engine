@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { modeAxes, realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } from '../styleguide-data.mjs';
 import { checkStyleguidePage, failures, missingRoles, controlClasses } from '../styleguide-check.mjs';
-import { differences, differencesMarkdown, plainDifference } from '../run-diff.mjs';
+import { differences, differencesMarkdown, plainDifference, plainAction } from '../run-diff.mjs';
 import { appDir } from '../code-roots.mjs';
 
 const defs = {
@@ -205,9 +205,17 @@ test('each difference in plain English for the style guide: a contract field, a 
   assert.equal(plainDifference('modal.fontSizeVar: contract=null  Figma="l"'), "In Figma the text size is the l text style; the code's contract (its written spec) says no text size is set.");
   assert.equal(plainDifference('modal.children.header.gapVar: contract="(uncontracted - add a children entry)"  Figma="gap/s"'), "In Figma the space between the items in its header part is gap/s; the code's contract (its written spec) does not describe that part yet.");
   assert.equal(plainDifference('input.fillStructure: contract="before"  Figma="none"'), "In Figma it has no fill; the code's contract (its written spec) says it has a fill on a layer behind its content.");
-  assert.equal(plainDifference('chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.chip--l · src/theme.css:60)  → set 32px'), 'When Size is L and Icon is True, the height is 32px in Figma and 36px in the code. To fix it, set 32px. (src/theme.css:60)');
+  assert.equal(plainDifference('chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.chip--l · src/theme.css:60)  → set 32px'), 'When Size is L and Icon is True, the height is 32px in Figma and 36px in the code. (src/theme.css:60)');
   assert.equal(plainDifference('node background: Figma paints a background, rendered no background  (.node · theme.css:443)  [Figma moved, code is behind]'), 'Figma has a background; the code draws none. Figma changed last, so the code should follow it. (theme.css:443)');
   assert.match(plainDifference('list [State=Hover · light]: 1.23:1 (needs 4.5:1)  #e8e8e8 (--label) on #ffffff (--bg)  (theme.css:1)'), /^Hover, in light mode, its text \(--label\) on its background \(--bg\) has a contrast of 1.23 to 1; it needs 4.5 to 1/);
   assert.match(plainDifference('· overlay/color'), /overlay\/color holds a raw colour/);
   assert.equal(plainDifference('Something the engine has no rule for'), 'Something the engine has no rule for', 'kept as it is');
+});
+
+test('what to do about each difference, and who does it', () => {
+  assert.deepEqual(plainAction('chip height (Size=L): Figma 32, rendered 36px  (.chip · theme.css:60)  → set 32px'), { who: 'code', todo: 'In the code, set the chip height to 32px. Tell me to do it.' });
+  assert.deepEqual(plainAction('node font size: Figma m (11px), rendered 13px via --l-size  (.x · a.html:75)  → in Figma, set it to the token behind --l-size  [code moved, Figma is behind]'), { who: 'figma', todo: 'In Figma, set the node font size to the token behind --l-size.' });
+  assert.equal(plainAction('modal.fontSizeVar: contract=null  Figma="l"').who, 'code');
+  assert.equal(plainAction('· overlay/color').who, 'figma');
+  assert.equal(plainAction('x [default · light]: 3.1:1 (needs 4.5:1)  #000 (--a) on #111 (--b)').who, 'both');
 });

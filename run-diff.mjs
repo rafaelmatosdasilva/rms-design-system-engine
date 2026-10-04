@@ -218,8 +218,8 @@ export function plainDifference(what = '') {
     }
     const file = WHERE(where);
     const leadSay = lead ? /code moved/.test(lead) ? ' The code changed last, so Figma should follow it.' : /Figma moved/.test(lead) ? ' Figma changed last, so the code should follow it.' : '' : '';
-    const fixSay = fix ? ` To fix it, ${fix.replace(/^set /, 'set ').replace(/^in Figma, /, 'in Figma ')}.` : '';
-    return `${say}${leadSay}${fixSay}`.replace(/\.\.(\s|$)/g, '.$1') + (file ? ` (${file})` : '');
+    // The fix itself is said once, as the action (plainAction), not here again.
+    return `${say}${leadSay}`.replace(/\.\.(\s|$)/g, '.$1') + (file ? ` (${file})` : '');
   }
   // Something the products lay over the component: "node: .a, .b laid over it (file). The component may be missing …"
   if ((m = /^(?:[\w-]+|(a [\w\s]+? \([^)]+\))): (.+?) laid over it \((.+?)\)\. (.+)$/.exec(s))) return `In a product, ${m[2]} ${/,/.test(m[2]) ? 'are' : 'is'} placed on top of ${m[1] ?? 'it'} (${m[3]}). ${m[4]}`;
@@ -233,4 +233,36 @@ export function plainDifference(what = '') {
   // Token layering: "· overlay/color"
   if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return `In Figma, ${m[1].trim()} holds a raw colour instead of pointing at another token, as most of the system's tokens do.`;
   return s;
+}
+
+// ── What to do about a difference, and who does it ────────────────────────────────────────────────────────────────
+// → { who: 'figma' | 'code' | 'both', todo }. Figma leads unless the engine measured that the code changed last; a
+// fix the audit names is said as it is, else the one way to make the two sides agree.
+export function plainAction(what = '', component = '') {
+  const s = String(what).trim();
+  const name = component || (s.match(/^([\w-]+)/) ?? [])[1] || 'the component';
+  let m;
+  if ((m = /^([\w-]+)\.(.+?):\s*contract=(.+?)\s{1,}Figma=(.+)$/.exec(s))) {
+    const f = unq(m[4]);
+    if (/no longer bound/.test(f)) return { who: 'both', todo: `Decide which side is right: bind a token there again in Figma, or tell me to take it out of the code's contract (structure-contract.mjs).` };
+    return { who: 'code', todo: `Update the code's contract (structure-contract.mjs) for ${name} to say what Figma says. Tell me to do it.` };
+  }
+  // A measured value: the property it names ("actionBar min height"), the fix said for that property.
+  const measured = /^([\w-]+) (.+?)(?: \([^)]*=[^)]*\))?: Figma .+?, rendered /.exec(s);
+  const what2 = measured ? `the ${measured[1]} ${measured[2].replace(/\(left\/right\)/, 'on the left and right').replace(/\(top\/bottom\)/, 'on the top and bottom')}` : name;
+  const fixFor = (fix) => (/^(in Figma, )?set (it to )?/.test(fix) ? `set ${what2} to ${fix.replace(/^(in Figma, )?set (it to )?/, '')}` : fix);
+  if ((m = /\[(code moved, Figma is behind|Figma moved, code is behind)\]/.exec(s))) {
+    const fix = (/→\s+(.+?)\s+\[/.exec(s) ?? [])[1];
+    if (/code moved/.test(m[1])) return { who: 'figma', todo: fix ? `In Figma, ${fixFor(fix)}.` : `In Figma, change ${what2} to match the code.` };
+    return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. Tell me to do it.` : `Make ${what2} in the code match Figma. Tell me to do it.` };
+  }
+  if (measured) {
+    const fix = (/→\s+(.+?)(?:\s+\[|$)/.exec(s) ?? [])[1];
+    return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. Tell me to do it.` : `Make ${what2} in the code match Figma. Tell me to do it.` };
+  }
+  if (/ has `[^`]+` - Figma has no stroke/.test(s)) return { who: 'both', todo: `Decide: tell me to remove the border from the code, or add it to ${name} in Figma.` };
+  if (/: [\d.]+:1 \(needs [\d.]+:1\)/.test(s)) return { who: 'both', todo: `Pick colours with more contrast for ${name}: change them in Figma, then tell me to update the code.` };
+  if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return { who: 'figma', todo: `In Figma, point ${m[1].trim()} at another token instead of a raw colour.` };
+  if (/ laid over it /.test(s)) return { who: 'both', todo: `Decide: add a slot or prop for this action to ${name} in Figma (then tell me to build it), or tell me to leave it as the product's own.` };
+  return { who: 'both', todo: 'Look at it in the differences file and tell me which side is right.' };
 }

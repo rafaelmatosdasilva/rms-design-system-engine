@@ -31,7 +31,7 @@ test('a prop both sides agree on is a control with Figma\'s label and the code\'
   assert.deepEqual(button.controls, [{ label: 'Disabled', prop: 'disabled', type: 'BOOLEAN', default: false, on: { add: [], attrs: { disabled: '' } } }]);   // Tone differs: not shown
   assert.equal(v.components.some((c) => c.name === 'field'), false, 'a component not built yet is not shown');
   assert.equal(v.notAgreed.differences, 2);   // the chip prop only the code has, the button's other default
-  assert.equal(v.notAgreed.line, 'Not shown until agreed, 2 differences between Figma and the code and 1 component not built yet (field). Run the audit to see them and decide each one.');
+  assert.equal(v.notAgreed.line, 'Left off this page until Figma and the code agree: 2 values where Figma and the code differ and 1 component the code does not have yet (field). Each one is in the To do list, with who does it and what to do.');
 });
 
 test('a recorded value that moved on one side is not agreed; nothing left says so', () => {
@@ -39,7 +39,7 @@ test('a recorded value that moved on one side is not agreed; nothing left says s
   const moved = agreedView({ propsSnap: { button: propsSnap.button }, rows, agreedRecord: { facts: { 'button/height': { figma: '32px', code: '36px' } } } });
   assert.equal(moved.notAgreed.differences, 1);
   const clean = agreedView({ propsSnap: { button: { properties: { Disabled: propsSnap.button.properties.Disabled } } }, rows, agreedRecord: { facts: { 'button/height': { figma: '32px', code: '32px' } } } });
-  assert.equal(clean.notAgreed.line, 'Everything Figma and the code have is agreed.');
+  assert.equal(clean.notAgreed.line, 'Figma and the code agree on everything this page shows.');
 });
 
 test('--styleguide with no template of the project\'s own builds the engine\'s, from the components that are built', { timeout: 300000 }, () => {
@@ -49,7 +49,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Style guide → \.design-system-engine-out\/styleguide\/index\.html {2}\(2 components agreed · the engine's template\)/);
-  assert.match(r.stdout, /not built yet \(button, field, disclosure, stepper\)/);
+  assert.match(r.stdout, /components the code does not have yet \(button, field, disclosure and stepper\)/);
   assert.equal(existsSync(join(dir, 'component-prop-result.json')), false, 'the project is left as it was');
   const html = readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8');
   assert.doesNotMatch(html, /\{\{[A-Z_]+\}\}/, 'every marker filled');
@@ -127,7 +127,7 @@ test('the demo design system: its real markup from its page, and props named dif
   assert.equal(button.markupFrom, 'page');
   assert.equal(button.markup, '<button class="tp-button" type="button">Save</button>');
   assert.deepEqual(button.controls, [], 'Disabled is "disabled" in the code: a difference to decide, not a control');
-  assert.match(data.notAgreed.line, /differences between Figma and the code/);
+  assert.match(data.notAgreed.line, /where Figma and the code differ/);
 });
 
 test('in the browser: no script error, a control changes the real component, the tokens behind it are named', { timeout: 300000 }, async (t) => {

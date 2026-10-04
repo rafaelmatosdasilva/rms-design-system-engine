@@ -327,8 +327,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { OUT_DIR } = await import('./names.mjs');
       const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8'));
       const by = new Map((d.groups ?? []).map((g) => [g.component, g.items ?? []]));
-      const { plainDifference } = await import('./run-diff.mjs');
-      for (const c of view.components) { const list = by.get(c.name); if (list?.length) c.differences = list.map((x) => ({ check: x.check, what: x.what, plain: plainDifference(x.what), new: !!x.new })); }
+      const { plainDifference, plainAction } = await import('./run-diff.mjs');
+      // Each difference said in plain English, with who acts (Figma or the code) and exactly what to do.
+      for (const c of view.components) { const list = by.get(c.name); if (list?.length) c.differences = list.map((x) => ({ check: x.check, what: x.what, plain: plainDifference(x.what), ...plainAction(x.what, c.name), new: !!x.new })); }
       view.differences = { total: d.total ?? 0, at: d.at ?? null, file: `${OUT_DIR}/differences.md` };
     } catch { /* no full audit yet: nothing to list */ }
     // When each component last changed: the latest commit on its own CSS rules and its contract and config entries (git
