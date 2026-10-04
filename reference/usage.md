@@ -544,6 +544,20 @@ The rules are `--check-ui`'s, plus:
   is saved beside it (`<name>.png`), and Claude looks at it before answering. With a Figma image of the screen
   (`.design-system-engine-refs/screens/<screen>.png`, at any scale, or FIGMA_TOKEN), the share of pixels that differ is
   printed, with a diff image. `--no-browser` draws without measuring.
+- **Drawn as the designed screen shows.** A screen read from Figma (`--from-screens`, the screen capture records each
+  layer's place, the screen's modes, what clips and what fills its parent, and the words each small instance shows) is
+  drawn in its own modes (`Page.mode`), at its fixed size with what overflows cut (`Page.height`, `clip`), with each
+  side's padding (`paddingTop` … `paddingLeft`), filling its parent as in Figma (`grow` along, `stretch` across). A
+  layer placed over the layout (connector lines, a background) is left out and listed. A component Figma has and the
+  code lacks keeps what the screen put inside it and its size. A frame bound to one of the system's colour tokens is
+  drawn with the code's variable for it (`surface`; a text's `color`), and is still listed as a container the system
+  could own. An option value turns on the class the system's CSS adds for it (Selected=True the class that says
+  selected); one the CSS has no class for is drawn without it, with a warning. Each instance's own words are written
+  into its text parts, and an instance that shows no words (an icon-only button) shows none.
+- **Accessibility of the drawn page.** With Chrome, the page also goes through the accessibility check (contrast in
+  every mode, names, one main heading, the keyboard; the engine's bar left out). What the composition itself causes (no
+  main heading, a text colour that does not read on its surface) is a ⚠️ line the reply owes; what a system component
+  does is a • line for the audit.
 - A composition with an error is not drawn (exit 1). A file `{ "prototype": …, "gaps": [...] }` adds the gaps written
   beside it.
 
@@ -679,7 +693,14 @@ there, never a failure.
   exception is the person's: `contract.authored.json → components[name].behaviourExceptions` `{ "<behaviour id>":
   "<why, with a link to the ADR or pull request>" }` (ids: `keys-toggle`, `click-toggle`, `click-expand`,
   `click-select`, `types`, `escape-closes`, `arrows-move`, `keys-activate`). Without a link it is still checked, and
-  that is reported. The build sheet lists each role's behaviours.
+  that is reported. The build sheet lists each role's behaviours. On the style guide they run when the project lists
+  its scripts in `systemScripts`.
+- **States follow their props** — on the style guide, an option that shows a state (Selected, Pressed, Checked,
+  Expanded, Error, Disabled) and changes only a class is reported: a screen reader still hears the component as it
+  was. The attribute its role names goes with it (`aria-pressed` for a toggle button, `aria-selected` for a tab,
+  `aria-checked` for a switch or checkbox, `aria-expanded`, `aria-invalid`, `disabled`). A computed ARIA attribute in
+  JSX (`aria-pressed={pressed ? 'true' : 'false'}`) is drawn with the props' defaults, so the drawn component says what
+  the real one does.
 
 **Writing accessibility notes in Figma.** Use Figma's annotation tool on the component (the component set or
 a standalone component). A category such as "Accessibility" helps people find them; the skill reads the text.
