@@ -344,7 +344,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const probeList = [...new Set([...probeBySelector.values()])];
     const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, probeList, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
       check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: opts.names ?? [], themeCss: themeFiles.map(readText).join('\n'),
-      propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).map(([n, c]) => [n, c.propertyMap])),
+      // A contract entry named apart from its Figma component (figmaName) maps that component's props too.
+      propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).flatMap(([n, c]) => [[n, c.propertyMap], ...(c.figmaName && c.figmaName !== n && !contract.CONTRACT[c.figmaName]?.propertyMap ? [[c.figmaName, c.propertyMap]] : [])])),
       parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
     // "In use": the approved pictures of the system's own frames (Gate [2]'s references), embedded, six at most.
     const refsDir = resolve(ROOT, cfg.visualRefs ?? '.design-system-engine-refs');
