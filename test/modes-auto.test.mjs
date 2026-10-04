@@ -43,3 +43,10 @@ test('a component\'s height is read from the base values, not from a breakpoint\
   assert.match(r.stdout, /PASS {2}1\/1 CSS height rules/, r.stdout);
   assert.doesNotMatch(r.stdout, /CSS height is 32px/);
 });
+
+test('a font recorded as a bound typography variable reads as its text scale, like one recorded from a text style', async () => {
+  const { textScaleKey, withTextScaleKeys } = await import('../naming-convention.mjs');
+  assert.deepEqual(['typography/m/font-size', 'font-size/l', 'type/body/weight', 'm', null].map(textScaleKey), ['m', 'l', 'body', 'm', null]);
+  assert.equal(textScaleKey('radii/card'), 'radii/card', 'a name that is not a text property is left as it is');
+  assert.deepEqual(withTextScaleKeys({ chip: { h: 24, fontSizeVar: 'typography/s/font-size', fontWeightVar: 's' } }).chip, { h: 24, fontSizeVar: 's', fontWeightVar: 's' });
+});

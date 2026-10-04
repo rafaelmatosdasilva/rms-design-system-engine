@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: a stroked icon is not a border, a bound typography variable reads as its scale, the evaluation recorded in one command (continuous evaluation)
+
+What changed since the entry below (engine 681ecf6): Evaluation 70/70 on Haiku; the differences list leaves out token contrast; Gate 5 reads the map's sizing names and skips; The differences list holds differences only, not the lines that point at them; The style guide finds a component's controls under the contract name it is mapped by; The style guide's own heading rules no longer reach the components it previews; A breakpoint mode in the CSS is read as a mode, not as a value or as the base; The style guide switches a breakpoint mode with the code's own values and says what it changes; A stroked icon is not a border, and a bound typography variable reads as its text scale; The differences list names the checks that did not run; a measured height is never patched; The evaluation a guide change needs is one command, recorded automatically. The guide changed in `cookbook/refresh-figma.md`, `reference/maintainers.md`.
+
+Guide set measured: `f0da7d60203a` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8082467 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.057 |
+| Input a run | 115k | 113k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 113k a run against 115k. Records: `records/2026-10-04-the-evaluation-a-guide-change`.
+
 ## 2026-10: the style guide is the system's own and is checked against it; every mode checked; one list of differences (continuous evaluation)
 
 What changed since the entry below (engine 681ecf6): the style guide's template is the layout only, and its colours,

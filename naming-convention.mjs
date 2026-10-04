@@ -80,3 +80,20 @@ export function varToToken(cssVar, spec = DEFAULT_NAMING) {
   const body = cssVar.startsWith(spec.prefix) ? cssVar.slice(spec.prefix.length) : cssVar.replace(/^--/, '');
   return body.split(spec.separator).join('/');
 }
+
+// A text scale key from what a structure snapshot records for a component's font: the key itself ('m'), or a bound
+// typography variable's name, whose scale is the segment beside the property (typography/m/font-size → 'm',
+// font-size/m → 'm'). A capture that kept the variable's full name reads the same as one that kept the key.
+const TEXT_PROP = /^(font-?size|size|font-?weight|weight|line-?height)$/i;
+export function textScaleKey(v) {
+  if (v == null || !String(v).includes('/')) return v;
+  const parts = String(v).split('/');
+  const i = parts.findIndex((p) => TEXT_PROP.test(p));
+  return i > 0 ? parts[i - 1] : i === 0 && parts.length > 1 ? parts[1] : v;
+}
+// A structure snapshot's components with their font fields read as text scale keys.
+export function withTextScaleKeys(components = {}) {
+  const out = {};
+  for (const [name, c] of Object.entries(components ?? {})) out[name] = c && typeof c === 'object' ? { ...c, fontSizeVar: textScaleKey(c.fontSizeVar), fontWeightVar: textScaleKey(c.fontWeightVar) } : c;
+  return out;
+}

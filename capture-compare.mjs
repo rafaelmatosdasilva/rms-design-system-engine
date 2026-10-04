@@ -16,7 +16,7 @@ import { pathHash } from './icon-source.mjs';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
+import { resolveNamingSpec, tokenToVar, withTextScaleKeys } from './naming-convention.mjs';
 import { sameValue } from './component-capture.mjs';
 import { parseColor, colorHex } from './css-values.mjs';
 import { projectPath } from './names.mjs';
@@ -505,7 +505,7 @@ export function compareNesting(code, composition) {
 
 export async function compareCapture(ROOT, cfg, code, { readJSON }) {
   const vars = readJSON(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')) ?? {};
-  const structure = readJSON(resolve(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'))?.components ?? {};
+  const structure = withTextScaleKeys(readJSON(resolve(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'))?.components ?? {});
   const figmaIcons = cfg.paths?.snapshotIcons ? readJSON(resolve(ROOT, cfg.paths.snapshotIcons)) : null;
   const composition = readJSON(resolve(ROOT, 'component-composition.snapshot.json'));
   const maps = await loadParityMaps(ROOT, cfg);

@@ -195,7 +195,7 @@ test('RESULTS.md records the guide set that is in the repository', async () => {
   const results = readFileSync(join(root, 'test', 'skill-evals', 'RESULTS.md'), 'utf8');
   const measured = [...results.matchAll(/Guide set measured: `([0-9a-f]{12})`/g)].map((m) => m[1]);
   const now = guideSetHash(root);
-  assert.ok(measured.includes(now), `the guide, a recipe or a reference file changed since the last evaluation (RESULTS.md has ${measured.join(', ') || 'none'}, the repository has ${now}): run the skill evaluation and record the results with "Guide set measured: \`${now}\`"`);
+  assert.ok(measured.includes(now), `the guide, a recipe or a reference file changed since the last evaluation (RESULTS.md has ${measured.join(', ') || 'none'}, the repository has ${now}): run \`node test/skill-evals/continuous.mjs\`, which measures the committed guide and writes the entry with "Guide set measured: \`${now}\`"`);
 });
 
 // The project every run works on is part of the measurement: a change to the demo design system changes every
