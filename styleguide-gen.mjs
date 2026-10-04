@@ -361,13 +361,20 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const intent = designIntent();
   const { docs, code } = docsMaps(intent);
   let agreedSummary = null;
+  // The system's own scripts (ds-config.json → systemScripts): what builds or wires its components at run time (a
+  // segmented control made by script, a toggle's click). Inlined after the page's own drawing, each in its own
+  // <script>, so the page behaves as the product does and the accessibility check can try its behaviours.
+  const systemScripts = () => (Array.isArray(cfg.systemScripts) ? cfg.systemScripts : []).map((p) => {
+    try { return `<script data-system-script="${String(p).replace(/"/g, '')}">\n${readFileSync(resolve(ROOT, p), 'utf8').replace(/<\/script/gi, '<\\/script')}\n</script>`; } catch { return `<!-- systemScripts: ${String(p).replace(/--/g, '')} not found -->`; }
+  }).join('\n');
   // opts.partsOnly: what the page is made of, without writing it (a prototype draws with the same parts).
-  if (opts.partsOnly) return { themeCSS: themeCSS(), componentCSS: await componentCSS(), view: JSON.parse(await agreed()), iconSheet: iconSheet() };
+  if (opts.partsOnly) return { themeCSS: themeCSS(), componentCSS: await componentCSS(), view: JSON.parse(await agreed()), iconSheet: iconSheet(), scripts: systemScripts() };
   const fills = {
     THEME_CSS: () => themeCSS(),
     COMPONENT_CSS: () => componentCSS(),
     AGREED: () => agreed(),
     ICON_SHEET: () => iconSheet(),
+    SYSTEM_SCRIPTS: () => systemScripts(),
     USAGE: () => JSON.stringify(usageMap(intent)),
     DOCS_CODE: () => JSON.stringify(code),
     DOCS: () => JSON.stringify(docs),

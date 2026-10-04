@@ -155,6 +155,34 @@
         }
       },
       "nodeId": "3:26"
+    },
+    "disclosure": {
+      "h": 38,
+      "gapVar": "gap/s",
+      "fontSizeVar": "m",
+      "strokeOnDefault": false,
+      "colors": {
+        "text": {
+          "token": "text/primary/color"
+        }
+      },
+      "defaultVariant": "Expanded=False",
+      "variants": {
+        "Expanded=False": {
+          "h": 38,
+          "layers": [
+            "Trigger"
+          ]
+        },
+        "Expanded=True": {
+          "h": 74,
+          "layers": [
+            "Trigger",
+            "Panel"
+          ]
+        }
+      },
+      "nodeId": "15:14"
     }
   }
 }
