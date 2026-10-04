@@ -623,12 +623,20 @@ whatever surface the project serves, in this order:
 1. **Configured / built** — `--url <route>` (repeatable/comma; runs with **no `ds-config.json`** at all),
    or `ds-config.json → a11y.urls`.
 2. **The generated styleguide** (the preferred default when it exists) — `ds-config.json → styleguide.out`
-   (default `apps/styleguide/index.html`), opened via `file://`. It renders **every component × every
+   (else `apps/styleguide/index.html`, else the engine template's `.design-system-engine-out/styleguide/index.html`),
+   opened via `file://`. It renders **every component × every
    state on one static page**, so the sweep is deterministic, complete and needs **no dev server**, and —
    because each state is its own instance in the resting DOM — the existing checks get **per-state coverage
    for free** (a disabled/checked/error instance is measured directly). `a11y.styleguide:false` opts out;
    `a11y.regenerateStyleguide:true` rebuilds it first (via `styleguide-gen.mjs`) so a11y never audits a
    stale one. Falls through to the built plugin UIs (`apps/*/ui.html`) when there is no styleguide.
+   **The components rendered from their own code** (`component-harness.mjs`) — in build mode, or when there is no
+   page to open: each React component (`.jsx`/`.tsx`) in each of its Figma variants on one served page, its CSS
+   linked and its JSX turned into calls to a small stand-in for React that keeps each component's state and updates
+   the page in place (TypeScript from the project, else the global npm folder). The page acts as an app does: it
+   gives a field or a spinbutton a name, and tells a controlled toggle its new state when it reports a click. So
+   names, roles, parts and behaviours are tried on what ships, with no dev server. One it cannot load is listed as
+   not rendered, never clean. `a11y.harness: false` turns it off.
 3. **Auto-discovery (the default when nothing is configured)** — it reads `package.json`, **starts the
    project's dev server** (`storybook` / `dev` / `serve` / `start` / `preview`, or `a11y.serve`), reads the
    URL it prints, and **enumerates the pages itself**: Storybook stories → else static router routes → else
