@@ -7,6 +7,7 @@
 // not a design-system value at all. Only a project that uses Tailwind is read (an @theme block or a
 // tailwindcss import in the theme CSS, or a tailwind.config file). Advisory. "tailwind": false turns it off.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { codeRoots } from './code-roots.mjs';
 import { join, relative, extname } from 'node:path';
 import { ENGINE_DIRS } from './names.mjs';
 
@@ -103,7 +104,7 @@ function walk(ROOT, limit = 4000) {
       else if (MARKUP.has(extname(n).toLowerCase()) && st.size < 1024 * 1024) files.push(abs);
     }
   };
-  go(ROOT, 0);
+  for (const root of codeRoots(ROOT)) go(root, 0);
   return files;
 }
 

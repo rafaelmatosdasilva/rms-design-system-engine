@@ -8,6 +8,7 @@
 // recipe, a pasted step list followed or asked about). Here it is a fixed table, tested, the same on any
 // model, in English and Portuguese. route() is pure: projectState() reads the project for it.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { codeRoots } from './code-roots.mjs';
 import { join, relative } from 'node:path';
 
 // What the router needs from the project: is there a config, which components, when the snapshots were
@@ -62,7 +63,7 @@ export function uiFiles(ROOT, limit = 400) {
       else if (UI_FILE.test(e.name) && !/\.(test|spec|stories)\./.test(e.name)) out.push(relative(ROOT, join(dir, e.name)).split('\\').join('/'));
     }
   };
-  walk(ROOT);
+  for (const root of codeRoots(ROOT)) walk(root);
   return out.sort();
 }
 
