@@ -71,7 +71,7 @@ import { loadModes } from './mode-resolver.mjs';
 import { modeSwitch } from './code-capture.mjs';
 import { codeSnapshotPath } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
-import { partRoleOf, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression } from './behaviour-contract.mjs';
+import { partRoleOf, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
 
 // ── Pure, unit-testable core (exported; importing this module runs NOTHING) ─────
 // Parse a computed-style color. Returns {r,g,b,a} or null when it is not an rgb()/rgba()
@@ -281,6 +281,11 @@ export const A11Y_GUIDE = {
     title: (n) => `${plural(n, 'component does', 'components do')} not behave as its role or its Figma note says`,
     why: 'What a person can do with a component comes with its role: Space flips a toggle, a click opens a disclosure, a tab takes the selection, a text box takes typing. Figma notes can add more (Escape closes, the arrow keys move).',
     fix: 'Make the component do it (the finding says what was tried and what happened), or record the person\'s exception with a link to its decision in contract.authored.json → behaviourExceptions.',
+  },
+  statefollows: {
+    title: (n) => `${plural(n, 'state changes', 'states change')} the look but not what a screen reader hears`,
+    why: 'An option that shows a state (selected, checked, expanded, in error) changes only a class here, so a screen reader still announces the component as it was.',
+    fix: 'Set the attribute the finding names together with the class (aria-pressed, aria-checked, aria-expanded, aria-invalid), from the same prop.',
   },
   semantics: {
     title: (n) => `${plural(n, 'component is', 'components are')} announced as something else than the design system says`,
@@ -1279,8 +1284,15 @@ async function main() {
       try { contract = (await import(pathToFileURL(resolve(ROOT, cfg.paths?.structureContract ?? 'structure-contract.mjs')).href)).CONTRACT ?? {}; } catch { /* parts are optional */ }
       const roles = Object.fromEntries(Object.entries(contractSemantics(ROOT, cfg)).map(([c, r]) => [c, r]));
       for (const [c, v] of Object.entries(snap)) { const w = !c.startsWith('_') && roleWordOf(v?.annotations ?? []); if (w) roles[c] = w; }   // the role as Figma writes it (togglebutton, disclosure)
+      // States follow their props: on the style guide, each option's effect is in its data (the code's selector for it).
+      if (target.styleguide) {
+        const sg = await evalv(`(() => { try { return JSON.parse(document.getElementById('sg-data').textContent).components || []; } catch (e) { return []; } })()`);
+        for (const f of stateFindings((sg ?? []).map((c) => ({ ...c, role: roles[c.name] ?? c.role })))) if (!components.length || components.includes(f.component)) findings.push({ kind: 'statefollows', plugin: label, desc: f.message });
+      }
       const names = [...new Set([...Object.keys(roles), ...Object.keys(snap).filter((k) => !k.startsWith('_'))])];
       const KEY = { ' ': [' ', 'Space', 32, ' '], Enter: ['Enter', 'Enter', 13, '\r'], Escape: ['Escape', 'Escape', 27], ArrowRight: ['ArrowRight', 'ArrowRight', 39], ArrowDown: ['ArrowDown', 'ArrowDown', 40] };
+      // A style guide that inlines the system's own scripts (systemScripts) runs its components as the product does.
+      const scripted = target.styleguide ? !!(await evalv(`!!document.querySelector('script[data-system-script]')`)) : true;
       let n = 0;
       for (const comp of names) {
         if (components.length && !components.includes(comp)) continue;
@@ -1294,7 +1306,7 @@ async function main() {
         const plan = behavioursFor(roles[comp] ?? '', entry.annotations ?? [], authored[comp]?.behaviourExceptions ?? {});
         for (const w of plan.weak) findings.push({ kind: 'behaviour', plugin: label, desc: `${comp}: the exception for "${w.id}" gives no link to the decision (an ADR or a pull request), so it is still checked` });
         if (!plan.rows.length) continue;
-        if (target.styleguide) { behavioursNotChecked.add(comp); continue; }
+        if (target.styleguide && !scripted) { behavioursNotChecked.add(comp); continue; }
         const mark = `b${n++}`;
         if (!(await evalv(markInstanceExpression(sel, mark)))) continue;
         for (const row of plan.rows) {
@@ -1383,7 +1395,7 @@ async function main() {
   if (unrendered.length) console.log(`⚠️  [a11y] not checked: ${unrendered.join(', ')} showed none of the design system's components within 10s`);
   if (unread.length) console.log(`⚠️  [a11y] partly not checked: the page could not be read in ${unread.join(', ')}; those results are missing, not clean`);
   if (unfinished.length) console.log(`⚠️  [a11y] partly not checked: ${unfinished.join('; ')}; those results are missing, not clean`);
-  if (behavioursNotChecked.size) console.log(`ℹ️  [a11y] behaviours not checked for ${[...behavioursNotChecked].join(', ')}: the style guide draws markup without the components' script. Point a11y.urls (or --url) at a page that runs them (Storybook, the app) to check them.`);
+  if (behavioursNotChecked.size) console.log(`ℹ️  [a11y] behaviours not checked for ${[...behavioursNotChecked].join(', ')}: the style guide draws markup without the components' script. List the system's scripts in ds-config.json → systemScripts, or point a11y.urls (or --url) at a page that runs them (Storybook, the app), to check them.`);
 
   // ── Report ────────────────────────────────────────────────────────────────────
   const contrast = groupSame(findings.filter((f) => f.kind === 'contrast' && !f.cannotCompute));
@@ -1396,7 +1408,7 @@ async function main() {
   const keyboard = findings.filter((f) => f.kind === 'keyboard');
   const themes   = [...new Set(modes.map((m) => m.name))];
 
-  const more = ['target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'behaviour'].map((k) => [k, findings.filter((f) => f.kind === k)]);
+  const more = ['target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'behaviour', 'statefollows'].map((k) => [k, findings.filter((f) => f.kind === k)]);
   const buckets = [['contrast', contrast], ['hovercontrast', hoverCon], ['name', names], ['focus', focus], ['focuscontrast', focusCon], ['ariastate', state], ['keyboard', keyboard], ...more].filter(([, l]) => l.length);
   const total = buckets.reduce((n, [, l]) => n + l.length, 0);
   const inThemes = themes.length > 1 ? ` (checked in ${themes.length} themes)` : '';

@@ -13,7 +13,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, resolve, basename, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
 import { checkPrototype, systemScales, nodesOf, mergeGaps, gapLine, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
@@ -46,7 +46,8 @@ export function prototypePage({ name, tree, parts, scales, gaps, note = '', cata
     .split('/*{{THEME_CSS}}*/').join(parts.themeCSS ?? '')
     .split('/*{{COMPONENT_CSS}}*/').join(parts.componentCSS ?? '')
     .split('<!--{{ICON_SHEET}}-->').join(parts.iconSheet ?? '')
-    .split('/*{{PROTOTYPE}}*/').join(JSON.stringify(data).replace(/</g, '\\u003c'));
+    .split('/*{{PROTOTYPE}}*/').join(JSON.stringify(data).replace(/</g, '\\u003c'))
+    .split('<!--{{SYSTEM_SCRIPTS}}-->').join(parts.scripts ?? '');
 }
 
 // What every drawing needs once: the catalog, the system's parts (CSS, drawable components, modes) and its scales.
@@ -222,14 +223,41 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
   const pick = screenFor(name, raw, tree, screens ?? sys.context.screens ?? [], sys.catalog, slug);
   const r = await renderPrototype(ROOT, cfg, page, { name, screen: pick?.screen ?? null, mode: pick?.mode ?? 'sibling' }).catch((e) => ({ why: String(e?.message ?? e).split('\n')[0] }));
   if (r.why) return { why: r.why };
-  if (!pick) return { picture: r.picture, cmp: [] };
+  if (!pick) return { picture: r.picture, cmp: [], a11y: prototypeA11y(ROOT, page) };
   const cmp = compareWithScreen(tree, r.rendered, pick.screen, { mode: pick.mode, catalog: sys.catalog, drawn: new Set((sys.parts.view.components ?? []).map((c) => c.name)) });
   const owed = owedFromScreen(cmp);
   if (owed.length) {
     const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
     try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...owed.map((d) => ({ need: `${d.what} ${pick.screen.name}`, kind: 'screen', line: d.message }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
   }
-  return { ...pick, cmp, picture: r.picture, visual: r.visual };
+  const a11y = prototypeA11y(ROOT, page);
+  const ownA11y = (a11y ?? []).filter((i) => i.own);
+  if (ownA11y.length) {
+    const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
+    try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...ownA11y.map((i) => ({ need: `accessibility ${i.issue}`, kind: 'a11y', line: `${i.issue}: ${i.selector} (${i.fix})` }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
+  }
+  return { ...pick, cmp, picture: r.picture, visual: r.visual, a11y };
+}
+
+// The drawn page through the accessibility check: contrast in every mode, names, one main heading, the keyboard. The
+// engine's own bar (pt-…) is left out. Returns [{ issue, selector, fix }] or null when the check could not run.
+// The page's own composition (its main heading, a text's colour on its surface) is owed in the reply; what a system
+// component does is the component's, for the audit.
+export function prototypeA11y(ROOT, page) {
+  const r = spawnSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(page).href, '--json'], { cwd: ROOT, encoding: 'utf8', timeout: 240000, env: process.env });
+  const out = String(r.stdout ?? '');
+  const at = out.indexOf('{');
+  if (at < 0) return null;
+  try {
+    const d = JSON.parse(out.slice(at));
+    if (d.notChecked) return null;
+    return (d.issues ?? []).filter((i) => !/(^|[#. ])pt-(bar|outline|gaps|modes|title|note|seg)/.test(String(i.selector ?? ''))).map((i) => ({ issue: i.issue, selector: String(i.selector ?? ''), fix: i.fix, own: i.issue === 'heading' || (i.issue === 'contrast' && /pt-text/.test(String(i.selector ?? ''))) }));
+  } catch { return null; }
+}
+export function a11yLines(list) {
+  if (!list) return [];
+  if (!list.length) return ['♿ ACCESSIBILITY OF THE DRAWN PAGE: nothing found'];
+  return [`♿ ACCESSIBILITY OF THE DRAWN PAGE: ${list.length} issue(s)`, ...list.slice(0, 10).map((i) => `   ${i.own ? '⚠️ ' : '•'} ${i.issue}: ${i.selector}${i.own ? ` (the page's own: ${i.fix})` : ' (a system component: for the audit)'}`), ...(list.length > 10 ? [`   … ${list.length - 10} more`] : [])];
 }
 
 // --from-screens <capture.json>: each designed screen becomes a starting point in prototypes/, drawn at once.
@@ -356,6 +384,7 @@ export async function runPrototype(ROOT, argv) {
   }
   if (seen?.screen) { console.log(''); for (const l of screenLines(seen.cmp, { ...seen, root: ROOT })) console.log(l); }
   else if (seen?.picture) console.log(`\n   picture of the page: ${seen.picture.replace(ROOT + '/', '')}`);
+  if (seen?.a11y) { console.log(''); for (const l of a11yLines(seen.a11y)) console.log(l); }
   else if (seen?.why) console.log(`\n   ⏭  not measured in the browser (${seen.why})`);
   const placed = seen?.cmp ? owedFromScreen(seen.cmp) : [];
   const gaps = mergeGaps({ [name]: r.gaps });
@@ -368,6 +397,7 @@ export async function runPrototype(ROOT, argv) {
     r.uses.length ? 'Check each use above against what its component is for: a use the documentation rules out gets "standInFor" with the need, or a Missing box, and the prototype is drawn again.' : null,
     r.differs.length ? 'Make each 📐 line match the other pages, or tell the person why this page differs.' : null,
     placed.length ? `Make each ⚠️ line under 📏 match "${seen.screen.name}", or tell the person why this page differs from it.` : null,
+    (seen?.a11y ?? []).some((i) => i.own) ? 'Fix each ⚠️ line under ♿ in the composition (one main heading: a Text with as h1; a text colour that reads on its surface), or tell the person.' : null,
     seen?.picture ? `Look at ${seen.picture.replace(ROOT + '/', '')} before you answer.` : null,
     gaps.length ? 'Tell the person each gap above as it is written: the design team decides them; never build one.' : null,
   ].filter(Boolean);

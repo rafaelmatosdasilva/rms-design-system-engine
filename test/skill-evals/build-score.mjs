@@ -26,7 +26,7 @@ const BOOL = new Set(['disabled','checked','readonly','required','hidden','selec
 export function createElement(type, props, ...children) {
   props = props || {};
   const kids = children.flat(Infinity).filter((c) => c != null && c !== false && c !== true);
-  if (typeof type === 'function') return type({ ...props, children: kids.length <= 1 ? kids[0] : kids });
+  if (typeof type === 'function') return mount(type, { ...props, children: kids.length <= 1 ? kids[0] : kids });
   if (type === Fragment) { const f = document.createDocumentFragment(); kids.forEach((c) => f.append(c instanceof Node ? c : String(c))); return f; }
   const el = document.createElement(type);
   for (const [k, v] of Object.entries(props)) {
@@ -43,12 +43,38 @@ export function createElement(type, props, ...children) {
   return el;
 }
 export const Fragment = Symbol('Fragment');
-export const useState = (v) => [typeof v === 'function' ? v() : v, () => {}];
-export const useEffect = () => {}; export const useLayoutEffect = () => {}; export const useRef = (v) => ({ current: v ?? null });
-export const useMemo = (f) => f(); export const useCallback = (f) => f; export const useId = () => 'id' + Math.random().toString(36).slice(2, 8);
+// A function component keeps its hooks between renders: a state change renders it again in place, so a component
+// that opens on a click (a disclosure, a toggle) can be tried. One that never sets state renders once, as before.
+let CURRENT = null, IDS = 0;
+function mount(type, props) {
+  const inst = { hooks: [], i: 0, nodes: [] };
+  const render = () => {
+    const prev = CURRENT; CURRENT = inst; inst.i = 0;
+    let out; try { out = type(props); } finally { CURRENT = prev; }
+    const node = out instanceof Node ? out : document.createTextNode(String(out ?? ''));
+    const nodes = node.nodeType === 11 ? [...node.childNodes] : [node];
+    const old = inst.nodes.filter((n) => n.parentNode);
+    if (old.length) { old[0].before(...nodes); old.forEach((n) => n.remove()); inst.nodes = nodes; return null; }
+    inst.nodes = nodes;
+    return node;
+  };
+  inst.render = render;
+  return render();
+}
+export const useState = (v) => {
+  const inst = CURRENT;
+  if (!inst) return [typeof v === 'function' ? v() : v, () => {}];
+  const i = inst.i++;
+  if (!(i in inst.hooks)) inst.hooks[i] = typeof v === 'function' ? v() : v;
+  return [inst.hooks[i], (x) => { inst.hooks[i] = typeof x === 'function' ? x(inst.hooks[i]) : x; inst.render(); }];
+};
+const keep = (make) => { const inst = CURRENT; if (!inst) return make(); const i = inst.i++; if (!(i in inst.hooks)) inst.hooks[i] = make(); return inst.hooks[i]; };
+export const useReducer = (r, init) => { const [s, set] = useState(init); return [s, (a) => set((x) => r(x, a))]; };
+export const useEffect = () => {}; export const useLayoutEffect = () => {}; export const useRef = (v) => keep(() => ({ current: v ?? null }));
+export const useMemo = (f) => f(); export const useCallback = (f) => f; export const useId = () => keep(() => ':r' + (IDS++).toString(36) + ':');
 export const forwardRef = (f) => (p) => f(p, null); export const memo = (f) => f;
 export const createContext = (v) => ({ Provider: ({ children }) => children, _v: v }); export const useContext = (c) => c?._v;
-export default { createElement, Fragment, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, useId, forwardRef, memo, createContext, useContext };
+export default { createElement, Fragment, useState, useReducer, useEffect, useLayoutEffect, useRef, useMemo, useCallback, useId, forwardRef, memo, createContext, useContext };
 `;
 
 const CODE_EXT = ['.jsx', '.tsx', '.js', '.ts', '.mjs'];
@@ -155,7 +181,7 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
           const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: own ? `#case .${cls}` : '#case > *' }, sessionId);
           if (nodeId) await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: c.pseudo }, sessionId);
         }
-        m = await ev(`(${MEASURE})('#case', ${JSON.stringify(label)}, ${JSON.stringify(cls)})`);
+        m = await ev(c.script ? `(${c.script})('#case')` : `(${MEASURE})('#case', ${JSON.stringify(label)}, ${JSON.stringify(cls)})`);
         if (!c.dark || (m && c.expectDark && c.expectDark(m))) break;
       }
       out[c.id] = m;

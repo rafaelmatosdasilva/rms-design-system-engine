@@ -100,5 +100,50 @@
     },
     "annotations": []
   },
+  "disclosure": {
+    "nodeId": "15:14",
+    "properties": {
+      "Label#15:0": {
+        "type": "TEXT",
+        "defaultValue": "Details"
+      },
+      "Content#15:3": {
+        "type": "TEXT",
+        "defaultValue": "Shipping takes two business days."
+      },
+      "Expanded": {
+        "type": "VARIANT",
+        "defaultValue": "False",
+        "variantOptions": [
+          "False",
+          "True"
+        ]
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: disclosure"
+      }
+    ],
+    "layerAnnotations": [
+      {
+        "layer": "Chevron",
+        "annotations": [
+          {
+            "label": "Role: indicator"
+          }
+        ]
+      },
+      {
+        "layer": "Panel",
+        "annotations": [
+          {
+            "label": "Role: panel"
+          }
+        ]
+      }
+    ],
+    "description": "Shows or hides a short passage under its label."
+  },
   "_note": "Tidepool, a fictional design system, as captured from its Figma file (b0LpOCBsaRgo8lUqbkQNaY) for the build evaluation. Every name is invented."
 }

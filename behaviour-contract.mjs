@@ -219,3 +219,39 @@ export function partRoleExpression(selector, partSelector, layer, part) {
     return seen ? [...out] : ['no instance shows its "' + layer + '" part: not checked'];
   })()`;
 }
+
+// ── States follow their props ────────────────────────────────────────────────────────────────────────────────────────
+// An option that shows a state (Selected=True, State=Error, Expanded) must also say it to a screen reader: the attribute
+// its role names. An option that only changes the look (a class) is heard as nothing. Read from the style guide's
+// controls: each option's effect is what the code's selector for it sets (classes and attributes).
+const STATE_WORDS = [
+  { re: /^(selected|pressed|active|on|toggled|current)$/i, by: { togglebutton: ['aria-pressed'], button: ['aria-pressed'], tab: ['aria-selected'], option: ['aria-selected'], switch: ['aria-checked', 'checked'], checkbox: ['aria-checked', 'checked'], radio: ['aria-checked', 'checked'] } },
+  { re: /^(checked)$/i, all: ['aria-checked', 'checked'] },
+  { re: /^(expanded|open|opened)$/i, all: ['aria-expanded'] },
+  { re: /^(error|invalid)$/i, all: ['aria-invalid'] },
+  { re: /^(disabled)$/i, all: ['disabled', 'aria-disabled'] },
+];
+const stateWord = (s) => String(s ?? '').replace(/^is[\s_-]*/i, '').replace(/[\s_-]+/g, '');
+function expectedFor(word, role) {
+  const w = STATE_WORDS.find((x) => x.re.test(stateWord(word)));
+  if (!w) return null;
+  return w.all ?? w.by[roleKey(role)] ?? null;
+}
+// components: [{ name, role, controls: [{ label, type: 'VARIANT' | 'BOOLEAN', options: [{ label, add, attrs }], on: { add, attrs } }] }]
+export function stateFindings(components = []) {
+  const out = [];
+  for (const c of components) {
+    for (const ctl of c.controls ?? []) {
+      const pairs = ctl.type === 'BOOLEAN' ? [[ctl.label, ctl.on, 'true']] : (ctl.options ?? []).map((o) => [/^(true|on|yes)$/i.test(o.label) ? ctl.label : o.label, o, o.label]);
+      for (const [word, effect, value] of pairs) {
+        const want = expectedFor(word, c.role);
+        if (!want || !effect) continue;
+        const attrs = Object.keys(effect.attrs ?? {});
+        if (!(effect.add ?? []).length && !attrs.length) continue;   // the option changes nothing that is drawn
+        if (attrs.some((a) => want.includes(a))) continue;
+        out.push({ component: c.name, control: ctl.label, value, want, message: `${c.name}: ${ctl.label}=${value} changes how it looks (${(effect.add ?? []).map((k) => `.${k}`).join(' ') || 'its attributes'}) but not what a screen reader hears: set ${want.join(' or ')} with it` });
+      }
+    }
+  }
+  return out;
+}

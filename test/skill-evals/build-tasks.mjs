@@ -64,6 +64,29 @@ async function componentChecks(ctx, file, exportName, label, cases, a11y) {
 
 const font = (size, lh) => ({ fontSize: size, fontWeight: 500, lineHeight: lh });
 
+// The disclosure, tried in the browser as a person would: closed, a click opens it, a second click closes it. A
+// component the page opens itself (an uncontrolled one) or one that opens from its prop and tells its parent on a
+// click (a controlled one) both count.
+const DISCLOSURE = `(sel) => {
+  const host = document.querySelector(sel);
+  const vis = (x) => { if (!x || !x.isConnected) return false; for (let n = x; n && n !== host; n = n.parentElement) { const s = getComputedStyle(n); if (s.display === 'none' || s.visibility === 'hidden' || n.hidden) return false; } const r = x.getBoundingClientRect(); return r.height > 0 && r.width > 0; };
+  const trig = () => host.querySelector('button,[role=button],summary');
+  const passage = () => [...host.querySelectorAll('*')].find((n) => !n.children.length && /two business days/.test(n.textContent));
+  const read = () => {
+    const t = trig(); if (!t) return null;
+    const id = (t.getAttribute('aria-controls') || '').split(/\\s+/)[0]; const panel = id ? document.getElementById(id) : null; const p = passage();
+    const marks = [...t.querySelectorAll('svg,img,[class*=chevron i],[class*=icon i],[class*=indicator i],[class*=arrow i],[class*=caret i]')];
+    const heard = marks.filter((m) => !m.closest('[aria-hidden="true"]') && m.getAttribute('role') !== 'presentation' && !(m.tagName === 'IMG' && m.getAttribute('alt') === '') && (m.tagName === 'IMG' || m.tagName.toLowerCase() === 'svg' || m.textContent.trim()));
+    return { tag: t.tagName.toLowerCase(), role: t.getAttribute('role'), expanded: t.getAttribute('aria-expanded'), controls: !!panel, controlsPassage: !!(panel && p && (panel === p || panel.contains(p))), shown: vis(p), silent: !heard.length };
+  };
+  const before = read(); if (!before) return { before: null };
+  trig().click(); const after = read(); trig().click(); const again = read();
+  let called = 0; const f = () => { called++; };
+  host.innerHTML = ''; try { const n = window.__C({ expanded: true, Expanded: true, open: true, isOpen: true, onToggle: f, onChange: f, onExpandedChange: f, onOpenChange: f, onClick: f }); host.append(n instanceof Node ? n : String(n ?? '')); } catch (e) {}
+  const open = read(); if (trig()) trig().click();
+  return { before, after, again, controlled: { open, called } };
+}`;
+
 export const BUILD = [
   {
     id: 'build-tokens', mayChangeAll: true,
@@ -140,6 +163,25 @@ export const BUILD = [
       r.push(check('says the Positive colours have no variable in the design system', flagsMissing(ctx.final)));
       return r;
     },
+  },
+  {
+    id: 'build-disclosure', mayChangeAll: true, setup: withTokens,
+    prompt: `build the disclosure from our Figma design system as a React component, exported as Disclosure from src/components/Disclosure.jsx, styled with CSS that uses the design tokens in src/styles/tokens.css. ${MCP('disclosure')}`,
+    score: (ctx) => componentChecks(ctx, 'src/components/Disclosure.jsx', 'Disclosure', 'Details', [
+      { id: 'closed', props: propsOf({ Label: 'Details', Content: 'Shipping takes two business days.' }), expect: { height: 38, color: L['text/primary'], ...font(14, 20) } },
+      { id: 'dark', props: propsOf({ Label: 'Details' }), dark: true, expectDark: (m) => sameColor(m, 'color', D['text/primary']), expect: { color: D['text/primary'] } },
+      { id: 'tried', probe: true, props: {}, script: DISCLOSURE },
+    ], (r) => {
+      const t = r.tried ?? {}, b = t.before, a = t.after, g = t.again, c = t.controlled ?? {};
+      const controlled = c.open?.expanded === 'true' && c.open.shown && c.called > 0;
+      return [
+        check('it is a button that says whether it is open (Figma role: disclosure): aria-expanded="false" while closed', b && (b.tag === 'button' || b.role === 'button' || b.tag === 'summary') && b.expanded === 'false' && !b.shown, b ? `${b.tag} aria-expanded=${b.expanded}, passage ${b.shown ? 'shown' : 'hidden'}` : 'no button'),
+        check('a click opens it: aria-expanded="true" and the passage shows', (a && a.expanded === 'true' && a.shown) || controlled, a ? `aria-expanded=${a.expanded}, passage ${a.shown ? 'shown' : 'hidden'}${controlled ? ' (controlled: opens from its prop and calls its handler)' : ''}` : ''),
+        check('a second click closes it again', (a && a.expanded === 'true' && a.shown && g && g.expanded === 'false' && !g.shown) || controlled, g ? `aria-expanded=${g.expanded}, passage ${g.shown ? 'shown' : 'hidden'}` : ''),
+        check('aria-controls names the passage it opens (Figma: Panel, role panel)', (a && a.controlsPassage) || (c.open && c.open.controlsPassage), a ? `aria-controls ${a.controls ? 'points to an element' : 'missing or pointing nowhere'}${a.controls && !a.controlsPassage ? ' that does not hold the passage' : ''}` : ''),
+        check('the chevron is silent for screen readers (Figma: Chevron, role indicator)', b && b.silent),
+      ];
+    }),
   },
   {
     id: 'build-settings', mayChangeAll: true, setup: withComponents,
