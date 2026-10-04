@@ -13,6 +13,7 @@
 // Exit 1 = a Figma icon has no code symbol (an unimplemented DS icon).
 
 import { readFileSync, existsSync, readdirSync } from 'fs';
+import { codeRoots } from './code-roots.mjs';
 import { join, extname } from 'path';
 import { ENGINE_DIRS } from './names.mjs';
 
@@ -54,7 +55,7 @@ function walk(dir, out) {
   }
 }
 const files = [];
-walk(ROOT, files);
+for (const root of codeRoots(ROOT)) walk(root, files);
 const codeIcons = new Set();
 const pfx = PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const symRe  = new RegExp(`<symbol[^>]*\\bid\\s*=\\s*['"\`]${pfx}([\\w-]+)['"\`]`, 'gi');

@@ -31,6 +31,7 @@
 // Exit 1 = a composed component is missing from the template code AND templateCompositionStrict.
 
 import { readFileSync, existsSync, readdirSync } from 'fs';
+import { codeRoots } from './code-roots.mjs';
 import { join, extname, basename, relative } from 'path';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
 import { ENGINE_DIRS } from './names.mjs';
@@ -96,6 +97,7 @@ function walk(dir, out) {
 const files = [];
 for (const d of SRC_DIRS) if (existsSync(d)) walk(d, files);
 if (!files.length) walk(ROOT, files);
+for (const root of codeRoots(ROOT).slice(1)) walk(root, files);   // sibling folders the config names
 const _txt = new Map();
 const read = (f) => { if (!_txt.has(f)) { try { _txt.set(f, readFileSync(f, 'utf8')); } catch { _txt.set(f, ''); } } return _txt.get(f); };
 
