@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pruneRow } from './skill-evals/record.mjs';
+import { pruneRow, runStats, resultsEntry } from './skill-evals/record.mjs';
 import { readFolder, summarize } from './skill-evals/summarize.mjs';
 
 const RECORDS = join(dirname(fileURLToPath(import.meta.url)), 'skill-evals', 'records');
@@ -32,4 +32,17 @@ test('every record in the repository: no private task, no installed package, and
     }
     assert.match(summarize(readFolder(join(RECORDS, dir))), /\| Side \| Pass \|/);
   }
+});
+
+test('recording an evaluation writes its RESULTS.md entry from the runs, against the runs of the entry before', () => {
+  const row = (task, run, pass, extra = {}) => ({ task, run, pass, engineHash: 'e2', project: 'p1', usage: { cost: 0.05, input: 100000 }, checks: [{ name: 'does the task', ok: pass }], rules: [{ name: 'never commits', ok: true }], ...extra });
+  const now = { 'claude-haiku-4-5-20251001': runStats([row('a', 0, true), row('a', 1, true), row('b', 0, true), row('b', 1, false), row('b', 2, true)]) };
+  const before = { 'claude-haiku-4-5-20251001': runStats([row('a', 0, true, { engineHash: 'e1', usage: { cost: 0.04, input: 90000 } }), row('b', 0, true, { engineHash: 'e1', usage: { cost: 0.04, input: 90000 } })]) };
+  assert.deepEqual([now['claude-haiku-4-5-20251001'].pass, now['claude-haiku-4-5-20251001'].more], [4, ['`b` at 3 runs']]);
+  const md = resultsEntry({ title: 'a change', what: 'one; two', guideFiles: ['cookbook/x.md'], prevEngine: 'e1', guideSet: 'abcdef123456', now, before, name: '2026-10-05-x', date: '2026-10' });
+  assert.match(md, /^## 2026-10: a change \(continuous evaluation\)\n\nWhat changed since the entry below \(engine e1\): one; two\. The guide changed in `cookbook\/x\.md`\./);
+  assert.match(md, /Guide set measured: `abcdef123456` · Project measured: `p1`/, 'the line test/skill-evals.test.mjs reads');
+  assert.match(md, /\| The 2 guide tasks \(`b` at 3 runs\) \| 2\/2 \| 4\/5 \|/);
+  assert.match(md, /Haiku: 1 of 5 runs failed, fewer passes than the entry below\. Failed: b #1: does the task\./, 'a failure is named, task and check');
+  assert.match(md, /Records: `records\/2026-10-05-x`\./);
 });

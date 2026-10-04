@@ -106,6 +106,16 @@ the files after, and the rules it must never break (asking for a token in the ch
 hand-editing a snapshot or `ds-config.json`, applying the hand-back unasked). It spends model tokens, so it is
 not part of `node --test`.
 
+**One command for a guide change.** `node test/skill-evals/continuous.mjs` measures the committed engine (the guide
+tasks with the skill on Haiku, 3 runs each, `new-ui-saved` at 10), waits out a usage limit and carries on, then
+records the runs: the entry at the top of `RESULTS.md` (the guide set and project measured, what changed since the
+entry before from the commits and the guide files they touched, and the pass count, cost, input and rule violations
+against the runs recorded for that entry), the `records/` folder and its README row. A failed check is listed and the
+command exits 1: the engine is fixed and measured again before the change ships. `record.mjs <name> <results> --entry`
+does the recording alone, for runs made by hand.
+
+A fuller comparison (Sonnet, a baseline guide, the adoption rule):
+
 ```bash
 node test/skill-evals/run.mjs --variant cookbook --model claude-sonnet-5 --runs 5 --set all --jobs 1 --resume
 node test/skill-evals/run.mjs --variant cookbook --model claude-haiku-4-5-20251001 --runs 3 --set all --jobs 1 --resume
