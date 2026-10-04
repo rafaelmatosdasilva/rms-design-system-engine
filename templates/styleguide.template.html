@@ -71,6 +71,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-modes { display: flex; flex-direction: column; gap: var(--sg-space-l); }
 .sg-mode-ctl { display: flex; flex-direction: column; align-items: stretch; gap: var(--sg-space-xs); }
 .sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+.pg-updated { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xs) 0 0; }
 .sg-mode-diff { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); margin: 0; }
 #mode-controls { margin-top: var(--sg-space-m); }
 
@@ -250,7 +251,7 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
         diff.hidden = !list.length;
       };
       wrap._sync();
-      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(); }); });
+      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(axis); }); });
       return wrap;
     }
     function controls(scope, onChange, which) {
@@ -493,6 +494,10 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2><div class="pg-usage" aria-label="Used in">' + usageBadges(c) + '</div></div>' +
         (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') +
+        (c.updated ? '<p class="pg-updated">' + [
+          c.updated.uncommitted ? 'Code changed, not committed yet' : c.updated.code ? 'Code last changed ' + esc(c.updated.code.date) + ' · ' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')' : '',
+          c.updated.figmaRead ? 'Figma read ' + esc(c.updated.figmaRead) : ''
+        ].filter(Boolean).join(' · ') + '</p>' : '') +
         (doc ? '<div class="pg-note"><b>Documentation</b><span>' + esc(doc) + '</span></div>' : '') +
         ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><span>' + c.differences.slice(0, 6).map(function (x) { return (x.new ? 'new · ' : '') + esc(x.what); }).join('<br>') + (c.differences.length > 6 ? '<br>and ' + (c.differences.length - 6) + ' more' : '') + (DATA.differences ? ' (' + esc(DATA.differences.file) + ')' : '') + '</span></div>' : '') +
       '</div>' +
@@ -632,7 +637,11 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
 
   // Global mode controls: every axis on <html>; a change re-reads every card and re-syncs the per-card controls.
   var mount = document.getElementById('mode-controls');
-  if (mount && AXES.length) mount.appendChild(SGModes.controls(html, function () { refreshers.forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); }, function () { return true; }));
+  // A change on the page applies to every component: each one's own choice of that mode is dropped, so it follows.
+  if (mount && AXES.length) mount.appendChild(SGModes.controls(html, function (axis) {
+    if (axis && axis.attr) document.querySelectorAll('.pg-preview[' + axis.attr + ']').forEach(function (p) { p.removeAttribute(axis.attr); });
+    refreshers.forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll();
+  }, function () { return true; }));
 
   // The section in view is marked in the navigation.
   var links = document.querySelectorAll('.sg-nav a'), sections = document.querySelectorAll('section[id]');

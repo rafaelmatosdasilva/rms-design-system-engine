@@ -330,6 +330,26 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const c of view.components) { const list = by.get(c.name); if (list?.length) c.differences = list.map((x) => ({ check: x.check, what: x.what, new: !!x.new })); }
       view.differences = { total: d.total ?? 0, at: d.at ?? null, file: `${OUT_DIR}/differences.md` };
     } catch { /* no full audit yet: nothing to list */ }
+    // When each component last changed: the latest commit on its own CSS rules and its contract and config entries (git
+    // blame on their lines), and the day Figma was last read for it (the props snapshot). A line not committed yet says so.
+    try {
+      const { codeReason } = await import('./change-reason.mjs');
+      const { ruleLines, entryLines } = await import('./styleguide-data.mjs');
+      const sheets = [...new Set([...themeFiles, ...(ctx?.componentSheets ?? [])])].map((f) => [f, readText(f)]).filter(([, t]) => t);
+      // its entries in the contract and config files (structure-contract.mjs, contract.authored.json, ds-config.json)
+      const entries = ['structure-contract.mjs', 'contract.authored.json', 'ds-config.json'].map((f) => [f, readText(f)]).filter(([, t]) => t);
+      const figmaRead = String(ctx?.propsSnap?._updated ?? '').slice(0, 10) || null;
+      for (const c of view.components) {
+        let latest = null, uncommitted = false;
+        const at = [...sheets.flatMap(([f, t]) => ruleLines(t, c.cls).map((l) => `${f}:${l}`)), ...entries.flatMap(([f, t]) => entryLines(t, c.name).map((l) => `${f}:${l}`))];
+        for (const a of at) {
+          const r = codeReason(ROOT, a);
+          if (r?.uncommitted) uncommitted = true;
+          else if (r?.time && (!latest || r.time > latest.time)) latest = r;
+        }
+        if (latest || uncommitted || figmaRead) c.updated = { ...(latest ? { code: latest } : {}), ...(uncommitted ? { uncommitted: true } : {}), ...(figmaRead ? { figmaRead } : {}) };
+      }
+    } catch { /* outside git: no dates */ }
     const { segmentedUi, fieldUi } = await import('./styleguide-data.mjs');
     view.ui = { segmented: segmentedUi(view.components), field: fieldUi(view.components, themeFiles.map(readText).join('\n')) };
     lastView = view;
