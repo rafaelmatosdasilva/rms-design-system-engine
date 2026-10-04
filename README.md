@@ -98,7 +98,7 @@ The easiest way is to ask in Claude Code, in your own words, after `/rms-design-
 
 You can mix them. `rms-design-system-engine --component button --only accessibility` checks only the accessibility of the button.
 
-**Every difference in one list.** Each full check writes `.design-system-engine-out/differences.md`: every difference between Figma and the code, grouped by component, with what is new since the last check. It is written whether or not you have a style guide, and the summary of every check says where it is.
+**Every difference in one list.** Each full check writes `.design-system-engine-out/differences.md`: every difference between Figma and the code, grouped by component, with what is new since the last check. It is written whether or not you have a style guide, and the summary of every check says where it is. It also names each check that did not run, so a gap is never mistaken for a pass.
 
 ### The style guide
 

@@ -118,7 +118,10 @@ if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
     const before = prevName && existsSync(join(HERE, 'records', prevName)) ? sidesOf(join(HERE, 'records', prevName)) : {};
     const prevEngine = [...new Set(Object.values(before).map((x) => x.engine))][0] ?? '';
     const range = prevEngine ? `${prevEngine}..${engines[0]}` : `${engines[0]}~1..${engines[0]}`;
-    const subjects = sh(['log', '--no-merges', '--format=%s', range], ENGINE).split('\n').filter(Boolean).reverse();
+    // What changed: the commits in between, without the ones that only recorded an evaluation (RESULTS.md, records/).
+    const recordOnly = (h) => sh(['show', '--name-only', '--format=', h], ENGINE).split('\n').filter(Boolean).every((f) => /^test\/skill-evals\/(RESULTS\.md|records\/)/.test(f));
+    const subjects = sh(['log', '--no-merges', '--format=%h %s', range], ENGINE).split('\n').filter(Boolean).reverse()
+      .filter((l) => !recordOnly(l.split(' ')[0])).map((l) => l.slice(l.indexOf(' ') + 1));
     const guideFiles = sh(['diff', '--name-only', ...range.split('..'), '--', ...GUIDE_PATHS], ENGINE).split('\n').filter(Boolean);
     const title = opt('title') ?? sh(['log', '-1', '--format=%s', engines[0]], ENGINE);
     const what = opt('what') ?? subjects.join('; ');
