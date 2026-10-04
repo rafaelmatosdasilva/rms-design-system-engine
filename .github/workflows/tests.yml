@@ -12,6 +12,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # The build scorer and the component harness read JSX with TypeScript, from the project or a global install.
+      - name: Install TypeScript
+        run: npm install -g typescript@6
       # The browser tests use the runner's Chrome (found on PATH); without it they skip.
       # Each failing test is also written as an annotation, so its name and first error lines show on the check.
       - name: Run the test suite
