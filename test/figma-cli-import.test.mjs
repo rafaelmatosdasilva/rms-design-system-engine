@@ -34,7 +34,7 @@ test('each component: variant props, height, the variables bound to padding, gap
   assert.deepEqual(c.tag.colors.fill, { hex: '#d6f5e3' });
   assert.deepEqual(out.props.chip.properties.Size, { type: 'VARIANT', defaultValue: 'M', variantOptions: ['M', 'L'] });
   assert.equal(out.props._private, undefined, 'a private component is not part of the system');
-  assert.deepEqual(out.counts, { modes: 2, colours: Object.keys(tpVars.color.light).length * 2, sizing: Object.keys(tpVars.sizing).length, components: 5 });
+  assert.deepEqual(out.counts, { modes: 2, colours: Object.keys(tpVars.color.light).length * 2, sizing: Object.keys(tpVars.sizing).length, components: 6 });
 });
 
 test('what design.json does not hold is kept: text styles, text props, descriptions, annotations, other variants', () => {

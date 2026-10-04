@@ -87,6 +87,35 @@ const DISCLOSURE = `(sel) => {
   return { before, after, again, controlled: { open, called } };
 }`;
 
+// The stepper, tried as a person would: its value and range, the names of its two step buttons, a click on each, its
+// floor, and the arrow keys. One the page keeps itself (uncontrolled) or one that tells its parent the next value
+// (controlled) both count.
+const STEPPER = `(sel) => {
+  const host = document.querySelector(sel);
+  const spin = () => host.querySelector('[role=spinbutton],input[type=number]');
+  const valueOf = () => { const s = spin(); if (s) return Number(s.getAttribute('aria-valuenow') ?? s.value); const leaf = [...host.querySelectorAll('*')].find((n) => !n.children.length && /^\\s*\\d+\\s*$/.test(n.textContent)); return leaf ? Number(leaf.textContent) : NaN; };
+  const steps = () => [...host.querySelectorAll('button,[role=button]')].filter((b) => b !== spin() && !b.contains(spin())).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+  const nameOf = (b) => { const by = (b.getAttribute('aria-labelledby') || '').split(/\\s+/).map((id) => document.getElementById(id)).filter(Boolean).map((n) => n.textContent).join(' ');
+    const heard = [...b.childNodes].map((n) => (n.nodeType === 3 ? n.textContent : n.nodeType === 1 && !n.closest('[aria-hidden="true"]') && n.tagName.toLowerCase() !== 'svg' ? n.textContent : '')).join('');
+    return (b.getAttribute('aria-label') || by || heard || b.getAttribute('title') || '').trim(); };
+  const s0 = spin();
+  const range = s0 ? { role: s0.getAttribute('role') || s0.type, now: s0.getAttribute('aria-valuenow') ?? s0.value, min: s0.getAttribute('aria-valuemin') ?? s0.min, max: s0.getAttribute('aria-valuemax') ?? s0.max, named: !!(s0.getAttribute('aria-label') || s0.getAttribute('aria-labelledby') || (s0.labels && s0.labels.length)) } : null;
+  const names = steps().map(nameOf);
+  // Each click finds the button again: a re-render may have replaced it.
+  const dec = () => steps()[0], inc = () => steps()[steps().length - 1];
+  const start = valueOf();
+  let up = NaN, down = NaN, floor = NaN, key = NaN;
+  if (steps().length > 1) { inc().click(); up = valueOf(); dec().click(); down = valueOf(); for (let i = 0; i < start + 2; i++) { const d = dec(); if (d && !d.disabled) d.click(); } floor = valueOf(); }
+  const s1 = spin(); const native = !!(s1 && s1.tagName === 'INPUT');
+  if (s1 && !native) { const was = valueOf(); s1.focus(); s1.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true, cancelable: true })); key = valueOf() - was; }
+  const calls = []; const f = (a) => { calls.push(Number(a && typeof a === 'object' && a.target ? a.target.value : a)); };
+  const render = (v) => { host.innerHTML = ''; try { const n = window.__h(window.__C, { value: v, Value: String(v), onChange: f, onValueChange: f }); host.append(n instanceof Node ? n : String(n ?? '')); } catch (e) {} };
+  render(3); const cs = steps(); if (cs.length > 1) cs[cs.length - 1].click(); const cUp = calls.slice();
+  calls.length = 0; render(0); const cd = steps(); if (cd.length > 1 && !cd[0].disabled) cd[0].click(); const cFloor = calls.slice();
+  calls.length = 0; render(3); const cs2 = spin(); if (cs2 && cs2.tagName !== 'INPUT') cs2.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true, cancelable: true })); const cKey = calls.slice();
+  return { range, names, start, up, down, floor, native, key, controlled: { up: cUp, floor: cFloor, key: cKey } };
+}`;
+
 export const BUILD = [
   {
     id: 'build-tokens', mayChangeAll: true,
@@ -180,6 +209,27 @@ export const BUILD = [
         check('a second click closes it again', (a && a.expanded === 'true' && a.shown && g && g.expanded === 'false' && !g.shown) || controlled, g ? `aria-expanded=${g.expanded}, passage ${g.shown ? 'shown' : 'hidden'}` : ''),
         check('aria-controls names the passage it opens (Figma: Panel, role panel)', (a && a.controlsPassage) || (c.open && c.open.controlsPassage), a ? `aria-controls ${a.controls ? 'points to an element' : 'missing or pointing nowhere'}${a.controls && !a.controlsPassage ? ' that does not hold the passage' : ''}` : ''),
         check('the chevron is silent for screen readers (Figma: Chevron, role indicator)', b && b.silent),
+      ];
+    }),
+  },
+  {
+    id: 'build-stepper', mayChangeAll: true, setup: withTokens,
+    prompt: `build the stepper from our Figma design system as a React component, exported as Stepper from src/components/Stepper.jsx, styled with CSS that uses the design tokens in src/styles/tokens.css. ${MCP('stepper')}`,
+    score: (ctx) => componentChecks(ctx, 'src/components/Stepper.jsx', 'Stepper', null, [
+      { id: 'default', props: { ...propsOf({ Value: '1' }), 'aria-label': 'Guests', label: 'Guests' }, expect: { height: 30, paddingTop: 4, paddingLeft: 4, radius: 6, borderWidth: 1, borderColor: L['field/border'], bg: L['surface/page'], color: L['text/primary'], ...font(14, 20) } },
+      { id: 'dark', props: { ...propsOf({ Value: '1' }), 'aria-label': 'Guests' }, dark: true, expectDark: (m) => sameColor(m, 'borderColor', D['field/border']), expect: { borderColor: D['field/border'], bg: D['surface/page'] } },
+      { id: 'tried', probe: true, props: { ...propsOf({ Value: '1' }), 'aria-label': 'Guests', label: 'Guests' }, script: STEPPER },
+    ], (r) => {
+      const t = r.tried ?? {}, g = t.range, c = t.controlled ?? {};
+      const spoken = (n) => /[a-z]{3}/i.test(n ?? '');
+      const controlledUp = c.up?.includes(4), controlledFloor = Array.isArray(c.floor) && !c.floor.some((v) => v < 0);
+      return [
+        check('the value is a spinbutton with its range (Figma role: spinbutton, from 0 to 10)', g && String(g.now) === '1' && String(g.min) === '0' && String(g.max) === '10', g ? `${g.role} now=${g.now} min=${g.min} max=${g.max}` : 'no spinbutton or number input'),
+        check('the spinbutton can have an accessible name', g && g.named),
+        check('the step buttons have spoken names (Figma: Decrement and Increment, roles decrement and increment)', (t.names ?? []).length >= 2 && t.names.every(spoken), JSON.stringify(t.names ?? [])),
+        check('a click on Increment steps it up, on Decrement down', (t.up === t.start + 1 && t.down === t.start) || controlledUp, `from ${t.start}: up ${t.up}, down ${t.down}${controlledUp ? ' (controlled: tells its parent the next value)' : ''}`),
+        check('it stays within 0 to 10 (Decrement stops at 0)', t.floor === 0 || (Number.isNaN(t.floor) && controlledFloor), `after stepping down from ${t.start}: ${t.floor}`),
+        check('ArrowUp steps the spinbutton up', t.native || t.key === 1 || c.key?.includes(4), t.native ? 'a native number input' : `ArrowUp changed it by ${t.key}`),
       ];
     }),
   },
