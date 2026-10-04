@@ -9,13 +9,13 @@
 - **Same request, same data, two sides.** Each task is asked in the same words. Both sides get the same project and the same Figma MCP output. One side has Claude alone (Figma MCP plus the repository). The other has Claude with the skill (its guide, its engine and its hooks).
 - **Scored by code, not by eye.** Builds are rendered in Chrome and measured against Figma (sizes, spacing, radius, colours in light and dark, hover, disabled, the HTML element and its role). Prototypes are read for anything invented, any change to the system, and whether the reply names what the system lacks. The scorer does not use the engine, so it judges both sides the same way.
 - **Three models.** Opus (the most capable), Sonnet and Haiku (the smallest and cheapest). 3 to 13 runs per task.
-- **A fictional design system.** Tidepool, a real Figma file with two colour modes, button, chip, field, tag and a Settings screen. Every run is kept in `test/skill-evals/records/`, and the full log of every measurement is in `test/skill-evals/RESULTS.md`.
+- **A fictional design system.** Tidepool, a real Figma file with two colour modes, button, chip, field, tag, stepper and a Settings screen. Every run is kept in `test/skill-evals/records/`, and the full log of every measurement is in `test/skill-evals/RESULTS.md`.
 
 ## Results
 
 ### 1. Building components and screens from Figma
 
-Six tasks. Build the tokens, the button, the chip, the field, the tag, then the Settings screen.
+Six tasks. Build the tokens, the button, the chip, the field, the tag, then the Settings screen. Two more came later, a stepper and a Figma change.
 
 | Model | Claude alone | With the skill |
 |---|---|---|
@@ -26,6 +26,8 @@ Six tasks. Build the tokens, the button, the chip, the field, the tag, then the 
 - **Dark mode.** No run without the skill got the dark colours right, on any model (0 of 11). The MCP returns one mode, so every dark value was guessed. The skill reads every mode.
 - **What Figma knows and the code missed.** The chip's toggle role and the field's real text input come from Figma annotations. Variables replace literal colours, and the tag keeps its exact height. Without the skill these were missed or guessed.
 - **Every miss with the skill becomes a check.** Opus with the skill first passed 16 of 18. Both misses overwrote an accessible name passed in by the caller. The engine now catches that pattern in every edit, and the next run passed 18 of 18. Haiku then missed two builds, a field with no text colour and a second way of losing the accessible name. Both became checks, and Haiku passed 18 of 18.
+- **When Figma changes.** The chip is built, then a designer changes its colours in Figma. Without the skill no run updated the dark mode, on Opus or Haiku (0 of 6). The MCP returns one mode, so the old dark colours stayed. With the skill Opus passed 3 of 3 and Haiku 2 of 3.
+- **Accessibility tried on the component's own code.** A stepper whose parts have roles in Figma (a value, a Decrement and an Increment button). Opus alone built it right (3 of 3). Haiku alone did not (0 of 3, silent step buttons and no arrow keys). With the skill both passed 3 of 3. The engine renders each component from its code, presses each part with the keyboard, and tells the design team what the Figma file itself owes, such as a missing focus state.
 
 ### 2. Prototyping with the design system
 
@@ -78,7 +80,7 @@ Prototyping costs about the same or less with the skill, because Claude does not
 ## Limits
 
 - **One small system.** Tidepool has four components and one screen, so Claude alone can read all of it in a few steps. The skill should matter more on a real system with many components, documentation spread across tools and many screens. Tests on a real, private system are kept out of this repository.
-- **Opus alone is strong when the task is simple and the documentation is easy to find.** Most of the skill's measured gain on Opus is enforcement. It does not invent, it checks every mode, and it does not stop until the checks pass.
+- **Opus alone is strong when the task is simple and the documentation is easy to find.** Most of the skill's measured gain on Opus is enforcement. It does not invent, it checks every mode, and it does not stop until the checks pass. The one task Opus alone failed every time is a change in Figma after the code was built.
 - **Not every run passes.** Haiku with the skill missed one prototype (it used the chip for a switch and did not say the system has no switch) and one of 67 everyday task runs (its first answer asked for a GitLab token in the chat, which the engine sent back). Each is recorded with its run, and each is the next check to add.
 
 ## Reproduce
