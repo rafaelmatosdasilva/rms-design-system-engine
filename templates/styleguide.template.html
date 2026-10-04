@@ -123,12 +123,10 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .color-chip-swatch { height: 36px; border-radius: var(--sg-radius-s); border: var(--sg-line); }
 .color-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); line-height: var(--sg-lh); word-break: break-word; }
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: break-all; }
-.type-specimen { display: flex; align-items: baseline; gap: var(--sg-space-l); padding: var(--sg-space-s) 0; border-bottom: var(--sg-line); }
+.type-specimen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 360px); align-items: start; gap: var(--sg-space-l); padding: var(--sg-space-m) 0; border-bottom: var(--sg-line); }
 .type-specimen:last-child { border-bottom: none; }
-.type-specimen-meta { width: 220px; flex-shrink: 0; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }
-.type-specimen-meta > b { display: block; color: var(--sg-text-2); margin-bottom: var(--sg-space-xxs); }
-.type-specimen-meta > span { display: block; font-weight: var(--sg-s-weight); }
-.type-specimen-preview { flex: 1; color: var(--sg-text); }
+.type-specimen-preview { color: var(--sg-text); min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 720px) { .type-specimen { grid-template-columns: 1fr; } }   /* on a phone the table goes under the sample */
 .spacing-row { display: flex; align-items: center; gap: var(--sg-space-m); padding: var(--sg-space-xs) 0; border-bottom: var(--sg-line); }
 .spacing-row:last-child { border-bottom: none; }
 .spacing-bar-wrap { width: 120px; }
@@ -439,16 +437,18 @@ a.pg-usage-name { color: var(--sg-text); }
         // The family is the system's page font, which every text inherits (with its fallbacks): named, never set again here.
         [['size', 'font-size'], ['weight', 'font-weight'], ['lh', 'line-height']].forEach(function (k) { if (t[k[0]]) style.push(k[1] + ':var(' + t[k[0]].var + ')'); });
         var row = document.createElement('div'); row.className = 'type-specimen';
-        row.innerHTML = '<div class="type-specimen-meta"></div><div class="type-specimen-preview" style="' + esc(style.join(';')) + '">The quick brown fox jumps over the lazy dog</div>';
+        row.innerHTML = '<div class="type-specimen-preview" style="' + esc(style.join(';')) + '">The quick brown fox jumps over the lazy dog</div><div class="pg-inspect"><div class="pg-inspect-head"></div><table></table></div>';
         demo.appendChild(row);
-        // Every property of the style as the browser draws it in this mode: family, size, weight, line height,
-        // letter spacing and case, each with the variable it comes from.
-        var cs = getComputedStyle(row.lastElementChild), tok = function (k) { return t[k] ? ' (' + t[k].var + ')' : ''; };
+        // Every property of the style as the browser draws it in this mode, as a component's token table: the property,
+        // then the variable it comes from and its value.
+        var cs = getComputedStyle(row.firstElementChild);
+        var val = function (k, v) { return t[k] ? t[k].var + ' · ' + v : v; };
         var family = (t.family && (live(demo, t.family.var) || t.family.value)) || cs.fontFamily.split(',')[0].replace(/["']/g, '').trim();
-        var lines = [['Family', family + tok('family')], ['Size', cs.fontSize + tok('size')], ['Weight', cs.fontWeight + tok('weight')], ['Line height', (cs.lineHeight === 'normal' ? 'auto' : cs.lineHeight) + tok('lh')],
-          ['Letter spacing', (cs.letterSpacing === 'normal' ? '0' : cs.letterSpacing) + tok('ls')]];
-        if (cs.textTransform && cs.textTransform !== 'none') lines.push(['Case', cs.textTransform]);
-        row.firstElementChild.innerHTML = '<b>' + esc(t.scale) + '</b>' + lines.map(function (l) { return '<span>' + esc(l[0]) + ' ' + esc(l[1]) + '</span>'; }).join('');
+        var lines = [['family', val('family', family)], ['size', val('size', cs.fontSize)], ['weight', val('weight', cs.fontWeight)], ['line height', val('lh', cs.lineHeight === 'normal' ? 'auto' : cs.lineHeight)],
+          ['letter spacing', val('ls', cs.letterSpacing === 'normal' ? '0' : cs.letterSpacing)]];
+        if (cs.textTransform && cs.textTransform !== 'none') lines.push(['case', cs.textTransform]);
+        row.querySelector('.pg-inspect-head').textContent = t.scale;
+        row.querySelector('table').innerHTML = rowsHTML(lines);
       });
     };
     sizeSwitch(ts, drawType); ts.appendChild(demo); drawType();
