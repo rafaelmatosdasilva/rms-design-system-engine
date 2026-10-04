@@ -79,6 +79,7 @@ test('guard: Figma is written only by the engine\'s script, and only after a yes
 });
 
 test('router: bringing Figma in line with the code goes to the engine\'s edits; a value to change in Figma stays the person\'s', () => {
-  for (const t of ['update Figma to match the code', 'add the roles in Figma', 'alinha o figma com o código']) assert.deepEqual([route(t, {}).recipe, route(t, {}).run], ['figma-edits', ['rms-design-system-engine --figma-edits']], t);
+  for (const t of ['update Figma to match the code', 'update Figma so it states the roles the code has', 'add the roles in Figma', 'alinha o figma com o código', 'make figma match the code']) assert.deepEqual([route(t, {}).recipe, route(t, {}).run], ['figma-edits', ['rms-design-system-engine --figma-edits']], t);
   assert.equal(route('change the chip radius in Figma to 12px so it matches the code', {}).recipe, 'fix-a-difference');
+  assert.notEqual(route('update the code to match Figma', {}).recipe, 'figma-edits', 'the code to Figma is the other way');
 });
