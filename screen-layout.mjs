@@ -125,11 +125,16 @@ function propsFor(node, def) {
   const out = {};
   for (const [k, v] of Object.entries(node.props ?? {})) {
     const name = Object.keys(def.props ?? {}).find((p) => key(p) === key(k));
+    // The state the screen shows it in (State=Disabled), which the catalog leaves out of the options a person picks:
+    // kept as a note, so the drawing turns on the class the code has for it.
+    if (!name && /^state$/i.test(k) && typeof v === 'string' && !/^(default|rest|idle|enabled)$/i.test(v)) { out.figmaState = v; continue; }
     if (!name) continue;
     const p = def.props[name];
     if (p.type === 'enum') { const val = (p.values ?? []).find((x) => key(x) === key(v)); if (val != null) out[name] = val; }
     else if (p.type === 'boolean') out[name] = v === true || /^true$/i.test(String(v));
     else if (p.type === 'text' && typeof v === 'string') out[name] = v;
+    // A swapped-in icon (iconContent: Icon-var-color): its name, which the drawing looks up in the system's icons.
+    else if (p.type === 'slot' && typeof v === 'string' && /icon|glyph/i.test(v)) out[name] = v;
   }
   return out;
 }
@@ -174,7 +179,9 @@ export function screenToPrototype(screen, { catalog = { components: {} }, scales
           if (own && ['Stack', 'Row', 'Columns'].includes(own.component)) own.props = { ...own.props, grow: true };
           inside = own ? [own] : [];
         } else inside = slotsOf(node).map((sl) => convert({ ...sl, kind: 'frame' }, depth + 1, node.layout ?? 'NONE')).filter(Boolean);
-        return { component: name, props: { ...propsFor(node, comps[name]), ...notesOf(!!unbuilt) }, ...(inside.length ? { children: inside } : {}) };
+        // One the code has not built keeps the surface the screen gives it, when it is one of the system's colours.
+        const look = unbuilt && colourToken(node.fill?.var, scales) ? { surface: colourToken(node.fill.var, scales) } : {};
+        return { component: name, props: { ...propsFor(node, comps[name]), ...notesOf(!!unbuilt), ...look }, ...(inside.length ? { children: inside } : {}) };
       }
       // A local component that holds others (a whole screen, a panel) is not a system part: read its inside as layout,
       // and say it is a structure the system could own (a template, or a component).

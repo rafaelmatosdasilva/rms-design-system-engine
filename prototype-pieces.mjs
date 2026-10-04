@@ -18,10 +18,14 @@ export const GAP_KINDS = ['component', 'option', 'token', 'icon', 'layout', 'pat
 // The system's scales a piece may use: spacing tokens ({ figma, var, value }) and text styles ({ name, size, weight, lh }).
 // The family the system's own text is set in: its text styles' when Figma names one, else the one its component CSS
 // uses most (`font-family`, or the family at the end of a `font` shorthand).
+// A family written through a variable (font-family: var(--font-family), sans-serif) counts as the variable's value.
 export function systemFamily(cssText = '') {
   const count = new Map();
-  for (const m of String(cssText).matchAll(/font-family\s*:\s*([^;}]+)/g)) { const f = m[1].trim(); if (!/^var\(/.test(f)) count.set(f, (count.get(f) ?? 0) + 1); }
-  for (const m of String(cssText).matchAll(/(?<![\w-])font\s*:[^;}]*?(?<![\w.])[\d.]+(?:px|rem|em|%)(?:\s*\/\s*[\d.]+(?:px|rem|em|%)?)?\s+([^;}]+)/g)) { const f = m[1].trim(); if (!/^var\(/.test(f)) count.set(f, (count.get(f) ?? 0) + 1); }
+  const vars = new Map();
+  for (const m of String(cssText).matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) if (!vars.has(m[1])) vars.set(m[1], m[2].trim());
+  const resolve = (f) => f.replace(/^var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)/, (all, v) => { const x = vars.get(v); return x && !/var\(/.test(x) ? x : all; });
+  for (const m of String(cssText).matchAll(/font-family\s*:\s*([^;}]+)/g)) { const f = resolve(m[1].trim()); if (!/^var\(/.test(f) && f !== 'inherit') count.set(f, (count.get(f) ?? 0) + 1); }
+  for (const m of String(cssText).matchAll(/(?<![\w-])font\s*:[^;}]*?(?<![\w.])[\d.]+(?:px|rem|em|%)(?:\s*\/\s*[\d.]+(?:px|rem|em|%)?)?\s+([^;}]+)/g)) { const f = resolve(m[1].trim()); if (!/^var\(/.test(f)) count.set(f, (count.get(f) ?? 0) + 1); }
   return [...count].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
 
@@ -83,10 +87,11 @@ function withoutNotes(ui) {
   // A column count may be written as a number; the catalog lists it as text.
   const strip = (o) => {
     // Notes the check reads and the drawing uses, never options: standInFor, purpose, content (the words a designed
-    // instance shows) and box (its size on the screen).
-    const { standInFor, purpose, content, box, textless, ...rest } = o;
+    // instance shows), box (its size on the screen) and, on a component the code has not built, the surface the screen
+    // gives it, and figmaState (the state a designed screen shows it in).
+    const { standInFor, purpose, content, box, textless, figmaState, ...rest } = o;
     for (const k of ['width', 'height']) if (typeof rest[k] === 'number') rest[k] = String(rest[k]);
-    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, ...p } = rest.props; rest.props = p; for (const k of ['width', 'height', 'count']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
+    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, ...p } = rest.props; if (!PIECES.includes(rest.component)) delete p.surface; rest.props = p; for (const k of ['width', 'height', 'count']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
     if (typeof rest.count === 'number') rest.count = String(rest.count);
     return rest;
   };
@@ -142,7 +147,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const agreed = new Set((v.controls ?? []).flatMap((c) => [c.label, c.prop]));
     const optDefs = catalog.components[node.component]?.props ?? {};
     for (const k of Object.keys(p)) {
-      if (['standInFor', 'purpose', 'content', 'box', 'textless'].includes(k) || agreed.has(k)) continue;
+      if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState'].includes(k) || agreed.has(k)) continue;
       // A value of a choice turns on the class the system's CSS adds for it (.node.node-selected); a default value
       // needs none. One the CSS has no class for is drawn without it, and said.
       if (optDefs[k]?.type === 'enum') {
@@ -194,7 +199,12 @@ export function modifierFor(css, cls, value) {
   if (word.length < 3) return null;
   const mods = new Set();
   for (const m of String(css).matchAll(new RegExp(`\\.${String(cls).replace(/[^\w-]/g, '')}((?:\\.[A-Za-z][\\w-]*)+)`, 'g'))) for (const k of m[1].split('.').filter(Boolean)) mods.add(k);
-  return [...mods].find((m) => { const w = m.toLowerCase().replace(/[^a-z0-9]/g, ''); return w === word || w.endsWith(word) || (word.length >= 4 && w.includes(word)); }) ?? null;
+  const flat = (x) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const named = [...mods].find((m) => { const w = flat(m); return w === word || w.endsWith(word) || (word.length >= 4 && w.includes(word)); });
+  if (named || word.length < 4) return named ?? null;
+  // Else the class whose rules use a variable the value names (Type=negative: .badge.high coloured with --…-negative).
+  const clean = String(css).replace(/\/\*[\s\S]*?\*\//g, '');
+  return [...mods].find((m) => { const sel = new RegExp(`\\.${String(cls).replace(/[^\w-]/g, '')}\\.${m.replace(/[^\w-]/g, '')}(?![\\w-])`); return [...clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)].some((r) => sel.test(r[1]) && [...r[2].matchAll(/var\(\s*(--[\w-]+)/g)].some((v) => flat(v[1]).includes(word))); }) ?? null;
 }
 
 // Whether the prototype page can draw an option by its name (the same reading the page does): a class in the
