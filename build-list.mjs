@@ -264,6 +264,7 @@ export function projectDerivedContract(ROOT, cfg, classFor, varOf = () => null) 
 export { roleMarkup } from './role-markup.mjs';
 import { roleMarkup, roleSheetLines } from './role-markup.mjs';
 import { behaviourSheetLines, partSheetLines, partRolesOf } from './behaviour-contract.mjs';
+import { designA11yFindings, designA11ySheetLines } from './design-a11y.mjs';
 
 // ── The build sheet: what --query prints for a component still to build ────────────────────────────────────────
 // Every line is something the engine checks once the component exists, written as the code must write it.
@@ -310,6 +311,9 @@ export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}
   if (role) lines.push(`    role: ${role}, so write it as ${roleMarkup(role)}`);
   if (role) for (const o of [...roleSheetLines(role), ...behaviourSheetLines(role)]) lines.push(`      and ${o}`);
   for (const l of partSheetLines(partRolesOf(props[name] ?? {}))) lines.push(`    ${l}`);
+  // What the design does not give it yet (no focus state, an error shown by colour alone): written meanwhile, or left
+  // to the person (design-a11y.mjs).
+  for (const l of designA11ySheetLines(designA11yFindings({ [name]: props[name] }, { [name]: { ...s, h: s.h ?? c.h } }), name)) lines.push(`    ${l}`);
   const nested = (nesting[name] ?? []).filter((n) => n !== name && !/^icon[-/ ]/i.test(n));
   if (nested.length) lines.push(`    uses the system's own ${nested.join(', ')} inside it, never a copy`);
   lines.push(`    the component file${file ? `: ${file}` : ''} names its props exactly as above (Figma's names), or, when the person decides so, contract.authored.json records the code's name`);

@@ -25,7 +25,8 @@ export function collectFindings(lines) {
       if (!t) continue;
       if (/^(PARITY  ·|GATE SUMMARY)/.test(t)) { phase = 'skip'; continue; }
       if (/^(AUDIT FAILED|ALL GATES PASS|EVERY GATE THAT RAN|NO REGRESSIONS)/.test(t)) { phase = 'advisory'; section = null; continue; }
-      if (/^(AI-READINESS SCORECARD|📓|📐)/.test(t)) { section = null; continue; }
+      // The design's own debt (what the Figma file owes) is not a code finding: never tracked, never in the burndown.
+      if (/^(AI-READINESS SCORECARD|📓|📐|♿ Accessibility in the Figma file)/.test(t)) { section = null; continue; }
       if (phase === 'gates') {
         const g = line.match(GATE);
         if (g) { section = g[3].trim(); sectionBad = g[1] === '❌'; if (sectionBad) out.add(`${section} :: gate fails`); continue; }
