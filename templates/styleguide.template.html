@@ -37,7 +37,8 @@
 /* ── Reset ───────────────────────────────────────────────────────────────── */
 .sg-page, .sg-page *, .sg-page *::before, .sg-page *::after { box-sizing: border-box; }
 .sg-page { margin: 0; }
-.sg-page h1, .sg-page h2, .sg-page h3, .sg-page p, .sg-page figure { margin: 0; }
+/* Only the page's own headings and paragraphs: a rule that reached into a preview would restyle the component. */
+:where(.sg-sidebar-header, .sg-hero, .sg-section, .sg-subsection, .sg-card, .pg-header, .pg-head, .sg-screens) > :where(h1, h2, h3, p, figure) { margin: 0; }
 /* The page's text (font, size, weight, line height, colour) is the system's own: its body rule, which the components
    inherit in the product too. The template sets only the background. */
 html, body.sg-page { background: var(--sg-bg); }
@@ -50,7 +51,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-sidebar { width: 200px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: var(--sg-line); background: var(--sg-bg-2); display: flex; flex-direction: column; scrollbar-gutter: stable; }
 .sg-sidebar-header { padding: var(--sg-space-l) var(--sg-space-l) var(--sg-space-m); border-bottom: var(--sg-line); }
 .sg-sidebar-header .sg-title { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); }
-.sg-sidebar-header p { font-size: var(--sg-s); font-weight: var(--sg-m-weight); color: var(--sg-muted); margin-top: var(--sg-space-xxs); }
+.sg-sidebar-header > p { font-size: var(--sg-s); font-weight: var(--sg-m-weight); color: var(--sg-muted); margin-top: var(--sg-space-xxs); }
 .sg-nav { padding: var(--sg-space-s) 0; flex: 1; }
 .sg-nav a { display: flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-l); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-text-2); text-decoration: none; transition: background 0.1s, color 0.1s; line-height: var(--sg-lh); }
 .sg-nav a:hover { background: var(--sg-bg); color: var(--sg-text); }
@@ -75,23 +76,23 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* ── Section headings ────────────────────────────────────────────────────── */
 .sg-section { margin-bottom: var(--sg-space-xxl); scroll-margin-top: var(--sg-space-l); }
 .sg-section-badge { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-s); font-weight: var(--sg-s-weight); background: color-mix(in srgb, var(--sg-muted) 12%, transparent); color: var(--sg-muted); margin-bottom: var(--sg-space-s); }
-.sg-section h2 { font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xs); }
+.sg-section > h2, .pg-head > h2 { font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xs); }
 .sg-section > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xl); max-width: 560px; }
 .sg-subsection { margin-bottom: var(--sg-space-xxl); }
-.sg-subsection h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-m); padding-bottom: var(--sg-space-s); border-bottom: var(--sg-line); }
+.sg-subsection > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-m); padding-bottom: var(--sg-space-s); border-bottom: var(--sg-line); }
 .sg-hr { border: none; border-top: var(--sg-line); margin: var(--sg-space-xxl) 0; }
 
 /* ── Overview ────────────────────────────────────────────────────────────── */
 .sg-hero { margin-bottom: var(--sg-space-xxl); }
-.sg-hero h1 { font-size: var(--sg-h1); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-s); }
-.sg-hero p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); max-width: 500px; }
+.sg-hero > h1 { font-size: var(--sg-h1); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-s); }
+.sg-hero > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); max-width: 500px; }
 .sg-pending { font-size: var(--sg-m); color: var(--sg-text); background: color-mix(in srgb, var(--sg-warning) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sg-warning) 40%, transparent); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-xl); max-width: 720px; }
 .sg-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sg-space-m); margin-bottom: var(--sg-space-xxl); }
 .sg-card { display: block; background: var(--sg-surface); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-space-l); cursor: pointer; box-shadow: var(--sg-shadow); transition: border-color var(--sg-ease), box-shadow var(--sg-ease), transform var(--sg-ease); text-decoration: none; color: inherit; }
 .sg-card:hover { border-color: var(--sg-accent); box-shadow: var(--sg-shadow-lift);  }
 .sg-card-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-xs); }
-.sg-card h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xs); }
-.sg-card p { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); }
+.sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xs); }
+.sg-card > p { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); }
 .sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-l); }
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
 .sg-screen img { display: block; width: 100%; height: auto; }
@@ -123,7 +124,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 
 /* ── Component playground ────────────────────────────────────────────────── */
 .pg-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
-.pg-head h2 { margin: 0; }
+.pg-head > h2 { margin: 0; }
 .pg-usage { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); align-items: center; }
 .pg-usage-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 a.pg-badge { text-decoration: none; }
