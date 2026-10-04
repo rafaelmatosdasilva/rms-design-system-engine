@@ -193,3 +193,9 @@ test('the measuring page (?all) draws no card thumbnails; icons follow Figma, wi
   assert.doesNotMatch(tpl, /Own size|iconSizes/);
   assert.match(tpl, /DATA\.iconFigma/);
 });
+
+test('a text part no text prop writes is drawn with its name, so its switch shows something', () => {
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /A text part no text prop writes \(Show Description alone\) gets its own name/);
+  assert.match(tpl, /replace\(\/\^show\[\\s-\]\+\/i, ''\)/);
+});
