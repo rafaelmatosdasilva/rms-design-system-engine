@@ -4,7 +4,7 @@
 
 ## Steps
 
-1. The project's Claude Code hooks: `--install-hooks`, `--remove-hooks`, or `"hooks": false` (the main guide's rule). They also route each `/rms-design-system-engine` request before the agent reads it, check each UI edit when it is made (`"editCheck": false` turns that part off), and, when the route gave a line the person has to hear (the Figma snapshots were not refreshed, the skill does not change Figma), send the agent back once if its final reply leaves it out.
+1. The project's Claude Code hooks: `--install-hooks`, `--remove-hooks`, or `"hooks": false` (the main guide's rule). They also route each `/rms-design-system-engine` request before the agent reads it, check each UI edit when it is made (`"editCheck": false` turns that part off), let a Figma write through only as the engine's own `--figma-edits` script once the person said yes, and, when the route gave a line the person has to hear (the Figma snapshots were not refreshed, the skill does not change Figma), send the agent back once if its final reply leaves it out.
 2. CI and webhooks: the sections below.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.

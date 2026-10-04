@@ -231,6 +231,8 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
     if (userText !== null && CODE.test(String(file ?? '')) && !asksForChange(userText)) return { decision: 'ask', reason: `The person's last message does not ask for a change to ${basename(file)}. Report the fix the audit names instead of making it, or confirm they asked for it.` };
     return null;
   }
+  // A write to Figma (the Figma MCP's use_figma): only the engine's own script, and only when the person said yes.
+  if (/use_figma$/.test(String(tool ?? ''))) return figmaWriteVerdict(String(input.code ?? ''), { root: resolve(event.cwd ?? process.cwd()), userText });
   if (tool === 'Bash') {
     const cmd = String(input.command ?? '');
     const engine = /^\s*(node\s+\S*audit\.mjs|rms-design-system-engine)\b/.test(cmd);
@@ -249,6 +251,26 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
     if (/\bgit\b[^|;&\n]*\spush\b/.test(cmd)) return { decision: 'ask', reason: 'Pushing sends the work to the remote. Confirm the person asked for a push.' };
     if (/\bgit\b[^|;&\n]*\scommit\b/.test(cmd)) return { decision: 'ask', reason: 'Committing records the change. Confirm the person asked for a commit.' };
     if (/\bgit\b[^|;&\n]*\sapply\b/.test(cmd) && /handback|code-changes\.diff/.test(cmd) && !(userText !== null && asksForChange(userText))) return { decision: 'ask', reason: 'The hand-back patch is only applied when the person asks. Confirm they did.' };
+  }
+  return null;
+}
+
+// What changes a Figma file in a plugin script: an assignment to a node's properties, or a call that creates, removes,
+// moves or edits. A script without one only reads.
+const FIGMA_WRITE = /\.(annotations|name|description|characters|fills|strokes|effects|visible|opacity|x|y|cornerRadius|layoutMode|itemSpacing|padding\w*)\s*=(?!=)|\bfigma\.create\w*\(|\.(remove|resize|appendChild|insertChild|setProperties|editComponentProperty|addComponentProperty|deleteComponentProperty|setValueForMode|setBoundVariable\w*|swapComponent|detachInstance|set|setPluginData|setSharedPluginData)\s*\(/;
+// A yes to what was shown: an approval, or a request to make the change.
+const APPROVES = /^\s*(yes|yeah|yep|ok(ay)?|sure|go( ahead)?|do it|please do|apply( them| it)?|sim|pode|manda)\b/i;
+const norm = (t) => String(t ?? '').replace(/\s+/g, ' ').trim();
+export function figmaWriteVerdict(code, { root, userText = null } = {}) {
+  if (!FIGMA_WRITE.test(code)) return null;
+  let script = null;
+  try { script = readFileSync(join(root, OUT_DIR, 'handback', 'figma-apply.js'), 'utf8'); } catch { /* none written */ }
+  const body = (t) => norm(String(t).replace(/^\s*\/\/.*$/gm, ''));
+  if (!script || body(script) !== body(code)) {
+    return { decision: 'deny', reason: 'Figma is changed only through the engine: rms-design-system-engine --figma-edits lists what the code says Figma should state and writes the script for it (.design-system-engine-out/handback/figma-apply.js). Show the person that list, and run that script unchanged once they say yes. What needs a person (descriptions, missing components, layout) is listed for the design team, never written.' };
+  }
+  if (userText !== null && !APPROVES.test(userText) && !asksForChange(userText)) {
+    return { decision: 'ask', reason: 'This changes the Figma file. The person\'s last message does not say yes to the list rms-design-system-engine --figma-edits showed: show it and ask first.' };
   }
   return null;
 }

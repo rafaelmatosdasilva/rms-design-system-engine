@@ -572,6 +572,24 @@ border or corner, a typed number, a text with no style, a shape and a component 
 the spacing habits across the screens and the structures that repeat (template candidates). A starting point already
 in `prototypes/` is kept unless `--force`.
 
+#### --figma-edits (Figma brought in line with the code, once the person says yes)
+
+`rms-design-system-engine --figma-edits` lists what the code already states that Figma does not, as edits the engine
+writes itself (`figma-edits.mjs`). Today that is a component's role: each component's markup as the code shows it
+(every instance the pages, scripts, JSX or structure contract give; the role most of them have, a number field among
+text fields still a text field) gives a role in the engine's vocabulary (`button`, `togglebutton`, `disclosure`,
+`textbox`, `checkbox`, `radio`, `switch`, `spinbutton`, `link`, `dialog`, `tab`). A Figma component that states no role
+gets the annotation `Role: <role>`; one whose Figma role differs from the code is listed for a person to decide and
+never changed. A wrapper around several controls (a stepper, a group) has no single role and is left out, as is a
+component the code does not show.
+
+It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its Figma node, what it adds and why) and
+`figma-apply.js`, a Figma plugin script that makes exactly those edits, leaves a component that already states a role
+as it is, and returns `{ changed, skipped, missing }`. The agent shows the list, and only when the person says yes runs
+the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
+and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
+Descriptions, missing components and layout are never written: they stay in `figma-changes.md`.
+
 #### Adoption baseline / ratchet (opt-in, gate-level)
 
 A real codebase is rarely 100% green on day one. Rather than a wall of red (ignored) or turning gates

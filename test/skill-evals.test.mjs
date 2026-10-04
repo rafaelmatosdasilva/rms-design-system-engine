@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { context, decisionPoints } from './skill-evals/lib.mjs';
 import { globalChecks, asksForToken } from './skill-evals/rules.mjs';
-import { DEV, chipFixed, radiusAccepted, burndownTop } from './skill-evals/tasks.mjs';
+import { DEV, chipFixed, radiusAccepted, burndownTop, figmaRolesScore } from './skill-evals/tasks.mjs';
 import { HELDOUT } from './skill-evals/heldout.mjs';
 import { makeFixture } from './helpers.mjs';
 
@@ -231,4 +231,13 @@ test('the files the engine writes on every run are never the agent\'s change', a
     'contracts/llms.txt', 'llms.txt'];
   const ctx = context([], null, { changed: [...engineWrites, 'src/theme.css', 'design-system-engine-baseline.json'], commits: 1, files: {} });
   assert.deepEqual(ctx.changed, ['src/theme.css', 'design-system-engine-baseline.json']);   // the theme and an accepted debt are the agent's
+});
+
+test('figma-roles: the engine\'s list shown and a yes asked for passes; a claim that Figma was changed, or no engine run, fails', () => {
+  const run = (final, cmd = 'rms-design-system-engine --figma-edits') => figmaRolesScore(fakeCtx({ calls: [{ name: 'Bash', input: { command: cmd }, result: '' }], final })).every((c) => c.ok);
+  const good = 'The engine lists one Figma change: field gets the annotation "Role: textbox". The chip is a decision for you: Figma says togglebutton, the code renders a plain button. Shall I apply the field change?';
+  assert.equal(run(good), true);
+  assert.equal(run('I added Role: textbox to the field in Figma, and the chip is a togglebutton question for you.'), false);
+  assert.equal(run(good, 'rms-design-system-engine --component field'), false);
+  assert.equal(run('field: Role: textbox. Want me to apply it?'), false, 'the chip split is not mentioned');
 });

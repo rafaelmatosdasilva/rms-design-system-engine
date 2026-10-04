@@ -16,7 +16,7 @@ Have only Figma? It helps Claude build your design system in code from it, one p
 - **Safer AI building.** When an AI builds screens, every change it makes is checked against your real components and tokens, and for accessibility, and it is told how to fix what does not match.
 - **Accessibility included.** Text that is hard to read, buttons with no label, things you cannot reach with the keyboard.
 - **The same answer every time.** The checks are fixed rules, not opinions.
-- **You stay in control.** It never changes Figma, and it never changes your code unless you ask. An AI cannot accept a difference or switch a check off without asking you first.
+- **You stay in control.** It changes Figma only to state what your code already has, such as a component's role, and only after you approve the list. It never changes your code unless you ask. An AI cannot accept a difference or switch a check off without asking you first.
 
 ## How it works
 
@@ -108,6 +108,18 @@ You can mix them. `rms-design-system-engine --component button --only accessibil
 - **Not agreed yet.** A prop only one side has, another default, a token that differs or a component not built yet is left out and counted in one line at the top, so you decide each one before it appears.
 
 A project can still use a template of its own (`ds-config.json` → `styleguide.template`).
+
+### Bring Figma in line with the code
+
+When the code already states something Figma does not, the engine can write it into Figma for you. Today that is each component's role: a component built as a real `<button>` or `<input type="checkbox">` whose Figma component says nothing about it gets the note `Role: button`, the note every later check reads.
+
+| You want to | Type in Claude Code | Or in the terminal |
+|---|---|---|
+| Update Figma to match the code | `/rms-design-system-engine update Figma to match the code` | `rms-design-system-engine --figma-edits` |
+
+- **You see the list first.** Each change names the component, what it adds and why (what the code renders, in how many places). Nothing changes until you say yes.
+- **The engine writes the change, not the AI.** It writes the script, Claude runs it through the Figma MCP, and the project hooks refuse any other write to Figma.
+- **Only what the code already proves.** A component whose role differs between Figma and code is listed for you to decide. Descriptions, missing components and layouts are never written; they stay on the hand-back list for your design team.
 
 ### Start from Figma only
 

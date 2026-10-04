@@ -473,6 +473,24 @@ if (process.argv.includes('--styleguide')) {
   } catch (e) { console.error(`❌ style guide not built: ${e.message}`); process.exit(1); }
 }
 
+// ── --figma-edits: the Figma side of the hand-back, written by the engine, applied only when a person says yes ──
+if (process.argv.includes('--figma-edits')) {
+  let feConfig = {};
+  try { feConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  try {
+    const { figmaEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const { generateStyleguide } = await import('./styleguide-gen.mjs');
+    let propsSnap = {};
+    try { propsSnap = JSON.parse(readFileSync(resolve(ROOT, feConfig.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { console.error('❌ no Figma component snapshot: refresh Figma first (rms-design-system-engine --refresh-figma).'); process.exit(1); }
+    const parts = await generateStyleguide(ROOT, feConfig, { partsOnly: true, names: Object.keys(propsSnap).filter((k) => !k.startsWith('_')) });
+    const edits = figmaEdits(propsSnap, parts.view?.components ?? []);
+    const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits);
+    for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null })) console.log(l);
+    if (edits.length) console.log(`   (${relative(ROOT, files.json)} · ${relative(ROOT, files.script)})`);
+    process.exit(0);
+  } catch (e) { console.error(`❌ Figma edits not listed: ${e.message}`); process.exit(1); }
+}
+
 // ── --prototype <composition.json>: draw a prototype from the system's own components (prototype.mjs) ──
 if (process.argv.includes('--prototype')) {
   const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'prototype.mjs'), ...process.argv.slice(2)], { cwd: ROOT, stdio: 'inherit' });
