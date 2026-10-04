@@ -230,7 +230,8 @@ export const BUILD = [
         check('the spinbutton can have an accessible name', g && g.named),
         check('the step buttons have spoken names (Figma: Decrement and Increment, roles decrement and increment)', (t.names ?? []).length >= 2 && t.names.every(spoken), JSON.stringify(t.names ?? [])),
         check('a click on Increment steps it up, on Decrement down', (t.up === t.start + 1 && t.down === t.start) || controlledUp, `from ${t.start}: up ${t.up}, down ${t.down}${controlledUp ? ' (controlled: tells its parent the next value)' : ''}`),
-        check('it stays within 0 to 10 (Decrement stops at 0)', t.floor === 0 || (Number.isNaN(t.floor) && controlledFloor), `after stepping down from ${t.start}: ${t.floor}`),
+        // A controlled stepper (its value from its prop) is measured through its parent, as its clicks are.
+        check('it stays within 0 to 10 (Decrement stops at 0)', t.floor === 0 || ((Number.isNaN(t.floor) || controlledUp) && controlledFloor), `after stepping down from ${t.start}: ${t.floor}${controlledUp ? ` (controlled: at 0 it reports ${c.floor?.length ? c.floor.join(', ') : 'nothing'})` : ''}`),
         check('ArrowUp steps the spinbutton up', t.native || t.key === 1 || c.key?.includes(4), t.native ? 'a native number input' : `ArrowUp changed it by ${t.key}`),
       ];
     }),

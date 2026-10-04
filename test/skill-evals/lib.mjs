@@ -176,7 +176,8 @@ export function context(events, dir, saved = null) {
     .filter((p) => !ENGINE_WRITES.test(p) && !/(^|\/)(node_modules|\.design-system-engine-out)(\/|$)/.test(p));
   const nextLines = calls.flatMap((c) => String(c.result).split('\n')).map((l) => l.match(/^NEXT:\s*(.+)$/)?.[1]).filter(Boolean);
   const savedFiles = saved?.files ?? {};
-  const read = (p) => { if (saved) return savedFiles[p] ?? null; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
+  // A saved run (rescoring) keeps the files it wrote; a file it left as it was is read from the rebuilt project.
+  const read = (p) => { if (saved && savedFiles[p] != null) return savedFiles[p]; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
   return {
     calls, bash, engine, texts, final, all: [...texts, final].join('\n'), changed, commits: saved ? saved.commits ?? 1 : Number(git('rev-list', '--count', 'HEAD').trim() || 0),
     diff: git('diff', 'HEAD'), read, nextLines, dir,
