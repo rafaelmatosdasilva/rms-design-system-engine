@@ -164,3 +164,13 @@ test('"In use" shows the approved pictures of the system\'s own frames', { timeo
   assert.deepEqual(data.screens.map((x) => x.caption), ['Settings']);
   assert.match(data.screens[0].src, /^data:image\/png;base64,iVBOR/);
 });
+
+test('the template\'s heading and paragraph rules reach only its own chrome, never a component in a preview', () => {
+  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const css = tpl.slice(tpl.lastIndexOf('<style'), tpl.lastIndexOf('</style>')).replace(/\/\*[\s\S]*?\*\//g, '');
+  const top = (sel) => { const out = ['']; let depth = 0; for (const ch of sel) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && !depth) out.push(''); else out[out.length - 1] += ch; } return out.map((x) => x.trim()); };
+  const selectors = (css.match(/[^{}]+\{/g) ?? []).flatMap((r) => top(r.slice(0, -1)));
+  assert.ok(selectors.length > 50, 'the page\'s own stylesheet is read');
+  const reaching = selectors.filter((s) => /(^|[\s(,])(h[1-6]|p|figure)\b/.test(s) && !/>\s*(:where\()?(h[1-6]|p|figure)\b/.test(s));
+  assert.deepEqual(reaching, []);
+});
