@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The browser check can read a ::before or ::after layer, for components that draw their background or lines as their own layers (continuous evaluation)
+
+What changed since the entry below (engine 926750e): Evaluation 70/70 on Haiku for the style guide icons and capture fixes; the forbidden-green scorer reads hidden as a reason; The browser check can read a ::before or ::after layer, for components that draw their background or lines as their own layers. The guide changed in `cookbook/full-audit.md`.
+
+Guide set measured: `46c0014f7509` · Project measured: `13d811a9d668`
+
+| Haiku, engine 298b82e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.055 |
+| Input a run | 96k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 96k. Records: `records/2026-10-04-the-browser-check-can-read`.
+
 ## 2026-10: Style guide icons at Figma's size and name; the capture never measures card thumbnails; a hidden Figma stroke is not a stroke (continuous evaluation)
 
 What changed since the entry below (engine 3191dd5): Style guide: one view at a time, each component at its own address; Style guide: what belongs to a component is in its view, and its differences read as English; Style guide: a numbered To do list in plain English, with who acts and exactly what to do; Read the FigJam board only when the diagram is to change; Style guide: cards show the name only, update rows and documentation at the bottom, differences not sticky, no per-mode value lists; Style guide icons at Figma's size and name; the capture never measures card thumbnails; a hidden Figma stroke is not a stroke. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
