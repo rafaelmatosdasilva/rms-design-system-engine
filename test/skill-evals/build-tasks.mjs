@@ -82,7 +82,7 @@ const DISCLOSURE = `(sel) => {
   const before = read(); if (!before) return { before: null };
   trig().click(); const after = read(); trig().click(); const again = read();
   let called = 0; const f = () => { called++; };
-  host.innerHTML = ''; try { const n = window.__C({ expanded: true, Expanded: true, open: true, isOpen: true, onToggle: f, onChange: f, onExpandedChange: f, onOpenChange: f, onClick: f }); host.append(n instanceof Node ? n : String(n ?? '')); } catch (e) {}
+  host.innerHTML = ''; try { const n = window.__h(window.__C, { expanded: true, Expanded: true, open: true, isOpen: true, onToggle: f, onChange: f, onExpandedChange: f, onOpenChange: f, onClick: f }); host.append(n instanceof Node ? n : String(n ?? '')); } catch (e) {}
   const open = read(); if (trig()) trig().click();
   return { before, after, again, controlled: { open, called } };
 }`;
