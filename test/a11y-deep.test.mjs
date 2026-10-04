@@ -258,8 +258,8 @@ test('role contracts: what each role requires, on the rendered component', { ski
   const got = d.issues.filter((i) => i.issue === 'rolecontract').map((i) => i.selector).sort();
   assert.deepEqual(got, [
     'fakeCheck (checkbox): has no checkbox control (a native input, or role="checkbox" with aria-checked)',
+    'field (textbox): in its error state the error is shown only by its look: there is no message to read (WCAG 3.3.1). The design needs an error message part, linked to the field with aria-describedby (send it back to Figma)',
     'field (textbox): in its error state the field has no aria-invalid="true"',
-    'field (textbox): in its error state the field is not linked to its message (aria-describedby)',
     'go (button): looks disabled but is not disabled or aria-disabled',
     'pin (toggle button): aria-pressed does not change when clicked',
     'star (toggle button): is a toggle button without aria-pressed',

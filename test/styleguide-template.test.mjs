@@ -49,7 +49,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Style guide → \.design-system-engine-out\/styleguide\/index\.html {2}\(2 components agreed · the engine's template\)/);
-  assert.match(r.stdout, /not built yet \(button, field\)/);
+  assert.match(r.stdout, /not built yet \(button, field, disclosure, stepper\)/);
   assert.equal(existsSync(join(dir, 'component-prop-result.json')), false, 'the project is left as it was');
   const html = readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8');
   assert.doesNotMatch(html, /\{\{[A-Z_]+\}\}/, 'every marker filled');
@@ -57,6 +57,9 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   assert.match(html, /--chip-background/, 'and the tokens');
   const data = JSON.parse(html.match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(data.components.map((c) => c.name).sort(), ['chip', 'tag']);
+  const tag = data.components.find((c) => c.name === 'tag');
+  assert.equal(tag.markupFrom, 'jsx', 'no page shows it: drawn from its own React source');
+  assert.equal(tag.markup, '<span class="tag">New</span>');
   assert.deepEqual(data.components.find((c) => c.name === 'tag').controls.find((c) => c.label === 'Tone').options, [{ label: 'Neutral' }, { label: 'Positive', add: ['tag--positive'], attrs: {} }]);
   assert.deepEqual(data.tokens.radii.map((t) => t.var), ['--radii-button', '--radii-chip', '--radii-field']);
   assert.deepEqual(data.modes, [{ label: 'Color', values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme' }]);
@@ -144,4 +147,17 @@ test('in the browser: no script error, a control changes the real component, the
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
+});
+
+test('"In use" shows the approved pictures of the system\'s own frames', { timeout: 300000 }, () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, frames: [{ name: 'Settings', nodeId: '5:1' }, { name: 'Missing', nodeId: '9:9' }] }));
+  mkdirSync(join(dir, '.design-system-engine-refs'), { recursive: true });
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  writeFileSync(join(dir, '.design-system-engine-refs', '5-1.png'), png);
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
+  const data = JSON.parse(readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8').match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
+  assert.deepEqual(data.screens.map((x) => x.caption), ['Settings']);
+  assert.match(data.screens[0].src, /^data:image\/png;base64,iVBOR/);
 });

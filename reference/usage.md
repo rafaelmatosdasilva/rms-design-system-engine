@@ -62,6 +62,8 @@ rms-design-system-engine --prune                         # list prune candidates
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
 rms-design-system-engine --no-docs                       # skip the design-intent layer this run (emitted by default; local, gitignored)
+rms-design-system-engine --refresh-figma                 # read Figma the best way there is: design.json, figma-cli, else says how
+rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
@@ -159,7 +161,7 @@ from Notion, the person does three one-time things: (1) create a Notion **intern
 copy its secret; (2) **share the page** with that integration; (3) put the secret in the project's
 `.env` as `NOTION_TOKEN` (gitignored, so it is per-person and never committed). The page **link** in
 `ds-config.json` is not secret and is committed; the **token** stays in each person's `.env`. No token,
-page not shared, or offline → the audit keeps the committed `guidelines.md` and never fails. The fetch
+page not shared, or offline → the audit keeps the committed `guidelines.md` and never fails. A prototype's catalog refreshes a link whose file is missing or older than `guidelines.maxAgeHours` (24) the same way. The fetch
 reads one page and does not follow links inside it.
 
 **The easy way: paste the link into the chat.** The agent runs `rms-design-system-engine --guidelines <link>`,
@@ -218,10 +220,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; icons from
   the icon sheet.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
-  own pages, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
+  own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   Below it, the tokens behind what is drawn and its size; above it, the apps that use it and its documentation.
+- **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component.
 - **Not agreed yet**: a prop on one side only, another default, a token that differs, a component not built yet:
@@ -454,6 +457,121 @@ to the tree, or a child the design system never nests there is a warning. Findin
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
+#### Prototypes
+
+`rms-design-system-engine --prototype --catalog` prints everything a prototype may use, in this order: what it was read
+from (each Figma snapshot with its age, the code, the authored contract, each guidelines file with the Notion or GitLab
+link it came from, and a link not fetched yet); for this request, what applies to it; the catalog's components with
+their options (a component the code does not have is marked: it is drawn as a labelled box); what each component is for;
+the team's rules for the product; the rules the check holds every prototype to; the templates in Figma; how the
+product's pages are arranged; the engine's layout pieces with the spacing tokens, text styles and screen widths they
+take; the format; and the prototypes already in `prototypes/`.
+
+- **What each component is for** comes from everything the team wrote, read as the design intent reads it
+  (`intent-gen.mjs`, nothing written): the Figma description and annotations (a `Role:` annotation is shown as its
+  role), each option's description, the code's notes and the comment above its CSS rule, the authored contract
+  (`whenNotToUse`, `useInstead`, status, notes) and the guidelines section named after it.
+- **The team's rules** are every other guidelines section, each with its file (`guidelines.sources`, and the files the
+  Notion and GitLab links are fetched into), and the authored layers of `design-intent.json` (system, foundations,
+  patterns, templates, pages, flows). A link whose file is missing or older than `guidelines.maxAgeHours` (24) is
+  fetched again first, as the audit does (`DESIGN_SYSTEM_ENGINE_NO_FETCH=1` skips it); with no token or no network the
+  committed file is kept, and a link never fetched is listed with ⚠️.
+- **For this request.** The request is the one made with the command in the last hour (the prompt hook keeps it in
+  `.design-system-engine-out/prototypes/request.json`), or `--for "<text>"`. Against it: the guidelines' opening text
+  and the sections its words touch, in full; the components its words point to (by name, description, options, notes
+  or guidelines); and the closest page to start from, made already or designed in Figma.
+- **Rules the check holds.** A plain sentence in the guidelines, "one button per screen", "at most two fields on a
+  page", is a limit: a prototype with more is not drawn, and the error quotes the sentence and its section.
+- **What the request asks for.** A component the request names (every word of its name is in it: "an empty state"
+  → emptyState) that the prototype does not use is a warning the reply owes: add it, or say why. A kind of component
+  the request names that the system has none of (a switch, a toast, a dialog, a progress bar), shown neither as a Missing
+  box nor with `standInFor`, is a warning the reply owes too: the system has no such component, say so. A component the
+  documentation rules out for the request's words ("a message confirming…" and a tag that is never a message that comes
+  and goes), used anyway, is an error, unless the node says what else it is for in `"purpose"` (a note, like
+  `standInFor`, that the check reads and the drawing ignores).
+- **Uses the documentation rules out.** A sentence with never, not for, do not or avoid in a component's guidelines,
+  notes or `whenNotToUse` rules out the words after it, up to the end of its clause ("it never submits anything" rules
+  out submitting, not the rest of the sentence). A request word it names lists that component as ruled out, not as one
+  the request points to; a stand-in it names is an error (show the need as a Missing box), and a label it names is a
+  warning.
+- **Templates in Figma** are `figma-templates.snapshot.json` (`templates` in `ds-config.json`): the components each
+  template composes, in order. **Screen widths** are the Figma breakpoints; a `Page.width` that is none of them is a
+  warning.
+- **Designed screens.** The screen capture (`paths.screenLayout`, or `figma-screen-layout.snapshot.json` beside the
+  Figma snapshots) is read even before `--from-screens` brings it into `prototypes/`: its screens count as the product's
+  pages and as places to start from.
+
+`rms-design-system-engine --prototype prototypes/<name>.json` checks a composition (the format `--check-ui` reads, nested
+or flat) and, when it holds, draws it as one page under `.design-system-engine-out/prototypes/<name>.html`: each
+component from its own markup (the contract's probe, a page instance, or its React source) with the project's CSS, in
+every mode the system has, with a switch for the colour modes and one that outlines the engine's pieces and stand-ins.
+The rules are `--check-ui`'s, plus:
+- **The engine's pieces** (Page, Stack, Row, Columns, Text) exist only where the system has no component of that name.
+  They carry no colour, border or font of their own: `gap` and `padding` take a spacing token, `Text.style` a text
+  style, `Page.width` the screen's width in px; `grow` takes the room a parent leaves. The page takes the system's own
+  page surface, text colour and font family. Each piece used is a layout gap.
+- **A need nothing fits** is `{ "component": "Missing", "props": { "need": "…", "kind": "…", "closest": "…" } }`, drawn
+  as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`.
+- **An option Figma and the code do not share by name** is drawn on the part its name points to: a text option
+  (`TitleContent`) writes the element whose class says title, or the one holding Figma's default text, or the
+  component's own text for a label; an on/off option (`Show Description`) set off removes the part it names. A page
+  instance's own state (a `hidden` class, a position on its page) is taken off. An option with no such part is drawn
+  without it, with a warning once per component.
+- **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
+  `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
+  needed first. The Stop hook holds the reply to the gaps of the prototype just drawn.
+- **A retired component** (status deprecated) is an error that names its replacement.
+- **What the documentation says.** After drawing, each system component the prototype uses is listed beside what it
+  uses it for (its labels and stand-ins) and what the documentation says it is for, so a use it is not for stands out:
+  that use gets `standInFor`, or a Missing box, and the prototype is drawn again.
+- **The product's other pages.** A prototype is compared with the other prototypes in `prototypes/`: page padding, the
+  space between sections, the screen width, the page heading's text style, where the actions sit and how they line up,
+  the frame (the containers at the top of the layout, a component holding other parts or named as a bar, panel, header,
+  window or nav, like an action bar and a side panel), and the answer given to each need the system lacks (a chip as a stand-in on one page and a Missing box on another is
+  a difference). A decision counts when two pages share it, or one screen a designer made in Figma (in the screen
+  capture, or a starting point from `--from-screens`), and no other value weighs as much; `prototypes/conventions.json` (`{ "page": { "padding":
+  … }, "heading": { "style": … }, "actions": { "at": "end", "justify": "end" }, "needs": { "<need>": "<answer>" } }`),
+  written by the team, wins. Each difference is listed with the pages it differs from, and the Stop hook holds the
+  reply to it like a gap. `rms-design-system-engine --prototype --consistency` compares every page with the others.
+- **The drawn page against the designed screens.** With Chrome, the drawn page is opened and measured: every part's
+  box, the page's padding, the space between its sections, each text's size. A prototype that redraws a designed screen
+  (same name) is compared with it part by part: each component and text in its place (the first from the page's corner,
+  each next one from the part before it, so a part drawn wider moves nothing after it into a finding) and at its size. A
+  new page is compared with the designed screen it started from, or the one sharing the most components: the page's
+  width, padding and spacing, and the size of each component the two share with the same options. A difference in the
+  page's own arrangement (padding, spacing, a part's place) is a ⚠️ line the Stop hook holds the reply to; a component
+  drawn at another size than Figma's is a • line for the audit, since it is the component's code. A picture of the page
+  is saved beside it (`<name>.png`), and Claude looks at it before answering. With a Figma image of the screen
+  (`.design-system-engine-refs/screens/<screen>.png`, at any scale, or FIGMA_TOKEN), the share of pixels that differ is
+  printed, with a diff image. `--no-browser` draws without measuring.
+- **Drawn as the designed screen shows.** A screen read from Figma (`--from-screens`, the screen capture records each
+  layer's place, the screen's modes, what clips and what fills its parent, and the words each small instance shows) is
+  drawn in its own modes (`Page.mode`), at its fixed size with what overflows cut (`Page.height`, `clip`), with each
+  side's padding (`paddingTop` … `paddingLeft`), filling its parent as in Figma (`grow` along, `stretch` across). A
+  layer placed over the layout (connector lines, a background) is left out and listed. A component Figma has and the
+  code lacks keeps what the screen put inside it and its size. A frame bound to one of the system's colour tokens is
+  drawn with the code's variable for it (`surface`; a text's `color`), and is still listed as a container the system
+  could own. An option value turns on the class the system's CSS adds for it (Selected=True the class that says
+  selected); one the CSS has no class for is drawn without it, with a warning. Each instance's own words are written
+  into its text parts, and an instance that shows no words (an icon-only button) shows none.
+- **Accessibility of the drawn page.** With Chrome, the page also goes through the accessibility check (contrast in
+  every mode, names, one main heading, the keyboard; the engine's bar left out). What the composition itself causes (no
+  main heading, a text colour that does not read on its surface) is a ⚠️ line the reply owes; what a system component
+  does is a • line for the audit.
+- A composition with an error is not drawn (exit 1). A file `{ "prototype": …, "gaps": [...] }` adds the gaps written
+  beside it.
+
+`rms-design-system-engine --prototype --from-screens <capture.json>` turns designed screens into starting points:
+`prototypes/<screen>.json`, each drawn at once. The capture is `SCREEN_CAPTURE_JS` in `screen-layout.mjs`, a read-only
+Plugin API script run with the Figma MCP (`use_figma`) or figma-cli on the screens' node ids; it records where each
+layer sits on its screen and whether it fills its parent (an older capture is placed by auto layout). Each screen keeps its
+arrangement (auto layout direction, gap and padding as spacing tokens, Fill as `grow`, alignment), the system's
+components with their options and what their slots hold; a local component that holds others (a whole screen made a
+component) is read as layout and listed as a template or component the system could own; a frame with its own fill,
+border or corner, a typed number, a text with no style, a shape and a component the catalog lacks are gaps. It ends with
+the spacing habits across the screens and the structures that repeat (template candidates). A starting point already
+in `prototypes/` is kept unless `--force`.
+
 #### Adoption baseline / ratchet (opt-in, gate-level)
 
 A real codebase is rarely 100% green on day one. Rather than a wall of red (ignored) or turning gates
@@ -505,12 +623,20 @@ whatever surface the project serves, in this order:
 1. **Configured / built** — `--url <route>` (repeatable/comma; runs with **no `ds-config.json`** at all),
    or `ds-config.json → a11y.urls`.
 2. **The generated styleguide** (the preferred default when it exists) — `ds-config.json → styleguide.out`
-   (default `apps/styleguide/index.html`), opened via `file://`. It renders **every component × every
+   (else `apps/styleguide/index.html`, else the engine template's `.design-system-engine-out/styleguide/index.html`),
+   opened via `file://`. It renders **every component × every
    state on one static page**, so the sweep is deterministic, complete and needs **no dev server**, and —
    because each state is its own instance in the resting DOM — the existing checks get **per-state coverage
    for free** (a disabled/checked/error instance is measured directly). `a11y.styleguide:false` opts out;
    `a11y.regenerateStyleguide:true` rebuilds it first (via `styleguide-gen.mjs`) so a11y never audits a
    stale one. Falls through to the built plugin UIs (`apps/*/ui.html`) when there is no styleguide.
+   **The components rendered from their own code** (`component-harness.mjs`) — in build mode, or when there is no
+   page to open: each React component (`.jsx`/`.tsx`) in each of its Figma variants on one served page, its CSS
+   linked and its JSX turned into calls to a small stand-in for React that keeps each component's state and updates
+   the page in place (TypeScript from the project, else the global npm folder). The page acts as an app does: it
+   gives a field or a spinbutton a name, and tells a controlled toggle its new state when it reports a click. So
+   names, roles, parts and behaviours are tried on what ships, with no dev server. One it cannot load is listed as
+   not rendered, never clean. `a11y.harness: false` turns it off.
 3. **Auto-discovery (the default when nothing is configured)** — it reads `package.json`, **starts the
    project's dev server** (`storybook` / `dev` / `serve` / `start` / `preview`, or `a11y.serve`), reads the
    URL it prints, and **enumerates the pages itself**: Storybook stories → else static router routes → else
@@ -557,6 +683,32 @@ there, never a failure.
 - **Figma accessibility annotations** — a note that states a role, a name, a heading level or alt text is
   checked against what the component renders (see *Writing accessibility notes in Figma* below). Other notes
   stay notes.
+- **Part roles (I85)** — a note `Role: label` (or `errormessage`, `description`, `indicator`, `increment`,
+  `decrement`, `placeholder`, `value`, `panel`; also `error`, `helper text`, `hint`, `icon`, `plus`, `minus`) on an
+  inner layer says what that part owes its control: a label names it (a `<label for>`, the control inside it, or
+  `aria-labelledby`), an error message is linked while it shows (`aria-describedby` or `aria-errormessage`, with
+  `aria-invalid="true"`), a description is linked with `aria-describedby`, an indicator stays silent
+  (`aria-hidden="true"`), a step button has a name with a word in it (a lone `-` is not one), a placeholder is not the
+  only name, a value is exposed by its spinbutton or slider, a panel is named by `aria-controls`. The part is the
+  contract's child of that name, else the element whose class ends with the layer's name. The build sheet lists
+  each part's duty.
+- **Behaviours (I92)** — what a person can do with a component comes with its role and runs in Chrome on the
+  first instance a page shows: Space flips a toggle button's `aria-pressed`; a click and Space flip a switch or a
+  checkbox; a click flips a disclosure's `aria-expanded` and shows or hides its panel; a click selects a tab and no
+  other; typing writes into a text box. A Figma note adds one: `Escape closes`, `arrow keys move`, `Enter and Space
+  activate`. A behaviour needs the component's own script, so it runs on a page that has it (`a11y.urls`, `--url`,
+  Storybook, the app); on the engine's style guide, which draws markup only, it is listed as not checked. An
+  exception is the person's: `contract.authored.json → components[name].behaviourExceptions` `{ "<behaviour id>":
+  "<why, with a link to the ADR or pull request>" }` (ids: `keys-toggle`, `click-toggle`, `click-expand`,
+  `click-select`, `types`, `escape-closes`, `arrows-move`, `keys-activate`). Without a link it is still checked, and
+  that is reported. The build sheet lists each role's behaviours. On the style guide they run when the project lists
+  its scripts in `systemScripts`.
+- **States follow their props** — on the style guide, an option that shows a state (Selected, Pressed, Checked,
+  Expanded, Error, Disabled) and changes only a class is reported: a screen reader still hears the component as it
+  was. The attribute its role names goes with it (`aria-pressed` for a toggle button, `aria-selected` for a tab,
+  `aria-checked` for a switch or checkbox, `aria-expanded`, `aria-invalid`, `disabled`). A computed ARIA attribute in
+  JSX (`aria-pressed={pressed ? 'true' : 'false'}`) is drawn with the props' defaults, so the drawn component says what
+  the real one does.
 
 **Writing accessibility notes in Figma.** Use Figma's annotation tool on the component (the component set or
 a standalone component). A category such as "Accessibility" helps people find them; the skill reads the text.

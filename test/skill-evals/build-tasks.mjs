@@ -4,7 +4,7 @@
 // also has what the skill gives a project: its config and the Figma snapshots. The MCP's side has neither.
 //
 // Scored by build-score.mjs, the same way whoever built it: rendered in a browser and measured against the Figma facts.
-import { cpSync, readFileSync } from 'node:fs';
+import { cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderCases, cssVariables, compare, rgb, offSystemValues, written } from './build-score.mjs';
@@ -24,6 +24,8 @@ export const TOKENS = {
   dark: Object.fromEntries(Object.entries(VARS.color.dark).map(([k, v]) => [cssName(k), v])),
 };
 const DECLARED = new Set(Object.keys(TOKENS.light));
+// The designer's change for update-chip, as Figma has it after (captured from the Tidepool file with the change in place).
+const CHANGED = { light: '#dfe7f7', dark: '#2d3b5c', radius: '12px' };
 
 const withTokens = (dir) => cpSync(join(REF, 'src/styles'), join(dir, 'src/styles'), { recursive: true });
 const withComponents = (dir) => { withTokens(dir); cpSync(join(REF, 'src/components'), join(dir, 'src/components'), { recursive: true }); };
@@ -63,6 +65,58 @@ async function componentChecks(ctx, file, exportName, label, cases, a11y) {
 }
 
 const font = (size, lh) => ({ fontSize: size, fontWeight: 500, lineHeight: lh });
+
+// The disclosure, tried in the browser as a person would: closed, a click opens it, a second click closes it. A
+// component the page opens itself (an uncontrolled one) or one that opens from its prop and tells its parent on a
+// click (a controlled one) both count.
+const DISCLOSURE = `(sel) => {
+  const host = document.querySelector(sel);
+  const vis = (x) => { if (!x || !x.isConnected) return false; for (let n = x; n && n !== host; n = n.parentElement) { const s = getComputedStyle(n); if (s.display === 'none' || s.visibility === 'hidden' || n.hidden) return false; } const r = x.getBoundingClientRect(); return r.height > 0 && r.width > 0; };
+  const trig = () => host.querySelector('button,[role=button],summary');
+  const passage = () => [...host.querySelectorAll('*')].find((n) => !n.children.length && /two business days/.test(n.textContent));
+  const read = () => {
+    const t = trig(); if (!t) return null;
+    const id = (t.getAttribute('aria-controls') || '').split(/\\s+/)[0]; const panel = id ? document.getElementById(id) : null; const p = passage();
+    const marks = [...t.querySelectorAll('svg,img,[class*=chevron i],[class*=icon i],[class*=indicator i],[class*=arrow i],[class*=caret i]')];
+    const heard = marks.filter((m) => !m.closest('[aria-hidden="true"]') && m.getAttribute('role') !== 'presentation' && !(m.tagName === 'IMG' && m.getAttribute('alt') === '') && (m.tagName === 'IMG' || m.tagName.toLowerCase() === 'svg' || m.textContent.trim()));
+    return { tag: t.tagName.toLowerCase(), role: t.getAttribute('role'), expanded: t.getAttribute('aria-expanded'), controls: !!panel, controlsPassage: !!(panel && p && (panel === p || panel.contains(p))), shown: vis(p), silent: !heard.length };
+  };
+  const before = read(); if (!before) return { before: null };
+  trig().click(); const after = read(); trig().click(); const again = read();
+  let called = 0; const f = () => { called++; };
+  host.innerHTML = ''; try { const n = window.__h(window.__C, { expanded: true, Expanded: true, open: true, isOpen: true, onToggle: f, onChange: f, onExpandedChange: f, onOpenChange: f, onClick: f }); host.append(n instanceof Node ? n : String(n ?? '')); } catch (e) {}
+  const open = read(); if (trig()) trig().click();
+  return { before, after, again, controlled: { open, called } };
+}`;
+
+// The stepper, tried as a person would: its value and range, the names of its two step buttons, a click on each, its
+// floor, and the arrow keys. One the page keeps itself (uncontrolled) or one that tells its parent the next value
+// (controlled) both count.
+const STEPPER = `(sel) => {
+  const host = document.querySelector(sel);
+  const spin = () => host.querySelector('[role=spinbutton],input[type=number]');
+  const valueOf = () => { const s = spin(); if (s) return Number(s.getAttribute('aria-valuenow') ?? s.value); const leaf = [...host.querySelectorAll('*')].find((n) => !n.children.length && /^\\s*\\d+\\s*$/.test(n.textContent)); return leaf ? Number(leaf.textContent) : NaN; };
+  const steps = () => [...host.querySelectorAll('button,[role=button]')].filter((b) => b !== spin() && !b.contains(spin())).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+  const nameOf = (b) => { const by = (b.getAttribute('aria-labelledby') || '').split(/\\s+/).map((id) => document.getElementById(id)).filter(Boolean).map((n) => n.textContent).join(' ');
+    const heard = [...b.childNodes].map((n) => (n.nodeType === 3 ? n.textContent : n.nodeType === 1 && !n.closest('[aria-hidden="true"]') && n.tagName.toLowerCase() !== 'svg' ? n.textContent : '')).join('');
+    return (b.getAttribute('aria-label') || by || heard || b.getAttribute('title') || '').trim(); };
+  const s0 = spin();
+  const range = s0 ? { role: s0.getAttribute('role') || s0.type, now: s0.getAttribute('aria-valuenow') ?? s0.value, min: s0.getAttribute('aria-valuemin') ?? s0.min, max: s0.getAttribute('aria-valuemax') ?? s0.max, named: !!(s0.getAttribute('aria-label') || s0.getAttribute('aria-labelledby') || (s0.labels && s0.labels.length)) } : null;
+  const names = steps().map(nameOf);
+  // Each click finds the button again: a re-render may have replaced it.
+  const dec = () => steps()[0], inc = () => steps()[steps().length - 1];
+  const start = valueOf();
+  let up = NaN, down = NaN, floor = NaN, key = NaN;
+  if (steps().length > 1) { inc().click(); up = valueOf(); dec().click(); down = valueOf(); for (let i = 0; i < start + 2; i++) { const d = dec(); if (d && !d.disabled) d.click(); } floor = valueOf(); }
+  const s1 = spin(); const native = !!(s1 && s1.tagName === 'INPUT');
+  if (s1 && !native) { const was = valueOf(); s1.focus(); s1.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true, cancelable: true })); key = valueOf() - was; }
+  const calls = []; const f = (a) => { calls.push(Number(a && typeof a === 'object' && a.target ? a.target.value : a)); };
+  const render = (v) => { host.innerHTML = ''; try { const n = window.__h(window.__C, { value: v, Value: String(v), onChange: f, onValueChange: f }); host.append(n instanceof Node ? n : String(n ?? '')); } catch (e) {} };
+  render(3); const cs = steps(); if (cs.length > 1) cs[cs.length - 1].click(); const cUp = calls.slice();
+  calls.length = 0; render(0); const cd = steps(); if (cd.length > 1 && !cd[0].disabled) cd[0].click(); const cFloor = calls.slice();
+  calls.length = 0; render(3); const cs2 = spin(); if (cs2 && cs2.tagName !== 'INPUT') cs2.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true, cancelable: true })); const cKey = calls.slice();
+  return { range, names, start, up, down, floor, native, key, controlled: { up: cUp, floor: cFloor, key: cKey } };
+}`;
 
 export const BUILD = [
   {
@@ -115,7 +169,8 @@ export const BUILD = [
     id: 'build-field', mayChangeAll: true, setup: withTokens,
     prompt: `build the field from our Figma design system as a React component, exported as Field from src/components/Field.jsx, styled with CSS that uses the design tokens in src/styles/tokens.css. ${MCP('field')}`,
     score: (ctx) => componentChecks(ctx, 'src/components/Field.jsx', 'Field', null, [
-      { id: 'default', props: { ...propsOf({}), value: 'Ada', defaultValue: 'Ada', 'aria-label': 'Name' }, expect: { height: 36, paddingTop: 8, paddingLeft: 8, radius: 6, borderWidth: 1, borderColor: L['field/border'], color: L['text/primary'], ...font(14, 20) } },
+      // Named the two usual ways: aria-label passed through, or the component's own label prop.
+      { id: 'default', props: { ...propsOf({}), value: 'Ada', defaultValue: 'Ada', 'aria-label': 'Name', label: 'Name' }, expect: { height: 36, paddingTop: 8, paddingLeft: 8, radius: 6, borderWidth: 1, borderColor: L['field/border'], color: L['text/primary'], ...font(14, 20) } },
       { id: 'state Error', props: { ...propsOf({ State: 'Error' }), error: true, invalid: true, value: 'Ada', defaultValue: 'Ada', 'aria-label': 'Name' }, expect: { borderColor: L['field/border/error'] } },
       { id: 'dark', props: { value: 'Ada', defaultValue: 'Ada', 'aria-label': 'Name' }, dark: true, expectDark: (m) => sameColor(m, 'borderColor', D['field/border']), expect: { borderColor: D['field/border'], color: D['text/primary'] } },
       { id: 'dark error', props: { ...propsOf({ State: 'Error' }), error: true, invalid: true, value: 'Ada', 'aria-label': 'Name' }, dark: true, expectDark: (m) => sameColor(m, 'borderColor', D['field/border/error']), expect: { borderColor: D['field/border/error'] } },
@@ -138,6 +193,79 @@ export const BUILD = [
       if (i !== -1) r[i] = cleanCode(ctx, { allowHex: ['#d6f5e3', '#136c3a'] });
       r.push(check('says the Positive colours have no variable in the design system', flagsMissing(ctx.final)));
       return r;
+    },
+  },
+  {
+    id: 'build-disclosure', mayChangeAll: true, setup: withTokens,
+    prompt: `build the disclosure from our Figma design system as a React component, exported as Disclosure from src/components/Disclosure.jsx, styled with CSS that uses the design tokens in src/styles/tokens.css. ${MCP('disclosure')}`,
+    score: (ctx) => componentChecks(ctx, 'src/components/Disclosure.jsx', 'Disclosure', 'Details', [
+      { id: 'closed', props: propsOf({ Label: 'Details', Content: 'Shipping takes two business days.' }), expect: { height: 38, color: L['text/primary'], ...font(14, 20) } },
+      { id: 'dark', props: propsOf({ Label: 'Details' }), dark: true, expectDark: (m) => sameColor(m, 'color', D['text/primary']), expect: { color: D['text/primary'] } },
+      { id: 'tried', probe: true, props: {}, script: DISCLOSURE },
+    ], (r) => {
+      const t = r.tried ?? {}, b = t.before, a = t.after, g = t.again, c = t.controlled ?? {};
+      const controlled = c.open?.expanded === 'true' && c.open.shown && c.called > 0;
+      return [
+        check('it is a button that says whether it is open (Figma role: disclosure): aria-expanded="false" while closed', b && (b.tag === 'button' || b.role === 'button' || b.tag === 'summary') && b.expanded === 'false' && !b.shown, b ? `${b.tag} aria-expanded=${b.expanded}, passage ${b.shown ? 'shown' : 'hidden'}` : 'no button'),
+        check('a click opens it: aria-expanded="true" and the passage shows', (a && a.expanded === 'true' && a.shown) || controlled, a ? `aria-expanded=${a.expanded}, passage ${a.shown ? 'shown' : 'hidden'}${controlled ? ' (controlled: opens from its prop and calls its handler)' : ''}` : ''),
+        check('a second click closes it again', (a && a.expanded === 'true' && a.shown && g && g.expanded === 'false' && !g.shown) || controlled, g ? `aria-expanded=${g.expanded}, passage ${g.shown ? 'shown' : 'hidden'}` : ''),
+        check('aria-controls names the passage it opens (Figma: Panel, role panel)', (a && a.controlsPassage) || (c.open && c.open.controlsPassage), a ? `aria-controls ${a.controls ? 'points to an element' : 'missing or pointing nowhere'}${a.controls && !a.controlsPassage ? ' that does not hold the passage' : ''}` : ''),
+        check('the chevron is silent for screen readers (Figma: Chevron, role indicator)', b && b.silent),
+      ];
+    }),
+  },
+  {
+    id: 'build-stepper', mayChangeAll: true, setup: withTokens,
+    prompt: `build the stepper from our Figma design system as a React component, exported as Stepper from src/components/Stepper.jsx, styled with CSS that uses the design tokens in src/styles/tokens.css. ${MCP('stepper')}`,
+    score: (ctx) => componentChecks(ctx, 'src/components/Stepper.jsx', 'Stepper', null, [
+      { id: 'default', props: { ...propsOf({ Value: '1' }), 'aria-label': 'Guests', label: 'Guests' }, expect: { height: 30, paddingTop: 4, paddingLeft: 4, radius: 6, borderWidth: 1, borderColor: L['field/border'], bg: L['surface/page'], color: L['text/primary'], ...font(14, 20) } },
+      { id: 'dark', props: { ...propsOf({ Value: '1' }), 'aria-label': 'Guests' }, dark: true, expectDark: (m) => sameColor(m, 'borderColor', D['field/border']), expect: { borderColor: D['field/border'], bg: D['surface/page'] } },
+      { id: 'tried', probe: true, props: { ...propsOf({ Value: '1' }), 'aria-label': 'Guests', label: 'Guests' }, script: STEPPER },
+    ], (r) => {
+      const t = r.tried ?? {}, g = t.range, c = t.controlled ?? {};
+      const spoken = (n) => /[a-z]{3}/i.test(n ?? '');
+      const controlledUp = c.up?.includes(4), controlledFloor = Array.isArray(c.floor) && !c.floor.some((v) => v < 0);
+      return [
+        check('the value is a spinbutton with its range (Figma role: spinbutton, from 0 to 10)', g && String(g.now) === '1' && String(g.min) === '0' && String(g.max) === '10', g ? `${g.role} now=${g.now} min=${g.min} max=${g.max}` : 'no spinbutton or number input'),
+        check('the spinbutton can have an accessible name', g && g.named),
+        check('the step buttons have spoken names (Figma: Decrement and Increment, roles decrement and increment)', (t.names ?? []).length >= 2 && t.names.every(spoken), JSON.stringify(t.names ?? [])),
+        check('a click on Increment steps it up, on Decrement down', (t.up === t.start + 1 && t.down === t.start) || controlledUp, `from ${t.start}: up ${t.up}, down ${t.down}${controlledUp ? ' (controlled: tells its parent the next value)' : ''}`),
+        // A controlled stepper (its value from its prop) is measured through its parent, as its clicks are.
+        check('it stays within 0 to 10 (Decrement stops at 0)', t.floor === 0 || ((Number.isNaN(t.floor) || controlledUp) && controlledFloor), `after stepping down from ${t.start}: ${t.floor}${controlledUp ? ` (controlled: at 0 it reports ${c.floor?.length ? c.floor.join(', ') : 'nothing'})` : ''}`),
+        check('ArrowUp steps the spinbutton up', t.native || t.key === 1 || c.key?.includes(4), t.native ? 'a native number input' : `ArrowUp changed it by ${t.key}`),
+      ];
+    }),
+  },
+  {
+    // The designer changed the chip in Figma (its background, light and dark, and its corner radius); the code was built
+    // before. The Figma MCP shows the new light values only (figma-mcp/chip-changed.md, captured with the change in
+    // place); the skill's capture of the file has every mode.
+    id: 'update-chip', mayChangeAll: true,
+    setup: (dir) => {
+      withComponents(dir);
+      const f = join(dir, 'src/figma/figma-vars.snapshot.json');
+      const v = JSON.parse(readFileSync(f, 'utf8'));
+      v._updated = new Date().toISOString();
+      v.color.light['chip/background/color'] = CHANGED.light; v.color.dark['chip/background/color'] = CHANGED.dark; v.sizing['radii/chip'] = CHANGED.radius;
+      writeFileSync(f, JSON.stringify(v, null, 2) + '\n');
+    },
+    prompt: `our designer changed the chip in Figma. Update our code so the chip matches Figma again (we ship light and dark mode). What the Figma MCP returns for the chip now is in figma-mcp/chip-changed.md (its screenshot is figma-mcp/chip-changed.png; start with figma-mcp/_note.md).`,
+    score: async (ctx) => {
+      const names = Object.keys(TOKENS.light);
+      const want = { light: { ...TOKENS.light, '--chip-background': CHANGED.light, '--radii-chip': CHANGED.radius }, dark: { ...TOKENS.dark, '--chip-background': CHANGED.dark } };
+      // Dark mode is found by the tokens that did not change, so a wrong dark chip does not hide which mode is dark.
+      const v = await cssVariables(ctx.dir, names, (d) => Object.entries(want.dark).filter(([n]) => n !== '--chip-background').every(([n, x]) => sameValue(d[n], x)));
+      const moved = (mode) => Object.keys(want[mode]).filter((n) => !['--chip-background', '--radii-chip'].includes(n) && !sameValue(v[mode][n], want[mode][n]));
+      const r = await componentChecks(ctx, 'src/components/Chip.jsx', 'Chip', 'Filter', [
+        { id: 'light', props: propsOf({ Label: 'Filter' }), expect: { radius: 12, bg: CHANGED.light, color: L['chip/text'], height: 24 } },
+        { id: 'dark', props: propsOf({ Label: 'Filter' }), dark: true, expectDark: (m) => sameColor(m, 'bg', CHANGED.dark), expect: { bg: CHANGED.dark, color: D['chip/text'] } },
+      ], () => []);
+      return [
+        check('the new light background and radius are in the tokens (chip/background #dfe7f7, radii/chip 12px)', sameValue(v.light['--chip-background'], CHANGED.light) && sameValue(v.light['--radii-chip'], CHANGED.radius), `--chip-background ${v.light['--chip-background'] || '(missing)'}, --radii-chip ${v.light['--radii-chip'] || '(missing)'}`),
+        check('the new dark background is in the tokens (chip/background, dark: #2d3b5c)', sameValue(v.dark['--chip-background'], CHANGED.dark), `dark --chip-background ${v.dark['--chip-background'] || '(missing)'}`),
+        check('no other token moved', !moved('light').length && !moved('dark').length, [...moved('light'), ...moved('dark').map((n) => `${n} (dark)`)].join(', ')),
+        ...r,
+      ];
     },
   },
   {

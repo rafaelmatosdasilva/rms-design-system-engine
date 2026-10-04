@@ -98,6 +98,26 @@ function attributes(text) {
 
 const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
+// The value a computed attribute takes with the props' defaults, when it is simple enough to know: a string, a prop
+// ({label}), or a choice on one prop (pressed ? 'true' : 'false', State === 'Error' ? 'true' : undefined). null =
+// unknown or no attribute (undefined, null, false). So aria-pressed="false" is drawn, as the component renders it.
+export function attrValue(expr, defaults = {}) {
+  const e = String(expr ?? '').trim();
+  const lit = (x) => { const t = x.trim(); const m = /^(['"`])([^'"`]*)\1$/.exec(t); if (m) return m[2]; if (/^(undefined|null|false)$/.test(t)) return null; if (/^(true|-?\d+(\.\d+)?)$/.test(t)) return t; if (/^[A-Za-z_$][\w$]*$/.test(t)) return defaults[t] ?? null; return undefined; };
+  const direct = lit(e);
+  if (direct !== undefined) return direct;
+  const m = /^(.+?)\s*\?\s*(.+?)\s*:\s*(.+)$/s.exec(e);
+  if (!m) return null;
+  const [, cond, yes, no] = m;
+  const c = /^\s*([A-Za-z_$][\w$]*)\s*(===?|!==?)\s*(['"`])([^'"`]*)\3\s*$/.exec(cond), bare = /^\s*(!?)\s*([A-Za-z_$][\w$]*)\s*$/.exec(cond);
+  let truth;
+  if (c) { const v = defaults[c[1]]; if (v == null) return null; truth = (String(v) === c[4]) === c[2].startsWith('='); }
+  else if (bare) { const v = defaults[bare[2]]; truth = v != null && !/^(false|0|)$/.test(String(v)); if (bare[1]) truth = !truth; }
+  else return null;
+  const out = lit(truth ? yes : no);
+  return out === undefined ? null : out;
+}
+
 export function jsxMarkup(source, cls) {
   const jsx = returnedJsx(source);
   if (!jsx) return null;
@@ -128,7 +148,12 @@ export function jsxMarkup(source, cls) {
       for (const a of attributes(raw.slice(name.length + 1, raw.endsWith('/>') ? -2 : -1))) {
         if (a.spread) continue;
         if (a.key === 'className' || a.key === 'class') { classes = staticClass(a.expr ?? JSON.stringify(a.value ?? ''), source); continue; }
-        if (a.expr != null) { if (a.expr.trim() === 'true') attrs.push(a.key); continue; }   // computed: left out
+        if (a.expr != null) {
+          if (a.expr.trim() === 'true') { attrs.push(a.key); continue; }
+          // An ARIA state, a role, a type or a title computed from the props: drawn with their defaults when knowable.
+          if (/^(aria-[\w-]+|role|type|title|tabIndex|tabindex)$/.test(a.key)) { const v = attrValue(a.expr, defaults); if (v != null) attrs.push(`${a.key === 'tabIndex' ? 'tabindex' : a.key}="${esc(v)}"`); }
+          continue;   // anything else computed: left out
+        }
         if (/^on[A-Z]/.test(a.key) || a.key === 'key' || a.key === 'ref' || a.key === 'style') continue;
         attrs.push(a.value == null ? a.key : `${a.key === 'htmlFor' ? 'for' : a.key}="${esc(a.value)}"`);
       }

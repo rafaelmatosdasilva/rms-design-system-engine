@@ -25,7 +25,8 @@ export function collectFindings(lines) {
       if (!t) continue;
       if (/^(PARITY  ·|GATE SUMMARY)/.test(t)) { phase = 'skip'; continue; }
       if (/^(AUDIT FAILED|ALL GATES PASS|EVERY GATE THAT RAN|NO REGRESSIONS)/.test(t)) { phase = 'advisory'; section = null; continue; }
-      if (/^(AI-READINESS SCORECARD|📓|📐)/.test(t)) { section = null; continue; }
+      // The design's own debt (what the Figma file owes) is not a code finding: never tracked, never in the burndown.
+      if (/^(AI-READINESS SCORECARD|📓|📐|♿ Accessibility in the Figma file)/.test(t)) { section = null; continue; }
       if (phase === 'gates') {
         const g = line.match(GATE);
         if (g) { section = g[3].trim(); sectionBad = g[1] === '❌'; if (sectionBad) out.add(`${section} :: gate fails`); continue; }
@@ -93,7 +94,8 @@ export function componentOf(finding, names) {
 }
 // Lines that are not a finding of anything: a count ("❌ FAIL  1", "⚠️  NEW SKIP  0"), the fix under a
 // finding, a gate that printed no result line.
-const NOT_A_FINDING = / :: ((❌|⚠️)\s+[A-Z][A-Z ?]*\s+\d|Fix:|⚠️\s+this gate printed no result line)/;
+// A scoped run's note about the findings it left out ("… 2 finding(s) outside badge") names the scope, not a finding of it.
+const NOT_A_FINDING = / :: ((❌|⚠️)\s+[A-Z][A-Z ?]*\s+\d|Fix:|⚠️\s+this gate printed no result line|… \d+ finding\(s\) outside )/;
 // Work in the Figma file, not in the code the burndown works down.
 const FIGMA_WORK = /^Figma file hygiene :: /;
 

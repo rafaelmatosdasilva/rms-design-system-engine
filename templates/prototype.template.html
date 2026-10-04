@@ -13,7 +13,7 @@
 /* The bar above the prototype is the engine's, not the design system's: it keeps to its own prefixed classes. */
 html, body { margin: 0; }
 .pt-bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 16px; font: 13px/1.4 system-ui, sans-serif; color: #1d1d1f; background: #f5f5f7; border-bottom: 1px solid #d2d2d7; }
-.pt-bar h1 { font-size: 14px; margin: 0 8px 0 0; font-weight: 600; }
+.pt-bar .pt-name { font-size: 14px; margin: 0 8px 0 0; font-weight: 600; }
 .pt-bar button { font: inherit; padding: 4px 10px; border: 1px solid #c7c7cc; border-radius: 6px; background: #fff; color: inherit; cursor: pointer; }
 .pt-bar button[aria-pressed="true"] { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
 .pt-seg { display: inline-flex; gap: 4px; }
@@ -28,13 +28,18 @@ html, body { margin: 0; }
 .pt-show [data-pt-standin] { outline: 2px solid #ff9f0a; outline-offset: 2px; }
 .pt-missing-box { display: flex !important; flex-direction: column; align-items: stretch !important; justify-content: flex-start !important; gap: 4px; }
 .pt-missing-cap { font: 11px/1.4 system-ui, sans-serif; color: #6e6e73; }
+/* A component Figma has and the code has not built: what the screen put inside it, outlined only when asked. */
+.pt-unbuilt { box-sizing: border-box; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 0; }
+.pt-unbuilt > .pt-missing-cap { display: none; }
+.pt-show .pt-unbuilt { outline: 2px dashed #ff9f0a; outline-offset: -2px; }
+.pt-show .pt-unbuilt > .pt-missing-cap { display: block; }
 .pt-missing { box-sizing: border-box; display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; border: 1px dashed #8e8e93; border-radius: 4px; font: 12px/1.4 system-ui, sans-serif; color: #6e6e73; background: repeating-linear-gradient(45deg, transparent 0 6px, rgba(142,142,147,.08) 6px 12px); }
 </style>
 </head>
 <body>
 <!--{{ICON_SHEET}}-->
 <div class="pt-bar" role="toolbar" aria-label="Prototype">
-  <h1 id="pt-title">Prototype</h1>
+  <strong class="pt-name" id="pt-title">Prototype</strong>
   <span class="pt-seg" id="pt-modes"></span>
   <button type="button" id="pt-outline" aria-pressed="false">Show engine layout and stand-ins</button>
   <button type="button" id="pt-gaps-toggle" aria-pressed="false">Gaps</button>
@@ -47,15 +52,30 @@ html, body { margin: 0; }
 (function () {
   var D = JSON.parse(document.getElementById('pt-data').textContent || '{}');
   var html = document.documentElement, canvas = document.getElementById('pt-canvas');
-  var COMP = D.components || {}, SCALES = D.scales || { spacing: [], text: [] };
+  var WROTE = [], COMP = D.components || {}, SCALES = D.scales || { spacing: [], text: [] };
   document.title = D.name ? D.name + ' · prototype' : 'Prototype';
   document.getElementById('pt-title').textContent = D.name || 'Prototype';
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function colour(name) { var t = (SCALES.colors || []).find(function (c) { return c.name === name; }); return t ? 'var(' + t.var + ')' : ''; }
   function space(name) { if (!name || name === 'none') return '0'; var t = SCALES.spacing.find(function (s) { return s.name === name; }); return t ? 'var(' + t.var + ', ' + t.value + ')' : '0'; }
 
   // A system component, drawn as the style guide draws it: its own markup, then each option's own effect.
-  function baseElement(c) {
-    if (c.markup) { var t = document.createElement('template'); t.innerHTML = c.markup.trim(); var first = t.content.firstElementChild; if (first) return first; }
+  // The words a markup has room for: each run of text it shows and each field.
+  function slotsIn(e) {
+    var n = 0, w = document.createTreeWalker(e, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT), x;
+    while ((x = w.nextNode())) { if (x.nodeType === 1) { if (x.tagName === 'INPUT' || x.tagName === 'TEXTAREA') n++; } else if (x.textContent.trim() && !x.parentNode.closest('svg')) n++; }
+    return n;
+  }
+  function parse(m) { var t = document.createElement('template'); t.innerHTML = String(m).trim(); return t.content.firstElementChild; }
+  // Of the markups the code shows for a component, the one with room for as many words as the designed instance shows,
+  // none for one that shows no words (an icon-only switch); the fullest when several fit, or when nothing is known.
+  function baseElement(c, count) {
+    if (c.markups && c.markups.length > 1 && count != null) {
+      var best = null, bestGap = Infinity;
+      c.markups.forEach(function (m) { var e = parse(m); if (!e) return; var gap = Math.abs(slotsIn(e) - count); if (gap < bestGap) { best = e; bestGap = gap; } });
+      if (best) return best;
+    }
+    if (c.markup) { var first = parse(c.markup); if (first) return first; }
     var e;
     switch (c.role) {
       case 'button': e = document.createElement('button'); e.type = 'button'; break;
@@ -86,15 +106,127 @@ html, body { margin: 0; }
     return leaf;
   }
   function truthy(v) { return v === true || /^true$/i.test(String(v)); }
+  // An option Figma and the code do not share by name is drawn on the part its name points to: TitleContent writes the
+  // element whose class says title, "Show Description" off removes the one that says description, a label goes where
+  // the component's text is. A page instance's own state (hidden, placed absolutely on its page) is taken off.
+  function keyWord(prop) { return String(prop).replace(/^show[\s_-]*/i, '').replace(/[\s_-]*content$/i, '').replace(/[\s_-]+/g, '').toLowerCase(); }
+  function partFor(e, word) {
+    if (!word) return null;
+    var all = Array.prototype.slice.call(e.querySelectorAll('[class]'));
+    var hit = all.find(function (k) { return (k.getAttribute('class') || '').toLowerCase().split(/[\s_-]+/).some(function (c) { return c === word || (c.length >= 4 && word.indexOf(c) === 0) || (word.length >= 4 && c.indexOf(word) === 0); }); });
+    if (hit) return hit;
+    if (word === 'icon') return e.querySelector('svg');
+    return null;
+  }
+  var WRITTEN = [];
+  function setText(el, v) {
+    WRITTEN.push(el); WROTE.push(String(v).trim());
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') { el.value = v; return; }
+    if (!el.children.length) { el.textContent = v; return; }
+    // Its parts stay: the words go in its own text, else its first part without an icon.
+    var tn = Array.prototype.find.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); });
+    var span = Array.prototype.find.call(el.children, function (k) { return k.tagName !== 'svg' && !k.querySelector('svg') && !/icon/i.test(k.getAttribute('class') || ''); });
+    if (tn) tn.textContent = v; else if (span) span.textContent = v; else { var t = document.createElement('span'); t.textContent = v; el.appendChild(t); }
+  }
+  // The element holding the first words a component's markup shows (its text slot), or null.
+  function firstWords(e) {
+    var w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT), n;
+    while ((n = w.nextNode())) if (n.textContent.trim() && !n.parentNode.closest('svg')) return n.parentNode;
+    return null;
+  }
+  function cleanInstance(e) {
+    Array.prototype.slice.call(e.classList).forEach(function (k) { if (/^(hidden|is-hidden|d-none|invisible)$/.test(k)) e.classList.remove(k); });
+    e.removeAttribute('hidden');
+    ['position', 'inset', 'top', 'left', 'right', 'bottom'].forEach(function (k) { e.style[k] = ''; });
+    if (e.style.display === 'none') e.style.display = '';
+  }
+  function byName(e, c, p, done) {
+    Object.keys(p).forEach(function (k) {
+      if (done[k] || k === 'standInFor') return;
+      var word = keyWord(k);
+      if ((c.boolProps || {})[k]) { if (!truthy(p[k])) { var gone = partFor(e, word); if (gone && gone !== e) gone.remove(); } else modifier(e, c, k, 'true'); return; }
+      if (Object.prototype.hasOwnProperty.call(c.enumProps || {}, k)) { modifier(e, c, k, p[k]); return; }
+      if (!Object.prototype.hasOwnProperty.call(c.textProps || {}, k) || p[k] == null || p[k] === '') return;
+      var dflt = String(c.textProps[k] || '').trim().toLowerCase();
+      var target = partFor(e, word);
+      if (!target && dflt) target = Array.prototype.slice.call(e.querySelectorAll('*')).find(function (x) { return !x.children.length && x.textContent.trim().toLowerCase() === dflt; }) || null;
+      if (!target && (word === 'label' || word === 'title' || word === 'text')) target = firstWords(e) || e;
+      if (target) setText(target, String(p[k]));
+    });
+  }
+  // Its size on the designed screen, for a component the code has no CSS for yet: fixed, or filling its parent.
+  // Fill the parent the way the screen does, along its direction or across it; a component the code lacks also keeps
+  // the screen's fixed size, since it has no CSS of its own.
+  function sized(e, p, row, fixed) {
+    var b = p.box; if (!b) return;
+    var along = row ? b.fillW : b.fillH, across = row ? b.fillH : b.fillW;
+    if (along) { e.style.flex = '1 1 0'; e.style[row ? 'minWidth' : 'minHeight'] = '0'; }
+    if (across) e.style.alignSelf = 'stretch';
+    if (fixed && !b.fillW && b.w) { e.style.width = b.w + 'px'; e.style.flexShrink = '0'; }
+    if (fixed && !b.fillH && b.h) { e.style.height = b.h + 'px'; e.style.flexShrink = '0'; }
+  }
+  // An option value turns on the class the system's CSS adds for it: Selected=True the class that says selected,
+  // State=Disabled the one that says disabled. A default or false value turns nothing on.
+  function modifier(e, c, k, v) {
+    var mods = c.mods || []; if (!mods.length || v == null) return;
+    var val = String(v).toLowerCase();
+    if (/^(default|false|none|off|no|normal|rest)$/.test(val)) return;
+    var word = val === 'true' ? keyWord(k) : keyWord(v);
+    if (word.length < 3) return;
+    var hit = mods.find(function (m) { var w = m.toLowerCase().replace(/[^a-z0-9]/g, ''); return w === word || w.slice(-word.length) === word || (word.length >= 4 && w.indexOf(word) >= 0); })
+      // else the class whose rules use the variables the value names (Type=negative: the class coloured with --…-negative).
+      || (word.length >= 4 && mods.find(function (m) { return ((c.modVars || {})[m] || []).some(function (v) { return v.toLowerCase().replace(/[^a-z0-9]/g, '').indexOf(word) >= 0; }); }));
+    if (hit) e.classList.add(hit);
+  }
+  // The words a designed instance shows, written into the component's text slots that no option wrote, in order: each
+  // run of text its markup shows (a placeholder, a label between parts), an input's placeholder, else the empty element.
+  function writeWords(e, content, done) {
+    if (!Array.isArray(content) || !content.length) return;
+    var left = content.slice();
+    WROTE.forEach(function (w) { var i = left.indexOf(w); if (i >= 0) left.splice(i, 1); });
+    if (!left.length) return;
+    var slots = [], w = document.createTreeWalker(e, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT), n;
+    while ((n = w.nextNode())) {
+      if (n.nodeType === 1) { if (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA') slots.push(n); continue; }
+      var host = n.parentNode;
+      if (!n.textContent.trim() || host.closest('svg') || done.indexOf(host) >= 0) continue;
+      slots.push(n);
+    }
+    if (!slots.length && !e.children.length) slots = [e];
+    if (!slots.length) return;
+    // More words than slots: the last one takes the rest ("High · 5" in one label).
+    slots.slice(0, left.length).forEach(function (x, i) {
+      var v = i === slots.length - 1 ? left.slice(i).join(' ') : left[i];
+      if (x.tagName === 'INPUT' || x.tagName === 'TEXTAREA') { if (!x.value) x.placeholder = v; } else x.textContent = v;
+    });
+  }
+  // A swapped-in icon (iconContent: Icon-var-color) drawn from the system's icon sheet: into the component's empty icon
+  // part, else in place of its first icon. One the sheet does not have leaves the part as the code draws it.
+  function swapIcons(e, c, p) {
+    Object.keys(c.slotProps || {}).forEach(function (k) {
+      var v = p[k]; if (typeof v !== 'string' || !v) return;
+      var flat = v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      var id = [flat, 'icon-' + flat, flat.replace(/^icon-/, '')].find(function (x) { return document.getElementById(x) && document.getElementById(x).tagName.toLowerCase() === 'symbol'; });
+      if (!id) return;
+      var use = '<svg width="16" height="16" aria-hidden="true"><use href="#' + id + '"/></svg>';
+      var slot = Array.prototype.find.call(e.querySelectorAll('[class*="icon" i]'), function (x) { return !x.children.length && !x.textContent.trim() && x.tagName.toLowerCase() !== 'svg'; });
+      if (slot) { slot.innerHTML = use; return; }
+      var u = e.querySelector('svg use'); if (u) u.setAttribute('href', '#' + id);
+    });
+  }
   function systemComponent(node) {
     var c = COMP[node.component];
+    WROTE = [];
     if (!c) {
       // A component the code does not have: a labelled box, and what the screen put in it stays visible inside.
-      if ((node.children || []).length) { var box = document.createElement('div'); box.className = 'pt-missing pt-missing-box'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', node.component + ' (not built in the code yet)'); var cap = document.createElement('div'); cap.className = 'pt-missing-cap'; cap.textContent = node.component + ' (not built in the code yet)'; box.appendChild(cap); return box; }
+      if ((node.children || []).length) { var box = document.createElement('div'); box.className = 'pt-unbuilt'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', node.component + ' (not built in the code yet)'); var cap = document.createElement('div'); cap.className = 'pt-missing-cap'; cap.textContent = node.component + ' (not built in the code yet)'; box.appendChild(cap); box.setAttribute('data-pt-unbuilt', ''); if ((node.props || {}).surface) box.style.background = colour(node.props.surface); return box; }
       return missing(node.component + ' (not built in the code yet)');
     }
-    var e = baseElement(c), p = node.props || {};
+    var p = node.props || {}, e = baseElement(c, p.textless ? 0 : (Array.isArray(p.content) && p.content.length ? p.content.length : null)), done = {};
+    if (c.markup) cleanInstance(e);
+    else { var words = Object.keys(c.textProps || {}).map(function (k) { return p[k]; }).filter(function (v) { return v != null && v !== ''; }); if (words.length) e.textContent = words.join(' · '); }
     (c.controls || []).forEach(function (ctl) {
+      done[ctl.label] = 1; done[ctl.prop] = 1;
       var has = Object.prototype.hasOwnProperty.call(p, ctl.label) ? p[ctl.label] : (Object.prototype.hasOwnProperty.call(p, ctl.prop) ? p[ctl.prop] : undefined);
       var v = has === undefined ? ctl.default : has;
       if (ctl.type === 'VARIANT') (ctl.options || []).forEach(function (o) { applyEffect(e, o, o.label === String(v)); });
@@ -103,6 +235,9 @@ html, body { margin: 0; }
         else if (ctl.part && !truthy(v)) partsOf(e, ctl.part).forEach(function (k) { if (k !== e) k.remove(); });
       } else if (ctl.type === 'TEXT' && v != null && v !== '') { var leaf = textLeaf(e, ctl.part); if (leaf.tagName === 'INPUT' || leaf.tagName === 'TEXTAREA') leaf.placeholder = v; else leaf.textContent = v; }
     });
+    if (c.markup) { byName(e, c, p, done); writeWords(e, p.content, WRITTEN); swapIcons(e, c, p); if (p.figmaState) modifier(e, c, 'State', p.figmaState); }
+    // The designed instance shows no words (an icon-only button): none are drawn.
+    if (p.textless) Array.prototype.slice.call(e.querySelectorAll('*')).concat([e]).forEach(function (x) { if (!x.closest('svg')) Array.prototype.forEach.call(x.childNodes, function (n) { if (n.nodeType === 3) n.textContent = ''; }); });
     if (p.standInFor) { e.setAttribute('data-pt-standin', ''); e.title = 'Stand-in for ' + p.standInFor; }
     return e;
   }
@@ -111,22 +246,33 @@ html, body { margin: 0; }
   // The engine's neutral pieces: arrangement and copy, with the system's spacing and text styles only.
   function piece(node) {
     var p = node.props || {}, e;
-    if (node.component === 'Missing') return missing(p.need || 'unnamed need');
+    if (node.component === 'Missing') {
+      var mb = missing(p.need || 'unnamed need');
+      // A missing piece the size the screen gives it (an icon stays an icon's size), its name in its title.
+      if (p.box && p.box.w && p.box.h && p.box.w * p.box.h < 4000) { mb.style.width = p.box.w + 'px'; mb.style.height = p.box.h + 'px'; mb.style.minHeight = '0'; mb.style.padding = '0'; mb.style.fontSize = '0'; mb.title = 'Missing: ' + (p.need || ''); mb.style.flexShrink = '0'; }
+      return mb;
+    }
     if (node.component === 'Text') {
       e = document.createElement(/^(h1|h2|h3|p|span)$/.test(p.as) ? p.as : 'p');
       e.className = 'pt-text'; e.style.margin = '0';
       var st = SCALES.text.find(function (t) { return t.name === p.style; });
       if (st) { e.style.fontSize = st.size; e.style.fontWeight = st.weight; e.style.lineHeight = st.lh; if (st.family) e.style.fontFamily = st.family; }
+      if (p.color) e.style.color = colour(p.color);
       e.textContent = p.text || '';
       return e;
     }
     e = document.createElement(node.component === 'Page' ? 'div' : 'div');
     e.className = 'pt-engine'; e.setAttribute('data-engine', node.component);
     if (truthy(p.grow)) { e.style.flex = '1 1 0'; e.style.minWidth = '0'; e.style.minHeight = '0'; }
+    if (truthy(p.stretch)) e.style.alignSelf = 'stretch';
+    if (p.surface) e.style.background = colour(p.surface);
     if (node.component === 'Page' && /^\d+$/.test(String(p.width || ''))) { e.style.width = p.width + 'px'; e.style.maxWidth = '100%'; }
+    if (truthy(p.clip)) { e.style.overflow = 'hidden'; e.style.minHeight = '0'; }
     e.style.padding = space(p.padding); e.style.gap = space(p.gap);
+    ['Top', 'Right', 'Bottom', 'Left'].forEach(function (side) { if (p['padding' + side]) e.style['padding' + side] = space(p['padding' + side]); });
     if (node.component === 'Page') {
-      e.style.display = 'flex'; e.style.flexDirection = 'column'; e.style.minHeight = 'calc(100vh - 48px)';
+      e.style.display = 'flex'; e.style.flexDirection = 'column';
+      if (/^\d+$/.test(String(p.height || ''))) e.style.height = p.height + 'px'; else e.style.minHeight = 'calc(100vh - 48px)';
       if (SCALES.surface) e.style.background = 'var(' + SCALES.surface + ')';
       if (SCALES.ink) e.style.color = 'var(' + SCALES.ink + ')';
       if (SCALES.family) e.style.fontFamily = SCALES.family;
@@ -137,17 +283,27 @@ html, body { margin: 0; }
     e.style.alignItems = { start: 'flex-start', end: 'flex-end', center: 'center', stretch: 'stretch', baseline: 'baseline' }[p.align] || (node.component === 'Columns' ? 'stretch' : 'flex-start');
     return e;
   }
-  function draw(node) {
+  // Each drawn node carries its place in the composition (data-pt-path), so the engine can measure it against Figma.
+  function draw(node, path, row) {
     var isPiece = (D.pieces || []).indexOf(node.component) >= 0;
     var e = isPiece ? piece(node) : systemComponent(node);
+    if (!isPiece) sized(e, node.props || {}, row, e.hasAttribute('data-pt-unbuilt'));
+    e.setAttribute('data-pt-path', path);
     // A system component's children go in its slot: the part its markup names slot, content or body, else itself.
     var into = e;
     // With no slot part, what the composition puts inside replaces the copy's own page content.
     if (!isPiece && (node.children || []).length) { var slot = e.querySelector('[class*="slot" i], [class*="content" i], [class*="body" i], [class*="main" i]'); if (slot) { slot.innerHTML = ''; into = slot; } else e.innerHTML = ''; }
-    (node.children || []).forEach(function (k) { into.appendChild(draw(k)); });
+    var rowInside = isPiece ? node.component === 'Row' : getComputedStyle(into).flexDirection === 'row';
+    (node.children || []).forEach(function (k, i) {
+      var kid = draw(k, path + '.' + i, rowInside);
+      // In an arrangement the composition owns the space between parts, as Figma's auto layout does: a component's own
+      // outer margin (a list item spaced for the app's list) would add to it.
+      if (isPiece && (D.pieces || []).indexOf(k.component) < 0) kid.style.margin = '0';
+      into.appendChild(kid);
+    });
     return e;
   }
-  if (D.tree) canvas.appendChild(draw(D.tree));
+  if (D.tree) canvas.appendChild(draw(D.tree, '0'));
 
   // The system's own modes (colour and size), as in the style guide.
   (D.modes || []).forEach(function (axis) {
@@ -162,6 +318,9 @@ html, body { margin: 0; }
       box.appendChild(b);
     });
   });
+  // A page read from a designed screen opens in the screen's own modes (a screen made in Dark is drawn in Dark).
+  var wanted = String((D.tree && D.tree.props && D.tree.props.mode) || '').toLowerCase().split(/\s*,\s*/).filter(Boolean);
+  if (wanted.length) Array.prototype.forEach.call(document.querySelectorAll('#pt-modes button'), function (b) { if (wanted.indexOf(b.textContent.trim().toLowerCase()) >= 0) b.click(); });
   var outline = document.getElementById('pt-outline');
   outline.addEventListener('click', function () { var on = outline.getAttribute('aria-pressed') !== 'true'; outline.setAttribute('aria-pressed', String(on)); canvas.classList.toggle('pt-show', on); });
   var gaps = D.gaps || [], panel = document.getElementById('pt-gaps'), gt = document.getElementById('pt-gaps-toggle');
@@ -171,5 +330,6 @@ html, body { margin: 0; }
   document.getElementById('pt-note').textContent = D.note || '';
 })();
 </script>
+<!--{{SYSTEM_SCRIPTS}}-->
 </body>
 </html>
