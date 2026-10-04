@@ -11,7 +11,8 @@ import { execFileSync } from 'node:child_process';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 const MARK = 'guard.mjs';
-const MATCHER = 'Edit|Write|MultiEdit|NotebookEdit|Bash';
+// mcp__.*use_figma: a write to Figma goes through the engine's own script (figma-edits.mjs), once the person said yes.
+const MATCHER = 'Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__.*use_figma';
 const EDIT_MATCHER = 'Edit|Write|MultiEdit';
 
 export function guardCommand(engineDir = ENGINE) {
