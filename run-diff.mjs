@@ -129,3 +129,30 @@ export function burndownLines(b, { top = 8, scoped = false } = {}) {
   }
   return lines;
 }
+
+// ── The one list of differences between Figma and the code ──────────────────────────────────────────────────────
+// Every finding of this run that is a difference between the two sides (not the freshness of the data, not an
+// accessibility note), grouped by the component it names, else under "the whole system", each marked new when the
+// last run did not have it. Written to <out>/differences.md and differences.json; the style guide reads the JSON, so
+// a component's page lists its own open differences, and the hand-back files say how each side would change.
+const NOT_A_DIFFERENCE = /^(Data is up to date|Accessibility[^:]*|Token contrast|What this audit actually checked) :: /;
+export function differences(findings = [], names = [], prev = null) {
+  const old = new Set(prev ?? []);
+  const items = findings.filter((f) => !NOT_A_FINDING.test(f) && !NOT_A_DIFFERENCE.test(f) && !/ :: gate fails$/.test(f)).map((f) => {
+    const i = f.indexOf(' :: ');
+    return { component: componentOf(f, names), check: i > 0 ? f.slice(0, i) : '', what: i > 0 ? f.slice(i + 4).replace(/^\s*(❌|⚠️|ℹ️)\s*/, '') : f, side: FIGMA_WORK.test(f) ? 'figma' : 'decide', new: prev ? !old.has(f) : false };
+  });
+  const groups = new Map();
+  for (const it of items) { const k = it.component ?? ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); }
+  return { total: items.length, fresh: items.filter((x) => x.new).length, groups: [...groups].sort((a, b) => (a[0] === '') - (b[0] === '') || b[1].length - a[1].length).map(([component, list]) => ({ component: component || null, items: list })) };
+}
+export function differencesMarkdown(d, { at = '', handback = {} } = {}) {
+  const out = ['# Differences between Figma and the code', '',
+    `${d.total} open${d.fresh ? `, ${d.fresh} new since the last run` : ''}${at ? ` · ${at}` : ''}. Written by rms-design-system-engine on every full audit: the one list to work from. Each line says what differs and where; fix the side that is wrong, or accept a difference on purpose (\`--baseline --findings\`), and the next run takes it off.`];
+  if (handback.code || handback.figma) out.push('', `How each side would change: ${[handback.code && `the code, \`${handback.code}\` (apply only when you ask)`, handback.figma && `Figma, \`${handback.figma}\``].filter(Boolean).join('; ')}.`);
+  for (const g of d.groups) {
+    out.push('', `## ${g.component ?? 'The whole system'} (${g.items.length})`, '');
+    for (const it of g.items) out.push(`- ${it.new ? '**new** ' : ''}${it.check ? `${it.check}: ` : ''}${it.what}${it.side === 'figma' ? ' _(in Figma)_' : ''}`);
+  }
+  return out.join('\n') + '\n';
+}

@@ -5,7 +5,7 @@
 ## Steps
 
 1. Run `rms-design-system-engine --refresh-figma` first. It picks the best way to read Figma: a `design.json` newer than the snapshots, else figma-cli when Figma Desktop is connected to it (it runs `figma-cli snapshot` and reads the result), else it says the Figma tool of this session reads it (the steps below), or the API with FIGMA_TOKEN. A design.json read this way keeps what it does not hold (text styles, other variants, descriptions, annotations) from the snapshots already there.
-2. Otherwise refresh only with a capture faithful to the steps below (the Plugin API capture works on any plan). Never hand-edit a snapshot: the project's hooks refuse it.
+2. Otherwise refresh only with a capture faithful to the steps below (the Plugin API capture works on any plan). Never hand-edit a snapshot: the project's hooks refuse it. Every value in a refreshed snapshot is one read from Figma in this capture: a value the capture cannot read is never kept from the old snapshot, it is told to the person (which variable, in which mode, and what Figma holds there) so they can fix the file or report the capture.
 3. When no refresh path is available (no figma-cli, no token, no Figma MCP, no Plugin API), say so and audit the committed snapshots.
 4. After a refresh, run the audit (`--recipe full-audit` or `--recipe audit-component`).
 
@@ -118,7 +118,9 @@ function toHex(c){const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).pa
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={};
 for(const col of collections){for(const id of col.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v)idToVar[id]=v;}}
-function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);return null;}
+function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);
+// A colour with its own opacity ({ color: <alias or rgb>, opacity: 88 }): the colour, its alpha times that opacity.
+if(val.color){const base=val.color.type==='VARIABLE_ALIAS'?resolve(val.color.id,modeId,d+1):('r'in val.color?toHex(val.color):null);if(!base)return null;const op=(val.opacity??100)/100;const a0=base.length>7?parseInt(base.slice(7,9),16)/255:1;const a=Math.round(a0*op*255);return a>=255?base.slice(0,7):base.slice(0,7)+a.toString(16).padStart(2,'0');}return null;}
 function aliasChain(varId,modeId,d=0){if(d>10)return[];const v=idToVar[varId];if(!v)return[];const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val||typeof val!=='object'||val.type!=='VARIABLE_ALIAS')return[];const a=idToVar[val.id];if(!a)return[];return[a.name,...aliasChain(val.id,modeId,d+1)];}
 // Fill from ds-config.json:
 const COLOR_COLLECTION='Theme'; const SIZING_COLLECTION='Sizing'; const PRIMITIVE_PREFIX='primitives/';
@@ -150,6 +152,9 @@ const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:
 // axis (base key 'desktop'; other modes slugified, Phone -> 'phone'). Single-mode
 // sizing collections are a no-op. The styleguide's [data-size] axis is built from this.
 if(SIZING_COLLECTION){const _s=collections.find(c=>c.name===SIZING_COLLECTION);if(_s&&_s.modes.length>=2&&!COLLECTIONS.some(c=>c.name===SIZING_COLLECTION))COLLECTIONS.push({name:SIZING_COLLECTION,modes:_s.modes.map((m,i)=>({name:m.name,snapshotKey:i===0?'desktop':m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});}
+// Every other collection with two or more modes too (breakpoints, density, locale), even when ds-config names none:
+// a value that changes with a mode is never captured as one value.
+for(const _c of collections){if(_c.modes.length>=2&&_c.name!==COLOR_COLLECTION&&!COLLECTIONS.some(c=>c.name===_c.name))COLLECTIONS.push({name:_c.name,modes:_c.modes.map(m=>({name:m.name,snapshotKey:m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});}
 const KIND={COLOR:'color',FLOAT:'scalar',STRING:'string',BOOLEAN:'boolean'};
 const modeVariantsOut={};
 for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c||c.modes.length<2)continue;const vars={};for(const id of c.variableIds){const v=idToVar[id];if(!v||v.name.startsWith(PRIMITIVE_PREFIX))continue;const kind=KIND[v.resolvedType]||'scalar';if(kind==='color'&&cc.name===COLOR_COLLECTION)continue;const values={};for(const m of cc.modes){const mid=c.modes.find(fm=>fm.name===m.name)?.modeId;if(!mid)continue;values[m.snapshotKey]=kind==='color'?resolve(id,mid):resolveScalarVal(id,mid);}if(new Set(Object.values(values).map(String)).size>1)vars[v.name]={kind,values};}if(Object.keys(vars).length)modeVariantsOut[cc.name]={modes:cc.modes,vars};}
@@ -174,7 +179,9 @@ function toHex(c){const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).pa
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={};
 for(const col of collections){for(const id of col.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v)idToVar[id]=v;}}
-function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);return null;}
+function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);
+// A colour with its own opacity ({ color: <alias or rgb>, opacity: 88 }): the colour, its alpha times that opacity.
+if(val.color){const base=val.color.type==='VARIABLE_ALIAS'?resolve(val.color.id,modeId,d+1):('r'in val.color?toHex(val.color):null);if(!base)return null;const op=(val.opacity??100)/100;const a0=base.length>7?parseInt(base.slice(7,9),16)/255:1;const a=Math.round(a0*op*255);return a>=255?base.slice(0,7):base.slice(0,7)+a.toString(16).padStart(2,'0');}return null;}
 // Fill from ds-config.json:
 const COLOR_COLLECTION='Theme'; const PRIMITIVE_PREFIX='primitives/';
 const MODES=[{name:'Light',snapshotKey:'light'},{name:'Dark',snapshotKey:'dark'}];
@@ -244,6 +251,9 @@ const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:
 // axis (base key 'desktop'; other modes slugified, Phone -> 'phone'). Single-mode
 // sizing collections are a no-op. The styleguide's [data-size] axis is built from this.
 if(SIZING_COLLECTION){const _s=collections.find(c=>c.name===SIZING_COLLECTION);if(_s&&_s.modes.length>=2&&!COLLECTIONS.some(c=>c.name===SIZING_COLLECTION))COLLECTIONS.push({name:SIZING_COLLECTION,modes:_s.modes.map((m,i)=>({name:m.name,snapshotKey:i===0?'desktop':m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});}
+// Every other collection with two or more modes too (breakpoints, density, locale), even when ds-config names none:
+// a value that changes with a mode is never captured as one value.
+for(const _c of collections){if(_c.modes.length>=2&&_c.name!==COLOR_COLLECTION&&!COLLECTIONS.some(c=>c.name===_c.name))COLLECTIONS.push({name:_c.name,modes:_c.modes.map(m=>({name:m.name,snapshotKey:m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});}
 const KIND={COLOR:'color',FLOAT:'scalar',STRING:'string',BOOLEAN:'boolean'};
 const modeVariantsOut={};
 for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c||c.modes.length<2)continue;const vars={};for(const id of c.variableIds){const v=idToVar[id];if(!v||v.name.startsWith(PRIMITIVE_PREFIX))continue;const kind=KIND[v.resolvedType]||'scalar';if(kind==='color'&&cc.name===COLOR_COLLECTION)continue;const values={};for(const m of cc.modes){const mid=c.modes.find(fm=>fm.name===m.name)?.modeId;if(!mid)continue;values[m.snapshotKey]=kind==='color'?resolve(id,mid):resolveScalarVal(id,mid);}if(new Set(Object.values(values).map(String)).size>1)vars[v.name]={kind,values};}if(Object.keys(vars).length)modeVariantsOut[cc.name]={modes:cc.modes,vars};}

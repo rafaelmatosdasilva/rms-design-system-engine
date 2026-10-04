@@ -17,7 +17,7 @@ const cleanName = (k) => String(k).replace(/#[\d:]+$/, '');
 // cssSelector forms the capture reads), size from the sizing collection's own modes (vars snapshot modeVariants).
 // An axis is `scoped` when its CSS is an attribute block that nests ([data-color], [data-size]): then each component
 // can flip its own preview, as a Figma mode does on a frame. A :root-only switch is global.
-export function modeAxes(cfg = {}, figmaVars = {}) {
+export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
   const axes = [];
   const modes = cfg.figma?.modes?.length ? cfg.figma.modes : [{ name: 'Light', cssSelector: 'root' }, { name: 'Dark', cssSelector: 'dark-media' }];
   const colour = { label: 'Color', values: [] };
@@ -35,7 +35,11 @@ export function modeAxes(cfg = {}, figmaVars = {}) {
   for (const def of Object.values(figmaVars.modeVariants ?? {})) {
     const ms = def?.modes ?? [];
     if (ms.length < 2 || !Object.values(def.vars ?? {}).some((v) => v?.kind === 'scalar')) continue;
-    axes.push({ label: 'Size', attr: 'data-size', scoped: true, values: ms.map((m, i) => ({ label: m.name ?? m.snapshotKey, value: i === 0 ? '' : m.snapshotKey })) });
+    // A mode the code has no CSS for (no @media, [data-…] or class block sets these variables) is offered but not
+    // drawn: the page would show Figma's values, not the code's.
+    const vars = Object.keys(def.vars ?? {}).map((t) => `--${t.replace(/\//g, '-')}`);
+    const inCode = (m) => { const k = String(m.snapshotKey); return new RegExp(`\\[data-[\\w-]+=["']?${k}["']?\\]|\\.${k}\\b`).test(themeCss) || [...String(themeCss).matchAll(/@media\s*([^{]+)\{((?:[^{}]|\{[^{}]*\})*)\}/g)].some((b) => !/prefers-/.test(b[1]) && vars.some((v) => b[2].includes(`${v}:`))); };
+    axes.push({ label: 'Size', attr: 'data-size', scoped: true, values: ms.map((m, i) => ({ label: m.name ?? m.snapshotKey, value: i === 0 ? '' : m.snapshotKey, ...(i > 0 && !inCode(m) ? { notInCode: true } : {}) })) });
     break;
   }
   return axes;
@@ -73,6 +77,84 @@ function variantClass(cls, option, cssText) {
   return new RegExp(`\\.${c}(?![\\w-])`).test(cssText) ? c : null;
 }
 
+// ── An HTML and CSS system: no code props to compare, so a Figma prop counts when the code realizes it ─────────────
+// The contract's propertyMap (Figma prop → option → selector, or one selector for a boolean or a text), ds-config.json
+// htmlRealizations ({ component: { prop: selector } }), else a modifier class the CSS has (.chip--l) and, for a
+// disabled switch, a :disabled rule. A prop whose name the contract spells another way is found by its options when
+// they are the same set. → { controls, unrealized: [prop names] }. Instance swaps are not a control.
+const lc = (s) => String(s).toLowerCase().replace(/[\s_-]+/g, ' ').trim();
+function mapFor(map = {}, prop, options = null) {
+  const key = Object.keys(map ?? {}).find((k) => lc(k) === lc(prop));
+  if (key) return map[key];
+  if (options?.length) {
+    const want = options.map(lc).sort().join('|');
+    const same = Object.entries(map ?? {}).find(([, v]) => v && typeof v === 'object' && Object.keys(v).map(lc).sort().join('|') === want);
+    if (same) return same[1];
+  }
+  return undefined;
+}
+const optionKey = (obj, option) => Object.keys(obj ?? {}).find((k) => lc(k) === lc(option));
+// One selector for a boolean: ".badge.no-label .badge-label" hides the label with no-label; ".button svg" is the part.
+function booleanSelector(base, sel, cssText) {
+  const compounds = String(sel).trim().split(/\s+/).filter(Boolean);
+  if (!compounds.length || /:has\(|@/.test(sel)) return null;
+  const baseClasses = new Set((base.match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1)));
+  const first = (compounds[0].match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1));
+  const modifier = first.filter((c) => !baseClasses.has(c));
+  const inCss = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(cssText);
+  if (compounds.length === 1) return modifier.length && modifier.every(inCss) ? { on: { add: modifier, attrs: {} } } : null;
+  const part = compounds[compounds.length - 1];
+  if (modifier.length && modifier.every(inCss) && /^(no|hide|without)[-_]/.test(modifier[0])) return { off: { add: modifier, attrs: {} } };
+  return { part };
+}
+export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}, realizations = {}, cssText = '', parts = [] }) {
+  const base = cls ? `.${cls}` : '';
+  const controls = [], unrealized = [];
+  for (const [label, d] of Object.entries(defs)) {
+    if (!d || d.type === 'INSTANCE_SWAP') continue;
+    const opts = d.variantOptions ?? [];
+    const yesNo = d.type === 'VARIANT' && opts.length === 2 && opts.every((o) => /^(true|false)$/i.test(o));
+    const pm = mapFor(propertyMap, label, d.type === 'VARIANT' && !yesNo ? opts : null);
+    const hr = mapFor(realizations, label);
+    const control = { label, prop: label, type: d.type, default: d.defaultValue ?? null };
+    if (d.type === 'BOOLEAN' || yesNo) {
+      control.type = 'BOOLEAN';
+      control.default = String(d.defaultValue).toLowerCase() === 'true';
+      let found = null;
+      if (pm && typeof pm === 'object') {
+        const on = optionEffect(base, pm[optionKey(pm, 'true')]), off = optionEffect(base, pm[optionKey(pm, 'false')]);
+        found = {};
+        if (on && (on.add?.length || Object.keys(on.attrs ?? {}).length)) found.on = on;
+        if (off && (off.add?.length || Object.keys(off.attrs ?? {}).length)) found.off = off;
+        if (!found.on && !found.off) found = null;
+      } else if (typeof pm === 'string') found = booleanSelector(base, pm, cssText);
+      if (!found && typeof hr === 'string') found = booleanSelector(base, hr, cssText) ?? { part: hr };
+      if (!found && /^(is)?disabled$/i.test(label) && cls && new RegExp(`\\.${cls}[^{,]*:disabled`).test(cssText)) found = { on: { add: [], attrs: { disabled: '' } } };
+      if (!found) { const c = variantClass(cls, label, cssText); if (c) found = { on: { add: [c], attrs: {} } }; }
+      if (!found) { unrealized.push(label); continue; }
+      Object.assign(control, found);
+    } else if (d.type === 'VARIANT') {
+      const options = opts.map((o) => {
+        const k = pm && typeof pm === 'object' ? optionKey(pm, o) : undefined;
+        if (k !== undefined) return { label: o, ...(optionEffect(base, pm[k]) ?? {}), mapped: true };
+        const c = variantClass(cls, o, cssText);
+        return c ? { label: o, add: [c], attrs: {}, mapped: true } : { label: o };
+      });
+      // Realized when every option is mapped, or every option but the default is a class the CSS has.
+      const missing = options.filter((o) => !o.mapped && lc(o.label) !== lc(d.defaultValue ?? ''));
+      if (missing.length || !options.some((o) => o.mapped)) { unrealized.push(label); continue; }
+      control.options = options.map(({ mapped, ...o }) => o);
+    } else if (d.type === 'TEXT') {
+      const sel = typeof hr === 'string' ? hr : (typeof pm === 'string' ? pm : null);
+      const part = sel ? String(sel).trim().split(/\s+/).pop() : partFor(label.replace(/\s*content$/i, ''), parts, null);
+      if (!part) { unrealized.push(label); continue; }
+      control.part = part;
+    } else continue;
+    controls.push(control);
+  }
+  return { controls, unrealized };
+}
+
 // propsSnap: figma-component-props.snapshot.json · rows: component-prop-result.json rows · agreedRecord: the agreed
 // record ({ facts }) · classFor(name) → the component's class · cssText: the project's CSS · probes: { name: markup }
 // · probeList: every probe the contract has (one that holds the component's class is a candidate too) · unbuilt: names
@@ -83,11 +165,11 @@ function variantClass(cls, option, cssText) {
 // from the contract's children. · jsx: { name: the markup a React component's own JSX returns (jsx-markup.mjs) }, used
 // when neither the contract nor a page has it.
 export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, classFor = () => null, cssText = '', probes = {}, probeList = [], unbuilt = [], cfg = {},
-  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, parts = {}, jsx = {}, alsoNames = [] } = {}) {
+  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, parts = {}, jsx = {}, alsoNames = [], themeCss = '' } = {}) {
   const byComponent = new Map();
   for (const r of rows) { if (!byComponent.has(r.component)) byComponent.set(r.component, []); byComponent.get(r.component).push(r); }
   const components = [], waiting = [];
-  let undecided = 0;
+  let undecided = 0, unrealized = 0;
   // alsoNames: components the catalog has that Figma lists no props for (a prototype draws them as they are, when the
   // code has their markup); they never count as waiting or undecided.
   const extra = alsoNames.filter((n) => !(n in propsSnap)).map((n) => [n, { properties: {}, noProps: true }]);
@@ -99,6 +181,12 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     const cls = String(classFor(name) ?? '').replace(/^\./, '') || null;   // the class itself, without its dot
     const defs = Object.fromEntries(Object.entries(entry.properties ?? {}).map(([k, d]) => [cleanName(k), d]));
     const controls = [];
+    // An HTML and CSS system has no code props for Gate [15] to pair: what the code realizes is what agrees.
+    if (!mine.length && (cfg.frameworkComponents === false || !rows.length)) {
+      const r = realizedControls({ name, defs, cls, propertyMap: propertyMaps[name] ?? {}, realizations: cfg.htmlRealizations?.[name] ?? {}, cssText, parts: parts[name] ?? [] });
+      controls.push(...r.controls);
+      unrealized += r.unrealized.length;
+    }
     for (const r of mine) {
       if (r.status !== 'match') { undecided++; continue; }   // missing, renamed, another value, or a prop only the code has
       const d = defs[r.figmaProp];
@@ -146,9 +234,10 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
   undecided += tokens?.differences ?? 0;
   const said = [];
   if (undecided) said.push(`${undecided} difference${undecided === 1 ? '' : 's'} between Figma and the code`);
+  if (unrealized) said.push(`${unrealized} Figma propert${unrealized === 1 ? 'y' : 'ies'} the code does not realize yet (no contract propertyMap, htmlRealizations entry or modifier class)`);
   if (waiting.length) said.push(`${waiting.length} component${waiting.length === 1 ? '' : 's'} not built yet (${waiting.map((w) => w.replace(/ \(not built yet\)$/, '')).join(', ')})`);
   const line = said.length ? `Not shown until agreed, ${said.join(' and ')}. Run the audit to see them and decide each one.` : 'Everything Figma and the code have is agreed.';
-  return { title, components, tokens, icons, notAgreed: { differences: undecided, waiting, line }, modes: modeAxes(cfg, figmaVars) };
+  return { title, components, tokens, icons, notAgreed: { differences: undecided, unrealized, waiting, line }, modes: modeAxes(cfg, figmaVars, themeCss) };
 }
 
 // ── Tokens: only the ones the token check found equal to Figma (parity-check.mjs --json → passVars) ─────────────
@@ -171,7 +260,15 @@ export function agreedTokens(check = {}, figmaVars = {}) {
     if (!groups.has(group)) groups.set(group, []);
     groups.get(group).push({ figma: name, var: c.var, values: c.values });
   }
-  const sizes = pass.filter((x) => x.dimension === 'sizing').map((p) => ({ figma: p.token, var: p.cssVar, value: p.value }));
+  // A size whose value changes with a mode (a breakpoint): every mode's Figma value, the base first.
+  const byMode = (token) => {
+    for (const def of Object.values(figmaVars.modeVariants ?? {})) {
+      const v = def?.vars?.[token];
+      if (v?.values) return (def.modes ?? []).map((m) => ({ mode: m.name ?? m.snapshotKey, value: v.values[m.snapshotKey] })).filter((x) => x.value != null);
+    }
+    return null;
+  };
+  const sizes = pass.filter((x) => x.dimension === 'sizing').map((p) => ({ figma: p.token, var: p.cssVar, value: p.value, ...(byMode(p.token) ? { modes: byMode(p.token) } : {}) }));
   const isRadius = (t) => /radi(i|us)|corner/i.test(t.figma), isSpace = (t) => /\b(gap|padding|margin|space|spacing|inset)\b/i.test(t.figma.replace(/\//g, ' '));
   const scales = new Map();
   for (const p of pass.filter((x) => x.dimension === 'typography')) {
@@ -353,4 +450,146 @@ export function componentTokens(cssText, cls) {
     }
   }
   return out;
+}
+
+// ── The page's own look, from the system: each role the template's layout uses, filled with one of the system's own
+// tokens (styleguide.chrome in ds-config.json names one by hand: { "text": "--my-ink" }). A role with no token is left
+// to the browser's own and listed, never given a value of the engine's.
+// tokens: agreedTokens() · themeCss: the system's CSS (its font) · componentNames: tokens named after one component
+// (badge/background) are only a last resort · icons: { size } the system's icon size, read from its icon set.
+const CHROME_COLOURS = [
+  ['surface', [/(surface|background|bg)/, /(elevationhigh|high|raised|card|elevated|primary|default|base)/]],
+  ['bg', [/(surface|background|bg|canvas)/, /(page|canvas|app|window|elevationlow|low|sunken|base|default)/]],
+  ['bg-2', [/(surface|background|bg)/, /(elevationmedium|medium|elevationlow|low|secondary|subtle|muted|alt|sunken|detail)/]],
+  ['text', [/(text|content|foreground|fg|ink)/, /(primary|default|base|strong)/]],
+  ['text-2', [/(text|content|foreground|fg|ink)/, /(secondary)/]],
+  ['muted', [/(text|content|foreground|fg|ink)/, /(tertiary|muted|subtle|placeholder|disabled)/]],
+  ['border', [/(border|divider|stroke|outline|line)/, /(default|primary|base|subtle|divider)?/]],
+  ['accent', [/(accent|brand|focus|link|interactive|highlight|action)/, /.*/]],
+  ['warning', [/(warning|caution|attention)/, /.*/]],
+  ['positive', [/(positive|success|valid)/, /.*/]],
+  ['negative', [/(negative|error|danger|critical)/, /.*/]],
+];
+export function chromeRoles({ tokens = null, themeCss = '', componentNames = [], icons = {}, override = {} } = {}) {
+  const roles = {}, from = {};
+  const comps = new Set(componentNames.map((n) => n.toLowerCase()));
+  const flat = (tokens?.colors ?? []).flatMap((g) => g.items).filter((t) => t?.var);
+  const words = (t) => t.figma.toLowerCase().replace(/[^a-z0-9/]+/g, '').split('/');
+  // A token for everyone before one a component owns: a shared group (semantic/content/primary, color/text), then the
+  // shortest CSS name (--border before --card-border); a group named after a component comes last.
+  const GENERIC = /^(semantic|global|base|core|sys|system|foundation|foundations|theme|color|colors|palette|alias|ref|common)$/;
+  const rank = (t) => { const g = words(t)[0]; return (GENERIC.test(g) ? 0 : 50) + (comps.has(g) ? 100 : 0) + t.var.length; };
+  const used = new Set();
+  const byVar = new Map(flat.map((t) => [t.var, t]));
+  // What the system's own page uses: the background and text colour its html or body rule sets.
+  const page = [...String(themeCss).matchAll(/(?:^|[}\s;])(?:html|body|:root)\b[^{]*\{([^}]*)\}/g)].map((m) => m[1]).join(';');
+  const pageVar = (prop) => { const m = new RegExp(`(?:^|[;\\s])${prop}\\s*:\\s*var\\((--[\\w-]+)`).exec(page); return m && byVar.has(m[1]) ? byVar.get(m[1]) : null; };
+  for (const [role, t] of [['bg', pageVar('background(?:-color)?')], ['text', pageVar('color')]]) if (t) { roles[role] = `var(${t.var})`; from[role] = `${t.figma} (the system's page)`; used.add(t.var); }
+  for (const [role, [what, which]] of CHROME_COLOURS) {
+    if (roles[role]) continue;
+    const pick = flat.filter((t) => !used.has(t.var) && rank(t) < 100 && words(t).some((w) => what.test(w)) && words(t).some((w) => which.test(w)))
+      .sort((a, b) => rank(a) - rank(b) || a.figma.localeCompare(b.figma))[0];
+    if (pick) { roles[role] = `var(${pick.var})`; from[role] = pick.figma; if (!['positive', 'negative', 'warning'].includes(role)) used.add(pick.var); }
+  }
+  if (!roles.bg && roles.surface) { roles.bg = roles.surface; from.bg = from.surface; }
+  if (!roles['bg-2'] && roles.bg) { roles['bg-2'] = roles.bg; from['bg-2'] = from.bg; }
+  if (!roles['text-2'] && roles.text) { roles['text-2'] = roles.text; from['text-2'] = from.text; }
+  if (!roles.muted && roles['text-2']) { roles.muted = roles['text-2']; from.muted = from['text-2']; }
+  if (!roles.accent && roles.text) { roles.accent = roles.text; from.accent = from.text; }
+  if (roles.bg) { roles.stage = roles.bg; from.stage = from.bg; }
+  if (roles.warning) from.warning = from.warning ?? '';
+  // Type: the system's text styles, smallest to largest; headings take the largest.
+  const type = (tokens?.typography ?? []).filter((t) => t.size?.var).sort((a, b) => parseFloat(a.size.value) - parseFloat(b.size.value));
+  if (type.length) {
+    const s = type[0], l = type[type.length - 1], m = type[Math.floor((type.length - 1) / 2)] === s && type.length > 1 ? type[1] : type[Math.floor((type.length - 1) / 2)];
+    const put = (role, t) => { roles[role] = `var(${t.size.var})`; from[role] = `type/${t.scale}`; if (t.weight?.var) { roles[`${role}-weight`] = `var(${t.weight.var})`; } };
+    put('xs', s); put('s', s); put('m', m); put('l', l); put('h1', l); put('h2', l);
+    if (l.weight?.var) roles['heading-weight'] = `var(${l.weight.var})`;
+    if (m.lh?.var) roles.lh = `var(${m.lh.var})`;
+  }
+  // The font: a family variable the theme declares, else the family the theme sets on its page.
+  const famVar = /(--[\w-]*font[\w-]*family[\w-]*)\s*:/i.exec(themeCss) ?? /(--[\w-]*family[\w-]*)\s*:/i.exec(themeCss);
+  const famDecl = /(?:^|[{;\s])(?:html|body|:root)[^{]*\{[^}]*?font-family\s*:\s*([^;}]+)/i.exec(themeCss);
+  if (famVar) { roles.font = `var(${famVar[1]})`; from.font = famVar[1]; }
+  else if (famDecl) { roles.font = famDecl[1].trim(); from.font = 'the theme\'s page font'; }
+  // Radii and spacing: the system's own scale, nearest to each step the layout uses.
+  const px = (t) => parseFloat(String(t.value));
+  const nearest = (list, want) => list.filter((t) => Number.isFinite(px(t))).sort((a, b) => Math.abs(px(a) - want) - Math.abs(px(b) - want) || px(a) - px(b))[0];
+  const radii = (tokens?.radii ?? []).filter((t) => px(t) > 0);
+  const card = radii.find((t) => /card|surface|container|panel/i.test(t.figma));
+  for (const [role, want, t] of [['radius-s', 4], ['radius', 8, card], ['radius-l', 12, card], ['radius-pill', 999]]) {
+    const pick = t ?? nearest(radii, want);
+    if (pick) { roles[role] = `var(${pick.var})`; from[role] = pick.figma; }
+  }
+  const spaces = tokens?.spacing ?? [];
+  for (const [role, want] of [['space-xxs', 2], ['space-xs', 4], ['space-s', 8], ['space-m', 12], ['space-l', 16], ['space-xl', 24], ['space-xxl', 32]]) {
+    const pick = nearest(spaces, want);
+    if (pick) { roles[role] = `var(${pick.var})`; from[role] = pick.figma; }
+  }
+  if (icons.size) { roles.icon = `${icons.size}px`; from.icon = 'the size of the system\'s icons'; }
+  for (const [role, v] of Object.entries(override ?? {})) if (typeof v === 'string' && v) { roles[role] = /^--/.test(v) ? `var(${v})` : v; from[role] = 'styleguide.chrome'; }
+  const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 'font', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
+  const missing = NEEDED.filter((r) => !roles[r]);
+  const css = Object.keys(roles).length ? `:root { ${Object.entries(roles).map(([k, v]) => `--sg-${k}: ${v};`).join(' ')} }` : '';
+  return { roles, from, missing, css };
+}
+
+// ── The system's own segmented control, for every switch the page offers ────────────────────────────────────────────
+// Read from a component's markup: a root holding two or more of the same element (button, a, li, a tab) where one
+// carries a class or attribute the others lack (selected, active, aria-selected): that is the selected state. A name
+// that says it (segment, toggle, tabs, switcher, picker) is preferred. → { from, open, close, item: { tag, classes,
+// label }, selected: { add, attrs } } or null (the page then uses a plain row of buttons the browser draws).
+export function segmentedUi(components = []) {
+  const found = [];
+  for (const c of components) {
+    const m = /^\s*<([a-z][\w-]*)\b([^>]*)>([\s\S]*)<\/\1>\s*$/i.exec(c.markup ?? '');
+    if (!m) continue;
+    const [, rootTag, rootAttrs, inner] = m;
+    const kids = [...inner.matchAll(/<(button|a|li|div|span)\b([^>]*)>([\s\S]*?)<\/\1>/gi)].map((k) => ({ tag: k[1].toLowerCase(), attrs: k[2], inner: k[3] }));
+    const byTag = {};
+    for (const k of kids) (byTag[k.tag] ??= []).push(k);
+    const items = Object.values(byTag).filter((list) => list.length >= 2).sort((a, b) => b.length - a.length)[0];
+    if (!items) continue;
+    const classesOf = (a) => (/\bclass\s*=\s*["']([^"']*)["']/i.exec(a)?.[1] ?? '').split(/\s+/).filter(Boolean);
+    const sets = items.map((k) => classesOf(k.attrs));
+    const common = sets[0].filter((x) => sets.every((s) => s.includes(x)));
+    const odd = sets.map((s) => s.filter((x) => !common.includes(x)));
+    const selectedIdx = odd.findIndex((s) => s.some((x) => /^(is-)?(selected|active|current|checked|on)$/i.test(x)));
+    const attrSel = items.findIndex((k) => /aria-(selected|pressed|checked)\s*=\s*["']true["']/i.test(k.attrs));
+    if (selectedIdx < 0 && attrSel < 0) continue;
+    const selected = selectedIdx >= 0 ? { add: odd[selectedIdx].filter((x) => /^(is-)?(selected|active|current|checked|on)$/i.test(x)), attrs: {} }
+      : { add: [], attrs: { [/aria-(selected|pressed|checked)/i.exec(items[attrSel].attrs)[0].toLowerCase()]: 'true' } };
+    const label = /<span\b[^>]*\bclass\s*=\s*["']([^"']*(?:label|text)[^"']*)["']/i.exec(items[0].inner)?.[1]?.split(/\s+/)[0] ?? null;
+    const score = (/(segment|toggle|tabs?|switcher|picker|chooser)/i.test(c.name) ? 0 : 10) + (items[0].tag === 'button' ? 0 : 2);
+    const base = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(rootAttrs)?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
+    // The control itself, without the modifiers one product gave it (full-width, compact): only its own class.
+    found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected });
+  }
+  const best = found.sort((a, b) => a.score - b.score)[0];
+  if (!best) return null;
+  const { score, ...ui } = best;
+  return ui;
+}
+
+// The system's own text field, for the page's text inputs: a component's markup holding a text <input> (role
+// textbox, or a name that says input or field, preferred), cut to its root and the input, each keeping only the
+// classes the system's own CSS defines (a product's extra classes stay out). → { from, markup } or null.
+export function fieldUi(components = [], systemCss = '') {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  const keep = (attrs) => (/\bclass\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1] ?? '').split(/\s+/).filter((c) => c && defined(c));
+  const found = [];
+  for (const c of components) for (const mk of [c.markup, ...(c.markups ?? [])]) {
+    const root = /^\s*<([a-z][\w-]*)\b([^>]*)>/i.exec(mk ?? '');
+    const input = /<input\b([^>]*)>/i.exec(mk ?? '');
+    if (!root || !input) continue;
+    const type = (/\btype\s*=\s*["']?([\w-]+)/i.exec(input[1])?.[1] ?? 'text').toLowerCase();
+    if (!/^(text|search|email|url|tel)$/.test(type)) continue;
+    const ic = keep(input[1]), rc = keep(root[2]);
+    const inputTag = `<input type="text" aria-label="Value"${ic.length ? ` class="${ic.join(' ')}"` : ''}>`;
+    const markup = root[1].toLowerCase() === 'input' ? inputTag : `<${root[1]}${rc.length ? ` class="${rc.join(' ')}"` : ''}>${inputTag}</${root[1]}>`;
+    const score = (c.role === 'textbox' || /input|field|text/i.test(c.name) ? 0 : 10) + (ic.length || rc.length ? 0 : 5);
+    found.push({ score, from: c.name, markup });
+  }
+  const best = found.sort((a, b) => a.score - b.score)[0];
+  return best ? { from: best.from, markup: best.markup } : null;
 }

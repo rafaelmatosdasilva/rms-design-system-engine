@@ -44,6 +44,7 @@ const THEME_PATHS = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();
 // ── Load design-system-engine-map.mjs ───────────────────────────────────────────────────────
 let EXPLICIT = {}, SKIP_TOKENS = new Set();
 let NL = {}, ND = {}, NEUTRAL_MAPS = null, NEUTRAL_VAR_RE = /^--neutral-(\d+)$/;
+let EXPLICIT_SIZING = {}, SIZING_SKIP = new Map();
 try {
   const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
   if (map.EXPLICIT)        EXPLICIT        = map.EXPLICIT;
@@ -52,6 +53,8 @@ try {
   if (map.NEUTRAL_DARK)    ND              = map.NEUTRAL_DARK;
   if (map.NEUTRAL_MAPS)    NEUTRAL_MAPS    = map.NEUTRAL_MAPS;
   if (map.NEUTRAL_VAR_RE)  NEUTRAL_VAR_RE  = map.NEUTRAL_VAR_RE;
+  if (map.EXPLICIT_SIZING) EXPLICIT_SIZING = map.EXPLICIT_SIZING;
+  if (map.SIZING_SKIP)     SIZING_SKIP     = map.SIZING_SKIP;
 } catch { /* optional */ }
 
 // ── Resolver over EVERY mode across every axis/collection ──────────────────────
@@ -59,7 +62,6 @@ const COLOR_MODES  = loadModes(cfg);
 const COLLECTIONS  = loadCollections(cfg);
 // The theme files as sources, local @import followed (css-source.mjs, shared with the code capture).
 const rawCss = loadCssSources(ROOT, THEME_PATHS).files;
-const { resolve, resolveRaw } = buildResolver(rawCss, allModes(cfg), { NL, ND, NEUTRAL_MAPS, NEUTRAL_VAR_RE });
 
 // ── token → CSS var (via the shared, DS-declarable convention) ─────────────────
 const NAMING = resolveNamingSpec(cfg);
@@ -76,6 +78,43 @@ function nonColorTokenToVar(col, token) {
 
 // ── Load snapshot ─────────────────────────────────────────────────────────────
 const snap = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8'));
+
+// ── Every other multi-mode collection the snapshot holds, even when ds-config declares none ──────────────────
+// The capture keeps every collection whose values change with a mode (a sizing collection per breakpoint). One the
+// config does not describe is still checked: its first mode is the base (:root), and each other mode is where the
+// theme CSS really sets that collection's variables (an @media block, a [data-…] or class block). A mode with no
+// such block is a mode the code does not implement, and every value it changes is a failure.
+const cssText = rawCss.map((f) => (typeof f === 'string' ? f : f?.text ?? f?.css ?? '')).join('\n');
+const NOT_IMPLEMENTED = [];
+for (const [name, section] of Object.entries(snap.modeVariants ?? {})) {
+  if (COLLECTIONS.some((c) => c.name === name) || name === cfg.figma?.colorCollection || !Array.isArray(section?.modes) || section.modes.length < 2) continue;
+  // The map's sizing names and skips (design-system-engine-map.mjs EXPLICIT_SIZING, SIZING_SKIP) hold here too.
+  const auto = { explicit: EXPLICIT_SIZING, skip: [...(SIZING_SKIP instanceof Map ? SIZING_SKIP.keys() : Object.keys(SIZING_SKIP ?? {}))] };
+  const vars = Object.keys(section.vars ?? {}).map((t) => nonColorTokenToVar(auto, t)).filter(Boolean);
+  const sets = (body) => vars.some((v) => new RegExp(`${v.replace(/[-]/g, '\\-')}\\s*:`).test(body));
+  const blocks = [];
+  for (const m of cssText.matchAll(/@media\s*([^{]+)\{((?:[^{}]|\{[^{}]*\})*)\}/g)) if (!/prefers-color-scheme|prefers-contrast/.test(m[1]) && sets(m[2])) blocks.push({ selector: `media:${m[1].trim().replace(/\s+/g, ' ')}`, words: [] });
+  for (const m of cssText.matchAll(/([^{}@;]+)\{([^{}]*)\}/g)) {
+    if (!sets(m[2])) continue;
+    for (const sel of m[1].split(',').map((x) => x.trim())) {
+      const data = sel.match(/\[data-([\w-]+)=["']?([\w-]+)["']?\]/), cls = sel.match(/^(?::root|html)?\.([\w-]+)/);
+      if (data) blocks.push({ selector: `data:${data[1]}=${data[2]}`, words: [data[2]] });
+      else if (cls) blocks.push({ selector: `class:${cls[1]}`, words: [cls[1]] });
+    }
+  }
+  const modes = section.modes.map((m, i) => {
+    if (i === 0) return { ...m, cssSelector: 'root' };
+    const key = String(m.snapshotKey).toLowerCase();
+    const hit = blocks.find((b) => b.words.some((w) => String(w).toLowerCase() === key)) ?? (section.modes.length === 2 && blocks.length === 1 ? blocks[0] : null);
+    return { ...m, cssSelector: hit?.selector ?? null };
+  });
+  for (const m of modes.filter((x) => !x.cssSelector)) {
+    const owed = Object.entries(section.vars ?? {}).filter(([t, v]) => nonColorTokenToVar(auto, t) && v?.values?.[m.snapshotKey] != null && String(v.values[m.snapshotKey]) !== String(v.values[modes[0].snapshotKey]));
+    NOT_IMPLEMENTED.push({ collection: name, mode: m.name, base: modes[0].name, owed: owed.map(([t, v]) => ({ token: t, cssVar: nonColorTokenToVar(auto, t), base: v.values[modes[0].snapshotKey], value: v.values[m.snapshotKey] })) });
+  }
+  COLLECTIONS.push({ name, kind: 'scalar', modes: modes.filter((x) => x.cssSelector), auto: true, ...auto });
+}
+const { resolve, resolveRaw } = buildResolver(rawCss, [...allModes(cfg), ...COLLECTIONS.filter((c) => c.auto).flatMap((c) => c.modes)], { NL, ND, NEUTRAL_MAPS, NEUTRAL_VAR_RE });
 
 // ── Build the unified list of checkable collections ───────────────────────────
 // Each entry is a self-describing unit: its modes, how to read a token's Figma value per mode, how
@@ -180,6 +219,7 @@ for (const c of CHECKABLE) {
 }
 
 // ── Report ────────────────────────────────────────────────────────────────────
+for (const n of NOT_IMPLEMENTED) for (const o of n.owed) MISSING.push({ type: 'no-mode', label: n.collection, token: o.token, cssVar: o.cssVar, mode: n.mode, base: n.base, baseVal: o.base, figmaVal: o.value });
 const total = OK.length + MISSING.length;
 const axisLabel = CHECKABLE.map(c => `${c.label}[${c.modes.map(m => m.snapshotKey).join('/')}]`).join('  ');
 console.log(`\n✅ OK        ${OK.length}/${total}  (adapts across modes, and matches Figma per mode where value-checked)`);
@@ -191,7 +231,9 @@ if (MISSING.length) {
   console.log('\n─── Mode failures ────────────────────────────────────────────────');
   for (const m of MISSING) {
     console.log(`  ❌ [${m.label}] ${m.token} → ${m.cssVar}`);
-    if (m.type === 'mismatch') {
+    if (m.type === 'no-mode') {
+      console.log(`       ${m.mode}: Figma ${m.figmaVal} (${m.base} ${m.baseVal}); the CSS has no ${m.mode} mode at all (no @media, [data-…] or class block sets ${m.label}'s variables)  (mode not implemented)`);
+    } else if (m.type === 'mismatch') {
       console.log(`       ${m.mode}: Figma ${m.figmaVal}, CSS ${m.cssVal}  (value mismatch)`);
     } else {
       console.log(`       Figma: ${m.modeA}=${m.figmaA}  ${m.modeB}=${m.figmaB}`);

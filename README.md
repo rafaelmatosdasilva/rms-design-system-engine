@@ -98,13 +98,16 @@ The easiest way is to ask in Claude Code, in your own words, after `/rms-design-
 
 You can mix them. `rms-design-system-engine --component button --only accessibility` checks only the accessibility of the button.
 
+**Every difference in one list.** Each full check writes `.design-system-engine-out/differences.md`: every difference between Figma and the code, grouped by component, with what is new since the last check. It is written whether or not you have a style guide, and the summary of every check says where it is.
+
 ### The style guide
 
 `rms-design-system-engine --styleguide` builds a living style guide of what Figma and the code agree on, in `.design-system-engine-out/styleguide/index.html`. **[See an example](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)**: the RMS Design System's style guide, built by this engine and published by that design system, so it shows what the engine makes today. Every project fills the same template, the one in the engine (`templates/styleguide.template.html`), with its own data, so an improvement made there reaches every design system on its next run.
 
-- **Foundations.** Colours, typography, spacing, radii and icons, each the CSS variable itself, shown only when the token check finds it equal to Figma in every mode.
-- **Components.** Each one drawn from your own markup (the contract's probe, the first instance in your pages, or what its React source returns) with your own CSS. Its controls are the props both sides have, labelled with Figma's names; an option applies what your contract's propertyMap says it adds. Below it, the tokens behind what is drawn and its size.
-- **Modes.** A switch for each of your mode collections, for the whole page or one component.
+- **Its look is your system's.** The template is only the layout: every colour, text style, radius, space and the icon size on the page is one of your tokens, the page's text is your own body rule, and its switches and text fields are your own segmented control and text field. The engine checks the built page and fails it when anything on it is not from your system, or when it breaks an accessibility rule it checks you by.
+- **Foundations.** Colours, typography, spacing, radii and icons, each the CSS variable itself, shown only when the token check finds it equal to Figma in every mode. A size that changes with a mode shows each mode's value (Desktop 8px · Phone 10px).
+- **Components.** Each one drawn from your own markup (the contract's probe, the first instance in your pages, or what its React source returns) with your own CSS. Its controls are the props both sides have, labelled with Figma's names; an option applies what your contract's propertyMap says it adds. In a plain HTML and CSS system the controls are the Figma props your code realizes (the contract's propertyMap, `htmlRealizations`, a modifier class). Each component says which of your products it is used in, linked to each one, and what still differs from Figma. Below it, the tokens behind what is drawn and its size.
+- **Modes.** A switch for each of your mode collections, for the whole page or one component. A mode your code has no CSS for yet is shown as such, never drawn with Figma's values.
 - **In use.** The approved pictures of your Figma frames (the ones the frame check compares against), when there are any.
 - **Not agreed yet.** A prop only one side has, another default, a token that differs or a component not built yet is left out and counted in one line at the top, so you decide each one before it appears.
 

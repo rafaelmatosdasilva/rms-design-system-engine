@@ -216,17 +216,31 @@ The output goes to `styleguide.out`, else `.design-system-engine-out/styleguide/
 
 What the engine's template shows (`styleguide-data.mjs` decides it):
 
+- **Its look is the system's.** The template is the layout only. Every colour, text size and weight, corner radius,
+  space and the icon size on the page is a role the engine fills with one of the system's own tokens: the
+  background and text colour the system's own page uses (its `html`/`body` rule), a shared token before one a
+  component owns, its text styles, radii and spacing scale, its icons' Figma size (`styleguide.chrome` names a role
+  by hand: `{ "accent": "--brand" }`). The page's text is the system's body rule, which the components inherit as in
+  the product. Its switches are the system's own segmented control and its text inputs its own text field, read from
+  their markup (a row of the same element where one carries the selected class). A role the system has no token for
+  is left to the browser's own and listed, never given a value of the engine's.
 - **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
-  when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; icons from
-  the icon sheet.
+  when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; a size that
+  changes with a mode shows each mode's value (`padding/s`: Desktop 8px · Phone 10px); icons from the icon sheet.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
-  Below it, the tokens behind what is drawn and its size; above it, the apps that use it and its documentation.
+  An HTML and CSS system has no code props to pair, so a Figma prop is a control when the code realizes it: the
+  contract's `propertyMap` (found by its options when the contract spells the prop another way), `htmlRealizations`,
+  a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. Below it, the
+  tokens behind what is drawn and its size; above it, its documentation, the products it is **used in** (each by
+  its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
+  differences list the last full audit wrote.
 - **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
-  and, where the CSS nests, for one component.
+  and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,
+  not in the code yet"): the page never draws Figma's values as if the code had them.
 - **Not agreed yet**: a prop on one side only, another default, a token that differs, a component not built yet:
   left out and counted in one line at the top, for the person to decide.
 
@@ -238,7 +252,13 @@ A project's own template is filled through markers:
 - `{{DOCS}}` / `{{DOCS_CODE}}` ← Figma descriptions and code notes, from the design-intent JSON (hardcoded pixel dimensions are stripped — docs describe with tokens).
 - `{{THEME_CSS}}` ← the token CSS inlined verbatim, with its `@media (prefers-color-scheme: dark)` guarded to `:root:not([data-color])` so the manual light/dark toggle wins; `{{COMPONENT_CSS}}` ← the component stylesheets outside the theme.
 
-Config: `styleguide: { template?, out?, iconSource?, plugins? }`. `plugins` is `[{ key, match }]`, a short usage label per app and a fragment of its source path; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
+**The page is checked against the system it shows.** After building it, `--styleguide` checks the page's own CSS
+(every `<style>` but the system's, which the template marks `data-system`): a colour, font, text size, weight, line
+height, corner radius or space that is not one of the system's tokens fails it, and so does what the static
+accessibility check finds in its markup; the run exits 1. `--styleguide-check [page]` runs the same check on a page
+already built, after a project added its own links to it.
+
+Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome? }`. `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
 DS actually contains and agrees on, the styleguide can never invent or drift — the same guarantee Gate 20
 (docs-truth) checks on the output.
 

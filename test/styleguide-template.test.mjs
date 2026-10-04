@@ -81,8 +81,11 @@ test('the mode axes: colour from the config, size from the sizing collection, ne
   const vars = { modeVariants: { sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { kind: 'scalar', values: { desktop: '12px', phone: '16px' } } } } } };
   assert.deepEqual(modeAxes({}, vars), [
     { label: 'Color', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true },
-    { label: 'Size', attr: 'data-size', scoped: true, values: [{ label: 'Desktop', value: '' }, { label: 'Phone', value: 'phone' }] },
+    { label: 'Size', attr: 'data-size', scoped: true, values: [{ label: 'Desktop', value: '' }, { label: 'Phone', value: 'phone', notInCode: true }] },
   ]);
+  // A mode the code has CSS for (a [data-…] block, or an @media that sets the collection's variables) is drawn.
+  assert.equal(modeAxes({}, vars, ':root[data-size="phone"] { --padding-m: 16px; }')[1].values[1].notInCode, undefined);
+  assert.equal(modeAxes({}, vars, '@media (max-width: 480px) { :root { --padding-m: 16px; } }')[1].values[1].notInCode, undefined);
   assert.deepEqual(modeAxes({ figma: { modes: [{ name: 'Day', cssSelector: 'root' }, { name: 'Night', cssSelector: 'class:night' }] } }), [{ label: 'Color', values: [{ label: 'Day', value: '' }, { label: 'Night', value: 'night' }], classes: true }]);
 });
 
