@@ -2,7 +2,7 @@
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest } from '../styleguide-data.mjs';
+import { realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS } from '../styleguide-data.mjs';
 import { checkStyleguidePage, failures, missingRoles } from '../styleguide-check.mjs';
 import { differences, differencesMarkdown } from '../run-diff.mjs';
 import { appDir } from '../code-roots.mjs';
@@ -58,7 +58,7 @@ test('the page\'s look is the system\'s: its page colours, a shared token before
   assert.equal(roles['space-s'], 'var(--gap-m)');
   assert.equal(roles.icon, '16px', 'the size the system\'s icons are drawn at');
   assert.deepEqual(missing, []);
-  assert.match(out, /^:root \{ --sg-bg: var\(--bg\);/);
+  assert.match(out, /^:root, \[data-color\], \[data-size\] \{ --sg-bg: var\(--bg\);/, 'declared again where a preview has its own mode');
   assert.deepEqual(chromeRoles({ tokens, override: { accent: '--brand' } }).roles.accent, 'var(--brand)', 'styleguide.chrome names one by hand');
 });
 
@@ -112,4 +112,17 @@ test('a preview never uses an instance that is hidden at rest', () => {
   assert.equal(hiddenAtRest('<div class="chip" hidden>x</div>', 'chip'), true);
   assert.equal(hiddenAtRest('<div class="chip" style="display:none;">x</div>', 'chip'), true);
   assert.equal(hiddenAtRest('<button class="chip">x</button>', 'chip', css), false);
+});
+
+test('a component switched to Light on a Dark page inherits the Light text colour, not the page\'s', () => {
+  const css = modeRootCSS('  body {\n    overflow-x: hidden;\n    color: var(--text);\n    font-size: var(--m-size);\n    background: var(--bg);\n  }');
+  assert.match(css, /\[data-color\], \[data-size\] \{ color: var\(--text\); font-size: var\(--m-size\); \}/, 'the page\'s inherited text styles, resolved again on the preview');
+  assert.equal(modeRootCSS('.x { color: red; }'), '', 'no page rule, nothing to repeat');
+});
+
+test('a preview uses the instance that holds the parts its props show and hide', () => {
+  assert.equal(holdsPart('<button class="b"><span>View</span><svg></svg></button>', 'svg'), true);
+  assert.equal(holdsPart('<button class="b">label</button>', 'span'), false, 'a bare text label is no part');
+  assert.equal(holdsPart('<button class="b"><span class="x-label">a</span></button>', '[class*="label"], span'), true);
+  assert.equal(holdsPart('<svg class="b"></svg>', 'svg'), false, 'the component itself is not one of its parts');
 });
