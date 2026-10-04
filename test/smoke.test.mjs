@@ -146,3 +146,9 @@ test('[rendered-check] an assertion can read a ::before or ::after layer', async
   assert.match(src, /getComputedStyle\(el, a\.pseudo\)\[a\.prop\]/);
   assert.match(src, /pseudo: x\.a\.pseudo \?\? null/);
 });
+
+test('[rendered-check] transitions are off before any colour scheme group is measured', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../rendered-check.mjs', import.meta.url), 'utf8');
+  const guard = src.indexOf("Transitions off before any group is measured");
+  assert.ok(guard > 0 && guard < src.indexOf("for (const scheme of [...new Set(indexed.map"));
+});
