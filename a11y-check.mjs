@@ -417,11 +417,11 @@ export function styleguideTarget(cfg, ROOT, exists = existsSync) {
   // Where the style guide is written: the configured place, else the project's own template's, else the engine's.
   for (const rel of [cfg?.styleguide?.out, 'apps/styleguide/index.html', `${OUT_DIR}/styleguide/index.html`].filter(Boolean)) {
     const abs = join(ROOT, rel);
-    if (exists(abs)) return { label: rel, url: pathToFileURL(abs).href, styleguide: true };
+    if (exists(abs)) return { label: rel, url: pathToFileURL(abs).href + '?all', styleguide: true };   // every view drawn at once
   }
   // Not built by the project yet: the code capture keeps its own copy, built from the same template.
   const cap = join(ROOT, dirname(codeSnapshotPath(cfg)), 'styleguide.html');
-  return cfg?.styleguide?.template && exists(cap) ? { label: 'styleguide (built by the code capture)', url: pathToFileURL(cap).href, styleguide: true } : null;
+  return cfg?.styleguide?.template && exists(cap) ? { label: 'styleguide (built by the code capture)', url: pathToFileURL(cap).href + '?all', styleguide: true } : null;
 }
 
 // Chrome discovery + DevTools plumbing live in cdp.mjs (shared with Gate [16]).

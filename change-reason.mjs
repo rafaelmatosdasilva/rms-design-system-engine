@@ -37,10 +37,10 @@ export function parseBlame(out) {
     if (h) { cur = { hash: h[1], line: Number(h[2]) }; continue; }
     if (!cur) continue;
     if (l.startsWith('author ')) cur.author = l.slice(7);
-    else if (l.startsWith('author-time ')) cur.date = new Date(Number(l.slice(12)) * 1000).toISOString().slice(0, 10);
+    else if (l.startsWith('author-time ')) { cur.time = new Date(Number(l.slice(12)) * 1000).toISOString(); cur.date = cur.time.slice(0, 10); }
     else if (l.startsWith('summary ')) cur.subject = l.slice(8);
     else if (l.startsWith('\t')) {
-      by.set(cur.line, /^0{40}$/.test(cur.hash) ? { uncommitted: true } : { hash: cur.hash.slice(0, 7), author: cur.author, date: cur.date, subject: cur.subject });
+      by.set(cur.line, /^0{40}$/.test(cur.hash) ? { uncommitted: true } : { hash: cur.hash.slice(0, 7), author: cur.author, date: cur.date, time: cur.time, subject: cur.subject });
       cur = null;
     }
   }

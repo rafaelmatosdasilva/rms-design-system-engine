@@ -217,7 +217,8 @@ export async function browserTokenReading(ROOT, { files, pages, modes, send, tmp
       writeFileSync(p, themePage(files));
       targets.push({ label: '(theme)', url: pathToFileURL(p).href, isTheme: true });
     }
-    for (const pg of pages) targets.push({ label: pg.label, url: /^https?:/.test(pg.path) ? pg.path : pathToFileURL(resolve(ROOT, pg.path)).href });
+    // The generated style guide draws one view at a time for a person; ?all draws every view, as a capture needs.
+    for (const pg of pages) targets.push({ label: pg.label, url: /^https?:/.test(pg.path) ? pg.path : pathToFileURL(resolve(ROOT, pg.path)).href + (pg.generated ? '?all' : '') });
     for (const t of targets) {
       const { targetId, sessionId } = await openLoaded(send, t.url);
       if (!sessionId) { result.notRead.push(`${t.label}: page did not load`); continue; }
@@ -505,7 +506,7 @@ export async function captureCode(ROOT, cfg, { force = false, browser: wantBrows
         // Components: the styleguide first (every component and state on one page), then the apps;
         // the theme-only page last, as a clean place for probes and bare elements.
         const ordered = [...pages].sort((a, b) => (b.label === 'styleguide') - (a.label === 'styleguide'));
-        const compPages = ordered.map((p) => ({ label: p.label, generated: !!p.generated, url: /^https?:/.test(p.path) ? p.path : pathToFileURL(resolve(ROOT, p.path)).href }));
+        const compPages = ordered.map((p) => ({ label: p.label, generated: !!p.generated, url: /^https?:/.test(p.path) ? p.path : pathToFileURL(resolve(ROOT, p.path)).href + (p.generated ? '?all' : '') }));
         if (!compPages.length && files.length) {
           const tp = join(tmpDir, 'theme-page.html');
           if (existsSync(tp)) compPages.push({ label: '(theme)', url: pathToFileURL(tp).href });
