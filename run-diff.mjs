@@ -154,6 +154,7 @@ export function differences(findings = [], names = [], prev = null) {
 export function differencesMarkdown(d, { at = '', handback = {} } = {}) {
   const out = ['# Differences between Figma and the code', '',
     `${d.total} open${d.fresh ? `, ${d.fresh} new since the last run` : ''}${at ? ` · ${at}` : ''}. Written by rms-design-system-engine on every full audit: the one list to work from. Each line says what differs and where; fix the side that is wrong, or accept a difference on purpose (\`--baseline --findings\`), and the next run takes it off.`];
+  if (d.notChecked?.length) out.push('', `Not checked this run, so a difference there would not show: ${d.notChecked.map((n) => `${n.check} (${n.why})`).join('; ')}.`);
   if (handback.code || handback.figma) out.push('', `How each side would change: ${[handback.code && `the code, \`${handback.code}\` (apply only when you ask)`, handback.figma && `Figma, \`${handback.figma}\``].filter(Boolean).join('; ')}.`);
   for (const g of d.groups) {
     out.push('', `## ${g.component ?? 'The whole system'} (${g.items.length})`, '');
