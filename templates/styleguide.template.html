@@ -442,7 +442,8 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
       default: e = document.createElement('span');
     }
     if (c.cls) e.classList.add(c.cls);
-    if (e.tagName !== 'INPUT') e.textContent = c.name.charAt(0).toUpperCase() + c.name.slice(1);
+    // Its name as the words only when no text prop fills it.
+    if (e.tagName !== 'INPUT' && !(c.controls || []).some(function (k) { return k.type === 'TEXT'; })) e.textContent = c.name.charAt(0).toUpperCase() + c.name.slice(1);
     return e;
   }
   function applyEffect(e, effect, on) {
@@ -451,21 +452,25 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
     Object.keys(effect.attrs || {}).forEach(function (a) { if (on) e.setAttribute(a, effect.attrs[a]); else e.removeAttribute(a); });
   }
   function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)) : []; } catch (x) { return []; } }
-  function textLeaf(e, sel) {
+  // A selector list searched one selector at a time, in its own order (the first is the best match), not in page order.
+  function partsInOrder(e, sel) { return String(sel || '').split(',').reduce(function (acc, one) { return acc.concat(partsOf(e, one.trim()).filter(function (k) { return acc.indexOf(k) < 0; })); }, []); }
+  function textLeaf(e, sel, used) {
     if (e.tagName === 'INPUT') return e;
     // The part the prop names, even an empty one (a label the product fills at run time), never the component itself.
-    var parts = partsOf(e, sel).filter(function (k) { return k !== e && !k.closest('svg') && k.tagName !== 'INPUT'; });
-    var named = parts.find(function (k) { return k.textContent.trim(); }) || parts.find(function (k) { return !k.children.length; });
+    var parts = partsInOrder(e, sel).filter(function (k) { return k !== e && !k.closest('svg') && !(used && used.indexOf(k) >= 0); });
+    var named = parts.find(function (k) { return k.tagName !== 'INPUT' && k.textContent.trim(); }) || parts.find(function (k) { return k.tagName === 'INPUT' || !k.children.length; });
     if (named) return named;
     var leaf = e;
-    while (leaf.firstElementChild) { var next = Array.prototype.find.call(leaf.children, function (k) { return k.tagName.toLowerCase() !== 'svg' && k.textContent.trim(); }); if (!next) break; leaf = next; }
+    while (leaf.firstElementChild) { var next = Array.prototype.find.call(leaf.children, function (k) { return k.tagName.toLowerCase() !== 'svg' && k.textContent.trim() && !(used && used.some(function (u) { return u === k || k.contains(u); })); }); if (!next) break; leaf = next; }
     return leaf;
   }
   // Writes a text prop without wiping what else the element holds (an icon beside the words).
+  // Writes a text prop without wiping what else the element holds (an icon beside the words), and never adds loose
+  // text to an element that has none: its part, when a show prop draws it, carries the text.
   function setText(el, v) {
     if (!el.children.length) { el.textContent = v; return; }
     var node = Array.prototype.find.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); });
-    if (node) node.textContent = v; else el.insertBefore(document.createTextNode(v), el.firstChild);
+    if (node) node.textContent = v;
   }
   function hasPart(c, sel) { var e = baseElement(c); return partsOf(e, sel).some(function (k) { return k !== e; }); }
   // Where the component is used: each product by its full name, linked when the config gives its page.
@@ -505,13 +510,27 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
       preview.innerHTML = '';
       var e = baseElement(c);
       preview.appendChild(e);
-      props.forEach(function (p) {
+      var written = [], hidden = [];
+      // Shows, hides and options first, text last, so a part a show prop draws gets its text.
+      props.slice().sort(function (a, b) { return (a.type === 'TEXT') - (b.type === 'TEXT'); }).forEach(function (p) {
         var v = state[p.label];
         if (p.type === 'VARIANT') (p.options || []).forEach(function (o) { applyEffect(e, o, o.label === v); });
         else if (p.type === 'BOOLEAN') {
           if (p.on || p.off) { applyEffect(e, p.on, !!v); applyEffect(e, p.off, !v); }
-          else if (p.part && !v) partsOf(e, p.part).forEach(function (k) { if (k !== e) k.remove(); });
-        } else if (p.type === 'TEXT' && v) { var leaf = textLeaf(e, p.part); if (leaf.tagName === 'INPUT') leaf.placeholder = v; else setText(leaf, v); }
+          else if (p.part) {
+            var have = partsOf(e, p.part).filter(function (k) { return k !== e; });
+            if (!v) { have.forEach(function (k) { k.remove(); }); hidden = hidden.concat(lastCompound(p.part)); }
+            else if (!have.length) addPart(e, p);   // no instance in the products has it: drawn from the code's own CSS
+          }
+        } else if (p.type === 'TEXT' && v) {
+          if (lastCompound(p.part).some(function (x) { return hidden.indexOf(x) >= 0; })) return;   // its show prop is off
+          // Its own part missing from the instance (a class the code styles): drawn, never written into another part.
+          if (/^\.[\w-]+$/.test(lastCompound(p.part)[0]) && !partsInOrder(e, p.part).some(function (k) { return k !== e && written.indexOf(k) < 0; })) { addPart(e, p); return; }
+          var leaf = textLeaf(e, p.part, written);   // a part another text prop already wrote is not this one's
+          if (leaf.tagName === 'INPUT') { if (/value/i.test(p.label)) { leaf.value = v; leaf.setAttribute('value', v); } else leaf.placeholder = v; }
+          else setText(leaf, v);
+          written.push(leaf);
+        }
       });
       var el = (c.cls && (e.classList.contains(c.cls) ? e : e.querySelector('.' + c.cls))) || e;
       var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px';
@@ -528,6 +547,44 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
       var box = el.getBoundingClientRect();
       tComputed.innerHTML = rowsHTML([['width', Math.round(box.width) + 'px'], ['height', Math.round(box.height) + 'px']]);
     }
+    // A part no instance in the products holds, made from the selector the code styles it with: an icon from the
+    // system's own sheet at its icon size, else an element with the selector's classes and the text its text prop gives.
+    function lastCompound(sel) { return String(sel || '').split(',').map(function (x) { return x.trim().split(/\s+/).pop(); }); }
+    function addPart(e, p) {
+      var simple = lastCompound(p.part)[0], tag = (/^[a-z][\w-]*/i.exec(simple) || [])[0] || 'span';
+      var classes = (simple.match(/\.[\w-]+/g) || []).map(function (k) { return k.slice(1); });
+      if (tag === 'svg') {
+        var id = (DATA.icons || [])[0]; if (!id) return;
+        var ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'), use = document.createElementNS(ns, 'use');
+        var size = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sg-icon'), 10) || 16;
+        svg.setAttribute('width', size); svg.setAttribute('height', size); svg.setAttribute('aria-hidden', 'true');
+        classes.forEach(function (k) { svg.classList.add(k); });
+        use.setAttribute('href', '#' + id); svg.appendChild(use); e.insertBefore(svg, e.firstChild); return;
+      }
+      var el = document.createElement(tag);
+      classes.forEach(function (k) { el.classList.add(k); });
+      var mine = lastCompound(p.part);
+      var t = props.find(function (k) { return k.type === 'TEXT' && k.part && lastCompound(k.part).some(function (x) { return mine.indexOf(x) >= 0; }); });
+      if (t) el.textContent = state[t.label] || t.default || '';
+      // Beside the component's other text parts, in the order of its props (a title before its description).
+      var rank = function (k) { return /title|heading/i.test(k.label) ? -1 : props.indexOf(k); };   // a title leads
+      var me = rank(t || p), next = null, last = null;
+      props.slice().sort(function (a, b) { return rank(a) - rank(b); }).forEach(function (k) {
+        if (k.type !== 'TEXT' || k === t || !k.part) return;
+        var at = partsInOrder(e, k.part).find(function (x) { return x !== e && !x.closest('svg') && x.tagName !== 'INPUT'; });
+        if (!at) return;
+        if (rank(k) > me && !next) next = at; else if (rank(k) < me) last = at;
+      });
+      if (next) next.parentNode.insertBefore(el, next); else if (last) last.parentNode.insertBefore(el, last.nextSibling); else e.appendChild(el);
+    }
+    function textLands(p) {
+      var keep = {}, probe = 'sg' + Math.random().toString(36).slice(2, 8);
+      props.forEach(function (k) { keep[k.label] = state[k.label]; if (k.type === 'BOOLEAN') state[k.label] = true; });
+      state[p.label] = probe; refresh();
+      var at = preview.innerHTML.indexOf(probe) >= 0 || Array.prototype.some.call(preview.querySelectorAll('input'), function (i) { return i.value === probe || i.placeholder === probe; });
+      props.forEach(function (k) { state[k.label] = keep[k.label]; }); refresh();
+      return at;
+    }
     sec._refresh = refresh;
     // Every control is one segmented control showing the actual value: a boolean as false/true, a variant by its
     // option names, a text prop as a field. An option the page cannot show (a live state such as :hover, or a
@@ -539,17 +596,26 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
         ctl.innerHTML = label + (DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text">');
         var field = ctl.querySelector('input'); field.value = state[p.label]; field.setAttribute('aria-label', p.label);
         field.addEventListener('input', function () { state[p.label] = field.value; refresh(); });
+        // A text the preview has nowhere to put (no part in the code for it, with every show prop on) is offered but not
+        // editable, so a field never seems to do nothing.
+        if (!textLands(p)) { field.disabled = true; field.title = 'No part in the code holds this text yet'; }
       } else {
         var opts = p.type === 'VARIANT' ? (p.options || []).map(function (o) { return { v: o.label, off: o.live && !(o.add || []).length && !Object.keys(o.attrs || {}).length }; })
-          : [{ v: 'false' }, { v: 'true', off: !p.on && !p.off && !(p.part && hasPart(c, p.part)), missing: true }];   // a part the markup does not hold cannot be shown
-        ctl.innerHTML = label + segHTML(opts.map(function (o) { return { v: o.v, label: o.v, off: o.off, title: o.missing ? 'No instance in the code has this part yet' : 'Shown live, not as a style the page can set' }; }));
+          : [{ v: 'false' }, { v: 'true', off: !p.on && !p.off && !p.part, drawn: p.part && !hasPart(c, p.part) }];   // a part no instance holds is drawn from the code's CSS
+        ctl.innerHTML = label + segHTML(opts.map(function (o) { return { v: o.v, label: o.v, off: o.off, title: o.drawn ? 'No instance in the products has this part: drawn from the code\'s own CSS for it' : o.off ? 'Shown live, not as a style the page can set' : '' }; }));
         var sync = function () { segItems(ctl).forEach(function (b) { segSelect(b, b.dataset.v === String(state[p.label])); }); };
         segItems(ctl).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; state[p.label] = p.type === 'VARIANT' ? b.dataset.v : b.dataset.v === 'true'; sync(); refresh(); }); });
         sync();
       }
       controlsEl.appendChild(ctl);
     });
-    if (!props.length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = 'No agreed props yet.'; controlsEl.appendChild(none); }
+    // Figma's props the code does not build yet: listed with the rest, offered but not drawn.
+    (c.unbuilt || []).forEach(function (u) {
+      var ctl = document.createElement('div'); ctl.className = 'pg-ctl';
+      ctl.innerHTML = '<div class="pg-ctl-label">' + esc(u.label) + '</div>' + segHTML([{ v: '', label: 'Not in the code yet', off: true, title: 'Figma has this prop; the code does not build it yet' }]);
+      controlsEl.appendChild(ctl);
+    });
+    if (!props.length && !(c.unbuilt || []).length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = 'No agreed props yet.'; controlsEl.appendChild(none); }
     return sec;
   }
 

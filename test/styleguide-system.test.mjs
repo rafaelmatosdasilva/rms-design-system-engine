@@ -30,6 +30,9 @@ test('an HTML system: a Figma prop is a control when the code realizes it, throu
   assert.deepEqual(by.Filled, { label: 'Filled', prop: 'Filled', type: 'BOOLEAN', default: true, off: { add: ['empty'], attrs: {} } });
   assert.equal(by['Icon Content'], undefined, 'an instance swap is not a control');
   assert.deepEqual(r.unrealized, ['Size'], 'a prop nothing in the code realizes is counted, not shown');
+  const part = realizedControls({ name: 'chip', defs: { 'Show Icon': { type: 'BOOLEAN', defaultValue: true } }, cls: 'chip', cssText: '.chip{} .chip-icon{}', realizations: { 'Show Icon': '.chip-icon' } });
+  assert.deepEqual(part.controls[0].part, '.chip-icon', 'a realization names a part, never a class put on the component itself');
+  assert.equal(part.controls[0].on, undefined);
 });
 
 const tokens = {
