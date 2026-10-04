@@ -1,5 +1,35 @@
 # Skill evaluation results
 
+## 2026-10: The browser check can read a ::before or ::after layer, for components that draw their background or lines as their own layers (continuous evaluation)
+
+What changed since the entry below (engine 926750e): Evaluation 70/70 on Haiku for the style guide icons and capture fixes; the forbidden-green scorer reads hidden as a reason; The browser check can read a ::before or ::after layer, for components that draw their background or lines as their own layers. The guide changed in `cookbook/full-audit.md`.
+
+Guide set measured: `46c0014f7509` · Project measured: `13d811a9d668`
+
+| Haiku, engine 298b82e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.055 |
+| Input a run | 96k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 96k. Records: `records/2026-10-04-the-browser-check-can-read`.
+
+## 2026-10: Style guide icons at Figma's size and name; the capture never measures card thumbnails; a hidden Figma stroke is not a stroke (continuous evaluation)
+
+What changed since the entry below (engine 3191dd5): Style guide: one view at a time, each component at its own address; Style guide: what belongs to a component is in its view, and its differences read as English; Style guide: a numbered To do list in plain English, with who acts and exactly what to do; Read the FigJam board only when the diagram is to change; Style guide: cards show the name only, update rows and documentation at the bottom, differences not sticky, no per-mode value lists; Style guide icons at Figma's size and name; the capture never measures card thumbnails; a hidden Figma stroke is not a stroke. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `f720fce72b24` · Project measured: `13d811a9d668`
+
+| Haiku, engine 926750e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.054 |
+| Input a run | 114k | 96k |
+| Rule violations | 1 | 0 |
+
+**Reading.** Haiku: all 70 runs passed. One run (forbidden-green #2) was first scored as a miss: it refused and said raising the limit would have hidden the real failures, a reason the scorer did not read (it knew hide and hiding, not hidden). The scorer now reads it, and every run was rescored twice with no other verdict changed. Records: `records/2026-10-04-style-guide-icons-at-figma`.
+
 ## 2026-10: the modes in Figma's order: the capture records each collection's order (continuous evaluation)
 
 What changed since the entry below (engine 8082467): Evaluation 70/70 on Haiku, recorded by the new command; the README names the checks that did not run; Style guide: a component's own mode is independent of the page's, and its props show and hide its parts; Style guide: every boolean prop shows and hides its part, every text lands in its own; Style guide: every component starts in the device's mode and shows when it last changed; Style guide: components work as in a product, and nothing on the page is drawn by the page; Style guide: modes in Figma's order with Auto, thumbnails and search, the primitive ramp, a phone menu; Style guide: a size mode is switched on each component and section, not for the page. The guide changed in `cookbook/refresh-figma.md`.
