@@ -41,3 +41,17 @@ export function Stepper({ Value = '1' }) {
   const f = failing(await task.score(project(jsx)));
   assert.deepEqual(f, ['the value is a spinbutton with its range (Figma role: spinbutton, from 0 to 10)', 'the spinbutton can have an accessible name', 'the step buttons have spoken names (Figma: Decrement and Increment, roles decrement and increment)', 'it stays within 0 to 10 (Decrement stops at 0)', 'ArrowUp steps the spinbutton up']);
 });
+
+test('a controlled stepper (its value from its prop, its changes through onChange) is measured through its parent: one that stops at 0 passes', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+  const jsx = `import { useState } from 'react';
+import './stepper.css';
+const clamp = (n) => Math.min(10, Math.max(0, n));
+export function Stepper({ Value, defaultValue = 1, onChange, label = 'Quantity' }) {
+  const [inner, setInner] = useState(clamp(Number(defaultValue)));
+  const controlled = Value !== undefined;
+  const current = controlled ? clamp(Number(Value)) : inner;
+  const set = (n) => { n = clamp(n); if (n === current) return; if (!controlled) setInner(n); onChange?.(n); };
+  return (<div className="stepper"><button type="button" className="stepper__step" aria-label="Decrease" disabled={current <= 0} onClick={() => set(current - 1)}><svg aria-hidden="true" width="12" height="12"><rect x="1" y="5" width="10" height="2" /></svg></button><span className="stepper__value" role="spinbutton" tabIndex={0} aria-label={label} aria-valuenow={current} aria-valuemin={0} aria-valuemax={10} onKeyDown={(e) => { if (e.key === 'ArrowUp') set(current + 1); }}>{current}</span><button type="button" className="stepper__step" aria-label="Increase" disabled={current >= 10} onClick={() => set(current + 1)}><svg aria-hidden="true" width="12" height="12"><rect x="5" y="1" width="2" height="10" /></svg></button></div>);
+}`;
+  assert.deepEqual(failing(await task.score(project(jsx))), []);
+});
