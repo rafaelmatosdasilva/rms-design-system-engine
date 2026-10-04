@@ -35,19 +35,64 @@ export function treeOf(ui) {
 // The page itself: the engine's template filled with the system's CSS, its icons and the prototype.
 // catalog: each component's text and on/off options, drawn by the part their name points to when the code has no prop
 // of that name.
-export function prototypePage({ name, tree, parts, scales, gaps, note = '', catalog = { components: {} } }) {
+// The families the design sets its text in (Figma's text styles, else the system's own), when the machine may not
+// have them: loaded from Google Fonts, so the drawing reads as the design does. A generic or system family is skipped;
+// ds-config.json → prototypeFonts: false turns it off (an offline machine falls back to the system's stack).
+const GENERIC = /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-[\w-]+|-apple-system|blinkmacsystemfont|segoe ui|roboto|helvetica( neue)?|arial|sf pro[\w ]*|inherit|initial)$/i;
+export function fontLinks(scales = {}) {
+  const fams = new Set();
+  for (const f of [scales.family, ...(scales.text ?? []).map((t) => t.family)]) {
+    const first = String(f ?? '').split(',')[0].trim().replace(/^["']|["']$/g, '');
+    if (first && !/^var\(/.test(first) && !GENERIC.test(first)) fams.add(first);
+  }
+  return [...fams].slice(0, 3).map((f) => `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@300;400;500;600;700&amp;display=swap" data-pt-font>`).join('\n');
+}
+
+export function prototypePage({ name, tree, parts, scales, gaps, note = '', catalog = { components: {} }, fonts = true }) {
   const opts = (n, type) => Object.fromEntries(Object.entries(catalog.components?.[n]?.props ?? {}).filter(([, e]) => e.type === type).map(([k, e]) => [k, typeof e.default === 'string' ? e.default : '']));
   // The classes the system's CSS adds to a component's own class (.node.node-selected): what an option value can turn on.
-  const css = String(parts.componentCSS ?? '');
+  // The theme's rules count as much as the components' own sheets: a system often writes its states there.
+  const css = `${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`.replace(/\/\*[\s\S]*?\*\//g, '');
   const modsOf = (cls) => { if (!cls) return []; const out = new Set(); for (const m of css.matchAll(new RegExp(`\\.${cls.replace(/[^\w-]/g, '')}((?:\\.[A-Za-z][\\w-]*)+)`, 'g'))) for (const k of m[1].split('.').filter(Boolean)) out.add(k); return [...out]; };
-  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean'), enumProps: opts(c.name, 'enum'), mods: modsOf(c.cls) }]));
+  // The variables each of those classes' rules use (.badge.high { color: var(--semantic-negative) }): an option whose
+  // value names none of the classes can still name the colour one of them uses.
+  const modVarsOf = (cls, mods) => Object.fromEntries(mods.map((k) => { const vars = new Set(); const sel = new RegExp(`\\.${cls.replace(/[^\w-]/g, '')}\\.${k.replace(/[^\w-]/g, '')}(?![\\w-])`); for (const r of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) if (sel.test(r[1])) for (const v of r[2].matchAll(/var\(\s*(--[\w-]+)/g)) vars.add(v[1]); return [k, [...vars]]; }).filter(([, v]) => v.length));
+  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => { const mods = modsOf(c.cls); return [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, markups: c.markups, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean'), enumProps: opts(c.name, 'enum'), slotProps: opts(c.name, 'slot'), mods, modVars: modVarsOf(c.cls ?? '', mods) }]; }));
   const data = { name, tree, components: drawable, scales, modes: parts.view.modes ?? [], pieces: ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'].filter((p) => !drawable[p]), gaps, note };
   return readFileSync(PROTOTYPE_TEMPLATE, 'utf8')
     .split('/*{{THEME_CSS}}*/').join(parts.themeCSS ?? '')
     .split('/*{{COMPONENT_CSS}}*/').join(parts.componentCSS ?? '')
     .split('<!--{{ICON_SHEET}}-->').join(parts.iconSheet ?? '')
     .split('/*{{PROTOTYPE}}*/').join(JSON.stringify(data).replace(/</g, '\\u003c'))
-    .split('<!--{{SYSTEM_SCRIPTS}}-->').join(parts.scripts ?? '');
+    .split('<!--{{SYSTEM_SCRIPTS}}-->').join(parts.scripts ?? '')
+    .replace('</head>', `${fonts ? fontLinks(scales) : ''}\n</head>`);
+}
+
+// Every Figma colour the code has a variable for, added to the colour scale, so a surface or a text colour a designed
+// screen binds to one is drawn with the code's variable, as building the screen would: the variable the naming rule
+// gives it (agreed or not); else the one whose comment names it (--bg: …; /* semantic/surface/elevationMedium */);
+// else, for a colour Figma makes from another (panel/background/primary → semantic/surface/elevationMedium), that
+// one's. toVar(name) → the CSS variable the naming rule gives a Figma name.
+export function codeColours(scales, figmaVars = {}, themeCSS = '', allCSS = themeCSS, toVar = () => null) {
+  const declared = new Set([...String(allCSS).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+  const have = new Set(scales.colors.map((t) => t.name));
+  const figmaNames = new Map([...new Set(Object.values(figmaVars.color ?? {}).flatMap((m) => Object.keys(m ?? {})))].map((n) => [n.replace(/\/colou?r$/, ''), n]));
+  for (const [short, name] of figmaNames) {
+    if (have.has(short)) continue;
+    const v = [toVar(name), toVar(short)].find((x) => x && declared.has(x));
+    if (v) { scales.colors.push({ name: short, var: v }); have.add(short); }
+  }
+  for (const m of String(themeCSS).matchAll(/(--[\w-]+)\s*:[^;{}]*;[ \t]*\/\*([^*]*(?:\*(?!\/)[^*]*)*)\*\//g)) {
+    const said = [...m[2].matchAll(/[A-Za-z][\w-]*(?:\/[\w-]+)+/g)].map((x) => x[0].replace(/\/colou?r$/, '')).find((n) => figmaNames.has(n));
+    if (said && !have.has(said)) { scales.colors.push({ name: said, var: m[1] }); have.add(said); }
+  }
+  for (const [short, full] of figmaNames) {
+    if (have.has(short)) continue;
+    const chain = Object.values(figmaVars.aliases ?? {}).map((m) => m?.[full]).find(Array.isArray) ?? [];
+    const via = chain.map((n) => String(n).replace(/\/colou?r$/, '')).map((n) => scales.colors.find((t) => t.name === n)).find(Boolean);
+    if (via) { scales.colors.push({ name: short, var: via.var }); have.add(short); }
+  }
+  return scales;
 }
 
 // What every drawing needs once: the catalog, the system's parts (CSS, drawable components, modes) and its scales.
@@ -64,18 +109,10 @@ async function systemFor(ROOT, cfg) {
   let figmaVars = {};
   try { figmaVars = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { /* no text styles */ }
   const scales = systemScales(parts.view, figmaVars, `${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`);
-  // Every Figma colour whose variable the code declares (agreed or not): a surface or a text colour a designed screen
-  // binds to one is drawn with the code's variable, as building the screen would.
   {
     const { resolveNamingSpec, tokenToVar } = await import('./naming-convention.mjs');
-    const spec = resolveNamingSpec(cfg), declared = new Set([...`${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
-    const have = new Set(scales.colors.map((t) => t.name));
-    for (const name of new Set(Object.values(figmaVars.color ?? {}).flatMap((m) => Object.keys(m ?? {})))) {
-      const short = name.replace(/\/colou?r$/, '');
-      if (have.has(short)) continue;
-      const v = [tokenToVar(name, spec), tokenToVar(short, spec)].find((x) => declared.has(x));
-      if (v) { scales.colors.push({ name: short, var: v }); have.add(short); }
-    }
+    const spec = resolveNamingSpec(cfg);
+    codeColours(scales, figmaVars, parts.themeCSS ?? '', `${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`, (n) => tokenToVar(n, spec));
   }
   // What the team wrote about each component and its product (descriptions, annotations, notes, guidelines, layers).
   const context = await loadContext(ROOT, cfg, catalog, { fetchLinks: envVar(process.env, 'NO_FETCH') !== '1' });
@@ -86,7 +123,7 @@ async function systemFor(ROOT, cfg) {
     const { screenToPrototype } = await import('./screen-layout.mjs');
     designed = context.screens.map((sc) => { try { return { name: slug(sc.name), label: sc.name, id: sc.id, prototype: screenToPrototype(sc, { catalog, scales, drawable: new Set((parts.view.components ?? []).map((c) => c.name)) }).prototype }; } catch { return null; } }).filter(Boolean);
   }
-  return { catalog, parts, scales, context, actionNames, designed };
+  return { catalog, parts, scales, context, actionNames, designed, fonts: cfg.prototypeFonts !== false };
 }
 
 // The texts a composition shows (headings, labels, stand-ins), to match it with a request.
@@ -132,7 +169,7 @@ export function productPages(ROOT, sys, except = null) {
 function drawOne(ROOT, name, raw, sys) {
   const ui = raw?.prototype ?? raw;
   const declared = Array.isArray(raw?.gaps) ? raw.gaps : [];
-  const r = checkPrototype(ui, { catalog: sys.catalog, view: sys.parts.view, scales: sys.scales, name, declared, limits: sys.context.limits, breakpoints: sys.context.breakpoints, context: sys.context, request: sys.request ?? requestOf(ROOT, []), css: sys.parts.componentCSS ?? '' });
+  const r = checkPrototype(ui, { catalog: sys.catalog, view: sys.parts.view, scales: sys.scales, name, declared, limits: sys.context.limits, breakpoints: sys.context.breakpoints, context: sys.context, request: sys.request ?? requestOf(ROOT, []), css: `${sys.parts.themeCSS ?? ''}\n${sys.parts.componentCSS ?? ''}` });
   // The same decisions as the product's other pages (frame, heading, actions, the answer to each missing need).
   const { pages, authored } = productPages(ROOT, sys, name);
   const conventions = deriveConventions(pages, authored);
@@ -152,7 +189,7 @@ function drawOne(ROOT, name, raw, sys) {
     const mine = mergeGaps({ [name]: r.gaps }).map(gapLine);
     // What the reply owes the person: every gap of the prototype just drawn (the Stop hook holds the reply to it).
     writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name, pending: true, gaps: [...mergeGaps({ [name]: r.gaps }).map((g) => ({ need: g.need, kind: g.kind, line: gapLine(g) })), ...differs.map((d) => ({ need: `${d.what} ${d.product}`, kind: 'consistency', line: consistencyLine(d) })), ...r.findings.filter((f) => f.kind === 'request').map((f) => ({ need: f.message.replace(/^the request asks for /, '').split(' and ')[0], kind: 'request', line: f.message }))] }, null, 2) + '\n');
-    writeFileSync(page, prototypePage({ name, tree: treeOf(ui), parts: sys.parts, scales: sys.scales, gaps: mine, catalog: sys.catalog, note: `${r.counts.components} parts · only the design system's own components${r.gaps.some((g) => g.kind === 'layout') ? ', with the engine\'s neutral layout' : ''}` }));
+    writeFileSync(page, prototypePage({ name, tree: treeOf(ui), parts: sys.parts, scales: sys.scales, gaps: mine, catalog: sys.catalog, fonts: sys.fonts !== false, note: `${r.counts.components} parts · only the design system's own components${r.gaps.some((g) => g.kind === 'layout') ? ', with the engine\'s neutral layout' : ''}` }));
   }
   return { ...r, page, differs, uses, used: [...new Set(nodesOf(ui).nodes.map((n) => n.component))] };
 }

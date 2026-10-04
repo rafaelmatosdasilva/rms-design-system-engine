@@ -75,13 +75,14 @@ function variantClass(cls, option, cssText) {
 
 // propsSnap: figma-component-props.snapshot.json · rows: component-prop-result.json rows · agreedRecord: the agreed
 // record ({ facts }) · classFor(name) → the component's class · cssText: the project's CSS · probes: { name: markup }
-// · unbuilt: names Figma has and the code does not yet.
+// · probeList: every probe the contract has (one that holds the component's class is a candidate too) · unbuilt: names
+// Figma has and the code does not yet.
 // check: parity-check.mjs --json result · figmaVars: the vars snapshot · pages: the project's own HTML (text) ·
 // usage: { name: [app labels] } · notes: { name: the code's own note } · icons: the icon ids · title: the system's name.
 // propertyMaps: { name: the contract's propertyMap (Figma prop → option → selector) } · parts: { name: [{ name, selector }] }
 // from the contract's children. · jsx: { name: the markup a React component's own JSX returns (jsx-markup.mjs) }, used
 // when neither the contract nor a page has it.
-export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, classFor = () => null, cssText = '', probes = {}, unbuilt = [], cfg = {},
+export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, classFor = () => null, cssText = '', probes = {}, probeList = [], unbuilt = [], cfg = {},
   check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, parts = {}, jsx = {}, alsoNames = [] } = {}) {
   const byComponent = new Map();
   for (const r of rows) { if (!byComponent.has(r.component)) byComponent.set(r.component, []); byComponent.get(r.component).push(r); }
@@ -123,12 +124,21 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
       else if (d.type === 'TEXT') control.part = partFor(r.figmaProp, parts[name], 'label');
       controls.push(control);
     }
-    // Its markup: the contract's probe, else the first instance in the project's pages, else what its React source returns.
-    const fromPage = probes[name] ? null : pages.map((h) => instanceMarkup(h, cls)).find(Boolean) ?? null;
-    const markup = probes[name] ?? fromPage ?? jsx[name] ?? null;
+    // Its markup: the fullest of the contract's probes, its instances in the project's pages, what the pages' scripts
+    // build and what its React source returns.
+    const candidates = [
+      ...[probes[name], ...probeList.filter((p) => p !== probes[name])].flatMap((p) => (p === probes[name] && p ? [p] : instanceMarkups(p, cls, 1))).map((markup) => ({ markup, from: 'contract' })),
+      ...pages.flatMap((h) => instanceMarkups(h, cls)).map((markup) => ({ markup, from: 'page' })),
+      ...pages.flatMap((h) => scriptMarkups(h, cls)).map((markup) => ({ markup, from: 'script' })),
+      ...(jsx[name] ? [{ markup: jsx[name], from: 'jsx' }] : []),
+    ];
+    const chosen = fullestMarkup(candidates);
+    const markup = chosen?.markup ?? null;
+    // Every other markup the code shows for it, fullest first: a drawing picks the one that fits each instance's words.
+    const markups = [...new Set(candidates.map((c) => c.markup).filter((m) => m && elementsIn(m) <= 30))].sort((a, b) => elementsIn(b) - elementsIn(a)).slice(0, 6);
     if (entry.noProps && !markup) continue;
     components.push({ name, cls, role: roleWord(entry.annotations), description: entry.description ?? '', note: notes[name.toLowerCase()] ?? notes[name] ?? '',
-      markup, markupFrom: probes[name] ? 'contract' : fromPage ? 'page' : jsx[name] ? 'jsx' : 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls });
+      markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls });
   }
   // A recorded value that moved on one side since it was agreed is not agreed any more.
   for (const f of Object.values(agreedRecord.facts ?? {})) if (f && f.figma !== undefined && f.code !== undefined && String(f.figma) !== String(f.code)) undecided++;
@@ -184,22 +194,144 @@ export function agreedTokens(check = {}, figmaVars = {}) {
 // Static HTML only (a React page renders in the browser). Ids, inline handlers and scripts are taken out, so the copy
 // is markup and nothing else.
 export function instanceMarkup(html, cls) {
-  if (!html || !cls) return null;
+  return instanceMarkups(html, cls, 1)[0] ?? null;
+}
+
+// Every element in a piece of HTML that carries the class, outermost first (the first `max` of them).
+export function instanceMarkups(html, cls, max = 20) {
+  if (!html || !cls) return [];
   const open = new RegExp(`<([a-zA-Z][\\w-]*)\\b[^>]*\\bclass\\s*=\\s*["'][^"']*(?<![\\w-])${cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])[^"']*["'][^>]*>`, 'g');
   const body = html.replace(/<script\b[\s\S]*?<\/script>/gi, '').replace(/<style\b[\s\S]*?<\/style>/gi, '').replace(/<template\b[\s\S]*?<\/template>/gi, '');
-  const m = open.exec(body);
-  if (!m) return null;
-  const tag = m[1].toLowerCase();
   const VOID = /^(area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/;
-  let end = m.index + m[0].length;
-  if (!VOID.test(tag) && !/\/>$/.test(m[0])) {
-    const re = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'gi');
-    re.lastIndex = end;
-    let depth = 1, t;
-    while (depth && (t = re.exec(body))) { if (t[1]) depth--; else if (!/\/>$/.test(t[0])) depth++; end = re.lastIndex; }
-    if (depth) return null;
+  const out = [];
+  let m;
+  while (out.length < max && (m = open.exec(body))) {
+    const tag = m[1].toLowerCase();
+    let end = m.index + m[0].length;
+    if (!VOID.test(tag) && !/\/>$/.test(m[0])) {
+      const re = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'gi');
+      re.lastIndex = end;
+      let depth = 1, t;
+      while (depth && (t = re.exec(body))) { if (t[1]) depth--; else if (!/\/>$/.test(t[0])) depth++; end = re.lastIndex; }
+      if (depth) continue;
+    }
+    out.push(body.slice(m.index, end).replace(/\s(id|on\w+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '').trim());
+    open.lastIndex = end;
   }
-  return body.slice(m.index, end).replace(/\s(id|on\w+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '').trim();
+  return out;
+}
+
+// The markup a page's scripts build for a component: a string written piece by piece ('<button class="node' + (on ?
+// ' node-selected' : '') + '">' + esc(name) + '</button>'), read as its literal pieces only, so what a value would
+// fill is left empty and a branch is left out. Only a string that closes the component's element counts.
+export function scriptMarkups(html, cls, max = 20) {
+  if (!html || !cls) return [];
+  const scripts = [...String(html).matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
+  const out = [];
+  const hasCls = new RegExp(`<[a-zA-Z][\\w-]*\\b[^<>]*\\bclass\\s*=\\s*["'][^"']*(?<![\\w-])${cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`);
+  for (const js of scripts) {
+    // A variable that holds markup (var badge = remote ? '<span…>' : '') is a part, not words.
+    markupVars = new Set([...js.matchAll(/\b(?:var|let|const)\s+([\w$]+)\s*=[^;]*?['"`]\s*</g)].map((m) => m[1]));
+    for (let i = 0; i < js.length && out.length < max; i++) {
+      const q = js[i];
+      if (q !== "'" && q !== '"' && q !== '`') continue;
+      if (/[\w$\\]/.test(js[i - 1] ?? '')) continue;
+      const first = literalAt(js, i);
+      if (!first) continue;
+      if (!/^\s*<[a-zA-Z]/.test(first.text) || !hasCls.test(first.text + '"')) { i = first.end - 1; continue; }
+      const { text, end } = concatenation(js, i);
+      i = end - 1;
+      const m = instanceMarkup(text, cls);
+      if (m) out.push(m.replace(/\s{2,}/g, ' '));
+    }
+  }
+  return out;
+}
+// A string literal starting at i: its text (a template's ${…} left empty) and where it ends.
+function literalAt(js, i) {
+  const q = js[i];
+  let text = '', j = i + 1;
+  while (j < js.length) {
+    const ch = js[j];
+    if (ch === '\\') { text += js[j + 1] === 'n' ? '\n' : js[j + 1]; j += 2; continue; }
+    if (ch === q) return { text, end: j + 1 };
+    if (q === '`' && ch === '$' && js[j + 1] === '{') { const e = balanced(js, j + 1); if (e < 0) return null; j = e; continue; }
+    if (q !== '`' && ch === '\n') return null;
+    text += ch; j++;
+  }
+  return null;
+}
+// The index just past the bracket that closes the one at i, or -1.
+function balanced(js, i) {
+  const open = js[i], close = { '(': ')', '[': ']', '{': '}' }[open];
+  let depth = 0;
+  for (let j = i; j < js.length; j++) {
+    const ch = js[j];
+    if (ch === "'" || ch === '"' || ch === '`') { const l = literalAt(js, j); if (!l) return -1; j = l.end - 1; continue; }
+    if (ch === open) depth++;
+    else if (ch === close && --depth === 0) return j + 1;
+  }
+  return -1;
+}
+// A run of pieces joined by + from i: the literal pieces at its own level, joined. A value written as text (a name, a
+// count, esc(…)) becomes the placeholder Label, where the drawing writes the designed words; a value inside a tag, or one
+// a helper builds (an icon's markup), is left empty. A part written only when an option is on (cond ? '<span…>' : '')
+// is kept, so the drawing has every part; a class added the same way is left out.
+const TEXT_CALL = /^(esc|escape\w*|encode\w*|String|text\w*|t)$/i;
+let markupVars = new Set();
+function concatenation(js, i, stop = js.length) {
+  let text = '', j = i;
+  const inTag = () => text.lastIndexOf('<') > text.lastIndexOf('>');
+  while (j < stop) {
+    while (j < stop && /\s/.test(js[j])) j++;
+    if (js.startsWith('//', j)) { while (j < stop && js[j] !== '\n') j++; continue; }
+    if (js.startsWith('/*', j)) { const e = js.indexOf('*/', j + 2); j = e < 0 ? stop : e + 2; continue; }
+    const ch = js[j];
+    if (ch === "'" || ch === '"' || ch === '`') { const l = literalAt(js, j); if (!l) break; text += l.text; j = l.end; }
+    else if (ch === '(' || ch === '[') {
+      const e = balanced(js, j); if (e < 0) break;
+      if (ch === '(' && !inTag()) { const part = optionalPart(js, j + 1, e - 1); if (part) text += part; }
+      j = e;
+    } else if (/[\w$.]/.test(ch)) {
+      const from = j;
+      while (j < stop && /[\w$.]/.test(js[j])) j++;
+      const name = js.slice(from, j).split('.').pop();
+      let called = false;
+      while (js[j] === '(' || js[j] === '[') { const e = balanced(js, j); if (e < 0) return { text, end: stop }; called = called || js[j] === '('; j = e; }
+      if (!inTag() && (called ? TEXT_CALL.test(name) : !markupVars.has(js.slice(from, j)))) text += 'Label';
+    } else break;
+    while (j < stop && /[ \t\r\n]/.test(js[j])) j++;
+    if (js[j] === '+' && js[j + 1] !== '+' && js[j + 1] !== '=') { j++; continue; }
+    break;
+  }
+  return { text, end: Math.max(j, i + 1) };
+}
+// The element a bracketed `cond ? '<…>' : ''` writes when its option is on, or null.
+function optionalPart(js, from, to) {
+  let depth = 0, q = -1, c = -1;
+  for (let k = from; k < to; k++) {
+    const ch = js[k];
+    if (ch === "'" || ch === '"' || ch === '`') { const l = literalAt(js, k); if (!l) return null; k = l.end - 1; continue; }
+    if ('([{'.includes(ch)) depth++; else if (')]}'.includes(ch)) depth--;
+    else if (!depth && ch === '?' && q < 0) q = k;
+    else if (!depth && ch === ':' && q >= 0) { c = k; break; }
+  }
+  if (q < 0 || c < 0) return null;
+  let k = q + 1; while (/\s/.test(js[k])) k++;
+  const { text } = concatenation(js, k, c);
+  return /^\s*<[a-zA-Z]/.test(text) ? text : null;
+}
+
+// The markup a drawing uses: the fullest of what the code shows for the component (the contract's probes, its
+// instances in the pages, what the pages' scripts build, what its React source returns), so a list item a script
+// builds with its icon and name is drawn with them rather than from a test's one-line probe. A candidate larger than
+// a component (a whole section) counts only when nothing else is there.
+const elementsIn = (m) => (String(m).match(/<[a-zA-Z]/g) ?? []).length;
+export function fullestMarkup(candidates, limit = 30) {
+  const ok = candidates.filter((c) => c && c.markup);
+  const fit = ok.filter((c) => elementsIn(c.markup) <= limit);
+  const pool = fit.length ? fit : ok.slice(0, 1);
+  return pool.reduce((best, c) => (!best || elementsIn(c.markup) > elementsIn(best.markup) ? c : best), null);
 }
 
 // The tokens a component's own rules use: each var() in a rule whose selector holds its class, with the property.

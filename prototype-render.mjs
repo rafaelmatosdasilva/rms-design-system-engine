@@ -226,6 +226,8 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
       await cdp.send('Page.enable', {}, sessionId);
       await cdp.send('Page.navigate', { url: pathToFileURL(page).href }, sessionId);
       if (!(await waitForTrue(cdp.send, sessionId, `${FILE_PAGE_LOADED} && !!document.querySelector('[data-pt-path="0"]')`, { tolerateErrors: true }))) return { why: `the page did not draw${errors.length ? `: ${errors[0]}` : ''}` };
+      // The design's fonts, when the page loads them: measured once they are in (or after 3s without them).
+      await cdp.send('Runtime.evaluate', { expression: `Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 3000))]).then(() => true)`, awaitPromise: true, returnByValue: true }, sessionId).catch(() => null);
       const rendered = (await cdp.send('Runtime.evaluate', { expression: RENDER_EXPRESSION, returnByValue: true }, sessionId)).result?.value ?? [];
       // The picture: the page itself, without the engine's bar, at scale 2 as Figma exports.
       const box = (await cdp.send('Runtime.evaluate', { expression: `(() => { const e = document.querySelector('[data-pt-path="0"]'); const kids = [...e.children]; const r = e.getBoundingClientRect(); const pb = parseFloat(getComputedStyle(e).paddingBottom) || 0; const bottom = kids.length ? Math.max(...kids.map((k) => k.getBoundingClientRect().bottom)) + pb : r.bottom; return { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: Math.max(1, bottom - r.top) }; })()`, returnByValue: true }, sessionId)).result?.value;

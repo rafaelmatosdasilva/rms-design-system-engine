@@ -52,7 +52,7 @@ html, body { margin: 0; }
 (function () {
   var D = JSON.parse(document.getElementById('pt-data').textContent || '{}');
   var html = document.documentElement, canvas = document.getElementById('pt-canvas');
-  var COMP = D.components || {}, SCALES = D.scales || { spacing: [], text: [] };
+  var WROTE = [], COMP = D.components || {}, SCALES = D.scales || { spacing: [], text: [] };
   document.title = D.name ? D.name + ' · prototype' : 'Prototype';
   document.getElementById('pt-title').textContent = D.name || 'Prototype';
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -60,8 +60,22 @@ html, body { margin: 0; }
   function space(name) { if (!name || name === 'none') return '0'; var t = SCALES.spacing.find(function (s) { return s.name === name; }); return t ? 'var(' + t.var + ', ' + t.value + ')' : '0'; }
 
   // A system component, drawn as the style guide draws it: its own markup, then each option's own effect.
-  function baseElement(c) {
-    if (c.markup) { var t = document.createElement('template'); t.innerHTML = c.markup.trim(); var first = t.content.firstElementChild; if (first) return first; }
+  // The words a markup has room for: each run of text it shows and each field.
+  function slotsIn(e) {
+    var n = 0, w = document.createTreeWalker(e, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT), x;
+    while ((x = w.nextNode())) { if (x.nodeType === 1) { if (x.tagName === 'INPUT' || x.tagName === 'TEXTAREA') n++; } else if (x.textContent.trim() && !x.parentNode.closest('svg')) n++; }
+    return n;
+  }
+  function parse(m) { var t = document.createElement('template'); t.innerHTML = String(m).trim(); return t.content.firstElementChild; }
+  // Of the markups the code shows for a component, the one with room for as many words as the designed instance shows,
+  // none for one that shows no words (an icon-only switch); the fullest when several fit, or when nothing is known.
+  function baseElement(c, count) {
+    if (c.markups && c.markups.length > 1 && count != null) {
+      var best = null, bestGap = Infinity;
+      c.markups.forEach(function (m) { var e = parse(m); if (!e) return; var gap = Math.abs(slotsIn(e) - count); if (gap < bestGap) { best = e; bestGap = gap; } });
+      if (best) return best;
+    }
+    if (c.markup) { var first = parse(c.markup); if (first) return first; }
     var e;
     switch (c.role) {
       case 'button': e = document.createElement('button'); e.type = 'button'; break;
@@ -106,12 +120,19 @@ html, body { margin: 0; }
   }
   var WRITTEN = [];
   function setText(el, v) {
-    WRITTEN.push(el);
+    WRITTEN.push(el); WROTE.push(String(v).trim());
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') { el.value = v; return; }
-    if (!el.querySelector('svg')) { el.textContent = v; return; }
+    if (!el.children.length) { el.textContent = v; return; }
+    // Its parts stay: the words go in its own text, else its first part without an icon.
     var tn = Array.prototype.find.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); });
-    var span = Array.prototype.find.call(el.children, function (k) { return k.tagName !== 'svg' && !k.querySelector('svg'); });
+    var span = Array.prototype.find.call(el.children, function (k) { return k.tagName !== 'svg' && !k.querySelector('svg') && !/icon/i.test(k.getAttribute('class') || ''); });
     if (tn) tn.textContent = v; else if (span) span.textContent = v; else { var t = document.createElement('span'); t.textContent = v; el.appendChild(t); }
+  }
+  // The element holding the first words a component's markup shows (its text slot), or null.
+  function firstWords(e) {
+    var w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT), n;
+    while ((n = w.nextNode())) if (n.textContent.trim() && !n.parentNode.closest('svg')) return n.parentNode;
+    return null;
   }
   function cleanInstance(e) {
     Array.prototype.slice.call(e.classList).forEach(function (k) { if (/^(hidden|is-hidden|d-none|invisible)$/.test(k)) e.classList.remove(k); });
@@ -129,7 +150,7 @@ html, body { margin: 0; }
       var dflt = String(c.textProps[k] || '').trim().toLowerCase();
       var target = partFor(e, word);
       if (!target && dflt) target = Array.prototype.slice.call(e.querySelectorAll('*')).find(function (x) { return !x.children.length && x.textContent.trim().toLowerCase() === dflt; }) || null;
-      if (!target && (word === 'label' || word === 'title' || word === 'text')) target = e;
+      if (!target && (word === 'label' || word === 'title' || word === 'text')) target = firstWords(e) || e;
       if (target) setText(target, String(p[k]));
     });
   }
@@ -152,32 +173,56 @@ html, body { margin: 0; }
     if (/^(default|false|none|off|no|normal|rest)$/.test(val)) return;
     var word = val === 'true' ? keyWord(k) : keyWord(v);
     if (word.length < 3) return;
-    var hit = mods.find(function (m) { var w = m.toLowerCase().replace(/[^a-z0-9]/g, ''); return w === word || w.slice(-word.length) === word || (word.length >= 4 && w.indexOf(word) >= 0); });
+    var hit = mods.find(function (m) { var w = m.toLowerCase().replace(/[^a-z0-9]/g, ''); return w === word || w.slice(-word.length) === word || (word.length >= 4 && w.indexOf(word) >= 0); })
+      // else the class whose rules use the variables the value names (Type=negative: the class coloured with --…-negative).
+      || (word.length >= 4 && mods.find(function (m) { return ((c.modVars || {})[m] || []).some(function (v) { return v.toLowerCase().replace(/[^a-z0-9]/g, '').indexOf(word) >= 0; }); }));
     if (hit) e.classList.add(hit);
   }
-  // The words a designed instance shows, written into the component's text parts that no option wrote, in order.
+  // The words a designed instance shows, written into the component's text slots that no option wrote, in order: each
+  // run of text its markup shows (a placeholder, a label between parts), an input's placeholder, else the empty element.
   function writeWords(e, content, done) {
     if (!Array.isArray(content) || !content.length) return;
-    var leaves = Array.prototype.slice.call(e.querySelectorAll('*')).concat([e]).filter(function (x) {
-      if (x.closest('svg') || done.indexOf(x) >= 0) return false;
-      if (x.tagName === 'INPUT' || x.tagName === 'TEXTAREA') return true;
-      return !x.children.length && (x.textContent.trim() || x === e);
-    });
-    if (!leaves.length) return;
-    // More words than text parts: the last part takes the rest ("High · 5" in one label).
-    leaves.slice(0, content.length).forEach(function (x, i) {
-      var v = i === leaves.length - 1 ? content.slice(i).join(' ') : content[i];
+    var left = content.slice();
+    WROTE.forEach(function (w) { var i = left.indexOf(w); if (i >= 0) left.splice(i, 1); });
+    if (!left.length) return;
+    var slots = [], w = document.createTreeWalker(e, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT), n;
+    while ((n = w.nextNode())) {
+      if (n.nodeType === 1) { if (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA') slots.push(n); continue; }
+      var host = n.parentNode;
+      if (!n.textContent.trim() || host.closest('svg') || done.indexOf(host) >= 0) continue;
+      slots.push(n);
+    }
+    if (!slots.length && !e.children.length) slots = [e];
+    if (!slots.length) return;
+    // More words than slots: the last one takes the rest ("High · 5" in one label).
+    slots.slice(0, left.length).forEach(function (x, i) {
+      var v = i === slots.length - 1 ? left.slice(i).join(' ') : left[i];
       if (x.tagName === 'INPUT' || x.tagName === 'TEXTAREA') { if (!x.value) x.placeholder = v; } else x.textContent = v;
+    });
+  }
+  // A swapped-in icon (iconContent: Icon-var-color) drawn from the system's icon sheet: into the component's empty icon
+  // part, else in place of its first icon. One the sheet does not have leaves the part as the code draws it.
+  function swapIcons(e, c, p) {
+    Object.keys(c.slotProps || {}).forEach(function (k) {
+      var v = p[k]; if (typeof v !== 'string' || !v) return;
+      var flat = v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      var id = [flat, 'icon-' + flat, flat.replace(/^icon-/, '')].find(function (x) { return document.getElementById(x) && document.getElementById(x).tagName.toLowerCase() === 'symbol'; });
+      if (!id) return;
+      var use = '<svg width="16" height="16" aria-hidden="true"><use href="#' + id + '"/></svg>';
+      var slot = Array.prototype.find.call(e.querySelectorAll('[class*="icon" i]'), function (x) { return !x.children.length && !x.textContent.trim() && x.tagName.toLowerCase() !== 'svg'; });
+      if (slot) { slot.innerHTML = use; return; }
+      var u = e.querySelector('svg use'); if (u) u.setAttribute('href', '#' + id);
     });
   }
   function systemComponent(node) {
     var c = COMP[node.component];
+    WROTE = [];
     if (!c) {
       // A component the code does not have: a labelled box, and what the screen put in it stays visible inside.
-      if ((node.children || []).length) { var box = document.createElement('div'); box.className = 'pt-unbuilt'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', node.component + ' (not built in the code yet)'); var cap = document.createElement('div'); cap.className = 'pt-missing-cap'; cap.textContent = node.component + ' (not built in the code yet)'; box.appendChild(cap); box.setAttribute('data-pt-unbuilt', ''); return box; }
+      if ((node.children || []).length) { var box = document.createElement('div'); box.className = 'pt-unbuilt'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', node.component + ' (not built in the code yet)'); var cap = document.createElement('div'); cap.className = 'pt-missing-cap'; cap.textContent = node.component + ' (not built in the code yet)'; box.appendChild(cap); box.setAttribute('data-pt-unbuilt', ''); if ((node.props || {}).surface) box.style.background = colour(node.props.surface); return box; }
       return missing(node.component + ' (not built in the code yet)');
     }
-    var e = baseElement(c), p = node.props || {}, done = {};
+    var p = node.props || {}, e = baseElement(c, p.textless ? 0 : (Array.isArray(p.content) && p.content.length ? p.content.length : null)), done = {};
     if (c.markup) cleanInstance(e);
     else { var words = Object.keys(c.textProps || {}).map(function (k) { return p[k]; }).filter(function (v) { return v != null && v !== ''; }); if (words.length) e.textContent = words.join(' · '); }
     (c.controls || []).forEach(function (ctl) {
@@ -190,7 +235,7 @@ html, body { margin: 0; }
         else if (ctl.part && !truthy(v)) partsOf(e, ctl.part).forEach(function (k) { if (k !== e) k.remove(); });
       } else if (ctl.type === 'TEXT' && v != null && v !== '') { var leaf = textLeaf(e, ctl.part); if (leaf.tagName === 'INPUT' || leaf.tagName === 'TEXTAREA') leaf.placeholder = v; else leaf.textContent = v; }
     });
-    if (c.markup) { byName(e, c, p, done); writeWords(e, p.content, WRITTEN); }
+    if (c.markup) { byName(e, c, p, done); writeWords(e, p.content, WRITTEN); swapIcons(e, c, p); if (p.figmaState) modifier(e, c, 'State', p.figmaState); }
     // The designed instance shows no words (an icon-only button): none are drawn.
     if (p.textless) Array.prototype.slice.call(e.querySelectorAll('*')).concat([e]).forEach(function (x) { if (!x.closest('svg')) Array.prototype.forEach.call(x.childNodes, function (n) { if (n.nodeType === 3) n.textContent = ''; }); });
     if (p.standInFor) { e.setAttribute('data-pt-standin', ''); e.title = 'Stand-in for ' + p.standInFor; }
@@ -249,7 +294,13 @@ html, body { margin: 0; }
     // With no slot part, what the composition puts inside replaces the copy's own page content.
     if (!isPiece && (node.children || []).length) { var slot = e.querySelector('[class*="slot" i], [class*="content" i], [class*="body" i], [class*="main" i]'); if (slot) { slot.innerHTML = ''; into = slot; } else e.innerHTML = ''; }
     var rowInside = isPiece ? node.component === 'Row' : getComputedStyle(into).flexDirection === 'row';
-    (node.children || []).forEach(function (k, i) { into.appendChild(draw(k, path + '.' + i, rowInside)); });
+    (node.children || []).forEach(function (k, i) {
+      var kid = draw(k, path + '.' + i, rowInside);
+      // In an arrangement the composition owns the space between parts, as Figma's auto layout does: a component's own
+      // outer margin (a list item spaced for the app's list) would add to it.
+      if (isPiece && (D.pieces || []).indexOf(k.component) < 0) kid.style.margin = '0';
+      into.appendChild(kid);
+    });
     return e;
   }
   if (D.tree) canvas.appendChild(draw(D.tree, '0'));

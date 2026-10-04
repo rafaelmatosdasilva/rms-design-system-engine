@@ -338,7 +338,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const icons = (iconSheet().match(/<symbol\b[^>]*\bid\s*=\s*["']([^"']+)["']/g) ?? []).map((m) => m.match(/id\s*=\s*["']([^"']+)["']/)[1]);
     let title = cfg.name ?? '';
     if (!title) { try { title = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { /* no package.json */ } }
-    const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
+    const probeList = [...new Set([...probeBySelector.values()])];
+    const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, probeList, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
       check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: opts.names ?? [],
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).map(([n, c]) => [n, c.propertyMap])),
       parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
