@@ -2,7 +2,7 @@
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi } from '../styleguide-data.mjs';
+import { modeAxes, realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } from '../styleguide-data.mjs';
 import { checkStyleguidePage, failures, missingRoles, controlClasses } from '../styleguide-check.mjs';
 import { differences, differencesMarkdown } from '../run-diff.mjs';
 import { appDir } from '../code-roots.mjs';
@@ -179,4 +179,24 @@ test('the style guide check: a button or link the page draws itself fails; a fon
   assert.deepEqual([...controlClasses(body)].sort(), ['chip-link', 'mine']);
   const bad = failures(checkStyleguidePage(page('.chip-link { background: var(--sg-bg-2); border-radius: var(--sg-radius); } .mine { border: var(--sg-line); } .sg-nav a.active { box-shadow: inset 2px 0 0 var(--sg-text); } .x { font-family: var(--font); } .y { font-family: inherit; }', body)));
   assert.deepEqual(bad.map((f) => `${f.selector} ${f.property}`), ['.chip-link background', '.chip-link border-radius', '.mine border', '.x font-family'], 'an inset line marking the current link is not a button');
+});
+
+test('the colour modes in Figma\'s own order (Dark before Light), and the page resting on the root mode when the device is not dark', () => {
+  const axes = modeAxes({}, { _modeOrder: { color: ['dark', 'light'] } });
+  assert.deepEqual(axes[0].values.map((v) => v.label), ['Dark', 'Light']);
+  assert.equal(axes[0].restValue, 'light', 'Light is the rest, wherever Figma lists it');
+  assert.deepEqual(modeAxes({}, {})[0].values.map((v) => v.label), ['Light', 'Dark'], 'with no order recorded, the config\'s');
+});
+
+test('the primitive ramp: shown when the theme carries Figma\'s value for each primitive in every mode', () => {
+  const vars = { primitives: { light: { 'primitives/Neutral 100': '#0a0a0a', 'primitives/red': '#c20000' }, dark: { 'primitives/Neutral 100': '#f5f5f5', 'primitives/red': '#fe6767' } } };
+  const css = ':root { --neutral-100: #0a0a0a; --red: #c20000; } @media (prefers-color-scheme: dark) { :root { --neutral-100: #F5F5F5; } }';
+  assert.deepEqual(primitiveColours(vars, css), { group: 'primitives', items: [{ figma: 'Neutral 100', var: '--neutral-100', values: { light: '#0a0a0a', dark: '#f5f5f5' } }] }, 'red differs in dark: not agreed, not shown');
+  assert.equal(primitiveColours({}, css), null);
+});
+
+test('the page\'s menu and close buttons are the system\'s icon-only button', () => {
+  const css = '.bIcon{} .bText{}';
+  assert.deepEqual(iconButtonUi([{ name: 'bText', role: 'button', markup: '<button class="bText"><span>Go</span><svg></svg></button>' }, { name: 'bIcon', role: 'button', markup: '<button class="bIcon" data-tip="Copy"><svg></svg></button>' }], css), { from: 'bIcon', cls: 'bIcon' });
+  assert.equal(iconButtonUi([{ name: 'x', role: 'button', markup: '<button class="bText"><span class="label"></span><svg></svg></button>' }], css), null, 'an empty label holder is a text button');
 });

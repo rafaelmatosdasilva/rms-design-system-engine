@@ -125,8 +125,17 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
     else if (sel.startsWith('class:')) { colour.classes = true; colour.values.push({ label: m.name, value: sel.slice(6) }); }
     // other media modes (breakpoints, contrast) are not a switch on one page
   }
+  // In Figma's own order of the collection's modes when the snapshot records it (Dark before Light, as the file has it).
+  const figmaOrder = figmaVars._modeOrder?.color;
+  if (Array.isArray(figmaOrder)) {
+    const keyOf = (label) => modes.find((m) => m.name === label)?.snapshotKey ?? String(label).toLowerCase();
+    const at = (v) => { const i = figmaOrder.indexOf(keyOf(v.label)); return i < 0 ? 99 : i; };
+    colour.values.sort((a, b) => at(a) - at(b));
+  }
   // The derived [data-color] blocks name the light mode too, so a scoped preview can go back to light inside a dark page.
   if (colour.attr === 'data-color') colour.values = colour.values.map((v) => (v.value === '' ? { ...v, value: 'light' } : v));
+  // The mode the page rests on when the device's media query does not match: the root one, wherever Figma lists it.
+  if (colour.media) colour.restValue = colour.values.find((v) => v.value !== colour.mediaValue)?.value ?? '';
   if (colour.values.length > 1) axes.push(colour);
   for (const def of Object.values(figmaVars.modeVariants ?? {})) {
     const ms = def?.modes ?? [];
@@ -141,6 +150,7 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
     const code = codeSizeMode(def, themeCss);
     const axis = { label: 'Size', attr: 'data-size', scoped: true, values: ms.map((m, i) => ({ label: m.name ?? m.snapshotKey, value: i === 0 ? (code ? String(m.snapshotKey) : '') : m.snapshotKey, ...(i > 0 && !inCode(m) ? { notInCode: true } : {}) })) };
     if (code) Object.assign(axis, { media: code.block.condition, mediaValue: code.mode });   // the device or window the code draws it on
+    if (code) axis.restValue = axis.values.find((v) => v.value !== code.mode && !v.notInCode)?.value ?? axis.values[0].value;
     if (code) axis.changes = { [code.mode]: Object.entries(code.block.decls).filter(([k, v]) => code.block.base[k] != null && code.block.base[k] !== v).map(([k, v]) => ({ name: code.names[k] ?? k, from: code.block.base[k], to: v })) };
     axes.push(axis);
     break;
@@ -359,6 +369,51 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
   if (waiting.length) said.push(`${waiting.length} component${waiting.length === 1 ? '' : 's'} not built yet (${waiting.map((w) => w.replace(/ \(not built yet\)$/, '')).join(', ')})`);
   const line = said.length ? `Not shown until agreed, ${said.join(' and ')}. Run the audit to see them and decide each one.` : 'Everything Figma and the code have is agreed.';
   return { title, components, tokens, icons, notAgreed: { differences: undecided, unrealized, waiting, line }, modes: modeAxes(cfg, figmaVars, themeCss) };
+}
+
+// The primitive colours (Figma's primitives/… ramp) the theme declares with Figma's value in every mode, for the ramp
+// the style guide shows first. A primitive is named by the convention (primitives/Neutral 100 → --neutral-100) and
+// read from the theme's own blocks: :root for the root mode, the dark media block, or a [data-…] / class block.
+// → { group: 'primitives', items: [{ figma, var, values }] } | null
+export function primitiveColours(figmaVars = {}, themeCss = '', cfg = {}) {
+  const prim = figmaVars.primitives ?? {};
+  const prefix = cfg.figma?.primitivePrefix ?? 'primitives/';
+  const modes = cfg.figma?.modes?.length ? cfg.figma.modes : [{ snapshotKey: 'light', cssSelector: 'root' }, { snapshotKey: 'dark', cssSelector: 'dark-media' }];
+  const css = String(themeCss).replace(/\/\*[\s\S]*?\*\//g, '');
+  const decls = (body) => Object.fromEntries([...String(body).matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim().toLowerCase()]));
+  const block = (re) => { let out = {}; for (const m of css.matchAll(re)) out = { ...out, ...decls(m[1]) }; return out; };
+  // The theme's top-level :root blocks, and the :root blocks inside its dark media blocks.
+  const media = [], top = [];
+  for (let i = 0, depth = 0, start = 0, head = ''; i < css.length; i++) {
+    if (css[i] === '{') { if (depth === 0) { head = css.slice(start, i).trim(); start = i + 1; } depth++; }
+    else if (css[i] === '}') { depth--; if (depth === 0) { (/^@media/.test(head) ? media : top).push([head, css.slice(start, i)]); start = i + 1; } }
+  }
+  const root = Object.assign({}, ...top.filter(([h]) => /(^|,)\s*:root\s*$/.test(h)).map(([, b]) => decls(b)));
+  const dark = Object.assign({}, ...media.filter(([h]) => /prefers-color-scheme:\s*dark/.test(h)).map(([, b]) => decls((b.match(/:root\s*\{([^{}]*)\}/) ?? [])[1] ?? '')));
+  const of = (m) => {
+    const sel = m.cssSelector ?? 'root';
+    if (sel === 'root') return root;
+    if (sel === 'dark-media') return { ...root, ...dark };
+    const [a, v = ''] = sel.replace(/^(data|class):/, '').split('=');
+    const re = sel.startsWith('class:') ? new RegExp(`\\.${a}\\s*\\{([^{}]*)\\}`, 'g') : new RegExp(`\\[(?:data-)?${a.replace(/^data-/, '')}=["']?${v}["']?\\]\\s*\\{([^{}]*)\\}`, 'g');
+    return { ...root, ...block(re) };
+  };
+  const names = [...new Set(Object.values(prim).flatMap((m) => Object.keys(m ?? {})))];
+  const items = [];
+  for (const name of names) {
+    const v = `--${name.slice(name.startsWith(prefix) ? prefix.length : 0).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+    const values = {};
+    let ok = true;
+    for (const m of modes) {
+      const want = prim[m.snapshotKey]?.[name];
+      if (want == null) continue;
+      const have = of(m)[v];
+      if (!have || have !== String(want).toLowerCase()) { ok = false; break; }
+      values[m.snapshotKey] = want;
+    }
+    if (ok && Object.keys(values).length) items.push({ figma: name.slice(name.startsWith(prefix) ? prefix.length : 0), var: v, values });
+  }
+  return items.length ? { group: 'primitives', items } : null;
 }
 
 // ── Tokens: only the ones the token check found equal to Figma (parity-check.mjs --json → passVars) ─────────────
@@ -783,6 +838,21 @@ export function buttonUi(components = [], systemCss = '', prefer = null) {
 
 // The system's own card, for the overview's links to each section: a component named card or tile whose root class the
 // system's CSS styles. → { from, cls } | null
+// The system's own icon-only button (an svg and no label), for the page's menu and close buttons on a phone.
+// → { from, cls } | null
+export function iconButtonUi(components = [], systemCss = '') {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  for (const c of components) {
+    const m = /^\s*<button\b([^>]*)>([\s\S]*)<\/button>\s*$/i.exec(c.markup ?? '');
+    if (!m || (c.role && c.role !== 'button') || !/<svg\b/i.test(m[2])) continue;
+    if (m[2].replace(/<svg[\s\S]*?<\/svg>/gi, '').replace(/<[^>]+>/g, '').trim()) continue;   // it has a label
+    if (/<(span|strong|b|em)\b[^>]*>\s*<\/\1>/i.test(m[2].replace(/<svg[\s\S]*?<\/svg>/gi, ''))) continue;   // an empty label holder
+    const cls = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(m[1])?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
+    if (cls && defined(cls)) return { from: c.name, cls };
+  }
+  return null;
+}
+
 export function cardUi(components = [], systemCss = '') {
   const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
   for (const c of components) {

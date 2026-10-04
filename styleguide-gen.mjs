@@ -350,14 +350,21 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         if (latest || uncommitted || figmaRead) c.updated = { ...(latest ? { code: latest } : {}), ...(uncommitted ? { uncommitted: true } : {}), ...(figmaRead ? { figmaRead } : {}) };
       }
     } catch { /* outside git: no dates */ }
-    const { segmentedUi, fieldUi, buttonUi, cardUi, motionUi } = await import('./styleguide-data.mjs');
+    const { segmentedUi, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
+    // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
+    // every mode), the semantic roles, then each component's own.
+    if (view.tokens?.colors) {
+      const prim = primitiveColours(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, systemCss, cfg);
+      const rest = view.tokens.colors.filter((g) => g.group !== 'primitives');
+      view.tokens.colors = [...(prim ? [prim] : []), ...rest.filter((g) => /^semantic/i.test(g.group)), ...rest.filter((g) => !/^semantic/i.test(g.group))];
+    }
     // How each component moves (an entry, an exit, an overlay it opens in), so its preview can play it.
     const allCss = [systemCss, ...(ctx?.componentSheets ?? []).map(readText)].join('\n');
     for (const c of view.components) { const m = motionUi(c.cls, allCss); if (m) c.motion = m; }
     // The sizes the system's components draw icons at (each svg's width in their markup), for the icon size switch.
     view.iconSizes = [...new Set(view.components.flatMap((c) => [c.markup, ...(c.markups ?? [])]).flatMap((mk) => [...String(mk ?? '').matchAll(/<svg\b[^>]*?(?<![\w-])width\s*=\s*["']?(\d+(?:\.\d+)?)/gi)].map((m) => Number(m[1]))))].sort((a, b) => a - b);
-    view.ui = { segmented: segmentedUi(view.components), field: fieldUi(view.components, systemCss), button: buttonUi(view.components, systemCss, sh.ui?.button ?? null), card: cardUi(view.components, systemCss) };
+    view.ui = { segmented: segmentedUi(view.components), field: fieldUi(view.components, systemCss), button: buttonUi(view.components, systemCss, sh.ui?.button ?? null), card: cardUi(view.components, systemCss), iconButton: iconButtonUi(view.components, systemCss), overlay: view.components.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
     lastView = view;
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
