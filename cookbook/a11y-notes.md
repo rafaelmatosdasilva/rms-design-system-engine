@@ -4,8 +4,8 @@
 
 ## Steps
 
-1. Notes use Figma's annotation tool, one fact per line: `Role: togglebutton`, `aria-label: Close dialog`, `Heading level 2`, `Alt: …`.
-2. The accessibility check is advisory; run `rms-design-system-engine --a11y` for every element and where it is.
+1. Notes use Figma's annotation tool, one fact per line: `Role: togglebutton`, `aria-label: Close dialog`, `Heading level 2`, `Alt: …`. A part's role goes on its own layer: `Role: label`, `Role: indicator`, `Role: decrement`.
+2. The accessibility check is advisory; run `rms-design-system-engine --a11y` for every element and where it is. While a component is being built, its lines are part of building it (the `NEXT:` line says so), except one that says to send it back to Figma: that one is the person's.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 
