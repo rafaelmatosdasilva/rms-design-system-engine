@@ -1,5 +1,30 @@
 # Skill evaluation results
 
+## 2026-10: the style guide is the system's own and is checked against it; every mode checked; one list of differences (continuous evaluation)
+
+What changed since the entry below (engine 681ecf6): the style guide's template is the layout only, and its colours,
+text styles, radii, spaces, icon size, switches and text fields come from the system itself; `--styleguide` checks
+the built page against the system and its own accessibility. An HTML and CSS system's components get controls from
+what the code realizes. The capture keeps every collection with two or more modes, Gate [5] checks them even when
+`ds-config.json` declares none, and a full audit writes every difference between Figma and the code to
+`differences.md`. The guide changed in `reference/usage.md`, `reference/config.md` and `cookbook/refresh-figma.md`.
+
+Guide set measured: `6d1d7c1796a2` · Project measured: `13d811a9d668`
+
+| Haiku, engine 681ecf6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.058 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Every task passes and no rule is broken. Runs read a little more (115k input a run against 99k), from
+the longer style guide and capture sections.
+
+**Also measured, outside the evaluation.** On a private design system the refreshed capture found a sizing
+collection's second mode the old capture had dropped (seven values), and Gate [5] now fails the mode the code never
+implements; the style guide built from that system passes its own check. Its results are kept out of this
+repository. Records: `records/2026-10-04-styleguide-system`.
+
 ## 2026-10: products in their own repositories, read as the project's code (continuous evaluation)
 
 What changed since the entry below (engine 7765e76): a design system whose products live in their own repositories,
