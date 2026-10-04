@@ -234,6 +234,7 @@ test('using the component in the playground sets its props: a box ticked, a swit
 
 test('on a phone the documentation is one column, each name above its text', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
-  const phone = tpl.slice(tpl.indexOf('@media (max-width: 720px)'), tpl.indexOf('</style>'));
-  assert.match(phone, /\.pg-updated > div \{ grid-template-columns: 1fr;/);
+  const phone = tpl.slice(tpl.indexOf('@media (max-width: 720px)'));
+  const block = phone.slice(0, phone.indexOf('</style>'));
+  assert.match(block, /\.pg-updated > div \{ grid-template-columns: 1fr;/);
 });
