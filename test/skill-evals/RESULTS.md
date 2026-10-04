@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: Figma's annotations and slots as documentation, times to the minute, every component centred, any state selectable, a nested component drawn once, overlays open in the playground, component-only tokens in their component (continuous evaluation)
+
+What changed since the entry below (engine 298b82e): The browser check turns transitions off before every colour scheme group, not only the forced-state one; Style guide: a text part no text prop writes is drawn with its name, so its switch shows something Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> Claude-Session: https://claude.ai/code/session_01NAiQF7FaCvTe9vgNQmgsRB; Style guide: Figma's annotations and slots as documentation, times to the minute, every component centred, any state selectable, a nested component drawn once, overlays open in the playground, component-only tokens in their component. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `476f365cbcd2` · Project measured: `13d811a9d668`
+
+| Haiku, engine 58685ab | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.055 |
+| Input a run | 100k | 102k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 100k. Records: `records/2026-10-04-style-guide-figma-s-annotations`.
+
 ## 2026-10: The browser check can read a ::before or ::after layer, for components that draw their background or lines as their own layers (continuous evaluation)
 
 What changed since the entry below (engine 926750e): Evaluation 70/70 on Haiku for the style guide icons and capture fixes; the forbidden-green scorer reads hidden as a reason; The browser check can read a ::before or ::after layer, for components that draw their background or lines as their own layers. The guide changed in `cookbook/full-audit.md`.
