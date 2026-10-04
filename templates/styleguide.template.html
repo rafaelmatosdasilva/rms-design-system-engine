@@ -89,7 +89,20 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-pending { font-size: var(--sg-m); color: var(--sg-text); background: color-mix(in srgb, var(--sg-warning) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sg-warning) 40%, transparent); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-xl); max-width: 720px; }
 .sg-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sg-space-m); margin-bottom: var(--sg-space-xxl); }
 /* Each overview link is the system's own card (DATA.ui.card); with none, a plain block link. Never a box of the page's. */
-.sg-card { display: block; text-decoration: none; color: inherit; }
+.sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
+.sg-card[hidden], .sg-section[hidden], .sg-hr[hidden], .sg-nav a[hidden] { display: none; }
+.sg-overview-group { margin-bottom: var(--sg-space-xl); }
+.sg-overview-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-m); }
+/* Each card's thumbnail: a few of the real tokens, or the component itself, drawn small on the system's own surface. */
+.sg-thumb { position: relative; height: 140px; overflow: hidden; contain: layout paint; display: flex; align-items: center; justify-content: center; gap: var(--sg-space-s); background: var(--sg-stage, var(--sg-bg)); border-radius: var(--sg-radius); pointer-events: none; }
+.sg-thumb-dot { width: 32px; height: 32px; border-radius: 50%; border: var(--sg-line); flex-shrink: 0; }
+.sg-thumb-bar { height: var(--sg-space-s); background: var(--sg-text-2); border-radius: var(--sg-radius-s); }
+.sg-thumb-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sg-space-xs); }
+.sg-thumb-box { width: 36px; height: 36px; border: var(--sg-line); background: var(--sg-bg-2); flex-shrink: 0; }
+.sg-thumb-live { transform-origin: center; flex-shrink: 0; }
+#sg-search { margin-top: var(--sg-space-m); }
+#sg-search > input { font: inherit; width: 100%; }
+.sg-search-none { font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-xs) var(--sg-space-l); }
 .sg-card-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-xs); }
 .sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xs); }
 .sg-card > p { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); }
@@ -163,8 +176,20 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
 .pg-inspect td:last-child { color: var(--sg-text); word-break: break-all; }
 .pg-inspect tr:last-child td { border-bottom: none; }
+.sg-topbar, .sg-nav-close, .sg-scrim { display: none; }
 @media (max-width: 720px) {
-  .sg-layout { flex-direction: column; } .sg-sidebar { width: auto; height: auto; position: static; }
+  /* A phone: a bar at the top with the menu button; the sidebar is a panel that slides in over the page. */
+  .sg-layout { flex-direction: column; }
+  .sg-topbar { display: flex; align-items: center; gap: var(--sg-space-s); position: sticky; top: 0; z-index: 20; padding: var(--sg-space-s) var(--sg-space-l); background: var(--sg-bg); border-bottom: var(--sg-line); }
+  .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; }
+  .sg-sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; width: min(320px, 85vw); height: 100vh; transform: translateX(-100%); transition: transform 0.2s ease; visibility: hidden; }
+  body.sg-nav-open .sg-sidebar { transform: none; visibility: visible; }
+  .sg-nav-close { display: inline-flex; position: absolute; top: var(--sg-space-s); right: var(--sg-space-s); }
+  .sg-sidebar-header { position: relative; }
+  body.sg-nav-open .sg-scrim { display: block; position: fixed; inset: 0; z-index: 30; }
+  .sg-scrim:not([class*=" "]) { background: color-mix(in srgb, var(--sg-text) 40%, transparent); }
+  .sg-main { padding: var(--sg-space-l); width: 100%; box-sizing: border-box; }
+  .pg-preview { overflow-x: auto; justify-content: flex-start; }   /* a component wider than a phone scrolls inside its own card */
   .pg-preview-card { grid-template-columns: 1fr; } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); }
 }
 </style>
@@ -172,11 +197,14 @@ a.pg-usage-name { color: var(--sg-text); }
 <body class="sg-page">
 <!--{{ICON_SHEET}}-->
 <div class="sg-layout">
-  <nav class="sg-sidebar" aria-label="Design system navigation">
+  <header class="sg-topbar" id="sg-topbar"><p class="sg-title" id="sg-topbar-title">Design system</p></header>
+  <div class="sg-scrim" id="sg-scrim"></div>
+  <nav class="sg-sidebar" id="sg-sidebar" aria-label="Design system navigation">
     <div class="sg-sidebar-header">
       <p class="sg-title" id="sg-title">Design system</p>
       <p>Living style guide</p>
       <div id="mode-controls"></div>
+      <div id="sg-search" role="search"></div>
     </div>
     <div class="sg-nav" id="sg-nav"></div>
   </nav>
@@ -226,7 +254,7 @@ a.pg-usage-name { color: var(--sg-text); }
 
   var SGModes = (function () {
     // The mode the page starts in: the one the code's own media query draws on this device or window, else the first.
-    function base(axis) { return axis.media && window.matchMedia && window.matchMedia(axis.media).matches ? axis.mediaValue : axis.values[0].value; }
+    function base(axis) { return axis.media && window.matchMedia && window.matchMedia(axis.media).matches ? axis.mediaValue : (axis.restValue != null ? axis.restValue : axis.values[0].value); }
     function apply(scope, axis, value) {
       if (axis.classes) { axis.values.forEach(function (v) { if (v.value) scope.classList.remove(v.value); }); if (value) scope.classList.add(value); }
       else if (!value) scope.removeAttribute(axis.attr); else scope.setAttribute(axis.attr, value);
@@ -238,19 +266,31 @@ a.pg-usage-name { color: var(--sg-text); }
     }
     function control(axis, scope, onChange) {
       var wrap = document.createElement('div'); wrap.className = 'sg-mode-ctl';
-      wrap.innerHTML = '<span class="sg-mode-label">' + esc(axis.label) + '</span>' + segHTML(axis.values.map(function (v) { return { v: v.value, label: v.label, off: !!v.notInCode, title: v.notInCode ? v.label + ' is in Figma, not in the code yet' : '' }; }));
+      // On the page's own switch, a mode the device's setting decides comes first as Auto: it follows the device and names
+      // the mode it found (Auto (Dark)). Each component's switch shows the mode it is in.
+      var auto = scope === html && !!axis.media && !axis.classes;
+      var items = axis.values.map(function (v) { return { v: v.value, label: v.label, off: !!v.notInCode, title: v.notInCode ? v.label + ' is in Figma, not in the code yet' : '' }; });
+      if (auto) items.unshift({ v: '__auto', label: 'Auto', title: 'Follows this device\'s setting' });
+      wrap.innerHTML = '<span class="sg-mode-label">' + esc(axis.label) + '</span>' + segHTML(items);
+      var autoNote = null;
+      if (auto) { autoNote = document.createElement('p'); autoNote.className = 'sg-mode-diff'; autoNote.setAttribute('aria-live', 'polite'); wrap.appendChild(autoNote); }
       // On the page's own switch, what the chosen mode changes in the code (axis.changes, from the theme's own values).
       var diff = null;
       if (scope === html && axis.changes) { diff = document.createElement('p'); diff.className = 'sg-mode-diff'; diff.setAttribute('aria-live', 'polite'); wrap.appendChild(diff); }
       wrap._sync = function () {
-        var c = effective(axis, scope); segItems(wrap).forEach(function (b) { segSelect(b, b.dataset.v === c); }); nudge();
+        var c = effective(axis, scope), on = auto && !scope.hasAttribute(axis.attr) ? '__auto' : c;
+        segItems(wrap).forEach(function (b) {
+          segSelect(b, b.dataset.v === on);
+        });
+        if (autoNote) { var lab = axis.values.find(function (v) { return v.value === base(axis); }); autoNote.textContent = lab ? 'This device ' + lab.label : ''; autoNote.hidden = on !== '__auto'; }
+        nudge();
         if (!diff) return;
         var list = axis.changes[c] || [], on = axis.values.find(function (v) { return v.value === c; });
         diff.textContent = list.length ? (on ? on.label : c) + ' changes ' + list.map(function (x) { return x.name + ' ' + x.from + ' → ' + x.to; }).join(' · ') : '';
         diff.hidden = !list.length;
       };
       wrap._sync();
-      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(axis); }); });
+      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (b.dataset.v === '__auto') scope.removeAttribute(axis.attr); else apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(axis); }); });
       return wrap;
     }
     function controls(scope, onChange, which) {
@@ -271,14 +311,37 @@ a.pg-usage-name { color: var(--sg-text); }
   var ov = document.getElementById('overview');
   document.getElementById('sg-hero-title').textContent = DATA.title || 'Design system';
   if (DATA.notAgreed && (DATA.notAgreed.differences || DATA.notAgreed.unrealized || (DATA.notAgreed.waiting || []).length)) { var pend = document.createElement('p'); pend.className = 'sg-pending'; pend.textContent = DATA.notAgreed.line + (DATA.differences ? ' Every difference the last audit found, in one list: ' + DATA.differences.file + ' (' + DATA.differences.total + ' open).' : ''); ov.appendChild(pend); }
-  var grid = document.createElement('div'); grid.className = 'sg-card-grid'; ov.appendChild(grid);
-  function card(id, label, title, sub) { var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ''); a.href = '#' + id; a.innerHTML = '<div class="sg-card-label">' + esc(label) + '</div><h3>' + esc(title) + '</h3><p>' + esc(sub) + '</p>'; grid.appendChild(a); }
-  if (FLAT.length) card('colors', 'Foundations', 'Colors', FLAT.length + ' colour tokens, in every mode.');
-  if ((TOKENS.typography || []).length) card('typography', 'Foundations', 'Typography', TOKENS.typography.length + ' text styles.');
-  if ((TOKENS.spacing || []).length) card('spacing', 'Foundations', 'Spacing', TOKENS.spacing.length + ' gap and padding tokens.');
-  if ((TOKENS.radii || []).length) card('radii', 'Foundations', 'Radii', TOKENS.radii.length + ' radius tokens.');
-  if ((DATA.icons || []).length) card('icons', 'Foundations', 'Icons', DATA.icons.length + ' icons from the system\'s sheet.');
-  COMPONENTS.forEach(function (c) { card('c-' + c.name, 'Components', c.name, c.description ? c.description.replace(/@\w+/g, '').trim() : (c.controls || []).length + ' agreed props.'); });
+  // Two groups, as the page has them: the foundations, then every component in the order of its sections. Each card
+  // is a thumbnail (a few of the real tokens, or the component itself, drawn when its section is built) and its name.
+  function group(title) { var g = document.createElement('div'); g.className = 'sg-overview-group'; g.innerHTML = '<h3>' + esc(title) + '</h3>'; var grid = document.createElement('div'); grid.className = 'sg-card-grid'; g.appendChild(grid); ov.appendChild(g); return grid; }
+  var THUMBS = {};
+  function card(grid, id, label, title, sub, thumb) {
+    var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ''); a.href = '#' + id; a.dataset.name = title.toLowerCase();
+    a.innerHTML = '<div class="sg-thumb" aria-hidden="true">' + (thumb || '') + '</div><div><div class="sg-card-label">' + esc(label) + '</div><h3>' + esc(title) + '</h3><p>' + esc(sub) + '</p></div>';
+    grid.appendChild(a); THUMBS[id] = a.querySelector('.sg-thumb'); return a;
+  }
+  var fGrid = group('Foundations');
+  var ramp = ((TOKENS.colors || [])[0] || { items: [] }).items, step = Math.max(1, Math.floor(ramp.length / 5));
+  if (FLAT.length) card(fGrid, 'colors', 'Foundations', 'Colors', FLAT.length + ' colour tokens, in every mode.', ramp.filter(function (t, i) { return i % step === 0; }).slice(0, 5).map(function (t) { return '<span class="sg-thumb-dot" style="background:var(' + esc(t.var) + ')"></span>'; }).join(''));
+  if ((TOKENS.typography || []).length) card(fGrid, 'typography', 'Foundations', 'Typography', TOKENS.typography.length + ' text styles.', TOKENS.typography.map(function (t) { return '<span style="' + (t.size ? 'font-size:var(' + esc(t.size.var) + ');' : '') + (t.weight ? 'font-weight:var(' + esc(t.weight.var) + ')' : '') + '">Aa</span>'; }).join(''));
+  if ((TOKENS.spacing || []).length) card(fGrid, 'spacing', 'Foundations', 'Spacing', TOKENS.spacing.length + ' gap and padding tokens.', '<div class="sg-thumb-col">' + TOKENS.spacing.slice().sort(function (a, b) { return parseFloat(a.value) - parseFloat(b.value); }).filter(function (t, i, all) { return i % Math.max(1, Math.floor(all.length / 4)) === 0; }).slice(0, 4).map(function (t) { return '<span class="sg-thumb-bar" style="width:calc(var(' + esc(t.var) + ') * 4)"></span>'; }).join('') + '</div>');
+  if ((TOKENS.radii || []).length) card(fGrid, 'radii', 'Foundations', 'Radii', TOKENS.radii.length + ' radius tokens.', TOKENS.radii.slice(0, 4).map(function (t) { return '<span class="sg-thumb-box" style="border-radius:var(' + esc(t.var) + ')"></span>'; }).join(''));
+  if ((DATA.icons || []).length) card(fGrid, 'icons', 'Foundations', 'Icons', DATA.icons.length + ' icons from the system\'s sheet.', DATA.icons.slice(0, 5).map(function (id) { return '<svg width="24" height="24" aria-hidden="true"><use href="#' + esc(id) + '"/></svg>'; }).join(''));
+  var cGrid = COMPONENTS.length ? group('Components') : null;
+  // Its Figma description, else its note, else the props it offers.
+  var about = function (c) {
+    var d = (c.description || '').replace(/@\w+/g, '').trim() || (c.note || '').trim(); if (d) return d;
+    var ps = (c.controls || []).map(function (p) { return p.label; });
+    return ps.length ? ps.slice(0, 3).join(', ') + (ps.length > 3 ? ' and ' + (ps.length - 3) + ' more' : '') + '.' : c.role ? 'A ' + c.role + '.' : 'No props yet.';
+  };
+  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { card(cGrid, 'c-' + c.name, 'Components', c.name, about(c)); });
+  // A component's thumbnail is its own preview, drawn small and inert, once its section has drawn it.
+  function thumbOf(c, preview) {
+    var at = THUMBS['c-' + c.name], src = preview.firstElementChild; if (!at || !src) return;
+    at.innerHTML = ''; var k = src.cloneNode(true); k.classList.add('sg-thumb-live'); k.setAttribute('inert', ''); at.appendChild(k);
+    var bw = at.clientWidth - 24, bh = at.clientHeight - 24, r = k.getBoundingClientRect();
+    var f = Math.min(1, bw / (r.width || 1), bh / (r.height || 1)); if (f < 1) k.style.transform = 'scale(' + f.toFixed(3) + ')';
+  }
   if ((DATA.screens || []).length) {
     hr(); navLink('in-use', 'in use');
     var iu = section('in-use', 'In use', 'The system in use', 'Screens built with the system.');
@@ -335,10 +398,16 @@ a.pg-usage-name { color: var(--sg-text); }
     if (!(list || []).length) return;
     hr(); navLink(id, title.toLowerCase());
     var s = section(id, 'Foundations', title, null);
-    var d = document.createElement('div'); d.className = 'sg-demo sg-demo--col';
+    // One group per family of the name (gap, padding), each from the smallest to the largest.
+    var fams = [], byFam = {};
+    list.forEach(function (t) { var f = t.figma.indexOf('/') > 0 ? t.figma.split('/')[0] : title; if (!byFam[f]) { byFam[f] = []; fams.push(f); } byFam[f].push(t); });
+    var d = document.createElement('div');
     var draw = function () {
-      d.innerHTML = list.map(function (t) {
-        return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + esc(t.var) + ' · ' + esc(live(d, t.var) || t.value) + otherModes(t) + '</div></div>';
+      d.innerHTML = fams.map(function (f) {
+        var rows = byFam[f].slice().sort(function (a, b) { return (parseFloat(live(d, a.var) || a.value) || 0) - (parseFloat(live(d, b.var) || b.value) || 0); });
+        return '<div class="sg-subsection">' + (fams.length > 1 ? '<h3>' + esc(f) + '</h3>' : '') + '<div class="sg-demo sg-demo--col">' + rows.map(function (t) {
+          return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + esc(t.var) + ' · ' + esc(live(d, t.var) || t.value) + otherModes(t) + '</div></div>';
+        }).join('') + '</div></div>';
       }).join('');
     };
     sizeSwitch(s, draw); s.appendChild(d); draw();
@@ -375,11 +444,17 @@ a.pg-usage-name { color: var(--sg-text); }
       segItems(ictl).forEach(function (b) { b.addEventListener('click', function () { iconSize = b.dataset.v; isync(); drawIcons(); }); });
       isync();
     }
-    var idm = document.createElement('div'); idm.className = 'sg-demo'; is.appendChild(idm);
+    var idm = document.createElement('div'); is.appendChild(idm);
+    // Grouped by each icon's own size (the small set, the large set), as the system draws them.
     function drawIcons() {
-      idm.innerHTML = DATA.icons.map(function (id) {
-        var n = own(id), at = iconSize ? Number(iconSize) : (n || '');
-        return '<div class="icon-chip"><svg aria-hidden="true"' + (at ? ' width="' + at + '" height="' + at + '" style="width:' + at + 'px;height:' + at + 'px"' : '') + '><use href="#' + esc(id) + '"/></svg><span class="color-chip-value">' + esc(id) + (n ? '<br>' + n + 'px' : '') + '</span></div>';
+      var groups = {}, order = [];
+      DATA.icons.forEach(function (id) { var n = own(id) || 0; if (!groups[n]) { groups[n] = []; order.push(n); } groups[n].push(id); });
+      order.sort(function (a, b) { return a - b; });
+      idm.innerHTML = order.map(function (n) {
+        return '<div class="sg-subsection">' + (order.length > 1 ? '<h3>' + (n ? n + 'px' : 'Other') + '</h3>' : '') + '<div class="sg-demo">' + groups[n].map(function (id) {
+          var at = iconSize ? Number(iconSize) : (n || '');
+          return '<div class="icon-chip"><svg aria-hidden="true"' + (at ? ' width="' + at + '" height="' + at + '" style="width:' + at + 'px;height:' + at + 'px"' : '') + '><use href="#' + esc(id) + '"/></svg><span class="color-chip-value">' + esc(id) + '</span></div>';
+        }).join('') + '</div></div>';
       }).join('');
     }
     drawIcons();
@@ -774,10 +849,57 @@ a.pg-usage-name { color: var(--sg-text); }
     hr();
     var cardEl = buildCard(c); main.appendChild(cardEl);
     cardEl._refresh();   // measure after it is in the page: a detached node computes to nothing
+    thumbOf(c, cardEl.querySelector('.pg-preview'));
     refreshers.push(cardEl._refresh);
     navLink('c-' + c.name, c.name);
   });
   if (!COMPONENTS.length && !FLAT.length) { var empty = document.createElement('p'); empty.className = 'pg-empty'; empty.textContent = 'Nothing agreed yet.'; main.appendChild(empty); }
+
+  // On a phone, a menu button at the top left opens the sidebar as a panel over the page: the system's own icon-only
+  // button and overlay, the search field focused, closed by its close button, the overlay, a link or Escape.
+  (function () {
+    var ib = DATA.ui && DATA.ui.iconButton, icons = DATA.icons || [];
+    var pick = function (re) { return icons.find(function (id) { return re.test(id); }); };
+    var menuIcon = pick(/menu|hamburger|burger/i) || pick(/-list$/i), closeIcon = pick(/close|clear|cross|-x$/i);
+    var btn = function (id, label, icon) { return '<button type="button" id="' + id + '"' + (ib ? ' class="' + esc(ib.cls) + '"' : '') + ' aria-label="' + esc(label) + '">' + (icon ? '<svg width="16" height="16" aria-hidden="true"><use href="#' + esc(icon) + '"/></svg>' : esc(label)) + '</button>'; };
+    var bar = document.getElementById('sg-topbar'), side = document.getElementById('sg-sidebar'), scrim = document.getElementById('sg-scrim');
+    document.getElementById('sg-topbar-title').textContent = DATA.title || 'Design system';
+    bar.insertAdjacentHTML('afterbegin', btn('sg-menu', 'Open the menu', menuIcon));
+    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('afterbegin', btn('sg-nav-close', 'Close the menu', closeIcon));
+    var menu = document.getElementById('sg-menu'), shut = document.getElementById('sg-nav-close');
+    shut.classList.add('sg-nav-close');
+    if (DATA.ui && DATA.ui.overlay) scrim.classList.add(DATA.ui.overlay);
+    menu.setAttribute('aria-controls', 'sg-sidebar'); menu.setAttribute('aria-expanded', 'false');
+    var open = function (on) {
+      document.body.classList.toggle('sg-nav-open', on); menu.setAttribute('aria-expanded', on ? 'true' : 'false');
+      if (on) { var f = side.querySelector('#sg-search input') || shut; setTimeout(function () { f.focus(); }, 50); } else menu.focus();
+    };
+    menu.addEventListener('click', function () { open(true); });
+    shut.addEventListener('click', function () { open(false); });
+    scrim.addEventListener('click', function () { open(false); });
+    side.addEventListener('click', function (e) { if (e.target.closest('.sg-nav a') && document.body.classList.contains('sg-nav-open')) { document.body.classList.remove('sg-nav-open'); menu.setAttribute('aria-expanded', 'false'); } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.body.classList.contains('sg-nav-open')) open(false); });
+  })();
+
+  // Search: the system's own text field in the sidebar; typing narrows the components (their sections, links and
+  // overview cards) to the ones whose name or description has the words. Escape clears it.
+  var sMount = document.getElementById('sg-search');
+  if (sMount && COMPONENTS.length) {
+    sMount.innerHTML = DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text">';
+    var q = sMount.querySelector('input'); q.type = 'search'; q.placeholder = 'Search components'; q.setAttribute('aria-label', 'Search components'); q.removeAttribute('value');
+    var none = document.createElement('p'); none.className = 'sg-search-none'; none.hidden = true; none.setAttribute('role', 'status'); nav.appendChild(none);
+    var filter = function () {
+      var words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean), shown = 0;
+      COMPONENTS.forEach(function (c) {
+        var hay = (c.name + ' ' + (c.description || '') + ' ' + (c.role || '')).toLowerCase(), on = words.every(function (w) { return hay.indexOf(w) >= 0; });
+        var id = 'c-' + c.name, sec = document.getElementById(id); if (on) shown++;
+        [sec, sec && sec.previousElementSibling && sec.previousElementSibling.classList.contains('sg-hr') ? sec.previousElementSibling : null, nav.querySelector('a[href="#' + id + '"]'), ov.querySelector('a.sg-card[href="#' + id + '"]')].forEach(function (el) { if (el) el.hidden = !on; });
+      });
+      none.hidden = !(words.length && !shown); none.textContent = 'No component matches ' + q.value.trim() + '.';
+    };
+    q.addEventListener('input', filter);
+    q.addEventListener('keydown', function (e) { if (e.key === 'Escape') { q.value = ''; filter(); } });
+  }
 
   // Global mode controls: every axis on <html>; a change re-reads every card and re-syncs the per-card controls.
   var mount = document.getElementById('mode-controls');
