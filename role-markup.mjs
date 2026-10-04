@@ -69,13 +69,18 @@ export const ROLES = {
     { says: 'role="dialog" (or a <dialog>)', check: (t) => /role\s*=\s*["'](?:alert)?dialog|<dialog\b/i.test(t) },
     { says: 'a label (aria-labelledby on its title, or aria-label)', check: (t) => /aria-label(?:ledby)?\s*=/i.test(t) || SPREAD.test(t), owed: true },
   ] },
+  spinbutton: { element: 'an element with role="spinbutton" (or an <input type="number">) carrying aria-valuenow, aria-valuemin and aria-valuemax, with a label; its step buttons beside it, each with a spoken name', obligations: [
+    { says: 'role="spinbutton" (or an <input type="number">)', check: (t) => /role\s*=\s*["']spinbutton|type\s*=\s*["']number/i.test(t) },
+    { says: 'its value and range: aria-valuenow, aria-valuemin and aria-valuemax (or min and max on the number input)', check: (t) => (/aria-valuenow/i.test(t) && /aria-valuemin/i.test(t) && /aria-valuemax/i.test(t)) || (/type\s*=\s*["']number/i.test(t) && /\bmin\s*=/.test(t) && /\bmax\s*=/.test(t)) },
+    { says: 'a label (aria-label or aria-labelledby, or a <label>)', check: (t) => LABELLED.test(t) || SPREAD.test(t), owed: true },
+  ] },
   img: { element: 'an <img> with alt text (or role="img" with aria-label)', obligations: [
     { says: 'alt text (or role="img" with aria-label; alt="" when it only decorates)', check: (t) => /\balt\s*=|role\s*=\s*["']img["'][^>]*aria-label|aria-hidden\s*=\s*["']?\{?\s*["']?true/i.test(t), owed: true },
   ] },
 };
 // Other words for the same role (Specs' and common names).
 const ALIASES = { iconbutton: 'button', togglebuttons: 'togglebutton', toggle: 'togglebutton', textinput: 'textbox', input: 'textbox', textfield: 'textbox',
-  textarea: 'textbox', expander: 'disclosure', accordion: 'disclosure', modal: 'dialog', image: 'img', icon: 'img' };
+  textarea: 'textbox', stepper: 'spinbutton', numberinput: 'spinbutton', numberfield: 'spinbutton', counter: 'spinbutton', expander: 'disclosure', accordion: 'disclosure', modal: 'dialog', image: 'img', icon: 'img' };
 
 const norm = (role) => String(role ?? '').toLowerCase().replace(/[\s_-]+/g, '');
 export const roleOf = (role) => ROLES[ALIASES[norm(role)] ?? norm(role)] ?? null;

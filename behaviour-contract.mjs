@@ -56,8 +56,9 @@ export const BEHAVIOURS = {
   disclosure: [{ id: 'click-expand', says: 'a click flips aria-expanded and shows or hides the panel it controls', act: { click: true }, expect: 'expanded' }],
   tab: [{ id: 'click-select', says: 'a click selects it: aria-selected="true" on it and on no other tab of its list', act: { click: true }, expect: 'selected' }],
   textbox: [{ id: 'types', says: 'typing writes into it', act: { type: 'a' }, expect: 'value' }],
+  spinbutton: [{ id: 'keys-step', says: 'ArrowUp steps it up', sheet: 'ArrowUp and ArrowDown step its value (aria-valuenow), within aria-valuemin and aria-valuemax', act: { keys: ['ArrowUp'] }, expect: 'valuenow' }],
 };
-const ROLE_ALIASES = { toggle: 'togglebutton', expander: 'disclosure', accordion: 'disclosure', textinput: 'textbox', input: 'textbox', textfield: 'textbox', textarea: 'textbox', searchbox: 'textbox' };
+const ROLE_ALIASES = { stepper: 'spinbutton', numberinput: 'spinbutton', numberfield: 'spinbutton', counter: 'spinbutton', toggle: 'togglebutton', expander: 'disclosure', accordion: 'disclosure', textinput: 'textbox', input: 'textbox', textfield: 'textbox', textarea: 'textbox', searchbox: 'textbox' };
 export const roleKey = (role) => { const r = norm(role); return ROLE_ALIASES[r] ?? r; };
 
 // A behaviour a Figma annotation states, in the words designers write.
@@ -122,7 +123,7 @@ export function behaviourExpression(mark, row, phase) {
     const state = () => ({ pressed: c.getAttribute('aria-pressed'), checked: c.getAttribute('aria-checked') ?? (('checked' in c) ? String(c.checked) : null),
       expanded: c.getAttribute('aria-expanded'), panel: vis(panel()), selected: c.getAttribute('aria-selected'),
       others: c.closest('[role=tablist]') ? [...c.closest('[role=tablist]').querySelectorAll('[role=tab][aria-selected="true"]')].filter((t) => t !== c).length : 0,
-      value: 'value' in c ? String(c.value) : (c.textContent || ''), shown: vis(el), focus: document.activeElement });
+      value: 'value' in c ? String(c.value) : (c.textContent || ''), valuenow: c.getAttribute('aria-valuenow') ?? ('value' in c ? String(c.value) : null), shown: vis(el), focus: document.activeElement });
     if (phase === 'before') {
       w.__dseNav = (e) => { if (e.target && e.target.closest && e.target.closest('a[href]')) e.preventDefault(); };
       w.__dseSubmit = (e) => e.preventDefault();
@@ -142,6 +143,7 @@ export function behaviourExpression(mark, row, phase) {
       else if (row.expect === 'expanded') { ok = flipped('expanded') && (!panel() || now.panel !== was.panel); saw = !flipped('expanded') ? 'aria-expanded stayed ' + (now.expanded ?? 'unset') : !panel() ? '' : 'the panel it controls did not ' + (was.panel ? 'hide' : 'show'); if (flipped('expanded') && !panel() && !c.getAttribute('aria-controls')) { ok = true; } }
       else if (row.expect === 'selected') { ok = now.selected === 'true' && now.others === 0; saw = now.selected !== 'true' ? 'aria-selected is ' + (now.selected ?? 'unset') : now.others + ' other tab(s) still selected'; }
       else if (row.expect === 'value') { ok = now.value !== was.value; saw = 'its value did not change'; }
+      else if (row.expect === 'valuenow') { ok = Number(now.valuenow) > Number(was.valuenow) || (c.tagName === 'INPUT' && c.type === 'number'); saw = 'aria-valuenow stayed ' + (now.valuenow ?? 'unset'); }
       else if (row.expect === 'hidden') { ok = !now.shown || c.getAttribute('aria-expanded') === 'false'; saw = 'it is still shown'; }
       else if (row.expect === 'focus-moves') { ok = now.focus !== was.focus && el.contains(now.focus); saw = 'the focus did not move to another of its items'; }
       else if (row.expect === 'activates') { ok = w.__dseClicks > 0 || ['pressed', 'checked', 'expanded', 'selected'].some(flipped); saw = 'nothing happened'; }

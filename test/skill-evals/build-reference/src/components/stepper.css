@@ -1,0 +1,4 @@
+.stepper { display: inline-flex; align-items: center; gap: var(--gap-s); padding: var(--padding-xs); background: var(--surface-page); color: var(--text-primary); border: var(--stroke-default) solid var(--field-border); border-radius: var(--radii-field); font: 500 14px/20px Inter, sans-serif; box-sizing: border-box; }
+.stepper__step { display: inline-flex; align-items: center; justify-content: center; padding: var(--padding-xs); border: 0; border-radius: var(--radii-button); background: var(--chip-background); color: var(--text-primary); }
+.stepper__step:disabled { opacity: 0.5; }
+.stepper__value { width: 32px; text-align: center; }

@@ -78,3 +78,11 @@ test('page: each part does what its role says, and each component does what its 
   assert.deepEqual(of('behaviour'), ['dead: Space flips aria-pressed (role togglebutton), but aria-pressed stayed false'], out);
   assert.ok(!of('behaviour').some((x) => /^(toggle|more|stuck):/.test(x)), out);
 });
+
+test('a stepper is a spinbutton: its value and range in the markup, ArrowUp in the browser', async () => {
+  const { roleObligations } = await import('../role-markup.mjs');
+  assert.deepEqual(behavioursFor('stepper').rows.map((r) => r.id), ['keys-step']);
+  assert.deepEqual(roleObligations('<div><button aria-label="Decrease"/><span role="spinbutton" aria-valuenow={v} aria-valuemin={0} aria-valuemax={10} aria-label={label}>{v}</span></div>', 'stepper'), { missing: [], owed: [] });
+  assert.deepEqual(roleObligations('<input type="number" min={0} max={10} aria-label="Guests" />', 'spinbutton'), { missing: [], owed: [] });
+  assert.deepEqual(roleObligations('<div><button>-</button><span>{v}</span><button>+</button></div>', 'spinbutton').missing.length, 2);
+});

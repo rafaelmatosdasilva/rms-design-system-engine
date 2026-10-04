@@ -183,6 +183,40 @@
         }
       },
       "nodeId": "15:14"
+    },
+    "stepper": {
+      "h": 30,
+      "paddingVar": {
+        "tb": "padding/xs",
+        "lr": "padding/xs"
+      },
+      "gapVar": "gap/s",
+      "innerRadiusVar": "radii/field",
+      "fontSizeVar": "m",
+      "strokeOnDefault": true,
+      "colors": {
+        "fill": {
+          "token": "surface/page/color"
+        },
+        "text": {
+          "token": "text/primary/color"
+        },
+        "stroke": {
+          "token": "field/border/color"
+        }
+      },
+      "defaultVariant": "stepper",
+      "variants": {
+        "stepper": {
+          "h": 30,
+          "layers": [
+            "Decrement",
+            "Value",
+            "Increment"
+          ]
+        }
+      },
+      "nodeId": "17:2"
     }
   }
 }
