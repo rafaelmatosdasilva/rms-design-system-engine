@@ -650,6 +650,18 @@ a.pg-usage-name { color: var(--sg-text); }
       if (a === 'checked' || a === 'disabled' || a === 'indeterminate') t[a] = on;   // the live state, not only the attribute
     });
   }
+  // Whether an option's look is what the component shows now: true or false, or null when the page cannot read it
+  // (a live state such as hover, or an option that sets nothing).
+  function effectHolds(e, effect) {
+    if (!effect || effect.state) return null;
+    var t = effect.target ? (e.matches(effect.target) ? e : e.querySelector(effect.target)) : e;
+    if (!t) return null;
+    var cls = (effect.add || []).filter(function (k) { return effect.target || !e.querySelector('.' + k); }), attrs = Object.keys(effect.attrs || {});
+    if (!cls.length && !attrs.length) return null;
+    return cls.every(function (k) { return t.classList.contains(k); }) && attrs.every(function (a) {
+      return (a === 'checked' || a === 'disabled' || a === 'indeterminate') ? !!t[a] : t.getAttribute(a) === String(effect.attrs[a]);
+    });
+  }
   function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)) : []; } catch (x) { return []; } }
   // A selector list searched one selector at a time, in its own order (the first is the best match), not in page order.
   function partsInOrder(e, sel) { return String(sel || '').split(',').reduce(function (acc, one) { return acc.concat(partsOf(e, one.trim()).filter(function (k) { return acc.indexOf(k) < 0; })); }, []); }
@@ -740,6 +752,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var modeRow = SGModes.controls(preview, function () { refresh(); }, function (a) { return a.scoped; });
       sec.querySelector('.pg-modes-slot').appendChild(modeRow); SGModes.register(modeRow);
     }
+    var cur = null;   // the element the props act on, as last drawn
     function refresh() {
       preview.innerHTML = '';
       var e = baseElement(c);
@@ -752,6 +765,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // A component that lives inside another (one segment of a segmented control): drawn once, inside its parent,
       // and its props act on it, not on the parent.
       if (c.only) { var ones = Array.prototype.slice.call(e.querySelectorAll(c.only)); if (ones.length) { ones.slice(1).forEach(function (k) { k.remove(); }); e = ones[0]; } }
+      cur = e;
       var written = [], hidden = [];
       // Shows, hides and options first, text last, so a part a show prop draws gets its text.
       props.slice().sort(function (a, b) { return (a.type === 'TEXT') - (b.type === 'TEXT'); }).forEach(function (p) {
@@ -777,6 +791,10 @@ a.pg-usage-name { color: var(--sg-text); }
           written.push(leaf);
         }
       });
+      inspect(e);
+    }
+    // The tables beside the preview, read from the component as it is drawn now.
+    function inspect(e) {
       var el = (c.cls && (e.classList.contains(c.cls) ? e : e.querySelector('.' + c.cls))) || e;
       var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px';
       tTokens.innerHTML = rowsHTML([].concat(
@@ -866,6 +884,37 @@ a.pg-usage-name { color: var(--sg-text); }
         nudge(); return;
       }
     });
+    // Using the component sets its props: a switch flipped, a box ticked, a value typed in the preview shows in the
+    // controls, as long as the option it lands on is one the page can read from the component.
+    var syncs = {};
+    function readBack() {
+      if (!cur || !preview.contains(cur)) return;
+      var changed = false;
+      props.forEach(function (p) {
+        var v = state[p.label], next = v;
+        if (p.type === 'VARIANT') {
+          var opts = p.options || [], now = opts.find(function (o) { return o.label === v; });
+          if (now && now.state) return;   // a live state the page holds by a class of its own
+          var holds = opts.filter(function (o) { return effectHolds(cur, o) === true; });
+          var mine = now && effectHolds(cur, now);
+          if (mine === true) return;
+          if (holds.length) next = holds.sort(function (a, b) { return ((b.add || []).length + Object.keys(b.attrs || {}).length) - ((a.add || []).length + Object.keys(a.attrs || {}).length); })[0].label;
+          else if (mine === false) { var plain = opts.filter(function (o) { return effectHolds(cur, o) === null && !o.state; }); if (plain.length === 1) next = plain[0].label; }
+        } else if (p.type === 'BOOLEAN' && (p.on || p.off)) {
+          var on = effectHolds(cur, p.on), off = effectHolds(cur, p.off);
+          if (on === true && off !== true) next = true;
+          else if (off === true && on !== true) next = false;
+          else if (on === false && off !== false) next = false;
+          else if (off === false && on !== false) next = true;
+        } else if (p.type === 'TEXT' && /value/i.test(p.label)) {
+          var leaf = textLeaf(cur, p.part);
+          if (leaf && leaf.tagName === 'INPUT') next = leaf.value;
+        }
+        if (next !== v) { state[p.label] = next; changed = true; if (syncs[p.label]) syncs[p.label](); }
+      });
+      if (changed) inspect(cur);
+    }
+    ['click', 'change', 'input'].forEach(function (t) { preview.addEventListener(t, function () { setTimeout(readBack, 0); }); });
     // How it moves (DATA, read from the system's CSS): its entry and exit replayed, an overlay opened with its own
     // container, layers and open and closing classes. Each button is the system's own.
     var actions = sec.querySelector('.pg-actions'), mv = c.motion;
@@ -912,6 +961,7 @@ a.pg-usage-name { color: var(--sg-text); }
         ctl.innerHTML = label + (DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text">');
         var field = ctl.querySelector('input'); field.value = state[p.label]; field.setAttribute('aria-label', p.label);
         field.addEventListener('input', function () { state[p.label] = field.value; refresh(); });
+        syncs[p.label] = function () { field.value = state[p.label]; };
         // A text the preview has nowhere to put (no part in the code for it, with every show prop on) is offered but not
         // editable, so a field never seems to do nothing.
         if (!textLands(p)) { field.disabled = true; field.title = 'No part in the code holds this text yet'; }
@@ -920,6 +970,7 @@ a.pg-usage-name { color: var(--sg-text); }
           : [{ v: 'false' }, { v: 'true', off: !p.on && !p.off && !p.part, drawn: p.part && !hasPart(c, p.part) }];   // a part no instance holds is drawn from the code's CSS
         ctl.innerHTML = label + segHTML(opts.map(function (o) { return { v: o.v, label: o.v, off: o.off, title: o.drawn ? 'No instance in the products has this part: drawn from the code\'s own CSS for it' : o.off ? 'Shown live, not as a style the page can set' : '' }; }));
         var sync = function () { segItems(ctl).forEach(function (b) { segSelect(b, b.dataset.v === String(state[p.label])); }); nudge(); };
+        syncs[p.label] = sync;
         segItems(ctl).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; var next = p.type === 'VARIANT' ? b.dataset.v : b.dataset.v === 'true'; if (next === state[p.label]) return; state[p.label] = next; sync(); refresh(); }); });   // the option already set changes nothing
         sync();
       }
