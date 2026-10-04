@@ -80,7 +80,7 @@ test('what an option adds comes from the contract\'s selector: a class, an attri
 test('the mode axes: colour from the config, size from the sizing collection, nesting only where the CSS nests', () => {
   const vars = { modeVariants: { sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { kind: 'scalar', values: { desktop: '12px', phone: '16px' } } } } } };
   assert.deepEqual(modeAxes({}, vars), [
-    { label: 'Color', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true },
+    { label: 'Color', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true, media: '(prefers-color-scheme: dark)', mediaValue: 'dark' },
     { label: 'Size', attr: 'data-size', scoped: true, values: [{ label: 'Desktop', value: '' }, { label: 'Phone', value: 'phone', notInCode: true }] },
   ]);
   // A mode the code has CSS for (a [data-…] block, or an @media that sets the collection's variables) is drawn.

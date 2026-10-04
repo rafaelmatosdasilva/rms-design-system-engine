@@ -14,7 +14,7 @@ test('code side: the commit behind a line, an uncommitted line, and nothing outs
   const dir = makeFixture({ 'theme.css': '.chip {\n  padding: 8px;\n}\n' });
   git(dir, 'init', '-q'); git(dir, 'add', '.'); git(dir, 'commit', '-qm', 'Tighten chip padding for dense tables');
   const r = codeReason(dir, 'theme.css:2');
-  assert.deepEqual({ ...r, hash: r.hash.length }, { hash: 7, author: 'Ana', date: '2026-09-20', subject: 'Tighten chip padding for dense tables' });
+  assert.deepEqual({ ...r, hash: r.hash.length, time: r.time.slice(0, 10) }, { hash: 7, author: 'Ana', date: '2026-09-20', time: '2026-09-20', subject: 'Tighten chip padding for dense tables' });
   assert.match(reasonLine(r), /^last changed 2026-09-20 by Ana: "Tighten chip padding for dense tables" \([0-9a-f]{7}\)$/);
   // A line changed after the last commit says so.
   const dir3 = makeFixture({ 'b.css': '.b {\n}\n' });

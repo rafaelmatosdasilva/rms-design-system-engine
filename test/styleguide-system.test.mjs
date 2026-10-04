@@ -2,7 +2,7 @@
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS } from '../styleguide-data.mjs';
+import { realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines } from '../styleguide-data.mjs';
 import { checkStyleguidePage, failures, missingRoles } from '../styleguide-check.mjs';
 import { differences, differencesMarkdown } from '../run-diff.mjs';
 import { appDir } from '../code-roots.mjs';
@@ -128,4 +128,14 @@ test('a preview uses the instance that holds the parts its props show and hide',
   assert.equal(holdsPart('<button class="b">label</button>', 'span'), false, 'a bare text label is no part');
   assert.equal(holdsPart('<button class="b"><span class="x-label">a</span></button>', '[class*="label"], span'), true);
   assert.equal(holdsPart('<svg class="b"></svg>', 'svg'), false, 'the component itself is not one of its parts');
+});
+
+test('a component is dated from its own CSS rules and its contract and config entries', () => {
+  const css = '.chip { gap: 0; }\n.chips { gap: 1px; }\n@media (max-width: 480px) {\n  .chip.on {\n    gap: 2px;\n  }\n}\n/* .chip */ .other { x: 1 }\n#tt { y: 1 }';
+  assert.deepEqual(ruleLines(css, 'chip'), [1, 4, 5, 6], 'its rules, nested ones too, never a longer class or a comment');
+  assert.deepEqual(ruleLines(css, '#tt'), [9], 'an id selector');
+  const contract = 'export const C = {\n  chip: {\n    props: { a: 1 },\n  },\n  chipGroup: { },\n};';
+  assert.deepEqual(entryLines(contract, 'chip'), [2, 3, 4]);
+  assert.deepEqual(entryLines('{ "input": { "chip": { "x": 1 } } }', 'chip'), [], 'only an entry that starts its own line');
+  assert.deepEqual(entryLines('{\n  "chip": {\n    "x": 1\n  }\n}', 'chip'), [2, 3, 4]);
 });

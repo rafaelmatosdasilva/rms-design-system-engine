@@ -31,6 +31,41 @@ export function modeRootCSS(css = '') {
   return body ? `\n\n  /* == The page's text styles on each element with its own mode (inherited values follow that mode) == */\n  [data-color], [data-size] { ${body} }\n` : '';
 }
 
+// The lines of a component's own CSS rules (every rule whose selector names its class, or its id when the selector
+// is one, as #tt), 1-based, in a stylesheet.
+export function ruleLines(css = '', cls = '') {
+  if (!cls) return [];
+  const token = /^[.#]/.test(cls) ? cls : `.${cls}`;
+  const text = String(css), want = new RegExp(`${token.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?![\\w-])`), out = [];
+  const lineAt = (i) => text.slice(0, i).split('\n').length;
+  let depth = 0, start = 0, ruleStart = -1, ruleDepth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '{') { if (ruleStart < 0 && want.test(text.slice(start, i).replace(/\/\*[\s\S]*?\*\//g, ''))) { ruleStart = lineAt(start + text.slice(start, i).search(/\S/)); ruleDepth = depth; } depth++; start = i + 1; }
+    else if (ch === '}') { depth--; if (ruleStart > 0 && depth === ruleDepth) { for (let l = ruleStart; l <= lineAt(i); l++) out.push(l); ruleStart = -1; } start = i + 1; }
+    else if (ch === ';' && depth === 0) start = i + 1;
+  }
+  return [...new Set(out)];
+}
+
+// The lines of every object entry keyed by a component's name (badge: { … } or "badge": { … }), 1-based, in a
+// contract or config file, so a change to its contract dates the component as a change to its CSS does.
+export function entryLines(text = '', key = '') {
+  if (!key) return [];
+  const src = String(text), lines = src.split('\n'), out = [];
+  const head = new RegExp(`^\\s*["']?${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*:\\s*\\{`);
+  lines.forEach((l, i) => {
+    if (!head.test(l)) return;
+    let depth = 0;
+    for (let j = i; j < lines.length; j++) {
+      for (const ch of lines[j].replace(/\/\/.*$/, '')) { if (ch === '{') depth++; else if (ch === '}') depth--; }
+      out.push(j + 1);
+      if (depth <= 0) break;
+    }
+  });
+  return [...new Set(out)];
+}
+
 // The code's own breakpoint modes: each @media block (not a colour or contrast preference) that sets variables on
 // :root, with the base :root's values for the same variables. → [{ condition, decls, base, rules }]
 export function codeSizeBlocks(css = '') {
@@ -85,7 +120,7 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
   for (const m of modes) {
     const sel = m.cssSelector ?? 'root';
     if (sel === 'root') colour.values.push({ label: m.name, value: '' });
-    else if (sel === 'dark-media') { colour.attr = 'data-color'; colour.scoped = true; colour.values.push({ label: m.name, value: 'dark' }); }
+    else if (sel === 'dark-media') { colour.attr = 'data-color'; colour.scoped = true; colour.values.push({ label: m.name, value: 'dark' }); Object.assign(colour, { media: '(prefers-color-scheme: dark)', mediaValue: 'dark' }); }
     else if (sel.startsWith('data:')) { const [a, v = ''] = sel.slice(5).split('='); colour.attr = colour.attr ?? (a.startsWith('data-') ? a : `data-${a}`); colour.values.push({ label: m.name, value: v }); }
     else if (sel.startsWith('class:')) { colour.classes = true; colour.values.push({ label: m.name, value: sel.slice(6) }); }
     // other media modes (breakpoints, contrast) are not a switch on one page
