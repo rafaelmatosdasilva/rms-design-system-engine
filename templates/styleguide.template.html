@@ -907,7 +907,7 @@ a.pg-usage-name { color: var(--sg-text); }
   if (mount && AXES.length) { var pageModes = SGModes.controls(html, function (axis) {
     if (axis && axis.attr) document.querySelectorAll('.pg-preview[' + axis.attr + '], .sg-scope[' + axis.attr + ']').forEach(function (p) { p.removeAttribute(axis.attr); });
     refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll();
-  }, function () { return true; }); mount.appendChild(pageModes); SGModes.register(pageModes); }
+  }, function (a) { return a.attr !== 'data-size'; }); mount.appendChild(pageModes); SGModes.register(pageModes); }   // a size (breakpoint) is switched on each component and section, not for the page
   // The browser's own setting leads until someone picks a mode: when it changes (the computer goes dark at night, the
   // window narrows), the page and every component not switched by hand follow it.
   AXES.forEach(function (axis) {
