@@ -144,6 +144,10 @@ const MEASURE = `(sel, label, cls) => {
     rowGap: cs.rowGap, buttons: el.querySelectorAll('button,[role=button]').length + (el.matches('button,[role=button]') ? 1 : 0), inputs: el.querySelectorAll('input,textarea').length, text: el.textContent.replace(/\\s+/g, ' ').trim().slice(0, 200) };
 }`;
 
+// Pictures of each rendered case, for the gallery (gallery.mjs): set a store, and every case renders into it too.
+let SHOTS = null;
+export function capturePictures(store) { SHOTS = store; }
+
 // Render cases of one exported component and measure each. cases: [{ id, props, pseudo: ['hover'], dark: bool }]
 export async function renderCases(dir, file, exportName, cases, { label = null } = {}) {
   const cls = String(exportName).toLowerCase();   // the component's class, as the build sheet and Figma name it
@@ -185,6 +189,14 @@ export async function renderCases(dir, file, exportName, cases, { label = null }
         if (!c.dark || (m && c.expectDark && c.expectDark(m))) break;
       }
       out[c.id] = m;
+      if (SHOTS && !c.probe) {
+        const box = await ev(`(() => { const e = document.getElementById('case'); document.body.style.background = getComputedStyle(document.documentElement).getPropertyValue('--surface-page') || ''; const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; })()`).catch(() => null);
+        if (box && box.w > 0 && box.h > 0) {
+          const pad = 12;
+          const { data } = await send('Page.captureScreenshot', { format: 'png', clip: { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.w + pad * 2, height: box.h + pad * 2, scale: 2 } }, sessionId);
+          SHOTS[c.id] = `data:image/png;base64,${data}`;
+        }
+      }
     }
   } finally { close(); chrome.kill(); server.close(); }
   return out;
