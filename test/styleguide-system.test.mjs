@@ -82,13 +82,15 @@ test('the style guide check: only the system\'s tokens on the page; a role with 
   assert.ok(failures(checkStyleguidePage(page('', '<main><img src="a.png"></main>'))).some((f) => f.property === 'accessibility'));
 });
 
-test('one list of differences: grouped by component, marked new, the data\'s freshness and accessibility left out', () => {
+test('one list of differences: grouped by component, marked new, the data\'s freshness, accessibility and pointer lines left out', () => {
   const now = ['Structure :: badge height: Figma 20, rendered 24', 'Token values :: ❌ [sizing] padding/s → --padding-s: 8px vs 10px', 'Data is up to date :: ⚠️ a snapshot is old', 'Accessibility :: no label', 'Token contrast :: a on b 2:1', 'Structure :: gate fails', 'Figma file hygiene :: badge has no description'];
   const d = differences(now, ['badge'], ['Structure :: badge height: Figma 20, rendered 24']);
   assert.equal(d.total, 3);
   assert.equal(d.fresh, 2);
   assert.deepEqual(d.groups.map((g) => [g.component, g.items.length]), [['badge', 2], [null, 1]]);
   assert.equal(d.groups[0].items.find((x) => x.check === 'Figma file hygiene').side, 'figma');
+  const pointers = ['Structure :: 🔗 badge in Figma: https://example.test', 'Structure :: ↳ last changed 2026-07-31 by someone', 'Every mode is covered: :: ⏭  SKIPPED 17', 'Structure :: least checked: badge, 3 not comparable of 8', 'Docs tell the truth :: surface not found, skipped: a.html', 'Structure :: NO-SHRINK 1 component - advisory, not a difference from Figma', 'Exemption debt :: knownStateExemptions: 18'];
+  assert.equal(differences([...now, ...pointers], ['badge']).total, 3, 'a line that only points at a difference is not one');
   const md = differencesMarkdown(d, { handback: { code: 'out/handback/code-changes.diff' } });
   assert.match(md, /^# Differences between Figma and the code\n\n3 open, 2 new since the last run/);
   assert.match(md, /## badge \(2\)/);
