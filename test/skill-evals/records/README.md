@@ -25,5 +25,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-04-styleguide-system` | The 21 guide tasks on Haiku (engine 681ecf6) | "the style guide is the system's own and is checked against it" |
 | `2026-10-04-the-evaluation-a-guide-change` | The 21 guide tasks on Haiku (engine 8082467) | "a stroked icon is not a border, a bound typography variable reads as its scale, the evaluation recorded in one command" |
 | `2026-10-04-style-guide-a-size-mode` | The 21 guide tasks on Haiku (engine 3191dd5) | "the modes in Figma's order: the capture records each collection's order" |
+| `2026-10-04-style-guide-icons-at-figma` | The 21 guide tasks on Haiku (engine 926750e) | "Style guide icons at Figma's size and name; the capture never measures card thumbnails; a hidden Figma stroke is not a stroke" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
