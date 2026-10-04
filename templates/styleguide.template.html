@@ -148,6 +148,12 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-note b { color: var(--sg-text); font-weight: var(--sg-heading-weight); white-space: nowrap; }
 .pg-diff-list { margin: 0; padding-left: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-xs); }
 .pg-diff-list b { white-space: normal; }
+.pg-todo { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-text-2); }
+.sg-todo-group { margin-bottom: var(--sg-space-xl); }
+.sg-todo-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }
+.sg-todo-group > p { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
+.sg-todo-list { margin: 0; padding-left: var(--sg-space-xl); display: flex; flex-direction: column; gap: var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text); line-height: var(--sg-lh); }
+.sg-todo-list .pg-todo { font-weight: var(--sg-heading-weight); color: var(--sg-text); }
 .pg-diff { border-color: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
 .pg-note:last-child { margin-bottom: var(--sg-space-m); }
 .pg-header { position: sticky; top: 0; z-index: 5; background: var(--sg-bg); padding: var(--sg-space-s) 0 var(--sg-space-m); margin-bottom: var(--sg-space-xs); }
@@ -310,11 +316,27 @@ a.pg-usage-name { color: var(--sg-text); }
   // The stage behind each preview is the system's own page surface, so a dark mode reads as dark.
   var FLAT = []; (TOKENS.colors || []).forEach(function (g) { FLAT = FLAT.concat(g.items); });
 
+  /* ── To do: every difference and everything not built yet, numbered, by who acts ──────────────────────────────
+     In Figma (the person), in the code (ask Claude), or a decision first. The numbers are the same in each component's
+     own list, so "do 3 and 7" names them. */
+  var WHO = { figma: 'In Figma', code: 'In the code', both: 'Decide' };
+  function doWhat(t) { var r = String(t || '').replace(/^In (the code|Figma), /, ''); return r.charAt(0).toUpperCase() + r.slice(1); }   // the label already says where
+  var TODO = [], TODO_NO = {};
+  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
+    (c.differences || []).forEach(function (x) { TODO.push({ who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
+    (c.unbuilt || []).forEach(function (u) { TODO.push({ who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell me to do it.' }); });
+  });
+  ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. Tell me to do it.' }); });
+  var ORDER = ['figma', 'code', 'both'];
+  TODO.sort(function (a, b) { return ORDER.indexOf(a.who) - ORDER.indexOf(b.who); });
+  TODO.forEach(function (t, i) { t.no = i + 1; if (t.key) TODO_NO[t.key] = t.no; });
+
   /* ── Overview ─────────────────────────────────────────────────────────────────────────────────────────────── */
   navLink('overview', 'overview');
   var ov = document.getElementById('overview');
   document.getElementById('sg-hero-title').textContent = DATA.title || 'Design system';
-  if (DATA.notAgreed && (DATA.notAgreed.differences || DATA.notAgreed.unrealized || (DATA.notAgreed.waiting || []).length)) { var pend = document.createElement('p'); pend.className = 'sg-pending'; pend.textContent = DATA.notAgreed.line + (DATA.differences ? ' Every difference the last audit found, in one list: ' + DATA.differences.file + ' (' + DATA.differences.total + ' open).' : ''); ov.appendChild(pend); }
+  if (DATA.notAgreed && (DATA.notAgreed.differences || DATA.notAgreed.unrealized || (DATA.notAgreed.waiting || []).length)) { var pend = document.createElement('p'); pend.className = 'sg-pending'; pend.dataset.todo = '1'; pend.textContent = DATA.notAgreed.line; ov.appendChild(pend); }
+  if (TODO.length) { var go = document.createElement('p'); go.innerHTML = sysButton('a', 'Open the To do list (' + TODO.length + ')', ' href="#todo"'); ov.appendChild(go); }
   // Two groups, as the page has them: the foundations, then every component in the order of its sections. Each card
   // is a thumbnail (a few of the real tokens, or the component itself, drawn when its section is built) and its name.
   function group(title) { var g = document.createElement('div'); g.className = 'sg-overview-group'; g.innerHTML = '<h3>' + esc(title) + '</h3>'; var grid = document.createElement('div'); grid.className = 'sg-card-grid'; g.appendChild(grid); ov.appendChild(g); return grid; }
@@ -350,6 +372,19 @@ a.pg-usage-name { color: var(--sg-text); }
     var k = at.querySelector('.sg-thumb-live'); if (!k || !at.clientWidth) return;
     k.style.transform = ''; var bw = at.clientWidth - 24, bh = at.clientHeight - 24, r = k.getBoundingClientRect();
     var f = Math.min(1, bw / (r.width || 1), bh / (r.height || 1)); if (f < 1) k.style.transform = 'scale(' + f.toFixed(3) + ')';
+  }
+  if (TODO.length) {
+    hr(); navLink('todo', 'to do (' + TODO.length + ')');
+    var td = section('todo', 'To do', 'What to do', 'Everything where Figma and the code differ, and everything Figma has that the code does not build yet. Each says who does it and exactly what to do. Tell me the numbers you want done, for example do 3 and 7.');
+    var groups = { figma: ['In Figma', 'For you, in the Figma file. Once it is done, ask me to read Figma again.'], code: ['In the code', 'Tell me to do them, one by one or all at once.'], both: ['Decide first', 'Figma and the code each have a case. Tell me which side is right and I will do the rest.'] };
+    ORDER.forEach(function (w) {
+      var items = TODO.filter(function (t) { return t.who === w; }); if (!items.length) return;
+      var g = document.createElement('div'); g.className = 'sg-todo-group';
+      g.innerHTML = '<h3>' + esc(groups[w][0]) + ' (' + items.length + ')</h3><p>' + esc(groups[w][1]) + '</p><ol class="sg-todo-list">' + items.map(function (t) {
+        return '<li value="' + t.no + '">' + (t.comp ? '<a href="#c-' + esc(t.comp) + '">' + esc(t.comp) + '</a>. ' : '') + esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span></li>';
+      }).join('') + '</ol>';
+      td.appendChild(g);
+    });
   }
   if ((DATA.screens || []).length) {
     hr(); navLink('in-use', 'in use');
@@ -658,7 +693,7 @@ a.pg-usage-name { color: var(--sg-text); }
           c.updated.figmaRead ? 'Figma read ' + esc(c.updated.figmaRead) : ''
         ].filter(Boolean).join(' · ') + '</p>' : '') +
         (doc ? '<div class="pg-note"><b>Documentation</b><span>' + esc(doc) + '</span></div>' : '') +
-        ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.slice(0, 8).map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + '</li>'; }).join('') + (c.differences.length > 8 ? '<li>And ' + (c.differences.length - 8) + ' more' + (DATA.differences ? ', every one in ' + esc(DATA.differences.file) : '') + '.</li>' : '') + '</ul></div>' : '') +
+        ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '') +
       '</div>' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview"></div><div class="pg-panel"><div class="pg-actions"></div><div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
         '<div class="pg-inspect-grid"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
