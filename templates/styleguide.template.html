@@ -69,7 +69,11 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-modes { display: flex; flex-direction: column; gap: var(--sg-space-l); }
 .sg-mode-ctl { display: flex; flex-direction: column; align-items: stretch; gap: var(--sg-space-xs); }
 .sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
-.pg-updated { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xs) 0 0; }
+.pg-footer { display: flex; flex-direction: column; gap: var(--sg-space-m); margin-top: var(--sg-space-xl); }
+.pg-updated { display: grid; gap: var(--sg-space-xxs); margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }
+.pg-updated > div { display: grid; grid-template-columns: 140px 1fr; gap: var(--sg-space-s); }
+.pg-updated dt { font-weight: var(--sg-heading-weight); color: var(--sg-text-2); }
+.pg-updated dd { margin: 0; }
 .sg-mode-diff { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); margin: 0; }
 #mode-controls { margin-top: var(--sg-space-m); }
 
@@ -104,9 +108,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 #sg-search { margin-top: var(--sg-space-m); }
 #sg-search > input { font: inherit; width: 100%; }
 .sg-search-none { font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-xs) var(--sg-space-l); }
-.sg-card-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-xs); }
 .sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xs); }
-.sg-card > p { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); }
 .sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-l); }
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
 .sg-screen img { display: block; width: 100%; height: auto; }
@@ -343,7 +345,8 @@ a.pg-usage-name { color: var(--sg-text); }
   var THUMBS = {};
   function card(grid, id, label, title, sub, thumb) {
     var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ''); a.href = '#' + id; a.dataset.name = title.toLowerCase();
-    a.innerHTML = '<div class="sg-thumb" aria-hidden="true">' + (thumb || '') + '</div><div><div class="sg-card-label">' + esc(label) + '</div><h3>' + esc(title) + '</h3><p>' + esc(sub) + '</p></div>';
+    // The thumbnail and the name only: the group heading says what it is, its view says the rest.
+    a.innerHTML = '<div class="sg-thumb" aria-hidden="true">' + (thumb || '') + '</div><h3>' + esc(title) + '</h3>';
     grid.appendChild(a); THUMBS[id] = a.querySelector('.sg-thumb'); return a;
   }
   var fGrid = group('Foundations');
@@ -416,7 +419,6 @@ a.pg-usage-name { color: var(--sg-text); }
     sec.appendChild(row); SGModes.register(row);
   }
   function live(el, v) { return getComputedStyle(el).getPropertyValue(v).trim(); }
-  function otherModes(t) { return t.modes ? ' (' + t.modes.map(function (m) { return esc(m.mode) + ' ' + esc(m.value); }).join(' · ') + ')' : ''; }
 
   /* ── Typography ───────────────────────────────────────────────────────────────────────────────────────────── */
   if ((TOKENS.typography || []).length) {
@@ -450,7 +452,7 @@ a.pg-usage-name { color: var(--sg-text); }
       d.innerHTML = fams.map(function (f) {
         var rows = byFam[f].slice().sort(function (a, b) { return (parseFloat(live(d, a.var) || a.value) || 0) - (parseFloat(live(d, b.var) || b.value) || 0); });
         return '<div class="sg-subsection">' + (fams.length > 1 ? '<h3>' + esc(f) + '</h3>' : '') + '<div class="sg-demo sg-demo--col">' + rows.map(function (t) {
-          return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + esc(t.var) + ' · ' + esc(live(d, t.var) || t.value) + otherModes(t) + '</div></div>';
+          return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + esc(t.var) + ' · ' + esc(live(d, t.var) || t.value) + '</div></div>';
         }).join('') + '</div></div>';
       }).join('');
     };
@@ -463,7 +465,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var rd = document.createElement('div'); rd.className = 'sg-demo';
     var drawRadii = function () {
       rd.innerHTML = TOKENS.radii.map(function (t) {
-        return '<div class="radius-chip"><div class="radius-chip-box" style="border-radius:var(' + esc(t.var) + ')"></div><div class="radius-chip-label">' + esc(t.figma) + '<br>' + esc(live(rd, t.var) || t.value) + otherModes(t) + '</div></div>';
+        return '<div class="radius-chip"><div class="radius-chip-box" style="border-radius:var(' + esc(t.var) + ')"></div><div class="radius-chip-label">' + esc(t.figma) + '<br>' + esc(live(rd, t.var) || t.value) + '</div></div>';
       }).join('');
     };
     sizeSwitch(rs, drawRadii); rs.appendChild(rd); drawRadii();
@@ -688,17 +690,18 @@ a.pg-usage-name { color: var(--sg-text); }
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2><div class="pg-usage" aria-label="Used in">' + usageBadges(c) + '</div></div>' +
         (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') +
-        (c.updated ? '<p class="pg-updated">' + [
-          c.updated.uncommitted ? 'Code changed, not committed yet' : c.updated.code ? 'Code last changed ' + esc(c.updated.code.date) + ' · ' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')' : '',
-          c.updated.figmaRead ? 'Figma read ' + esc(c.updated.figmaRead) : ''
-        ].filter(Boolean).join(' · ') + '</p>' : '') +
-        (doc ? '<div class="pg-note"><b>Documentation</b><span>' + esc(doc) + '</span></div>' : '') +
-        ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '') +
       '</div>' +
+        ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '') +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview"></div><div class="pg-panel"><div class="pg-actions"></div><div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
         '<div class="pg-inspect-grid"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
         '<div class="pg-inspect"><div class="pg-inspect-head">Computed</div><table class="pg-computed"></table></div>' +
-        (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>';
+        (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>' +
+        '<div class="pg-footer">' +
+        (doc ? '<div class="pg-note"><b>Documentation</b><span>' + esc(doc) + '</span></div>' : '') +
+        (c.updated ? '<dl class="pg-updated">' +
+          (c.updated.uncommitted ? '<div><dt>Code</dt><dd>Changed, not committed yet</dd></div>' : c.updated.code ? '<div><dt>Code last changed</dt><dd>' + esc(c.updated.code.date) + '</dd></div><div><dt>Last change</dt><dd>' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')</dd></div>' : '') +
+          (c.updated.figmaRead ? '<div><dt>Figma read</dt><dd>' + esc(c.updated.figmaRead) + '</dd></div>' : '') + '</dl>' : '') +
+        '</div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls');
     var tTokens = sec.querySelector('.pg-tokens'), tComputed = sec.querySelector('.pg-computed'), tOwn = sec.querySelector('.pg-own');
     // Every token named after this component (its colours and sizes), with the value in the mode it is shown in.
@@ -706,7 +709,7 @@ a.pg-usage-name { color: var(--sg-text); }
       if (!tOwn) return;
       var o = c.ownTokens;
       tOwn.innerHTML = o.colors.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td><span class="pg-own-swatch" style="background:var(' + esc(t.var) + ')"></span>' + esc(t.var) + '  ·  ' + esc(live(preview, t.var)) + '</td></tr>'; }).join('') +
-        o.sizes.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + esc(t.var) + '  ·  ' + esc(live(preview, t.var) || t.value) + (t.modes ? ' (' + t.modes.map(function (m) { return esc(m.mode) + ' ' + esc(m.value); }).join(' · ') + ')' : '') + '</td></tr>'; }).join('');
+        o.sizes.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + esc(t.var) + '  ·  ' + esc(live(preview, t.var) || t.value) + '</td></tr>'; }).join('');
     }
     // Per-component mode controls: only the axes that nest, so this preview can differ from the page.
     if (AXES.some(function (a) { return a.scoped; })) {

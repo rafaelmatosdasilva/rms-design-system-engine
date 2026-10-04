@@ -226,7 +226,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   is left to the browser's own and listed, never given a value of the engine's.
 - **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; a size that
-  changes with a mode shows each mode's value (`padding/s`: Desktop 8px · Phone 10px); icons from the icon sheet.
+  changes with a mode shows the value of the mode its section's size switch picks; icons from the icon sheet.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
