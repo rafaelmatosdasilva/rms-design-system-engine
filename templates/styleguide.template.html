@@ -71,6 +71,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-modes { display: flex; flex-direction: column; gap: var(--sg-space-l); }
 .sg-mode-ctl { display: flex; flex-direction: column; align-items: stretch; gap: var(--sg-space-xs); }
 .sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+.sg-mode-diff { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); margin: 0; }
 #mode-controls { margin-top: var(--sg-space-m); }
 
 /* ── Section headings ────────────────────────────────────────────────────── */
@@ -224,7 +225,8 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
   function segItems(box) { return Array.prototype.slice.call(box.querySelectorAll('[data-v]')); }
 
   var SGModes = (function () {
-    function base(axis) { return axis.values[0].value; }
+    // The mode the page starts in: the one the code's own media query draws on this device or window, else the first.
+    function base(axis) { return axis.media && window.matchMedia && window.matchMedia(axis.media).matches ? axis.mediaValue : axis.values[0].value; }
     function apply(scope, axis, value) {
       if (axis.classes) { axis.values.forEach(function (v) { if (v.value) scope.classList.remove(v.value); }); if (value) scope.classList.add(value); }
       else if (!value) scope.removeAttribute(axis.attr); else scope.setAttribute(axis.attr, value);
@@ -237,7 +239,16 @@ a.pg-badge:hover, a.pg-badge:focus-visible { color: var(--sg-text); text-decorat
     function control(axis, scope, onChange) {
       var wrap = document.createElement('div'); wrap.className = 'sg-mode-ctl';
       wrap.innerHTML = '<span class="sg-mode-label">' + esc(axis.label) + '</span>' + segHTML(axis.values.map(function (v) { return { v: v.value, label: v.label, off: !!v.notInCode, title: v.notInCode ? v.label + ' is in Figma, not in the code yet' : '' }; }));
-      wrap._sync = function () { var c = effective(axis, scope); segItems(wrap).forEach(function (b) { segSelect(b, b.dataset.v === c); }); };
+      // On the page's own switch, what the chosen mode changes in the code (axis.changes, from the theme's own values).
+      var diff = null;
+      if (scope === html && axis.changes) { diff = document.createElement('p'); diff.className = 'sg-mode-diff'; diff.setAttribute('aria-live', 'polite'); wrap.appendChild(diff); }
+      wrap._sync = function () {
+        var c = effective(axis, scope); segItems(wrap).forEach(function (b) { segSelect(b, b.dataset.v === c); });
+        if (!diff) return;
+        var list = axis.changes[c] || [], on = axis.values.find(function (v) { return v.value === c; });
+        diff.textContent = list.length ? (on ? on.label : c) + ' changes ' + list.map(function (x) { return x.name + ' ' + x.from + ' → ' + x.to; }).join(' · ') : '';
+        diff.hidden = !list.length;
+      };
       wrap._sync();
       segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(); }); });
       return wrap;
