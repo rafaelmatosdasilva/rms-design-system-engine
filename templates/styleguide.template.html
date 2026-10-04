@@ -146,6 +146,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-selector { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xs) 0 var(--sg-space-m); }
 .pg-note { display: flex; gap: var(--sg-space-s); font-size: var(--sg-m); line-height: var(--sg-lh); color: var(--sg-text-2); background: var(--sg-bg-2); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-s); }
 .pg-note b { color: var(--sg-text); font-weight: var(--sg-heading-weight); white-space: nowrap; }
+.pg-diff-list { margin: 0; padding-left: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-xs); }
+.pg-diff-list b { white-space: normal; }
 .pg-diff { border-color: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
 .pg-note:last-child { margin-bottom: var(--sg-space-m); }
 .pg-header { position: sticky; top: 0; z-index: 5; background: var(--sg-bg); padding: var(--sg-space-s) 0 var(--sg-space-m); margin-bottom: var(--sg-space-xs); }
@@ -177,6 +179,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
 .pg-inspect td:last-child { color: var(--sg-text); word-break: break-all; }
 .pg-inspect tr:last-child td { border-bottom: none; }
+.pg-own-swatch { display: inline-block; width: var(--sg-space-m); height: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius-s); vertical-align: middle; margin-right: var(--sg-space-xs); }
 .sg-topbar, .sg-nav-close, .sg-scrim { display: none; }
 @media (max-width: 720px) {
   /* A phone: a bar at the top with the menu button; the sidebar is a panel that slides in over the page. */
@@ -430,7 +433,6 @@ a.pg-usage-name { color: var(--sg-text); }
     };
     sizeSwitch(rs, drawRadii); rs.appendChild(rd); drawRadii();
   }
-  spacing('sizing', 'Other sizes', TOKENS.sizing);
 
   /* ── Icons: every icon is a real one from the system's symbol sheet, referenced by id ───────────────────────── */
   if ((DATA.icons || []).length) {
@@ -451,6 +453,7 @@ a.pg-usage-name { color: var(--sg-text); }
       isync();
     }
     var idm = document.createElement('div'); is.appendChild(idm);
+    if ((TOKENS.iconStrokes || []).length) { var st = document.createElement('div'); st.className = 'sg-subsection'; st.innerHTML = '<h3>Stroke widths</h3><div class="sg-demo sg-demo--col">' + TOKENS.iconStrokes.map(function (t) { return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + esc(t.var) + ' · ' + esc(t.value) + '</div></div>'; }).join('') + '</div>'; is.appendChild(st); }
     // Grouped by each icon's own size (the small set, the large set), as the system draws them.
     function drawIcons() {
       var groups = {}, order = [];
@@ -655,13 +658,21 @@ a.pg-usage-name { color: var(--sg-text); }
           c.updated.figmaRead ? 'Figma read ' + esc(c.updated.figmaRead) : ''
         ].filter(Boolean).join(' · ') + '</p>' : '') +
         (doc ? '<div class="pg-note"><b>Documentation</b><span>' + esc(doc) + '</span></div>' : '') +
-        ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><span>' + c.differences.slice(0, 6).map(function (x) { return (x.new ? 'new · ' : '') + esc(x.what); }).join('<br>') + (c.differences.length > 6 ? '<br>and ' + (c.differences.length - 6) + ' more' : '') + (DATA.differences ? ' (' + esc(DATA.differences.file) + ')' : '') + '</span></div>' : '') +
+        ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.slice(0, 8).map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + '</li>'; }).join('') + (c.differences.length > 8 ? '<li>And ' + (c.differences.length - 8) + ' more' + (DATA.differences ? ', every one in ' + esc(DATA.differences.file) : '') + '.</li>' : '') + '</ul></div>' : '') +
       '</div>' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview"></div><div class="pg-panel"><div class="pg-actions"></div><div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
         '<div class="pg-inspect-grid"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
-        '<div class="pg-inspect"><div class="pg-inspect-head">Computed</div><table class="pg-computed"></table></div></div></div>';
+        '<div class="pg-inspect"><div class="pg-inspect-head">Computed</div><table class="pg-computed"></table></div>' +
+        (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls');
-    var tTokens = sec.querySelector('.pg-tokens'), tComputed = sec.querySelector('.pg-computed');
+    var tTokens = sec.querySelector('.pg-tokens'), tComputed = sec.querySelector('.pg-computed'), tOwn = sec.querySelector('.pg-own');
+    // Every token named after this component (its colours and sizes), with the value in the mode it is shown in.
+    function ownRows() {
+      if (!tOwn) return;
+      var o = c.ownTokens;
+      tOwn.innerHTML = o.colors.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td><span class="pg-own-swatch" style="background:var(' + esc(t.var) + ')"></span>' + esc(t.var) + '  ·  ' + esc(live(preview, t.var)) + '</td></tr>'; }).join('') +
+        o.sizes.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + esc(t.var) + '  ·  ' + esc(live(preview, t.var) || t.value) + (t.modes ? ' (' + t.modes.map(function (m) { return esc(m.mode) + ' ' + esc(m.value); }).join(' · ') + ')' : '') + '</td></tr>'; }).join('');
+    }
     // Per-component mode controls: only the axes that nest, so this preview can differ from the page.
     if (AXES.some(function (a) { return a.scoped; })) {
       var modeRow = SGModes.controls(preview, function () { refresh(); }, function (a) { return a.scoped; });
@@ -724,6 +735,7 @@ a.pg-usage-name { color: var(--sg-text); }
         if (had == null) preview.removeAttribute(sizeAxis.attr); else preview.setAttribute(sizeAxis.attr, had);
       }
       tComputed.innerHTML = rowsHTML(perMode.length ? perMode : [['width', Math.round(box.width) + 'px'], ['height', Math.round(box.height) + 'px']]);
+      ownRows();
       nudge();
     }
     // A part no instance in the products holds, made from the selector the code styles it with: an icon from the

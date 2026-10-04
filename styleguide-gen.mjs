@@ -327,7 +327,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { OUT_DIR } = await import('./names.mjs');
       const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8'));
       const by = new Map((d.groups ?? []).map((g) => [g.component, g.items ?? []]));
-      for (const c of view.components) { const list = by.get(c.name); if (list?.length) c.differences = list.map((x) => ({ check: x.check, what: x.what, new: !!x.new })); }
+      const { plainDifference } = await import('./run-diff.mjs');
+      for (const c of view.components) { const list = by.get(c.name); if (list?.length) c.differences = list.map((x) => ({ check: x.check, what: x.what, plain: plainDifference(x.what), new: !!x.new })); }
       view.differences = { total: d.total ?? 0, at: d.at ?? null, file: `${OUT_DIR}/differences.md` };
     } catch { /* no full audit yet: nothing to list */ }
     // When each component last changed: the latest commit on its own CSS rules and its contract and config entries (git
@@ -354,6 +355,31 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const systemCss = themeFiles.map(readText).join('\n');
     // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
     // every mode), the semantic roles, then each component's own.
+    // What belongs to one component is shown in that component, not in the foundations: a colour group or a size
+    // named after it (badge/…, button/… for every button) goes to the component's own view. Icon strokes go to the
+    // icons, the text sizes stay with the text styles, and the rest of the sizes join the spacing.
+    if (view.tokens) {
+      const owners = (prefix) => view.components.filter((c) => { const a = c.name.toLowerCase(), b = String(prefix).toLowerCase(); return a === b || a.startsWith(b); });
+      const keepColours = [];
+      for (const g of view.tokens.colors ?? []) {
+        const own = /^(primitives|semantic|color)$/i.test(g.group) ? [] : owners(g.group);
+        if (!own.length) { keepColours.push(g); continue; }
+        for (const c of own) (c.ownTokens ??= { colors: [], sizes: [] }).colors.push(...g.items);
+      }
+      view.tokens.colors = keepColours;
+      const iconStrokes = [], general = [];
+      for (const t of view.tokens.sizing ?? []) {
+        const prefix = t.figma.split('/')[0];
+        if (/^typography$/i.test(prefix)) continue;
+        if (/^icons?$/i.test(prefix)) { iconStrokes.push(t); continue; }
+        const own = owners(prefix);
+        if (own.length) { for (const c of own) (c.ownTokens ??= { colors: [], sizes: [] }).sizes.push(t); continue; }
+        general.push(t);
+      }
+      view.tokens.spacing = [...(view.tokens.spacing ?? []), ...general];
+      view.tokens.iconStrokes = iconStrokes;
+      view.tokens.sizing = [];
+    }
     if (view.tokens?.colors) {
       const prim = primitiveColours(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, systemCss, cfg);
       const rest = view.tokens.colors.filter((g) => g.group !== 'primitives');
