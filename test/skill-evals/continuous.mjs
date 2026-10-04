@@ -24,6 +24,16 @@ const git = (...a) => execFileSync('git', a, { cwd: ENGINE, encoding: 'utf8' }).
 if (git('status', '--porcelain', '--untracked-files=no')) { console.log('✗ commit the change first: the evaluation measures a committed engine'); process.exit(2); }
 const engine = git('rev-parse', '--short', 'HEAD');
 
+// The audit's browser checks (every variant combination, the rendered page) run in Chrome: without one they are
+// skipped and the tasks that ask for what they find fail for a reason that is not the guide's. Found here once.
+if (!process.env.CHROME_PATH) {
+  const { findChrome } = await import(join(ENGINE, 'cdp.mjs'));
+  const found = findChrome({ playwright: true });
+  if (!found) { console.log('✗ no Chrome found: set CHROME_PATH, the audit\'s browser checks need it'); process.exit(2); }
+  process.env.CHROME_PATH = found;
+}
+console.log(`Chrome: ${process.env.CHROME_PATH}`);
+
 // A results file from another engine or guide is moved aside, so this measurement starts clean and never mixes.
 const file = join(HERE, 'results', `cookbook.${MODEL}.jsonl`);
 if (existsSync(file)) {

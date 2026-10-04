@@ -91,6 +91,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* Each overview link is the system's own card (DATA.ui.card); with none, a plain block link. Never a box of the page's. */
 .sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
 .sg-card[hidden], .sg-section[hidden], .sg-hr[hidden], .sg-nav a[hidden] { display: none; }
+.sg-hero > h1[tabindex="-1"]:focus, .pg-head > h2[tabindex="-1"]:focus, .sg-section > h2[tabindex="-1"]:focus { outline: none; }   /* the heading a new view moves focus to, for a screen reader */
 .sg-overview-group { margin-bottom: var(--sg-space-xl); }
 .sg-overview-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-m); }
 /* Each card's thumbnail: a few of the real tokens, or the component itself, drawn small on the system's own surface. */
@@ -336,10 +337,15 @@ a.pg-usage-name { color: var(--sg-text); }
   };
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { card(cGrid, 'c-' + c.name, 'Components', c.name, about(c)); });
   // A component's thumbnail is its own preview, drawn small and inert, once its section has drawn it.
-  function thumbOf(c, preview) {
-    var at = THUMBS['c-' + c.name], src = preview.firstElementChild; if (!at || !src) return;
+  function thumbOf(c, src) {
+    var at = THUMBS['c-' + c.name]; if (!at || !src) return;
     at.innerHTML = ''; var k = src.cloneNode(true); k.classList.add('sg-thumb-live'); k.setAttribute('inert', ''); at.appendChild(k);
-    var bw = at.clientWidth - 24, bh = at.clientHeight - 24, r = k.getBoundingClientRect();
+    fitThumb(at);
+  }
+  // Scaled to fit its card once the overview is on screen (a hidden card has no size to fit).
+  function fitThumb(at) {
+    var k = at.querySelector('.sg-thumb-live'); if (!k || !at.clientWidth) return;
+    k.style.transform = ''; var bw = at.clientWidth - 24, bh = at.clientHeight - 24, r = k.getBoundingClientRect();
     var f = Math.min(1, bw / (r.width || 1), bh / (r.height || 1)); if (f < 1) k.style.transform = 'scale(' + f.toFixed(3) + ')';
   }
   if ((DATA.screens || []).length) {
@@ -845,13 +851,20 @@ a.pg-usage-name { color: var(--sg-text); }
   COMPONENTS.forEach(function (c) { if (/^#[\w-]+$/.test(c.cls || '') && !document.getElementById(c.cls.slice(1))) { var one = document.createElement('div'); one.id = c.cls.slice(1); document.body.appendChild(one); } });
   var refreshers = [];
   if (COMPONENTS.length) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'Components'; nav.appendChild(lab); }
+  // Each component is its own view, drawn the first time it is opened (every view at once with ?all, as the engine's
+  // own checks open the page). Its card's thumbnail is its markup at first, then its drawn preview.
+  var ALL = /[?&]all\b/.test(location.search), BUILDERS = {};
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
-    hr();
-    var cardEl = buildCard(c); main.appendChild(cardEl);
-    cardEl._refresh();   // measure after it is in the page: a detached node computes to nothing
-    thumbOf(c, cardEl.querySelector('.pg-preview'));
-    refreshers.push(cardEl._refresh);
+    BUILDERS['c-' + c.name] = function () {
+      hr();
+      var cardEl = buildCard(c); main.appendChild(cardEl); cardEl.hidden = false;
+      cardEl._refresh();   // measure after it is in the page: a detached node computes to nothing
+      thumbOf(c, cardEl.querySelector('.pg-preview').firstElementChild);
+      refreshers.push(cardEl._refresh);
+      return cardEl;
+    };
     navLink('c-' + c.name, c.name);
+    if (ALL) BUILDERS['c-' + c.name](); else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
   });
   if (!COMPONENTS.length && !FLAT.length) { var empty = document.createElement('p'); empty.className = 'pg-empty'; empty.textContent = 'Nothing agreed yet.'; main.appendChild(empty); }
 
@@ -893,12 +906,16 @@ a.pg-usage-name { color: var(--sg-text); }
       COMPONENTS.forEach(function (c) {
         var hay = (c.name + ' ' + (c.description || '') + ' ' + (c.role || '')).toLowerCase(), on = words.every(function (w) { return hay.indexOf(w) >= 0; });
         var id = 'c-' + c.name, sec = document.getElementById(id); if (on) shown++;
-        [sec, sec && sec.previousElementSibling && sec.previousElementSibling.classList.contains('sg-hr') ? sec.previousElementSibling : null, nav.querySelector('a[href="#' + id + '"]'), ov.querySelector('a.sg-card[href="#' + id + '"]')].forEach(function (el) { if (el) el.hidden = !on; });
+        // One view at a time: the links and cards narrow (the open view stays); with ?all the sections themselves too.
+        [ALL ? sec : null, ALL && sec && sec.previousElementSibling && sec.previousElementSibling.classList.contains('sg-hr') ? sec.previousElementSibling : null, nav.querySelector('a[href="#' + id + '"]'), ov.querySelector('a.sg-card[href="#' + id + '"]')].forEach(function (el) { if (el) el.hidden = !on; });
       });
       none.hidden = !(words.length && !shown); none.textContent = 'No component matches ' + q.value.trim() + '.';
     };
     q.addEventListener('input', filter);
-    q.addEventListener('keydown', function (e) { if (e.key === 'Escape') { q.value = ''; filter(); } });
+    q.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { q.value = ''; filter(); }
+      if (e.key === 'Enter') { var first = Array.prototype.find.call(nav.querySelectorAll('a[href^="#c-"]'), function (a) { return !a.hidden; }); if (first) { location.hash = first.getAttribute('href'); if (document.body.classList.contains('sg-nav-open')) { document.body.classList.remove('sg-nav-open'); document.getElementById('sg-menu').setAttribute('aria-expanded', 'false'); } } }
+    });
   }
 
   // Global mode controls: every axis on <html>; a change re-reads every card and re-syncs the per-card controls.
@@ -915,15 +932,25 @@ a.pg-usage-name { color: var(--sg-text); }
     if (mq && mq.addEventListener) mq.addEventListener('change', function () { refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); });
   });
 
-  // The section in view is marked in the navigation.
-  var links = document.querySelectorAll('.sg-nav a'), sections = document.querySelectorAll('section[id]');
-  function onScroll() {
-    var y = window.scrollY + 80, current = '';
-    sections.forEach(function (s) { if (s.offsetTop <= y) current = s.id; });
-    links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href').slice(1) === current); });
+  // One view at a time: the overview, a foundation or a component, by the address (#c-badge), so each can be shared.
+  // With ?all every view shows, one after another, as before.
+  var links = document.querySelectorAll('.sg-nav a');
+  function route() {
+    var id = decodeURIComponent(location.hash.slice(1)) || 'overview';
+    if (!document.getElementById(id) && BUILDERS[id]) BUILDERS[id]();
+    var target = document.getElementById(id) && document.getElementById(id).matches('main > section') ? document.getElementById(id) : document.getElementById('overview');
+    if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
+    links.forEach(function (a) { var on = a.getAttribute('href').slice(1) === target.id; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    if (target.id === 'overview') Object.keys(THUMBS).forEach(function (k) { fitThumb(THUMBS[k]); });
+    if (!ALL) {
+      window.scrollTo(0, 0);
+      var h = target.querySelector('h1, h2'); document.title = (h && target.id !== 'overview' ? h.textContent + ' · ' : '') + (DATA.title || 'Design system') + ' · Living style guide';
+      if (h && route.ran) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+    }
+    route.ran = true; nudge();
   }
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
+  window.addEventListener('hashchange', route);
+  route();
 })();
 </script>
 <!--{{SYSTEM_SCRIPTS}}-->
