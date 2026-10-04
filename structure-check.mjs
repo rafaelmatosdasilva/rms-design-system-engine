@@ -19,7 +19,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname, resolve as resolvePath } from 'path';
 import { loadCssSources, walkCss, styleBlocksOf, blankComments } from './css-source.mjs';
 import { rawGapMatches } from './raw-gap.mjs';
-import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
+import { resolveNamingSpec, tokenToVar, withTextScaleKeys } from './naming-convention.mjs';
 import { createLocator } from './component-locator.mjs';
 import { pathToFileURL } from 'url';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
@@ -94,6 +94,7 @@ try {
 let snap;
 try {
   snap = JSON.parse(readFileSync(join(ROOT, SNAPSHOT_PATH), 'utf8'));
+  snap.components = withTextScaleKeys(snap.components);   // a bound typography variable reads as its scale key
 } catch {
   console.log('\n❌ figma-structure.snapshot.json not found or unreadable.');
   console.log('   Run /rms-design-system-engine Phase 1 to capture it.\n');
