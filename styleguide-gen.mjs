@@ -22,6 +22,7 @@
 // Exit 0 on success. Never throws into the audit — callers wrap it.
 
 import { appDir } from './code-roots.mjs';
+import { codeSizeCSS } from './styleguide-data.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
@@ -31,7 +32,6 @@ import { OUT_DIR } from './names.mjs';
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
 // The engine's own template, used when the project has none (ds-config.json → styleguide.template wins).
 export const ENGINE_TEMPLATE = join(ENGINE_DIR, 'templates', 'styleguide.template.html');
-import { resolveNamingSpec, tokenToVar, DEFAULT_NAMING } from './naming-convention.mjs';
 
 // ── DS-derived colour-mode CSS ────────────────────────────────────────────────
 // The DS expresses colour mode ONLY as @media (prefers-color-scheme: dark). The
@@ -144,36 +144,6 @@ export function deriveModeCSS(raw) {
     (comp ? comp + '\n' : '');
 }
 
-// ── DS-derived size axis (e.g. Desktop/Phone) ─────────────────────────────────
-// The styleguide toggles size with a [data-size] attribute, exactly like colour.
-// The per-mode values come from the DS sizing collection's OWN modes, captured
-// into the snapshot's `modeVariants` (the engine's per-mode, non-colour axis).
-// Each non-base mode becomes a [data-size="<key>"] block; only vars that DIFFER
-// from the base are emitted (base already lives in :root). A Figma token like
-// `padding/m` maps to the CSS var `--padding-m`. When the snapshot has no such
-// data (sizing captured single-mode), this returns '' - the styleguide keeps
-// whatever the template already carries. Nothing invented, all from the DS.
-export function deriveSizeCSS(modeVariants, spec = DEFAULT_NAMING) {
-  const mv = modeVariants || {};
-  let out = '';
-  for (const def of Object.values(mv)) {
-    const modes = def?.modes || [];
-    const vars = def?.vars || {};
-    const scalar = Object.entries(vars).filter(([, v]) => v && v.kind === 'scalar');
-    if (modes.length < 2 || !scalar.length) continue;
-    const baseKey = modes[0].snapshotKey;
-    for (const m of modes.slice(1)) {
-      const decls = scalar.map(([token, v]) => {
-        const val = v.values?.[m.snapshotKey];
-        if (val == null || val === v.values?.[baseKey]) return null;   // unchanged from base
-        return '    ' + tokenToVar(String(token), spec, { raw: true }) + ': ' + val + ';';
-      }).filter(Boolean);
-      if (decls.length) out += `  [data-size="${m.snapshotKey}"] {\n${decls.join('\n')}\n  }\n`;
-    }
-  }
-  return out ? '\n\n  /* == Size axis - generated from the DS sizing-collection modes (no hand-copied values) == */\n' + out : '';
-}
-
 // Short usage labels for app names: the initials of a name with two or more words ("order-history"
 // → "OH"), the name itself for one word. If two apps would share a label, every app keeps its full name.
 export function appLabels(names) {
@@ -218,7 +188,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     let sizeCSS = '';
     try {
       const snapPath = cfg.paths?.snapshotVars ? resolve(ROOT, cfg.paths.snapshotVars) : null;
-      if (snapPath && existsSync(snapPath)) sizeCSS = deriveSizeCSS(JSON.parse(readFileSync(snapPath, 'utf8')).modeVariants, resolveNamingSpec(cfg));
+      if (snapPath && existsSync(snapPath)) sizeCSS = codeSizeCSS(JSON.parse(readFileSync(snapPath, 'utf8')).modeVariants, css);
     } catch {}
     return deriveModeCSS(css) + sizeCSS;
   }

@@ -497,7 +497,7 @@ const cssVars = {};
 if (themeCSS) {
   let inRoot = false, rootDepth = 0, rootContent = '';
   // The base values only: a :root inside @media (dark mode, a breakpoint's sizes) holds another mode's values.
-  const baseCSS = themeCSS.replace(/@(media|supports|container)\b[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/g, '');
+  const baseCSS = themeCSS.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' ')).replace(/@(media|supports|container)\b[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/g, '');
   for (const line of baseCSS.split('\n')) {
     if (!inRoot && /:root\s*\{/.test(line)) { inRoot = true; rootDepth = 1; continue; }
     if (inRoot) {

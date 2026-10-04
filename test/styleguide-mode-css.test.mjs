@@ -5,7 +5,8 @@
 // ("a per-component light override does not win under a global dark mode").
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveModeCSS, deriveSizeCSS } from '../styleguide-gen.mjs';
+import { deriveModeCSS } from '../styleguide-gen.mjs';
+import { codeSizeCSS } from '../styleguide-data.mjs';
 
 // A DS token file: neutrals flip by mode, semantics ride on them, plus a
 // size-axis var and a typography var (which must NOT leak into colour blocks),
@@ -91,30 +92,23 @@ test('[styleguide bugfix] an orphan brace in the DS file is balanced before appe
   assert.equal(d, 0, 'generated CSS is not brace-balanced');
 });
 
-// ── Size axis (Desktop/Phone) generated from the DS sizing-collection modes ──
-test('[styleguide] deriveSizeCSS emits [data-size] blocks from per-mode sizing (modeVariants)', () => {
-  const mv = { Sizing: {
-    modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }],
-    vars: {
-      'padding/m':        { kind: 'scalar', values: { desktop: '12px', phone: '8px' } },
-      'button/min-height':{ kind: 'scalar', values: { desktop: '24px', phone: '44px' } },
-      'padding/l':        { kind: 'scalar', values: { desktop: '16px', phone: '16px' } }, // unchanged
-    },
-  } };
-  const css = deriveSizeCSS(mv);
-  assert.match(css, /\[data-size="phone"\] \{/);
-  assert.match(css, /--padding-m:\s*8px/);            // Figma token padding/m -> CSS var --padding-m
-  assert.match(css, /--button-min-height:\s*44px/);
-  assert.doesNotMatch(css, /--padding-l/);            // unchanged from base -> not emitted
-  assert.doesNotMatch(css, /\[data-size="desktop"\]/); // base mode is :root, no block
+// ── Size axis (Desktop/Phone): the theme's own breakpoint block, toggled with [data-size] ──
+const MV = { Sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }],
+  vars: { 'padding/m': { kind: 'scalar', values: { desktop: '12px', phone: '8px' } }, 'button/min-height': { kind: 'scalar', values: { desktop: '24px', phone: '44px' } } } } };
+
+test('[styleguide] the size toggle takes the theme\'s own @media values, not Figma\'s', () => {
+  const theme = ':root {\n  /* light values; dark overrides in @media dark */\n  --padding-m: 12px;\n  --button-min-height: 24px;\n  --gap: 4px;\n}\n@media (max-width: 480px), (hover: none) and (pointer: coarse) {\n  :root { --padding-m: 14px; --button-min-height: 32px; }\n  .card { gap: 2px; }\n}\n';
+  const css = codeSizeCSS(MV, theme);
+  assert.match(css, /\[data-size="phone"\] \{\n {4}--padding-m: 14px;\n {4}--button-min-height: 32px;\n {2}\}/, 'the code\'s 14px, not Figma\'s 8px');
+  assert.match(css, /\[data-size="desktop"\] \{\n {4}--padding-m: 12px;\n {4}--button-min-height: 24px;\n {2}\}/, 'the base, so a page on a phone can switch back');
+  assert.match(css, /\[data-size="phone"\] \.card \{ gap: 2px; \}/);
+  assert.doesNotMatch(css, /--gap:/, 'a variable the mode does not set stays as it is');
 });
 
-test('[styleguide] deriveSizeCSS is a no-op when sizing was captured single-mode', () => {
-  // The current real state: no modeVariants -> no phone data -> nothing emitted,
-  // so the styleguide keeps whatever the template already carries (no invention).
-  assert.equal(deriveSizeCSS(undefined), '');
-  assert.equal(deriveSizeCSS({}), '');
-  assert.equal(deriveSizeCSS({ Sizing: { modes: [{ snapshotKey: 'desktop' }], vars: {} } }), '');
+test('[styleguide] no size toggle when the theme has no breakpoint block for the mode', () => {
+  assert.equal(codeSizeCSS(MV, ':root { --padding-m: 12px; }'), '');
+  assert.equal(codeSizeCSS(MV, ':root { --padding-m: 12px; } @media (prefers-color-scheme: dark) { :root { --bg: #000; } }'), '');
+  assert.equal(codeSizeCSS(undefined, ''), '');
 });
 
 test('[styleguide bugfix] a MID-FILE orphan brace is dropped at its position, not by trimming the tail', () => {

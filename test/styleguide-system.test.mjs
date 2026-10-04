@@ -2,7 +2,7 @@
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { realizedControls, chromeRoles, segmentedUi, fieldUi } from '../styleguide-data.mjs';
+import { realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest } from '../styleguide-data.mjs';
 import { checkStyleguidePage, failures, missingRoles } from '../styleguide-check.mjs';
 import { differences, differencesMarkdown } from '../run-diff.mjs';
 import { appDir } from '../code-roots.mjs';
@@ -102,4 +102,13 @@ test('one list of differences: grouped by component, marked new, the data\'s fre
 test('an app lives where pluginDirs says, else apps/<app>', () => {
   assert.equal(appDir({ pluginDirs: { gallery: '../gallery-app/' } }, 'gallery'), '../gallery-app');
   assert.equal(appDir({}, 'gallery'), 'apps/gallery');
+});
+
+test('a preview never uses an instance that is hidden at rest', () => {
+  const css = '.chip { gap: 0 } .zoom-reset { display: none; } .zoom-reset.on { display: flex; }';
+  assert.equal(hiddenAtRest('<button class="chip zoom-reset">x</button>', 'chip', css), true, 'an extra class whose rule is display: none');
+  assert.equal(hiddenAtRest('<div class="chip hidden">x</div>', 'chip'), true);
+  assert.equal(hiddenAtRest('<div class="chip" hidden>x</div>', 'chip'), true);
+  assert.equal(hiddenAtRest('<div class="chip" style="display:none;">x</div>', 'chip'), true);
+  assert.equal(hiddenAtRest('<button class="chip">x</button>', 'chip', css), false);
 });

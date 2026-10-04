@@ -85,7 +85,11 @@ test('the mode axes: colour from the config, size from the sizing collection, ne
   ]);
   // A mode the code has CSS for (a [data-…] block, or an @media that sets the collection's variables) is drawn.
   assert.equal(modeAxes({}, vars, ':root[data-size="phone"] { --padding-m: 16px; }')[1].values[1].notInCode, undefined);
-  assert.equal(modeAxes({}, vars, '@media (max-width: 480px) { :root { --padding-m: 16px; } }')[1].values[1].notInCode, undefined);
+  const media = modeAxes({}, vars, ':root { --padding-m: 12px; } @media (max-width: 480px) { :root { --padding-m: 16px; } }')[1];
+  assert.equal(media.values[1].notInCode, undefined);
+  assert.deepEqual(media.values[0], { label: 'Desktop', value: 'desktop' }, 'a breakpoint mode makes the base a choice of its own');
+  assert.deepEqual(media.changes, { phone: [{ name: 'padding/m', from: '12px', to: '16px' }] }, 'the switch says what the mode changes, from the code');
+  assert.equal(media.media, '(max-width: 480px)', 'the page starts in the mode its own device or window gets');
   assert.deepEqual(modeAxes({ figma: { modes: [{ name: 'Day', cssSelector: 'root' }, { name: 'Night', cssSelector: 'class:night' }] } }), [{ label: 'Color', values: [{ label: 'Day', value: '' }, { label: 'Night', value: 'night' }], classes: true }]);
 });
 
