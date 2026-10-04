@@ -85,7 +85,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-section > h2, .pg-head > h2 { font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xs); }
 .sg-section > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xl); max-width: 560px; }
 .sg-subsection { margin-bottom: var(--sg-space-xxl); }
-.sg-subsection > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-m); padding-bottom: var(--sg-space-s); border-bottom: var(--sg-line); }
+.sg-subsection > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-s); }   /* a title with no line under it */
 .sg-hr { border: none; border-top: var(--sg-line); margin: var(--sg-space-xxl) 0; }
 
 /* ── Overview ────────────────────────────────────────────────────────────── */
@@ -125,7 +125,9 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: break-all; }
 .type-specimen { display: flex; align-items: baseline; gap: var(--sg-space-l); padding: var(--sg-space-s) 0; border-bottom: var(--sg-line); }
 .type-specimen:last-child { border-bottom: none; }
-.type-specimen-meta { width: 160px; flex-shrink: 0; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }
+.type-specimen-meta { width: 220px; flex-shrink: 0; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }
+.type-specimen-meta > b { display: block; color: var(--sg-text-2); margin-bottom: var(--sg-space-xxs); }
+.type-specimen-meta > span { display: block; font-weight: var(--sg-s-weight); }
 .type-specimen-preview { flex: 1; color: var(--sg-text); }
 .spacing-row { display: flex; align-items: center; gap: var(--sg-space-m); padding: var(--sg-space-xs) 0; border-bottom: var(--sg-line); }
 .spacing-row:last-child { border-bottom: none; }
@@ -433,12 +435,20 @@ a.pg-usage-name { color: var(--sg-text); }
     var drawType = function () {
       demo.innerHTML = '';
       TOKENS.typography.forEach(function (t) {
-        var style = [], meta = [];
+        var style = [];
         // The family is the system's page font, which every text inherits (with its fallbacks): named, never set again here.
-        [['size', 'font-size'], ['weight', 'font-weight'], ['lh', 'line-height'], ['family', null]].forEach(function (k) { if (t[k[0]]) { if (k[1]) style.push(k[1] + ':var(' + t[k[0]].var + ')'); meta.push(live(demo, t[k[0]].var) || t[k[0]].value); } });
+        [['size', 'font-size'], ['weight', 'font-weight'], ['lh', 'line-height']].forEach(function (k) { if (t[k[0]]) style.push(k[1] + ':var(' + t[k[0]].var + ')'); });
         var row = document.createElement('div'); row.className = 'type-specimen';
-        row.innerHTML = '<div class="type-specimen-meta">' + esc(t.scale) + '<br>' + esc(meta.join(' / ')) + '</div><div class="type-specimen-preview" style="' + esc(style.join(';')) + '">The quick brown fox jumps over the lazy dog</div>';
+        row.innerHTML = '<div class="type-specimen-meta"></div><div class="type-specimen-preview" style="' + esc(style.join(';')) + '">The quick brown fox jumps over the lazy dog</div>';
         demo.appendChild(row);
+        // Every property of the style as the browser draws it in this mode: family, size, weight, line height,
+        // letter spacing and case, each with the variable it comes from.
+        var cs = getComputedStyle(row.lastElementChild), tok = function (k) { return t[k] ? ' (' + t[k].var + ')' : ''; };
+        var family = (t.family && (live(demo, t.family.var) || t.family.value)) || cs.fontFamily.split(',')[0].replace(/["']/g, '').trim();
+        var lines = [['Family', family + tok('family')], ['Size', cs.fontSize + tok('size')], ['Weight', cs.fontWeight + tok('weight')], ['Line height', (cs.lineHeight === 'normal' ? 'auto' : cs.lineHeight) + tok('lh')],
+          ['Letter spacing', (cs.letterSpacing === 'normal' ? '0' : cs.letterSpacing) + tok('ls')]];
+        if (cs.textTransform && cs.textTransform !== 'none') lines.push(['Case', cs.textTransform]);
+        row.firstElementChild.innerHTML = '<b>' + esc(t.scale) + '</b>' + lines.map(function (l) { return '<span>' + esc(l[0]) + ' ' + esc(l[1]) + '</span>'; }).join('');
       });
     };
     sizeSwitch(ts, drawType); ts.appendChild(demo); drawType();

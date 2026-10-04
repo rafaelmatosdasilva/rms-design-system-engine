@@ -256,3 +256,10 @@ test('a text goes to the part whose own words they are; a shape part stays empty
   assert.doesNotMatch(tpl, /preview\.appendChild\(wrap\)/);
   assert.match(tpl, /\.pg-updated \{ display: grid; gap: var\(--sg-space-l\);/);
 });
+
+test('a title in the style guide has no line under it; each type style lists its family, size, weight, line height and letter spacing', () => {
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const h3 = /\.sg-subsection > h3 \{[^}]*\}/.exec(tpl)[0];
+  assert.doesNotMatch(h3, /border-bottom/);
+  for (const k of ['Family', 'Size', 'Weight', 'Line height', 'Letter spacing']) assert.match(tpl, new RegExp("\\['" + k + "', "));
+});
