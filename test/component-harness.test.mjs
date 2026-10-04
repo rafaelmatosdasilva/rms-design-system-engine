@@ -46,7 +46,7 @@ const ready = CHROME && loadTypeScript(ENGINE) ? false : 'no Chrome or no TypeSc
 test('build mode: the reference components, rendered from their code, show only what the design itself lacks (an error shown by colour alone)', { skip: ready, timeout: 300000 }, () => {
   const d = check(tidepool());
   assert.match(String(d.target), /rendered from their code/);
-  assert.deepEqual(d.issues.map((i) => `${i.issue} ${i.selector}`), ['rolecontract field (textbox): in its error state the error is shown only by its look: there is no message to read (WCAG 3.3.1). The design needs an error message part, linked to the field with aria-describedby (send it back to Figma)']);
+  assert.deepEqual(d.issues.map((i) => `${i.issue} ${i.selector}`), ['rolecontract field (textbox): in its error state the error is shown only by its look: there is no message to read (WCAG 3.3.1). The design needs an error message part, linked to the field with aria-describedby (send it back to Figma)'], JSON.stringify({ issues: d.issues, notRead: d.notRead }));
 });
 
 test('build mode: a stepper with nameless step buttons and no keys is caught on its own code', { skip: ready, timeout: 300000 }, () => {

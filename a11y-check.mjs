@@ -1088,8 +1088,10 @@ async function main() {
     const label = target.label;
     const { targetId, sessionId } = await openPage(send, target.url);
     // up to ~10s — a dev server / SPA can be slower than a file://
-    const loaded = await waitForTrue(send, sessionId, pageLoadedExpression(waitFor) + (target.ready ? ` && (${target.ready})` : ''), { attempts: 200, intervalMs: 50, tolerateErrors: true });
-    if (!loaded) { unread.push(`${label} (the page did not finish loading within 10s)`); await send('Target.closeTarget', { targetId }); continue; }
+    // The components rendered from their code are served here and transpiled on request: a busy machine gets ~30s.
+    const loadSeconds = target.harness ? 30 : 10;
+    const loaded = await waitForTrue(send, sessionId, pageLoadedExpression(waitFor) + (target.ready ? ` && (${target.ready})` : ''), { attempts: loadSeconds * 20, intervalMs: 50, tolerateErrors: true });
+    if (!loaded) { unread.push(`${label} (the page did not finish loading within ${loadSeconds}s)`); await send('Target.closeTarget', { targetId }); continue; }
     await new Promise((res) => setTimeout(res, 300));   // settle — let an SPA finish its first render
     // Something to check must be on the page: a page that shows none of the design system's components
     // (still rendering, or blank) is not a clean page. Wait for it, up to ~10s, then say it was not checked,
@@ -1495,6 +1497,8 @@ async function main() {
     usedStyleguide: !!sg,
     themes, strict: STRICT, total, cannotMeasure: cannot.length,
     issues: buckets.flatMap(([kind, list]) => list.map((f) => { const r = a11yFindingRecord(kind, f); const u = figmaOf(f.desc); if (u) r.figma = u; return r; })),
+    // What could not be read, rendered or finished: never a clean result, so an agent or CI can tell.
+    ...(unread.length || unrendered.length || unfinished.length ? { notRead: [...unread, ...unrendered.map((u) => `${u} (not rendered)`), ...unfinished] } : {}),
     ...(RUN_AXE ? { axe, severeAxe } : {}),
   });
   if (JSON_OUT) { try { mkdirSync(dirname(resolve(JSON_OUT)), { recursive: true }); writeFileSync(resolve(JSON_OUT), JSON.stringify(machine(), null, 2) + '\n'); } catch { /* the file is a convenience */ } }
