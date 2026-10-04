@@ -96,14 +96,18 @@ export const partSheetLines = (parts) => parts.map((p) => `the "${p.layer}" part
 
 // The first usable instance of a component, marked so the steps find it again; its control (the instance, or the first
 // control inside it). Returns a description or null when the page shows none.
-export function markInstanceExpression(selector, mark) {
+// role: the component's role; the control tried is the element that carries it (a stepper's spinbutton, not its first
+// step button), else the first control inside.
+export function markInstanceExpression(selector, mark, role = null) {
   return `(() => {
     const vis = (el) => { const s = getComputedStyle(el); if (s.display==='none'||s.visibility==='hidden') return false; const r = el.getBoundingClientRect(); return r.width>0 && r.height>0; };
     let els; try { els = [...document.querySelectorAll(${JSON.stringify(selector)})]; } catch { return null; }
     const CONTROL = 'input:not([type=hidden]),textarea,select,button,[role=button],[role=switch],[role=checkbox],[role=tab],[role=textbox],[role=spinbutton],[role=slider],a[href]';
     const el = els.find((e) => vis(e) && !e.closest('[disabled],[aria-disabled="true"]') && !e.matches('[disabled],[aria-disabled="true"]'));
     if (!el) return null;
-    const control = el.matches(CONTROL) ? el : el.querySelector(CONTROL) || el;
+    const own = ${JSON.stringify(role ? `[role="${roleKey(role)}"]${roleKey(role) === 'spinbutton' ? ',input[type=number]' : ''}${roleKey(role) === 'textbox' ? ',input:not([type=hidden]),textarea' : ''}${roleKey(role) === 'checkbox' ? ',input[type=checkbox]' : ''}` : '')};
+    const mine = own ? (el.matches(own) ? el : el.querySelector(own)) : null;
+    const control = mine || (el.matches(CONTROL) ? el : el.querySelector(CONTROL) || el);
     el.setAttribute('data-dse-behaviour', ${JSON.stringify(mark)});
     control.setAttribute('data-dse-control', ${JSON.stringify(mark)});
     return (el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\\s+/).join('.') : '')).slice(0, 80);
@@ -175,7 +179,15 @@ export function partRoleExpression(selector, partSelector, layer, part) {
     const named = (x) => /[\\p{L}\\p{N}]/u.test((x.getAttribute('aria-label') || '') + (x.getAttribute('title') || '') + (x.getAttribute('aria-labelledby') ? 'x' : '') + (x.textContent || ''));
     const find = (el) => {
       if (psel) { try { if (el.matches(psel)) return el; const p = el.querySelector(psel); if (p) return p; } catch {} }
-      return [...el.querySelectorAll('[class]')].find((k) => String(k.getAttribute('class')).toLowerCase().split(/[\\s_]+/).some((c) => c.replace(/[^a-z0-9]/g, '').endsWith(word) || c.split('-').pop() === word)) || null;
+      const byClass = [...el.querySelectorAll('[class]')].find((k) => String(k.getAttribute('class')).toLowerCase().split(/[\\s_]+/).some((c) => c.replace(/[^a-z0-9]/g, '').endsWith(word) || c.split('-').pop() === word));
+      if (byClass) return byClass;
+      // No class names the part: a step button is the control's first (decrement) or last (increment) button, and a
+      // value part is the control that carries it, as Figma lays them out.
+      const buttons = [...el.querySelectorAll('button,[role=button]')];
+      if (part === 'decrement' && buttons.length >= 2) return buttons[0];
+      if (part === 'increment' && buttons.length >= 2) return buttons[buttons.length - 1];
+      if (part === 'value') return el.querySelector('[role=spinbutton],[role=slider],input:not([type=hidden])');
+      return null;
     };
     const out = new Set();
     let seen = 0;

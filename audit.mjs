@@ -2736,7 +2736,8 @@ function reportFull(label, items, shown) {
   // audit's a11y advisory covers the same components the user scoped the run to.
   const A11Y_JSON = join(ROOT, OUT_DIR, 'a11y.json');
   try { unlinkSync(A11Y_JSON); } catch { /* not there */ }
-  const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') ? ['--a11y'] : []), '--json-out', A11Y_JSON];
+  // Building a component: every accessibility line is listed element by element, as it is part of building it.
+  const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') || (cfg.build === true && SCOPE_COMPONENTS.length) ? ['--a11y'] : []), '--json-out', A11Y_JSON];
 
   // Code capture: the code side read once per run (code-capture.mjs), the mirror of the Figma
   // capture. Cached by content, so an unchanged project reuses it at once. Gates that need facts
@@ -4156,7 +4157,9 @@ function reportFull(label, items, shown) {
       toBuildLine = buildLine(toBuild);
       if (toBuildLine) console.log(`\n${toBuildLine}`);
     }
-    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true });
+    let a11yFound = null;
+    try { a11yFound = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
+    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true, a11y: a11yFound });
     const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
     const { dataStateLine } = await import('./next-step.mjs');
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };

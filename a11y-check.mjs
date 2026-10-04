@@ -69,7 +69,7 @@ import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './c
 import { loadLocator } from './component-locator.mjs';
 import { loadModes } from './mode-resolver.mjs';
 import { modeSwitch } from './code-capture.mjs';
-import { codeSnapshotPath } from './names.mjs';
+import { codeSnapshotPath, OUT_DIR } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
 import { partRoleOf, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
 
@@ -413,9 +413,11 @@ function argValues(flag, argv) {
 // coverage for free. Returns the target or null (missing, or opted out via a11y.styleguide:false).
 export function styleguideTarget(cfg, ROOT, exists = existsSync) {
   if (cfg?.a11y?.styleguide === false) return null;
-  const rel = cfg?.styleguide?.out ?? 'apps/styleguide/index.html';
-  const abs = join(ROOT, rel);
-  if (exists(abs)) return { label: rel, url: pathToFileURL(abs).href, styleguide: true };
+  // Where the style guide is written: the configured place, else the project's own template's, else the engine's.
+  for (const rel of [cfg?.styleguide?.out, 'apps/styleguide/index.html', `${OUT_DIR}/styleguide/index.html`].filter(Boolean)) {
+    const abs = join(ROOT, rel);
+    if (exists(abs)) return { label: rel, url: pathToFileURL(abs).href, styleguide: true };
+  }
   // Not built by the project yet: the code capture keeps its own copy, built from the same template.
   const cap = join(ROOT, dirname(codeSnapshotPath(cfg)), 'styleguide.html');
   return cfg?.styleguide?.template && exists(cap) ? { label: 'styleguide (built by the code capture)', url: pathToFileURL(cap).href, styleguide: true } : null;
@@ -479,10 +481,18 @@ function sweepExpression(roots, doFocus, stateMap) {
           // or drawn on ::before / ::after: every one of those counts as a visible change.
           const look = (s, pb, pa) => [s.outlineStyle, s.outlineWidth, s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor, s.textDecorationLine,
             pb.outlineStyle, pb.boxShadow, pb.borderColor, pb.backgroundColor, pb.opacity, pa.outlineStyle, pa.boxShadow, pa.borderColor, pa.backgroundColor, pa.opacity].join('|');
+          // The element the keyboard is already on (the page's first Tab) is let go first, so its look before is its rest.
+          if (document.activeElement === el) { try { el.blur(); } catch(e){} }
           const b = getComputedStyle(el); const before = look(b, getComputedStyle(el, '::before'), getComputedStyle(el, '::after'));
+          // The box that holds only this control (a field's frame around its borderless input) may show the focus
+          // for it (:focus-within): up to two levels up, while no other control is inside.
+          const boxes = []; for (let p = el.parentElement, i = 0; p && i < 2 && p.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[tabindex]').length === 1; p = p.parentElement, i++) boxes.push(p);
+          const boxLook = () => boxes.map((p) => { const s = getComputedStyle(p); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.backgroundColor].join('|'); }).join('/');
+          const boxBefore = boxLook();
           try { el.focus(); } catch(e){}
           const a = getComputedStyle(el); const after = look(a, getComputedStyle(el, '::before'), getComputedStyle(el, '::after'));
-          if (before === after) { noFocus.push(desc); }
+          if (before === after && boxBefore !== boxLook()) { /* its frame shows the focus */ }
+          else if (before === after) { noFocus.push(desc); }
           else {
             // Something changed — capture the focus-indicator colour + its background so Node can
             // check it is perceivable (WCAG 1.4.11, >= 3:1). A ring that "changes" but is nearly the
@@ -494,7 +504,8 @@ function sweepExpression(roots, doFocus, stateMap) {
             // WCAG 2.4.13 (AAA, advisory): a focus indicator at least 2 CSS pixels thick.
             // The browser's own ring (outline-style: auto) is drawn by the browser, not by this width.
             if (px != null && px < 2 && a.outlineStyle !== 'auto') thinFocus.push({ desc, px: Math.round(px * 10) / 10 });
-            if (ind) {
+            // The browser's own ring (outline-style: auto) is drawn in two tones so it shows on any background.
+            if (ind && a.outlineStyle !== 'auto') {
               // A ring drawn outside the element sits on what surrounds it: measure against the parent.
               const layers = []; let node = outside && el.parentElement ? el.parentElement : el;
               while (node && node.nodeType===1) {
@@ -671,7 +682,14 @@ export function roleContractExpression(selector, role, { pressed = false } = {})
         if (field.hasAttribute('aria-describedby') && !idsExist(field.getAttribute('aria-describedby'))) out.add('aria-describedby points to an element that does not exist');
         if (has(el, 'error', 'invalid') || has(field, 'error', 'invalid')) {
           if (field.getAttribute('aria-invalid') !== 'true') out.add('in its error state the field has no aria-invalid="true"');
-          if (!field.getAttribute('aria-describedby')) out.add('in its error state the field is not linked to its message (aria-describedby)');
+          if (!field.getAttribute('aria-describedby')) {
+            // A message on show that is not linked, or no message at all: an error shown only by a colour or a border
+            // is not read out and not seen by everyone (WCAG 1.4.1, 3.3.1). The design owes the message.
+            const shows = (x) => { const st = getComputedStyle(x); if (st.display === 'none' || st.visibility === 'hidden') return false; const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+            const words = [...el.querySelectorAll('*')].filter((x) => !x.children.length && x !== field && !x.closest('label > input') && shows(x) && (x.textContent || '').trim() && !(field.labels && [...field.labels].some((l) => l.contains(x) && l.textContent.trim() === x.textContent.trim())));
+            out.add(words.length || el.querySelector('[role=alert],[aria-live]') ? 'in its error state the field is not linked to its message (aria-describedby)'
+              : 'in its error state the error is shown only by its look: there is no message to read (WCAG 3.3.1). The design needs an error message part, linked to the field with aria-describedby (send it back to Figma)');
+          }
         }
       }
       if (role === 'tab' || role === 'tablist') {
@@ -947,12 +965,35 @@ async function main() {
     } catch (e) { console.log(`ℹ️  [a11y] styleguide regeneration skipped: ${e.message}`); }
   }
 
-  const sg = urlList.length ? null : styleguideTarget(cfg, ROOT);
+  // A React design system with no page to open: its components rendered from their own code (component-harness.mjs),
+  // so clicks, keys and names are tried on what ships; the style guide only draws their markup. a11y.harness:false
+  // turns it off.
+  // Used in build mode (a Figma-only project building its components), or when there is no style guide and no built
+  // page to open: a real page of the product is a better target than the components on their own.
+  let harness = null, harnessWhy = null;
+  const otherTarget = !!styleguideTarget(cfg, ROOT) || plugins.some((pl) => existsSync(builtUiPath(pl)));
+  if (!urlList.length && cfg.a11y?.harness !== false && (cfg.build === true || !otherTarget)) {
+    try {
+      const { startHarness } = await import('./component-harness.mjs');
+      const { componentSourceFiles, resolveComponentFile, textReader } = await import('./component-source.mjs');
+      let propsSnap = {};
+      try { propsSnap = JSON.parse(readFileSync(join(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8')); } catch { /* none */ }
+      const files = componentSourceFiles(ROOT, cfg).filter((f) => /\.(jsx|tsx)$/.test(f));
+      if (files.length) {
+        const read = textReader();
+        const names = [...new Set([...locator.names(), ...Object.keys(propsSnap).filter((n) => !n.startsWith('_'))])];
+        const h = await startHarness(ROOT, cfg, names, { propsSnap, locate: (n) => resolveComponentFile(n, { ROOT, cfg, files, read, classFor: (x) => locator.classFor(x) }).file });
+        if (h.url) { harness = h; stopServer = h.close; }
+        else if (h.why) harnessWhy = h.why;
+      }
+    } catch (e) { harnessWhy = String(e?.message ?? e).split('\n')[0]; }
+  }
+  const sg = urlList.length || harness ? null : styleguideTarget(cfg, ROOT);
   // The styleguide pins its own mode attribute: switch it too, or every mode is measured as light.
   if (sg) modes = modeDefs.map((m) => ({ name: m.name || m.snapshotKey || 'light', sw: modeSwitch(m, { styleguide: true }) })).filter((m) => !m.sw.unsupported);
   // On the styleguide, only the design system's own components are checked: the page's navigation,
   // badges and notes are the styleguide's chrome, not the DS.
-  if (sg && !roots) {
+  if ((sg || harness) && !roots) {
     let names = locator.names();
     try { names = [...new Set([...names, ...Object.keys(JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {})])]; } catch { /* optional */ }
     const sels = names.map(selOf).filter((s) => { try { return !!s && /^[.#[a-z]/i.test(s); } catch { return false; } });
@@ -962,6 +1003,10 @@ async function main() {
   if (urlList.length) {
     // An app page, not a story or a component's own page, is held to one main heading (I79).
     targets = urlList.map((u) => ({ label: u, url: u, page: !/iframe\.html|[?&]path=\/(story|docs)\/|\/story\//i.test(u) }));
+  } else if (harness) {
+    targets = [{ label: 'the components, rendered from their code', url: harness.url, ready: 'window.__dseHarnessReady === true', harness: true }];
+    console.log(`ℹ️  [a11y] target: ${harness.groups.length} component(s) rendered from their own code in each Figma variant, no dev server (${harness.groups.map((g) => g.name).join(', ')})`);
+    for (const m of harness.missing) console.log(`ℹ️  [a11y] not rendered: ${m}`);
   } else if (sg) {
     targets = [sg];
     console.log(`ℹ️  [a11y] target: the generated styleguide — every component × state on one page, no dev server (${sg.label})`);
@@ -992,7 +1037,7 @@ async function main() {
     }
   }
 
-  if (!targets.length) skip('no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.');
+  if (!targets.length) skip(`no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.${harnessWhy ? ` The components were not rendered from their code either: ${harnessWhy}.` : ''}`);
   const waitFor = cfg.a11y?.waitFor ?? null;   // optional selector to await before the sweep (SPA hydration)
 
   // State-class → the aria/native state it must also expose. A common-English default (extend or
@@ -1043,7 +1088,7 @@ async function main() {
     const label = target.label;
     const { targetId, sessionId } = await openPage(send, target.url);
     // up to ~10s — a dev server / SPA can be slower than a file://
-    const loaded = await waitForTrue(send, sessionId, pageLoadedExpression(waitFor), { attempts: 200, intervalMs: 50, tolerateErrors: true });
+    const loaded = await waitForTrue(send, sessionId, pageLoadedExpression(waitFor) + (target.ready ? ` && (${target.ready})` : ''), { attempts: 200, intervalMs: 50, tolerateErrors: true });
     if (!loaded) { unread.push(`${label} (the page did not finish loading within 10s)`); await send('Target.closeTarget', { targetId }); continue; }
     await new Promise((res) => setTimeout(res, 300));   // settle — let an SPA finish its first render
     // Something to check must be on the page: a page that shows none of the design system's components
@@ -1054,6 +1099,13 @@ async function main() {
     for (let i = 0; !shown && i < 20; i++) { await new Promise((res) => setTimeout(res, 500)); shown = await shows(); }
     if (!shown) { unrendered.push(label); await send('Target.closeTarget', { targetId }); continue; }
     sweptPlugins++;
+    // A keyboard user's page: one real Tab first, so the browser shows focus as it does for the keyboard
+    // (:focus-visible), not as it does after a mouse click.
+    try {
+      for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }, sessionId);
+    } catch { /* no keyboard: the sweep still runs */ }
+    // A component the harness could not load or render is said, never counted as clean.
+    if (target.harness) for (const f of ((await send('Runtime.evaluate', { expression: 'window.__dseHarnessFailed || []', returnByValue: true }, sessionId)).result?.value ?? [])) unrendered.push(`${f.name} (${f.why})`);
 
     // 2. Name/role — accessibility tree (theme-independent), run once per target.
     try {
@@ -1235,19 +1287,29 @@ async function main() {
       try { contract = (await import(pathToFileURL(resolve(ROOT, cfg.paths?.structureContract ?? 'structure-contract.mjs')).href)).CONTRACT ?? {}; } catch { /* parts are optional */ }
       await send('DOM.enable', {}, sessionId);
       const doc = await send('DOM.getDocument', { depth: 0 }, sessionId);
-      const axOf = async (selector) => {
+      const axOf = async (selector, want = null) => {
         let q;
         try { q = await send('DOM.querySelector', { nodeId: doc.root.nodeId, selector }, sessionId); } catch { return null; }
         if (!q?.nodeId) return null;
-        const ax = (await send('Accessibility.getPartialAXTree', { nodeId: q.nodeId, fetchRelatives: false }, sessionId))?.nodes?.[0];
+        let ax = (await send('Accessibility.getPartialAXTree', { nodeId: q.nodeId, fetchRelatives: false }, sessionId))?.nodes?.[0];
         if (!ax) return null;
+        // A plain wrapper (a div, a label around its input) is not the control: the role is read on the component's
+        // own control inside it, the first element there with a role of its own.
+        if (/^(generic|none|labeltext|group|section|presentation)$/i.test(String(ax.role?.value ?? '')) || ax.ignored) {
+          // The role the annotation names first (a stepper's spinbutton, not its first step button), else the first control.
+          const wanted = want ? `[role="${want}"],${want === 'textbox' ? 'input:not([type]),input[type=text],input[type=email],input[type=search],textarea,' : ''}${want === 'spinbutton' ? 'input[type=number],' : ''}${want === 'button' ? 'button,' : ''}` : '';
+          let inner = wanted ? await send('DOM.querySelector', { nodeId: q.nodeId, selector: wanted.replace(/,$/, '') }, sessionId).catch(() => null) : null;
+          if (!inner?.nodeId) inner = await send('DOM.querySelector', { nodeId: q.nodeId, selector: 'button,input,select,textarea,a[href],summary,[role]:not([role=presentation]):not([role=none]):not([role=group])' }, sessionId).catch(() => null);
+          const ix = inner?.nodeId ? (await send('Accessibility.getPartialAXTree', { nodeId: inner.nodeId, fetchRelatives: false }, sessionId))?.nodes?.[0] : null;
+          if (ix && !/^(generic|none)$/i.test(String(ix.role?.value ?? ''))) ax = ix;
+        }
         const prop = (n) => ax.properties?.find((p) => p.name === n)?.value?.value;
         return { role: String(ax.role?.value ?? '').toLowerCase(), name: String(ax.name?.value ?? ''), level: prop('level'), pressed: prop('pressed') };
       };
       for (const [comp, { facts: f, layers }] of Object.entries(facts)) {
         if (components.length && !components.includes(comp)) continue;
         if (Object.keys(f).length) {
-          const got = await axOf(selOf(comp));
+          const got = await axOf(selOf(comp), f.role ? String(f.role).toLowerCase() : null);
           if (got) for (const d of annotationMismatches(f, got)) findings.push({ kind: 'annotation', plugin: label, desc: `${comp}: ${d}` });
         }
         // A note on an inner layer is checked on the part the contract names the same way.
@@ -1290,7 +1352,7 @@ async function main() {
         for (const f of stateFindings((sg ?? []).map((c) => ({ ...c, role: roles[c.name] ?? c.role })))) if (!components.length || components.includes(f.component)) findings.push({ kind: 'statefollows', plugin: label, desc: f.message });
       }
       const names = [...new Set([...Object.keys(roles), ...Object.keys(snap).filter((k) => !k.startsWith('_'))])];
-      const KEY = { ' ': [' ', 'Space', 32, ' '], Enter: ['Enter', 'Enter', 13, '\r'], Escape: ['Escape', 'Escape', 27], ArrowRight: ['ArrowRight', 'ArrowRight', 39], ArrowDown: ['ArrowDown', 'ArrowDown', 40] };
+      const KEY = { ' ': [' ', 'Space', 32, ' '], Enter: ['Enter', 'Enter', 13, '\r'], Escape: ['Escape', 'Escape', 27], ArrowRight: ['ArrowRight', 'ArrowRight', 39], ArrowDown: ['ArrowDown', 'ArrowDown', 40], ArrowUp: ['ArrowUp', 'ArrowUp', 38], ArrowLeft: ['ArrowLeft', 'ArrowLeft', 37], Home: ['Home', 'Home', 36], End: ['End', 'End', 35] };
       // A style guide that inlines the system's own scripts (systemScripts) runs its components as the product does.
       const scripted = target.styleguide ? !!(await evalv(`!!document.querySelector('script[data-system-script]')`)) : true;
       let n = 0;
@@ -1308,7 +1370,7 @@ async function main() {
         if (!plan.rows.length) continue;
         if (target.styleguide && !scripted) { behavioursNotChecked.add(comp); continue; }
         const mark = `b${n++}`;
-        if (!(await evalv(markInstanceExpression(sel, mark)))) continue;
+        if (!(await evalv(markInstanceExpression(sel, mark, roles[comp] ?? null)))) continue;
         for (const row of plan.rows) {
           if (row.ifClickWorks) {
             await evalv(behaviourExpression(mark, row, 'before'));
@@ -1442,7 +1504,7 @@ async function main() {
   }
 
   // ── Human lane (default): plain language, no jargon ──
-  console.log(`\n─── Accessibility check ${STRICT ? '(must pass)' : '(advisory — never blocks the build)'} ───\n`);
+  console.log(`\n─── Accessibility check ${STRICT ? '(must pass)' : components.length ? `(${components.join(', ')}: each line is part of building it, unless it says to send it back to Figma)` : '(advisory — never blocks the build)'} ───\n`);
   if (!total && (unread.length || unrendered.length || unfinished.length)) {
     console.log(`Nothing found in what could be read${inThemes}, but part of it was not checked (see ⚠️ above): not a clean result.`);
   } else if (!total) {
@@ -1490,7 +1552,7 @@ async function main() {
   }
 
   // ── Smart nudge: how to get deeper results (only when a styleguide wasn't the target) ──
-  if (!sg && cfg.a11y?.styleguide !== false) {
+  if (!sg && !harness && cfg.a11y?.styleguide !== false) {
     const sgOut = cfg.styleguide?.out ?? 'apps/styleguide/index.html';
     if (cfg.styleguide?.template && !existsSync(join(ROOT, sgOut))) {
       console.log(`\nTip for a deeper check: you have a styleguide set up but it isn't built yet. Build it (run the parity with --docs) and this check will use it on its own — that is the most thorough result: every component in every state (normal, disabled, error, focused), all on one page.`);

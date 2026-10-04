@@ -167,7 +167,7 @@
 
 ────────────────────────────────────────────────────────────
 
-⏭  [a11y] no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.
+⏭  [a11y] no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing. The components were not rendered from their code either: no TypeScript to read the components' JSX (the project's own, or a global one: npm i -g typescript).
 
 📐 Contracts → contracts  (3 components · 13 DTCG tokens)
 ℹ️  Figma prop types → contracts/figma-props.d.ts: type a component's props with its <Name>FigmaProps so tsc shows prop drift.
