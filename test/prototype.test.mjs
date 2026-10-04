@@ -194,7 +194,7 @@ test('--prototype draws a valid composition with the components\' own markup and
   assert.match(r.stdout, /component: a message confirming the save; the prototype uses tag meanwhile/);
   assert.match(r.stdout, /component: a toggle switch/);
   const page = readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'notify.html'), 'utf8');
-  assert.match(page, /"markup":"\\u003cbutton class=\\"chip\\" type=\\"button\\">/, 'the chip is drawn from its own JSX');
+  assert.match(page, /"markup":"\\u003cbutton class=\\"chip\\" type=\\"button\\" aria-pressed=\\"false\\">/, 'the chip is drawn from its own JSX');
   assert.match(page, /\.chip\.chip--l|\.chip--l/, 'its CSS is on the page');
   assert.match(page, /"add":\["chip--l"\]/, 'Size=L applies the class the code has');
   const gaps = JSON.parse(readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'gaps.json'), 'utf8'));
