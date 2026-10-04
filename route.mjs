@@ -103,7 +103,7 @@ const TO_CODE = /\b(turn|convert|transforma\w*|converte\w*)\b[\s\S]{0,60}\b(into
 // A prototype ("prototype a settings page", "mock up a checkout with our components"): made only of the system's
 // components, checked and drawn by the engine; what the system lacks is listed, never invented.
 export const PROTOTYPE = /\b(prototyp\w*|mock[\s-]?ups?|wireframes?|prot[oó]tipos?|maquet\w*)\b/i;
-export const FIGMA_EDITS = /\b(align|update|sync|bring|match|annotat\w*|alinh\w*|atualiz\w*|sincroniz\w*)\b[\s\S]{0,40}\bfigma\b[\s\S]{0,40}\b(with|to|com|ao|a)\s+(the\s+|o\s+)?(code|c[oó]digo)\b|\bfigma\b[\s\S]{0,30}\b(match(es)?|in line with|up to date with|aligned with|igual ao|alinhado com)\s+(the\s+|o\s+)?(code|c[oó]digo)\b|\b(add|write|put|set|acrescent\w*|adicion\w*|p[oõ]e|coloca\w*)\b[\s\S]{0,30}\b(the\s+|os?\s+|as?\s+)?(roles?|pap[eé]is|annotations?|anota[çc][õo]es)\b[\s\S]{0,20}\b(in|to|into|no|na|ao)\s+figma\b|--figma-edits/i;
+export const FIGMA_EDITS = /\b(update|align|sync|bring|make|annotat\w*|atualiz\w*|alinh\w*|sincroniz\w*|p[oõ]e)\b[^.\n]{0,20}\bfigma\b[^.\n]{0,60}\b(code|c[oó]digo)\b|\bfigma\b[^.\n]{0,30}\b(match(es)?|in line with|up to date with|aligned with|igual ao|alinhado com)\s+(the\s+|o\s+)?(code|c[oó]digo)\b|\b(add|write|put|set|acrescent\w*|adicion\w*|p[oõ]e|coloca\w*)\b[^.\n]{0,30}\b(the\s+|os?\s+|as?\s+)?(roles?|pap[eé]is|annotations?|anota[çc][õo]es)\b[^.\n]{0,20}\b(in|to|into|no|na|ao)\s+figma\b|--figma-edits/i;
 const RULES = [
   ['guidelines-links', (t) => LINK.test(t)],
   ['prototype', (t) => PROTOTYPE.test(t) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
