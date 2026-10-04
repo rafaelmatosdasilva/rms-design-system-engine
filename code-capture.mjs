@@ -22,6 +22,7 @@
 // Config (all optional): ds-config.json → codeReading: { browser: "auto" | "off", pages: [paths or URLs],
 //                                                       out: ".design-system-engine-out/code.snapshot.json" }
 
+import { appDir } from './code-roots.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve, dirname, relative } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -50,7 +51,7 @@ export function captureInputs(ROOT, cfg) {
   const pages = [];
   apps.forEach((app, i) => {
     const src = appSrc[i];
-    const built = src ? src.replace(/\.src\.html$/, '.html') : `apps/${app}/ui.html`;
+    const built = src ? src.replace(/\.src\.html$/, '.html') : `${appDir(cfg, app)}/ui.html`;
     pages.push({ label: app, path: built });
   });
   // The styleguide shows every component and state on one page, so it is the capture's first place

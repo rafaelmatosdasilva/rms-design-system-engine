@@ -470,8 +470,22 @@ if (process.argv.includes('--styleguide')) {
     const r = await generateStyleguide(ROOT, sgConfig, {});
     console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${r.components} component${r.components === 1 ? '' : 's'} agreed · ${r.template === 'engine' ? "the engine's template" : "the project's template"})`);
     if (r.notAgreed) console.log(`   ${r.notAgreed}`);
-    process.exit(0);
+    // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
+    const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
+    const found = checkFile(r.out);
+    for (const line of checkLines(found)) console.log(line);
+    process.exit(failures(found).length ? 1 : 0);
   } catch (e) { console.error(`❌ style guide not built: ${e.message}`); process.exit(1); }
+}
+
+// ── --styleguide-check [page]: the same check on a page already built (after a project added its own links) ──
+if (process.argv.includes('--styleguide-check')) {
+  const i = process.argv.indexOf('--styleguide-check');
+  let page = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null;
+  if (!page) { try { const c = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); page = c.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html'; } catch { page = '.design-system-engine-out/styleguide/index.html'; } }
+  const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
+  try { const found = checkFile(resolve(ROOT, page)); for (const line of checkLines(found)) console.log(line); process.exit(failures(found).length ? 1 : 0); }
+  catch (e) { console.error(`❌ style guide not checked: ${e.message}`); process.exit(1); }
 }
 
 // ── --figma-edits: the Figma side of the hand-back, written by the engine, applied only when a person says yes ──
@@ -4182,6 +4196,19 @@ function reportFull(label, items, shown) {
       _burndownLines = lines; _burndownNext = bd.rows[0]?.name ?? null;
       if (lines.length) console.log(`\n📉 ${lines.join('\n')}`);
     } catch { /* a convenience */ }
+    // The one list of differences between Figma and the code, for people, the style guide and the agent.
+    if (!_scopeNames.length) try {
+      const { differences, differencesMarkdown } = await import('./run-diff.mjs');
+      const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+      const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_') && n.length > 2);
+      const d = differences(now, names, prev?.findings ?? null);
+      const hbDir = join(dirname(codeSnapshotPath(cfg)), 'handback');
+      const hb = (f) => (existsSync(join(ROOT, hbDir, f)) ? join(hbDir, f) : null);
+      mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+      writeFileSync(join(ROOT, OUT_DIR, 'differences.json'), JSON.stringify({ at: new Date().toISOString(), ...d }, null, 1) + '\n');
+      writeFileSync(join(ROOT, OUT_DIR, 'differences.md'), differencesMarkdown(d, { at: new Date().toISOString().slice(0, 16).replace('T', ' '), handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') } }));
+      console.log(`\n📋 Differences between Figma and the code: ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list → ${OUT_DIR}/differences.md`);
+    } catch { /* a convenience */ }
     ledger.scopes = { ...(ledger.scopes ?? {}), [scopeKey]: { at: new Date().toISOString(), findings: now } };
     mkdirSync(dirname(ledgerPath), { recursive: true });
     writeFileSync(ledgerPath, JSON.stringify(ledger, null, 1) + '\n');
@@ -4214,8 +4241,12 @@ function reportFull(label, items, shown) {
     let a11yIssues = null;
     try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
     const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues } : null } : null;
-    const summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine });
+    let summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine });
     mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+    // Where every difference is listed (written by a full audit above), so the chat always says where to look.
+    let diffLine = '';
+    try { const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8')); if (!ONLY && !_scopeNames.length && d.total) diffLine = `\nEvery difference between Figma and the code, ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list: ${OUT_DIR}/differences.md\n`; } catch { /* none written */ }
+    summary = summary.replace(/\n(NEXT:)/, `${diffLine}\n$1`);
     writeFileSync(join(ROOT, OUT_DIR, 'summary.md'), summary);
     console.log(`\n${C.bold(`─── SUMMARY (relay this in the chat as is; also in ${OUT_DIR}/summary.md) ───`)}\n\n${summary}`);
   } catch { /* the full report above still stands */ }

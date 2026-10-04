@@ -57,6 +57,7 @@
 //   - Reading order, skip links, landmark completeness — and anything the render cannot reveal:
 //     only when the project declares it in ds-config.json, never imposed (No-imposed-structure).
 
+import { appDir } from './code-roots.mjs';
 import './stdio-sync.mjs';   // the whole report reaches a pipe before process.exit
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
@@ -948,7 +949,7 @@ async function main() {
   const builtUiPath = (plugin) => {
     const i = plugins.indexOf(plugin);
     const src = i >= 0 ? pluginSrc[i] : null;
-    return join(ROOT, src ? src.replace(/\.src\.html$/, '.html') : `apps/${plugin}/ui.html`);
+    return join(ROOT, src ? src.replace(/\.src\.html$/, '.html') : `${appDir(cfg, plugin)}/ui.html`);
   };
 
   // Render targets — no project shape imposed. Priority: --url / a11y.urls > the generated

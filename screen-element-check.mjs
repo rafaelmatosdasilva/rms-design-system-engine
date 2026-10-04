@@ -20,6 +20,7 @@
 // Exit 0 = every interactive DS screen element has a code counterpart (or advisory-only).
 // Exit 1 = a DS element has no code counterpart AND `screenElementStrict: true` is set.
 
+import { appDir } from './code-roots.mjs';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, extname } from 'path';
 import { ENGINE_DIRS } from './names.mjs';
@@ -121,7 +122,7 @@ function stripNonMarkup(code) {
 const _codeCache = new Map();
 function codeForPlugin(plugin) {
   if (_codeCache.has(plugin)) return _codeCache.get(plugin);
-  const rel = (cfg.pluginDirs && cfg.pluginDirs[plugin]) || `apps/${plugin}`;
+  const rel = appDir(cfg, plugin);
   const files = [];
   walk(join(ROOT, rel), files);
   let text = '';
@@ -217,7 +218,7 @@ for (const id of screenIds) {
   const plugin = screen.plugin;
   if (!plugin) { SKIPPED.push(`screen ${id} has no plugin - cannot resolve code`); continue; }
   const code = codeForPlugin(plugin);
-  if (!code.full) { SKIPPED.push(`screen ${id} (${plugin}): no code files under apps/${plugin} - cannot check`); continue; }
+  if (!code.full) { SKIPPED.push(`screen ${id} (${plugin}): no code files under ${appDir(cfg, plugin)} - cannot check`); continue; }
 
   const seen = new Set(); // dedupe repeated labels within a screen
   for (const el of screen.elements || []) {
