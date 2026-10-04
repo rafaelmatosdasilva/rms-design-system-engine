@@ -280,7 +280,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const probeBySelector = new Map();
     for (const a of [...(contract.RENDERED_ASSERTIONS ?? []), ...(contract.CROSS_PLUGIN_CONSISTENCY ?? [])]) if (a?.probe && a.selector) probeBySelector.set(a.selector.replace(/\s+/g, ' ').trim(), a.probe);
     const probes = {};
-    const drawNames = [...new Set([...Object.keys(propsSnap), ...(opts.names ?? [])])];
+    // Every component Figma has: those with props, and those without (a divider line), from the structure snapshot.
+    const structNames = Object.keys(readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {});
+    const drawNames = [...new Set([...Object.keys(propsSnap), ...(opts.names ?? []), ...structNames])];
     for (const name of drawNames) { const sel = locator.selectorFor(name); const p = sel && probeBySelector.get(String(sel).replace(/\s+/g, ' ').trim()); if (p) probes[name] = p; }
     // A React component the pages do not show: the markup its own JSX returns, as the code capture draws it.
     const jsx = {};
@@ -313,7 +315,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     if (!title) { try { title = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { /* no package.json */ } }
     const probeList = [...new Set([...probeBySelector.values()])];
     const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, probeList, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
-      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: opts.names ?? [], themeCss: themeFiles.map(readText).join('\n'),
+      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: [...new Set([...(opts.names ?? []), ...structNames])], themeCss: themeFiles.map(readText).join('\n'),
       // A contract entry named apart from its Figma component (figmaName) maps that component's props too.
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).flatMap(([n, c]) => [[n, c.propertyMap], ...(c.figmaName && c.figmaName !== n && !contract.CONTRACT[c.figmaName]?.propertyMap ? [[c.figmaName, c.propertyMap]] : [])])),
       parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
@@ -340,7 +342,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const sheets = [...new Set([...themeFiles, ...(ctx?.componentSheets ?? [])])].map((f) => [f, readText(f)]).filter(([, t]) => t);
       // its entries in the contract and config files (structure-contract.mjs, contract.authored.json, ds-config.json)
       const entries = ['structure-contract.mjs', 'contract.authored.json', 'ds-config.json'].map((f) => [f, readText(f)]).filter(([, t]) => t);
-      const figmaRead = String(ctx?.propsSnap?._updated ?? '').slice(0, 10) || null;
+      const figmaRead = String(ctx?.propsSnap?._updated ?? '') || null;   // the date and time of the read
       for (const c of view.components) {
         let latest = null, uncommitted = false;
         const at = [...sheets.flatMap(([f, t]) => ruleLines(t, c.cls).map((l) => `${f}:${l}`)), ...entries.flatMap(([f, t]) => entryLines(t, c.name).map((l) => `${f}:${l}`))];
@@ -352,6 +354,36 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         if (latest || uncommitted || figmaRead) c.updated = { ...(latest ? { code: latest } : {}), ...(uncommitted ? { uncommitted: true } : {}), ...(figmaRead ? { figmaRead } : {}) };
       }
     } catch { /* outside git: no dates */ }
+    // Figma's annotations, as documentation: those on the component (props snapshot) and those inside it that the
+    // contract records (an annotation on a variant's Actions frame), each once.
+    for (const c of view.components) {
+      const fromFigma = (ctx?.propsSnap?.[c.name]?.annotations ?? []).map((a) => String(a?.label ?? a?.labelMarkdown ?? a ?? '').trim());
+      const inside = Object.keys(contract.CONTRACT?.[c.name]?.annotations ?? {});
+      const all = [...new Set([...fromFigma, ...inside].filter(Boolean))];
+      if (all.length) c.annotations = all;
+    }
+    // A component whose code selector names it inside another (.segmented-control button): its view draws one.
+    // The parent itself (the segmented control, whose class is the selector's first part) stays whole.
+    const camel = (k) => k.replace(/^\./, '').replace(/[-_]+(\w)/g, (m, ch) => ch.toUpperCase()).toLowerCase();
+    for (const c of view.components) {
+      const sel = String(locator.selectorFor?.(c.name) ?? '').trim(); if (!/\s/.test(sel)) continue;
+      const parts = sel.split(/\s+/);
+      if (camel(parts[0]) === c.name.toLowerCase()) continue;
+      c.only = parts.pop();
+    }
+    // Its slots, as documentation: each one's name and how Figma lets it be filled (empty at first, only its preferred
+    // components, at least or at most so many), the preferred components named when the structure snapshot has them.
+    const structSnap = readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
+    for (const c of view.components) {
+      const defs = ctx?.propsSnap?.[c.name]?.properties ?? {};
+      const slots = Object.entries(defs).filter(([, d]) => d?.type === 'SLOT').map(([k, d]) => {
+        const name = k.replace(/#.*$/, ''), st = d.slotSettings ?? {};
+        const names = structSnap[c.name]?.slots?.[name] ?? [];
+        return { name, description: d.description || '', emptyAtFirst: !!st.displayEmptyByDefault, preferredOnly: !!st.allowPreferredValuesOnly,
+          preferred: names, preferredCount: (d.preferredValues ?? []).length, min: st.minChildren ?? null, max: st.maxChildren ?? null };
+      });
+      if (slots.length) c.slots = slots;
+    }
     const { segmentedUi, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
     // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
@@ -361,11 +393,27 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // icons, the text sizes stay with the text styles, and the rest of the sizes join the spacing.
     if (view.tokens) {
       const owners = (prefix) => view.components.filter((c) => { const a = c.name.toLowerCase(), b = String(prefix).toLowerCase(); return a === b || a.startsWith(b); });
+      // Which tokens point at which (the vars snapshot's alias chains), so a group named after no component (window
+      // chrome colours only some components' tokens point at) is shown in those components.
+      const aliasSnap = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.aliases ?? {};
+      const pointers = new Map();   // a token's name → the component names whose tokens point at it
+      for (const modeAliases of Object.values(aliasSnap)) for (const [from, chain] of Object.entries(modeAliases ?? {})) {
+        const by = owners(from.split('/')[0]).map((c) => c.name);
+        if (!by.length) continue;
+        for (const to of [].concat(chain ?? [])) { const k = String(to).replace(/\/color$/, ''); (pointers.get(k) ?? pointers.set(k, new Set()).get(k)); by.forEach((n) => pointers.get(k).add(n)); }
+      }
       const keepColours = [];
       for (const g of view.tokens.colors ?? []) {
-        const own = /^(primitives|semantic|color)$/i.test(g.group) ? [] : owners(g.group);
-        if (!own.length) { keepColours.push(g); continue; }
-        for (const c of own) (c.ownTokens ??= { colors: [], sizes: [] }).colors.push(...g.items);
+        if (/^(primitives|semantic)$/i.test(g.group)) { keepColours.push(g); continue; }
+        const stay = [];
+        for (const t of g.items) {
+          const name = String(t.figma ?? '');
+          let own = owners(/^color$/i.test(g.group) ? name.split('/')[0] : g.group);
+          if (!own.length) { const users = [...(pointers.get(name) ?? [])]; own = view.components.filter((c) => users.includes(c.name)); }
+          if (!own.length) { stay.push(t); continue; }
+          for (const c of own) (c.ownTokens ??= { colors: [], sizes: [] }).colors.push(t);
+        }
+        if (stay.length) keepColours.push({ ...g, items: stay });
       }
       view.tokens.colors = keepColours;
       const iconStrokes = [], general = [];

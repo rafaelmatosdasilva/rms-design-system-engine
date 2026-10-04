@@ -169,9 +169,22 @@ export function optionEffect(baseSelector, optionSelector) {
   const attrs = {};
   for (const m of last.matchAll(/\[([\w-]+)(?:=["']?([^"'\]]*)["']?)?\]/g)) attrs[m[1]] = m[2] ?? '';
   for (const m of last.matchAll(/:(disabled|checked|indeterminate|required|invalid)\b/g)) attrs[m[1] === 'invalid' ? 'aria-invalid' : m[1]] = m[1] === 'invalid' ? 'true' : '';
-  const live = /:(hover|focus|focus-visible|focus-within|active)\b/.test(last);
-  if (!add.length && !Object.keys(attrs).length) return live ? { live: true } : {};
-  return { add, attrs, ...(live ? { live: true } : {}) };
+  const liveState = /:(hover|focus-visible|focus-within|focus|active)\b/.exec(last)?.[1] ?? null;
+  const live = !!liveState;
+  // A state set on an earlier part (.checkbox-input:checked + .checkbox-box): the option is that part's state, so
+  // the page sets it there (the input ticked), and the last part's class is the part itself, never added to the root.
+  const compounds = String(optionSelector).trim().split(/\s*[\s>+~]\s*/).filter(Boolean);
+  const stateAt = compounds.findIndex((c) => /:(disabled|checked|indeterminate|required|invalid)\b|\[[\w-]+/.test(c.replace(/:not\([^()]*\)/g, '')));
+  if (stateAt >= 0 && stateAt < compounds.length - 1) {
+    const at = compounds[stateAt].replace(/:not\([^()]*\)/g, '');
+    const target = (at.match(/^[a-z][\w-]*/i)?.[0] ?? '') + (at.match(/\.[\w-]+/g) ?? []).join('');
+    const partAttrs = {};
+    for (const m of at.matchAll(/\[([\w-]+)(?:=["']?([^"'\]]*)["']?)?\]/g)) partAttrs[m[1]] = m[2] ?? '';
+    for (const m of at.matchAll(/:(disabled|checked|indeterminate|required|invalid)\b/g)) partAttrs[m[1] === 'invalid' ? 'aria-invalid' : m[1]] = m[1] === 'invalid' ? 'true' : '';
+    if (target) return { add: [], attrs: partAttrs, target, ...(live ? { live: true, state: liveState } : {}) };
+  }
+  if (!add.length && !Object.keys(attrs).length) return live ? { live: true, state: liveState } : {};
+  return { add, attrs, ...(live ? { live: true, state: liveState } : {}) };
 }
 
 // The part a boolean shows or a text prop writes: the contract's child of that name ("Show Icon" → its Icon child),
@@ -219,7 +232,9 @@ function booleanSelector(base, sel, cssText) {
   const first = (compounds[0].match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1));
   const modifier = first.filter((c) => !baseClasses.has(c));
   const inCss = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(cssText);
-  if (compounds.length === 1) return modifier.length && modifier.every(inCss) ? { on: { add: modifier, attrs: {} } } : null;
+  // One compound: the modifier is the prop's state. A negative one (no-divider-top, often on a layer such as ::after)
+  // is the state with the part hidden, so it is the off state; any other is the on state.
+  if (compounds.length === 1) return modifier.length && modifier.every(inCss) ? (/^(no|hide|without)[-_]/.test(modifier[0]) ? { off: { add: modifier, attrs: {} } } : { on: { add: modifier, attrs: {} } }) : null;
   const part = compounds[compounds.length - 1];
   // The part too, so a part no instance holds can still be drawn when the prop turns it on.
   if (modifier.length && modifier.every(inCss) && /^(no|hide|without)[-_]/.test(modifier[0])) return { off: { add: modifier, attrs: {} }, part };

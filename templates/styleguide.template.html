@@ -74,6 +74,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-updated > div { display: grid; grid-template-columns: 140px 1fr; gap: var(--sg-space-s); }
 .pg-updated dt { font-weight: var(--sg-heading-weight); color: var(--sg-text-2); }
 .pg-updated dd { margin: 0; }
+.pg-updated dd > p { margin: 0 0 var(--sg-space-xxs); }
+.pg-doc > h3 { margin: 0 0 var(--sg-space-xs); }
 .sg-mode-diff { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); margin: 0; }
 #mode-controls { margin-top: var(--sg-space-m); }
 
@@ -161,7 +163,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-header { position: sticky; top: 0; z-index: 5; background: var(--sg-bg); padding: var(--sg-space-s) 0 var(--sg-space-m); margin-bottom: var(--sg-space-xs); }
 .pg-stage { display: flex; flex-direction: column; gap: var(--sg-space-l); }
 .pg-preview-card { display: grid; grid-template-columns: 1fr minmax(240px, 340px); gap: var(--sg-space-l); align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: var(--sg-space-l); background: var(--sg-bg); box-shadow: var(--sg-shadow); }
-.pg-preview { min-width: 0; min-height: 140px; padding: var(--sg-space-xl); display: flex; align-items: center; align-content: center; justify-content: center; gap: var(--sg-space-m); flex-wrap: wrap;
+.pg-preview { min-width: 0; min-height: 140px; padding: var(--sg-space-xl); display: flex; align-items: safe center; align-content: safe center; justify-content: safe center; gap: var(--sg-space-m); flex-wrap: wrap;
   /* A transparency checkerboard over the system's own page surface: a transparent component shows it, an opaque one covers it. */
   background-color: var(--sg-stage, var(--sg-bg));
   --sg-checker: color-mix(in srgb, var(--sg-text) 7%, transparent);
@@ -201,7 +203,7 @@ a.pg-usage-name { color: var(--sg-text); }
   body.sg-nav-open .sg-scrim { display: block; position: fixed; inset: 0; z-index: 30; }
   .sg-scrim:not([class*=" "]) { background: color-mix(in srgb, var(--sg-text) 40%, transparent); }
   .sg-main { padding: var(--sg-space-l); width: 100%; box-sizing: border-box; }
-  .pg-preview { overflow-x: auto; justify-content: flex-start; }   /* a component wider than a phone scrolls inside its own card */
+  .pg-preview { overflow-x: auto; }   /* centred like everywhere; a component wider than a phone scrolls from its start (safe center) */
   .pg-preview-card { grid-template-columns: 1fr; } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); }
 }
 </style>
@@ -302,7 +304,8 @@ a.pg-usage-name { color: var(--sg-text); }
         diff.hidden = !list.length;
       };
       wrap._sync();
-      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (b.dataset.v === '__auto') scope.removeAttribute(axis.attr); else apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(axis); }); });
+      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (b.getAttribute('aria-pressed') === 'true') return;   // the choice already set changes nothing
+      if (b.dataset.v === '__auto') scope.removeAttribute(axis.attr); else apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(axis); }); });
       return wrap;
     }
     function controls(scope, onChange, which) {
@@ -622,10 +625,30 @@ a.pg-usage-name { color: var(--sg-text); }
     if (e.tagName !== 'INPUT' && !(c.controls || []).some(function (k) { return k.type === 'TEXT'; })) e.textContent = c.name.charAt(0).toUpperCase() + c.name.slice(1);
     return e;
   }
+  (function liveStateRules() {
+    var out = [], map = [[':hover', '.sg-is-hover'], [':focus-visible', '.sg-is-focus-visible'], [':focus-within', '.sg-is-focus-within'], [':focus', '.sg-is-focus'], [':active', '.sg-is-active']];
+    var walk = function (rules) { Array.prototype.forEach.call(rules || [], function (r) {
+      if (r.cssRules && !r.selectorText) { walk(r.cssRules); return; }
+      if (!r.selectorText || !/:(hover|focus|active)/.test(r.selectorText)) return;
+      var sel = r.selectorText; map.forEach(function (m) { sel = sel.split(m[0]).join(m[1]); });
+      out.push(sel + '{' + r.style.cssText + '}');
+    }); };
+    Array.prototype.forEach.call(document.styleSheets, function (sh) { try { walk(sh.cssRules); } catch (x) {} });
+    var st = document.createElement('style'); st.id = 'sg-live-states'; st.textContent = out.join('\n'); document.head.appendChild(st);
+  })();
   function applyEffect(e, effect, on) {
     if (!effect) return;
-    (effect.add || []).forEach(function (k) { e.classList.toggle(k, on); });
-    Object.keys(effect.attrs || {}).forEach(function (a) { if (on) e.setAttribute(a, effect.attrs[a]); else e.removeAttribute(a); });
+    // A state the page cannot hold by itself (hover, focus, pressed): the system's own rules for it, copied onto a class.
+    if (effect.state) e.classList.toggle('sg-is-' + effect.state, on);
+    // The part the state is set on (a checkbox's input), else the component itself.
+    var t = effect.target ? (e.matches(effect.target) ? e : e.querySelector(effect.target)) : e;
+    if (!t) return;
+    // A class that names one of the component's own parts is that part, not a state to add to the whole.
+    (effect.add || []).forEach(function (k) { if (!effect.target && e.querySelector('.' + k)) return; t.classList.toggle(k, on); });
+    Object.keys(effect.attrs || {}).forEach(function (a) {
+      if (on) t.setAttribute(a, effect.attrs[a]); else t.removeAttribute(a);
+      if (a === 'checked' || a === 'disabled' || a === 'indeterminate') t[a] = on;   // the live state, not only the attribute
+    });
   }
   function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)) : []; } catch (x) { return []; } }
   // A selector list searched one selector at a time, in its own order (the first is the best match), not in page order.
@@ -675,7 +698,18 @@ a.pg-usage-name { color: var(--sg-text); }
     var state = {};
     props.forEach(function (p) { state[p.label] = p.type === 'BOOLEAN' ? !!p.default : (p.default == null ? '' : String(p.default)); });
     var sec = document.createElement('section'); sec.id = 'c-' + c.name; sec.className = 'sg-section';
-    var doc = [c.description && c.description.replace(/@\w+/g, '').trim(), c.note].filter(Boolean).join(' ');
+    // Its documentation: Figma's description and annotations first, then the code's own note.
+    var figDesc = c.description && c.description.replace(/@\w+/g, '').trim();
+    var figNotes = (c.annotations || []).filter(function (a) { return a && a !== figDesc; });
+    var docRows = (figDesc || figNotes.length ? '<div><dt>From Figma</dt><dd>' + [figDesc].concat(figNotes).filter(Boolean).map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') + '</dd></div>' : '') +
+      (c.slots ? '<div><dt>Slots</dt><dd>' + c.slots.map(function (sl) {
+        var what = sl.preferredOnly ? (sl.preferred.length ? 'Takes only ' + sl.preferred.join(', ') : sl.preferredCount ? 'Takes only its ' + (sl.preferredCount === 1 ? 'preferred component' : sl.preferredCount + ' preferred components') : 'Set in Figma to take only preferred components, with none listed yet') : (sl.preferred.length ? 'Takes any content; suggested ' + sl.preferred.join(', ') : 'Takes any content the product puts in it');
+        var count = sl.min && sl.max ? ', ' + sl.min + ' to ' + sl.max + ' items' : sl.min ? ', at least ' + sl.min + (sl.min === 1 ? ' item' : ' items') : sl.max ? ', at most ' + sl.max + ' items' : '';
+        return '<p><b>' + esc(sl.name) + '</b> ' + esc(what + count + '.' + (sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
+      }).join('') + '</dd></div>' : '') +
+      (c.note ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '');
+    // A date and time in the reader's own clock (two changes on one day read apart).
+    var when = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2><div class="pg-usage" aria-label="Used in">' + usageBadges(c) + '</div></div>' +
@@ -687,10 +721,10 @@ a.pg-usage-name { color: var(--sg-text); }
         '<div class="pg-inspect"><div class="pg-inspect-head">Computed</div><table class="pg-computed"></table></div>' +
         (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>' +
         '<div class="pg-footer">' +
-        (doc ? '<div class="pg-note"><b>Documentation</b><span>' + esc(doc) + '</span></div>' : '') +
+        (docRows ? '<div class="pg-doc"><h3>Documentation</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
         (c.updated ? '<dl class="pg-updated">' +
-          (c.updated.uncommitted ? '<div><dt>Code</dt><dd>Changed, not committed yet</dd></div>' : c.updated.code ? '<div><dt>Code last changed</dt><dd>' + esc(c.updated.code.date) + '</dd></div><div><dt>Last change</dt><dd>' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')</dd></div>' : '') +
-          (c.updated.figmaRead ? '<div><dt>Figma read</dt><dd>' + esc(c.updated.figmaRead) + '</dd></div>' : '') + '</dl>' : '') +
+          (c.updated.uncommitted ? '<div><dt>Code</dt><dd>Changed, not committed yet</dd></div>' : c.updated.code ? '<div><dt>Code last changed</dt><dd>' + esc(when(c.updated.code.time || c.updated.code.date)) + '</dd></div><div><dt>Last change</dt><dd>' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')</dd></div>' : '') +
+          (c.updated.figmaRead ? '<div><dt>Figma read</dt><dd>' + esc(when(c.updated.figmaRead)) + '</dd></div>' : '') + '</dl>' : '') +
         '</div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls');
     var tTokens = sec.querySelector('.pg-tokens'), tComputed = sec.querySelector('.pg-computed'), tOwn = sec.querySelector('.pg-own');
@@ -710,6 +744,14 @@ a.pg-usage-name { color: var(--sg-text); }
       preview.innerHTML = '';
       var e = baseElement(c);
       preview.appendChild(e);
+      // A component that takes its width from where it is placed (a divider line) draws nothing in a centred stage:
+      // it gets the stage's width, as it would in a product's row.
+      if (!e.children.length && !e.textContent.trim() && e.getBoundingClientRect().width < 1) e.style.width = '100%';
+      // Centred in the playground: a margin the instance has in its product (where it sits there) is not its own.
+      e.style.margin = '0';
+      // A component that lives inside another (one segment of a segmented control): drawn once, inside its parent,
+      // and its props act on it, not on the parent.
+      if (c.only) { var ones = Array.prototype.slice.call(e.querySelectorAll(c.only)); if (ones.length) { ones.slice(1).forEach(function (k) { k.remove(); }); e = ones[0]; } }
       var written = [], hidden = [];
       // Shows, hides and options first, text last, so a part a show prop draws gets its text.
       props.slice().sort(function (a, b) { return (a.type === 'TEXT') - (b.type === 'TEXT'); }).forEach(function (p) {
@@ -835,13 +877,18 @@ a.pg-usage-name { color: var(--sg-text); }
       AXES.forEach(function (a) { if (a.attr && preview.hasAttribute(a.attr)) wrap.setAttribute(a.attr, preview.getAttribute(a.attr)); });
       o.layers.forEach(function (z) { var d = document.createElement('div'); d.className = z; wrap.appendChild(d); });
       var card = src.cloneNode(true); if (!card.getAttribute('role')) card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', c.name);
-      wrap.appendChild(card); document.body.appendChild(wrap);
+      // It opens inside the playground, over the checkered area and centred there, not over the whole page: the
+      // system's container keeps its own look, only its placement is the stage's.
+      wrap.style.position = 'absolute'; wrap.style.inset = '0';
+      var stagePos = preview.style.position; preview.style.position = 'relative';
+      src.style.visibility = 'hidden';
+      wrap.appendChild(card); preview.appendChild(wrap);
       var closing = false;
       function key(e) { if (e.key === 'Escape') close(); }
       function close() {
         if (closing) return; closing = true; document.removeEventListener('keydown', key, true);
         if (o.closing) wrap.classList.add(o.closing);
-        setTimeout(function () { wrap.remove(); trigger.focus(); }, o.closing ? playTime(wrap) + 30 : 0);
+        setTimeout(function () { wrap.remove(); src.style.visibility = ''; preview.style.position = stagePos; trigger.focus(); }, o.closing ? playTime(wrap) + 30 : 0);
       }
       wrap.addEventListener('click', function (e) { if (e.target === wrap || o.layers.some(function (z) { return e.target.classList.contains(z); }) || e.target.closest('button, a')) close(); });
       document.addEventListener('keydown', key, true);
@@ -869,11 +916,11 @@ a.pg-usage-name { color: var(--sg-text); }
         // editable, so a field never seems to do nothing.
         if (!textLands(p)) { field.disabled = true; field.title = 'No part in the code holds this text yet'; }
       } else {
-        var opts = p.type === 'VARIANT' ? (p.options || []).map(function (o) { return { v: o.label, off: o.live && !(o.add || []).length && !Object.keys(o.attrs || {}).length }; })
+        var opts = p.type === 'VARIANT' ? (p.options || []).map(function (o) { return { v: o.label, off: o.live && !o.state && !(o.add || []).length && !Object.keys(o.attrs || {}).length }; })
           : [{ v: 'false' }, { v: 'true', off: !p.on && !p.off && !p.part, drawn: p.part && !hasPart(c, p.part) }];   // a part no instance holds is drawn from the code's CSS
         ctl.innerHTML = label + segHTML(opts.map(function (o) { return { v: o.v, label: o.v, off: o.off, title: o.drawn ? 'No instance in the products has this part: drawn from the code\'s own CSS for it' : o.off ? 'Shown live, not as a style the page can set' : '' }; }));
         var sync = function () { segItems(ctl).forEach(function (b) { segSelect(b, b.dataset.v === String(state[p.label])); }); nudge(); };
-        segItems(ctl).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; state[p.label] = p.type === 'VARIANT' ? b.dataset.v : b.dataset.v === 'true'; sync(); refresh(); }); });
+        segItems(ctl).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; var next = p.type === 'VARIANT' ? b.dataset.v : b.dataset.v === 'true'; if (next === state[p.label]) return; state[p.label] = next; sync(); refresh(); }); });   // the option already set changes nothing
         sync();
       }
       controlsEl.appendChild(ctl);
@@ -927,7 +974,7 @@ a.pg-usage-name { color: var(--sg-text); }
     menu.setAttribute('aria-controls', 'sg-sidebar'); menu.setAttribute('aria-expanded', 'false');
     var open = function (on) {
       document.body.classList.toggle('sg-nav-open', on); menu.setAttribute('aria-expanded', on ? 'true' : 'false');
-      if (on) { var f = side.querySelector('#sg-search input') || shut; setTimeout(function () { f.focus(); }, 50); } else menu.focus();
+      if (on) setTimeout(function () { shut.focus({ preventScroll: true }); }, 50); else menu.focus();   // never the search: no keyboard pops up
     };
     menu.addEventListener('click', function () { open(true); });
     shut.addEventListener('click', function () { open(false); });

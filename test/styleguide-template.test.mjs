@@ -70,8 +70,8 @@ test('what an option adds comes from the contract\'s selector: a class, an attri
   assert.deepEqual(optionEffect('.chip', '.chip.chip--l'), { add: ['chip--l'], attrs: {} });
   assert.deepEqual(optionEffect('.button', '.button:disabled'), { add: [], attrs: { disabled: '' } });
   assert.deepEqual(optionEffect('.tab', '.tab[aria-selected="true"]'), { add: [], attrs: { 'aria-selected': 'true' } });
-  assert.deepEqual(optionEffect('.button', '.button:hover'), { live: true });
-  assert.deepEqual(optionEffect('.field', '.field:not(.field--readonly):hover'), { live: true }, 'a class inside :not() is never added');
+  assert.deepEqual(optionEffect('.button', '.button:hover'), { live: true, state: 'hover' });
+  assert.deepEqual(optionEffect('.field', '.field:not(.field--readonly):hover'), { live: true, state: 'hover' }, 'a class inside :not() is never added');
   assert.deepEqual(optionEffect('.button', '.button'), {});
   const v = agreedView({ propsSnap: { badge: { properties: { State: { type: 'VARIANT', defaultValue: 'neutral', variantOptions: ['neutral', 'positive'] } } } },
     rows: [row('badge', 'State', 'state', 'match')], classFor: () => '.badge', propertyMaps: { badge: { State: { neutral: '.badge.none', positive: '.badge.low' } } } });
@@ -198,4 +198,19 @@ test('a text part no text prop writes is drawn with its name, so its switch show
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /A text part no text prop writes \(Show Description alone\) gets its own name/);
   assert.match(tpl, /replace\(\/\^show\[\\s-\]\+\/i, ''\)/);
+});
+
+test('a state set on an earlier part is set there: the checkbox input is ticked, the box class is never added to the whole', async () => {
+  const { optionEffect } = await import('../styleguide-data.mjs');
+  assert.deepEqual(optionEffect('.checkbox', '.checkbox-input:checked + .checkbox-box'), { add: [], attrs: { checked: '' }, target: '.checkbox-input' });
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /if \(!effect\.target && e\.querySelector\('\.' \+ k\)\) return;/);
+});
+
+test('choosing the option already set does nothing, and a slot is documented with how Figma lets it be filled', () => {
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /if \(next === state\[p\.label\]\) return;/);
+  assert.match(tpl, /if \(b\.getAttribute\('aria-pressed'\) === 'true'\) return;/);
+  assert.match(tpl, /<dt>Slots<\/dt>/);
+  assert.match(tpl, /<dt>From Figma<\/dt>/);
 });

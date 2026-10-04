@@ -517,11 +517,11 @@ async function deepFacts(node, set) {
     out.defaultVariant = node.name;
     out.variants = {};
     for (const v of set.children.filter((c) => c.type === 'COMPONENT')) out.variants[v.name] = await geometry(v);
-    // Each slot's preferred components, by name (the definitions only carry keys).
+    // Each slot's and instance swap's preferred components, by name (the definitions only carry keys).
     const byKey = new Map(figma.root.findAll((x) => (x.type === 'COMPONENT' || x.type === 'COMPONENT_SET') && x.key).map((x) => [x.key, x.name]));
     const slots = {};
     for (const [k, d] of Object.entries(set.componentPropertyDefinitions ?? {})) {
-      if (d.type !== 'INSTANCE_SWAP' || !d.preferredValues?.length) continue;
+      if ((d.type !== 'INSTANCE_SWAP' && d.type !== 'SLOT') || !d.preferredValues?.length) continue;
       slots[k.replace(/#.*$/, '')] = d.preferredValues.map((p) => byKey.get(p.key)).filter(Boolean);
     }
     if (Object.keys(slots).length) out.slots = slots;
