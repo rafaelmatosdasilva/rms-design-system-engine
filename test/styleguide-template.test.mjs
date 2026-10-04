@@ -49,7 +49,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Style guide → \.design-system-engine-out\/styleguide\/index\.html {2}\(2 components agreed · the engine's template\)/);
-  assert.match(r.stdout, /not built yet \(button, field\)/);
+  assert.match(r.stdout, /not built yet \(button, field, disclosure\)/);
   assert.equal(existsSync(join(dir, 'component-prop-result.json')), false, 'the project is left as it was');
   const html = readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8');
   assert.doesNotMatch(html, /\{\{[A-Z_]+\}\}/, 'every marker filled');

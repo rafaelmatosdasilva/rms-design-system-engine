@@ -30,7 +30,7 @@ test('figma-cli is run to write design.json, then it is read; a failed snapshot 
   const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
   const r = await refreshFromFigmaCli(dir, cfg, { run: () => { writeFileSync(join(dir, 'design.json'), JSON.stringify(tidepoolDesign())); return { status: 0 }; } });
   assert.equal(r.source, 'Tidepool');
-  assert.equal(r.counts.components, 4);
+  assert.equal(r.counts.components, 5);
   await assert.rejects(refreshFromFigmaCli(dir, cfg, { run: () => ({ status: 1, stderr: 'not connected to Figma\n' }) }), /figma-cli snapshot did not finish: not connected to Figma/);
 });
 
@@ -40,7 +40,7 @@ test('--from-figma-cli reads a design.json; a newer one is read by the audit on 
   const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', PATH: '/usr/bin:/bin' } });
   let r = run('--from-figma-cli');
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /✅ Figma read from design\.json \(Tidepool\): 18 colours in 2 modes, 8 sizes, 4 components/);
+  assert.match(r.stdout, /✅ Figma read from design\.json \(Tidepool\): 18 colours in 2 modes, 8 sizes, 5 components/);
   // Older than the snapshots it wrote: the audit does not read it again.
   r = run('--refresh-figma');
   assert.match(r.stdout, /Figma source: mcp/);
