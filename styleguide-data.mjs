@@ -135,7 +135,10 @@ function partFor(propName, list = [], fallback = null) {
   const named = (list ?? []).find((p) => String(p.name).toLowerCase() === word) ?? (list ?? []).find((p) => String(p.name).toLowerCase().includes(word));
   if (named) return String(named.selector).trim().split(/\s+/).pop();
   const kind = /icon|glyph|symbol/.test(word) ? 'icon' : /label|text|title|value/.test(word) ? 'label' : fallback;
-  return kind === 'icon' ? 'svg, [class*="icon"]' : kind === 'label' ? '[class*="label"], [class*="text"], span' : null;
+  // The prop's own word first (a title is a title class or a heading before it is any label), in the order to search.
+  const own = /^[a-z]+$/.test(word) && !/^(label|text|icon)$/.test(word) ? `[class*="${word}"], ` : '';
+  const heading = /title|heading/.test(word) ? 'h1, h2, h3, h4, ' : '';
+  return kind === 'icon' ? 'svg, [class*="icon"]' : kind === 'label' ? `${own}${heading}[class*="label"], [class*="text"], span` : null;
 }
 
 // The class a variant option would carry in the code, only when the project's CSS has that selector.
@@ -196,7 +199,9 @@ export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}
         if (off && (off.add?.length || Object.keys(off.attrs ?? {}).length)) found.off = off;
         if (!found.on && !found.off) found = null;
       } else if (typeof pm === 'string') found = booleanSelector(base, pm, cssText);
-      if (!found && typeof hr === 'string') found = booleanSelector(base, hr, cssText) ?? { part: hr };
+      // A realization names a part (".listItem-icon"), never a class to put on the component itself; only a no- or
+      // hide- modifier that hides the part (".x.no-icon svg") is a class.
+      if (!found && typeof hr === 'string') { const b = booleanSelector(base, hr, cssText); found = b?.off ? b : { part: String(hr).trim().split(/\s+/).pop() }; }
       if (!found && /^(is)?disabled$/i.test(label) && cls && new RegExp(`\\.${cls}[^{,]*:disabled`).test(cssText)) found = { on: { add: [], attrs: { disabled: '' } } };
       if (!found) { const c = variantClass(cls, label, cssText); if (c) found = { on: { add: [c], attrs: {} } }; }
       if (!found) { unrealized.push(label); continue; }
@@ -248,12 +253,14 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     if (unbuilt.includes(name) || mine.some((r) => /^\(no code file/.test(String(r.codeValue)))) { waiting.push(`${name} (not built yet)`); continue; }
     const cls = String(classFor(name) ?? '').replace(/^\./, '') || null;   // the class itself, without its dot
     const defs = Object.fromEntries(Object.entries(entry.properties ?? {}).map(([k, d]) => [cleanName(k), d]));
-    const controls = [];
+    const controls = [], propsNotBuilt = [];
     // An HTML and CSS system has no code props for Gate [15] to pair: what the code realizes is what agrees.
     if (!mine.length && (cfg.frameworkComponents === false || !rows.length)) {
       const r = realizedControls({ name, defs, cls, propertyMap: propertyMaps[name] ?? {}, realizations: cfg.htmlRealizations?.[name] ?? {}, cssText, parts: parts[name] ?? [] });
       controls.push(...r.controls);
       unrealized += r.unrealized.length;
+      // Figma's props the code does not build: shown in the panel as such, never drawn with Figma's look.
+      propsNotBuilt.push(...r.unrealized.map((label) => ({ label, type: defs[label]?.type ?? 'BOOLEAN' })));
     }
     for (const r of mine) {
       if (r.status !== 'match') { undecided++; continue; }   // missing, renamed, another value, or a prop only the code has
@@ -303,7 +310,7 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     const markups = [...new Set(candidates.map((c) => c.markup).filter((m) => m && elementsIn(m) <= 30))].sort((a, b) => elementsIn(b) - elementsIn(a)).slice(0, 6);
     if (entry.noProps && !markup) continue;
     components.push({ name, cls, role: roleWord(entry.annotations), description: entry.description ?? '', note: notes[name.toLowerCase()] ?? notes[name] ?? '',
-      markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls });
+      markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls, ...(propsNotBuilt.length ? { unbuilt: propsNotBuilt } : {}) });
   }
   // A recorded value that moved on one side since it was agreed is not agreed any more.
   for (const f of Object.values(agreedRecord.facts ?? {})) if (f && f.figma !== undefined && f.code !== undefined && String(f.figma) !== String(f.code)) undecided++;
