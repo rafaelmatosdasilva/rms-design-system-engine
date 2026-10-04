@@ -219,3 +219,10 @@ test('what to do about each difference, and who does it', () => {
   assert.equal(plainAction('· overlay/color').who, 'figma');
   assert.equal(plainAction('x [default · light]: 3.1:1 (needs 4.5:1)  #000 (--a) on #111 (--b)').who, 'both');
 });
+
+test('a switch whose selector adds a negative class on a layer (no-divider-top::after) turns it on only when off', () => {
+  const r = realizedControls({ name: 'bar', defs: { 'Show Line': { type: 'BOOLEAN', defaultValue: true } }, cls: 'bar', cssText: '.bar{} .bar.no-line::after{content:none}', propertyMap: { 'Show Line': '.bar.no-line::after' } });
+  const c = r.controls.find((k) => k.label === 'Show Line');
+  assert.deepEqual(c.off?.add, ['no-line']);
+  assert.equal(c.on, undefined);
+});

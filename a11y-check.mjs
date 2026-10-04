@@ -1129,6 +1129,9 @@ async function main() {
       await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: keyCode, ...(text ? { text } : {}) }, sessionId);
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode }, sessionId);
     };
+    // The page counts as focused even when another tab of the same browser holds the window's focus:
+    // without it, script focus can miss :focus / :focus-visible and a ring reads as missing.
+    try { await send('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId); } catch { /* older Chrome */ }
     try { await pressKey('Tab', 'Tab', 9); } catch { /* input domain unavailable: script focus only */ }
 
     // 1. Contrast, 3. focus (and its ring contrast) in EVERY mode; 4/5. state exposure and keyboard
