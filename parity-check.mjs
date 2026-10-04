@@ -295,13 +295,19 @@ function hexToNeutralVar(hex, modeIdx) {
 }
 
 function colorFixHint(cssVar, figmaHex, modeIdx) {
-  const line    = varLineMap[cssVar];
+  // The line of this mode's own declaration (a dark value lives in the dark block), else the base one.
+  const own     = modeIdx > 0 ? declaredByMode[modeIdx]?.get(cssVar) : null;
+  const line    = own?.line ?? varLineMap[cssVar];
+  const file    = own?.file ?? varFileMap[cssVar];
   const suggest = hexToNeutralVar(figmaHex, modeIdx);
   const current = (modeIdx > 0 ? modeVars[modeIdx]?.[cssVar] : undefined) ?? modeVars[0][cssVar];
-  const loc     = line ? `${varFileMap[cssVar] ?? THEME_PATH}:${line}` : THEME_PATH;
+  const loc     = line ? `${file ?? THEME_PATH}:${line}` : THEME_PATH;
+  const where   = modeIdx > 0 && MODES[modeIdx]?.name ? ` (${MODES[modeIdx].name})` : '';
   if (suggest)
-    return `${loc} - ${cssVar}: ${current ?? '?'} should resolve to ${suggest} (${figmaHex})`;
-  return `${loc} - chain should resolve to ${figmaHex} (no matching neutral found)`;
+    return `${loc} - ${cssVar}: ${current ?? '?'} should resolve to ${suggest} (${figmaHex})${where}`;
+  // A value written as is: say the change, old to new, as the sizing hints do.
+  if (current && !/var\(/.test(current)) return `${loc} - change ${cssVar}: ${current.trim()} → ${figmaHex}${where}`;
+  return `${loc} - ${cssVar} should resolve to ${figmaHex}${where}${current ? ` (it resolves through ${current.trim()})` : ''}`;
 }
 
 function sizingFixHint(cssVar, figmaVal) {

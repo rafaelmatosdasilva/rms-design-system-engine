@@ -10,3 +10,6 @@ circle filled with the chip's text colour.
 
 The Figma MCP's design-to-code tools show each variable in one mode only (Light here): no dark values come
 through them. The engine's capture reads every mode.
+
+`chip-changed.md` and `chip-changed.png` are the chip after a change the designer made (its background, light and dark,
+and its corner radius), captured the same way, from the same file, with the change in place. The file was put back after.

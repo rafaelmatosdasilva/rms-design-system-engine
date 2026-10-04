@@ -4,7 +4,7 @@
 // also has what the skill gives a project: its config and the Figma snapshots. The MCP's side has neither.
 //
 // Scored by build-score.mjs, the same way whoever built it: rendered in a browser and measured against the Figma facts.
-import { cpSync, readFileSync } from 'node:fs';
+import { cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderCases, cssVariables, compare, rgb, offSystemValues, written } from './build-score.mjs';
@@ -24,6 +24,8 @@ export const TOKENS = {
   dark: Object.fromEntries(Object.entries(VARS.color.dark).map(([k, v]) => [cssName(k), v])),
 };
 const DECLARED = new Set(Object.keys(TOKENS.light));
+// The designer's change for update-chip, as Figma has it after (captured from the Tidepool file with the change in place).
+const CHANGED = { light: '#dfe7f7', dark: '#2d3b5c', radius: '12px' };
 
 const withTokens = (dir) => cpSync(join(REF, 'src/styles'), join(dir, 'src/styles'), { recursive: true });
 const withComponents = (dir) => { withTokens(dir); cpSync(join(REF, 'src/components'), join(dir, 'src/components'), { recursive: true }); };
@@ -232,6 +234,38 @@ export const BUILD = [
         check('ArrowUp steps the spinbutton up', t.native || t.key === 1 || c.key?.includes(4), t.native ? 'a native number input' : `ArrowUp changed it by ${t.key}`),
       ];
     }),
+  },
+  {
+    // The designer changed the chip in Figma (its background, light and dark, and its corner radius); the code was built
+    // before. The Figma MCP shows the new light values only (figma-mcp/chip-changed.md, captured with the change in
+    // place); the skill's capture of the file has every mode.
+    id: 'update-chip', mayChangeAll: true,
+    setup: (dir) => {
+      withComponents(dir);
+      const f = join(dir, 'src/figma/figma-vars.snapshot.json');
+      const v = JSON.parse(readFileSync(f, 'utf8'));
+      v._updated = new Date().toISOString();
+      v.color.light['chip/background/color'] = CHANGED.light; v.color.dark['chip/background/color'] = CHANGED.dark; v.sizing['radii/chip'] = CHANGED.radius;
+      writeFileSync(f, JSON.stringify(v, null, 2) + '\n');
+    },
+    prompt: `our designer changed the chip in Figma. Update our code so the chip matches Figma again (we ship light and dark mode). What the Figma MCP returns for the chip now is in figma-mcp/chip-changed.md (its screenshot is figma-mcp/chip-changed.png; start with figma-mcp/_note.md).`,
+    score: async (ctx) => {
+      const names = Object.keys(TOKENS.light);
+      const want = { light: { ...TOKENS.light, '--chip-background': CHANGED.light, '--radii-chip': CHANGED.radius }, dark: { ...TOKENS.dark, '--chip-background': CHANGED.dark } };
+      // Dark mode is found by the tokens that did not change, so a wrong dark chip does not hide which mode is dark.
+      const v = await cssVariables(ctx.dir, names, (d) => Object.entries(want.dark).filter(([n]) => n !== '--chip-background').every(([n, x]) => sameValue(d[n], x)));
+      const moved = (mode) => Object.keys(want[mode]).filter((n) => !['--chip-background', '--radii-chip'].includes(n) && !sameValue(v[mode][n], want[mode][n]));
+      const r = await componentChecks(ctx, 'src/components/Chip.jsx', 'Chip', 'Filter', [
+        { id: 'light', props: propsOf({ Label: 'Filter' }), expect: { radius: 12, bg: CHANGED.light, color: L['chip/text'], height: 24 } },
+        { id: 'dark', props: propsOf({ Label: 'Filter' }), dark: true, expectDark: (m) => sameColor(m, 'bg', CHANGED.dark), expect: { bg: CHANGED.dark, color: D['chip/text'] } },
+      ], () => []);
+      return [
+        check('the new light background and radius are in the tokens (chip/background #dfe7f7, radii/chip 12px)', sameValue(v.light['--chip-background'], CHANGED.light) && sameValue(v.light['--radii-chip'], CHANGED.radius), `--chip-background ${v.light['--chip-background'] || '(missing)'}, --radii-chip ${v.light['--radii-chip'] || '(missing)'}`),
+        check('the new dark background is in the tokens (chip/background, dark: #2d3b5c)', sameValue(v.dark['--chip-background'], CHANGED.dark), `dark --chip-background ${v.dark['--chip-background'] || '(missing)'}`),
+        check('no other token moved', !moved('light').length && !moved('dark').length, [...moved('light'), ...moved('dark').map((n) => `${n} (dark)`)].join(', ')),
+        ...r,
+      ];
+    },
   },
   {
     id: 'build-settings', mayChangeAll: true, setup: withComponents,
