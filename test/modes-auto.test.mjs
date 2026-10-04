@@ -31,3 +31,15 @@ test('a mode the theme sets in an @media block, or a [data-…] block, is found 
   assert.equal(wrong.status, 1);
   assert.match(wrong.stdout, /phone: Figma 10px, CSS 12px/);
 });
+
+test('a component\'s height is read from the base values, not from a breakpoint\'s :root inside @media', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'modes-height-'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'theme.css', structureContract: 'structure-contract.mjs', snapshotStructure: 'structure.json' } }));
+  const facts = { h: 24, paddingVar: { tb: null, lr: null }, gapVar: null, fontSizeVar: null, fontWeightVar: null, fillStructure: 'none', innerRadiusVar: null, strokeOnDefault: false, strokeOnAnyState: false };
+  writeFileSync(join(dir, 'structure.json'), JSON.stringify({ _updated: new Date().toISOString(), components: { chip: facts } }));
+  writeFileSync(join(dir, 'structure-contract.mjs'), `export const CONTRACT = { chip: ${JSON.stringify(facts)} };\nexport const CSS_HEIGHT_RULES = { chip: { selector: '.chip', prop: 'height' } };\n`);
+  writeFileSync(join(dir, 'theme.css'), ':root {\n  /* sizes; the phone ones are in @media below */\n  --gap: 4px;\n  --h: 24px;\n}\n.chip { height: var(--h); }\n@media (max-width: 480px) {\n  :root {\n    --h: 32px;\n  }\n}\n');
+  const r = spawnSync(process.execPath, [join(ENGINE, 'structure-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  assert.match(r.stdout, /PASS {2}1\/1 CSS height rules/, r.stdout);
+  assert.doesNotMatch(r.stdout, /CSS height is 32px/);
+});

@@ -17,6 +17,53 @@ const cleanName = (k) => String(k).replace(/#[\d:]+$/, '');
 // cssSelector forms the capture reads), size from the sizing collection's own modes (vars snapshot modeVariants).
 // An axis is `scoped` when its CSS is an attribute block that nests ([data-color], [data-size]): then each component
 // can flip its own preview, as a Figma mode does on a frame. A :root-only switch is global.
+// The code's own breakpoint modes: each @media block (not a colour or contrast preference) that sets variables on
+// :root, with the base :root's values for the same variables. → [{ condition, decls, base, rules }]
+export function codeSizeBlocks(css = '') {
+  const text = String(css ?? '').replace(/\/\*[\s\S]*?\*\//g, '');   // a comment can name @media without being one
+  const decls = (body) => Object.fromEntries([...body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+  const outside = text.replace(/@(media|supports|container)\b[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/g, '');
+  const base = {};
+  for (const m of outside.matchAll(/(?:^|[}\s,]):root\s*\{([^{}]*)\}/g)) Object.assign(base, decls(m[1]));
+  const out = [];
+  for (const m of text.matchAll(/@media\s*([^{]+)\{((?:[^{}]|\{[^{}]*\})*)\}/g)) {
+    if (/prefers-color-scheme|prefers-contrast/.test(m[1])) continue;
+    const rules = [...m[2].matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((r) => ({ sel: r[1].trim(), body: r[2].trim() }));
+    const root = rules.filter((r) => r.sel === ':root');
+    if (!root.length) continue;
+    const d = Object.assign({}, ...root.map((r) => decls(r.body)));
+    out.push({ condition: m[1].trim().replace(/\s+/g, ' '), decls: d, base: Object.fromEntries(Object.keys(d).map((k) => [k, base[k] ?? null])), rules: rules.filter((r) => r.sel !== ':root') });
+  }
+  return out;
+}
+
+// Which breakpoint block draws a sizing collection's second mode: the one that sets the collection's variables, else
+// the only one there is. → { block, base, mode } (the snapshot keys) or null.
+export function codeSizeMode(def = {}, themeCss = '') {
+  const ms = def?.modes ?? [];
+  if (ms.length !== 2) return null;
+  const blocks = codeSizeBlocks(themeCss);
+  const names = Object.keys(def.vars ?? {}).map((t) => `--${t.replace(/\//g, '-')}`);
+  const named = blocks.filter((b) => names.some((n) => n in b.decls));
+  const block = named.length === 1 ? named[0] : (!named.length && blocks.length === 1 ? blocks[0] : null);
+  return block ? { block, base: String(ms[0].snapshotKey), mode: String(ms[1].snapshotKey), names: Object.fromEntries(Object.keys(def.vars ?? {}).map((t) => [`--${t.replace(/\//g, '-')}`, t])) } : null;
+}
+
+// The page's own toggle for a breakpoint mode: the theme's @media values under [data-size="<mode>"], the base values
+// under [data-size="<base>"], so a preview, or the page on a phone, can be shown in either. '' when the code has none.
+export function codeSizeCSS(modeVariants = {}, themeCss = '') {
+  for (const def of Object.values(modeVariants ?? {})) {
+    const hit = codeSizeMode(def, themeCss);
+    if (!hit) continue;
+    const { block, base, mode } = hit;
+    const lines = (map) => Object.entries(map).filter(([, v]) => v != null).map(([k, v]) => `    ${k}: ${v};`).join('\n');
+    return `\n\n  /* == Size toggle - the theme's own ${block.condition} block, under [data-size] (code values, nothing copied by hand) == */\n` +
+      `  [data-size="${base}"] {\n${lines(block.base)}\n  }\n  [data-size="${mode}"] {\n${lines(block.decls)}\n  }\n` +
+      block.rules.map((r) => `  [data-size="${mode}"] ${r.sel} { ${r.body} }\n`).join('');
+  }
+  return '';
+}
+
 export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
   const axes = [];
   const modes = cfg.figma?.modes?.length ? cfg.figma.modes : [{ name: 'Light', cssSelector: 'root' }, { name: 'Dark', cssSelector: 'dark-media' }];
@@ -39,7 +86,14 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
     // drawn: the page would show Figma's values, not the code's.
     const vars = Object.keys(def.vars ?? {}).map((t) => `--${t.replace(/\//g, '-')}`);
     const inCode = (m) => { const k = String(m.snapshotKey); return new RegExp(`\\[data-[\\w-]+=["']?${k}["']?\\]|\\.${k}\\b`).test(themeCss) || [...String(themeCss).matchAll(/@media\s*([^{]+)\{((?:[^{}]|\{[^{}]*\})*)\}/g)].some((b) => !/prefers-/.test(b[1]) && vars.some((v) => b[2].includes(`${v}:`))); };
-    axes.push({ label: 'Size', attr: 'data-size', scoped: true, values: ms.map((m, i) => ({ label: m.name ?? m.snapshotKey, value: i === 0 ? '' : m.snapshotKey, ...(i > 0 && !inCode(m) ? { notInCode: true } : {}) })) });
+    // When the theme draws the second mode in a breakpoint block, the page toggles it with [data-size] (codeSizeCSS):
+    // the base is then a value of its own, so a page seen on a phone can still be switched back, and the switch says
+    // what the mode changes, from the code's own values.
+    const code = codeSizeMode(def, themeCss);
+    const axis = { label: 'Size', attr: 'data-size', scoped: true, values: ms.map((m, i) => ({ label: m.name ?? m.snapshotKey, value: i === 0 ? (code ? String(m.snapshotKey) : '') : m.snapshotKey, ...(i > 0 && !inCode(m) ? { notInCode: true } : {}) })) };
+    if (code) Object.assign(axis, { media: code.block.condition, mediaValue: code.mode });   // the device or window the code draws it on
+    if (code) axis.changes = { [code.mode]: Object.entries(code.block.decls).filter(([k, v]) => code.block.base[k] != null && code.block.base[k] !== v).map(([k, v]) => ({ name: code.names[k] ?? k, from: code.block.base[k], to: v })) };
+    axes.push(axis);
     break;
   }
   return axes;
@@ -220,7 +274,10 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
       ...pages.flatMap((h) => scriptMarkups(h, cls)).map((markup) => ({ markup, from: 'script' })),
       ...(jsx[name] ? [{ markup: jsx[name], from: 'jsx' }] : []),
     ];
-    const chosen = fullestMarkup(candidates);
+    // An instance hidden at rest (a hidden class or attribute, or an extra class whose own rule sets display: none, such
+    // as a reset button that shows only once zoomed) would draw nothing: the next one is used when there is one.
+    const shown = candidates.filter((c) => !hiddenAtRest(c.markup, cls, cssText));
+    const chosen = fullestMarkup(shown.length ? shown : candidates);
     const markup = chosen?.markup ?? null;
     // Every other markup the code shows for it, fullest first: a drawing picks the one that fits each instance's words.
     const markups = [...new Set(candidates.map((c) => c.markup).filter((m) => m && elementsIn(m) <= 30))].sort((a, b) => elementsIn(b) - elementsIn(a)).slice(0, 6);
@@ -290,6 +347,17 @@ export function agreedTokens(check = {}, figmaVars = {}) {
 // ── A component's real markup: the first element in the project's own pages that carries its class ───────────────
 // Static HTML only (a React page renders in the browser). Ids, inline handlers and scripts are taken out, so the copy
 // is markup and nothing else.
+// Whether a piece of markup's own element is hidden until something happens: a hidden attribute, an inline
+// display: none, a hidden class, or a class besides the component's own whose rule is display: none.
+export function hiddenAtRest(markup, cls, cssText = '') {
+  const open = String(markup ?? '').match(/^<[a-zA-Z][\w-]*\b([^>]*)>/);
+  if (!open) return false;
+  if (/(^|\s)hidden(\s|=|$)/.test(open[1]) || /aria-hidden\s*=\s*["']true/.test(open[1]) || /\bstyle\s*=\s*["'][^"']*display\s*:\s*none/.test(open[1])) return true;
+  const classes = (open[1].match(/\bclass\s*=\s*["']([^"']*)["']/)?.[1] ?? '').split(/\s+/).filter((c) => c && c !== cls);
+  return classes.some((c) => /^(hidden|is-hidden|d-none|invisible)$/.test(c)
+    || new RegExp(`(^|[},\\s])\\.${c.replace(/[-]/g, '\\-')}\\s*\\{[^}]*\\bdisplay\\s*:\\s*none`).test(String(cssText)));
+}
+
 export function instanceMarkup(html, cls) {
   return instanceMarkups(html, cls, 1)[0] ?? null;
 }

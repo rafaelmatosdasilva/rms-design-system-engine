@@ -140,10 +140,12 @@ const NOT_A_DIFFERENCE = /^(Data is up to date|Accessibility[^:]*|Token contrast
 // how much was compared, the proposed patches. It stays in the audit, next to what it explains.
 const POINTER = /^(↳|🔗|⏭|📋|coverage source:|least checked:)|not a difference from Figma|\bskipped\b/;
 export function differences(findings = [], names = [], prev = null) {
-  const old = new Set(prev ?? []);
+  // A difference keeps its identity when only its line number moved (an edit higher up the same file).
+  const same = (f) => String(f).replace(/(\.[\w]+):\d+\b/g, '$1');
+  const old = new Set((prev ?? []).map(same));
   const items = findings.filter((f) => !NOT_A_FINDING.test(f) && !NOT_A_DIFFERENCE.test(f) && !/ :: gate fails$/.test(f)).map((f) => {
     const i = f.indexOf(' :: ');
-    return { component: componentOf(f, names), check: i > 0 ? f.slice(0, i) : '', what: i > 0 ? f.slice(i + 4).replace(/^\s*(❌|⚠️|ℹ️)\s*/, '') : f, side: FIGMA_WORK.test(f) ? 'figma' : 'decide', new: prev ? !old.has(f) : false };
+    return { component: componentOf(f, names), check: i > 0 ? f.slice(0, i) : '', what: i > 0 ? f.slice(i + 4).replace(/^\s*(❌|⚠️|ℹ️)\s*/, '') : f, side: FIGMA_WORK.test(f) ? 'figma' : 'decide', new: prev ? !old.has(same(f)) : false };
   }).filter((it) => !POINTER.test(it.what.trim()));
   const groups = new Map();
   for (const it of items) { const k = it.component ?? ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); }

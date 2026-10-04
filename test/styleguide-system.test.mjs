@@ -2,7 +2,7 @@
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { realizedControls, chromeRoles, segmentedUi, fieldUi } from '../styleguide-data.mjs';
+import { realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest } from '../styleguide-data.mjs';
 import { checkStyleguidePage, failures, missingRoles } from '../styleguide-check.mjs';
 import { differences, differencesMarkdown } from '../run-diff.mjs';
 import { appDir } from '../code-roots.mjs';
@@ -91,6 +91,8 @@ test('one list of differences: grouped by component, marked new, the data\'s fre
   assert.equal(d.groups[0].items.find((x) => x.check === 'Figma file hygiene').side, 'figma');
   const pointers = ['Structure :: 🔗 badge in Figma: https://example.test', 'Structure :: ↳ last changed 2026-07-31 by someone', 'Every mode is covered: :: ⏭  SKIPPED 17', 'Structure :: least checked: badge, 3 not comparable of 8', 'Docs tell the truth :: surface not found, skipped: a.html', 'Structure :: NO-SHRINK 1 component - advisory, not a difference from Figma', 'Exemption debt :: knownStateExemptions: 18'];
   assert.equal(differences([...now, ...pointers], ['badge']).total, 3, 'a line that only points at a difference is not one');
+  const moved = differences(['Structure :: badge gap: Figma 4, rendered 8 (.badge · theme.css:1230)'], ['badge'], ['Structure :: badge gap: Figma 4, rendered 8 (.badge · theme.css:1216)']);
+  assert.equal(moved.fresh, 0, 'a difference whose line only moved is not new');
   const md = differencesMarkdown(d, { handback: { code: 'out/handback/code-changes.diff' } });
   assert.match(md, /^# Differences between Figma and the code\n\n3 open, 2 new since the last run/);
   assert.match(md, /## badge \(2\)/);
@@ -100,4 +102,13 @@ test('one list of differences: grouped by component, marked new, the data\'s fre
 test('an app lives where pluginDirs says, else apps/<app>', () => {
   assert.equal(appDir({ pluginDirs: { gallery: '../gallery-app/' } }, 'gallery'), '../gallery-app');
   assert.equal(appDir({}, 'gallery'), 'apps/gallery');
+});
+
+test('a preview never uses an instance that is hidden at rest', () => {
+  const css = '.chip { gap: 0 } .zoom-reset { display: none; } .zoom-reset.on { display: flex; }';
+  assert.equal(hiddenAtRest('<button class="chip zoom-reset">x</button>', 'chip', css), true, 'an extra class whose rule is display: none');
+  assert.equal(hiddenAtRest('<div class="chip hidden">x</div>', 'chip'), true);
+  assert.equal(hiddenAtRest('<div class="chip" hidden>x</div>', 'chip'), true);
+  assert.equal(hiddenAtRest('<div class="chip" style="display:none;">x</div>', 'chip'), true);
+  assert.equal(hiddenAtRest('<button class="chip">x</button>', 'chip', css), false);
 });
