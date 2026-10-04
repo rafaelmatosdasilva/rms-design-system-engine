@@ -371,11 +371,13 @@ Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the 
 //                 'direct' when on the frame itself
 //                 'none' when default state has no fill (fills === [] - an empty array is a real
 //                 DS fact, not a capture miss; figma.mixed must be treated as no-fill too)
-// fontSizeVar/fontWeightVar = bound fontSize/fontWeight variable name on the component's
-//                 primary (first, depth-first) TEXT node. When unbound, fall back to the
-//                 applied text style's scale key (last path segment, lowercased) for BOTH
-//                 fields - a text style carries size AND weight, so recording one of the
-//                 pair as null while a style is applied is a capture bug, not a DS fact.
+// fontSizeVar/fontWeightVar = the text scale key of the component's primary (first,
+//                 depth-first) TEXT node: from its bound fontSize/fontWeight variable when it
+//                 has one (typography/m/font-size → 'm'), else from the applied text style
+//                 (last path segment, lowercased), for BOTH fields - a text style carries size
+//                 AND weight, so recording one of the pair as null while a style is applied is
+//                 a capture bug, not a DS fact. Record the key, not the variable's full name:
+//                 a bound size beside a style-only weight must still read as one scale.
 //                 null only when the component has no TEXT node or the text has no style.
 // innerRadiusVar = first bound radius variable (topLeftRadius → cornerRadius → other corners)
 //                 checked on the State=Default frame ITSELF first, THEN on a child named
@@ -385,7 +387,8 @@ Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the 
 // strokeOnDefault  = node.strokes?.length > 0 on the State=Default variant's top-level frame
 // strokeOnAnyState = true if a stroke exists ANYWHERE in ANY variant's subtree (deep walk).
 //                    Must walk recursively into children - many components put strokes on a
-//                    "Background" child rect rather than the component frame itself.
+//                    "Background" child rect rather than the component frame itself. Skip
+//                    what is inside an icon instance: a stroked icon's outline is not a border.
 //                    Controls Gate [3c] phantom border scan - when false, any CSS `border`
 //                    or `outline` on any selector matching this component is a phantom and fails.
 // childFramePadding = direct child FRAME nodes (not RECTANGLE/TEXT/INSTANCE) that have at
@@ -529,6 +532,7 @@ Capture `strokeOnAnyState` with a **deep recursive walk** across all variants:
 
 ```js
 function deepHasStroke(node, depth = 0) {
+  if (depth > 0 && node.type === 'INSTANCE' && /icon/i.test(node.name)) return false;   // an icon's outline, not a border
   if ((node.strokes?.length ?? 0) > 0) return true;
   if (depth < 4 && 'children' in node) {
     return node.children.some(c => deepHasStroke(c, depth + 1));
