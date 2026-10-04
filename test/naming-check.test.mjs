@@ -65,3 +65,18 @@ test('[regression reverse-exact] a var that maps to a real token exactly still t
   });
   assert.equal(code, 0, out);
 });
+
+test('a token the map points at a variable of another name is listed with Figma\'s name, and fails under figmaNames strict', () => {
+  const files = (strict) => ({
+    'ds-config.json': { paths, ...(strict ? { figmaNames: 'strict' } : {}) },
+    'design-system-engine-map.mjs': "export const EXPLICIT = { 'semantic/content/primary': '--text' }; export const EXPLICIT_SIZING = {}; export const SKIP_TOKENS = new Set(); export const SIZING_SKIP = new Map(); export const SYSTEM_VARS = new Set();",
+    'theme.css': ':root { --text: #0a0a0a; }',
+    'figma-vars.snapshot.json': { color: { light: { 'semantic/content/primary/color': '#0a0a0a' }, dark: {} } },
+  });
+  const soft = runGate(GATE, files(false));
+  assert.equal(soft.code, 0, soft.out);
+  assert.match(soft.out, /NOT FIGMA'S NAME \(1\)/);
+  assert.match(soft.out, /semantic\/content\/primary {2}→ {2}--text {3}\(Figma's name: --semantic-content-primary\)/);
+  const hard = runGate(GATE, files(true));
+  assert.equal(hard.code, 1, hard.out);
+});
