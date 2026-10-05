@@ -1,7 +1,7 @@
 // The engine's default style guide: only what Figma and the code agree on, controls labelled with Figma's names.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -138,6 +138,11 @@ test('in the browser: no script error, a control changes the real component, the
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
+  const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
+  writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', 'Size=L.png'), shot);
+  writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', 'notes.png'), shot);
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
   const c = await launchChrome(chromePath);
   try {
@@ -162,6 +167,55 @@ test('in the browser: no script error, a control changes the real component, the
     // system's own button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-code code').textContent`), '<Chip Size="L" />');
     assert.equal(await run(`document.querySelector('#c-chip .pg-code [data-copy]').tagName`), 'BUTTON');
+    // Inspect: the live component marked where it is, each part and padding numbered, the list below naming the token
+    // of each (its colours and text style included); never a second component.
+    const inspectBtn = `[...document.querySelectorAll('#c-chip .pg-actions button')].find((b) => b.textContent === 'Inspect')`;
+    await run(`${inspectBtn}.click()`);
+    for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-preview .pg-inspect-marks .pg-anat-num').length`)); i++) await new Promise((r) => setTimeout(r, 50));
+    assert.equal(await run(`${inspectBtn}.getAttribute('aria-pressed')`), 'true');
+    assert.equal(await run(`document.querySelectorAll('#c-chip .pg-preview .chip').length`), 1);
+    const looks = await run(`document.querySelector('#c-chip .pg-inspect-legend').textContent`);
+    assert.match(looks, /Spacing.*chip padding.*--padding-[a-z]+/s);
+    assert.match(looks, /--chip-[a-z-]+/, 'the colour tokens of what it draws');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-inspect-marks .pg-anat-num')].map((n) => n.textContent).join()`), await run(`[...document.querySelectorAll('#c-chip .pg-inspect-legend b')].map((b) => b.textContent).join()`));
+    // No number covers another: one that would is moved beside it, a line back to where it belongs.
+    assert.equal(await run(`(() => { const r = [...document.querySelectorAll('#c-chip .pg-inspect-marks .pg-anat-num')].map((n) => n.getBoundingClientRect()); return r.some((a, i) => r.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1)); })()`), false);
+    // Width: a chosen width draws it in a frame of that width with the page's own stylesheets (Inspect goes off);
+    // Fit brings the live preview back.
+    await run(`document.querySelector('#c-chip .pg-width [data-v="phone"]').click()`);
+    assert.equal(await run(`${inspectBtn}.getAttribute('aria-pressed') + '|' + document.querySelector('#c-chip .pg-inspect-legend').hidden + '|' + document.querySelector('#c-chip .pg-preview').hidden`), 'false|true|true');
+    assert.equal(await run(`document.querySelector('#c-chip .pg-frame iframe').style.width`), '375px');
+    assert.equal(await run(`(() => { const d = document.querySelector('#c-chip .pg-frame iframe').contentDocument; const e = d.querySelector('.pg-frame-stage .chip'); return !!e && d.defaultView.getComputedStyle(e).height; })()`), '32px', 'styled by the system in the frame, at the size set (L)');
+    assert.match(await run(`document.querySelector('#c-chip .pg-frame-label').textContent`), /Phone.*375px wide/);
+    await run(`document.querySelector('#c-chip .pg-width [data-v="fit"]').click()`);
+    assert.equal(await run(`document.querySelector('#c-chip .pg-frame').hidden + '|' + document.querySelector('#c-chip .pg-preview').hidden`), 'true|false');
+    // A link to the variant: the props set away from their defaults in the address, kept as they change, and a link
+    // opened sets them, the controls following.
+    assert.equal(await run(`location.hash`), '#c-chip?Size=L');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].some((b) => b.textContent === 'Copy link')`), true);
+    await run(`location.hash = '#overview'`); await new Promise((r) => setTimeout(r, 200));
+    await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'M').click()`);
+    assert.equal(await run(`location.hash`), '#overview', 'a view not shown leaves the address alone');
+    await run(`location.hash = '#c-chip?Size=L&Nope=1'`); await new Promise((r) => setTimeout(r, 300));
+    assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l') + '|' + [...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').getAttribute('aria-pressed')`), 'true|true');
+    // Figma beside the code: the image of the variant set (Size=L), beside a still copy of it, or over it with a slider;
+    // a variant Figma has no image of says so.
+    const figmaBtn = `[...document.querySelectorAll('#c-chip .pg-actions button')].find((b) => b.textContent === 'Figma')`;
+    await run(`${figmaBtn}.click()`);
+    for (let i = 0; i < 40 && !(await run(`!!document.querySelector('#c-chip .pg-compare img')`)); i++) await new Promise((r) => setTimeout(r, 50));
+    assert.equal(await run(`document.querySelector('#c-chip .pg-compare').hidden + '|' + document.querySelectorAll('#c-chip .pg-compare img').length + '|' + !!document.querySelector('#c-chip .pg-compare .chip[inert]')`), 'false|1|true');
+    await run(`[...document.querySelectorAll('#c-chip .pg-compare-bar [data-v]')].find((b) => b.dataset.v === 'over').click()`);
+    assert.equal(await run(`!document.querySelector('#c-chip .pg-compare-amount').hidden && /inset\\(0px? 50%/.test(document.querySelector('#c-chip .pg-compare-img').style.clipPath)`), true);
+    await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'M').click()`);
+    for (let i = 0; i < 40 && !(await run(`/no image of this variant/.test(document.querySelector('#c-chip .pg-compare').textContent)`)); i++) await new Promise((r) => setTimeout(r, 50));
+    assert.match(await run(`document.querySelector('#c-chip .pg-compare').textContent`), /Figma has no image of this variant yet \(it has 1\)/);
+    await run(`${figmaBtn}.click()`);
+    await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
+    // What uses a token: its name links from the tables to a view of the components that use it, and through which token.
+    assert.equal(await run(`!!document.querySelector('#c-chip .pg-tokens a.sg-uses-link[href="#uses?t=--chip-background"]')`), true);
+    await run(`location.hash = '#uses?t=--chip-background'`); await new Promise((r) => setTimeout(r, 300));
+    assert.match(await run(`document.getElementById('uses').textContent`), /--chip-background.*One component uses it.*Used by.*chip/s);
+    await run(`location.hash = '#c-chip?Size=L'`); await new Promise((r) => setTimeout(r, 300));
     // Its API read from Chip.jsx, and its accessibility: the role's obligations with their WCAG criterion, the text
     // contrast measured as drawn, and no browser check yet.
     assert.match(await run(`document.querySelector('#c-chip .pg-footer').textContent`), /Props.*Label.*default Filter.*Read from src\/components\/Chip\.jsx/s);
@@ -169,10 +223,18 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(a11y, /togglebutton: a <button type="button"> with aria-pressed/);
     assert.match(a11y, /WCAG 2\.1\.1 Keyboard \(A\)/);
     assert.match(a11y, /Passes: \d+\.\d:1 on "Filter", needs 4\.5:1/);
-    assert.match(a11y, /Not checked in a browser yet/);
+    assert.match(a11y, /Last audit.*Not run yet/s);
     await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Passes|Fails/, 'measured again in the other mode');
+    // On this variant: tried on the live component when the Accessibility area shows it, and again for another variant.
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
+    const live = await run(`document.querySelector('#c-chip .pg-a11y-live').textContent`);
+    assert.match(live, /Tab reaches it once: "Filter"/);
+    assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
+    assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
+    assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in,Changelog');
@@ -372,6 +434,9 @@ test('accessibility per component: its role\'s obligations and behaviours with W
   assert.equal(v.element, 'a <button type="button"> with aria-pressed="true" or "false" (on or off)');
   assert.deepEqual(v.expects.map((x) => x.wcag), ['WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 2.1.1 Keyboard (A)', 'WCAG 2.1.1 Keyboard (A)', 'WCAG 1.3.1 Info and Relationships (A)']);
   assert.match(v.expects[3].says, /^Escape closes it\.$/);
+  // What the page tries on the live component: its role's behaviours and the annotation's, with how each is done.
+  assert.deepEqual(v.behaviours.map((b) => [b.id, b.expect, b.act.keys ?? b.act]), [['keys-toggle', 'aria-pressed', [' ']], ['escape-closes', 'hidden', ['Escape']]]);
+  assert.equal(v.key, 'togglebutton');
   assert.deepEqual(v.checked.issues.map((i) => [i.kind, i.title, i.wcag, i.details]), [
     ['contrast', 'Text is hard to read (2)', 'WCAG 1.4.3 Contrast (Minimum) (AA)', ['"Filter" 3.2:1, needs 4.5:1 (dark)', '"Off" 2.9:1, needs 4.5:1 (light)']],
     ['behaviour', 'behaviour', 'WCAG 2.1.1 Keyboard (A)', ['chip: Space does not flip aria-pressed']],
@@ -530,4 +595,45 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /\['log', 'Changelog'\]/);
   assert.match(tpl, /importHTML\(c\) \+ linksHTML\(c\.links\)/);
   assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
+});
+
+test('status and coverage: only what the team said (Figma, the code, the authored contract), on the card and under the name; the overview counts them and says what each group holds', async () => {
+  const { statusView, coverageOf } = await import('../styleguide-data.mjs');
+  assert.deepEqual(statusView({ description: 'A chip.\nStatus: beta' }), { status: 'Beta', kind: 'beta', from: 'Figma' });
+  assert.deepEqual(statusView({ annotations: ['Maturity: Stable'] }), { status: 'Stable', kind: 'stable', from: 'Figma' });
+  assert.deepEqual(statusView({ text: '/** @deprecated use Tag */' }), { status: 'Deprecated', kind: 'deprecated', from: 'the code' });
+  assert.deepEqual(statusView({ authored: 'experimental' }), { status: 'Experimental', kind: 'beta', from: 'contract.authored.json' });
+  assert.equal(statusView({ description: 'A chip used for status pills.' }), null, 'never guessed from words that only mention it');
+  assert.deepEqual(coverageOf({ total: {}, '/repo/src/components/Chip.jsx': { lines: { pct: 87.5 } } }, 'src/components/Chip.jsx'), { lines: 87.5 });
+  assert.equal(coverageOf({ total: {} }, 'src/components/Chip.jsx'), null);
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /card\(cGrid, 'c-' \+ c\.name, 'Components', c\.name, about\(c\), '', c\.status\)/);
+  assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
+  assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
+  assert.match(tpl, /sc\.textContent = 'Status: ' \+ kinds\.stable \+ ' stable, '/);
+  assert.match(tpl, /\.sg-thumb-live \{[^}]*align-self: center/, 'a card preview is centred whatever its own rule says');
+});
+
+test('what uses each token: in a component\'s own rules, or through another token, nearest first', async () => {
+  const { tokenUses, variantOf } = await import('../styleguide-data.mjs');
+  const u = tokenUses(':root { --n100: #000; --btn-bg: var(--n100); --x: var(--btn-bg) } [data-theme="dark"] { --btn-bg: var(--n900) } .btn { background: var(--btn-bg); padding: var(--pad) } .chip { color: var(--n100) }', [{ name: 'button', cls: 'btn' }, { name: 'chip', cls: 'chip' }, { name: 'tip', cls: '#tt' }]);
+  assert.deepEqual(u['--n100'], { direct: ['chip'], via: [{ name: 'button', through: '--btn-bg' }] });
+  assert.deepEqual(u['--n900'], { direct: [], via: [{ name: 'button', through: '--btn-bg' }] }, 'a value in another mode counts too');
+  assert.equal(u['--x'], undefined, 'a token nothing uses is not listed');
+  assert.deepEqual([variantOf('Size=L, State=Default'), variantOf('notes'), variantOf(null)], [{ Size: 'L', State: 'Default' }, null, null]);
+});
+
+test('Figma images of each variant: the reference folder first, never the network without a token', async () => {
+  const { figmaVariantImages } = await import('../visual-diff.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'figma-variants-'));
+  try {
+    mkdirSync(join(dir, 'refs', 'components', 'chip'), { recursive: true });
+    writeFileSync(join(dir, 'refs', 'components', 'chip', 'Size=L.png'), 'x');
+    writeFileSync(join(dir, 'refs', 'components', 'chip.png'), 'x');
+    const r = await figmaVariantImages(dir, { visualRefs: 'refs' }, 'chip', { token: null });
+    assert.deepEqual(r.images.map((i) => i.variant), [null, 'Size=L'], 'its default first, then each variant');
+    let called = false;
+    const none = await figmaVariantImages(dir, { visualRefs: 'refs', figmaFileKey: 'K' }, 'tag', { nodeId: '1:2', token: null, fetchImpl: () => { called = true; } });
+    assert.deepEqual([none.images, called, /FIGMA_TOKEN/.test(none.why)], [[], false, true]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

@@ -476,6 +476,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     }
     // How each component moves (an entry, an exit, an overlay it opens in), so its preview can play it.
     const allCss = [systemCss, ...(ctx?.componentSheets ?? []).map(readText)].join('\n');
+    // What uses each token, for the page's "What uses it" view.
+    try { const { tokenUses } = await import('./styleguide-data.mjs'); view.tokenUses = tokenUses(allCss, view.components); } catch { /* none listed */ }
     for (const c of view.components) { const m = motionUi(c.cls, allCss); if (m) c.motion = m; }
     // Each icon as Figma has it (the icon snapshot, keyed by the code's symbol id): its Figma name and its size.
     view.iconFigma = Object.fromEntries(Object.entries(readJson(cfg.paths?.snapshotIcons ?? '') ?? {})
@@ -551,6 +553,44 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         ...(Array.isArray(cfg.styleguide?.links) ? cfg.styleguide.links.filter((l) => l?.url).map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })) : []),
       ].filter((l) => l.url);
     } catch { /* no links, no changelog */ }
+    // How ready each one is (a status the team gave it) and how much of its own file the tests cover, when the
+    // project's tests write a coverage summary (styleguide.coverage, else coverage/coverage-summary.json).
+    try {
+      const { statusView, coverageOf } = await import('./styleguide-data.mjs');
+      const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
+      const summary = readJson(cfg.styleguide?.coverage ?? 'coverage/coverage-summary.json');
+      for (const c of view.components) {
+        const st = statusView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.status ?? null, text: c.source?.text ?? '' });
+        if (st) c.status = st;
+        const cov = coverageOf(summary, c.source?.file ?? c.api?.file);
+        if (cov) c.coverage = cov;
+      }
+      if (cfg.styleguide?.groups) view.groups = cfg.styleguide.groups;
+    } catch { /* no status, no coverage */ }
+    // Figma beside the code: each variant's Figma image (refs, else the Figma API with FIGMA_TOKEN), in the page, up to
+    // styleguide.figmaImagesMB in all (8 by default, each component's default first); styleguide.figmaImages: false for none.
+    if (cfg.styleguide?.figmaImages !== false) {
+      try {
+        const { figmaVariantImages } = await import('./visual-diff.mjs');
+        const { variantOf } = await import('./styleguide-data.mjs');
+        const version = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?._figmaVersion ?? null;
+        let budget = (Number(cfg.styleguide?.figmaImagesMB) || 8) * 1024 * 1024;
+        for (const c of view.components) {
+          const r = await figmaVariantImages(ROOT, cfg, c.name, { nodeId: ctx?.propsSnap?.[c.name]?.nodeId ?? null, version });
+          const shots = [];
+          for (const im of r.images) {
+            const v = variantOf(im.variant);
+            if (im.variant && !v) continue;   // a file not named as a variant (Size=L.png) is not one
+            const b = readFileSync(im.file);
+            if (b.length > budget || b.length < 24) break;
+            budget -= b.length;
+            // Exported at 2x: drawn at half its pixels, its size in CSS pixels as the code's.
+            shots.push({ variant: v, src: `data:image/png;base64,${b.toString('base64')}`, w: b.readUInt32BE(16) / 2, h: b.readUInt32BE(20) / 2 });
+          }
+          if (shots.length) c.figmaShots = shots;
+        }
+      } catch { /* no Figma images */ }
+    }
     // Each product's own page, pictured as it opens, with where each component sits on it (product-shots.mjs), for the
     // "Used in" area. A product that gives a picture of its own (styleguide.plugins[].image) is shown with that one.
     if ((cfg.paths?.plugins ?? []).length && cfg.styleguide?.productShots !== false) {

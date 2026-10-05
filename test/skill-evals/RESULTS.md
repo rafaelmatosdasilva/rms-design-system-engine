@@ -1,5 +1,65 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: Figma beside the code, what uses each token, props in search (continuous evaluation)
+
+What changed since the entry below (engine 45caddf): Style guide: Figma beside the code (each variant's Figma image beside or over the live component, from references or the Figma API); what uses each token (linked from every token name, directly or through another token); search finds props; no line under the area switch. The guide changed in `reference/usage.md`.
+
+Guide set measured: `e12f10bfe869` · Project measured: `13d811a9d668`
+
+| Haiku, engine 22050d1 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 107k | 116k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 116k a run against 107k. Records: `records/2026-10-05-style-guide-figma-beside-the`.
+
+## 2026-10: Style guide: Inspect numbers apart, a link to each variant, accessibility tried on the live variant (continuous evaluation)
+
+What changed since the entry below (engine 659b70b): Style guide: Inspect numbers never cover each other; a link to each variant (its props and width in the address, Copy link); its accessibility tried on the live variant (Tab stops in order, visible focus at 3:1, names, a control drawn disabled that Tab reaches, its role's behaviours). The guide changed in `reference/usage.md`.
+
+Guide set measured: `9847ee43506c` · Project measured: `13d811a9d668`
+
+| Haiku, engine 45caddf | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.057 |
+| Input a run | 101k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 107k a run against 101k. Records: `records/2026-10-05-style-guide-inspect-numbers-never`.
+
+## 2026-10: Style guide: Inspect and Width in the Playground (continuous evaluation)
+
+What changed since the entry below (engine 5597eda): Skill evaluation: status and test coverage, 70/70 on Haiku, no rule broken; a record never written over an earlier one of the same day; Style guide: Inspect marks each part, padding and gap on the live component with the tokens behind them; Width shows it at Phone, Tablet and Desktop widths in a frame with the system's own stylesheets. The guide changed in `reference/usage.md`.
+
+Guide set measured: `be1a88a2e2b2` · Project measured: `13d811a9d668`
+
+| Haiku, engine 659b70b | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.055 |
+| Input a run | 118k | 101k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 118k. Records: `records/2026-10-05-style-guide-inspect-marks-each`.
+
+## 2026-10: Style guide: each component's status and test coverage, the overview counting statuses and describing its groups (continuous evaluation)
+
+What changed since the entry below (engine 6fb1975): Style guide: each component's status (stable, beta, deprecated, only when the team said so) under its name and on its card, its test coverage from the project's coverage summary, the overview counting the statuses and saying what each group holds; a card's preview always centred. The guide changed in `reference/usage.md`.
+
+Guide set measured: `9eb207a43515` · Project measured: `13d811a9d668`
+
+| Haiku, engine 5597eda | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.058 |
+| Input a run | 119k | 118k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 118k a run against 119k. Records: `records/2026-10-05-style-guide-status-coverage`.
+
 ## 2026-10: Style guide: links, changelog, Built with area, sticky area switch, square colours and four columns, numbers-only anatomy, a linked playground, a menu that gives the page the whole width (continuous evaluation)
 
 What changed since the entry below (engine 1b60458): Style guide: anatomy marks padding and gaps with numbers only, never colours; the code sits beside the tokens behind what is drawn, its own tokens below them all; a segmented control's sliding pill follows every new selection; Style guide: Built with is its own area of overview cards; the area switch stays at the top on scroll; square colour previews, the colour twice as tall on its page, four overview columns with more room; the playground and the preview stay linked (a part's state set on the part, a product's selector ignored, a chosen state from the component's own :checked rule, an option not built marked so) and a label edit changes only its words; Test: a neutral class name for a product's own markup; Style guide: links (Figma, the code, the team's pages) on the overview and under each component's name; a Changelog area with every commit that changed the component, by release and pull request, the dates moved there from Documentation; hiding the menu gives the page the whole width, from a small Hide at the menu's top right. The guide changed in `reference/usage.md`.
