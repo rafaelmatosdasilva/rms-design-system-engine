@@ -1094,6 +1094,15 @@ async function main() {
     const loaded = await waitForTrue(send, sessionId, pageLoadedExpression(waitFor) + (target.ready ? ` && (${target.ready})` : ''), { attempts: loadSeconds * 20, intervalMs: 50, tolerateErrors: true });
     if (!loaded) { unread.push(`${label} (the page did not finish loading within ${loadSeconds}s)`); await send('Target.closeTarget', { targetId }); continue; }
     await new Promise((res) => setTimeout(res, 300));   // settle — let an SPA finish its first render
+    // A selector the browser cannot parse (a component named table/row gives .table/row) would make every sweep of the
+    // page throw: it is dropped, and its component said not checked, never clean.
+    if (roots) {
+      const ok = (await send('Runtime.evaluate', { expression: `${JSON.stringify(roots)}.filter((s) => { try { document.querySelector(s); return true; } catch { return false; } })`, returnByValue: true }, sessionId)).result?.value;
+      if (Array.isArray(ok) && ok.length < roots.length) {
+        for (const bad of roots.filter((x) => !ok.includes(x))) unread.push(`${String(bad).replace(/^\./, '')} (its selector ${bad} is not valid CSS, so it was not checked)`);
+        roots = ok;
+      }
+    }
     // Something to check must be on the page: a page that shows none of the design system's components
     // (still rendering, or blank) is not a clean page. Wait for it, up to ~10s, then say it was not checked,
     // never "nothing to fix".
@@ -1113,8 +1122,12 @@ async function main() {
     // 2. Name/role — accessibility tree (theme-independent), run once per target.
     try {
       await send('Accessibility.enable', {}, sessionId);
-      const { nodes } = await send('Accessibility.getFullAXTree', {}, sessionId);
-      for (const n of nodes || []) {
+      // Asked role by role: the whole tree of a big page (a style guide with every component drawn, thousands of
+      // elements) is one message too large for the DevTools socket, which then closes and the check stalls.
+      const doc = (await send('Runtime.evaluate', { expression: 'document' }, sessionId)).result?.objectId;
+      const nodes = [];
+      for (const role of INTERACTIVE_ROLES) nodes.push(...((await send('Accessibility.queryAXTree', { objectId: doc, role }, sessionId)).nodes ?? []));
+      for (const n of nodes) {
         if (n.ignored) continue;
         const role = n.role?.value;
         if (!INTERACTIVE_ROLES.has(role)) continue;
@@ -1156,8 +1169,8 @@ async function main() {
     for (const mode of modes) {
       await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
       if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
-      const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, true, STATE_MAP), returnByValue: true }, sessionId);
-      if (!r.result?.value) { unread.push(`${label} (${mode.name})`); if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); first = false; continue; }
+      const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, true, STATE_MAP), returnByValue: true }, sessionId).catch((e) => ({ error: e.message }));
+      if (!r.result?.value) { const why = r.error ?? r.exceptionDetails?.exception?.description?.split('\n')[0]; unread.push(`${label} (${mode.name}${why ? `: ${why}` : ''})`); if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); first = false; continue; }
       const { textEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [] } = r.result.value;
       for (const t of thinFocus) note('focusthin', t.desc, mode.name, { px: t.px });
       for (const f of contrastFindings(textEls, mode.name)) findings.push({ plugin: label, ...f });
@@ -1485,12 +1498,30 @@ async function main() {
   // Findings name the component they sit in ("… in .chip"); that component links to Figma.
   const { figmaLinker } = await import('./figma-link.mjs');
   const linkFor = figmaLinker(ROOT, cfg);
-  const bySel = new Map(locator.names().map((n) => [selOf(n), n]));
+  // Every component the system has: the locator's, and those only Figma's snapshots list (their selectors come from the
+  // locator's convention all the same).
+  let everyName = locator.names();
+  for (const f of [cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json', cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json']) {
+    try { const j = JSON.parse(readFileSync(join(ROOT, f), 'utf8')); everyName = [...new Set([...everyName, ...Object.keys(j.components ?? j).filter((n) => !n.startsWith('_'))])]; } catch { /* optional */ }
+  }
+  const bySel = new Map(everyName.map((n) => [selOf(n), n]));
   // The owner is the selector the sweep matched; a component's selector can also be written as a
   // list or with its own class first, so the first class of each is compared too.
   const firstClass = (sel) => String(sel ?? '').match(/\.(-?[_a-zA-Z][\w-]*)/)?.[1];
-  const byClass = new Map(locator.names().map((n) => [firstClass(selOf(n)), n]).filter(([k]) => k));
-  const ownerName = (desc) => { const m = String(desc ?? '').match(/ in (.+)$/); return m ? bySel.get(m[1]) ?? byClass.get(firstClass(m[1])) ?? null : null; };
+  const byClass = new Map(everyName.map((n) => [firstClass(selOf(n)), n]).filter(([k]) => k));
+  // Read from the finding: "… in .chip", a description that starts with the component's name ("toast: …"), or the
+  // element itself (button.buttonPrimary.fix-action: the first of its classes that is a component's).
+  const allNames = new Set(everyName);
+  const ownerName = (desc) => {
+    const d = String(desc ?? '');
+    const m = d.match(/ in (.+)$/);
+    const inSel = m && (bySel.get(m[1]) ?? byClass.get(firstClass(m[1])));
+    if (inSel) return inSel;
+    const named = d.match(/^([\w/-]+): /);
+    if (named && allNames.has(named[1])) return named[1];
+    for (const k of d.split(/\s/)[0].match(/\.(-?[_a-zA-Z][\w-]*)/g) ?? []) { const n = byClass.get(k.slice(1)); if (n) return n; }
+    return null;
+  };
   const figmaOf = (desc) => { const n = ownerName(desc); return n ? linkFor(n) : null; };
   // Must-pass (a11yStrict) also counts axe's serious and critical violations, not only this check's own.
   const severeAxe = axe.filter((v) => v.impact === 'serious' || v.impact === 'critical').length;
