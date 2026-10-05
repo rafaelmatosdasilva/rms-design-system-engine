@@ -495,7 +495,7 @@ if (process.argv.includes('--figma-edits')) {
   let feConfig = {};
   try { feConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   try {
-    const { figmaEdits, gapEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const { figmaEdits, gapEdits, renameEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
     // What the prototypes needed and the system lacks: the design team's to do list.
     let gaps = [];
@@ -503,7 +503,10 @@ if (process.argv.includes('--figma-edits')) {
     let propsSnap = null;
     try { propsSnap = JSON.parse(readFileSync(resolve(ROOT, feConfig.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { if (!gaps.length) { console.error('❌ no Figma component snapshot: refresh Figma first (rms-design-system-engine --refresh-figma).'); process.exit(1); } }
     const parts = propsSnap ? await generateStyleguide(ROOT, feConfig, { partsOnly: true, names: Object.keys(propsSnap).filter((k) => !k.startsWith('_')) }) : null;
-    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []) : []), ...gapEdits(gaps)];
+    // Names written otherwise than most of the system's: renamed in their component sets, after the same yes.
+    let renames = [];
+    if (propsSnap && feConfig.namingConsistency !== false) { const { namingFindings } = await import('./naming-consistency.mjs'); renames = renameEdits(propsSnap, namingFindings(propsSnap).findings); }
+    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []) : []), ...renames, ...gapEdits(gaps)];
     const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits);
     for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null })) console.log(l);
     if (edits.length) console.log(`   (${relative(ROOT, files.json)} · ${relative(ROOT, files.script)})`);

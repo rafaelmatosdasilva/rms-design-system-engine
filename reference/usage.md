@@ -770,7 +770,10 @@ text fields still a text field) gives a role in the engine's vocabulary (`button
 `textbox`, `checkbox`, `radio`, `switch`, `spinbutton`, `link`, `dialog`, `tab`). A Figma component that states no role
 gets the annotation `Role: <role>`; one whose Figma role differs from the code is listed for a person to decide and
 never changed. A wrapper around several controls (a stepper, a group) has no single role and is left out, as is a
-component the code does not show. Every need the prototypes found the system lacks (`prototypes/gaps.json`, merged) becomes
+component the code does not show. Each property or option named otherwise than most of the system's names
+(`naming-consistency.mjs`, the same list the props check prints) is renamed in its component set: an option in each
+variant's name (`state=default` → `state=Default`), then a property (`editComponentProperty`, "show-icon" → "Show
+Icon"); one already renamed is skipped. Every need the prototypes found the system lacks (`prototypes/gaps.json`, merged) becomes
 the design team's to do list: a page "Design system to do" with a frame "Gaps from prototypes", one card per need (what
 kind, what the prototypes use meanwhile or the closest component, and which prototypes need it), the most needed first,
 written afresh each time; nothing else in the file is touched. With gaps and no Figma snapshot, only the list is written.
