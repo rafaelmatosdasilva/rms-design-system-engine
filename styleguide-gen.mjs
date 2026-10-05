@@ -551,6 +551,20 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         ...(Array.isArray(cfg.styleguide?.links) ? cfg.styleguide.links.filter((l) => l?.url).map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })) : []),
       ].filter((l) => l.url);
     } catch { /* no links, no changelog */ }
+    // How ready each one is (a status the team gave it) and how much of its own file the tests cover, when the
+    // project's tests write a coverage summary (styleguide.coverage, else coverage/coverage-summary.json).
+    try {
+      const { statusView, coverageOf } = await import('./styleguide-data.mjs');
+      const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
+      const summary = readJson(cfg.styleguide?.coverage ?? 'coverage/coverage-summary.json');
+      for (const c of view.components) {
+        const st = statusView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.status ?? null, text: c.source?.text ?? '' });
+        if (st) c.status = st;
+        const cov = coverageOf(summary, c.source?.file ?? c.api?.file);
+        if (cov) c.coverage = cov;
+      }
+      if (cfg.styleguide?.groups) view.groups = cfg.styleguide.groups;
+    } catch { /* no status, no coverage */ }
     // Each product's own page, pictured as it opens, with where each component sits on it (product-shots.mjs), for the
     // "Used in" area. A product that gives a picture of its own (styleguide.plugins[].image) is shown with that one.
     if ((cfg.paths?.plugins ?? []).length && cfg.styleguide?.productShots !== false) {

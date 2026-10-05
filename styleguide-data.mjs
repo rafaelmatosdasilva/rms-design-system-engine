@@ -1050,6 +1050,37 @@ export function guidanceView({ description = '', annotations = [], note = '', au
   return { sections, missing: sections.filter((x) => !x.text).map((x) => x.key) };
 }
 
+// ── How ready a component is: stable, beta or deprecated ─────────────────────────────────────────────────────────────
+// From where the team already says it: contract.authored.json → components.<name>.status, a line of Figma's description
+// or annotations (Status: beta), else its code (@deprecated, @beta, @status beta). Nothing said, nothing shown: a status
+// is never guessed. → { status: 'Beta', kind: 'stable' | 'beta' | 'deprecated', from } | null
+const STATUS_KIND = [['deprecated', /^(deprecated|obsolete|retired|legacy)$/i], ['beta', /^(beta|alpha|experimental|preview|draft|wip|new)$/i], ['stable', /^(stable|ready|released|production|done)$/i]];
+export function statusView({ description = '', annotations = [], note = '', authored = null, text = '' } = {}) {
+  const pick = (word, from) => { const k = STATUS_KIND.find(([, re]) => re.test(String(word).trim())); return k ? { status: String(word).trim().replace(/^\w/, (ch) => ch.toUpperCase()).toLowerCase().replace(/^\w/, (ch) => ch.toUpperCase()), kind: k[0], from } : null; };
+  if (authored) { const r = pick(authored, 'contract.authored.json'); if (r) return r; }
+  for (const t of [description, ...(annotations ?? []).map((a) => (typeof a === 'string' ? a : a?.label ?? ''))]) {
+    const m = /(?:^|\n)\s*(?:status|maturity|stage)\s*[:=–—-]\s*([A-Za-z]+)/i.exec(String(t ?? ''));
+    if (m) { const r = pick(m[1], 'Figma'); if (r) return r; }
+  }
+  for (const [t, from] of [[note, 'the code'], [text, 'the code']]) {
+    const s = String(t ?? '');
+    if (/@deprecated\b/.test(s)) return { status: 'Deprecated', kind: 'deprecated', from };
+    const m = /@status\s+([A-Za-z]+)/.exec(s) ?? /@(beta|alpha|experimental)\b/.exec(s);
+    if (m) { const r = pick(m[1], from); if (r) return r; }
+  }
+  return null;
+}
+
+// Its test coverage, from the coverage summary the project's tests write (Istanbul's json-summary: { "<file>": { lines:
+// { pct } } }): the entry for its own file. → { lines: 87.5 } | null
+export function coverageOf(summary, file) {
+  if (!summary || !file) return null;
+  const want = String(file).replace(/^\.\//, '');
+  const key = Object.keys(summary).find((k) => k !== 'total' && (k === want || k.endsWith('/' + want)));
+  const pct = key ? summary[key]?.lines?.pct : null;
+  return typeof pct === 'number' ? { lines: pct } : null;
+}
+
 // ── A component's code API, as its page lists it ──────────────────────────────────────────────────────────────────────
 // api: component-api.mjs apiFor(). → { file, tag?, syntax?, props: [{ name, values?, type?, default?, required? }],
 // events: [names], slots: [names] } | null when the code states none. A callback prop (onChange) is listed once, as an
