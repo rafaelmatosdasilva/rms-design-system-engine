@@ -220,7 +220,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   space and the icon size on the page is a role the engine fills with one of the system's own tokens: the
   background and text colour the system's own page uses (its `html`/`body` rule), a shared token before one a
   component owns, its text styles, radii and spacing scale, its icons' Figma size (`styleguide.chrome` names a role
-  by hand: `{ "accent": "--brand" }`). The page's text is the system's body rule, which the components inherit as in
+  by hand: `{ "accent": "--brand" }`). Every box (the Playground, its tables, the code, each section of the documentation)
+  has the look of the system's own card (`cardLook`: its border colour and width, its radius and shadow), as the
+  overview's cards are that card. The page's text is the system's body rule, which the components inherit as in
   the product. Its switches are the system's own segmented control and its text inputs its own text field, read from
   their markup (a row of the same element where one carries the selected class). A control the system lacks gets
   its nearest stand-in from the system (a segmented control: its tabs, then its radio group, then its buttons side by
@@ -245,7 +247,14 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
   `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
-  page scrolls. **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
+  page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
+  top too); Parity carries the system's alert icon (an icon named warning or alert) while something differs, its count
+  said to a screen reader. Each section of rows (Anatomy, Usage, Documentation, Accessibility) is one of the
+  Playground's tables, its title the head; the Changelog is a table per release; Parity is two columns of tables
+  (what differs, what is not built or compared, the values that agree, its props, its tokens). The code is as tall as
+  the tokens table beside it and scrolls inside. In the controls a text comes right after the boolean that shows it
+  (`showFirst`: Show Text and Text Content, or both on the same part); the tokens table leaves out the text style and
+  colour while no text is shown, and a part no one sees (a native input at no opacity). **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
   classes its markup holds, or the tags and imports of its file), each the overview's card with its own preview.
 - **Playground links**: a control and the preview follow each other (a radio picked in the preview sets State); a
   label edit writes only its words into its part. An option the contract maps to another element's selector (a

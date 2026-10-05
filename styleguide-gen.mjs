@@ -630,14 +630,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   // ── CHROME — the page's own look, from the system's tokens (styleguide-data.mjs chromeRoles) ──────────────────────
   async function chromeCSS() {
     if (!lastView) lastView = JSON.parse(await agreed());
-    const { chromeRoles } = await import('./styleguide-data.mjs');
+    const { chromeRoles, cardUi } = await import('./styleguide-data.mjs');
     const { propsSnap } = await context();
     // The system's icon size: the width most of its icons are drawn at in Figma (their viewBox), else in its icon sheet.
     const boxes = [...Object.values(readJson(cfg.paths?.snapshotIcons ?? '') ?? {}).map((i) => i?.viewBox), ...(iconSheet().match(/viewBox="[^"]+"/g) ?? []).map((v) => v.slice(9, -1))]
       .map((v) => parseFloat(String(v ?? '').trim().split(/[\s,]+/)[2])).filter((n) => n > 0);
     const count = {}; for (const b of boxes) count[b] = (count[b] ?? 0) + 1;
     const size = Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0];
-    chrome = chromeRoles({ tokens: lastView.tokens, themeCss: themeFiles.map(readText).join('\n'), componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome });
+    const sysCss = themeFiles.map(readText).join('\n');
+    chrome = chromeRoles({ tokens: lastView.tokens, themeCss: sysCss, componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome, card: cardUi(lastView.components ?? [], sysCss) });
     // The page's own contrast in every mode, for the style guide check to read from the page.
     return chrome.css + (chrome.contrast?.length ? `\n/*sg-contrast:${JSON.stringify(chrome.contrast)}*/` : '');
   }

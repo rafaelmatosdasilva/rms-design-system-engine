@@ -23,7 +23,7 @@
   color-scheme: light dark;
   --sg-bg: Canvas; --sg-bg-2: Canvas; --sg-surface: Canvas; --sg-stage: var(--sg-bg);
   --sg-text: CanvasText; --sg-text-2: CanvasText; --sg-muted: GrayText; --sg-border: GrayText; --sg-accent: AccentColor;
-  --sg-warning: var(--sg-accent); --sg-line: 1px solid var(--sg-border);
+  --sg-warning: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-border);
   --sg-xs: smaller; --sg-s: small; --sg-s-weight: normal; --sg-m: medium; --sg-m-weight: normal; --sg-l: large; --sg-l-weight: bold;
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: bold; --sg-lh: normal;
   --sg-space-xxs: 0.125rem; --sg-space-xs: 0.25rem; --sg-space-s: 0.5rem; --sg-space-m: 0.75rem; --sg-space-l: 1rem; --sg-space-xl: 1.5rem; --sg-space-xxl: 2rem;
@@ -167,7 +167,12 @@ a.pg-usage-name { color: var(--sg-text); }
 /* A component's page in areas (playground, documentation, accessibility, parity), switched by the system's own
    segmented control; how a product imports it and what it is built with, above them. */
 /* The areas stay at the top while the component's page scrolls, under the top bar when one shows. */
-.pg-areas { margin: var(--sg-space-m) 0 var(--sg-space-l); position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; }
+.pg-areas { margin: var(--sg-space-m) 0 var(--sg-space-l); position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; display: flex; align-items: center; gap: var(--sg-space-m); flex-wrap: wrap; }
+/* Its name stays in view: in the sticky bar beside the areas once its heading has scrolled away. */
+.pg-areas-name { display: none; font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.pg-areas.is-stuck > .pg-areas-name { display: inline; }
+/* A foundation's title stays at the top as its page scrolls. */
+.sg-section:not(.pg-card-section) > h2 { position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); margin: 0; padding: var(--sg-space-s) 0; }
 .pg-import { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); color: var(--sg-text-2); }
 .pg-import code { font-family: inherit; color: var(--sg-text); }
 .pg-parity-sum { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
@@ -179,10 +184,10 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-mark { position: absolute; border: 2px solid var(--sg-accent); border-radius: var(--sg-radius-s); pointer-events: none; }
 /* The code a product writes for what the playground shows, with the system's button to copy it. */
 .pg-code-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-m); align-items: start; }
-.pg-code { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; min-width: 0; }
+.pg-code { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; min-width: 0; display: flex; flex-direction: column; box-shadow: var(--sg-shadow); }
 .pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
-.pg-code pre { margin: 0; padding: var(--sg-space-m); overflow-x: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
+.pg-code pre { flex: 1; min-height: 0; margin: 0; padding: var(--sg-space-m); overflow: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
 .pg-code pre, .pg-code code { font-family: inherit; white-space: pre; }
 /* Words for a screen reader only (a mark's meaning, a copy confirmed). */
 .sg-hidden-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -264,13 +269,12 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-frame-box > iframe { display: block; border: 0; transform-origin: 0 0; background: transparent; }
 .pg-frame-stage { padding: var(--sg-space-xl); display: flex; flex-wrap: wrap; gap: var(--sg-space-m); justify-content: center; align-items: flex-start; }
 .pg-from, .pg-missing { color: var(--sg-muted); }
-.pg-log { margin: var(--sg-space-m) 0 var(--sg-space-l); }
-.pg-log > h4 { font-size: var(--sg-m); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }
-.pg-log ul { margin: 0; padding-left: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-xs); }
 .pg-log-date { color: var(--sg-muted); font-weight: var(--sg-s-weight); }
 .pg-missing { font-style: italic; }
 .pg-doc > .pg-from { margin-top: var(--sg-space-s); }
 .pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sg-space-m); align-items: start; }
+.pg-inspect-grid.pg-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* Parity: two columns */
+.sg-seg-icon { width: var(--sg-icon); height: var(--sg-icon); flex: none; color: var(--sg-warning); vertical-align: middle; margin-right: var(--sg-space-xxs); }
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; box-shadow: var(--sg-shadow); }
 .pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-inspect table { width: 100%; border-collapse: collapse; }
@@ -278,6 +282,17 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
 .pg-inspect td:last-child { color: var(--sg-text); word-break: break-all; }
 .pg-inspect tr:last-child td { border-bottom: none; }
+/* A section of the documentation as one of these tables: its title the head, each row a name and its text. */
+.pg-inspect-head > h3 { font: inherit; color: inherit; margin: 0; }
+.pg-cards { display: flex; flex-direction: column; gap: var(--sg-space-m); }
+.pg-cards .pg-inspect td:last-child { word-break: normal; overflow-wrap: anywhere; }   /* a commit's words wrap between words */
+.pg-doc-card > .pg-updated { gap: 0; margin: 0; font-size: var(--sg-m); color: var(--sg-text); }
+.pg-doc-card > .pg-updated > div { grid-template-columns: 38% 1fr; padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); }
+.pg-doc-card > .pg-updated > div:last-child { border-bottom: none; }
+.pg-doc-card > .pg-updated dt { color: var(--sg-muted); font-weight: inherit; }
+.pg-doc-card > :not(.pg-inspect-head):not(.pg-updated) { margin: var(--sg-space-m); }
+.pg-doc-card > .pg-anatomy { border: none; box-shadow: none; }
+.pg-doc-card > .pg-updated:empty { display: none; }
 .pg-own-swatch { display: inline-block; width: var(--sg-space-m); height: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius-s); vertical-align: middle; margin-right: var(--sg-space-xs); }
 .sg-topbar, .sg-nav-close, .sg-scrim { display: none; }
 /* The menu hidden on a wide screen: a bar at the top with the button that brings it back, the page at full width. */
@@ -304,7 +319,8 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   .sg-main { padding: var(--sg-space-l); width: 100%; box-sizing: border-box; }
   .pg-preview { overflow-x: auto; }   /* centred like everywhere; a component wider than a phone scrolls from its start (safe center) */
   .pg-preview-card { grid-template-columns: 1fr; } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); }
-  .pg-updated > div { grid-template-columns: 1fr; gap: 0; }   /* the documentation in one column: each name above its text */
+  .pg-updated > div { grid-template-columns: 1fr; gap: 0; }
+  .pg-inspect-grid.pg-grid-2 { grid-template-columns: 1fr; }   /* Parity in one column on a phone */   /* the documentation in one column: each name above its text */
 }
 </style>
 </head>
@@ -358,10 +374,15 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
      none, its stand-in (tabs, a radio group, its buttons side by side), else a plain row of buttons the browser draws;
      DATA.ui.gaps says which, on the overview and in the To do list. ─────────────────────────────────────────────── */
   var SEG = DATA.ui && DATA.ui.segmented, RADIO = SEG && SEG.item.radio, RADIO_NO = 0;
+  // The system's own icon for a warning (its name says so), else none: the count is still said.
+  var ALERT_ICON = (DATA.icons || []).find(function (i) { return /warn|alert|caution|attention|exclam/i.test(i); }) || (DATA.icons || []).find(function (i) { return /error|danger/i.test(i); }) || null;
   function segHTML(items) {
     var tag = SEG ? SEG.item.tag : 'button', cls = SEG ? SEG.item.classes.join(' ') : '', group = 'sg-r' + (++RADIO_NO);
     return (SEG ? SEG.open : '<div class="sg-seg">') + items.map(function (o) {
       var text = SEG && SEG.item.label ? '<span class="' + esc(SEG.item.label) + '">' + esc(o.label) + '</span>' : esc(o.label);
+      // A mark beside the words (the system's alert icon on Parity while something differs), with what it means said.
+      if (o.icon) text = '<svg class="sg-seg-icon" aria-hidden="true"><use href="#' + esc(o.icon) + '"/></svg>' + text;
+      if (o.say) text += '<span class="sg-hidden-text">, ' + esc(o.say) + '</span>';
       // A radio: its input carries the choice and the label around it is what a click lands on.
       if (RADIO) text = '<input type="radio" name="' + group + '"' + (RADIO.length ? ' class="' + esc(RADIO.join(' ')) + '"' : '') + (o.off ? ' disabled' : '') + '>' + text;
       return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '"' + (o.off ? (RADIO ? '' : ' disabled') + ' aria-disabled="true" title="' + esc(o.title || '') + '"' : '') + '>' + text + '</' + tag + '>';
@@ -705,12 +726,21 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   }
   // Each part drawn inside the component, as it is now (a prop that shows, hides or restyles a part changes these rows):
   // an icon by its size and colour, a text by its text style and colour.
+  // Whether the component, as drawn now, shows any text: a part hidden by a prop (Show Text off) takes its text style
+  // and colour out of the tokens with it.
+  function drawsText(root) {
+    return [root].concat(Array.prototype.slice.call(root.querySelectorAll('*'))).some(function (k) {
+      if (!(Array.prototype.some.call(k.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); }) || /^(INPUT|TEXTAREA)$/.test(k.tagName))) return false;
+      var b = k.getBoundingClientRect(), cs = getComputedStyle(k);
+      return b.width > 2 && b.height > 2 && cs.visibility !== 'hidden' && +cs.opacity > 0;
+    });
+  }
   function partRows(root, compName) {
     var rows = [], seen = {};
     root.querySelectorAll('*').forEach(function (k) {
       if (rows.length >= 10 || k.closest('svg') !== k && k.closest('svg')) return;
-      var b = k.getBoundingClientRect(); if (!b.width || !b.height) return;
-      var kcs = getComputedStyle(k); if (kcs.visibility === 'hidden') return;
+      var b = k.getBoundingClientRect(); if (b.width <= 2 || b.height <= 2) return;
+      var kcs = getComputedStyle(k); if (kcs.visibility === 'hidden' || +kcs.opacity === 0) return;   // a part no one sees (a native input under its drawn box) is not listed
       var name = (k.getAttribute('class') || '').split(/\s+/).filter(Boolean)[0] || k.tagName.toLowerCase();
       var v;
       if (k.tagName.toLowerCase() === 'svg') {
@@ -1117,17 +1147,16 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     var p = c.parity; if (!p) return differencesHTML(c);
     var n = p.counts, parts = [n.agree + ' agree', n.differ + ' differ'];
     if (n.notBuilt) parts.push(n.notBuilt + ' not built yet'); if (n.notCompared) parts.push(n.notCompared + ' not compared');
-    var box = function (head, rows) { return rows ? '<div class="pg-inspect pg-parity"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>' : ''; };
+    var box = function (head, rows, cls) { return rows ? '<div class="pg-inspect pg-parity' + (cls ? ' ' + cls : '') + '"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>' : ''; };
+    var diffs = (c.differences || []).map(function (x) { return '<tr><td>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + '</td><td>' + (x.todo ? '<b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) : '') + '</td></tr>'; }).join('');
+    var open = (p.notBuilt.length ? '<tr><td>Not built yet</td><td>Figma has ' + esc(p.notBuilt.join(', ')) + '; the code does not build ' + (p.notBuilt.length === 1 ? 'it' : 'them') + ' yet.</td></tr>' : '') +
+      (p.notCompared ? p.notCompared.reasons.map(function (r) { return '<tr><td>Not compared</td><td>' + esc(r[1] + ' · ' + r[0]) + '</td></tr>'; }).join('') : '');
     var facts = p.agreed.map(function (f) { return '<tr><td>' + esc(f.what) + '</td><td>' + esc(f.value) + (f.since ? '  ·  since ' + esc(when(f.since)) : '') + (f.commit ? ' (' + esc(f.commit) + ')' : '') + '</td></tr>'; }).join('');
     var props = p.props.map(function (k) { return '<tr><td>' + esc(k.figma) + '</td><td>' + esc(k.code) + '</td></tr>'; }).join('');
     var toks = p.tokens.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + esc(t.var) + '</td></tr>'; }).join('');
     return '<div class="pg-doc"><h3>Parity with Figma</h3><p class="pg-parity-sum">' + esc(parts.join('  ·  ')) + '</p>' +
-      ((c.differences || []).length ? differencesHTML(c) : '<p class="pg-parity-sum">Nothing differs from Figma in what the last audit compared.</p>') +
-      '<dl class="pg-updated">' +
-      (p.notBuilt.length ? '<div><dt>Not built yet</dt><dd><p>Figma has ' + esc(p.notBuilt.join(', ')) + '; the code does not build ' + (p.notBuilt.length === 1 ? 'it' : 'them') + ' yet.</p></dd></div>' : '') +
-      (p.notCompared ? '<div><dt>Not compared</dt><dd>' + p.notCompared.reasons.map(function (r) { return '<p>' + esc(r[1] + ' · ' + r[0]) + '</p>'; }).join('') + '</dd></div>' : '') +
-      '</dl>' +
-      '<div class="pg-inspect-grid">' + box('Values that agree', facts) + box('Props (Figma · code)', props) + box('Tokens (Figma · code)', toks) + '</div></div>';
+      (diffs ? '' : '<p class="pg-parity-sum">Nothing differs from Figma in what the last audit compared.</p>') +
+      '<div class="pg-inspect-grid pg-grid-2">' + box('Differs from Figma', diffs) + box('Not built or not compared', open) + box('Values that agree', facts) + box('Props (Figma · code)', props) + box('Tokens (Figma · code)', toks) + '</div></div>';
   }
   // ── How a product brings it in: its import line (copied), its file (downloaded), and what it is built with ────────
   function importHTML(c) {
@@ -1148,20 +1177,24 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     return '<div class="pg-import pg-links"><span class="pg-usage-label">Links</span>' + list.map(function (l) { return sysButton('a', l.label, ' href="' + esc(l.url) + '" target="_blank" rel="noopener"'); }).join('') + '</div>';
   }
   // ── Changelog: when Figma was last read for it, then every commit that changed it, by the release it shipped in ───
+  // Its changelog in the Playground's tables: when Figma was last read, then one table per release, each commit a row
+  // (its commit and pull request, what it says, its date).
   function changelogHTML(c) {
     var u = c.updated || {}, log = c.changelog || [];
-    var head = (u.figmaRead ? '<p>Figma last read ' + esc(when(u.figmaRead)) + '.</p>' : '') + (u.uncommitted ? '<p>Its code has changes not committed yet.</p>' : '');
-    if (!log.length) return head + '<p class="pg-parity-sum">No commit has changed it yet, or the project is not in git.</p>';
+    var card = function (head, rows) { return '<div class="pg-inspect"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>'; };
+    var top = (u.figmaRead ? '<tr><td>Figma last read</td><td>' + esc(when(u.figmaRead)) + '</td></tr>' : '') + (u.uncommitted ? '<tr><td>Its code</td><td>Has changes not committed yet</td></tr>' : '');
+    var out = top ? card('Read', top) : '';
+    if (!log.length) return '<div class="pg-cards">' + out + '<p class="pg-parity-sum">No commit has changed it yet, or the project is not in git.</p></div>';
     var groups = [], by = {};
     log.forEach(function (r) { var k = r.release || ''; if (!by[k]) { by[k] = []; groups.push(k); } by[k].push(r); });
-    return head + groups.map(function (k) {
+    return '<div class="pg-cards">' + out + groups.map(function (k) {
       var rows = by[k];
-      return '<div class="pg-log"><h4>' + esc(k || 'Not released yet') + ' <span class="pg-log-date">' + esc(String(rows[0].date).slice(0, 10)) + '</span></h4><ul>' + rows.map(function (r) {
+      return card(esc(k || 'Not released yet') + '  ·  ' + esc(String(rows[0].date).slice(0, 10)), rows.map(function (r) {
         var sha = r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener"><code>' + esc(r.short) + '</code></a>' : '<code>' + esc(r.short) + '</code>';
         var pr = r.pr ? (r.prUrl ? ' <a href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
-        return '<li>' + sha + pr + ' ' + esc(r.subject.replace(/\s*\(#\d+\)\s*$/, '')) + ' <span class="pg-log-date">' + esc(String(r.date).slice(0, 10)) + '</span></li>';
-      }).join('') + '</ul></div>';
-    }).join('');
+        return '<tr><td>' + sha + pr + '</td><td>' + esc(r.subject.replace(/\s*\(#\d+\)\s*$/, '')) + ' <span class="pg-log-date">' + esc(String(r.date).slice(0, 10)) + '</span></td></tr>';
+      }).join(''));
+    }).join('') + '</div>';
   }
   // Each card's preview, drawn once its area is on screen (a hidden card has no size to fit), never with ?all.
   function builtThumbs(sec) {
@@ -1258,6 +1291,20 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       '</dl></div>';
   }
 
+  // A text that shows only while a boolean is on (Show Text and Text Content, show-label and label-content, or both
+  // acting on the same part) comes right after that boolean, which decides whether it is seen; the rest keep their
+  // order and nothing is left out. list: the controls in Figma's order; propOf(item) its prop, or none.
+  function showFirst(list, propOf) {
+    var out = list.slice(), word = function (x, cut) { return String(x || '').toLowerCase().replace(cut, '').replace(/[^a-z0-9]+/g, ''); };
+    var shows = function (b, t) { var n = word(b.label, /^\s*show[\s_-]*/); return b.type === 'BOOLEAN' && t.type === 'TEXT' && ((n && n === word(t.label, /[\s_-]*content\s*$/)) || (!!b.part && b.part === t.part)); };
+    out.filter(function (k) { var p = propOf(k); return p && p.type === 'TEXT'; }).forEach(function (t) {
+      var b = out.find(function (k) { var p = propOf(k); return p && shows(p, propOf(t)); });
+      if (!b) return;
+      out.splice(out.indexOf(t), 1); out.splice(out.indexOf(b) + 1, 0, t);
+    });
+    return out;
+  }
+
   function buildCard(c) {
     var props = c.controls || [];
     var state = {};
@@ -1284,7 +1331,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     }
     // Kept as the variant changes, without a new step in the browser's history; only while this view is the one shown.
     function writeLink() { if (ALL || hashParts().id !== sec.id) return; var h = linkFor(); if (h !== location.hash) history.replaceState(null, '', h); }
-    var sec = document.createElement('section'); sec.id = 'c-' + c.name; sec.className = 'sg-section';
+    var sec = document.createElement('section'); sec.id = 'c-' + c.name; sec.className = 'sg-section pg-card-section';
     if (!ALL && hashParts().id === sec.id) fromLink(hashParts().q);
     // Its documentation: Figma's description and annotations first, then the code's own note.
     var figDesc = c.description && c.description.replace(/@\w+/g, '').trim();
@@ -1303,8 +1350,11 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
         importHTML(c) + linksHTML(c.links) +
       '</div>' +
-      ((c.differences || []).length ? '<p class="pg-parity-sum">' + esc(c.differences.length === 1 ? 'One thing differs from Figma.' : c.differences.length + ' things differ from Figma.') + ' ' + sysButton('button', 'See parity', ' data-area-go="parity"') + '</p>' : '') +
-      '<div class="pg-areas">' + segHTML(AREAS.filter(function (a) { return a[0] !== 'built' || (c.uses || []).length; }).map(function (a) { return { v: a[0], label: a[1] }; })) + '</div>' +
+      // What differs from Figma is marked on Parity itself: the system's alert icon, its count said to a screen reader.
+      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span>' + segHTML(AREAS.filter(function (a) { return a[0] !== 'built' || (c.uses || []).length; }).map(function (a) {
+        var n = a[0] === 'parity' ? (c.differences || []).length : 0;
+        return { v: a[0], label: a[1], icon: n ? ALERT_ICON : null, say: n ? (n === 1 ? 'one thing differs from Figma' : n + ' things differ from Figma') : null };
+      })) + '</div>' +
       // Playground: the component drawn, its controls, its code and the tokens behind it.
       '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview-col"><div class="pg-preview"></div><div class="pg-frame" hidden></div></div><div class="pg-panel"><div class="pg-actions"></div>' +
@@ -1368,7 +1418,25 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     }
     if (widthBar) segItems(widthBar).forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.v !== WIDTH) showWidth(b.dataset.v); }); });
     if (widthBar) segItems(widthBar).forEach(function (b) { segSelect(b, b.dataset.v === WIDTH); });   // the width last chosen
+    // Documentation, Accessibility and the rest in the Playground's tables: a section of rows (Usage, Documentation,
+    // Accessibility, Anatomy) becomes a card whose head is its title, each row a name and its text.
+    Array.prototype.forEach.call(sec.querySelectorAll('.pg-footer > .pg-doc'), function (d) {
+      var h = d.firstElementChild;
+      if (!h || h.tagName !== 'H3' || !d.querySelector(':scope > dl.pg-updated')) return;
+      var card = document.createElement('div'); card.className = 'pg-inspect pg-doc-card';
+      var head = document.createElement('div'); head.className = 'pg-inspect-head'; card.appendChild(head);
+      while (d.firstChild) (d.firstChild === h ? head : card).appendChild(d.firstChild);
+      d.appendChild(card);
+    });
     var tTokens = sec.querySelector('.pg-tokens'), tOwn = sec.querySelector('.pg-own');
+    // The code as tall as the tokens beside it (they set the height), scrolling inside; on its own row, its own height.
+    var codeBox = sec.querySelector('.pg-code'), tokBox = tTokens && tTokens.closest('.pg-inspect');
+    function codeHeight() {
+      if (!codeBox || !tokBox) return;
+      codeBox.style.height = '';
+      if (tokBox.offsetHeight && Math.abs(codeBox.offsetTop - tokBox.offsetTop) < 2) codeBox.style.height = tokBox.offsetHeight + 'px';
+    }
+    if (window.ResizeObserver && tokBox) new ResizeObserver(codeHeight).observe(tokBox);
     // The code for what the preview shows now: the component as a product writes it (its tag and the props set here,
     // each value as the code spells it; a prop the code requires and the playground does not set is written with …),
     // else the HTML the preview draws. Copied by the system's own button.
@@ -1380,6 +1448,8 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     // One area at a time (every one at once on the measuring page, ?all); the one chosen stays chosen on the next
     // component. A link to the parity area from the line that says what differs.
     var areaBar = sec.querySelector('.pg-areas');
+    var nameEl = sec.querySelector('.pg-head > h2');
+    if (!ALL && window.IntersectionObserver && nameEl) new IntersectionObserver(function (es) { areaBar.classList.toggle('is-stuck', !es[0].isIntersecting && es[0].boundingClientRect.top < 0); }).observe(nameEl);
     function showArea(v, kept) {
       // The area last chosen, kept for the next component only when that one has it (not every one is built with others).
       if (!sec.querySelector('.pg-area[data-area="' + v + '"]')) v = 'play';
@@ -1387,7 +1457,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       areaNow = v;
       Array.prototype.forEach.call(sec.querySelectorAll('.pg-area'), function (a) { a.hidden = !ALL && a.getAttribute('data-area') !== v; });
       segItems(areaBar).forEach(function (b) { segSelect(b, b.dataset.v === v); });
-      if (v === 'play') nudge();
+      if (v === 'play') { nudge(); codeHeight(); }
       if (v === 'docs') requestAnimationFrame(drawAnatomy);
       if (v === 'a11y') checkLive();
       if (v === 'built') requestAnimationFrame(function () { builtThumbs(sec); });
@@ -1665,20 +1735,20 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     // The tables beside the preview, read from the component as it is drawn now.
     function inspect(e) {
       var el = (c.cls && (e.classList.contains(c.cls) ? e : e.querySelector('.' + c.cls))) || e;
-      var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px';
+      var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px', texted = drawsText(el);
       tTokens.innerHTML = rowsHTML([].concat(
         padRows(el, cs),
         [['gap', hasGap ? tok(el, cs.gap, 'gap') : '-']],
         [['background', (cs.backgroundColor === 'rgba(0, 0, 0, 0)') ? 'transparent' : tok(el, cs.backgroundColor, 'color', c.name)]],
         [['border', bw === '0px' ? 'none' : (tok(el, cs.borderTopColor, 'color', c.name) + '  ·  ' + bw + ' ' + cs.borderTopStyle)]],
         radiusRows(el, cs),
-        [['color', tok(el, cs.color, 'color', c.name)]],
+        texted ? [['color', tok(el, cs.color, 'color', c.name)]] : [],
         extraColorRows(el, preview, c.name),
-        [['font', fontTok(el, cs)]],
+        texted ? [['font', fontTok(el, cs)]] : [],
         cs.opacity !== '1' ? [['opacity', cs.opacity]] : [],
         partRows(el, c.name)
       ));
-      ownRows(); writeLink(); checkLive();
+      ownRows(); writeLink(); checkLive(); codeHeight();
       showCode(e);
       if (contrastEl) contrastEl.innerHTML = contrastHTML(e);
       nudge();
@@ -1834,7 +1904,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     // option names, a text prop as a field. An option the page cannot show (a live state such as :hover, or a
     // markup-only switch) is offered but disabled.
     props.forEach(function (p) {
-      var ctl = document.createElement('div'); ctl.className = 'pg-ctl'; if (p.at != null) ctl.dataset.at = p.at;
+      var ctl = document.createElement('div'); ctl.className = 'pg-ctl'; if (p.at != null) ctl.dataset.at = p.at; ctl._prop = p;
       var label = '<div class="pg-ctl-label">' + esc(p.label) + (p.prop !== p.label ? '<code>' + esc(p.prop) + '</code>' : '') + '</div>';
       if (p.type === 'TEXT') {
         ctl.innerHTML = label + (DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text">');
@@ -1872,8 +1942,9 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       controlsEl.appendChild(ctl);
     });
     // In Figma's order (its panel's: variants first, then the rest as Figma lists them), built or not.
-    Array.prototype.slice.call(controlsEl.children).map(function (k, i) { return { k: k, at: k.dataset.at === undefined ? 1e6 + i : +k.dataset.at }; })
-      .sort(function (a, b) { return a.at - b.at; }).forEach(function (x) { controlsEl.appendChild(x.k); });
+    var ordered = Array.prototype.slice.call(controlsEl.children).map(function (k, i) { return { k: k, at: k.dataset.at === undefined ? 1e6 + i : +k.dataset.at }; })
+      .sort(function (a, b) { return a.at - b.at; }).map(function (x) { return x.k; });
+    showFirst(ordered, function (k) { return k._prop; }).forEach(function (k) { controlsEl.appendChild(k); });
     if (!props.length && !(c.unbuilt || []).length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = 'No agreed props yet.'; controlsEl.appendChild(none); }
     return sec;
   }
