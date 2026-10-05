@@ -1589,8 +1589,10 @@ function reportFull(label, items, shown) {
     const perComponent = (l) => /⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🖼  (⚠️|✓) /.test(l);
     const summary    = out.split('\n').filter(l => /✅|❌|⚠️  MEASURED|⚠️  VARIANTS|⚠️  NO-SHRINK|⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🔗 .* in Figma: |↳ |📋 census: |least checked: |🖼  /.test(l) && l.trim())
       .filter(l => !_scopeForms.length || !perComponent(l) || _lineInScope(l)).map(l => l.trim());
+    // A ❌ line the summary already shows is not said again under it.
+    const inSummary = new Set(summary);
     const failDetails = pass ? [] : out.split('\n')
-      .filter(l => l.trim().startsWith('❌') && !l.includes('FAIL  0'))
+      .filter(l => l.trim().startsWith('❌') && !l.includes('FAIL  0') && !inSummary.has(l.trim()))
       .map(l => '  ' + l.trim()).slice(0, 20);
     return { pass, lines: [...summary, ...failDetails] };
   }
