@@ -167,7 +167,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-shot img { display: block; width: 100%; height: auto; }
 .pg-mark { position: absolute; border: 2px solid var(--sg-accent); border-radius: var(--sg-radius-s); pointer-events: none; }
 /* The code a product writes for what the playground shows, with the system's button to copy it. */
-.pg-code { margin-top: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; }
+.pg-code-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-m); align-items: start; }
+.pg-code { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; min-width: 0; }
 .pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-code pre { margin: 0; padding: var(--sg-space-m); overflow-x: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
@@ -210,20 +211,17 @@ a.pg-usage-name { color: var(--sg-text); }
 /* With no text field in the system, the browser's own (never styled here, so it cannot sit inside the system's field). */
 .pg-ctl > input[type="text"] { font: inherit; }
 .pg-empty { font-size: var(--sg-s); color: var(--sg-muted); }
-/* Anatomy: the component as set in the Playground, drawn larger, each part numbered, padding and gaps tinted. */
+/* Anatomy: the component as set in the Playground, drawn larger, each part, padding and gap outlined and numbered. */
 .pg-anatomy { display: flex; justify-content: center; padding: var(--sg-space-xxl) var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-l); background: var(--sg-bg); overflow: auto; }
 .pg-anat-stage { position: relative; flex: none; }
 .pg-anat-wrap { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; }
 .pg-anat-wrap, .pg-anat-wrap * { animation: none !important; transition: none !important; }   /* drawn at rest, never mid-entry */
 .pg-anatomy-doc, .pg-anatomy { min-width: 0; }
 .pg-anat-marks { position: absolute; inset: 0; pointer-events: none; }
-.pg-anat-pad { position: absolute; background: color-mix(in srgb, var(--sg-accent) 22%, transparent); }
-.pg-anat-gap { position: absolute; background: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
+.pg-anat-space { position: absolute; outline: 1px dotted var(--sg-muted); outline-offset: -1px; }   /* a padding or a gap: outlined, never coloured, so no colour is mistaken for a token's */
 .pg-anat-part { position: absolute; outline: 1px dashed var(--sg-text); }
 .pg-anat-part.is-slot { outline: 2px dashed var(--sg-accent); }
 .pg-anat-num { position: absolute; transform: translate(-50%, -50%); min-width: 18px; height: 18px; padding: 0 var(--sg-space-xxs); box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: var(--sg-radius-pill); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); }
-.pg-anat-key { display: inline-block; width: 12px; height: 12px; margin-right: var(--sg-space-xs); vertical-align: -1px; border-radius: var(--sg-radius-s); }
-.pg-anat-key.is-pad { background: color-mix(in srgb, var(--sg-accent) 22%, transparent); } .pg-anat-key.is-gap { background: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
 .pg-anatomy-doc .pg-updated { margin-top: var(--sg-space-l); }
 .pg-from, .pg-missing { color: var(--sg-muted); }
 .pg-missing { font-style: italic; }
@@ -326,6 +324,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     } else el.classList.toggle('selected', on);
     if (RADIO) { var r = el.querySelector('input'); if (r) r.checked = on; el.dataset.on = on ? '1' : ''; }
     else el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (on) nudge();   // the system's own script places what follows the selection (a sliding pill) again
   }
   function segItems(box) { return Array.prototype.slice.call(box.querySelectorAll('[data-v]')); }
 
@@ -1043,9 +1042,10 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       // Playground: the component drawn, its controls, its code and the tokens behind it.
       '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview"></div><div class="pg-panel"><div class="pg-actions"></div><div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
-        '<div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div>' +
-        '<div class="pg-inspect-grid"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
-        (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>' +
+        // Its code beside the tokens behind what is drawn; every token named after it below them all.
+        '<div class="pg-code-row"><div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div>' +
+        '<div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div></div>' +
+        (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div>' +
       '</div>' +
       // Documentation: its API, Figma's and the code's own words, and when each side last changed.
       '<div class="pg-area" data-area="docs"><div class="pg-footer">' +
@@ -1082,7 +1082,8 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     Array.prototype.forEach.call(sec.querySelectorAll('[data-area-go]'), function (b) { b.addEventListener('click', function () { showArea(b.getAttribute('data-area-go')); }); });
     sec._area = showArea;
     // Anatomy: a copy of the component as the Playground draws it now, larger, with each part numbered (a slot outlined
-    // in the accent), its padding and gaps tinted and named by the token behind them, and how it lines its items up.
+    // in the accent), each padding and gap outlined and numbered after them and named by its token in the list (numbers,
+    // never colours, so nothing reads as a token's colour), and how it lines its items up.
     // One that covers the window has none (a modal is drawn as its card). Never on the measuring page (?all).
     var anatBox = sec.querySelector('.pg-anatomy'), anatLegend = sec.querySelector('.pg-anat-legend'), drawnWidth = 0;
     function drawAnatomy() {
@@ -1112,28 +1113,30 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       function box(el) { var r = el.getBoundingClientRect(), o = wrap.getBoundingClientRect(); return { x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height }; }
       function mark(cls, x, y, w, h) { if (w < 0.5 || h < 0.5) return null; var m = document.createElement('div'); m.className = cls; m.style.left = x * k + 'px'; m.style.top = y * k + 'px'; m.style.width = w * k + 'px'; m.style.height = h * k + 'px'; marks.appendChild(m); return m; }
       function px(v) { return parseFloat(v) || 0; }
+      // Each padding and gap: outlined where it sits and numbered after the parts, the same number in the list below.
       var spacing = [];
-      // Padding and gaps of one element, drawn and listed under its name.
       function spaces(el, label) {
         var b = box(el), cs = getComputedStyle(el);
         var bt = px(cs.borderTopWidth), br = px(cs.borderRightWidth), bb = px(cs.borderBottomWidth), bl = px(cs.borderLeftWidth);
         var pt = px(cs.paddingTop), pr = px(cs.paddingRight), pb = px(cs.paddingBottom), pl = px(cs.paddingLeft);
         var iw = b.w - bl - br, ih = b.h - bt - bb;
-        mark('pg-anat-pad', b.x + bl, b.y + bt, iw, pt); mark('pg-anat-pad', b.x + bl, b.y + b.h - bb - pb, iw, pb);
-        mark('pg-anat-pad', b.x + bl, b.y + bt + pt, pl, ih - pt - pb); mark('pg-anat-pad', b.x + b.w - br - pr, b.y + bt + pt, pr, ih - pt - pb);
-        if (pt || pr || pb || pl) padRows(el, cs).forEach(function (r) { if (r[1] !== '0') spacing.push(['pad', label + ' ' + r[0].replace(/-/g, ' '), r[1]]); });
+        var band = { top: [b.x + bl, b.y + bt, iw, pt], bottom: [b.x + bl, b.y + b.h - bb - pb, iw, pb], left: [b.x + bl, b.y + bt + pt, pl, ih - pt - pb], right: [b.x + b.w - br - pr, b.y + bt + pt, pr, ih - pt - pb] };
+        Object.keys(band).forEach(function (side) { mark('pg-anat-space', band[side][0], band[side][1], band[side][2], band[side][3]); });
+        // Each listed padding is numbered on its own band: top for all four or top and bottom, left for left and right.
+        if (pt || pr || pb || pl) padRows(el, cs).forEach(function (r) { if (r[1] === '0') return; var side = /left/.test(r[0]) ? 'left' : /right/.test(r[0]) ? 'right' : /bottom$/.test(r[0]) && !/top/.test(r[0]) ? 'bottom' : 'top'; spacing.push({ what: label + ' ' + r[0].replace(/-/g, ' '), value: r[1], at: band[side] }); });
         var flex = /flex|grid/.test(cs.display), row = /^row/.test(cs.flexDirection) && !/grid/.test(cs.display);
         var g = px(row ? cs.columnGap : cs.rowGap);
         if (!flex || !g) return;
         var kids = Array.prototype.filter.call(el.children, function (n) { var ncs = getComputedStyle(n); var r = n.getBoundingClientRect(); return ncs.position !== 'absolute' && ncs.position !== 'fixed' && r.width > 0 && r.height > 0; })
           .map(box).sort(function (a, z) { return row ? a.x - z.x : a.y - z.y; });
-        var drew = false;
+        var first = null;
         for (var i = 1; i < kids.length; i++) {
-          var a = kids[i - 1], z = kids[i];
-          if (row && z.x - (a.x + a.w) > 0.5) { mark('pg-anat-gap', a.x + a.w, b.y + bt + pt, z.x - a.x - a.w, ih - pt - pb); drew = true; }
-          if (!row && z.y - (a.y + a.h) > 0.5) { mark('pg-anat-gap', b.x + bl + pl, a.y + a.h, iw - pl - pr, z.y - a.y - a.h); drew = true; }
+          var a = kids[i - 1], z = kids[i], at = null;
+          if (row && z.x - (a.x + a.w) > 0.5) at = [a.x + a.w, b.y + bt + pt, z.x - a.x - a.w, ih - pt - pb];
+          if (!row && z.y - (a.y + a.h) > 0.5) at = [b.x + bl + pl, a.y + a.h, iw - pl - pr, z.y - a.y - a.h];
+          if (at) { mark('pg-anat-space', at[0], at[1], at[2], at[3]); first = first || at; }
         }
-        if (drew) spacing.push(['gap', label + ' gap', sideTok(el, row ? cs.columnGap : cs.rowGap, 'gap')]);
+        if (first) spacing.push({ what: label + ' gap', value: sideTok(el, row ? cs.columnGap : cs.rowGap, 'gap'), at: first });
       }
       // Its parts: the contract's named parts, else the elements directly inside it; each numbered where it sits.
       // Seen only: a part drawn hidden (a native input under its drawn box, at no opacity) is not one a person sees.
@@ -1152,6 +1155,10 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
         var b = box(p.el); mark('pg-anat-part' + (p.slot ? ' is-slot' : ''), b.x, b.y, b.w, b.h);
         var n = document.createElement('span'); n.className = 'pg-anat-num'; n.textContent = String(i + 1); n.style.left = b.x * k + 'px'; n.style.top = b.y * k + 'px'; marks.appendChild(n);
       });
+      spacing.forEach(function (sp, i) {
+        var n = document.createElement('span'); n.className = 'pg-anat-num'; n.textContent = String(parts.length + i + 1);
+        n.style.left = (sp.at[0] + sp.at[2] / 2) * k + 'px'; n.style.top = (sp.at[1] + sp.at[3] / 2) * k + 'px'; marks.appendChild(n);
+      });
       wrap.style.transform = 'scale(' + k + ')';
       var cs = getComputedStyle(root), lines = '';
       if (/flex/.test(cs.display)) {
@@ -1162,7 +1169,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       }
       anatLegend.innerHTML =
         (parts.length ? '<div><dt>Parts</dt><dd>' + parts.map(function (p, i) { return '<p><b>' + (i + 1) + '</b> ' + esc(p.name) + (p.slot ? ', a slot the product fills' : '') + '</p>'; }).join('') + '</dd></div>' : '') +
-        (spacing.length ? '<div><dt>Spacing</dt><dd>' + spacing.map(function (r) { return '<p><span class="pg-anat-key is-' + r[0] + '"></span>' + esc(r[1]) + '  ·  ' + esc(r[2]) + '</p>'; }).join('') + '</dd></div>' : '') +
+        (spacing.length ? '<div><dt>Spacing</dt><dd>' + spacing.map(function (sp, i) { return '<p><b>' + (parts.length + i + 1) + '</b> ' + esc(sp.what) + '  ·  ' + esc(sp.value) + '</p>'; }).join('') + '</dd></div>' : '') +
         (lines ? '<div><dt>Alignment</dt><dd><p>' + esc(lines) + '</p></dd></div>' : '');
     }
     var contrastEl = sec.querySelector('.pg-contrast');

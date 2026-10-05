@@ -180,12 +180,18 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
     assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity with Figma.*agree/s);
     // Its anatomy, in Documentation: a copy drawn larger as the Playground set it, each part numbered, its padding
-    // tinted and named by the token behind it, how it lines its items up; never a second live component.
+    // outlined and numbered after the parts and named by its token in the list (numbers, never colours), how it lines
+    // its items up; never a second live component.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
-    await new Promise((r) => setTimeout(r, 200));
+    // Drawn on the next frame: waited for, as a busy machine can take longer than a fixed pause.
+    for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-anat-num').length`)); i++) await new Promise((r) => setTimeout(r, 50));
     assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-num').length`) >= 1);
-    assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-pad').length`) >= 2);
-    assert.match(await run(`document.querySelector('#c-chip .pg-anat-legend').textContent`), /Parts.*Spacing.*chip padding.*--padding-[a-z]+.*Alignment.*row/s);
+    assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-space').length`) >= 2);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks > *')].every((m) => { const b = getComputedStyle(m).backgroundColor; return m.classList.contains('pg-anat-num') || b === 'rgba(0, 0, 0, 0)'; })`), true, 'no colour fills on the drawing');
+    const legend = await run(`document.querySelector('#c-chip .pg-anat-legend').textContent`);
+    assert.match(legend, /Parts.*Spacing.*chip padding.*--padding-[a-z]+.*Alignment.*row/s);
+    const nums = await run(`[...document.querySelectorAll('#c-chip .pg-anat-num')].map((n) => n.textContent).join()`);
+    assert.equal(nums, await run(`[...document.querySelectorAll('#c-chip .pg-anat-legend b')].map((b) => b.textContent).join()`), 'every number in the drawing is one in the list, in the same order');
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
     assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
     // How to use it: the same four sections on every page, a missing one said; the overview counts them.
@@ -251,6 +257,8 @@ test('choosing the option already set does nothing, and a slot is documented wit
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /if \(next === state\[p\.label\]\) return;/);
   assert.match(tpl, /if \(b\.getAttribute\('aria-pressed'\) === 'true' \|\| b\.dataset\.on === '1'\) return;/);
+  // A new selection tells the system's own script, so what follows the selection (a sliding pill) moves with it.
+  assert.match(tpl.slice(tpl.indexOf('function segSelect'), tpl.indexOf('function segItems')), /if \(on\) nudge\(\);/);
   assert.match(tpl, /<dt>Slots<\/dt>/);
   assert.match(tpl, /<dt>From Figma<\/dt>/);
 });
@@ -437,7 +445,7 @@ test('a control the system lacks: its stand-in draws the switch, and the page sa
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('var SEG = DATA.ui'), tpl.indexOf('function segItems'));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  const run = (ui) => new Function('DATA', 'esc', src + 'return { segHTML: segHTML, segSelect: segSelect };')({ ui }, esc);
+  const run = (ui) => new Function('DATA', 'esc', 'nudge', src + 'return { segHTML: segHTML, segSelect: segSelect };')({ ui }, esc, () => {});
   const b = run({ segmented: btn });
   assert.equal(b.segHTML([{ v: 'a', label: 'A' }]), '<div class="sg-seg"><button type="button" class="bSecondary" data-v="a"><span class="label">A</span></button></div>');
   const cls = new Set(['bSecondary']), attrs = {};
