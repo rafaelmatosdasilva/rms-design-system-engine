@@ -422,7 +422,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     try {
       const { guidanceView } = await import('./styleguide-data.mjs');
       const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
-      for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance });
+      // What the products get wrong with it, from the last audit: a rule laid over it, a look-alike, a parent overriding it.
+      const PRODUCT_MISUSE = /hand-built|look-?alike|Nested components keep|Templates compose/i;
+      const seenIn = (c) => (c.differences ?? []).filter((d) => PRODUCT_MISUSE.test(d.check ?? '') || / laid over it /.test(d.what ?? '')).map((d) => d.plain ?? d.what);
+      for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c) });
     } catch { /* no guidance */ }
     const { segmentedUi, radioGroupUi, buttonsAsSegmentedUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
@@ -646,6 +649,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         }
       } catch { /* no pictures: the cards show the names */ }
     }
+    // Where the system could be simpler: one component in several copies, props with nothing to choose, unused ones.
+    try {
+      const { simplifyView } = await import('./styleguide-data.mjs');
+      const usedBy = new Map();
+      for (const c of view.components) for (const u of c.uses ?? []) { const n = typeof u === 'string' ? u : u?.name; if (n) usedBy.set(n, [...(usedBy.get(n) ?? []), c.name]); }
+      view.simplify = simplifyView(view.components.map((c) => ({ ...c, usedBy: usedBy.get(c.name) ?? [] })), { products: view.components.some((c) => (c.usage ?? []).length) });
+    } catch { /* nothing to say */ }
     lastView = view;
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');

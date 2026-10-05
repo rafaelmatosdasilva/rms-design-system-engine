@@ -230,6 +230,8 @@ export function plainDifference(what = '') {
     const state = m[1].split(' · ').map((x) => x.replace(/^State=/, '').replace(/^default$/, 'at rest')).join(', in ').replace(/, in (light|dark)$/, ', in $1 mode');
     return `${state[0].toUpperCase()}${state.slice(1)}, its text (${m[5]}) on its background (${m[7]}) has a contrast of ${m[2]} to 1; it needs ${m[3]} to 1 to be read easily.`;
   }
+  // A name written otherwise than the rest of the system.
+  if ((m = /^[\w/-]+ (property|option) "([^"]+)"(?: of (.+?))? is named differently from the rest of the system: rename it "([^"]+)" in Figma \((.+)\)$/.exec(s))) return `In Figma, the ${m[1]} "${m[2]}"${m[3] ? ` of ${m[3]}` : ''} is written differently from the rest of the system: ${m[5]}.`;
   // Token layering: "· overlay/color"
   if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return `In Figma, ${m[1].trim()} holds a raw colour instead of pointing at another token, as most of the system's tokens do.`;
   return s;
@@ -263,6 +265,7 @@ export function plainAction(what = '', component = '') {
   if (/ has `[^`]+` - Figma has no stroke/.test(s)) return { who: 'both', todo: `Decide: tell me to remove the border from the code, or add it to ${name} in Figma.` };
   if (/: [\d.]+:1 \(needs [\d.]+:1\)/.test(s)) return { who: 'both', todo: `Pick colours with more contrast for ${name}: change them in Figma, then tell me to update the code.` };
   if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return { who: 'figma', todo: `In Figma, point ${m[1].trim()} at another token instead of a raw colour.` };
+  if ((m = /^[\w/-]+ (property|option) "([^"]+)"(?: of (.+?))? is named differently from the rest of the system: rename it "([^"]+)" in Figma/.exec(s))) return { who: 'figma', todo: `In Figma, rename the ${m[1]} "${m[2]}" of ${name}${m[3] ? `'s ${m[3]}` : ''} to "${m[4]}". Then tell me to update the code's contract to the new name.` };
   if (/ laid over it /.test(s)) return { who: 'both', todo: `Decide: add a slot or prop for this action to ${name} in Figma (then tell me to build it), or tell me to leave it as the product's own.` };
   return { who: 'both', todo: 'Look at it in the differences file and tell me which side is right.' };
 }

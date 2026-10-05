@@ -67,7 +67,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 
 /* ── Modes ───────────────────────────────────────────────────────────────── */
 .sg-modes { display: flex; flex-direction: column; gap: var(--sg-space-l); }
-.sg-mode-ctl { display: flex; flex-direction: column; align-items: stretch; gap: var(--sg-space-xs); }
+.sg-mode-ctl { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sg-space-xs); }
+.sg-sidebar .sg-mode-ctl { align-items: stretch; }   /* the page's own switch fills the sidebar; a section's is as wide as its options */
 .sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-footer { display: flex; flex-direction: column; gap: var(--sg-space-m); margin-top: var(--sg-space-xl); }
 .pg-updated { display: grid; gap: var(--sg-space-l); margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }   /* each section of the documentation clearly apart */
@@ -142,7 +143,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-screen figcaption { padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); border-top: var(--sg-line); }
 
 /* ── Foundations ─────────────────────────────────────────────────────────── */
-.sg-demo { background: var(--sg-surface); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-space-xl) var(--sg-space-l); display: flex; flex-wrap: wrap; gap: var(--sg-space-m); align-items: flex-start; }
+/* Every box on the page is drawn alike: the system card's border and corners, no fill of its own. */
+.sg-demo { background: transparent; border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-space-xl) var(--sg-space-l); display: flex; flex-wrap: wrap; gap: var(--sg-space-m); align-items: flex-start; }
 .sg-demo.sg-demo--col { flex-direction: column; align-items: stretch; gap: var(--sg-space-s); }
 .color-chip { display: flex; flex-direction: column; gap: var(--sg-space-xs); width: 96px; }
 /* Six colours a row, each as wide as the room allows, so its Figma name and variable have room to read. */
@@ -151,7 +153,14 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .color-chip-swatch { height: 72px; border: var(--sg-line); }   /* square corners, as on the overview; the colour twice the height of its label */
 .color-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); line-height: var(--sg-lh); word-break: break-word; }
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: normal; overflow-wrap: anywhere; }   /* a long variable breaks after a hyphen, never inside a word when it fits */
-.sg-uses-link { color: inherit; }   /* a token's name, linked to what uses it: underlined, in the colour around it */
+.sg-uses-link { color: inherit; }   /* a link in the colour around it, underlined */
+/* A token's name opens a panel in place: underlined like a link, in the text around it, no box of its own. */
+.sg-token-link { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; text-align: inherit; }
+.sg-token-pop { position: absolute; z-index: 60; background: var(--sg-bg); border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); padding: var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text); }
+.sg-token-pop[hidden] { display: none; }
+.sg-token-pop:focus { outline: none; }   /* the panel takes the focus to be read from its start; its controls show theirs */
+.sg-token-pop .pg-updated { margin: var(--sg-space-s) 0; }
+.sg-token-pop-actions { display: flex; gap: var(--sg-space-s); }
 .type-list { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-m); }
 .type-specimen-preview { color: var(--sg-text); padding: var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* the sample on one row, under the style's name */
 .type-specimen.pg-inspect td:last-child { word-break: normal; overflow-wrap: break-word; }   /* a name and its value wrap between words, never inside one */
@@ -224,6 +233,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-note:last-child { margin-bottom: var(--sg-space-m); }
 .pg-header { background: var(--sg-bg); padding: var(--sg-space-s) 0 var(--sg-space-m); margin-bottom: var(--sg-space-xs); }   /* scrolls away; the areas below it stay */
 .pg-stage { display: flex; flex-direction: column; gap: var(--sg-space-l); }
+.pg-preview-card.is-wide { grid-template-columns: 1fr; }   /* Full width: the component across the whole card, its controls below */
 .pg-preview-card { display: grid; grid-template-columns: 1fr minmax(240px, 340px); gap: var(--sg-space-l); align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: var(--sg-space-l); background: var(--sg-bg); box-shadow: var(--sg-shadow); }
 .pg-preview { min-width: 0; min-height: 140px; padding: var(--sg-space-xl); display: flex; align-items: safe center; align-content: safe center; justify-content: safe center; gap: var(--sg-space-m); flex-wrap: wrap; position: relative; isolation: isolate; }
 /* A transparency checkerboard over the system's own page surface: a transparent component shows it, an opaque one covers it. */
@@ -392,10 +402,55 @@ a.pg-usage-name { color: var(--sg-text); }
     main.appendChild(s); return s;
   }
   function hr() { var h = document.createElement('hr'); h.className = 'sg-hr'; main.appendChild(h); }
-  // A token's name, wherever the page shows it, opens what uses it (#uses?t=--name): a plain link.
+  // A token's name, wherever the page shows it, opens a panel in place: its Figma name, its value in each mode, the
+  // components that use it (each linked to its page) and a button to copy it. Nothing moves; Escape or a click outside
+  // closes it, the focus going back to the name.
   var USES = DATA.tokenUses || {};
-  // Every token links, so one nothing uses says so too.
-  function usesLink(v) { return /[?&]all\b/.test(location.search) ? esc(v) : '<a class="sg-uses-link" href="#uses?t=' + encodeURIComponent(v) + '" title="What uses ' + esc(v) + '">' + esc(v) + '</a>'; }
+  function usesLink(v) { return /[?&]all\b/.test(location.search) ? esc(v) : '<button type="button" class="sg-token-link" data-token="' + esc(v) + '" aria-expanded="false" aria-haspopup="dialog">' + esc(v) + '</button>'; }
+  var TOKEN_INFO = (function () {
+    var out = {}, T = DATA.tokens || {};
+    (T.colors || []).forEach(function (g) { (g.items || []).forEach(function (t) { out[t.var] = t; }); });
+    ['spacing', 'radii', 'sizing', 'iconStrokes'].forEach(function (k) { (T[k] || []).forEach(function (t) { if (t && t.var) out[t.var] = t; }); });
+    (T.typography || []).forEach(function (t) { ['size', 'weight', 'lh', 'ls', 'family'].forEach(function (k) { if (t[k] && t[k].var) out[t[k].var] = t[k]; }); });
+    return out;
+  })();
+  var tokenPop = null, tokenFrom = null;
+  function closeToken(back) { if (!tokenPop || tokenPop.hidden) return; tokenPop.hidden = true; if (tokenFrom) { tokenFrom.setAttribute('aria-expanded', 'false'); if (back) tokenFrom.focus(); } tokenFrom = null; }
+  function openToken(btn) {
+    var v = btn.getAttribute('data-token'), t = TOKEN_INFO[v] || {}, u = USES[v] || { direct: [], via: [] };
+    if (!tokenPop) {
+      tokenPop = document.createElement('div'); tokenPop.className = 'sg-token-pop'; tokenPop.setAttribute('role', 'dialog'); tokenPop.hidden = true; document.body.appendChild(tokenPop);
+      tokenPop.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); closeToken(true); } });
+    }
+    var now = getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    var values = t.values ? Object.keys(t.values).map(function (m) { return '<p>' + esc(m) + '  ·  ' + esc(t.values[m]) + '</p>'; }).join('') : '<p>' + esc(t.value || now || '-') + '</p>';
+    var comps = u.direct.map(function (n) { return { n: n }; }).concat(u.via.map(function (x) { return { n: x.name, through: x.through }; }));
+    var seenC = {}; comps = comps.filter(function (c) { if (seenC[c.n]) return false; seenC[c.n] = 1; return true; }).sort(function (a, b) { return a.n.localeCompare(b.n); });
+    tokenPop.setAttribute('aria-label', v);
+    tokenPop.innerHTML = '<p class="sg-token-pop-name"><code>' + esc(v) + '</code></p><dl class="pg-updated">' +
+      (t.figma ? '<div><dt>In Figma</dt><dd><p>' + esc(t.figma) + '</p></dd></div>' : '') +
+      '<div><dt>' + (t.values ? 'In each mode' : 'Its value') + '</dt><dd>' + values + '</dd></div>' +
+      '<div><dt>Used by</dt><dd>' + (comps.length ? comps.slice(0, 12).map(function (c) { return '<p><a class="sg-uses-link" href="#c-' + esc(c.n) + '">' + esc(c.n) + '</a>' + (c.through ? ', through ' + esc(c.through) : '') + '</p>'; }).join('') + (comps.length > 12 ? '<p><a class="sg-uses-link" href="#uses?t=' + encodeURIComponent(v) + '">and ' + (comps.length - 12) + ' more</a></p>' : '') : '<p>No component uses it yet.</p>') + '</dd></div></dl>' +
+      '<div class="sg-token-pop-actions">' + sysButton('button', 'Copy ' + v, ' data-copy-token') + '</div>';
+    tokenPop.querySelector('[data-copy-token]').addEventListener('click', function (e) { copyText('var(' + v + ')', e.currentTarget); });
+    Array.prototype.forEach.call(tokenPop.querySelectorAll('a'), function (a) { a.addEventListener('click', function () { closeToken(false); }); });
+    tokenPop.hidden = false;
+    var r = btn.getBoundingClientRect(), w = Math.min(360, window.innerWidth - 32);
+    tokenPop.style.width = w + 'px';
+    tokenPop.style.left = Math.max(16, Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - w - 16)) + 'px';
+    var below = r.bottom + window.scrollY + 6, h = tokenPop.offsetHeight;
+    tokenPop.style.top = (r.bottom + h + 6 > window.innerHeight && r.top - h - 6 > 0 ? r.top + window.scrollY - h - 6 : below) + 'px';
+    if (tokenFrom && tokenFrom !== btn) tokenFrom.setAttribute('aria-expanded', 'false');
+    tokenFrom = btn; btn.setAttribute('aria-expanded', 'true');
+    tokenPop.setAttribute('tabindex', '-1'); tokenPop.focus({ preventScroll: true });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.sg-token-link');
+    if (b) { e.preventDefault(); if (tokenFrom === b && tokenPop && !tokenPop.hidden) closeToken(true); else openToken(b); return; }
+    if (tokenPop && !tokenPop.hidden && !tokenPop.contains(e.target)) closeToken(false);
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeToken(true); });
+  window.addEventListener('hashchange', function () { closeToken(false); });
   function linkVars(text) { return esc(text).replace(/(^|[^\w-])(--[\w-]+)/g, function (m, pre, v) { return pre + usesLink(v); }); }
   if (DATA.title) { document.getElementById('sg-title').textContent = DATA.title; document.title = DATA.title + ' · Living style guide'; }
 
@@ -585,6 +640,22 @@ a.pg-usage-name { color: var(--sg-text); }
         return '<li value="' + t.no + '">' + (t.comp ? '<a href="#c-' + esc(t.comp) + '">' + esc(t.comp) + '</a>. ' : '') + esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span></li>';
       }).join('') + '</ol>';
       td.appendChild(g);
+    });
+  }
+  // Simplify: where the system could be simpler (one component in several copies, a prop with nothing to choose, a
+  // component no product uses), each with what to do.
+  var SIMPLIFY = DATA.simplify || [];
+  if (SIMPLIFY.length) {
+    hr(); navLink('simplify', 'simplify (' + SIMPLIFY.length + ')');
+    var sp = section('simplify', 'Review', 'Where it could be simpler', 'Components that are one component in several copies, props with nothing to choose and components no product uses. Each says what to do; nothing changes until you decide.');
+    var KIND = { family: 'One component in several copies', 'one-option': 'Nothing to choose', unused: 'Not used' };
+    ['family', 'one-option', 'unused'].forEach(function (k) {
+      var items = SIMPLIFY.filter(function (x) { return x.kind === k; }); if (!items.length) return;
+      var g = document.createElement('div'); g.className = 'sg-todo-group';
+      g.innerHTML = '<h3>' + esc(KIND[k]) + ' (' + items.length + ')</h3><ul class="sg-todo-list">' + items.map(function (x) {
+        return '<li>' + x.components.map(function (n) { return '<a href="#c-' + esc(n) + '">' + esc(n) + '</a>'; }).join(', ') + '. ' + esc(x.say) + '<span class="pg-todo">' + esc(x.todo) + '</span></li>';
+      }).join('') + '</ul>';
+      sp.appendChild(g);
     });
   }
   // What's new: every component's changes gathered by the release they shipped in, newest first, each a table of
@@ -2064,6 +2135,8 @@ a.pg-usage-name { color: var(--sg-text); }
     var actions = sec.querySelector('.pg-actions'), mv = c.motion;
     function action(label, fn) { actions.insertAdjacentHTML('beforeend', sysButton('button', label)); var b = actions.lastElementChild; b.addEventListener('click', function () { fn(b); }); }
     if (!ALL) action('Copy link', function (b) { copyText(location.href.split('#')[0] + linkFor(), b); });
+    // Full width: the component across the whole card, for one that needs the room (a bar, a table); again puts it back.
+    if (!ALL) { action('Full width', function (b) { var card = sec.querySelector('.pg-preview-card'), on = !card.classList.contains('is-wide'); card.classList.toggle('is-wide', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); if (WIDTH !== 'fit') renderFrame(); nudge(); }); actions.lastElementChild.setAttribute('aria-pressed', 'false'); }
     // Opened again by a link: its variant set, the controls following.
     sec._link = function (q) {
       if (!fromLink(q)) { writeLink(); return; }
@@ -2071,8 +2144,6 @@ a.pg-usage-name { color: var(--sg-text); }
       if (widthBar) segItems(widthBar).forEach(function (b) { segSelect(b, b.dataset.v === WIDTH); });
       refresh();
     };
-    // Its specs (parts, paddings, gaps and the tokens behind each) are their own area, drawn as the Playground sets it.
-    if (!ALL) action('See specs', function () { showArea('specs'); var bar = sec.querySelector('.pg-areas'); if (bar && bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ block: 'start' }); });
     if (!ALL && compareEl) { action('Figma', function (b) { compareOn = !compareOn; b.setAttribute('aria-pressed', compareOn ? 'true' : 'false'); if (compareOn && WIDTH !== 'fit') showWidth('fit'); drawCompare(); }); compareBtn = actions.lastElementChild; compareBtn.setAttribute('aria-pressed', 'false'); }
     function playTime(root) { var ms = 0; [root].concat(Array.prototype.slice.call(root.querySelectorAll('*'))).forEach(function (k) { var cs = getComputedStyle(k); cs.animationDuration.split(',').forEach(function (d, i) { var t = (parseFloat(d) || 0) * (/ms$/.test(d.trim()) ? 1 : 1000) + (parseFloat((cs.animationDelay.split(',')[i] || '0')) || 0) * 1000; ms = Math.max(ms, t); }); }); return ms; }
     if (mv && mv.overlay) action('Open ' + c.name, function (trigger) {
