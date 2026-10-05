@@ -269,7 +269,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   style by their tokens, each padding and gap by its token, and its alignment. Width shows it at Fit (the live
   preview), Phone (375px), Tablet (768px) or Desktop (1280px): a frame of that width written with the page's own
   stylesheets, its icon sheet and the component as drawn now, so the system's media queries apply, scaled down to
-  fit the room. Turning Inspect on returns to Fit; choosing a width turns Inspect off.
+  fit the room. Turning Inspect on returns to Fit; choosing a width turns Inspect off. A number that would cover
+  another moves to the nearest free place around it, with a line back (`marker`, for the anatomy too).
+- **A link to each variant**: the address carries the props set away from their defaults and the width
+  (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
+  the controls follow (a value the component does not have is left at its default). Copy link copies it.
 - **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
   out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
@@ -301,7 +305,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`role-markup.mjs`, `behaviour-contract.mjs`: element, name, keys, part roles), each with its WCAG 2.2 criterion;
   the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); and the last browser check's
   findings on it from `.design-system-engine-out/a11y.json` (each finding carries `component` and the file
-  `checkedAt`), or that it has not been checked yet.
+  `checkedAt`), or that it has not been checked yet. **On this variant** (none on the measuring page): tried on the
+  live component whenever the area shows a variant not tried yet, the Playground laid out out of sight for it and
+  drawn again as set afterwards: the Tab stops in order (a radio group one stop, a positive tabindex reported),
+  a control with an interactive role Tab does not reach, a name on each stop, a stop drawn as disabled (its class)
+  that Tab still reaches, the focus change on it, a box holding it or what follows it (at least 3:1 against what is
+  around it, 2.4.7 and 1.4.11), and each behaviour of `a11yView().behaviours` tried with the page's own events (a key
+  only a native element answers is said to be given by the browser).
 - **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,

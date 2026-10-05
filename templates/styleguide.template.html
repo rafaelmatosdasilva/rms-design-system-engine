@@ -231,6 +231,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-anat-marks { position: absolute; inset: 0; pointer-events: none; }
 .pg-anat-space { position: absolute; outline: 1px dotted var(--sg-muted); outline-offset: -1px; }   /* a padding or a gap: outlined, never coloured, so no colour is mistaken for a token's */
 .pg-anat-part { position: absolute; outline: 1px dashed var(--sg-text); }
+.pg-offstage { position: absolute !important; left: -100000px; top: 0; width: 100%; }   /* laid out, never seen: the live accessibility check reads it */
+.pg-anat-lead { position: absolute; height: 0; border-top: 1px solid var(--sg-text); transform-origin: 0 0; }
 .pg-anat-part.is-slot { outline: 2px dashed var(--sg-accent); }
 .pg-anat-num { position: absolute; transform: translate(-50%, -50%); min-width: 18px; height: 18px; padding: 0 var(--sg-space-xxs); box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: var(--sg-radius-pill); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); }
 .pg-anatomy-doc .pg-updated { margin-top: var(--sg-space-l); }
@@ -954,6 +956,141 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       '<span class="pg-wcag">WCAG 1.4.3 Contrast (Minimum) (AA)</span></p>';
   }
 
+  // ── Its accessibility on the variant shown, tried on the live component: what Tab reaches and in what order, whether
+  // each stop shows its focus (a change at least 3:1 against what is around it), a name on each control, and each
+  // behaviour its role and Figma's notes ask for. Keys go in as the page's own events: one only a native element
+  // answers (Space on a <button>) is given by the browser and said so.
+  var FOCUSABLE = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [tabindex], [contenteditable=""], [contenteditable="true"]';
+  var INTERACTIVE = /^(button|link|checkbox|radio|switch|tab|menuitem|menuitemcheckbox|menuitemradio|option|slider|spinbutton|textbox|combobox|searchbox|treeitem)$/;
+  function shown(el) { var cs = getComputedStyle(el); if (cs.visibility === 'hidden' || cs.display === 'none' || el.closest('[hidden]')) return false; var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
+  function tabStops(root) {
+    var all = [root].concat(Array.prototype.slice.call(root.querySelectorAll(FOCUSABLE))).filter(function (el) { return el.matches(FOCUSABLE) && !el.disabled && el.tabIndex >= 0 && shown(el) && !el.closest('[inert]'); });
+    // A radio group is one stop: its checked radio, else its first.
+    var groups = {};
+    all = all.filter(function (el) {
+      if (el.type !== 'radio' || !el.name) return true;
+      var g = groups[el.name] || (groups[el.name] = all.filter(function (x) { return x.type === 'radio' && x.name === el.name; }));
+      return el === (g.find(function (x) { return x.checked; }) || g[0]);
+    });
+    return all.filter(function (e) { return e.tabIndex > 0; }).sort(function (a, b) { return a.tabIndex - b.tabIndex; }).concat(all.filter(function (e) { return e.tabIndex === 0; }));
+  }
+  // Its accessible name, as a screen reader reads it (the common cases): a label, its words, an icon's title.
+  function textName(el) {
+    var out = '';
+    Array.prototype.forEach.call(el.childNodes, function (k) {
+      if (k.nodeType === 3) out += k.textContent;
+      else if (k.nodeType === 1 && k.getAttribute('aria-hidden') !== 'true' && !k.hidden) {
+        if (k.tagName === 'IMG') out += ' ' + (k.getAttribute('alt') || '');
+        else if (k.getAttribute('aria-label')) out += ' ' + k.getAttribute('aria-label');
+        else if (k.tagName.toLowerCase() === 'svg') { var t = k.querySelector('title'); out += ' ' + (t ? t.textContent : ''); }
+        else out += ' ' + textName(k);
+      }
+    });
+    return out.replace(/\s+/g, ' ').trim();
+  }
+  function accName(el) {
+    var by = (el.getAttribute('aria-labelledby') || '').trim();
+    if (by) { var t = by.split(/\s+/).map(function (id) { var n = document.getElementById(id); return n ? n.textContent : ''; }).join(' ').trim(); if (t) return t; }
+    if ((el.getAttribute('aria-label') || '').trim()) return el.getAttribute('aria-label').trim();
+    if (el.labels && el.labels.length) { var l = Array.prototype.map.call(el.labels, function (x) { return textName(x); }).join(' ').trim(); if (l) return l; }
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return /^(button|submit|reset)$/.test(el.type) ? el.value : (el.getAttribute('title') || '').trim();   // a placeholder is not a name
+    return textName(el) || (el.getAttribute('title') || '').trim();
+  }
+  function who(el) { var n = accName(el); return n ? '"' + n.slice(0, 40) + '"' : el.tagName.toLowerCase() + (el.classList[0] ? '.' + el.classList[0] : ''); }
+  function ratioOf(a, b) { var l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); }
+  // Its focus: what changes when it takes the focus from the keyboard, and how strongly that change stands out.
+  var LOOK = ['outlineStyle', 'outlineWidth', 'outlineColor', 'boxShadow', 'borderTopColor', 'borderBottomColor', 'backgroundColor', 'color', 'textDecorationLine'];
+  // Where a focus can show: on it, on a box that holds it (:focus-within), or on what follows it (a hidden native input
+  // whose drawn box comes next: input:focus-visible + .box). An element no one sees (at no opacity, a pixel wide) is not
+  // where a person sees it.
+  function seenBox(el) { var cs = getComputedStyle(el), r = el.getBoundingClientRect(); return cs.visibility !== 'hidden' && +cs.opacity > 0 && r.width > 2 && r.height > 2; }
+  function focusLook(el, root) {
+    var spots = [el];
+    for (var up = el.parentElement; up && root.contains(up); up = up.parentElement) spots.push(up);
+    for (var nx = el.nextElementSibling; nx && spots.length < 24; nx = nx.nextElementSibling) spots = spots.concat([nx], Array.prototype.slice.call(nx.querySelectorAll('*'), 0, 4));
+    spots = spots.filter(seenBox);
+    var read = function () { return spots.map(function (n) { var cs = getComputedStyle(n), o = {}; LOOK.forEach(function (k) { o[k] = cs[k]; }); return o; }); };
+    var was = read();
+    el.focus({ focusVisible: true, preventScroll: true });
+    if (document.activeElement !== el) return null;
+    var now = read(), changed = false, best = 0;
+    el.blur();
+    spots.forEach(function (n, i) {
+      var a = was[i], b = now[i], around = behind(n.parentElement || n);
+      if (!LOOK.some(function (k) { return a[k] !== b[k]; })) return;
+      changed = true;
+      var drawn = b.outlineStyle !== 'none' && parseFloat(b.outlineWidth) > 0;
+      if (drawn && (b.outlineStyle !== a.outlineStyle || b.outlineWidth !== a.outlineWidth || b.outlineColor !== a.outlineColor)) { var oc = rgba(b.outlineColor); if (oc) best = Math.max(best, ratioOf(over(oc, around), around)); }
+      if (b.boxShadow !== a.boxShadow && b.boxShadow !== 'none') { var m = /rgba?\([^)]*\)/.exec(b.boxShadow), sc = m && rgba(m[0]); if (sc) best = Math.max(best, ratioOf(over(sc, around), around)); }
+      ['borderTopColor', 'backgroundColor', 'color'].forEach(function (k) { if (a[k] === b[k]) return; var x = rgba(a[k]), y = rgba(b[k]); if (x && y) best = Math.max(best, ratioOf(over(y, around), over(x, around))); });
+    });
+    return { changed: changed, ratio: best };
+  }
+  // A behaviour tried: its control set up, the act done, then what changed.
+  function tryBehaviour(root, row, roleKey) {
+    var own = roleKey ? '[role="' + roleKey + '"]' + (roleKey === 'spinbutton' ? ',input[type=number]' : '') + (roleKey === 'textbox' ? ',input:not([type=hidden]),textarea' : '') + (roleKey === 'checkbox' ? ',input[type=checkbox]' : '') : '';
+    var CONTROL = 'input:not([type=hidden]),textarea,select,button,[role=button],[role=switch],[role=checkbox],[role=tab],[role=textbox],[role=spinbutton],[role=slider],a[href]';
+    var ctl = (own && (root.matches(own) ? root : root.querySelector(own))) || (root.matches(CONTROL) ? root : root.querySelector(CONTROL)) || root;
+    var tag = ctl.tagName, native = (tag === 'BUTTON' || (tag === 'INPUT' && /^(button|submit|reset|checkbox|radio)$/.test(ctl.type))) ? 'click' : (tag === 'INPUT' || tag === 'TEXTAREA') ? 'type' : '';
+    if (row.act.keys && native === 'click' && row.act.keys.every(function (k) { return k === ' ' || k === 'Enter'; })) return { given: 'a native <' + tag.toLowerCase() + '> answers ' + (row.act.keys[0] === ' ' ? 'Space' : 'Enter') + ' itself' };
+    if (row.act.type && native === 'type') return { given: 'a native text field takes typing itself' };
+    if (row.act.keys && native === 'type' && row.expect === 'valuenow' && ctl.type === 'number') return { given: 'a native number field steps with the arrow keys itself' };
+    var panel = function () { var id = (ctl.getAttribute('aria-controls') || '').split(/\s+/)[0]; return id ? document.getElementById(id) : null; };
+    var st = function () { return { pressed: ctl.getAttribute('aria-pressed'), checked: ctl.getAttribute('aria-checked') || ('checked' in ctl ? String(ctl.checked) : null), expanded: ctl.getAttribute('aria-expanded'), panel: !!(panel() && shown(panel())), selected: ctl.getAttribute('aria-selected'), valuenow: ctl.getAttribute('aria-valuenow') || ('value' in ctl ? String(ctl.value) : null), value: 'value' in ctl ? String(ctl.value) : '', shown: shown(root), focus: document.activeElement }; };
+    var clicks = 0, count = function () { clicks++; }, stop = function (e) { if (e.target.closest && e.target.closest('a[href]')) e.preventDefault(); };
+    ctl.addEventListener('click', count, true); window.addEventListener('click', stop, true);
+    if (row.expect === 'focus-moves') { var items = Array.prototype.filter.call(root.querySelectorAll('button,a[href],input,[tabindex],[role=option],[role=tab],[role=radio],[role=menuitem]'), shown); (items.find(function (x) { return x.tabIndex >= 0; }) || items[0] || ctl).focus({ preventScroll: true }); }
+    else ctl.focus({ preventScroll: true });
+    var was = st(), at = document.activeElement || ctl;
+    if (row.act.click) ctl.click();
+    (row.act.keys || []).forEach(function (k) { ['keydown', 'keyup'].forEach(function (t) { at.dispatchEvent(new KeyboardEvent(t, { key: k, code: k === ' ' ? 'Space' : k, bubbles: true, cancelable: true })); }); });
+    if (row.act.type) { ctl.value = (ctl.value || '') + row.act.type; ctl.dispatchEvent(new Event('input', { bubbles: true })); }
+    var now = st(), flip = function (k) { return now[k] != null && now[k] !== was[k]; }, ok = false, saw = '';
+    if (row.expect === 'aria-pressed') { ok = flip('pressed'); saw = 'aria-pressed stayed ' + (now.pressed || 'unset'); }
+    else if (row.expect === 'aria-checked' || row.expect === 'checked') { ok = flip('checked'); saw = 'it stayed ' + (now.checked === 'true' ? 'checked' : 'unchecked'); }
+    else if (row.expect === 'expanded') { ok = flip('expanded') && (!panel() || now.panel !== was.panel); saw = flip('expanded') ? 'the panel it controls did not change' : 'aria-expanded stayed ' + (now.expanded || 'unset'); }
+    else if (row.expect === 'selected') { ok = now.selected === 'true'; saw = 'aria-selected is ' + (now.selected || 'unset'); }
+    else if (row.expect === 'value') { ok = now.value !== was.value; saw = 'its value did not change'; }
+    else if (row.expect === 'valuenow') { ok = Number(now.valuenow) > Number(was.valuenow); saw = 'its value stayed ' + (now.valuenow || 'unset'); }
+    else if (row.expect === 'hidden') { ok = !now.shown || ctl.getAttribute('aria-expanded') === 'false'; saw = 'it is still shown'; }
+    else if (row.expect === 'focus-moves') { ok = now.focus !== was.focus && root.contains(now.focus); saw = 'the focus stayed where it was'; }
+    else if (row.expect === 'activates') { ok = clicks > 0 || ['pressed', 'checked', 'expanded', 'selected'].some(flip); saw = 'nothing happened'; }
+    ctl.removeEventListener('click', count, true); window.removeEventListener('click', stop, true);
+    return { ok: ok, saw: saw };
+  }
+  function liveA11yHTML(root, a) {
+    var line = function (ok, text, wcag) { return '<p>' + (ok ? 'Passes' : 'Fails') + ': ' + esc(text) + '<span class="pg-wcag">' + esc(wcag) + '</span></p>'; };
+    var out = [], stops = tabStops(root), had = document.activeElement;
+    var interactive = [root].concat(Array.prototype.slice.call(root.querySelectorAll('[role]'))).filter(function (el) { return INTERACTIVE.test(el.getAttribute('role') || '') && shown(el); });
+    var wants = a && a.key && INTERACTIVE.test(a.key);
+    if (stops.length) out.push(line(true, 'Tab reaches ' + (stops.length === 1 ? 'it once: ' : stops.length + ' stops in this order: ') + stops.map(function (s, i) { return (stops.length > 1 ? (i + 1) + ' ' : '') + who(s); }).join(', ') + '.', 'WCAG 2.1.1 Keyboard (A)'));
+    else if (wants || interactive.length) out.push(line(false, 'Tab never reaches it, so it cannot be used without a mouse.', 'WCAG 2.1.1 Keyboard (A)'));
+    else out.push('<p>Nothing in it takes the focus, and as drawn nothing in it needs to.</p>');
+    interactive.filter(function (el) { return stops.indexOf(el) < 0 && !el.closest('[disabled], [aria-disabled="true"]') && !(el.type === 'radio' && el.name); }).forEach(function (el) { out.push(line(false, who(el) + ' acts as a ' + el.getAttribute('role') + ' but Tab does not reach it.', 'WCAG 2.1.1 Keyboard (A)')); });
+    stops.filter(function (el) { return el.tabIndex > 0; }).forEach(function (el) { out.push(line(false, who(el) + ' sets its own place in the Tab order (tabindex="' + el.tabIndex + '"), ahead of the page.', 'WCAG 2.4.3 Focus Order (A)')); });
+    // Drawn as disabled (its class says so) while Tab still reaches it: a screen reader offers a control that does nothing.
+    var looksOff = function (el) { for (var n = el; n && (n === root || root.contains(n)); n = n.parentElement) if (/(^|[-_\s])(is-)?disabled\b/i.test(typeof n.className === 'string' ? n.className : '')) return true; return false; };
+    stops = stops.filter(function (el) {
+      if (!looksOff(el)) return true;
+      out.push(line(false, who(el) + ' is drawn as disabled, but Tab still reaches it. Set disabled on the control itself (or aria-disabled="true").', 'WCAG 4.1.2 Name, Role, Value (A)'));
+      return false;
+    });
+    stops.forEach(function (el) {
+      if (!/[\p{L}\p{N}]/u.test(accName(el))) out.push(line(false, who(el) + ' has no name a screen reader can read' + (accName(el) ? ' (only "' + accName(el) + '")' : '') + '. Give it words, an aria-label or a label.', 'WCAG 4.1.2 Name, Role, Value (A)'));
+      var f = focusLook(el, root);
+      if (!f) return;
+      if (!f.changed) out.push(line(false, who(el) + ' shows no change when it takes the focus.', 'WCAG 2.4.7 Focus Visible (AA)'));
+      else if (f.ratio && f.ratio < 3) out.push(line(false, 'The focus on ' + who(el) + ' stands out ' + (Math.floor(f.ratio * 10) / 10).toFixed(1) + ':1 from what is around it, needs 3:1.', 'WCAG 1.4.11 Non-text Contrast (AA)'));
+    });
+    if (stops.length && !out.some(function (h) { return /Focus Visible|Non-text|Name, Role/.test(h); })) out.push(line(true, (stops.length === 1 ? 'It shows its focus' : 'Each stop shows its focus') + ' and has a name.', 'WCAG 2.4.7 Focus Visible (AA)'));
+    ((a && a.behaviours) || []).forEach(function (row) {
+      var r = tryBehaviour(root, row, a.key);
+      out.push(r.given ? '<p>Given by the browser: ' + esc(row.says) + ' (' + esc(r.given) + ').</p>' : line(r.ok, row.says.replace(/^\w/, function (ch) { return ch.toUpperCase(); }) + (r.ok ? '.' : ', but ' + r.saw + '.'), row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)'));
+    });
+    if (had && had.focus && document.activeElement !== had) had.focus({ preventScroll: true, focusVisible: false });
+    return out.join('');
+  }
+
   // ── Its parity with Figma: what agrees (each value since when), its props and tokens on both sides, what differs
   // (each with who acts and what to do), what the code does not build yet and what could not be compared ──────────
   function differencesHTML(c) {
@@ -1019,6 +1156,11 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     });
   }
   // A text copied, the button says so for a moment and a screen reader hears it.
+  // The address of a view and, after a ?, the props of the variant it shows (#c-chip?Size=L&Label=Save).
+  function hashParts() {
+    var h = location.hash.slice(1), i = h.indexOf('?');
+    return { id: decodeURIComponent(i < 0 ? h : h.slice(0, i)), q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
+  }
   function copyText(text, btn, said) {
     var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
     var done = function () { label('Copied'); if (said) said.textContent = 'Copied'; setTimeout(function () { label(was); if (said) said.textContent = ''; }, 1500); };
@@ -1085,7 +1227,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     var p = function (x) { return '<p>' + esc(x.says) + (x.wcag ? '<span class="pg-wcag">' + esc(x.wcag) + '</span>' : '') + '</p>'; };
     var role = a.role ? '<p>' + esc(a.role) + (a.element ? ': ' + esc(a.element) : '') + '</p>' : '<p>Not stated. Add an annotation to the component in Figma that says its role (role: button), and the page lists what that role asks for.</p>';
     var ch = a.checked, last;
-    if (!ch) last = '<p>Not checked in a browser yet. The audit checks it and this page shows what it found.</p>';
+    if (!ch) last = '<p>Not run yet. The audit checks it on your pages, with real key presses, and this page shows what it found.</p>';
     else if (ch.notRead) last = '<p>' + esc(when(ch.at)) + ': it could not be checked (not drawn on the page that was checked).</p>';
     else if (!ch.issues.length) last = '<p>' + esc(when(ch.at)) + ': nothing found on it.</p>';
     else last = '<p>' + esc(when(ch.at)) + ':</p>' + ch.issues.map(function (i) { return '<p><b>' + esc(i.title) + '</b>: ' + esc(i.details.join('; ')) + '. ' + esc(i.fix) + (i.wcag ? '<span class="pg-wcag">' + esc(i.wcag) + '</span>' : '') + '</p>'; }).join('');
@@ -1093,16 +1235,40 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       '<div><dt>Role</dt><dd>' + role + '</dd></div>' +
       (a.expects.length ? '<div><dt>What it does</dt><dd>' + a.expects.map(p).join('') + '</dd></div>' : '') +
       ((a.excused || []).length ? '<div><dt>Not asked of it</dt><dd>' + a.excused.map(function (x) { return '<p>' + esc(x.says) + ': ' + esc(x.reason) + '</p>'; }).join('') + '</dd></div>' : '') +
+      (ALL ? '' : '<div><dt>On this variant</dt><dd class="pg-a11y-live"></dd></div>') +
       '<div><dt>Text contrast</dt><dd class="pg-contrast"></dd></div>' +
-      '<div><dt>Browser check</dt><dd>' + last + '</dd></div>' +
+      '<div><dt>Last audit</dt><dd>' + last + '</dd></div>' +
       '</dl></div>';
   }
 
   function buildCard(c) {
     var props = c.controls || [];
     var state = {};
-    props.forEach(function (p) { state[p.label] = p.type === 'BOOLEAN' ? !!p.default : (p.default == null ? '' : String(p.default)); });
+    function byDefault(p) { return p.type === 'BOOLEAN' ? !!p.default : (p.default == null ? '' : String(p.default)); }
+    props.forEach(function (p) { state[p.label] = byDefault(p); });
+    // A link to the variant shown: the props set away from their defaults and the width, read when it opens, so a
+    // shared link opens exactly that variant. A value the component does not have is left at its default.
+    function fromLink(q) {
+      if (!q) return false; var any = false;
+      props.forEach(function (p) {
+        if (!q.has(p.label)) return; var v = q.get(p.label);
+        if (p.type === 'BOOLEAN') { if (v !== 'true' && v !== 'false') return; state[p.label] = v === 'true'; }
+        else if (p.type === 'VARIANT') { if (!(p.options || []).some(function (o) { return o.label === v && !o.unbuilt; })) return; state[p.label] = v; }
+        else state[p.label] = v;
+        any = true;
+      });
+      if (q.has('width') && WIDTHS.some(function (w) { return w[0] === q.get('width'); })) { WIDTH = q.get('width'); any = true; }
+      return any;
+    }
+    function linkFor() {
+      var q = props.filter(function (p) { return state[p.label] !== byDefault(p); }).map(function (p) { return encodeURIComponent(p.label) + '=' + encodeURIComponent(String(state[p.label])); });
+      if (WIDTH !== 'fit') q.push('width=' + WIDTH);
+      return '#' + sec.id + (q.length ? '?' + q.join('&') : '');
+    }
+    // Kept as the variant changes, without a new step in the browser's history; only while this view is the one shown.
+    function writeLink() { if (ALL || hashParts().id !== sec.id) return; var h = linkFor(); if (h !== location.hash) history.replaceState(null, '', h); }
     var sec = document.createElement('section'); sec.id = 'c-' + c.name; sec.className = 'sg-section';
+    if (!ALL && hashParts().id === sec.id) fromLink(hashParts().q);
     // Its documentation: Figma's description and annotations first, then the code's own note.
     var figDesc = c.description && c.description.replace(/@\w+/g, '').trim();
     var figNotes = (c.annotations || []).filter(function (a) { return a && a !== figDesc; });
@@ -1175,7 +1341,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     var widthBar = sec.querySelector('.pg-width');
     var inspectBtn = null;
     function showWidth(v) {
-      WIDTH = v;
+      WIDTH = v; writeLink();
       if (v !== 'fit' && inspectOn) { inspectOn = false; if (inspectBtn) inspectBtn.setAttribute('aria-pressed', 'false'); }
       if (widthBar) segItems(widthBar).forEach(function (b) { segSelect(b, b.dataset.v === v); });
       renderFrame(); drawInspect();
@@ -1198,10 +1364,12 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       // The area last chosen, kept for the next component only when that one has it (not every one is built with others).
       if (!sec.querySelector('.pg-area[data-area="' + v + '"]')) v = 'play';
       if (!kept) AREA = v;
+      areaNow = v;
       Array.prototype.forEach.call(sec.querySelectorAll('.pg-area'), function (a) { a.hidden = !ALL && a.getAttribute('data-area') !== v; });
       segItems(areaBar).forEach(function (b) { segSelect(b, b.dataset.v === v); });
       if (v === 'play') nudge();
       if (v === 'docs') requestAnimationFrame(drawAnatomy);
+      if (v === 'a11y') checkLive();
       if (v === 'built') requestAnimationFrame(function () { builtThumbs(sec); });
     }
     segItems(areaBar).forEach(function (b) { b.addEventListener('click', function () { showArea(b.dataset.v); }); });
@@ -1265,9 +1433,26 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     }
     // A layer of marks over a drawing: outlines and numbers, at scale k, never clickable.
     function marker(layer, k) {
+      var placed = [];
       return {
         mark: function (cls, at) { if (at[2] < 0.5 || at[3] < 0.5) return; var m = document.createElement('div'); m.className = cls; m.style.left = at[0] * k + 'px'; m.style.top = at[1] * k + 'px'; m.style.width = at[2] * k + 'px'; m.style.height = at[3] * k + 'px'; layer.appendChild(m); },
-        num: function (n, x, y) { var e = document.createElement('span'); e.className = 'pg-anat-num'; e.textContent = String(n); e.style.left = x * k + 'px'; e.style.top = y * k + 'px'; layer.appendChild(e); }
+        // A number that would cover another moves to the nearest free place around where it belongs, a line back to it.
+        num: function (n, x, y) {
+          var e = document.createElement('span'); e.className = 'pg-anat-num'; e.textContent = String(n); layer.appendChild(e);
+          var w = e.offsetWidth + 2, h = e.offsetHeight + 2, x0 = x * k, y0 = y * k;
+          function free(px, py) { return placed.every(function (q) { return Math.abs(q[0] - px) >= (q[2] + w) / 2 || Math.abs(q[1] - py) >= (q[3] + h) / 2; }); }
+          var at = [x0, y0];
+          for (var ring = 1; !free(at[0], at[1]) && ring <= 6; ring++) {
+            var tries = [[0, -h * ring], [0, h * ring], [-w * ring, 0], [w * ring, 0], [-w * ring, -h * ring], [w * ring, -h * ring], [-w * ring, h * ring], [w * ring, h * ring]];
+            for (var t = 0; t < tries.length; t++) if (free(x0 + tries[t][0], y0 + tries[t][1])) { at = [x0 + tries[t][0], y0 + tries[t][1]]; break; }
+          }
+          if (at[0] !== x0 || at[1] !== y0) {
+            var dx = at[0] - x0, dy = at[1] - y0, lead = document.createElement('div'); lead.className = 'pg-anat-lead';
+            lead.style.left = x0 + 'px'; lead.style.top = y0 + 'px'; lead.style.width = Math.sqrt(dx * dx + dy * dy) + 'px'; lead.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+            layer.insertBefore(lead, layer.firstChild);
+          }
+          e.style.left = at[0] + 'px'; e.style.top = at[1] + 'px'; placed.push([at[0], at[1], w, h]);
+        }
       };
     }
     // The list beside a drawing: its parts (with what each looks like, for Inspect), its spacing and alignment.
@@ -1332,6 +1517,26 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       inspectLegend.querySelector('dl').innerHTML = legendHTML(r, true);
     }
     var contrastEl = sec.querySelector('.pg-contrast');
+    // On this variant: tried on the live component whenever the Accessibility area shows a variant not tried yet. The
+    // Playground is laid out out of sight for it (one task, nothing painted), and what the tries changed (a box ticked)
+    // is drawn again as set.
+    var liveEl = sec.querySelector('.pg-a11y-live'), liveSig = null, checking = false, areaNow = null;
+    function checkLive() {
+      if (ALL || !liveEl || checking || !cur || areaNow !== 'a11y') return;
+      var sig = JSON.stringify(state) + Array.prototype.map.call(document.documentElement.attributes, function (x) { return x.name + x.value; }).join() + Array.prototype.map.call(preview.attributes, function (x) { return x.name + x.value; }).join();
+      if (sig === liveSig) return;
+      checking = true; liveSig = sig;
+      var play = sec.querySelector('[data-area="play"]'), keep = {}, wasPreview = preview.hidden, wasPlay = play.hidden;
+      Object.keys(state).forEach(function (k) { keep[k] = state[k]; });
+      play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false;
+      // All it draws, the box around its control too.
+      try { liveEl.innerHTML = liveA11yHTML(preview.firstElementChild || cur, c.a11y); } catch (e) { liveEl.innerHTML = '<p>It could not be tried here.</p>'; }
+      play.classList.remove('pg-offstage'); play.hidden = wasPlay; preview.hidden = wasPreview;
+      Object.keys(keep).forEach(function (k) { state[k] = keep[k]; });
+      Object.keys(syncs).forEach(function (k) { syncs[k](); });
+      refresh();
+      checking = false;
+    }
     // Every token named after this component (its colours and sizes), with the value in the mode it is shown in.
     function ownRows() {
       if (!tOwn) return;
@@ -1404,7 +1609,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
         cs.opacity !== '1' ? [['opacity', cs.opacity]] : [],
         partRows(el, c.name)
       ));
-      ownRows();
+      ownRows(); writeLink(); checkLive();
       showCode(e);
       if (contrastEl) contrastEl.innerHTML = contrastHTML(e);
       nudge();
@@ -1515,9 +1720,16 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     // container, layers and open and closing classes. Each button is the system's own.
     var actions = sec.querySelector('.pg-actions'), mv = c.motion;
     function action(label, fn) { actions.insertAdjacentHTML('beforeend', sysButton('button', label)); var b = actions.lastElementChild; b.addEventListener('click', function () { fn(b); }); }
-    // Inspect: the marks and each part's tokens, on the live component, as long as it is on.
-    // Inspect marks the live component at the Playground's own width: turned on, the width goes back to Fit; a width
+    // Inspect: the marks and each part's tokens, on the live component, as long as it is on. It marks the live component at the Playground's own width: turned on, the width goes back to Fit; a width
     // chosen turns it off.
+    if (!ALL) action('Copy link', function (b) { copyText(location.href.split('#')[0] + linkFor(), b); });
+    // Opened again by a link: its variant set, the controls following.
+    sec._link = function (q) {
+      if (!fromLink(q)) { writeLink(); return; }
+      Object.keys(syncs).forEach(function (k) { syncs[k](); });
+      if (widthBar) segItems(widthBar).forEach(function (b) { segSelect(b, b.dataset.v === WIDTH); });
+      refresh();
+    };
     if (!ALL) { action('Inspect', function (b) { inspectOn = !inspectOn; b.setAttribute('aria-pressed', inspectOn ? 'true' : 'false'); if (inspectOn && WIDTH !== 'fit') showWidth('fit'); else drawInspect(); }); inspectBtn = actions.lastElementChild; inspectBtn.setAttribute('aria-pressed', 'false'); }
     function playTime(root) { var ms = 0; [root].concat(Array.prototype.slice.call(root.querySelectorAll('*'))).forEach(function (k) { var cs = getComputedStyle(k); cs.animationDuration.split(',').forEach(function (d, i) { var t = (parseFloat(d) || 0) * (/ms$/.test(d.trim()) ? 1 : 1000) + (parseFloat((cs.animationDelay.split(',')[i] || '0')) || 0) * 1000; ms = Math.max(ms, t); }); }); return ms; }
     if (mv && mv.overlay) action('Open ' + c.name, function (trigger) {
@@ -1734,8 +1946,9 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   // With ?all every view shows, one after another, as before.
   var links = document.querySelectorAll('.sg-nav a');
   function route() {
-    var id = decodeURIComponent(location.hash.slice(1)) || 'overview';
-    if (!document.getElementById(id) && BUILDERS[id]) BUILDERS[id]();
+    var at = hashParts(), id = at.id || 'overview', built = !!document.getElementById(id);
+    if (!built && BUILDERS[id]) BUILDERS[id]();
+    if (built && document.getElementById(id)._link) document.getElementById(id)._link(at.q);
     var target = document.getElementById(id) && document.getElementById(id).matches('main > section') ? document.getElementById(id) : document.getElementById('overview');
     if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
     links.forEach(function (a) { var on = a.getAttribute('href').slice(1) === target.id; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });

@@ -173,6 +173,8 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(looks, /Spacing.*chip padding.*--padding-[a-z]+/s);
     assert.match(looks, /--chip-[a-z-]+/, 'the colour tokens of what it draws');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-inspect-marks .pg-anat-num')].map((n) => n.textContent).join()`), await run(`[...document.querySelectorAll('#c-chip .pg-inspect-legend b')].map((b) => b.textContent).join()`));
+    // No number covers another: one that would is moved beside it, a line back to where it belongs.
+    assert.equal(await run(`(() => { const r = [...document.querySelectorAll('#c-chip .pg-inspect-marks .pg-anat-num')].map((n) => n.getBoundingClientRect()); return r.some((a, i) => r.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1)); })()`), false);
     // Width: a chosen width draws it in a frame of that width with the page's own stylesheets (Inspect goes off);
     // Fit brings the live preview back.
     await run(`document.querySelector('#c-chip .pg-width [data-v="phone"]').click()`);
@@ -182,6 +184,15 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(`document.querySelector('#c-chip .pg-frame-label').textContent`), /Phone.*375px wide/);
     await run(`document.querySelector('#c-chip .pg-width [data-v="fit"]').click()`);
     assert.equal(await run(`document.querySelector('#c-chip .pg-frame').hidden + '|' + document.querySelector('#c-chip .pg-preview').hidden`), 'true|false');
+    // A link to the variant: the props set away from their defaults in the address, kept as they change, and a link
+    // opened sets them, the controls following.
+    assert.equal(await run(`location.hash`), '#c-chip?Size=L');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].some((b) => b.textContent === 'Copy link')`), true);
+    await run(`location.hash = '#overview'`); await new Promise((r) => setTimeout(r, 200));
+    await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'M').click()`);
+    assert.equal(await run(`location.hash`), '#overview', 'a view not shown leaves the address alone');
+    await run(`location.hash = '#c-chip?Size=L&Nope=1'`); await new Promise((r) => setTimeout(r, 300));
+    assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l') + '|' + [...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').getAttribute('aria-pressed')`), 'true|true');
     // Its API read from Chip.jsx, and its accessibility: the role's obligations with their WCAG criterion, the text
     // contrast measured as drawn, and no browser check yet.
     assert.match(await run(`document.querySelector('#c-chip .pg-footer').textContent`), /Props.*Label.*default Filter.*Read from src\/components\/Chip\.jsx/s);
@@ -189,10 +200,18 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(a11y, /togglebutton: a <button type="button"> with aria-pressed/);
     assert.match(a11y, /WCAG 2\.1\.1 Keyboard \(A\)/);
     assert.match(a11y, /Passes: \d+\.\d:1 on "Filter", needs 4\.5:1/);
-    assert.match(a11y, /Not checked in a browser yet/);
+    assert.match(a11y, /Last audit.*Not run yet/s);
     await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Passes|Fails/, 'measured again in the other mode');
+    // On this variant: tried on the live component when the Accessibility area shows it, and again for another variant.
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
+    const live = await run(`document.querySelector('#c-chip .pg-a11y-live').textContent`);
+    assert.match(live, /Tab reaches it once: "Filter"/);
+    assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
+    assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
+    assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in,Changelog');
@@ -392,6 +411,9 @@ test('accessibility per component: its role\'s obligations and behaviours with W
   assert.equal(v.element, 'a <button type="button"> with aria-pressed="true" or "false" (on or off)');
   assert.deepEqual(v.expects.map((x) => x.wcag), ['WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 2.1.1 Keyboard (A)', 'WCAG 2.1.1 Keyboard (A)', 'WCAG 1.3.1 Info and Relationships (A)']);
   assert.match(v.expects[3].says, /^Escape closes it\.$/);
+  // What the page tries on the live component: its role's behaviours and the annotation's, with how each is done.
+  assert.deepEqual(v.behaviours.map((b) => [b.id, b.expect, b.act.keys ?? b.act]), [['keys-toggle', 'aria-pressed', [' ']], ['escape-closes', 'hidden', ['Escape']]]);
+  assert.equal(v.key, 'togglebutton');
   assert.deepEqual(v.checked.issues.map((i) => [i.kind, i.title, i.wcag, i.details]), [
     ['contrast', 'Text is hard to read (2)', 'WCAG 1.4.3 Contrast (Minimum) (AA)', ['"Filter" 3.2:1, needs 4.5:1 (dark)', '"Off" 2.9:1, needs 4.5:1 (light)']],
     ['behaviour', 'behaviour', 'WCAG 2.1.1 Keyboard (A)', ['chip: Space does not flip aria-pressed']],

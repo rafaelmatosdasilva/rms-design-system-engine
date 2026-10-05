@@ -8,7 +8,7 @@
 //
 // Pure: agreedView takes what the generator read and returns { components, notAgreed, modes }.
 import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
-import { behavioursFor, partSheetLines } from './behaviour-contract.mjs';
+import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs';
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // A Figma prop name without its node suffix ("Label#3:4" → "Label").
@@ -1160,7 +1160,9 @@ export function a11yView({ name, cls = null, role = null, annotations = [], part
   }
   for (const x of expects) x.wcag = wcagLabel(x.wcag);
   for (const x of checked?.issues ?? []) x.wcag = wcagLabel(x.wcag);
-  return { role: role ?? null, ...(known ? { element: roleMarkup(role) } : {}), expects, excused, checked };
+  // What the page tries on the live component: each behaviour its role and Figma's notes ask for.
+  const behaviours = b.rows.map((r) => ({ id: r.id, says: r.says, act: r.act, expect: r.expect }));
+  return { role: role ?? null, ...(known ? { element: roleMarkup(role), key: roleKey(role) } : {}), expects, excused, checked, behaviours };
 }
 
 // ── Parity, per component: what agrees with Figma and what does not ────────────────────────────────────────────────
