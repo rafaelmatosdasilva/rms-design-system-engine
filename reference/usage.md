@@ -675,10 +675,14 @@ The rules are `--check-ui`'s, plus:
   under 🖱.
 - **Every state.** A composition names its other states beside it, `"states": { "<name>": { "<id>": { …that part in
   this state… } } }` (in the composition, or beside `"prototype"` in the file), each naming by `id` only the parts that
-  differ; `null` leaves a part out. Each state is checked as a whole page (a state that names no part is an error), its
-  gaps join the prototype's, and the page has a switch for it (`#state=<name>` opens one). The page owes an empty state
-  when it shows a list (a part holding two or more of the same system component, or a component named or made for a
-  list, table, grid or feed), an error state when it takes input (a field and a button), and each state the request
+  differ; `null` leaves a part out, and a part with no `component` keeps its own with the `props` given over its own.
+  Each state is checked as a whole page (a state that names no part is an error), its gaps join the prototype's, and
+  the page has a switch for it (`#state=<name>` opens one). A value written as a person would (`false` for an option of
+  False and True, an option in another case) is read as the system writes it. The page owes an empty state when it
+  shows a list (two or more of the same system component that is not a control, two or more arrangements alike, a
+  row each with a name and a tag, a component named or made for a list, table, grid or feed, or a request that says
+  list; fields, buttons and chips side by side are a form or a set of choices), an error state when it takes input (a
+  field and a button), and each state the request
   names ("with a loading state") or the team's guidelines ask of the page or of a component it uses ("every list shows
   an empty state"). A state is found by its kind, whatever its name ("No results" is an empty state). One not given is
   a ⚠️ line the reply owes.
@@ -697,9 +701,11 @@ The rules are `--check-ui`'s, plus:
   flow starts and where it ends, and the team's flows: steps joined by arrows ("Sign-up: Account → Plan → Welcome") in
   the guidelines or the design intent's flows layer, or a numbered or bulleted list under a heading that says flow,
   journey or funnel. Each step is matched to the prototype whose name or main heading shares its words; a step with no
-  prototype, and two steps in a row whose pages do not link, are ⚠️ lines the reply owes. A link whose words go back
-  (Back, Previous) is a way back, not a step. The pages of a flow are held to each other as the product's pages are, the
-  flow's own order deciding which came first, and when one page after the first has a way back, every one must.
+  prototype, and two steps in a row whose pages do not link, are ❌ lines. A link whose words go back (Back, Previous)
+  is a way back, not a step. The pages of a flow are held to each other as the product's pages are, every page of it
+  voting and the flow's own order breaking a tie, and when one page after the first has a way back, every one must.
+  A flow with a ❌ line exits 1 and is not done: each one is fixed in the page it names and the flow run again until
+  it says ✅ the flow holds.
 - **Design review.** With Chrome, the drawn page is reviewed as a designer would before anyone sees it, and scored out
   of 10 under 🎨: the parts of a column start on one line (a component's own margin that pushes one in is named), one
   arrangement keeps one spacing and the page a few, one part styled as the primary action is in view (the system's
@@ -717,8 +723,8 @@ The rules are `--check-ui`'s, plus:
   kind of action is called and the component it is (save, cancel, go on, go back, delete, create: "Save" on every page,
   never "Submit" on one; a button for it everywhere, never a chip on one page), and the answer given to each need the
   system lacks (a chip as a stand-in on one page and a Missing box on another is a difference). A decision counts when
-  two pages share it, or one screen a designer made in Figma (in the screen capture, or a starting point from
-  `--from-screens`), and no other value weighs as much; where nothing is shared yet (one page, or pages that disagree
+  two pages share it (the page being drawn votes too), or one screen a designer made in Figma (in the screen capture,
+  or a starting point from `--from-screens`), and no other value weighs as much; where nothing is shared yet (one page, or pages that disagree
   evenly), the first page made sets it, for the pages made after it only, so a product with no patterns or templates
   still gets pages that match. `prototypes/conventions.json` (`{ "page": { "padding":
   … }, "heading": { "style": … }, "actions": { "at": "end", "justify": "end" }, "needs": { "<need>": "<answer>" } }`),
