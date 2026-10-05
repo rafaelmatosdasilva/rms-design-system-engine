@@ -31,6 +31,9 @@ test('rules: never asks for a token, never commits, never edits a snapshot or un
   assert.equal(asksForToken('**Give me a hex/token to use** (or confirm a green is fine)'), false);
   assert.equal(asksForToken('You tell me what green/token to use.'), false);
   assert.equal(asksForToken('Once you provide the token, I can complete setting up the guidelines.'), true);
+  // Steps that put the token in .env, introduced by "you'll need to provide a token:": set up in the project, not asked in chat.
+  assert.equal(asksForToken("To proceed, you'll need to provide a GitLab personal access token:\n\n1. Create one with the read_api scope\n2. Add it to a .env file in this project as GITLAB_TOKEN=<your-token>"), false);
+  assert.equal(asksForToken('You will need to provide your API key. Then I can run it.'), true);
   assert.equal(asksForToken("The label and background token pairs aren't contrast-checked because text and background share the same token."), false);   // design tokens in common, seen in a real run
   assert.equal(asksForToken('Please share the Figma token so I can refresh.'), true);
   assert.equal(asksForToken('NEXT (from the tool): tell you what fails under Token values and its fix; only change src/theme.css if you ask me to.'), false);   // a gate name, seen in a real run
