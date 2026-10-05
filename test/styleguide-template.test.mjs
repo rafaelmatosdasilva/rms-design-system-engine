@@ -162,6 +162,26 @@ test('in the browser: no script error, a control changes the real component, the
     // system's own button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-code code').textContent`), '<Chip Size="L" />');
     assert.equal(await run(`document.querySelector('#c-chip .pg-code [data-copy]').tagName`), 'BUTTON');
+    // Inspect: the live component marked where it is, each part and padding numbered, the list below naming the token
+    // of each (its colours and text style included); never a second component.
+    const inspectBtn = `[...document.querySelectorAll('#c-chip .pg-actions button')].find((b) => b.textContent === 'Inspect')`;
+    await run(`${inspectBtn}.click()`);
+    for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-preview .pg-inspect-marks .pg-anat-num').length`)); i++) await new Promise((r) => setTimeout(r, 50));
+    assert.equal(await run(`${inspectBtn}.getAttribute('aria-pressed')`), 'true');
+    assert.equal(await run(`document.querySelectorAll('#c-chip .pg-preview .chip').length`), 1);
+    const looks = await run(`document.querySelector('#c-chip .pg-inspect-legend').textContent`);
+    assert.match(looks, /Spacing.*chip padding.*--padding-[a-z]+/s);
+    assert.match(looks, /--chip-[a-z-]+/, 'the colour tokens of what it draws');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-inspect-marks .pg-anat-num')].map((n) => n.textContent).join()`), await run(`[...document.querySelectorAll('#c-chip .pg-inspect-legend b')].map((b) => b.textContent).join()`));
+    // Width: a chosen width draws it in a frame of that width with the page's own stylesheets (Inspect goes off);
+    // Fit brings the live preview back.
+    await run(`document.querySelector('#c-chip .pg-width [data-v="phone"]').click()`);
+    assert.equal(await run(`${inspectBtn}.getAttribute('aria-pressed') + '|' + document.querySelector('#c-chip .pg-inspect-legend').hidden + '|' + document.querySelector('#c-chip .pg-preview').hidden`), 'false|true|true');
+    assert.equal(await run(`document.querySelector('#c-chip .pg-frame iframe').style.width`), '375px');
+    assert.equal(await run(`(() => { const d = document.querySelector('#c-chip .pg-frame iframe').contentDocument; const e = d.querySelector('.pg-frame-stage .chip'); return !!e && d.defaultView.getComputedStyle(e).height; })()`), '32px', 'styled by the system in the frame, at the size set (L)');
+    assert.match(await run(`document.querySelector('#c-chip .pg-frame-label').textContent`), /Phone.*375px wide/);
+    await run(`document.querySelector('#c-chip .pg-width [data-v="fit"]').click()`);
+    assert.equal(await run(`document.querySelector('#c-chip .pg-frame').hidden + '|' + document.querySelector('#c-chip .pg-preview').hidden`), 'true|false');
     // Its API read from Chip.jsx, and its accessibility: the role's obligations with their WCAG criterion, the text
     // contrast measured as drawn, and no browser check yet.
     assert.match(await run(`document.querySelector('#c-chip .pg-footer').textContent`), /Props.*Label.*default Filter.*Read from src\/components\/Chip\.jsx/s);

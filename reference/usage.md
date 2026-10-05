@@ -264,6 +264,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   and numbered after the parts and named by its token in the list (numbers, never colours, so nothing reads as a
   token's colour), and how it lines up its items. A component shown in an overlay is drawn as its own element; none
   on the measuring page.
+- **Inspect and Width**, in the Playground (none on the measuring page): Inspect marks the live component with the
+  anatomy's numbers (`annotate`, shared with the anatomy) and lists below it each part's colours, icon size and text
+  style by their tokens, each padding and gap by its token, and its alignment. Width shows it at Fit (the live
+  preview), Phone (375px), Tablet (768px) or Desktop (1280px): a frame of that width written with the page's own
+  stylesheets, its icon sheet and the component as drawn now, so the system's media queries apply, scaled down to
+  fit the room. Turning Inspect on returns to Fit; choosing a width turns Inspect off.
 - **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
   out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
