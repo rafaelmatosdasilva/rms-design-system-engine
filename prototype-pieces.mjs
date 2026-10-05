@@ -246,6 +246,18 @@ export function mergeGaps(byPrototype = {}) {
   return [...merged.values()].sort((a, b) => b.prototypes.length - a.prototypes.length || (a.kind === 'layout') - (b.kind === 'layout'));
 }
 
+// The engine's layout pieces a system lacks (Row, Stack, Page) are one need for the design team: one line.
+export function groupLayout(gaps = []) {
+  const layout = gaps.filter((g) => g.kind === 'layout' && /^an? (\w+) layout component$/i.test(String(g.need)));
+  if (layout.length < 2) return gaps;
+  const names = layout.map((g) => /^an? (\w+) layout component$/i.exec(g.need)[1]);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+  const prototypes = [...new Set(layout.flatMap((g) => g.prototypes ?? []))];
+  const one = { kind: 'layout', need: `${list} layout components`, used: "the engine's own", closest: null, note: null, ...(prototypes.length ? { prototypes } : {}) };
+  const at = gaps.indexOf(layout[0]);
+  return [...gaps.slice(0, at).filter((g) => !layout.includes(g)), one, ...gaps.slice(at).filter((g) => !layout.includes(g))];
+}
+
 // One line per gap, for the summary and the reply.
 export function gapLine(g) {
   const where = g.prototypes ? ` (needed in ${g.prototypes.length} prototype${g.prototypes.length === 1 ? '' : 's'}: ${g.prototypes.join(', ')})` : '';

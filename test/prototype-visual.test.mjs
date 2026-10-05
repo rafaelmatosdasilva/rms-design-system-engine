@@ -12,8 +12,8 @@ const clean = {
 };
 
 test('a page aligned, on one rhythm, with one main action and a clear hierarchy scores 10', () => {
-  assert.deepEqual(visualFindings(clean), { score: 10, findings: [] });
-  assert.deepEqual(visualFindings(null), { score: null, findings: [] });
+  assert.deepEqual(visualFindings(clean), { score: 10, findings: [], limits: [] });
+  assert.deepEqual(visualFindings(null), { score: null, findings: [], limits: [] });
 });
 
 test('each problem is named with what to do, and takes points off', () => {
@@ -41,6 +41,17 @@ test('a heading no larger or heavier than the text it heads reads as body text',
   const c = structuredClone(clean);
   c.texts.push({ text: 'Payment', chars: 7, size: 13, weight: 400, level: 2, lines: 1, path: '0.4' });
   assert.deepEqual(visualLines(visualFindings(c)), ['⚠️  the heading "Payment" looks like body text (13px, weight 400): use a larger or heavier text style']);
+});
+
+test('a heading already in the system\'s largest text style is the system\'s limit: a gap to name, never taken off the score', () => {
+  const c = structuredClone(clean);
+  c.texts.push({ text: 'Payment', chars: 7, size: 13, weight: 400, level: 2, lines: 1, path: '0.4' });
+  const v = visualFindings(c, { textStyles: [{ name: 's', size: 11, weight: 400 }, { name: 'm', size: 13, weight: 400 }] });
+  assert.deepEqual([v.score, v.findings.length], [10, 0]);
+  assert.deepEqual(v.limits.map((l) => l.need), ['a heading text style']);
+  assert.match(visualLines(v).join('\n'), /ℹ️ {2}the heading "Payment" is in the system's largest text style \(m, 13px\), the same as its body text: the system has no heading style; say so as a gap/);
+  // A larger style the heading does not use is still the page's to fix.
+  assert.equal(visualFindings(c, { textStyles: [{ name: 'm', size: 13, weight: 400 }, { name: 'l', size: 18, weight: 600 }] }).findings.length, 1);
 });
 
 test('a column centred on purpose is not misaligned, and many spacings across the page are one line', () => {
