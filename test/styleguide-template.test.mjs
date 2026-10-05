@@ -174,6 +174,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Passes|Fails/, 'measured again in the other mode');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
+    // Built with only where the component is made of others (the chip is not).
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
@@ -476,4 +477,32 @@ test('usage on every component, from Figma, the code or the authored contract; t
   assert.deepEqual(low.map((c) => `${c.text} on ${c.on} in ${c.mode}`), ['muted on bg in light']);
   const page = `<html lang="en"><head><style>/*sg-contrast:${JSON.stringify(low)}*/</style></head><body><main><h1>S</h1></main></body></html>`;
   assert.match(failures(checkStyleguidePage(page, { missing: [] })).map((f) => f.why).join(), /muted text on its bg background is 3\.\d:1 in light, below 4\.5:1/);
+});
+
+test('built with: its own area, each component the overview\'s card with its preview, linked to its page', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /\['built', 'Built with'\], \['used', 'Used in'\]/);
+  const src = tpl.slice(tpl.indexOf('function builtWithHTML'), tpl.indexOf('function builtThumbs'));
+  const html = new Function('DATA', 'esc', src + 'return builtWithHTML;')({ ui: { card: { cls: 'card' } } }, (x) => String(x))({ uses: ['buttonPrimary', 'buttonSecondary'] });
+  assert.equal(html, '<div class="sg-card-grid"><a class="sg-card card" href="#c-buttonPrimary"><div class="sg-thumb" aria-hidden="true" data-thumb="buttonPrimary"></div><h3>buttonPrimary</h3></a><a class="sg-card card" href="#c-buttonSecondary"><div class="sg-thumb" aria-hidden="true" data-thumb="buttonSecondary"></div><h3>buttonSecondary</h3></a></div>');
+  assert.doesNotMatch(tpl.slice(tpl.indexOf('function importHTML'), tpl.indexOf('function builtWithHTML')), /pg-usage-label">Built with/, 'no longer a row of buttons under the import line');
+  assert.match(tpl, /if \(!sec\.querySelector\('\.pg-area\[data-area="' \+ v \+ '"\]'\)\) v = 'play';/, 'a component without it opens on the playground');
+});
+
+test('the playground and the preview stay linked: a part\'s state set on the part, a product\'s selector ignored, a label edit changes only its words', async () => {
+  const { optionEffect, ownSelector, realizedControls } = await import('../styleguide-data.mjs');
+  assert.deepEqual(optionEffect('.radioButton', '.radioButton-input:checked'), { add: [], attrs: { checked: '' }, target: '.radioButton-input' });
+  assert.deepEqual(optionEffect('.badge', '.badge.high'), { add: ['high'], attrs: {} });
+  assert.equal(ownSelector('radioButton', '.depth-option.done'), false);
+  assert.equal(ownSelector('radioButton', '.radioButton-input:checked'), true);
+  // A contract mapping State to a product's own markup (.depth-option) is not the component's: Selected falls back to its
+  // own :checked rule, and an option the code does not build is offered as not built, never drawn with another's look.
+  const r = realizedControls({ name: 'radioButton', cls: 'radioButton',
+    defs: { State: { type: 'VARIANT', defaultValue: 'Default', variantOptions: ['Default', 'Selected', 'Unselected'] } },
+    propertyMap: { State: { Default: '.depth-option', Selected: '.depth-option.done', Unselected: '.depth-option.unavailable' } },
+    cssText: '.radioButton { display: flex } .radioButton-input:checked + .radioButton-circle { border-color: red }' });
+  assert.deepEqual(r.controls[0].options, [{ label: 'Default' }, { label: 'Selected', add: [], attrs: { checked: '' }, target: '.radioButton-input' }, { label: 'Unselected', unbuilt: true }]);
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /if \(!field\.value \|\| !leaf \|\| !cur \|\| !cur\.isConnected \|\| !cur\.contains\(leaf\)\) \{ refresh\(\); return; \}/, 'a label edit writes into its part, the rest as it is');
+  assert.match(tpl, /o\.unbuilt \? 'Figma has this option; the code does not build it yet'/);
 });
