@@ -155,6 +155,11 @@ test('components: a stroked design with no visible border, sides Figma names, an
   const d = Object.fromEntries(compareComponents(code, structure, {}, cfg, maps()).differ.map((x) => [x.component, `${x.field}: ${x.figma} / ${x.code}`]));
   assert.equal(d.s, 'stroke: border on right / border on bottom');
   assert.equal(d.o, 'opacity (disabled): 0.24 / 0.4');
+  // An inside stroke drawn as an inset ring is a border on every side; a drop shadow is none.
+  const ring = (shadow) => ({ components: { t: { confidence: 'high', instance: { hasText: true }, props: { ...w('0px'), borderTopColor: { value: 'rgb(64, 64, 64)' }, boxShadow: { value: shadow } } } } });
+  const strokeOf = (code) => compareComponents(code, { t: { strokeOnDefault: true } }, {}, cfg, maps()).differ.filter((x) => x.field === 'stroke').length;
+  assert.equal(strokeOf(ring('rgb(232, 232, 232) 0px 0px 0px 1.5px inset')), 0, 'an inset ring is the stroke');
+  assert.equal(strokeOf(ring('rgba(0, 0, 0, 0.2) 0px 1px 2px 0px')), 1, 'a drop shadow is no stroke');
 });
 
 test('components: the extended capture adds width, stroke widths, opacity and text facts', () => {

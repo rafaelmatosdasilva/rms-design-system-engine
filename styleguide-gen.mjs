@@ -489,7 +489,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const c of view.components) for (const t of [...(c.ownTokens?.colors ?? []), ...(c.ownTokens?.sizes ?? [])]) put(t);
       const classes = view.components.map((c) => c.cls).filter((x) => x && !/^#/.test(x));
       for (const c of view.components) {
-        if (!c.cls || /^#/.test(c.cls)) continue;
+        if (!c.cls) continue;
         const own = allComponentTokens(allCss, c.cls, classes);
         // The tokens named after it that its rules reach only through another token stay listed too.
         for (const t of [...(c.ownTokens?.colors ?? []), ...(c.ownTokens?.sizes ?? [])]) if (!own.some((e) => e.var === t.var)) own.push({ var: t.var, props: [] });
