@@ -255,8 +255,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said, and the overview counts each section across the components.
-- **The page's own reading**: every button says what it does in words (Menu, Close menu, Hide menu; a hidden menu is
-  remembered in the browser), and the style guide check fails when the page's text roles fall below 4.5:1 on its
+- **The page's own reading**: every button says what it does in words (Menu, Close menu, and a small Hide at the menu's
+  top right that gives the page the whole width; a hidden menu is remembered in the browser), and the style guide check fails when the page's text roles fall below 4.5:1 on its
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
 - **Anatomy**, first in Documentation: an inert copy of the component as the Playground set it, drawn larger, each
   part numbered in reading order (the contract's named parts, `c.anatomy`, a Figma auto name such as Frame 106
@@ -266,6 +266,14 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   on the measuring page.
 - **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
   out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
+- **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
+  (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
+  component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
+  `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`) and
+  `contract.authored.json` → `components.<name>.links`.
+- **Changelog**, an area of its own: when Figma was last read for it, then each commit that changed it (its own file,
+  or a line of the shared stylesheet holding its class; the project's own files only), grouped by the release tag
+  (`v*`) that holds it, each linked to its commit and its pull request.
 - **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
   `docs/preview.png`, `docs/screenshot.png`, `preview.png` … beside its page), else its page pictured in Chrome as it
   opens with the component's places marked (`product-shots.mjs`, window size from its `showUI` call), and how many
