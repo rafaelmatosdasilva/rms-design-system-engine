@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Prototypes: flows, a design review, and pages held to each other (continuous evaluation)
+
+What changed since the entry below (engine ca59a27): reference/usage.md and the prototype recipe: click-through flows held to the team's flows, a design review scored in Chrome, and pages compared on text styles and action words, the first page made setting what none share yet. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `ab809a3f4f96` · Project measured: `13d811a9d668`
+
+| Haiku, engine ce48769 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.055 |
+| Input a run | 105k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 105k. Records: `records/2026-10-05-prototypes-click-through-flows-a`.
+
 ## 2026-10: Prototypes: usage, Do and Don't, interactive, gaps to Figma, every state and screen size (continuous evaluation)
 
 What changed since the entry below (engine cf070d8): reference/usage.md and the prototype and figma-edits recipes: a component's usage and Do and Don't in the prototype catalog and checks; prototypes that work (opens, selections, fields); the prototypes' gaps written to Figma as a to do list after a yes; every state, every screen width and longer words checked in Chrome. The guide changed in `cookbook/figma-edits.md`, `cookbook/prototype.md`, `reference/usage.md`, `rms-design-system-engine.md`.
