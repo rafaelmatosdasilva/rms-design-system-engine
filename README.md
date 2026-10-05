@@ -179,7 +179,7 @@ Each check is called a gate. To run just one, use its number or its name, for ex
 | 4 | Tokens used in screens exist | Nothing a screen uses is missing from the code |
 | 5 | Every mode is covered | Things that should change between light and dark really do |
 | 6 | Exception lists are valid | Your "ignore this" notes still point at real things |
-| 7 | No invented CSS variables | Every variable in the code comes from a Figma token |
+| 7 | No invented CSS variables | Every variable in the code comes from a Figma token, and carries that token's Figma name (a variable called by another name is listed; `figmaNames: "strict"` fails it) |
 | 8 | Docs tell the truth | Your docs mention only things that exist |
 | 9 | No invented text casing | No forced UPPERCASE the design did not ask for |
 | 10 | No hand-built DS components | Screens use the real component, not a hand-made copy |

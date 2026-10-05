@@ -1,5 +1,7 @@
 # /rms-design-system-engine - the engine of a design system
 
+**Loading this page runs nothing.** Run the command yourself, in the shell, now: with arguments, `rms-design-system-engine <those arguments>`; then answer from what it prints (its `NEXT:` line says what to do after). Never wait for it to run on its own.
+
 **In one line:** given a Figma design system and its codebase, decide whether the code
 matches the design, and emit machine-readable facts (real token names, values, selectors
 and component relationships) that other tools and AI agents can consume without guessing.
