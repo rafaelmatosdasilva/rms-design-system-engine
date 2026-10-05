@@ -175,7 +175,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Passes|Fails/, 'measured again in the other mode');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in,Changelog');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
@@ -505,4 +505,29 @@ test('the playground and the preview stay linked: a part\'s state set on the par
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /if \(!field\.value \|\| !leaf \|\| !cur \|\| !cur\.isConnected \|\| !cur\.contains\(leaf\)\) \{ refresh\(\); return; \}/, 'a label edit writes into its part, the rest as it is');
   assert.match(tpl, /o\.unbuilt \? 'Figma has this option; the code does not build it yet'/);
+});
+
+test('links and changelog: Figma, the code and the team\'s pages; each commit that changed the component, by its release and pull request', async () => {
+  const { normalizeRepo, commitUrl, prUrl, fileUrl, changelogs } = await import('../component-changelog.mjs');
+  assert.equal(normalizeRepo('git+https://github.com/o/r.git'), 'https://github.com/o/r');
+  assert.equal(normalizeRepo('git@gitlab.example.com:team/ds.git'), 'https://gitlab.example.com/team/ds');
+  assert.equal(fileUrl('https://github.com/o/r', 'main', 'src/theme.css', 12), 'https://github.com/o/r/blob/main/src/theme.css#L12');
+  assert.equal(commitUrl('https://gitlab.example.com/team/ds', 'abc'), 'https://gitlab.example.com/team/ds/-/commit/abc');
+  assert.equal(prUrl('https://github.com/o/r', '7'), 'https://github.com/o/r/pull/7');
+  // A small repository: a commit on the badge's rule, released as v1.0.0, then one on another rule, then a pull request
+  // that changes the badge again; a commit that did not touch the badge is never in its changelog.
+  const dir = mkdtempSync(join(tmpdir(), 'changelog-'));
+  const git = (...a) => spawnSync('git', a, { cwd: dir, encoding: 'utf8' });
+  git('init', '-q', '-b', 'main'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
+  const css = (s) => writeFileSync(join(dir, 'theme.css'), s);
+  css('.badge { color: red; }\n.chip { color: blue; }\n'); git('add', '.'); git('commit', '-qm', 'Badge and chip'); git('tag', 'v1.0.0');
+  css('.badge { color: red; }\n.chip { color: green; }\n'); git('commit', '-qam', 'Chip colour');
+  git('checkout', '-qb', 'feature'); css('.badge { color: maroon; }\n.chip { color: green; }\n'); git('commit', '-qam', 'Badge colour');
+  git('checkout', '-q', 'main'); git('merge', '-q', '--no-ff', 'feature', '-m', 'Merge pull request #4 from o/feature');
+  const logs = changelogs(dir, [{ name: 'badge', files: ['theme.css'], pattern: '\\.badge[^a-zA-Z0-9_-]' }]);
+  assert.deepEqual(logs.badge.map((r) => [r.subject, r.release, r.pr]), [['Badge colour', null, '4'], ['Badge and chip', 'v1.0.0', null]]);
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /\['log', 'Changelog'\]/);
+  assert.match(tpl, /importHTML\(c\) \+ linksHTML\(c\.links\)/);
+  assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
 });

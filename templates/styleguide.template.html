@@ -229,6 +229,10 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-anat-num { position: absolute; transform: translate(-50%, -50%); min-width: 18px; height: 18px; padding: 0 var(--sg-space-xxs); box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: var(--sg-radius-pill); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); }
 .pg-anatomy-doc .pg-updated { margin-top: var(--sg-space-l); }
 .pg-from, .pg-missing { color: var(--sg-muted); }
+.pg-log { margin: var(--sg-space-m) 0 var(--sg-space-l); }
+.pg-log > h4 { font-size: var(--sg-m); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }
+.pg-log ul { margin: 0; padding-left: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-xs); }
+.pg-log-date { color: var(--sg-muted); font-weight: var(--sg-s-weight); }
 .pg-missing { font-style: italic; }
 .pg-doc > .pg-from { margin-top: var(--sg-space-s); }
 .pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sg-space-m); align-items: start; }
@@ -244,9 +248,11 @@ a.pg-usage-name { color: var(--sg-text); }
 /* The menu hidden on a wide screen: a bar at the top with the button that brings it back, the page at full width. */
 body.sg-nav-hidden .sg-sidebar { display: none; }
 body.sg-nav-hidden .sg-layout { flex-direction: column; }
+body.sg-nav-hidden .sg-main { width: 100%; box-sizing: border-box; max-width: 1480px; }   /* the room the menu gave back, never less than with it */
 body.sg-nav-hidden .sg-topbar { display: flex; align-items: center; gap: var(--sg-space-s); position: sticky; top: 0; z-index: 20; padding: var(--sg-space-s) var(--sg-space-l); background: var(--sg-bg); border-bottom: var(--sg-line); }
 body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; }
-.sg-hide-nav { margin-top: var(--sg-space-s); }
+.sg-sidebar-header { position: relative; }
+.sg-hide-nav { position: absolute; top: var(--sg-space-s); right: var(--sg-space-s); margin: 0; }   /* small, at the menu's top right */
 @media (max-width: 720px) {
   /* A phone: a bar at the top with the menu button; the sidebar is a panel that slides in over the page. */
   .sg-layout { flex-direction: column; }
@@ -406,6 +412,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   navLink('overview', 'overview');
   var ov = document.getElementById('overview');
   document.getElementById('sg-hero-title').textContent = DATA.title || 'Design system';
+  if ((DATA.links || []).length) ov.insertAdjacentHTML('beforeend', linksHTML(DATA.links));
   if (DATA.notAgreed && (DATA.notAgreed.differences || DATA.notAgreed.unrealized || (DATA.notAgreed.waiting || []).length)) { var pend = document.createElement('p'); pend.className = 'sg-pending'; pend.dataset.todo = '1'; pend.textContent = DATA.notAgreed.line; ov.appendChild(pend); }
   // What the page could not take from the system, in one note: each control it lacks and the stand-in it uses instead.
   var GAPS = (DATA.ui && DATA.ui.gaps) || [];
@@ -948,6 +955,27 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       return '<a class="sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : '') + '" href="#c-' + esc(n) + '"><div class="sg-thumb" aria-hidden="true" data-thumb="' + esc(n) + '"></div><h3>' + esc(n) + '</h3></a>';
     }).join('') + '</div>';
   }
+  // ── Links: where else it lives (Figma, its code, the team's documentation), each opening in a new tab ────────────
+  function linksHTML(list) {
+    if (!(list || []).length) return '';
+    return '<div class="pg-import pg-links"><span class="pg-usage-label">Links</span>' + list.map(function (l) { return sysButton('a', l.label, ' href="' + esc(l.url) + '" target="_blank" rel="noopener"'); }).join('') + '</div>';
+  }
+  // ── Changelog: when Figma was last read for it, then every commit that changed it, by the release it shipped in ───
+  function changelogHTML(c) {
+    var u = c.updated || {}, log = c.changelog || [];
+    var head = (u.figmaRead ? '<p>Figma last read ' + esc(when(u.figmaRead)) + '.</p>' : '') + (u.uncommitted ? '<p>Its code has changes not committed yet.</p>' : '');
+    if (!log.length) return head + '<p class="pg-parity-sum">No commit has changed it yet, or the project is not in git.</p>';
+    var groups = [], by = {};
+    log.forEach(function (r) { var k = r.release || ''; if (!by[k]) { by[k] = []; groups.push(k); } by[k].push(r); });
+    return head + groups.map(function (k) {
+      var rows = by[k];
+      return '<div class="pg-log"><h4>' + esc(k || 'Not released yet') + ' <span class="pg-log-date">' + esc(String(rows[0].date).slice(0, 10)) + '</span></h4><ul>' + rows.map(function (r) {
+        var sha = r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener"><code>' + esc(r.short) + '</code></a>' : '<code>' + esc(r.short) + '</code>';
+        var pr = r.pr ? (r.prUrl ? ' <a href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
+        return '<li>' + sha + pr + ' ' + esc(r.subject.replace(/\s*\(#\d+\)\s*$/, '')) + ' <span class="pg-log-date">' + esc(String(r.date).slice(0, 10)) + '</span></li>';
+      }).join('') + '</ul></div>';
+    }).join('');
+  }
   // Each card's preview, drawn once its area is on screen (a hidden card has no size to fit), never with ?all.
   function builtThumbs(sec) {
     if (ALL) return;
@@ -971,7 +999,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     a.href = url; a.download = o.source.file.split('/').pop(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
   // The areas of a component's page, and the one last opened (kept from one component to the next).
-  var AREAS = [['play', 'Playground'], ['docs', 'Documentation'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['built', 'Built with'], ['used', 'Used in']], AREA = 'play';
+  var AREAS = [['play', 'Playground'], ['docs', 'Documentation'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['built', 'Built with'], ['used', 'Used in'], ['log', 'Changelog']], AREA = 'play';
   // ── Where it is used: a card per product, its own page pictured as it opens with each place the component sits on it
   // marked, linked to the product ─────────────────────────────────────────────────────────────────────────────────────
   function usedInHTML(c) {
@@ -1052,7 +1080,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2></div>' +
-        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') + importHTML(c) +
+        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') + importHTML(c) + linksHTML(c.links) +
       '</div>' +
       ((c.differences || []).length ? '<p class="pg-parity-sum">' + esc(c.differences.length === 1 ? 'One thing differs from Figma.' : c.differences.length + ' things differ from Figma.') + ' ' + sysButton('button', 'See parity', ' data-area-go="parity"') + '</p>' : '') +
       '<div class="pg-areas">' + segHTML(AREAS.filter(function (a) { return a[0] !== 'built' || (c.uses || []).length; }).map(function (a) { return { v: a[0], label: a[1] }; })) + '</div>' +
@@ -1068,14 +1096,12 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       '<div class="pg-area" data-area="docs"><div class="pg-footer">' +
         (ALL ? '' : '<div class="pg-doc pg-anatomy-doc"><h3>Anatomy</h3><div class="pg-anatomy"></div><dl class="pg-updated pg-anat-legend"></dl></div>') + guidanceHTML(c) + apiHTML(c) +
         (docRows ? '<div class="pg-doc"><h3>Documentation</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
-        (c.updated ? '<dl class="pg-updated">' +
-          (c.updated.uncommitted ? '<div><dt>Code</dt><dd>Changed, not committed yet</dd></div>' : c.updated.code ? '<div><dt>Code last changed</dt><dd>' + esc(when(c.updated.code.time || c.updated.code.date)) + '</dd></div><div><dt>Last change</dt><dd>' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')</dd></div>' : '') +
-          (c.updated.figmaRead ? '<div><dt>Figma read</dt><dd>' + esc(when(c.updated.figmaRead)) + '</dd></div>' : '') + '</dl>' : '') +
         '</div></div>' +
       '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + a11yHTML(c) + '</div></div>' +
       '<div class="pg-area" data-area="parity"><div class="pg-footer">' + parityHTML(c) + '</div></div>' +
       ((c.uses || []).length ? '<div class="pg-area" data-area="built"><div class="pg-footer"><div class="pg-doc"><h3>Built with</h3>' + builtWithHTML(c) + '</div></div></div>' : '') +
-      '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc"><h3>Used in</h3>' + usedInHTML(c) + '</div></div></div>';
+      '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc"><h3>Used in</h3>' + usedInHTML(c) + '</div></div></div>' +
+      '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc"><h3>Changelog</h3>' + changelogHTML(c) + '</div></div></div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls');
     var tTokens = sec.querySelector('.pg-tokens'), tOwn = sec.querySelector('.pg-own');
     // The code for what the preview shows now: the component as a product writes it (its tag and the props set here,
@@ -1483,7 +1509,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     document.getElementById('sg-topbar-title').textContent = DATA.title || 'Design system';
     bar.insertAdjacentHTML('afterbegin', sysButton('button', 'Menu', ' id="sg-menu"'));
     side.querySelector('.sg-sidebar-header').insertAdjacentHTML('afterbegin', sysButton('button', 'Close menu', ' id="sg-nav-close"'));
-    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('beforeend', '<p class="sg-hide-nav">' + sysButton('button', 'Hide menu', ' id="sg-hide-nav"') + '</p>');
+    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('afterbegin', '<p class="sg-hide-nav">' + sysButton('button', 'Hide', ' id="sg-hide-nav" aria-label="Hide menu" title="Hide menu"') + '</p>');
     var menu = document.getElementById('sg-menu'), shut = document.getElementById('sg-nav-close'), hide = document.getElementById('sg-hide-nav');
     shut.classList.add('sg-nav-close');
     if (DATA.ui && DATA.ui.overlay) scrim.classList.add(DATA.ui.overlay);
