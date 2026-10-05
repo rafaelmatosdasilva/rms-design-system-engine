@@ -58,8 +58,8 @@ export async function figmaImage(ROOT, cfg, name, { nodeId, defaultVariant, vers
 }
 
 // Every variant's Figma image of a component, for the style guide's Figma beside the code. From the first of:
-//   1. <visualRefs>/components/<name>/<variant>.png, each variant named as Figma names it (Size=L, State=Default.png),
-//      and <visualRefs>/components/<name>.png for its default variant;
+//   1. <visualRefs>/components/<name>/<variant>.png, each variant named as Figma names it (Size=L, State=Default.png,
+//      at 2x, or Size=L@1x.png at another scale), and <visualRefs>/components/<name>.png for its default variant;
 //   2. the Figma REST API (FIGMA_TOKEN and figmaFileKey): every variant of its component set in one images call, cached
 //      under <out>/visual/figma-variants/<name>/ until the Figma version changes.
 // → { images: [{ variant: 'Size=L, State=Default' | null, file }], from } or { images: [], why }. max: the most taken.
@@ -67,7 +67,8 @@ export async function figmaVariantImages(ROOT, cfg, name, { nodeId, version = nu
   const refDir = resolve(ROOT, cfg.visualRefs ?? projectPath(ROOT, 'refs'), 'components');
   const own = join(refDir, safe(name)), one = join(refDir, `${safe(name)}.png`);
   const images = [];
-  if (existsSync(own)) for (const f of readdirSync(own).filter((x) => /\.png$/i.test(x)).sort()) images.push({ variant: f.replace(/\.png$/i, ''), file: join(own, f) });
+  // A picture exported at another scale says so in its name (Size=L@1x.png); 2x by default.
+  if (existsSync(own)) for (const f of readdirSync(own).filter((x) => /\.png$/i.test(x)).sort()) { const at = /@([1-4])x\.png$/i.exec(f); images.push({ variant: f.replace(/(@[1-4]x)?\.png$/i, ''), file: join(own, f), scale: at ? Number(at[1]) : 2 }); }
   if (existsSync(one)) images.unshift({ variant: null, file: one });
   if (images.length) return { images: images.slice(0, max), from: 'reference' };
   if (!token) return { images: [], why: 'no reference images and no FIGMA_TOKEN' };
@@ -98,6 +99,36 @@ export async function figmaVariantImages(ROOT, cfg, name, { nodeId, version = nu
     writeFileSync(meta, JSON.stringify({ nodeId, version: version ?? null, images: kept }) + '\n');
     return { images: kept.map((x) => ({ variant: x.variant, file: join(dir, x.file) })), from: 'figma' };
   } catch (e) { return { images: [], why: `could not fetch the Figma images (${String(e.message || e).split('\n')[0]})` }; }
+}
+
+// A component's Do and Don't examples, for its Usage: pictures in <visualRefs>/components/<name>/do/ and .../dont/ (the
+// file's name is its caption: "Labels that say what happens.png"), then the Figma nodes contract.authored.json names
+// (components.<name>.examples: [{ "kind": "do" | "dont", "nodeId": "12:34", "caption": "…" }]), fetched with FIGMA_TOKEN
+// and cached under <out>/visual/figma-examples/<name>/. → [{ kind, caption, file }], do's first.
+export async function exampleImages(ROOT, cfg, name, { authored = [], token = process.env.FIGMA_TOKEN, fetchImpl = fetch, outDir = OUT_DIR } = {}) {
+  const base = join(resolve(ROOT, cfg.visualRefs ?? projectPath(ROOT, 'refs'), 'components'), safe(name));
+  const out = [];
+  for (const kind of ['do', 'dont']) {
+    const dir = join(base, kind);
+    if (existsSync(dir)) for (const f of readdirSync(dir).filter((x) => /\.png$/i.test(x)).sort()) out.push({ kind, caption: f.replace(/\.png$/i, '').replace(/^\d+[\s._-]+/, ''), file: join(dir, f) });
+  }
+  const wanted = (Array.isArray(authored) ? authored : []).filter((e) => e && /^(do|dont|don't)$/i.test(e.kind ?? '') && e.nodeId);
+  if (wanted.length && token && cfg.figmaFileKey) {
+    const dir = resolve(ROOT, outDir, 'visual', 'figma-examples', safe(name));
+    try {
+      const ids = wanted.map((e) => String(e.nodeId).replace('-', ':'));
+      const missing = ids.filter((id) => !existsSync(join(dir, `${safe(id)}.png`)));
+      if (missing.length) {
+        const r = await fetchImpl(`https://api.figma.com/v1/images/${cfg.figmaFileKey}?ids=${encodeURIComponent(missing.join(','))}&format=png&scale=2`, { headers: { 'X-Figma-Token': token }, signal: AbortSignal.timeout(30000) });
+        if (!r.ok) throw new Error(`Figma answered ${r.status}`);
+        const urls = (await r.json())?.images ?? {};
+        mkdirSync(dir, { recursive: true });
+        for (const id of missing) if (urls[id]) writeFileSync(join(dir, `${safe(id)}.png`), Buffer.from(await (await fetchImpl(urls[id], { signal: AbortSignal.timeout(30000) })).arrayBuffer()));
+      }
+      wanted.forEach((e, i) => { const f = join(dir, `${safe(ids[i])}.png`); if (existsSync(f)) out.push({ kind: /^do$/i.test(e.kind) ? 'do' : 'dont', caption: e.caption ?? '', file: f }); });
+    } catch { /* the examples that could be read */ }
+  }
+  return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'do' ? -1 : 1));
 }
 
 // Runs in the page: both images on one canvas size, the Figma one over the component's background.
