@@ -320,3 +320,16 @@ test('llms.txt carries the owner\'s primitives table (I42), and nothing when the
   assert.match(text, /## Primitives\n\nWrite the component, never a plain element \(div, span, p\) styled like it:\n- <Text size="small"> for an element styled with font: var\(--body-small\)\n/);
   assert.doesNotMatch(buildLlms([], {}, 0, null), /Primitives/);
 });
+
+test('a component named with a slash (table/row) gets its own folder, not a failed write', async () => {
+  const dir = makeFixture({
+    'theme.css': ':root{}\n',
+    'vars.json': { color: { light: {}, dark: {} }, sizing: {} },
+    'struct.json': { components: { 'table/row': { nodeId: '1:2', h: 32 } } },
+    'props.json': { 'table/row': { nodeId: '1:2', properties: {}, annotations: [] } },
+    'structure-contract.mjs': "export const CONTRACT = { 'table/row': { h: 32 } };\n",
+  });
+  const r = await generateContracts(dir, { paths: cfg.paths, figma: cfg.figma }, {});
+  assert.ok(r.components.includes('table/row'), JSON.stringify(r.components));
+  assert.ok(existsSync(join(r.outDir, 'table', 'row.contract.json')));
+});
