@@ -237,6 +237,19 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   tokens behind what is drawn and its size; above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
+- **Code**: the code for what the playground shows, with the system's button to copy it. With a framework file
+  (`component-api.mjs` `callName`): the component's tag with the props set, in its syntax (jsx, vue, svelte, a custom
+  element), each value as the code spells it, a default left out, every prop the code requires written (`={…}`).
+  Else the HTML the preview draws, keeping only the classes the system's CSS styles.
+- **API**: from the component's file (`component-api.mjs`): its props, each one the code requires marked `*` (a TS
+  member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
+  its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
+  elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
+- **Accessibility**: its role (the Figma annotation, else `contract.authored.json` semantics) and what it asks for
+  (`role-markup.mjs`, `behaviour-contract.mjs`: element, name, keys, part roles), each with its WCAG 2.2 criterion;
+  the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); and the last browser check's
+  findings on it from `.design-system-engine-out/a11y.json` (each finding carries `component` and the file
+  `checkedAt`), or that it has not been checked yet.
 - **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,
