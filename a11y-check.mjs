@@ -1500,7 +1500,8 @@ async function main() {
     target: targets.map((t) => t.label),
     usedStyleguide: !!sg,
     themes, strict: STRICT, total, cannotMeasure: cannot.length,
-    issues: buckets.flatMap(([kind, list]) => list.map((f) => { const r = a11yFindingRecord(kind, f); const u = figmaOf(f.desc); if (u) r.figma = u; return r; })),
+    checkedAt: new Date().toISOString(),
+    issues: buckets.flatMap(([kind, list]) => list.map((f) => { const r = a11yFindingRecord(kind, f); const n = ownerName(f.desc); if (n) r.component = n; const u = figmaOf(f.desc); if (u) r.figma = u; return r; })),
     // What could not be read, rendered or finished: never a clean result, so an agent or CI can tell.
     ...(unread.length || unrendered.length || unfinished.length ? { notRead: [...unread, ...unrendered.map((u) => `${u} (not rendered)`), ...unfinished] } : {}),
     ...(RUN_AXE ? { axe, severeAxe } : {}),

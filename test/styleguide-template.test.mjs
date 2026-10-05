@@ -157,8 +157,21 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true);
     assert.match(await run(`document.querySelector('#c-chip .pg-tokens').textContent`), /--chip-background/);
+    // The code a product writes for what is shown: its own tag, the prop just set, a default left out; copied by the
+    // system's own button.
+    assert.equal(await run(`document.querySelector('#c-chip .pg-code code').textContent`), '<Chip Size="L" />');
+    assert.equal(await run(`document.querySelector('#c-chip .pg-code [data-copy]').tagName`), 'BUTTON');
+    // Its API read from Chip.jsx, and its accessibility: the role's obligations with their WCAG criterion, the text
+    // contrast measured as drawn, and no browser check yet.
+    assert.match(await run(`document.querySelector('#c-chip .pg-footer').textContent`), /Props.*Label.*default Filter.*Read from src\/components\/Chip\.jsx/s);
+    const a11y = await run(`[...document.querySelectorAll('#c-chip .pg-doc')].find((d) => /Accessibility/.test(d.querySelector('h3').textContent)).textContent`);
+    assert.match(a11y, /togglebutton: a <button type="button"> with aria-pressed/);
+    assert.match(a11y, /WCAG 2\.1\.1 Keyboard \(A\)/);
+    assert.match(a11y, /Passes: \d+\.\d:1 on "Filter", needs 4\.5:1/);
+    assert.match(a11y, /Not checked in a browser yet/);
     await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
+    assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Passes|Fails/, 'measured again in the other mode');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
@@ -285,4 +298,49 @@ test('the search covers every part of the page and, while it has words, only its
   for (const kind of ['Component', 'Colour', 'Type style', 'Icon', 'Section']) assert.match(tpl, new RegExp("add\\('" + kind));
   assert.match(tpl, /nav\.hidden = !!words\.length; results\.hidden = !words\.length;/);
   assert.match(tpl, /sMount\.parentNode\.insertBefore\(results, sMount\.nextSibling\);/);
+});
+
+test('a component\'s API: a * on each prop the code says must be given, callbacks listed as events, nothing guessed', async () => {
+  const { apiView } = await import('../styleguide-data.mjs');
+  const v = apiView({ file: '/p/src/B.tsx', tag: 'Button', syntax: 'jsx', props: { label: { required: true }, size: { options: ['S', 'M'], default: 'M', required: false }, onClick: {}, tone: {} },
+    events: ['onClick'], slots: { named: ['icon'], default: true } }, 'src/B.tsx');
+  assert.deepEqual(v, { file: 'src/B.tsx', tag: 'Button', syntax: 'jsx', props: [{ name: 'label', required: true }, { name: 'size', values: ['S', 'M'], default: 'M', required: false }, { name: 'tone' }],
+    events: ['onClick'], slots: ['default', 'icon'] });
+  assert.equal(apiView({ file: '/p/x.css', props: {}, events: [], slots: { named: [], default: false } }), null, 'nothing read: no API section');
+  assert.equal(apiView({ file: null }), null);
+});
+
+test('the code shown: the tag with the props set, in its framework\'s syntax; a required prop never left out', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const src = tpl.slice(tpl.indexOf('var low = function'), tpl.indexOf('// The classes the system\'s CSS styles'));
+  const callCode = new Function(src + 'return callCode;')();
+  const props = [{ label: 'Size', prop: 'size', type: 'VARIANT', default: 'Medium' }, { label: 'Disabled', prop: 'disabled', type: 'BOOLEAN', default: false }, { label: 'Label', prop: 'label', type: 'TEXT', default: 'Save' }];
+  const api = (syntax) => ({ tag: syntax === 'html' ? 'ds-button' : 'Button', syntax, props: [{ name: 'size', values: ['sm', 'md'], default: 'md' }, { name: 'label', required: true }, { name: 'icon', required: true }] });
+  // the Figma option written as the code spells it (Small → sm); the default size left out
+  assert.equal(callCode({ api: api('jsx') }, props, { Size: 'SM', Disabled: true, Label: 'Send' }), '<Button size="sm" disabled label="Send" icon={…} />');
+  assert.equal(callCode({ api: api('jsx') }, props, { Size: 'md', Disabled: false, Label: 'Save' }), '<Button label={…} icon={…} />', 'a required prop the playground leaves at its default is still written');
+  assert.equal(callCode({ api: api('vue') }, [{ label: 'On', prop: 'on', type: 'BOOLEAN', default: true }], { On: false }), '<Button :on="false" label="…" icon="…" />');
+  assert.equal(callCode({ api: { tag: 'ds-tag', syntax: 'html', props: [] } }, [{ label: 'Tone', prop: 'tone', type: 'VARIANT', default: 'a' }], { Tone: 'b' }), '<ds-tag tone="b"></ds-tag>');
+});
+
+test('accessibility per component: its role\'s obligations and behaviours with WCAG, part roles, and what the last browser check found on it', async () => {
+  const { a11yView } = await import('../styleguide-data.mjs');
+  const result = { checkedAt: '2026-10-05T10:00:00Z', issues: [
+    { issue: 'contrast', selector: 'span in .chip', contrast: 3.2, needs: 4.5, theme: 'dark', text: 'Filter', fix: 'Use a darker colour.' },
+    { issue: 'behaviour', selector: 'chip: Space does not flip aria-pressed', component: 'chip', fix: 'Make it do it.' },
+    { issue: 'focus', selector: '.chips-row', fix: 'x' },   // another class that starts with the same word: not the chip's
+  ] };
+  const v = a11yView({ name: 'chip', cls: 'chip', role: 'togglebutton', annotations: ['Escape closes it'], parts: [{ layer: 'Icon', part: 'indicator' }], result,
+    guide: { contrast: { title: () => 'Text is hard to read' } } });
+  assert.equal(v.element, 'a <button type="button"> with aria-pressed="true" or "false" (on or off)');
+  assert.deepEqual(v.expects.map((x) => x.wcag), ['WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 2.1.1 Keyboard (A)', 'WCAG 2.1.1 Keyboard (A)', 'WCAG 1.3.1 Info and Relationships (A)']);
+  assert.match(v.expects[3].says, /^Escape closes it\.$/);
+  assert.deepEqual(v.checked.issues.map((i) => [i.kind, i.title, i.wcag, i.detail]), [
+    ['contrast', 'Text is hard to read', 'WCAG 1.4.3 Contrast (Minimum) (AA)', '"Filter" 3.2:1, needs 4.5:1 (dark)'],
+    ['behaviour', 'behaviour', 'WCAG 2.1.1 Keyboard (A)', 'chip: Space does not flip aria-pressed'],
+  ]);
+  // no role stated: nothing invented; no browser check yet: null, and the page says so
+  const none = a11yView({ name: 'card', cls: 'card' });
+  assert.deepEqual([none.role, none.expects, none.checked], [null, [], null]);
+  assert.deepEqual(a11yView({ name: 'card', result: { checkedAt: 't', notRead: ['card (not rendered)'], issues: [] } }).checked, { at: 't', notRead: true, issues: [] });
 });

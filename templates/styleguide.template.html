@@ -152,6 +152,17 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-usage-name { font-size: var(--sg-s); color: var(--sg-text-2); }
 a.pg-usage-name { color: var(--sg-text); }
 .pg-selector { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xs) 0 var(--sg-space-m); }
+/* The code a product writes for what the playground shows, with the system's button to copy it. */
+.pg-code { margin-top: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; }
+.pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
+.pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+.pg-code pre { margin: 0; padding: var(--sg-space-m); overflow-x: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
+.pg-code pre, .pg-code code { font-family: inherit; white-space: pre; }
+/* Words for a screen reader only (a mark's meaning, a copy confirmed). */
+.sg-hidden-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.pg-req { color: var(--sg-text); font-weight: var(--sg-heading-weight); }
+.pg-legend { font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-xs) var(--sg-space-m); border-top: var(--sg-line); }
+.pg-wcag { display: block; font-size: var(--sg-s); color: var(--sg-muted); }
 .pg-note { display: flex; gap: var(--sg-space-s); font-size: var(--sg-m); line-height: var(--sg-lh); color: var(--sg-text-2); background: var(--sg-bg-2); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-s); }
 .pg-note b { color: var(--sg-text); font-weight: var(--sg-heading-weight); white-space: nowrap; }
 .pg-diff-list { margin: 0; padding-left: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-xs); }
@@ -720,7 +731,153 @@ a.pg-usage-name { color: var(--sg-text); }
       return k.href ? sysButton('a', k.name, ' href="' + esc(k.href) + '" target="_blank" rel="noopener"', 'pg-usage-name') : '<span class="pg-usage-name">' + esc(k.name) + '</span>';
     }).join('');
   }
+  // A date and time in the reader's own clock (two changes on one day read apart).
+  var when = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
   function rowsHTML(rows) { return rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>'; }).join(''); }
+
+  // ── The code a product writes ─────────────────────────────────────────────────────────────────────────────────────
+  var low = function (x) { return String(x == null ? '' : x).toLowerCase().replace(/[\s_-]+/g, ''); };
+  var attrText = function (x) { return String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); };
+  // The component's own tag with the props set in the playground, in its framework's syntax. A value equal to the
+  // code's default (else Figma's) is left out, as a product leaves it out.
+  function callCode(c, props, state) {
+    var api = c.api, syn = api.syntax, attrs = [];
+    var codeProp = function (n) { return (api.props || []).find(function (q) { return low(q.name) === low(n); }); };
+    props.forEach(function (p) {
+      var name = p.prop || p.label, q = codeProp(name), v = state[p.label];
+      if (p.type === 'BOOLEAN') {
+        var def = q && q.default != null ? /^true$/i.test(q.default) : !!p.default;
+        if (!!v === def) return;
+        attrs.push(v ? name : syn === 'vue' ? ':' + name + '="false"' : syn === 'html' ? null : name + '={false}');
+      } else if (p.type === 'VARIANT') {
+        var val = q && q.values ? (q.values.find(function (x) { return low(x) === low(v); }) || v) : v;
+        var dv = q && q.default != null ? q.default : p.default;
+        if (dv != null && low(val) === low(dv)) return;
+        attrs.push(name + '="' + attrText(val) + '"');
+      } else if (p.type === 'TEXT' && v) {
+        var tv = q && q.default != null ? q.default : p.default;
+        if (tv == null || String(v) !== String(tv)) attrs.push(name + '="' + attrText(v) + '"');
+      }
+    });
+    (api.props || []).forEach(function (q) {
+      if (q.required && !attrs.some(function (a) { return a && low(a.replace(/^:/, '').split(/[=\s]/)[0]) === low(q.name); })) attrs.push(q.name + (syn === 'vue' || syn === 'html' ? '="…"' : '={…}'));
+    });
+    attrs = attrs.filter(Boolean);
+    var one = attrs.length ? ' ' + attrs.join(' ') : '';
+    var open = '<' + api.tag + (one.length > 60 ? '\n  ' + attrs.join('\n  ') + '\n' : one);
+    return syn === 'html' ? open + '></' + api.tag + '>' : open + (one.length > 60 ? '/>' : ' />');
+  }
+  // The HTML the preview draws, indented, without what the page itself set on it (its centring margin).
+  var VOID_TAG = /^(area|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/;
+  // The classes the system's CSS styles: a class the product put on its instance (a hook of its own) is not shown.
+  var SYS_CLASSES = null;
+  function systemClasses() {
+    if (SYS_CLASSES) return SYS_CLASSES;
+    SYS_CLASSES = {};
+    var walk = function (rules) { Array.prototype.forEach.call(rules || [], function (r) { if (r.selectorText) (r.selectorText.match(/\.[\w-]+/g) || []).forEach(function (k) { SYS_CLASSES[k.slice(1)] = 1; }); if (r.cssRules) walk(r.cssRules); }); };
+    Array.prototype.forEach.call(document.styleSheets, function (sh) { try { walk(sh.cssRules); } catch (x) { /* a sheet the page cannot read */ } });
+    return SYS_CLASSES;
+  }
+  function htmlCode(e) {
+    var copy = e.cloneNode(true);
+    copy.style.removeProperty('margin'); copy.style.removeProperty('width');
+    if (!copy.getAttribute('style')) copy.removeAttribute('style');
+    var known = systemClasses();
+    [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[class]'))).forEach(function (n) {
+      Array.prototype.slice.call(n.classList).forEach(function (k) { if (!known[k]) n.classList.remove(k); });
+      if (n.hasAttribute('class') && !n.getAttribute('class').trim()) n.removeAttribute('class');
+    });
+    var text = function (t) { return t.replace(/\s+/g, ' ').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+    var attrs = function (n) { return Array.prototype.map.call(n.attributes, function (a) { return a.value === '' ? ' ' + a.name : ' ' + a.name + '="' + attrText(a.value) + '"'; }).join(''); };
+    function out(n, depth) {
+      var pad = new Array(depth + 1).join('  ');
+      if (n.nodeType === 3) { var t = text(n.textContent); return t ? pad + t : ''; }
+      if (n.nodeType !== 1) return '';
+      var tag = n.tagName.toLowerCase(), open = '<' + tag + attrs(n) + '>';
+      if (VOID_TAG.test(tag)) return pad + open;
+      var kids = Array.prototype.filter.call(n.childNodes, function (k) { return k.nodeType === 1 || (k.nodeType === 3 && k.textContent.trim()); });
+      if (!kids.length) return pad + open + '</' + tag + '>';
+      if (kids.length === 1 && kids[0].nodeType === 3) return pad + open + text(kids[0].textContent) + '</' + tag + '>';
+      return pad + open + '\n' + kids.map(function (k) { return out(k, depth + 1); }).filter(Boolean).join('\n') + '\n' + pad + '</' + tag + '>';
+    }
+    return out(copy, 0);
+  }
+  // ── The contrast of its text, measured as it is drawn now (this mode, these props) ─────────────────────────────────
+  // Every colour read through a 1×1 canvas, so any colour syntax the browser accepts is read the same way.
+  var px = (function () { try { var cv = document.createElement('canvas'); cv.width = cv.height = 1; return cv.getContext('2d', { willReadFrequently: true }); } catch (e) { return null; } })();
+  function rgba(col) {
+    if (!px || !col) return null;
+    px.clearRect(0, 0, 1, 1); px.fillStyle = '#000'; px.fillStyle = col; px.fillRect(0, 0, 1, 1);
+    var d = px.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255];
+  }
+  function lum(c) { var f = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+  function over(top, under) { var a = top[3]; return [top[0] * a + under[0] * (1 - a), top[1] * a + under[1] * (1 - a), top[2] * a + under[2] * (1 - a), 1]; }
+  // What is behind an element: the backgrounds of it and every box above it, laid over each other.
+  function behind(el) {
+    var layers = [];
+    for (var n = el; n && n.nodeType === 1; n = n.parentElement) { var b = rgba(getComputedStyle(n).backgroundColor); if (b && b[3] > 0) { layers.push(b); if (b[3] >= 1) break; } }
+    var base = [255, 255, 255, 1];
+    for (var i = layers.length - 1; i >= 0; i--) base = over(layers[i], base);
+    return base;
+  }
+  function contrastHTML(root) {
+    var lowest = null;
+    var els = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
+    els.forEach(function (el) {
+      var own = Array.prototype.some.call(el.childNodes, function (k) { return k.nodeType === 3 && k.textContent.trim(); }) || (el.tagName === 'INPUT' && (el.value || el.placeholder));
+      if (!own || !el.getClientRects().length) return;
+      var cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || +cs.opacity === 0) return;
+      if (el.closest(':disabled, [aria-disabled="true"]')) return;   // WCAG 1.4.3 exempts a control that cannot be used
+      var fg = rgba(cs.color); if (!fg) return;
+      var bg = behind(el), col = over(fg, bg);
+      var l1 = lum(col), l2 = lum(bg), ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+      var size = parseFloat(cs.fontSize), large = size >= 24 || (size >= 18.66 && (+cs.fontWeight || 400) >= 700);
+      var need = large ? 3 : 4.5, words = (el.tagName === 'INPUT' ? (el.value || el.placeholder) : el.textContent).replace(/\s+/g, ' ').trim().slice(0, 40);
+      if (!lowest || ratio / need < lowest.ratio / lowest.need) lowest = { ratio: ratio, need: need, words: words };
+    });
+    if (!lowest) return '<p>No text drawn in this state.</p>';
+    var ok = lowest.ratio >= lowest.need;
+    return '<p>' + (ok ? 'Passes' : 'Fails') + ': ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '", needs ' + lowest.need + ':1 (' + (lowest.need === 3 ? 'large text' : 'text') + '), in the mode and state shown.' +
+      '<span class="pg-wcag">WCAG 1.4.3 Contrast (Minimum) (AA)</span></p>';
+  }
+
+  // ── Its code API: the props (a * on each one the code says must be given), the events it sends, its slots ─────────
+  function apiHTML(c) {
+    var api = c.api; if (!api) return '';
+    var req = (api.props || []).some(function (p) { return p.required; });
+    var props = (api.props || []).map(function (p) {
+      var what = p.values ? p.values.join(', ') : p.type || '';
+      var def = p.default != null ? 'default ' + p.default : '';
+      return '<tr><td>' + esc(p.name) + (p.required ? '<span class="pg-req" aria-hidden="true"> *</span><span class="sg-hidden-text"> (required)</span>' : '') + '</td><td>' + esc([what, def].filter(Boolean).join('  ·  ') || '-') + '</td></tr>';
+    }).join('');
+    var box = function (head, body, legend) { return '<div class="pg-inspect"><div class="pg-inspect-head">' + head + '</div><table>' + body + '</table>' + (legend || '') + '</div>'; };
+    var list = function (xs) { return xs.map(function (x) { return '<tr><td>' + esc(x) + '</td></tr>'; }).join(''); };
+    return '<div class="pg-doc"><h3>API</h3><div class="pg-inspect-grid">' +
+      (props ? box('Props', props, req ? '<div class="pg-legend"><span aria-hidden="true">* </span>Must be given</div>' : '') : '') +
+      ((api.events || []).length ? box('Events', list(api.events)) : '') +
+      ((api.slots || []).length ? box('Slots', list(api.slots)) : '') +
+      '</div><p class="pg-selector">Read from <code>' + esc(api.file) + '</code></p></div>';
+  }
+  // ── Its accessibility: its role, what it owes (each with its WCAG criterion), the contrast of its text as drawn, and
+  // what the last browser check found on it ──────────────────────────────────────────────────────────────────────────
+  function a11yHTML(c) {
+    var a = c.a11y; if (!a) return '';
+    var p = function (x) { return '<p>' + esc(x.says) + (x.wcag ? '<span class="pg-wcag">' + esc(x.wcag) + '</span>' : '') + '</p>'; };
+    var role = a.role ? '<p>' + esc(a.role) + (a.element ? ': ' + esc(a.element) : '') + '</p>' : '<p>Not stated. Add an annotation to the component in Figma that says its role (role: button), and the page lists what that role asks for.</p>';
+    var ch = a.checked, last;
+    if (!ch) last = '<p>Not checked in a browser yet. The audit checks it and this page shows what it found.</p>';
+    else if (ch.notRead) last = '<p>' + esc(when(ch.at)) + ': it could not be checked (not drawn on the page that was checked).</p>';
+    else if (!ch.issues.length) last = '<p>' + esc(when(ch.at)) + ': nothing found on it.</p>';
+    else last = '<p>' + esc(when(ch.at)) + ':</p>' + ch.issues.map(function (i) { return '<p><b>' + esc(i.title) + '</b> ' + esc(i.detail) + '. ' + esc(i.fix) + (i.wcag ? '<span class="pg-wcag">' + esc(i.wcag) + '</span>' : '') + '</p>'; }).join('');
+    return '<div class="pg-doc"><h3>Accessibility</h3><dl class="pg-updated">' +
+      '<div><dt>Role</dt><dd>' + role + '</dd></div>' +
+      (a.expects.length ? '<div><dt>What it does</dt><dd>' + a.expects.map(p).join('') + '</dd></div>' : '') +
+      ((a.excused || []).length ? '<div><dt>Not asked of it</dt><dd>' + a.excused.map(function (x) { return '<p>' + esc(x.says) + ': ' + esc(x.reason) + '</p>'; }).join('') + '</dd></div>' : '') +
+      '<div><dt>Text contrast</dt><dd class="pg-contrast"></dd></div>' +
+      '<div><dt>Browser check</dt><dd>' + last + '</dd></div>' +
+      '</dl></div>';
+  }
 
   function buildCard(c) {
     var props = c.controls || [];
@@ -737,8 +894,6 @@ a.pg-usage-name { color: var(--sg-text); }
         return '<p><b>' + esc(sl.name) + '</b> ' + esc(what + count + '.' + (sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
       }).join('') + '</dd></div>' : '') +
       (c.note ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '');
-    // A date and time in the reader's own clock (two changes on one day read apart).
-    var when = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2><div class="pg-usage" aria-label="Used in">' + usageBadges(c) + '</div></div>' +
@@ -746,16 +901,31 @@ a.pg-usage-name { color: var(--sg-text); }
       '</div>' +
         ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '') +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview"></div><div class="pg-panel"><div class="pg-actions"></div><div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
+        '<div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div>' +
         '<div class="pg-inspect-grid"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
         (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>' +
-        '<div class="pg-footer">' +
+        '<div class="pg-footer">' + apiHTML(c) +
         (docRows ? '<div class="pg-doc"><h3>Documentation</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
         (c.updated ? '<dl class="pg-updated">' +
           (c.updated.uncommitted ? '<div><dt>Code</dt><dd>Changed, not committed yet</dd></div>' : c.updated.code ? '<div><dt>Code last changed</dt><dd>' + esc(when(c.updated.code.time || c.updated.code.date)) + '</dd></div><div><dt>Last change</dt><dd>' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')</dd></div>' : '') +
           (c.updated.figmaRead ? '<div><dt>Figma read</dt><dd>' + esc(when(c.updated.figmaRead)) + '</dd></div>' : '') + '</dl>' : '') +
+        a11yHTML(c) +
         '</div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls');
     var tTokens = sec.querySelector('.pg-tokens'), tOwn = sec.querySelector('.pg-own');
+    // The code for what the preview shows now: the component as a product writes it (its tag and the props set here,
+    // each value as the code spells it; a prop the code requires and the playground does not set is written with …),
+    // else the HTML the preview draws. Copied by the system's own button.
+    var codeEl = sec.querySelector('.pg-code code'), copyBtn = sec.querySelector('.pg-code [data-copy]'), copySaid = sec.querySelector('.pg-code [role="status"]');
+    function showCode(e) { codeEl.textContent = c.api && c.api.tag ? callCode(c, props, state) : htmlCode(e); }
+    function copyLabel(t) { var leaf = copyBtn.querySelector('*') || copyBtn; leaf.textContent = t; }
+    copyBtn.addEventListener('click', function () {
+      var text = codeEl.textContent;
+      var done = function () { copyLabel('Copied'); copySaid.textContent = 'Code copied'; setTimeout(function () { copyLabel('Copy code'); copySaid.textContent = ''; }, 1500); };
+      var fallback = function () { var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { if (document.execCommand('copy')) done(); } catch (x) {} ta.remove(); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+    });
+    var contrastEl = sec.querySelector('.pg-contrast');
     // Every token named after this component (its colours and sizes), with the value in the mode it is shown in.
     function ownRows() {
       if (!tOwn) return;
@@ -826,6 +996,8 @@ a.pg-usage-name { color: var(--sg-text); }
         partRows(el, c.name)
       ));
       ownRows();
+      showCode(e);
+      if (contrastEl) contrastEl.innerHTML = contrastHTML(e);
       nudge();
     }
     // A part no instance in the products holds, made from the selector the code styles it with: an icon from the

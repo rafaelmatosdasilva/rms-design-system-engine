@@ -7,7 +7,8 @@
 // one side) is not shown: it is counted in one line, and the person decides it before it appears.
 //
 // Pure: agreedView takes what the generator read and returns { components, notAgreed, modes }.
-import { roleWord } from './role-markup.mjs';
+import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
+import { behavioursFor, partSheetLines } from './behaviour-contract.mjs';
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // A Figma prop name without its node suffix ("Label#3:4" → "Label").
@@ -917,4 +918,78 @@ export function fieldUi(components = [], systemCss = '') {
   }
   const best = found.sort((a, b) => a.score - b.score)[0];
   return best ? { from: best.from, markup: best.markup } : null;
+}
+
+// ── A component's code API, as its page lists it ──────────────────────────────────────────────────────────────────────
+// api: component-api.mjs apiFor(). → { file, tag?, syntax?, props: [{ name, values?, type?, default?, required? }],
+// events: [names], slots: [names] } | null when the code states none. A callback prop (onChange) is listed once, as an
+// event; "required" is only what the code says (a default makes a prop not required), never a guess.
+export function apiView(api, file = api?.file) {
+  if (!api?.file) return null;
+  const events = api.events ?? [];
+  const props = Object.entries(api.props ?? {}).filter(([n]) => !events.includes(n)).map(([n, f]) => ({ name: n,
+    ...(f.options ? { values: f.options } : f.type ? { type: f.type } : {}), ...(f.default != null ? { default: String(f.default) } : {}), ...(typeof f.required === 'boolean' ? { required: f.required } : {}) }));
+  const slots = [...(api.slots?.default ? ['default'] : []), ...(api.slots?.named ?? [])];
+  if (!props.length && !events.length && !slots.length) return null;
+  return { file, ...(api.tag ? { tag: api.tag, syntax: api.syntax } : {}), props, events, slots };
+}
+
+// ── Accessibility, per component: what it owes and what the last browser check found ─────────────────────────────────
+// Each check of a11y-check.mjs, by the WCAG 2.2 success criterion it stands for.
+export const A11Y_WCAG = {
+  contrast: '1.4.3', hovercontrast: '1.4.3', focuscontrast: '1.4.11', name: '4.1.2', focus: '2.4.7', ariastate: '4.1.2', keyboard: '2.1.1',
+  target: '2.5.8', tabtrap: '2.1.2', tabindex: '2.4.3', escape: '2.1.1', focusreturn: '2.4.3', heading: '1.3.1', motion: '2.3.3', forcedfocus: '2.4.7',
+  spacing: '1.4.12', activate: '2.1.1', arrows: '2.1.1', zoom: '1.4.4', obscured: '2.4.11', focusthin: '2.4.13', rolecontract: '4.1.2', annotation: '4.1.2',
+  reflow: '1.4.10', partrole: '1.3.1', behaviour: '2.1.1', statefollows: '4.1.2', semantics: '4.1.2',
+};
+// The criteria the page names, with their WCAG 2.2 title and level.
+export const WCAG_CRITERIA = {
+  '1.3.1': ['Info and Relationships', 'A'], '1.4.3': ['Contrast (Minimum)', 'AA'], '1.4.4': ['Resize Text', 'AA'], '1.4.10': ['Reflow', 'AA'],
+  '1.4.11': ['Non-text Contrast', 'AA'], '1.4.12': ['Text Spacing', 'AA'], '2.1.1': ['Keyboard', 'A'], '2.1.2': ['No Keyboard Trap', 'A'],
+  '2.3.3': ['Animation from Interactions', 'AAA'], '2.4.3': ['Focus Order', 'A'], '2.4.7': ['Focus Visible', 'AA'], '2.4.11': ['Focus Not Obscured (Minimum)', 'AA'],
+  '2.4.13': ['Focus Appearance', 'AAA'], '2.5.8': ['Target Size (Minimum)', 'AA'], '3.3.1': ['Error Identification', 'A'], '4.1.2': ['Name, Role, Value', 'A'],
+};
+const wcagOfLine = (line) => (/error/i.test(line) ? '3.3.1' : '4.1.2');
+// "WCAG 2.1.1 Keyboard (A)": a criterion as the page names it.
+export const wcagLabel = (id) => (!id ? null : WCAG_CRITERIA[id] ? `WCAG ${id} ${WCAG_CRITERIA[id][0]} (${WCAG_CRITERIA[id][1]})` : `WCAG ${id}`);
+
+// name, cls: the component · role: its role word (Figma's annotation, else the authored contract) · annotations: Figma's
+// notes on it · parts: its part roles ([{ layer, part }]) · exceptions: behaviours the person excused ({ id: reason }) ·
+// result: the last browser check (a11y.json), or null · guide: { kind: { title(n), fix } } (a11y-check.mjs A11Y_GUIDE).
+// → { role, element, expects: [{ says, wcag }], excused: [{ says, reason }], checked: null | { at, notRead?, issues: [{ kind,
+// title, fix, wcag, detail }] } }, each wcag as the page names it ("WCAG 4.1.2 Name, Role, Value (A)").
+export function a11yView({ name, cls = null, role = null, annotations = [], parts = [], exceptions = {}, result = null, guide = {} } = {}) {
+  const expects = [];
+  const known = role && roleOf(role);
+  if (role) {
+    expects.push({ says: known ? `It is ${roleMarkup(role)}.` : `It carries role="${role}".`, wcag: '4.1.2' });
+    for (const line of roleSheetLines(role)) expects.push({ says: `It has ${line}.`, wcag: wcagOfLine(line) });
+  }
+  const b = behavioursFor(role, annotations.map((a) => (typeof a === 'string' ? { label: a } : a)), exceptions);
+  for (const r of b.rows) expects.push({ says: (r.sheet ?? r.says).replace(/^\w/, (ch) => ch.toUpperCase()) + '.', wcag: r.act?.keys ? '2.1.1' : '4.1.2' });
+  for (const line of partSheetLines(parts)) expects.push({ says: line.replace(/^\w/, (ch) => ch.toUpperCase()) + '.', wcag: '1.3.1' });
+  const excused = b.excepted.map((x) => ({ says: x.id, reason: x.reason }));
+  let checked = null;
+  if (result) {
+    const at = result.checkedAt ?? null;
+    if ((result.notRead ?? []).some((x) => String(x).split(' (')[0] === name)) checked = { at, notRead: true, issues: [] };
+    else {
+      const mine = new RegExp(`\\.${String(cls ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`);
+      const seen = new Set(), issues = [];
+      for (const r of result.issues ?? []) {
+        // its own: the check named it, or the finding is on its class, or starts with its name ("stepper: …")
+        const sel = String(r.selector ?? '');
+        if (!(r.component === name || (!r.component && ((cls && mine.test(sel)) || sel.startsWith(`${name}: `))))) continue;
+        const detail = r.contrast != null ? `${r.text ? `"${r.text}" ` : ''}${r.contrast}:1, needs ${r.needs}:1${r.theme ? ` (${r.theme})` : ''}` : String(r.selector ?? '');
+        const k = r.issue + '|' + detail;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        issues.push({ kind: r.issue, title: guide[r.issue]?.title ? guide[r.issue].title(1) : r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', wcag: A11Y_WCAG[r.issue] ?? null, detail });
+      }
+      checked = { at, issues };
+    }
+  }
+  for (const x of expects) x.wcag = wcagLabel(x.wcag);
+  for (const x of checked?.issues ?? []) x.wcag = wcagLabel(x.wcag);
+  return { role: role ?? null, ...(known ? { element: roleMarkup(role) } : {}), expects, excused, checked };
 }

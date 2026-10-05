@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
 import { resolveComponentFile, textComponentApi, componentSourceFiles, textReader, usedComponents, norm } from '../component-source.mjs';
-import { cemComponents, docgenComponents, storybookFiles, codeConnectPairs, mergeApiReadings, createApiReader, loadTypeScript, typescriptComponentApi } from '../component-api.mjs';
+import { cemComponents, docgenComponents, storybookFiles, codeConnectPairs, mergeApiReadings, createApiReader, loadTypeScript, typescriptComponentApi, callName } from '../component-api.mjs';
 import { symbolsIn, iconRefs, iconUsage } from '../icon-source.mjs';
 import { fingerprint, markupClassSet } from '../markup-source.mjs';
 import { mergeNesting, captureIcons, captureMarkup, captureApis, apiReaderFor, sourceNesting } from '../structure-capture.mjs';
@@ -75,6 +75,9 @@ test('api: react-docgen (CLI shape) and vue-docgen-api output', () => {
   const [v] = docgenComponents([{ displayName: 'VChip', props: [{ name: 'tone', type: { name: 'string' }, values: ['info', 'warn'], defaultValue: { value: '"info"' } }], slots: [{ name: 'default' }, { name: 'icon' }] }]);
   assert.deepEqual(v.props.tone, { options: ['info', 'warn'], default: 'info' });
   assert.deepEqual(v.slots, { named: ['icon'], default: true });
+  const [w] = docgenComponents([{ displayName: 'VField', props: [{ name: 'value', required: true }], events: [{ name: 'update:value' }] }]);
+  assert.equal(w.props.value.required, true);
+  assert.deepEqual(w.events, ['update:value']);
 });
 
 test('api: Storybook index pairs a component with its file (v7 index.json and v6 stories.json)', () => {
@@ -113,23 +116,54 @@ test('api: the reader joins Code Connect by Figma node id and falls back to text
   const a = r.apiFor('Status pill');
   assert.equal(a.how, 'code connect');
   assert.deepEqual(a.codeConnect, { Tone: 'tone' });
-  assert.deepEqual(a.props.tone, { readBy: ['text'], default: 'a', options: ['a', 'b'], confidence: 'single-source' });
+  assert.deepEqual(a.props.tone, { readBy: ['text'], default: 'a', options: ['a', 'b'], required: false, confidence: 'single-source' });
 });
 
 test('api: TypeScript reads the Props type by syntax (unions, booleans, defaults, Vue defineProps)', { skip: TS ? false : 'no TypeScript compiler available' }, () => {
   const tsx = `interface ChipProps { size?: 'sm' | 'md' | 'lg'; disabled?: boolean; label: string }
 export const Chip = ({ size = 'md', disabled = false }: ChipProps) => null;`;
   const a = typescriptComponentApi(TS, 'Chip.tsx', tsx, 'Chip');
-  assert.deepEqual(a.props.size, { options: ['sm', 'md', 'lg'], default: 'md' });
-  assert.deepEqual(a.props.disabled, { type: 'boolean', default: 'false' });
-  assert.deepEqual(a.props.label, {});
+  assert.deepEqual(a.props.size, { options: ['sm', 'md', 'lg'], required: false, default: 'md' });
+  assert.deepEqual(a.props.disabled, { type: 'boolean', required: false, default: 'false' });
+  assert.deepEqual(a.props.label, { required: true });
   const vue = `<script setup lang="ts">
 const props = withDefaults(defineProps<{ tone?: 'info' | 'warn'; dense?: boolean }>(), { tone: 'info' });
 </script>`;
   const v = typescriptComponentApi(TS, 'Tag.vue', vue, 'Tag');
-  assert.deepEqual(v.props.tone, { options: ['info', 'warn'], default: 'info' });
-  assert.deepEqual(v.props.dense, { type: 'boolean' });
+  assert.deepEqual(v.props.tone, { options: ['info', 'warn'], required: false, default: 'info' });
+  assert.deepEqual(v.props.dense, { type: 'boolean', required: false });
   assert.equal(typescriptComponentApi(TS, 'X.tsx', 'export const a = 1;', 'X'), null);
+});
+
+test('api: which props must be given and which events a component sends, as each framework writes them', () => {
+  const vue = `<script setup lang="ts">
+const props = withDefaults(defineProps<{ label: string; size?: 'S' | 'M'; tone: 'a' | 'b' }>(), { tone: 'a' });
+const emit = defineEmits<{ (e: 'change', v: string): void; (e: 'close'): void }>();
+</script>`;
+  const v = mergeApiReadings([{ source: 'text', ...textComponentApi('/x/Chip.vue', vue) }]);
+  assert.equal(v.props.label.required, true);
+  assert.equal(v.props.size.required, false);
+  assert.equal(v.props.tone.required, false, 'a default fills it: not required of whoever uses it');
+  assert.deepEqual(v.events, ['change', 'close']);
+  // Options API: the props object's own keys only (type and required are a prop's options, not props), emits listed.
+  const opt = textComponentApi('/x/Field.vue', "export default { props: { value: { type: String, required: true }, max: { type: Number, default: 5 } }, emits: ['update:value', 'blur'] }");
+  assert.deepEqual(Object.keys(opt.props), ['value', 'max']);
+  assert.equal(opt.props.value.required, true);
+  assert.deepEqual(opt.events, ['update:value', 'blur']);
+  // React: a member without ? is required, PropTypes .isRequired too; a callback prop (onX) is an event.
+  const tsx = "export interface ButtonProps { label: string; size?: 'S' | 'M'; onClick?: () => void }\nexport function Button({ label, size = 'M', onClick }: ButtonProps) { return null; }";
+  const r = textComponentApi('/x/Button.tsx', tsx);
+  assert.equal(r.props.label.required, true);
+  assert.equal(r.props.onClick.required, false);
+  assert.deepEqual(r.events, ['onClick']);
+  assert.equal(textComponentApi('/x/T.jsx', "export function T({ a }) { return null; }\nT.propTypes = { a: PropTypes.string.isRequired };").props.a.required, true);
+  // Unstated stays unstated: the page never guesses a prop is required.
+  assert.equal('required' in textComponentApi('/x/U.jsx', "export function U({ a }) { return null; }").props.a, false);
+  // How a product writes it: the exported name, the file's own name for Vue, a custom element's tag.
+  assert.deepEqual(callName('button', '/x/Button.tsx', tsx), { tag: 'Button', syntax: 'jsx' });
+  assert.deepEqual(callName('chip', '/x/chip-item.vue', ''), { tag: 'ChipItem', syntax: 'vue' });
+  assert.deepEqual(callName('pill', '/x/pill.js', '', { names: ['Pill', 'ds-pill'] }), { tag: 'ds-pill', syntax: 'html' });
+  assert.deepEqual(callName('pill', '/x/pill.css', ''), {});
 });
 
 test('api: frameworkComponents false reads no props and says why', () => {

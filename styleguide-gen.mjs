@@ -24,7 +24,7 @@
 import { appDir } from './code-roots.mjs';
 import { codeSizeCSS, modeRootCSS } from './styleguide-data.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
-import { join, dirname, resolve } from 'path';
+import { join, dirname, resolve, relative } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import { OUT_DIR } from './names.mjs';
@@ -384,6 +384,36 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       });
       if (slots.length) c.slots = slots;
     }
+    // Its code API, as whoever uses it writes it: the props (each one the code says must be given marked), the events
+    // it sends and its slots, read from the component's own file (component-api.mjs). An HTML and CSS system has none.
+    if (cfg.frameworkComponents !== false) {
+      try {
+        const { createApiReader } = await import('./component-api.mjs');
+        const { apiView } = await import('./styleguide-data.mjs');
+        const nodeIds = Object.fromEntries(Object.entries(ctx?.propsSnap ?? {}).filter(([, e]) => e?.nodeId).map(([n, e]) => [n, e.nodeId]));
+        const reader = createApiReader(ROOT, cfg, { classFor: (n) => locator.classFor(n), nodeIds });
+        for (const c of view.components) {
+          const api = reader.apiFor(c.name);
+          const v = api.file && apiView(api, relative(ROOT, api.file));
+          if (v) c.api = v;
+        }
+      } catch { /* no component sources */ }
+    }
+    // Its accessibility: what its role and Figma's notes ask of it, each with the WCAG criterion, and what the last
+    // browser check (the audit's a11y.json) found on it. The page measures the text contrast itself, as it is drawn.
+    try {
+      const { a11yView } = await import('./styleguide-data.mjs');
+      const { contractSemantics, A11Y_GUIDE } = await import('./a11y-check.mjs');
+      const { partRolesOf } = await import('./behaviour-contract.mjs');
+      const authoredRoles = contractSemantics(ROOT, cfg);
+      const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
+      const result = readJson(join(OUT_DIR, 'a11y.json'));
+      for (const c of view.components) {
+        const entry = ctx?.propsSnap?.[c.name] ?? {};
+        c.a11y = a11yView({ name: c.name, cls: c.cls, role: c.role ?? authoredRoles[c.name] ?? null, annotations: entry.annotations ?? [], parts: partRolesOf(entry),
+          exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE });
+      }
+    } catch { /* the page shows what it can measure */ }
     const { segmentedUi, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
     // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
