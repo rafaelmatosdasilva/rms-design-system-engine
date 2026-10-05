@@ -514,6 +514,43 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         }
       }
     } catch { /* the page shows what it has */ }
+    // Its links (Figma, its code, the team's documentation) and its changelog: the commits that changed it, each with
+    // the release it shipped in and its pull request. The system's own links go on the overview.
+    try {
+      const { repoUrl, changelogs, commitUrl, prUrl, fileUrl, defaultBranch } = await import('./component-changelog.mjs');
+      const { figmaLink, figmaNodeIds } = await import('./figma-link.mjs');
+      const { ruleLines } = await import('./styleguide-data.mjs');
+      const repo = repoUrl(ROOT), branch = cfg.styleguide?.branch ?? defaultBranch(ROOT), ids = figmaNodeIds(ROOT, cfg);
+      // Only the project's own files: a product's stylesheet beside it (../a-product) has its own history and repository.
+      const inRepo = (f) => !/^\.\.?[\/]|^\//.test(String(f).replace(/^\.\//, '')) && !String(f).startsWith('..');
+      const sheets = [...new Set([...themeFiles, ...(ctx?.componentSheets ?? [])])].filter(inRepo).map((f) => [f, readText(f)]).filter(([, t]) => t);
+      const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
+      const docsUrl = cfg.styleguide?.componentDocs;   // "https://wiki.example.com/components/{name}"
+      const where = (c) => {
+        const own = c.source?.file ?? c.api?.file;
+        if (own && inRepo(own)) return { files: [own], at: [own, null] };
+        const hit = c.cls ? sheets.map(([f, t]) => [f, ruleLines(t, c.cls)]).filter(([, l]) => l.length) : [];
+        return { files: hit.map(([f]) => f), pattern: c.cls ? `${/^#/.test(c.cls) ? '' : '\\.'}${c.cls}[^a-zA-Z0-9_-]` : null, at: hit[0] ? [hit[0][0], hit[0][1][0]] : null };
+      };
+      const found = new Map(view.components.map((c) => [c.name, where(c)]));
+      const logs = changelogs(ROOT, view.components.map((c) => ({ name: c.name, ...found.get(c.name) })));
+      for (const c of view.components) {
+        const w = found.get(c.name);
+        c.changelog = (logs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha), prUrl: prUrl(repo, r.pr) }));
+        const extra = Array.isArray(authored[c.name]?.links) ? authored[c.name].links.filter((l) => l?.url) : [];
+        c.links = [
+          { label: 'Figma', url: figmaLink(cfg.figmaFileKey, ids[c.name]) },
+          { label: 'Code', url: w?.at ? fileUrl(repo, branch, w.at[0], w.at[1]) : null },
+          ...(docsUrl ? [{ label: 'Documentation', url: String(docsUrl).replace(/\{name\}/g, encodeURIComponent(c.name)) }] : []),
+          ...extra.map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })),
+        ].filter((l) => l.url);
+      }
+      view.links = [
+        { label: 'Figma file', url: cfg.figmaFileKey ? `https://www.figma.com/design/${cfg.figmaFileKey}` : null },
+        { label: 'Code repository', url: repo },
+        ...(Array.isArray(cfg.styleguide?.links) ? cfg.styleguide.links.filter((l) => l?.url).map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })) : []),
+      ].filter((l) => l.url);
+    } catch { /* no links, no changelog */ }
     // Each product's own page, pictured as it opens, with where each component sits on it (product-shots.mjs), for the
     // "Used in" area. A product that gives a picture of its own (styleguide.plugins[].image) is shown with that one.
     if ((cfg.paths?.plugins ?? []).length && cfg.styleguide?.productShots !== false) {

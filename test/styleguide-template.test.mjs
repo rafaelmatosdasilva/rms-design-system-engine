@@ -174,18 +174,25 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Passes|Fails/, 'measured again in the other mode');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in');
+    // Built with only where the component is made of others (the chip is not).
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in,Changelog');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
     assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity with Figma.*agree/s);
     // Its anatomy, in Documentation: a copy drawn larger as the Playground set it, each part numbered, its padding
-    // tinted and named by the token behind it, how it lines its items up; never a second live component.
+    // outlined and numbered after the parts and named by its token in the list (numbers, never colours), how it lines
+    // its items up; never a second live component.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
-    await new Promise((r) => setTimeout(r, 200));
+    // Drawn on the next frame: waited for, as a busy machine can take longer than a fixed pause.
+    for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-anat-num').length`)); i++) await new Promise((r) => setTimeout(r, 50));
     assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-num').length`) >= 1);
-    assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-pad').length`) >= 2);
-    assert.match(await run(`document.querySelector('#c-chip .pg-anat-legend').textContent`), /Parts.*Spacing.*chip padding.*--padding-[a-z]+.*Alignment.*row/s);
+    assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-space').length`) >= 2);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks > *')].every((m) => { const b = getComputedStyle(m).backgroundColor; return m.classList.contains('pg-anat-num') || b === 'rgba(0, 0, 0, 0)'; })`), true, 'no colour fills on the drawing');
+    const legend = await run(`document.querySelector('#c-chip .pg-anat-legend').textContent`);
+    assert.match(legend, /Parts.*Spacing.*chip padding.*--padding-[a-z]+.*Alignment.*row/s);
+    const nums = await run(`[...document.querySelectorAll('#c-chip .pg-anat-num')].map((n) => n.textContent).join()`);
+    assert.equal(nums, await run(`[...document.querySelectorAll('#c-chip .pg-anat-legend b')].map((b) => b.textContent).join()`), 'every number in the drawing is one in the list, in the same order');
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
     assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
     // How to use it: the same four sections on every page, a missing one said; the overview counts them.
@@ -251,6 +258,8 @@ test('choosing the option already set does nothing, and a slot is documented wit
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /if \(next === state\[p\.label\]\) return;/);
   assert.match(tpl, /if \(b\.getAttribute\('aria-pressed'\) === 'true' \|\| b\.dataset\.on === '1'\) return;/);
+  // A new selection tells the system's own script, so what follows the selection (a sliding pill) moves with it.
+  assert.match(tpl.slice(tpl.indexOf('function segSelect'), tpl.indexOf('function segItems')), /if \(on\) nudge\(\);/);
   assert.match(tpl, /<dt>Slots<\/dt>/);
   assert.match(tpl, /<dt>From Figma<\/dt>/);
 });
@@ -437,7 +446,7 @@ test('a control the system lacks: its stand-in draws the switch, and the page sa
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('var SEG = DATA.ui'), tpl.indexOf('function segItems'));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  const run = (ui) => new Function('DATA', 'esc', src + 'return { segHTML: segHTML, segSelect: segSelect };')({ ui }, esc);
+  const run = (ui) => new Function('DATA', 'esc', 'nudge', src + 'return { segHTML: segHTML, segSelect: segSelect };')({ ui }, esc, () => {});
   const b = run({ segmented: btn });
   assert.equal(b.segHTML([{ v: 'a', label: 'A' }]), '<div class="sg-seg"><button type="button" class="bSecondary" data-v="a"><span class="label">A</span></button></div>');
   const cls = new Set(['bSecondary']), attrs = {};
@@ -468,4 +477,57 @@ test('usage on every component, from Figma, the code or the authored contract; t
   assert.deepEqual(low.map((c) => `${c.text} on ${c.on} in ${c.mode}`), ['muted on bg in light']);
   const page = `<html lang="en"><head><style>/*sg-contrast:${JSON.stringify(low)}*/</style></head><body><main><h1>S</h1></main></body></html>`;
   assert.match(failures(checkStyleguidePage(page, { missing: [] })).map((f) => f.why).join(), /muted text on its bg background is 3\.\d:1 in light, below 4\.5:1/);
+});
+
+test('built with: its own area, each component the overview\'s card with its preview, linked to its page', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /\['built', 'Built with'\], \['used', 'Used in'\]/);
+  const src = tpl.slice(tpl.indexOf('function builtWithHTML'), tpl.indexOf('function builtThumbs'));
+  const html = new Function('DATA', 'esc', src + 'return builtWithHTML;')({ ui: { card: { cls: 'card' } } }, (x) => String(x))({ uses: ['buttonPrimary', 'buttonSecondary'] });
+  assert.equal(html, '<div class="sg-card-grid"><a class="sg-card card" href="#c-buttonPrimary"><div class="sg-thumb" aria-hidden="true" data-thumb="buttonPrimary"></div><h3>buttonPrimary</h3></a><a class="sg-card card" href="#c-buttonSecondary"><div class="sg-thumb" aria-hidden="true" data-thumb="buttonSecondary"></div><h3>buttonSecondary</h3></a></div>');
+  assert.doesNotMatch(tpl.slice(tpl.indexOf('function importHTML'), tpl.indexOf('function builtWithHTML')), /pg-usage-label">Built with/, 'no longer a row of buttons under the import line');
+  assert.match(tpl, /if \(!sec\.querySelector\('\.pg-area\[data-area="' \+ v \+ '"\]'\)\) v = 'play';/, 'a component without it opens on the playground');
+});
+
+test('the playground and the preview stay linked: a part\'s state set on the part, a product\'s selector ignored, a label edit changes only its words', async () => {
+  const { optionEffect, ownSelector, realizedControls } = await import('../styleguide-data.mjs');
+  assert.deepEqual(optionEffect('.radioButton', '.radioButton-input:checked'), { add: [], attrs: { checked: '' }, target: '.radioButton-input' });
+  assert.deepEqual(optionEffect('.badge', '.badge.high'), { add: ['high'], attrs: {} });
+  assert.equal(ownSelector('radioButton', '.step-item.done'), false);
+  assert.equal(ownSelector('radioButton', '.radioButton-input:checked'), true);
+  // A contract mapping State to a product's own markup (.step-item) is not the component's: Selected falls back to its
+  // own :checked rule, and an option the code does not build is offered as not built, never drawn with another's look.
+  const r = realizedControls({ name: 'radioButton', cls: 'radioButton',
+    defs: { State: { type: 'VARIANT', defaultValue: 'Default', variantOptions: ['Default', 'Selected', 'Unselected'] } },
+    propertyMap: { State: { Default: '.step-item', Selected: '.step-item.done', Unselected: '.step-item.unavailable' } },
+    cssText: '.radioButton { display: flex } .radioButton-input:checked + .radioButton-circle { border-color: red }' });
+  assert.deepEqual(r.controls[0].options, [{ label: 'Default' }, { label: 'Selected', add: [], attrs: { checked: '' }, target: '.radioButton-input' }, { label: 'Unselected', unbuilt: true }]);
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /if \(!field\.value \|\| !leaf \|\| !cur \|\| !cur\.isConnected \|\| !cur\.contains\(leaf\)\) \{ refresh\(\); return; \}/, 'a label edit writes into its part, the rest as it is');
+  assert.match(tpl, /o\.unbuilt \? 'Figma has this option; the code does not build it yet'/);
+});
+
+test('links and changelog: Figma, the code and the team\'s pages; each commit that changed the component, by its release and pull request', async () => {
+  const { normalizeRepo, commitUrl, prUrl, fileUrl, changelogs } = await import('../component-changelog.mjs');
+  assert.equal(normalizeRepo('git+https://github.com/o/r.git'), 'https://github.com/o/r');
+  assert.equal(normalizeRepo('git@gitlab.example.com:team/ds.git'), 'https://gitlab.example.com/team/ds');
+  assert.equal(fileUrl('https://github.com/o/r', 'main', 'src/theme.css', 12), 'https://github.com/o/r/blob/main/src/theme.css#L12');
+  assert.equal(commitUrl('https://gitlab.example.com/team/ds', 'abc'), 'https://gitlab.example.com/team/ds/-/commit/abc');
+  assert.equal(prUrl('https://github.com/o/r', '7'), 'https://github.com/o/r/pull/7');
+  // A small repository: a commit on the badge's rule, released as v1.0.0, then one on another rule, then a pull request
+  // that changes the badge again; a commit that did not touch the badge is never in its changelog.
+  const dir = mkdtempSync(join(tmpdir(), 'changelog-'));
+  const git = (...a) => spawnSync('git', a, { cwd: dir, encoding: 'utf8' });
+  git('init', '-q', '-b', 'main'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
+  const css = (s) => writeFileSync(join(dir, 'theme.css'), s);
+  css('.badge { color: red; }\n.chip { color: blue; }\n'); git('add', '.'); git('commit', '-qm', 'Badge and chip'); git('tag', 'v1.0.0');
+  css('.badge { color: red; }\n.chip { color: green; }\n'); git('commit', '-qam', 'Chip colour');
+  git('checkout', '-qb', 'feature'); css('.badge { color: maroon; }\n.chip { color: green; }\n'); git('commit', '-qam', 'Badge colour');
+  git('checkout', '-q', 'main'); git('merge', '-q', '--no-ff', 'feature', '-m', 'Merge pull request #4 from o/feature');
+  const logs = changelogs(dir, [{ name: 'badge', files: ['theme.css'], pattern: '\\.badge[^a-zA-Z0-9_-]' }]);
+  assert.deepEqual(logs.badge.map((r) => [r.subject, r.release, r.pr]), [['Badge colour', null, '4'], ['Badge and chip', 'v1.0.0', null]]);
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /\['log', 'Changelog'\]/);
+  assert.match(tpl, /importHTML\(c\) \+ linksHTML\(c\.links\)/);
+  assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
 });

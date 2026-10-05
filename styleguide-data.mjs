@@ -185,6 +185,10 @@ export function optionEffect(baseSelector, optionSelector) {
     if (target) return { add: [], attrs: partAttrs, target, ...(live ? { live: true, state: liveState } : {}) };
   }
   if (!add.length && !Object.keys(attrs).length) return live ? { live: true, state: liveState } : {};
+  // A state on one of the component's parts alone (.radioButton-input:checked): set on that part, the part's class
+  // never added to the root.
+  const part = Object.keys(attrs).length && add.length === 1 && [...baseClasses].some((b) => add[0].startsWith(`${b}-`)) ? add[0] : null;
+  if (part) return { add: [], attrs, target: `.${part}`, ...(live ? { live: true, state: liveState } : {}) };
   return { add, attrs, ...(live ? { live: true, state: liveState } : {}) };
 }
 
@@ -241,6 +245,13 @@ function booleanSelector(base, sel, cssText) {
   if (modifier.length && modifier.every(inCss) && /^(no|hide|without)[-_]/.test(modifier[0])) return { off: { add: modifier, attrs: {} }, part };
   return { part };
 }
+// A selector that concerns the component: one of its compound classes is the component's own or one of its parts
+// (.radioButton, .radioButton-input), or it names no class at all (a state such as :hover). → boolean
+export function ownSelector(cls, sel) {
+  if (!cls || typeof sel !== 'string') return true;
+  const classes = (sel.match(/\.[\w-]+/g) ?? []).map((k) => k.slice(1));
+  return !classes.length || classes.some((k) => k === cls || k.startsWith(`${cls}-`));
+}
 export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}, realizations = {}, cssText = '', parts = [] }) {
   const base = cls ? `.${cls}` : '';
   const controls = [], unrealized = [];
@@ -272,14 +283,20 @@ export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}
     } else if (d.type === 'VARIANT') {
       const options = opts.map((o) => {
         const k = pm && typeof pm === 'object' ? optionKey(pm, o) : undefined;
-        if (k !== undefined) return { label: o, ...(optionEffect(base, pm[k]) ?? {}), mapped: true };
+        // A selector of another element (a product's own markup the contract also maps) is not this component's.
+        if (k !== undefined && ownSelector(cls, pm[k])) return { label: o, ...(optionEffect(base, pm[k]) ?? {}), mapped: true };
         const c = variantClass(cls, o, cssText);
-        return c ? { label: o, add: [c], attrs: {}, mapped: true } : { label: o };
+        if (c) return { label: o, add: [c], attrs: {}, mapped: true };
+        // A chosen state (Selected, Checked, On) is the component's own :checked rule when its CSS has one.
+        const ch = /^(selected|checked|on)$/i.test(o) && cls ? new RegExp(`\\.(${cls.replace(/[-]/g, '\\-')}(?:-[\\w-]+)?):checked`).exec(cssText) : null;
+        if (ch) return { label: o, ...(optionEffect(base, `.${ch[1]}:checked`) ?? {}), mapped: true };
+        return { label: o };
       });
-      // Realized when every option is mapped, or every option but the default is a class the CSS has.
-      const missing = options.filter((o) => !o.mapped && lc(o.label) !== lc(d.defaultValue ?? ''));
-      if (missing.length || !options.some((o) => o.mapped)) { unrealized.push(label); continue; }
-      control.options = options.map(({ mapped, ...o }) => o);
+      // Realized when at least one option other than the default is; an option the code does not build is offered but
+      // marked so (unbuilt), never drawn with another's look.
+      const others = options.filter((o) => lc(o.label) !== lc(d.defaultValue ?? ''));
+      if (!others.some((o) => o.mapped)) { unrealized.push(label); continue; }
+      control.options = options.map(({ mapped, ...o }) => (mapped || lc(o.label) === lc(d.defaultValue ?? '') ? o : { ...o, unbuilt: true }));
     } else if (d.type === 'TEXT') {
       const sel = typeof hr === 'string' ? hr : (typeof pm === 'string' ? pm : null);
       const part = sel ? String(sel).trim().split(/\s+/).pop() : partFor(label.replace(/\s*content$/i, ''), parts, null);
