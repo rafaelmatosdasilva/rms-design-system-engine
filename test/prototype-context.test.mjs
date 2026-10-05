@@ -291,3 +291,50 @@ test('build mode: a text colour set on the component\'s text part counts; none a
   const none = readFileSync(join(ENGINE, 'test', 'skill-evals', 'build-reference', 'src', 'components', 'field.css'), 'utf8').replace(/ color: var\(--text-primary\);/, '');
   assert.match(make(none), /field\/default\/text: "color" not set in "\.field"/);
 });
+
+test('a component\'s usage (when to use, common mistakes, limitations) and its Do and Don\'t are part of what a prototype is held to', async () => {
+  const { requestFindings } = await import('../prototype-context.mjs');
+  const cat = { components: {
+    chip: { description: 'A filter people switch on and off.\nWhen to use: filtering a list by one value\nCommon mistakes: a chip as a link to another page', props: {} },
+    button: { description: 'The main action.', props: {} },
+  } };
+  const intentU = { components: { chip: { design: { annotations: [] }, code: {} }, button: { design: { annotations: [] }, code: {} } } };
+  const authored = { components: { button: { guidance: { limitations: 'Labels longer than three words wrap' } } } };
+  const examples = { chip: [{ kind: 'do', caption: 'Chips above the list they filter' }, { kind: 'dont', caption: 'Chips as tabs between sections' }] };
+  const ctx = contextFrom(cat, intentU, null, { authored, examples });
+  assert.deepEqual(ctx.components.chip.whenToUse, ['filtering a list by one value']);
+  assert.deepEqual(ctx.components.chip.mistakes, ['a chip as a link to another page']);
+  assert.deepEqual(ctx.components.button.limitations, ['Labels longer than three words wrap'], 'contract.authored.json fills what Figma leaves unsaid');
+  assert.deepEqual(ctx.components.chip.dos, ['Chips above the list they filter']);
+  assert.deepEqual(ctx.components.chip.donts, ['Chips as tabs between sections']);
+  assert.ok(ctx.components.chip.never.some((n) => n.sentence === 'Common mistake: a chip as a link to another page'));
+  assert.ok(ctx.components.chip.never.some((n) => n.sentence === 'Don\'t: Chips as tabs between sections'));
+  const lines = purposeLines(ctx, ['chip', 'button']).join('\n');
+  assert.match(lines, /use when filtering a list by one value/);
+  assert.match(lines, /mistake a chip as a link to another page/);
+  assert.match(lines, /do Chips above the list they filter/);
+  assert.match(lines, /don't Chips as tabs between sections/);
+  assert.match(lines, /limit Labels longer than three words wrap/);
+  // A Don't or a mistake takes two of its words: one shared word ("list") rules nothing out.
+  assert.equal(ruledOut(ctx.components.chip, 'a list of saved views', 'chip').length, 0);
+  assert.equal(ruledOut(ctx.components.chip, 'tabs for the account sections', 'chip').length, 1);
+  const out = requestFindings(ctx, 'tabs for the account sections', [{ id: 'c', component: 'chip', props: { Label: 'Profile' } }]).filter((f) => f.level === 'error');
+  assert.equal(out.length, 1, 'beside the warning that the system has no tabs');
+  assert.match(out[0].message, /chip is ruled out for "tab, section".*Don't: Chips as tabs between sections/);
+  const use = usesAgainstPurpose(ctx, [{ component: 'chip', props: { Label: 'Profile' } }]);
+  assert.match(use[0].rule, /Use when filtering a list by one value\..*Common mistakes: a chip as a link to another page\..*Don't: Chips as tabs between sections\./);
+  assert.ok(requestFocus(ctx, 'filter the list by one value').components.some((c) => c.name === 'chip'), 'When to use points a request to the component');
+});
+
+test('the prototype context reads the Do and Don\'t pictures\' captions from the references and contract.authored.json', async () => {
+  const { loadContext } = await import('../prototype-context.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'proto-usage-'));
+  mkdirSync(join(dir, 'refs', 'components', 'chip', 'dont'), { recursive: true });
+  writeFileSync(join(dir, 'refs', 'components', 'chip', 'dont', '01 Chips as tabs between sections.png'), '');
+  writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify({ components: { chip: { examples: [{ kind: 'do', caption: 'One row of chips above the list', nodeId: '1:2' }], guidance: { whenToUse: 'filtering a list' } } } }));
+  const ctx = await loadContext(dir, { visualRefs: 'refs' }, { components: { chip: { description: 'A filter.', props: {} } } }, { fetchLinks: false });
+  assert.deepEqual(ctx.components.chip.donts, ['Chips as tabs between sections']);
+  assert.deepEqual(ctx.components.chip.dos, ['One row of chips above the list']);
+  assert.deepEqual(ctx.components.chip.whenToUse, ['filtering a list']);
+  assert.ok(ctx.sources.some((s) => /Do and Don't of 1 component/.test(s.detail)));
+});

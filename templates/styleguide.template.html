@@ -719,7 +719,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var own = compName ? '--' + String(compName).toLowerCase().replace(/[^a-z0-9]+/g, '-') : null;
     // Several tokens with the same value: the one the component's own rules use first, then one that names the part
     // (badge/label for .badge-label), so a label's colour is not called the icon's.
-    var comp = compName ? COMPONENTS.find(function (k) { return k.name === compName; }) : COMPONENTS.find(function (k) { return k.cls && !/^#/.test(k.cls) && el.closest && el.closest('.' + k.cls); });
+    var comp = compName ? COMPONENTS.find(function (k) { return k.name === compName; }) : COMPONENTS.find(function (k) { return k.cls && el.closest && el.closest('.' + clsName(k)); });
     var uses = comp && comp.allTokens ? comp.allTokens.map(function (t) { return t.var; }) : [];
     var words = String(el.getAttribute && el.getAttribute('class') || '').split(/[\s_-]+/).filter(function (w) { return w.length > 2 && (!comp || w.toLowerCase() !== String(comp.cls || '').toLowerCase()); }).map(function (w) { return w.toLowerCase(); });
     function rank(n) {
@@ -810,6 +810,9 @@ a.pg-usage-name { color: var(--sg-text); }
      pages), else the element its Figma role asks for. Its controls are the props Figma and the code agree on; an
      option applies what the contract's propertyMap says it adds (a class, an attribute), a boolean shows or hides
      the part it names. Below: the tokens behind the rendered result and its computed box. */
+  // The class a preview draws a component with: its own, or, for one the system defines by id (#tt, kept once in
+  // the page for the system's scripts), a class standing for that id whose rules are the id's (idAliasRules).
+  function clsName(c) { return /^#/.test(c.cls || '') ? 'sg-id-' + c.cls.slice(1) : c.cls; }
   function baseElement(c) {
     if (c.markup) {
       var t = document.createElement('template'); t.innerHTML = c.markup.trim(); var first = t.content.firstElementChild;
@@ -827,10 +830,37 @@ a.pg-usage-name { color: var(--sg-text); }
       case 'link': e = document.createElement('a'); e.href = '#'; break;
       default: e = document.createElement('span');
     }
-    if (c.cls) e.classList.add(c.cls);
+    if (c.cls) e.classList.add(clsName(c));
     // Its name as the words only when no text prop fills it.
     if (e.tagName !== 'INPUT' && !(c.controls || []).some(function (k) { return k.type === 'TEXT'; })) e.textContent = c.name.charAt(0).toUpperCase() + c.name.slice(1);
     return e;
+  }
+  // A component the system defines by id: its rules copied for the class that stands for it in a preview.
+  (function idAliasRules() {
+    var ids = COMPONENTS.filter(function (c) { return /^#[\w-]+$/.test(c.cls || ''); }).map(function (c) { return c.cls.slice(1); });
+    if (!ids.length) return;
+    var re = new RegExp('#(' + ids.join('|') + ')(?![\\w-])', 'g'), out = [];
+    var walk = function (rules, wrap) { Array.prototype.forEach.call(rules || [], function (r) {
+      if (r.selectorText) { if (re.test(r.selectorText)) { re.lastIndex = 0; out.push(wrap(r.selectorText.replace(re, '.sg-id-$1') + '{' + r.style.cssText + '}')); } re.lastIndex = 0; return; }
+      if (r.cssRules) walk(r.cssRules, r.conditionText ? function (x) { return wrap('@media ' + r.conditionText + '{' + x + '}'); } : wrap);
+    }); };
+    Array.prototype.forEach.call(document.styleSheets, function (sh) { try { walk(sh.cssRules, function (x) { return x; }); } catch (e) { /* another origin's sheet */ } });
+    if (out.length) { var st = document.createElement('style'); st.textContent = out.join('\n'); document.head.appendChild(st); }
+  })();
+  // A component hidden at rest until a class shows it (a tooltip's visible class): the class whose own rule makes it
+  // seen (opacity 1, visibility visible or a display), so the preview shows it.
+  function showClass(c) {
+    var base = '.' + clsName(c), found = null;
+    var walk = function (rules) { Array.prototype.forEach.call(rules || [], function (r) {
+      if (found) return;
+      if (r.cssRules && !r.selectorText) { walk(r.cssRules); return; }
+      (r.selectorText || '').split(',').forEach(function (sel) {
+        var m = sel.trim().split(base + '.'); if (found || m.length !== 2 || m[0] !== '' || !/^[\w-]+$/.test(m[1])) return;
+        if (r.style.opacity === '1' || r.style.visibility === 'visible' || (r.style.display && r.style.display !== 'none')) found = m[1];
+      });
+    }); };
+    Array.prototype.forEach.call(document.styleSheets, function (sh) { try { walk(sh.cssRules); } catch (e) { /* another origin's sheet */ } });
+    return found;
   }
   (function liveStateRules() {
     var out = [], map = [[':hover', '.sg-is-hover'], [':focus-visible', '.sg-is-focus-visible'], [':focus-within', '.sg-is-focus-within'], [':focus', '.sg-is-focus'], [':active', '.sg-is-active']];
@@ -1390,7 +1420,7 @@ a.pg-usage-name { color: var(--sg-text); }
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2></div>' +
-        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') +
+        (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
         importHTML(c) + linksHTML(c.links) +
       '</div>' +
@@ -1622,7 +1652,7 @@ a.pg-usage-name { color: var(--sg-text); }
       anatBox.innerHTML = ''; anatLegend.innerHTML = '';
       // A component shown in an overlay (a modal over the window) is drawn as itself: its own element, without the layer.
       var src = preview.firstElementChild;
-      if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + c.cls); if (own) src = own; }
+      if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + clsName(c)); if (own) src = own; }
       var copy = src.cloneNode(true);
       // At the width the Playground last drew it (it is hidden while this area shows), so the copy lays out the same.
       var pw = src.getBoundingClientRect().width || (src === preview.firstElementChild ? drawnWidth : 0);
@@ -1674,7 +1704,7 @@ a.pg-usage-name { color: var(--sg-text); }
       compareEl.querySelector('.pg-compare-amount').hidden = compareMode !== 'over' || !sh;
       if (!sh) { body.innerHTML = '<p class="pg-empty">Figma has no image of this variant yet' + ((c.figmaShots || []).length ? ' (it has ' + c.figmaShots.length + ')' : '') + '.</p>'; return; }
       var src = preview.firstElementChild;
-      if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + c.cls); if (own) src = own; }
+      if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + clsName(c)); if (own) src = own; }
       var copy = src.cloneNode(true), w = src.getBoundingClientRect().width;
       if (w) { copy.style.width = w + 'px'; copy.style.boxSizing = 'border-box'; }
       copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
@@ -1786,6 +1816,11 @@ a.pg-usage-name { color: var(--sg-text); }
       if (!e.children.length && !e.textContent.trim() && e.getBoundingClientRect().width < 1) e.style.width = '100%';
       // Centred in the playground: a margin the instance has in its product (where it sits there) is not its own.
       e.style.margin = '0';
+      // Hidden at rest until a class shows it (a tooltip): shown, as it is seen in use. One fixed to the window
+      // (a tooltip at the pointer), not an overlay: drawn in place in the playground.
+      var ecs = getComputedStyle(e);
+      if (c.cls && (ecs.opacity === '0' || ecs.visibility === 'hidden')) { var sc = showClass(c); if (sc) { e.classList.add(sc); e.style.transition = 'none'; } }
+      if (ecs.position === 'fixed' && !(c.motion && c.motion.overlay)) { e.style.position = 'relative'; e.style.inset = 'auto'; }
       // A component that lives inside another (one segment of a segmented control): drawn once, inside its parent,
       // and its props act on it, not on the parent.
       if (c.only) { var ones = Array.prototype.slice.call(e.querySelectorAll(c.only)); if (ones.length) { ones.slice(1).forEach(function (k) { k.remove(); }); e = ones[0]; } }
@@ -1827,7 +1862,7 @@ a.pg-usage-name { color: var(--sg-text); }
     }
     // The tables beside the preview, read from the component as it is drawn now.
     function inspect(e) {
-      var el = (c.cls && (e.classList.contains(c.cls) ? e : e.querySelector('.' + c.cls))) || e;
+      var el = (c.cls && (e.classList.contains(clsName(c)) ? e : e.querySelector('.' + clsName(c)))) || e;
       tTokens.innerHTML = rowsHTML(lookRows(el, true).concat(partRows(el, c.name)));
       ownRows(); writeLink(); checkLive(); codeHeight();
       showCode(e);

@@ -10,7 +10,7 @@ It works inside Claude Code. It keeps your code matching your Figma design, and 
 
 - **High quality.** Every colour, size, font and state in your code is checked against Figma, with the fix in plain words.
 - **A living style guide.** One page with every token and component, built from your system, never written by hand.
-- **Prototypes from your real system.** Describe a screen in your own words and get it made only of your components.
+- **Prototypes from your real system.** Describe a screen in your own words and get it made only of your components, following your guidelines and Do and Don't, with every state and screen size checked, and working as your product does.
 - **Accessibility tested.** Each component is tried in a real browser, and every problem comes with its fix.
 - **Build from Figma.** Only have the design? Claude builds it in code, piece by piece, each piece checked.
 - **You stay in control.** Nothing in your design or code changes unless you ask.

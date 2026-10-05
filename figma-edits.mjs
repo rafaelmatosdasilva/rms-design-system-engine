@@ -5,7 +5,11 @@
 //   • a component whose code is a real control (a <button>, an <input type="checkbox">, role="switch"…) and whose
 //     Figma component states no role gets the annotation "Role: <role>", the vocabulary the engine reads back;
 //   • a component whose Figma role says one thing and whose code another is listed as a decision, never applied.
-// What needs a person's words or a design decision (descriptions, missing components, layout) is never written here.
+//   • what the prototypes needed and the system lacks (gaps.json) becomes the design team's to do list: a page
+//     "Design system to do" with a frame "Gaps from prototypes", one card per need, the most needed first. Written
+//     afresh each time; nothing else in the file is touched.
+// What needs a person's words or a design decision (descriptions, missing components, layout) is never written here:
+// the to do list only names the need, for the design team to decide.
 //
 // Two files under .design-system-engine-out/handback/:
 //   figma-edits.json  every edit, with the component, its Figma node, what is added and why (what the code renders);
@@ -105,10 +109,25 @@ export function figmaEdits(propsSnap = {}, components = []) {
   return out;
 }
 
+// The to do list for the design team, from every prototype's gaps (gaps.json → merged): one edit, or none.
+export const TODO_PAGE = 'Design system to do', TODO_FRAME = 'Gaps from prototypes';
+export function gapEdits(merged = []) {
+  const items = (merged ?? []).filter((g) => g?.need).map((g) => ({ need: String(g.need), kind: g.kind ?? 'component', closest: g.closest ?? null, used: g.used ?? null, note: g.note ?? null, prototypes: g.prototypes ?? [] }));
+  if (!items.length) return [];
+  const protos = new Set(items.flatMap((g) => g.prototypes));
+  return [{ kind: 'todo', page: TODO_PAGE, frame: TODO_FRAME, items, why: `${items.length} need${items.length === 1 ? '' : 's'} the system lacks, from ${protos.size} prototype${protos.size === 1 ? '' : 's'}, the most needed first` }];
+}
+const todoText = (g) => {
+  const n = g.prototypes.length;
+  return [`${g.kind}`, g.used ? `meanwhile: ${g.used}` : g.closest ? `closest: ${g.closest}` : null, g.note, n ? `needed in ${n} prototype${n === 1 ? '' : 's'}: ${g.prototypes.join(', ')}` : null].filter(Boolean).join(' · ');
+};
+
 // The Figma plugin script for the edits a person approved (decisions are never in it). Idempotent: a node that
 // already states a role is left as it is. Returns { changed, skipped, missing } for the agent to report.
 export function applyScript(edits = []) {
   const todo = edits.filter((e) => e.kind === 'role' && e.nodeId && e.label).map((e) => ({ id: e.nodeId, component: e.component, label: e.label }));
+  const list = edits.find((e) => e.kind === 'todo');
+  const cards = list ? list.items.map((g) => ({ title: g.need, text: todoText(g) })) : null;
   return `// Written by rms-design-system-engine --figma-edits. Run it with the Figma MCP's use_figma only after the person said yes.
 const edits = ${JSON.stringify(todo, null, 2)};
 const changed = [], skipped = [], missing = [];
@@ -120,18 +139,46 @@ for (const e of edits) {
   node.annotations = [...now.map((a) => (a.labelMarkdown ? { labelMarkdown: a.labelMarkdown, ...(a.properties ? { properties: a.properties } : {}), ...(a.categoryId ? { categoryId: a.categoryId } : {}) } : { label: a.label, ...(a.properties ? { properties: a.properties } : {}), ...(a.categoryId ? { categoryId: a.categoryId } : {}) })), { label: e.label }];
   changed.push(e.component + ' → ' + e.label);
 }
-return { changed, skipped, missing };
+${cards ? `// The design team's to do list: its own page and frame, written afresh; nothing else in the file is touched.
+const cards = ${JSON.stringify(cards, null, 2)};
+let page = figma.root.children.find((p) => p.name === ${JSON.stringify(list.page)});
+if (!page) { page = figma.createPage(); page.name = ${JSON.stringify(list.page)}; }
+if (page.loadAsync) await page.loadAsync();
+const old = page.children.find((n) => n.name === ${JSON.stringify(list.frame)});
+const at = old ? { x: old.x, y: old.y } : { x: 0, y: 0 };
+if (old) old.remove();
+await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+await figma.loadFontAsync({ family: 'Inter', style: 'Bold' });
+const text = (chars, style, size) => { const t = figma.createText(); t.fontName = { family: 'Inter', style }; t.fontSize = size; t.characters = chars; return t; };
+const list = figma.createFrame();
+list.name = ${JSON.stringify(list.frame)}; list.layoutMode = 'VERTICAL'; list.itemSpacing = 12; list.paddingTop = list.paddingBottom = list.paddingLeft = list.paddingRight = 24;
+list.primaryAxisSizingMode = 'AUTO'; list.counterAxisSizingMode = 'AUTO'; list.x = at.x; list.y = at.y;
+list.appendChild(text(${JSON.stringify(list.frame)} + ' · ' + cards.length + ' need' + (cards.length === 1 ? '' : 's') + ', the most needed first', 'Bold', 20));
+for (const c of cards) {
+  const card = figma.createFrame();
+  card.name = c.title; card.layoutMode = 'VERTICAL'; card.itemSpacing = 4; card.paddingTop = card.paddingBottom = card.paddingLeft = card.paddingRight = 12;
+  card.primaryAxisSizingMode = 'AUTO'; card.counterAxisSizingMode = 'AUTO'; card.cornerRadius = 8;
+  card.strokes = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
+  card.appendChild(text(c.title, 'Bold', 14));
+  card.appendChild(text(c.text, 'Regular', 12));
+  list.appendChild(card);
+}
+page.appendChild(list);
+const todo = ${JSON.stringify(list.page)} + ' › ' + ${JSON.stringify(list.frame)} + ': ' + cards.length + ' need' + (cards.length === 1 ? '' : 's');
+return { changed, skipped, missing, todo };` : 'return { changed, skipped, missing };'}
 `;
 }
 
 // The lines the run prints: what would change, what a person decides.
 export function editLines(edits, { fileKey = null } = {}) {
-  const apply = edits.filter((e) => !e.decision), decide = edits.filter((e) => e.decision);
-  if (!edits.length) return ['✅ Figma states every role the code has: nothing to send back.'];
+  const roles = edits.filter((e) => e.kind === 'role'), todo = edits.find((e) => e.kind === 'todo'), decide = edits.filter((e) => e.decision);
+  const apply = edits.filter((e) => !e.decision);
+  if (!edits.length) return ['✅ Figma states every role the code has, and no prototype needs anything the system lacks: nothing to send back.'];
   return [
-    ...(apply.length ? [`Figma changes the engine can make (${apply.length}), each read from the code:`, ...apply.map((e) => `   • ${e.component}: add the annotation "${e.label}" (${e.why})`)] : []),
+    ...(roles.length ? [`Figma changes the engine can make (${roles.length}), each read from the code:`, ...roles.map((e) => `   • ${e.component}: add the annotation "${e.label}" (${e.why})`)] : ['✅ Figma states every role the code has.']),
+    ...(todo ? [`The design team's to do list in Figma, page "${todo.page}", frame "${todo.frame}" (${todo.why}), written afresh:`, ...todo.items.map((g) => `   • ${g.need}: ${todoText(g)}`)] : []),
     ...(decide.length ? [`For a person to decide (${decide.length}), never applied:`, ...decide.map((e) => `   • ${e.component}: ${e.why}`)] : []),
-    ...(apply.length ? [`NEXT: show the person the ${apply.length} change${apply.length === 1 ? '' : 's'} above and ask; only when they say yes, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
+    ...(apply.length ? [`NEXT: show the person the ${roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : ''}${roles.length && todo ? ' and ' : ''}${todo ? 'to do list' : ''} above and ask; only when they say yes, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
   ];
 }
 

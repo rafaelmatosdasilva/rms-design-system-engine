@@ -279,6 +279,9 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
       document.body.appendChild(probeHost);
       const out = asserts.map(a => {
         let el = document.querySelector(a.selector);
+        // One the page holds but does not draw on load (in a closed panel, a list not filled yet) has no size of its own
+        // (its height reads auto): the probe, drawn, is measured instead.
+        if (el && a.probe && !el.getClientRects().length) el = null;
         if (!el && a.probe) {
           probeHost.insertAdjacentHTML('beforeend', a.probe);
           el = probeHost.querySelector(a.selector) ?? document.querySelector(a.selector);

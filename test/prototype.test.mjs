@@ -280,3 +280,20 @@ test('--prototype --catalog lists the system\'s components, the engine\'s pieces
   assert.match(r.stdout, /Text\s+text=<text>\s+style=m\|s/);
   assert.match(r.stdout, /NEXT: write prototypes\/<name>\.json with only the parts above/);
 });
+
+test('a part opens another part of the composition by its id; one that names no part, the page or itself is an error', () => {
+  const ok = checkPrototype({ component: 'Page', props: { padding: 'padding/m' }, children: [
+    { component: 'button', props: { Label: 'Filter', opens: 'filters' } },
+    { id: 'filters', component: 'Stack', children: [{ component: 'chip', props: { Label: 'Open' } }] }] }, { catalog, view, scales });
+  assert.equal(ok.ok, true, JSON.stringify(ok.findings));
+  assert.ok(!ok.findings.some((f) => /opens/.test(f.message)), 'opens is no option of the button');
+  const bad = checkPrototype({ id: 'page', component: 'Page', children: [
+    { component: 'button', props: { Label: 'Filter', opens: 'nowhere' } },
+    { id: 'b', component: 'button', props: { Label: 'Again', opens: 'b' } },
+    { component: 'button', props: { Label: 'Home', opens: 'page' } }] }, { catalog, view, scales });
+  assert.deepEqual(bad.findings.filter((f) => /opens/.test(f.message)).map((f) => f.message), [
+    'button.opens names "nowhere", and no part has that id: give the part it opens an "id" and name it here',
+    'button.opens names itself: it opens another part (a dialog, a menu), drawn closed until it is used',
+    'button.opens names the page itself: it opens another part (a dialog, a menu), drawn closed until it is used',
+  ]);
+});

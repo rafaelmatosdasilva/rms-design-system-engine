@@ -611,7 +611,11 @@ take; the format; and the prototypes already in `prototypes/`.
 - **What each component is for** comes from everything the team wrote, read as the design intent reads it
   (`intent-gen.mjs`, nothing written): the Figma description and annotations (a `Role:` annotation is shown as its
   role), each option's description, the code's notes and the comment above its CSS rule, the authored contract
-  (`whenNotToUse`, `useInstead`, status, notes) and the guidelines section named after it.
+  (`whenNotToUse`, `useInstead`, status, notes) and the guidelines section named after it. Its usage, as the style
+  guide shows it (When to use, When not to use, Common mistakes, Limitations: a line of Figma's description or
+  annotations, the code's note, else `guidance` in the authored contract), and its Do and Don't (the captions of the
+  pictures in `<refs>/components/<name>/do` and `dont`, and the `examples` the authored contract names) are listed with
+  it. A common mistake and a Don't rule a use out as a never sentence does, when two of their words are in it.
 - **The team's rules** are every other guidelines section, each with its file (`guidelines.sources`, and the files the
   Notion and GitLab links are fetched into), and the authored layers of `design-intent.json` (system, foundations,
   patterns, templates, pages, flows). A link whose file is missing or older than `guidelines.maxAgeHours` (24) is
@@ -661,6 +665,32 @@ The rules are `--check-ui`'s, plus:
 - **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
   `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
   needed first. The Stop hook holds the reply to the gaps of the prototype just drawn.
+- **It works as in the product.** The system's own scripts (`systemScripts`) run on the page, a click moves a
+  selection (tabs, a segmented control, a list), a field takes typing, and a link stays on the page. A part that opens
+  another carries `"opens": "<id>"` and the part it opens has that `"id"`: it is drawn closed and opens on a click, as
+  the system's overlay when its CSS has one (container, layers, open and closing classes, as the style guide plays it),
+  else as a popover under the part; Escape, a click outside or a button inside closes it and the focus goes back. An
+  `opens` that names no part, the page or itself is an error. With Chrome, each one is tried: it must open with the
+  focus inside, close with Escape and give the focus back, and each field must take typing; what does not is a ⚠️ line
+  under 🖱.
+- **Every state.** A composition names its other states beside it, `"states": { "<name>": { "<id>": { …that part in
+  this state… } } }` (in the composition, or beside `"prototype"` in the file), each naming by `id` only the parts that
+  differ; `null` leaves a part out. Each state is checked as a whole page (a state that names no part is an error), its
+  gaps join the prototype's, and the page has a switch for it (`#state=<name>` opens one). The page owes an empty state
+  when it shows a list (a part holding two or more of the same system component, or a component named or made for a
+  list, table, grid or feed), an error state when it takes input (a field and a button), and each state the request
+  names ("with a loading state") or the team's guidelines ask of the page or of a component it uses ("every list shows
+  an empty state"). A state is found by its kind, whatever its name ("No results" is an empty state). One not given is
+  a ⚠️ line the reply owes.
+- **Every screen size and state, with longer words.** With Chrome, each state is drawn at every screen width (Figma's
+  breakpoints, else Phone 375, Tablet 768 and Desktop 1280; a size mode of the same name is turned on, else the
+  system's media query decides), with the words as written and 40% longer, as a translation makes them. What runs past
+  the screen's edge (measured part by part, since a system often hides the page's overflow), a text cut by a box or an
+  ellipsis, a text that runs out of its component, a control's label on two lines, and on a phone a target under 24px
+  (WCAG 2.5.8) are ⚠️ lines under 📱, each with the widths and states it happens at; the ones that happen with the words
+  as written are owed in the reply. A picture is saved for each width (`<name>@<width>.png`) and each state
+  (`<name>.<state>.png`). Row `wrap` and Columns `minWidth` (the narrowest a column may be, in px) let a layout fit a
+  narrow screen.
 - **A retired component** (status deprecated) is an error that names its replacement.
 - **What the documentation says.** After drawing, each system component the prototype uses is listed beside what it
   uses it for (its labels and stand-ins) and what the documentation says it is for, so a use it is not for stands out:
@@ -722,11 +752,14 @@ text fields still a text field) gives a role in the engine's vocabulary (`button
 `textbox`, `checkbox`, `radio`, `switch`, `spinbutton`, `link`, `dialog`, `tab`). A Figma component that states no role
 gets the annotation `Role: <role>`; one whose Figma role differs from the code is listed for a person to decide and
 never changed. A wrapper around several controls (a stepper, a group) has no single role and is left out, as is a
-component the code does not show.
+component the code does not show. Every need the prototypes found the system lacks (`prototypes/gaps.json`, merged) becomes
+the design team's to do list: a page "Design system to do" with a frame "Gaps from prototypes", one card per need (what
+kind, what the prototypes use meanwhile or the closest component, and which prototypes need it), the most needed first,
+written afresh each time; nothing else in the file is touched. With gaps and no Figma snapshot, only the list is written.
 
 It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its Figma node, what it adds and why) and
 `figma-apply.js`, a Figma plugin script that makes exactly those edits, leaves a component that already states a role
-as it is, and returns `{ changed, skipped, missing }`. The agent shows the list, and only when the person says yes runs
+as it is, and returns `{ changed, skipped, missing }` (and `todo`, the list it wrote). The agent shows the list, and only when the person says yes runs
 the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
 and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
 Descriptions, missing components and layout are never written: they stay in `figma-changes.md`.
