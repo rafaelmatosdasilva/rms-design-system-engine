@@ -38,5 +38,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-05-style-guide-figma-beside-the` | The 21 guide tasks on Haiku (engine 22050d1) | "Style guide: Figma beside the code, what uses each token, props in search" |
 | `2026-10-05-style-guide-every-box-has` | The 21 guide tasks on Haiku (engine fc83ee2) | "Style guide: system card look, documentation in tables, Parity icon and columns, code height, prop order, sticky titles" |
 | `2026-10-05-style-guide-and-setup-modes` | The 21 guide tasks on Haiku (engine cf070d8) | "Setup without technical questions and the style guide's playground batch" |
+| `2026-10-05-prototypes-every-state-every-screen` | The 21 guide tasks on Haiku (engine ca59a27) | "Prototypes: usage, Do and Don't, interactive, gaps to Figma, every state and screen size" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
