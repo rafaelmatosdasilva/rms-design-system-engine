@@ -41,6 +41,46 @@ export function splitStates(raw) {
   return { ui, states, findings };
 }
 
+// A part in a state: null leaves it out; one that names its component replaces it; one that does not changes it, its
+// props over the part's own ({ "props": { "Error": "True" } } keeps the field and sets its Error).
+function merged(node, next) {
+  if (next === null) return null;
+  if (next.component) return { id: node.id, ...next };
+  return { ...node, ...next, id: node.id, props: { ...(node.props ?? {}), ...(next.props ?? {}) } };
+}
+
+// A value written as the person would say it, read as the system writes it: an option in another case ("false" for
+// False), true or false for an option of False and True, "true" or "false" for a boolean. Every part, in every state.
+// → the notes on what was read, ["button.Disabled false read as False"]
+export function normaliseValues(raw, catalog = { components: {} }) {
+  const notes = [];
+  const seen = new WeakSet();
+  // A state's part that names no component is the part of that id: its component, read from the page.
+  const byId = new Map();
+  (function ids(o) { if (!o || typeof o !== 'object') return; if (Array.isArray(o)) { o.forEach(ids); return; } if (o.id != null && typeof o.component === 'string') byId.set(String(o.id), o.component); for (const v of Object.values(o)) ids(v); })(raw);
+  const walk = (o, key = null) => {
+    if (!o || typeof o !== 'object' || seen.has(o)) return;
+    seen.add(o);
+    if (Array.isArray(o)) { o.forEach((x) => walk(x)); return; }
+    const name = typeof o.component === 'string' ? o.component : key != null && o.props ? byId.get(String(key)) : null;
+    const def = name ? catalog.components?.[name] : null;
+    if (def && o.props && typeof o.props === 'object') {
+      for (const [k, v] of Object.entries(o.props)) {
+        const p = def.props?.[k] ?? Object.entries(def.props ?? {}).find(([, e]) => e.codeName === k)?.[1];
+        if (!p) continue;
+        const allowed = k === p.codeName && p.codeValues ? p.codeValues : p.values;
+        if (p.type === 'enum' && Array.isArray(allowed) && !allowed.includes(v) && (typeof v === 'string' || typeof v === 'boolean')) {
+          const hit = allowed.find((a) => String(a).toLowerCase() === String(v).toLowerCase());
+          if (hit !== undefined) { o.props[k] = hit; notes.push(`${name}.${k} ${JSON.stringify(v)} read as ${JSON.stringify(hit)}`); }
+        } else if (p.type === 'boolean' && typeof v === 'string' && /^(true|false)$/i.test(v)) { o.props[k] = /^true$/i.test(v); notes.push(`${name}.${k} ${JSON.stringify(v)} read as ${o.props[k]}`); }
+      }
+    }
+    for (const [k, v] of Object.entries(o)) walk(v, k);
+  };
+  walk(raw);
+  return notes;
+}
+
 // The composition in one state: each part named replaced (null leaves it out). Works on either form. → { ui, unknown }
 export function applyState(ui, overrides = {}) {
   const ids = new Set(Object.keys(overrides));
@@ -49,8 +89,7 @@ export function applyState(ui, overrides = {}) {
     if (!node || typeof node !== 'object') return node;
     if (node.id != null && ids.has(String(node.id))) {
       seen.add(String(node.id));
-      const next = overrides[node.id];
-      return next === null ? null : { id: node.id, ...next };
+      return merged(node, overrides[node.id]);
     }
     return Array.isArray(node.children) ? { ...node, children: node.children.map(swap).filter((k) => k !== null) } : node;
   };
@@ -60,9 +99,9 @@ export function applyState(ui, overrides = {}) {
     const components = ui.components.map((c) => {
       if (c.id == null || !ids.has(String(c.id))) return c;
       seen.add(String(c.id));
-      const next = overrides[c.id];
-      if (next === null) { gone.add(String(c.id)); return null; }
-      return { id: c.id, ...next };
+      const next = merged(c, overrides[c.id]);
+      if (next === null) gone.add(String(c.id));
+      return next;
     }).filter(Boolean).map((c) => (Array.isArray(c.children) ? { ...c, children: c.children.filter((k) => !gone.has(String(typeof k === 'object' ? k.id : k))) } : c));
     out = { ...ui, components };
   } else out = swap(ui);
@@ -80,14 +119,25 @@ export function statesOwed(ui, { context = null, request = null, catalog = { com
   const about = (n) => { const k = context?.components?.[n.component]; return `${n.component} ${k?.role ?? ''} ${k?.purpose ?? ''}`; };
   const out = [];
   const owe = (state, why) => { if (!out.some((o) => o.state === state)) out.push({ state, why }); };
-  // A list: a part that holds two or more of the same system component, or a component named or made for one.
+  // A list: a part that holds two or more of the same system component, or of the same arrangement (a row each with a
+  // name and a tag), or a component named or made for one. Fields, buttons and switches side by side are a form or a set
+  // of choices, not a list: a page shows them whatever the data.
+  const control = (n) => { const role = context?.components?.[n.component]?.role ?? ''; return /^(textbox|searchbox|combobox|button|togglebutton|checkbox|radio|switch|spinbutton|slider|tab)$/i.test(role) || FIELD.test(n.component.replace(/([a-z])([A-Z])/g, '$1 $2')) || /button|switch|toggle|checkbox|radio|chip/i.test(n.component); };
+  const kidsOf = (n) => (n.children ?? []).map((k) => byId.get(typeof k === 'object' ? k.id : k)).filter(Boolean);
+  const shape = (n) => `${n.component}(${kidsOf(n).map(shape).join(',')})`;
+  const holdsContent = (n) => kidsOf(n).some((k) => (own(k) && !control(k)) || k.component === 'Text' || holdsContent(k));
   for (const n of nodes) {
-    const kids = (n.children ?? []).map((k) => byId.get(typeof k === 'object' ? k.id : k)).filter(Boolean);
+    const kids = kidsOf(n);
     const counts = new Map();
-    for (const k of kids) if (own(k)) counts.set(k.component, (counts.get(k.component) ?? 0) + 1);
+    for (const k of kids) if (own(k) && !control(k)) counts.set(k.component, (counts.get(k.component) ?? 0) + 1);
     const repeated = [...counts].find(([, c]) => c >= 2);
     if (repeated) { owe('empty', `it shows a list of ${repeated[0]}`); break; }
+    const shapes = new Map();
+    for (const k of kids) if (!own(k) && (k.children ?? []).length && holdsContent(k)) shapes.set(shape(k), (shapes.get(shape(k)) ?? 0) + 1);
+    const alike = [...shapes].find(([, c]) => c >= 2);
+    if (alike) { owe('empty', `it shows a list: ${alike[1]} ${alike[0].split('(')[0]}s alike${n.id ? ` in ${n.id}` : ''}`); break; }
   }
+  if (request && /\b(list|lists|table|feed|inbox|results|catalog(ue)?|gallery|history|lista|tabela)\b/i.test(request)) owe('empty', 'the request asks for a list');
   const listy = nodes.find((n) => own(n) && LISTY.test(about(n).replace(/([a-z])([A-Z])/g, '$1 $2')));
   if (listy) owe('empty', `it shows ${listy.component}, made for a list`);
   // Input: a field and something that sends it.
