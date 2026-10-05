@@ -63,7 +63,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   assert.equal(tag.markup, '<span class="tag">New</span>');
   assert.deepEqual(data.components.find((c) => c.name === 'tag').controls.find((c) => c.label === 'Tone').options, [{ label: 'Neutral' }, { label: 'Positive', add: ['tag--positive'], attrs: {} }]);
   assert.deepEqual(data.tokens.radii.map((t) => t.var), ['--radii-button', '--radii-chip', '--radii-field']);
-  assert.deepEqual(data.modes, [{ label: 'Color', values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme' }]);
+  assert.deepEqual(data.modes, [{ label: 'Mode', values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme' }]);
   assert.match(html, /Living style guide/);
 });
 
@@ -195,7 +195,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Picked.*chip padding \w+.*--padding-[a-z]+/s);
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-inspect-marks .is-picked').length`), 1);
     await run(`document.querySelector('#c-chip .pg-inspect-legend [data-pick^="part 1"]').click()`);
-    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Picked.*background.*--chip-background/s);
+    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Picked.*color.*--chip-text.*font/s, 'the label: its colour and text style');
     await run(`document.querySelector('#c-chip .pg-inspect-legend [data-pick^="part 1"]').click()`);
     assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Click a part/);
     // No number covers another: one that would is moved beside it, a line back to where it belongs.
