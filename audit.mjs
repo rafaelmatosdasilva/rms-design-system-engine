@@ -2964,8 +2964,8 @@ function reportFull(label, items, shown) {
   // rather than collapsing the gate to SKIPPED.
   addGate('Component props match Figma  (names, defaults, variant options & slots vs code)',
     (cfg.frameworkComponents === false && cfg.htmlRealization)
-      ? parseGeneric(rCompProp, /REALIZED|UNREALIZED|UNMAPPED|VIA STATE/)
-      : parseComponentFrameworkGate(rCompProp, /OK|MISSING|NAME|VALUE|SLOT|NO FILE|RENAME/));
+      ? parseGeneric(rCompProp, /REALIZED|UNREALIZED|UNMAPPED|VIA STATE|named differently from the rest/)
+      : parseComponentFrameworkGate(rCompProp, /OK|MISSING|NAME|VALUE|SLOT|NO FILE|RENAME|named differently from the rest/));
   addGate('Sub-components match Figma  (the sub-components Figma nests are the ones the code uses)',
     (cfg.frameworkComponents === false && cfg.htmlRealization)
       ? parseGeneric(rCompose, /OK|MISSING|SKIP/)
