@@ -93,6 +93,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-hero > h1 { font-size: var(--sg-h1); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-s); }
 .sg-hero > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); max-width: 500px; }
 .sg-pending { font-size: var(--sg-m); color: var(--sg-text); background: color-mix(in srgb, var(--sg-warning) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sg-warning) 40%, transparent); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-xl); max-width: 720px; }
+.sg-usage-count { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-l); max-width: 720px; }
 .sg-gap ul { margin: var(--sg-space-xs) 0 0; padding-left: var(--sg-space-l); }
 .sg-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sg-space-m); margin-bottom: var(--sg-space-xxl); }
 /* Each overview link is the system's own card (DATA.ui.card); with none, a plain block link. Never a box of the page's. */
@@ -209,6 +210,24 @@ a.pg-usage-name { color: var(--sg-text); }
 /* With no text field in the system, the browser's own (never styled here, so it cannot sit inside the system's field). */
 .pg-ctl > input[type="text"] { font: inherit; }
 .pg-empty { font-size: var(--sg-s); color: var(--sg-muted); }
+/* Anatomy: the component as set in the Playground, drawn larger, each part numbered, padding and gaps tinted. */
+.pg-anatomy { display: flex; justify-content: center; padding: var(--sg-space-xxl) var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-l); background: var(--sg-bg); overflow: auto; }
+.pg-anat-stage { position: relative; flex: none; }
+.pg-anat-wrap { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; }
+.pg-anat-wrap, .pg-anat-wrap * { animation: none !important; transition: none !important; }   /* drawn at rest, never mid-entry */
+.pg-anatomy-doc, .pg-anatomy { min-width: 0; }
+.pg-anat-marks { position: absolute; inset: 0; pointer-events: none; }
+.pg-anat-pad { position: absolute; background: color-mix(in srgb, var(--sg-accent) 22%, transparent); }
+.pg-anat-gap { position: absolute; background: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
+.pg-anat-part { position: absolute; outline: 1px dashed var(--sg-text); }
+.pg-anat-part.is-slot { outline: 2px dashed var(--sg-accent); }
+.pg-anat-num { position: absolute; transform: translate(-50%, -50%); min-width: 18px; height: 18px; padding: 0 var(--sg-space-xxs); box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: var(--sg-radius-pill); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); }
+.pg-anat-key { display: inline-block; width: 12px; height: 12px; margin-right: var(--sg-space-xs); vertical-align: -1px; border-radius: var(--sg-radius-s); }
+.pg-anat-key.is-pad { background: color-mix(in srgb, var(--sg-accent) 22%, transparent); } .pg-anat-key.is-gap { background: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
+.pg-anatomy-doc .pg-updated { margin-top: var(--sg-space-l); }
+.pg-from, .pg-missing { color: var(--sg-muted); }
+.pg-missing { font-style: italic; }
+.pg-doc > .pg-from { margin-top: var(--sg-space-s); }
 .pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sg-space-m); align-items: start; }
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; box-shadow: var(--sg-shadow); }
 .pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
@@ -219,6 +238,12 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect tr:last-child td { border-bottom: none; }
 .pg-own-swatch { display: inline-block; width: var(--sg-space-m); height: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius-s); vertical-align: middle; margin-right: var(--sg-space-xs); }
 .sg-topbar, .sg-nav-close, .sg-scrim { display: none; }
+/* The menu hidden on a wide screen: a bar at the top with the button that brings it back, the page at full width. */
+body.sg-nav-hidden .sg-sidebar { display: none; }
+body.sg-nav-hidden .sg-layout { flex-direction: column; }
+body.sg-nav-hidden .sg-topbar { display: flex; align-items: center; gap: var(--sg-space-s); position: sticky; top: 0; z-index: 20; padding: var(--sg-space-s) var(--sg-space-l); background: var(--sg-bg); border-bottom: var(--sg-line); }
+body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; }
+.sg-hide-nav { margin-top: var(--sg-space-s); }
 @media (max-width: 720px) {
   /* A phone: a bar at the top with the menu button; the sidebar is a panel that slides in over the page. */
   .sg-layout { flex-direction: column; }
@@ -227,6 +252,8 @@ a.pg-usage-name { color: var(--sg-text); }
   .sg-sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; width: min(320px, 85vw); height: 100vh; transform: translateX(-100%); transition: transform 0.2s ease; visibility: hidden; }
   body.sg-nav-open .sg-sidebar { transform: none; visibility: visible; }
   .sg-nav-close { display: inline-flex; position: absolute; top: var(--sg-space-s); right: var(--sg-space-s); }
+  .sg-hide-nav { display: none; }   /* a phone shows the menu on demand already */
+  body.sg-nav-hidden .sg-sidebar { display: flex; }
   .sg-sidebar-header { position: relative; }
   body.sg-nav-open .sg-scrim { display: block; position: fixed; inset: 0; z-index: 30; }
   .sg-scrim:not([class*=" "]) { background: color-mix(in srgb, var(--sg-text) 40%, transparent); }
@@ -379,6 +406,13 @@ a.pg-usage-name { color: var(--sg-text); }
   // What the page could not take from the system, in one note: each control it lacks and the stand-in it uses instead.
   var GAPS = (DATA.ui && DATA.ui.gaps) || [];
   if (GAPS.length) { var gp = document.createElement('div'); gp.className = 'sg-pending sg-gap'; gp.innerHTML = '<b>Stand-ins on this page</b><ul>' + GAPS.map(function (g) { return '<li>' + esc(g.say) + '</li>'; }).join('') + '</ul>'; ov.appendChild(gp); }
+  // Usage written so far: how many components have each of the four sections, so the gaps are in view.
+  var GUIDED = COMPONENTS.filter(function (c) { return c.guidance; });
+  if (GUIDED.length && GUIDED.some(function (c) { return c.guidance.missing.length; })) {
+    var ug = document.createElement('p'); ug.className = 'sg-usage-count';
+    ug.textContent = 'Usage written: ' + GUIDED[0].guidance.sections.map(function (x) { return x.title + ' ' + GUIDED.filter(function (c) { return c.guidance.missing.indexOf(x.key) < 0; }).length + ' of ' + GUIDED.length; }).join(', ') + '. Each component\'s Documentation says what is missing.';
+    ov.appendChild(ug);
+  }
   if (TODO.length) { var go = document.createElement('p'); go.innerHTML = sysButton('a', 'Open the To do list (' + TODO.length + ')', ' href="#todo"'); ov.appendChild(go); }
   // Two groups, as the page has them: the foundations, then every component in the order of its sections. Each card
   // is a thumbnail (a few of the real tokens, or the component itself, drawn when its section is built) and its name.
@@ -958,6 +992,14 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   // ── Its accessibility: its role, what it owes (each with its WCAG criterion), the contrast of its text as drawn, and
   // what the last browser check found on it ──────────────────────────────────────────────────────────────────────────
+  // How to use it: the same four sections on every component, each from where it was written; a missing one says so
+  // and where to write it.
+  function guidanceHTML(c) {
+    var g = c.guidance; if (!g) return '';
+    return '<div class="pg-doc"><h3>Usage</h3><dl class="pg-updated">' + g.sections.map(function (x) {
+      return '<div><dt>' + esc(x.title) + '</dt><dd>' + (x.text ? x.text.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '<p class="pg-from">From ' + esc(x.from) + '</p>' : '<p class="pg-missing">Not written yet.</p>') + '</dd></div>';
+    }).join('') + '</dl>' + (g.missing.length ? '<p class="pg-from">Write a missing one in Figma, as a line of the component\'s description that starts with its name (' + esc(g.sections.filter(function (x) { return !x.text; })[0].title) + ': …), or in contract.authored.json under guidance.</p>' : '') + '</div>';
+  }
   function a11yHTML(c) {
     var a = c.a11y; if (!a) return '';
     var p = function (x) { return '<p>' + esc(x.says) + (x.wcag ? '<span class="pg-wcag">' + esc(x.wcag) + '</span>' : '') + '</p>'; };
@@ -1006,7 +1048,8 @@ a.pg-usage-name { color: var(--sg-text); }
         (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>' +
       '</div>' +
       // Documentation: its API, Figma's and the code's own words, and when each side last changed.
-      '<div class="pg-area" data-area="docs"><div class="pg-footer">' + apiHTML(c) +
+      '<div class="pg-area" data-area="docs"><div class="pg-footer">' +
+        (ALL ? '' : '<div class="pg-doc pg-anatomy-doc"><h3>Anatomy</h3><div class="pg-anatomy"></div><dl class="pg-updated pg-anat-legend"></dl></div>') + guidanceHTML(c) + apiHTML(c) +
         (docRows ? '<div class="pg-doc"><h3>Documentation</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
         (c.updated ? '<dl class="pg-updated">' +
           (c.updated.uncommitted ? '<div><dt>Code</dt><dd>Changed, not committed yet</dd></div>' : c.updated.code ? '<div><dt>Code last changed</dt><dd>' + esc(when(c.updated.code.time || c.updated.code.date)) + '</dd></div><div><dt>Last change</dt><dd>' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')</dd></div>' : '') +
@@ -1033,10 +1076,95 @@ a.pg-usage-name { color: var(--sg-text); }
       Array.prototype.forEach.call(sec.querySelectorAll('.pg-area'), function (a) { a.hidden = !ALL && a.getAttribute('data-area') !== v; });
       segItems(areaBar).forEach(function (b) { segSelect(b, b.dataset.v === v); });
       if (v === 'play') nudge();
+      if (v === 'docs') requestAnimationFrame(drawAnatomy);
     }
     segItems(areaBar).forEach(function (b) { b.addEventListener('click', function () { showArea(b.dataset.v); }); });
     Array.prototype.forEach.call(sec.querySelectorAll('[data-area-go]'), function (b) { b.addEventListener('click', function () { showArea(b.getAttribute('data-area-go')); }); });
     sec._area = showArea;
+    // Anatomy: a copy of the component as the Playground draws it now, larger, with each part numbered (a slot outlined
+    // in the accent), its padding and gaps tinted and named by the token behind them, and how it lines its items up.
+    // One that covers the window has none (a modal is drawn as its card). Never on the measuring page (?all).
+    var anatBox = sec.querySelector('.pg-anatomy'), anatLegend = sec.querySelector('.pg-anat-legend'), drawnWidth = 0;
+    function drawAnatomy() {
+      if (!anatBox || !cur || !preview.firstElementChild || anatBox.offsetParent === null) return;
+      anatBox.innerHTML = ''; anatLegend.innerHTML = '';
+      // A component shown in an overlay (a modal over the window) is drawn as itself: its own element, without the layer.
+      var src = preview.firstElementChild;
+      if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + c.cls); if (own) src = own; }
+      var copy = src.cloneNode(true);
+      // At the width the Playground last drew it (it is hidden while this area shows), so the copy lays out the same.
+      var pw = src.getBoundingClientRect().width || (src === preview.firstElementChild ? drawnWidth : 0);
+      if (pw) { copy.style.width = pw + 'px'; copy.style.boxSizing = 'border-box'; }
+      copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
+      [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[id]'))).forEach(function (k) { k.removeAttribute('id'); });
+      var stage = document.createElement('div'); stage.className = 'pg-anat-stage';
+      var wrap = document.createElement('div'); wrap.className = 'pg-anat-wrap'; wrap.appendChild(copy);
+      var marks = document.createElement('div'); marks.className = 'pg-anat-marks'; marks.setAttribute('aria-hidden', 'true');
+      stage.appendChild(wrap); stage.appendChild(marks); anatBox.appendChild(stage);
+      var root = c.only ? (copy.querySelector(c.only) || copy) : copy;
+      var doc = anatBox.closest('.pg-anatomy-doc');
+      if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { doc.hidden = true; return; }
+      doc.hidden = false;
+      var whole = copy.getBoundingClientRect(), rr = root.getBoundingClientRect();
+      var k = Math.max(1, Math.min(4, 160 / Math.max(1, rr.height), (anatBox.clientWidth - 64) / Math.max(1, whole.width)));
+      stage.style.width = whole.width * k + 'px'; stage.style.height = whole.height * k + 'px';
+      // Measured from where the copy sits now (the stage moves once it is sized), before it is scaled.
+      function box(el) { var r = el.getBoundingClientRect(), o = wrap.getBoundingClientRect(); return { x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height }; }
+      function mark(cls, x, y, w, h) { if (w < 0.5 || h < 0.5) return null; var m = document.createElement('div'); m.className = cls; m.style.left = x * k + 'px'; m.style.top = y * k + 'px'; m.style.width = w * k + 'px'; m.style.height = h * k + 'px'; marks.appendChild(m); return m; }
+      function px(v) { return parseFloat(v) || 0; }
+      var spacing = [];
+      // Padding and gaps of one element, drawn and listed under its name.
+      function spaces(el, label) {
+        var b = box(el), cs = getComputedStyle(el);
+        var bt = px(cs.borderTopWidth), br = px(cs.borderRightWidth), bb = px(cs.borderBottomWidth), bl = px(cs.borderLeftWidth);
+        var pt = px(cs.paddingTop), pr = px(cs.paddingRight), pb = px(cs.paddingBottom), pl = px(cs.paddingLeft);
+        var iw = b.w - bl - br, ih = b.h - bt - bb;
+        mark('pg-anat-pad', b.x + bl, b.y + bt, iw, pt); mark('pg-anat-pad', b.x + bl, b.y + b.h - bb - pb, iw, pb);
+        mark('pg-anat-pad', b.x + bl, b.y + bt + pt, pl, ih - pt - pb); mark('pg-anat-pad', b.x + b.w - br - pr, b.y + bt + pt, pr, ih - pt - pb);
+        if (pt || pr || pb || pl) padRows(el, cs).forEach(function (r) { if (r[1] !== '0') spacing.push(['pad', label + ' ' + r[0].replace(/-/g, ' '), r[1]]); });
+        var flex = /flex|grid/.test(cs.display), row = /^row/.test(cs.flexDirection) && !/grid/.test(cs.display);
+        var g = px(row ? cs.columnGap : cs.rowGap);
+        if (!flex || !g) return;
+        var kids = Array.prototype.filter.call(el.children, function (n) { var ncs = getComputedStyle(n); var r = n.getBoundingClientRect(); return ncs.position !== 'absolute' && ncs.position !== 'fixed' && r.width > 0 && r.height > 0; })
+          .map(box).sort(function (a, z) { return row ? a.x - z.x : a.y - z.y; });
+        var drew = false;
+        for (var i = 1; i < kids.length; i++) {
+          var a = kids[i - 1], z = kids[i];
+          if (row && z.x - (a.x + a.w) > 0.5) { mark('pg-anat-gap', a.x + a.w, b.y + bt + pt, z.x - a.x - a.w, ih - pt - pb); drew = true; }
+          if (!row && z.y - (a.y + a.h) > 0.5) { mark('pg-anat-gap', b.x + bl + pl, a.y + a.h, iw - pl - pr, z.y - a.y - a.h); drew = true; }
+        }
+        if (drew) spacing.push(['gap', label + ' gap', sideTok(el, row ? cs.columnGap : cs.rowGap, 'gap')]);
+      }
+      // Its parts: the contract's named parts, else the elements directly inside it; each numbered where it sits.
+      // Seen only: a part drawn hidden (a native input under its drawn box, at no opacity) is not one a person sees.
+      function seen(n) { var r = n.getBoundingClientRect(), ncs = getComputedStyle(n); return r.width > 1 && r.height > 1 && ncs.visibility !== 'hidden' && ncs.opacity !== '0'; }
+      function nameOf(n) { var cls = (n.getAttribute('class') || '').split(/\s+/).filter(Boolean)[0]; return n.tagName.toLowerCase() === 'svg' ? 'icon' : cls || (n.children.length ? 'group' : n.textContent.trim() ? 'text' : n.tagName.toLowerCase()); }
+      // A layer Figma named on its own (Frame 106) says nothing: its class names it instead.
+      var named = (c.anatomy || []).map(function (p) { var hit = partsOf(root, p.selector).filter(function (n) { return n !== root && seen(n); })[0]; return hit ? { el: hit, name: /^(frame|group|rectangle|ellipse|vector|instance)\s*\d+$/i.test(p.name) ? nameOf(hit) : p.name, slot: p.slot || (!!c.slots && /slot/i.test(nameOf(hit))) } : null; }).filter(Boolean);
+      // Then what sits directly inside it and no named part covers.
+      var parts = named.concat(Array.prototype.filter.call(root.children, function (n) { return seen(n) && !named.some(function (p) { return p.el === n || p.el.contains(n) || n.contains(p.el); }); }).map(function (n) { return { el: n, name: nameOf(n), slot: !!c.slots && /slot/i.test(nameOf(n)) }; }));
+      // Numbered in reading order: top to bottom, then start to end.
+      parts.sort(function (a, z) { var ra = a.el.getBoundingClientRect(), rz = z.el.getBoundingClientRect(); var sameLine = ra.top < rz.bottom && rz.top < ra.bottom; return sameLine ? ra.left - rz.left : ra.top - rz.top; });
+      parts = parts.filter(function (p, i) { return parts.findIndex(function (q) { return q.el === p.el; }) === i; }).slice(0, 12);
+      spaces(root, c.name);
+      parts.forEach(function (p) { if (p.el.children.length) spaces(p.el, p.name); });
+      parts.forEach(function (p, i) {
+        var b = box(p.el); mark('pg-anat-part' + (p.slot ? ' is-slot' : ''), b.x, b.y, b.w, b.h);
+        var n = document.createElement('span'); n.className = 'pg-anat-num'; n.textContent = String(i + 1); n.style.left = b.x * k + 'px'; n.style.top = b.y * k + 'px'; marks.appendChild(n);
+      });
+      wrap.style.transform = 'scale(' + k + ')';
+      var cs = getComputedStyle(root), lines = '';
+      if (/flex/.test(cs.display)) {
+        var rowDir = /^row/.test(cs.flexDirection);
+        var along = { center: 'centred', 'flex-end': 'from the end', end: 'from the end', 'space-between': 'spread to both ends', 'space-around': 'spread evenly', 'space-evenly': 'spread evenly' }[cs.justifyContent] || 'from the start';
+        var across = { center: 'centred', 'flex-end': 'at the end', end: 'at the end', baseline: 'on the text baseline', stretch: 'stretched', normal: 'stretched' }[cs.alignItems] || 'at the start';
+        lines = 'Its items sit in a ' + (rowDir ? 'row' : 'column') + ', ' + along + ', ' + across + (rowDir ? ' up and down.' : ' side to side.');
+      }
+      anatLegend.innerHTML =
+        (parts.length ? '<div><dt>Parts</dt><dd>' + parts.map(function (p, i) { return '<p><b>' + (i + 1) + '</b> ' + esc(p.name) + (p.slot ? ', a slot the product fills' : '') + '</p>'; }).join('') + '</dd></div>' : '') +
+        (spacing.length ? '<div><dt>Spacing</dt><dd>' + spacing.map(function (r) { return '<p><span class="pg-anat-key is-' + r[0] + '"></span>' + esc(r[1]) + '  ·  ' + esc(r[2]) + '</p>'; }).join('') + '</dd></div>' : '') +
+        (lines ? '<div><dt>Alignment</dt><dd><p>' + esc(lines) + '</p></dd></div>' : '');
+    }
     var contrastEl = sec.querySelector('.pg-contrast');
     // Every token named after this component (its colours and sizes), with the value in the mode it is shown in.
     function ownRows() {
@@ -1090,6 +1218,8 @@ a.pg-usage-name { color: var(--sg-text); }
         }
       });
       inspect(e);
+      drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
+      if (AREA === 'docs') requestAnimationFrame(drawAnatomy);
     }
     // The tables beside the preview, read from the component as it is drawn now.
     function inspect(e) {
@@ -1305,26 +1435,30 @@ a.pg-usage-name { color: var(--sg-text); }
   });
   if (!COMPONENTS.length && !FLAT.length) { var empty = document.createElement('p'); empty.className = 'pg-empty'; empty.textContent = 'Nothing agreed yet.'; main.appendChild(empty); }
 
-  // On a phone, a menu button at the top left opens the sidebar as a panel over the page: the system's own icon-only
-  // button and overlay, the search field focused, closed by its close button, the overlay, a link or Escape.
+  // The menu, on every screen: its buttons say what they do in words (the system's own text button), never an icon
+  // alone. On a phone, Menu at the top opens the sidebar as a panel over the page (the system's overlay), closed by
+  // Close menu, the overlay, a link or Escape. On a wide screen, Hide menu gives the page the full width and Menu
+  // at the top brings it back; the choice is remembered in this browser.
   (function () {
-    var ib = DATA.ui && DATA.ui.iconButton, icons = DATA.icons || [];
-    var pick = function (re) { return icons.find(function (id) { return re.test(id); }); };
-    var menuIcon = pick(/menu|hamburger|burger/i) || pick(/-list$/i), closeIcon = pick(/close|clear|cross|-x$/i);
-    var btn = function (id, label, icon) { return '<button type="button" id="' + id + '"' + (ib ? ' class="' + esc(ib.cls) + '"' : '') + ' aria-label="' + esc(label) + '">' + (icon ? '<svg width="16" height="16" aria-hidden="true"><use href="#' + esc(icon) + '"/></svg>' : esc(label)) + '</button>'; };
     var bar = document.getElementById('sg-topbar'), side = document.getElementById('sg-sidebar'), scrim = document.getElementById('sg-scrim');
     document.getElementById('sg-topbar-title').textContent = DATA.title || 'Design system';
-    bar.insertAdjacentHTML('afterbegin', btn('sg-menu', 'Open the menu', menuIcon));
-    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('afterbegin', btn('sg-nav-close', 'Close the menu', closeIcon));
-    var menu = document.getElementById('sg-menu'), shut = document.getElementById('sg-nav-close');
+    bar.insertAdjacentHTML('afterbegin', sysButton('button', 'Menu', ' id="sg-menu"'));
+    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('afterbegin', sysButton('button', 'Close menu', ' id="sg-nav-close"'));
+    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('beforeend', '<p class="sg-hide-nav">' + sysButton('button', 'Hide menu', ' id="sg-hide-nav"') + '</p>');
+    var menu = document.getElementById('sg-menu'), shut = document.getElementById('sg-nav-close'), hide = document.getElementById('sg-hide-nav');
     shut.classList.add('sg-nav-close');
     if (DATA.ui && DATA.ui.overlay) scrim.classList.add(DATA.ui.overlay);
     menu.setAttribute('aria-controls', 'sg-sidebar'); menu.setAttribute('aria-expanded', 'false');
+    var phone = function () { return window.matchMedia && window.matchMedia('(max-width: 720px)').matches; };
+    var remember = function (on) { try { localStorage.setItem('sg-nav-hidden', on ? '1' : ''); } catch (e) {} };
+    var setHidden = function (on) { document.body.classList.toggle('sg-nav-hidden', on); menu.setAttribute('aria-expanded', on ? 'false' : 'true'); remember(on); };
+    try { if (!ALL && localStorage.getItem('sg-nav-hidden') === '1') setHidden(true); } catch (e) {}
+    hide.addEventListener('click', function () { setHidden(true); menu.focus(); });
     var open = function (on) {
       document.body.classList.toggle('sg-nav-open', on); menu.setAttribute('aria-expanded', on ? 'true' : 'false');
       if (on) setTimeout(function () { shut.focus({ preventScroll: true }); }, 50); else menu.focus();   // never the search: no keyboard pops up
     };
-    menu.addEventListener('click', function () { open(true); });
+    menu.addEventListener('click', function () { if (phone()) open(true); else { setHidden(false); hide.focus(); } });
     shut.addEventListener('click', function () { open(false); });
     scrim.addEventListener('click', function () { open(false); });
     side.addEventListener('click', function (e) { if (e.target.closest('.sg-nav a') && document.body.classList.contains('sg-nav-open')) { document.body.classList.remove('sg-nav-open'); menu.setAttribute('aria-expanded', 'false'); } });

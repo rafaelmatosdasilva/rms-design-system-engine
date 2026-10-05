@@ -179,6 +179,24 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
     assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity with Figma.*agree/s);
+    // Its anatomy, in Documentation: a copy drawn larger as the Playground set it, each part numbered, its padding
+    // tinted and named by the token behind it, how it lines its items up; never a second live component.
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
+    await new Promise((r) => setTimeout(r, 200));
+    assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-num').length`) >= 1);
+    assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-pad').length`) >= 2);
+    assert.match(await run(`document.querySelector('#c-chip .pg-anat-legend').textContent`), /Parts.*Spacing.*chip padding.*--padding-[a-z]+.*Alignment.*row/s);
+    assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
+    assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
+    // How to use it: the same four sections on every page, a missing one said; the overview counts them.
+    assert.match(await run(`document.querySelector('#c-chip [data-area="docs"]').textContent`), /Usage.*When to use.*When not to use.*Common mistakes.*Limitations.*Not written yet/s);
+    // The menu: worded buttons; on a wide screen it hides and comes back.
+    assert.equal(await run(`document.getElementById('sg-menu').textContent + '|' + document.getElementById('sg-nav-close').textContent`), 'Menu|Close menu');
+    await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
+    await run(`document.getElementById('sg-hide-nav').click()`);
+    assert.equal(await run(`document.body.classList.contains('sg-nav-hidden') && getComputedStyle(document.getElementById('sg-sidebar')).display === 'none' && getComputedStyle(document.getElementById('sg-topbar')).display !== 'none'`), true);
+    await run(`document.getElementById('sg-menu').click()`);
+    assert.equal(await run(`document.body.classList.contains('sg-nav-hidden')`), false);
     // How a product brings it in: the import line, copied by the system's button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-import code').textContent`), "import { Chip } from '@/components/Chip';");
     assert.deepEqual(errors, []);
@@ -433,4 +451,21 @@ test('a control the system lacks: its stand-in draws the switch, and the page sa
   assert.deepEqual([input.checked, lab.dataset.on], [true, '1']);
   assert.match(tpl, /\(\(DATA\.ui && DATA\.ui\.gaps\) \|\| \[\]\)\.forEach\(function \(g\) \{ TODO\.push\(\{ who: 'both', comp: null, say: g\.say, todo: g\.todo \}\); \}\);/);
   assert.match(tpl, /gp\.className = 'sg-pending sg-gap'; gp\.innerHTML = '<b>Stand-ins on this page<\/b><ul>' \+ GAPS\.map\(function \(g\) \{ return '<li>' \+ esc\(g\.say\) \+ '<\/li>'; \}\)/);
+});
+
+test('usage on every component, from Figma, the code or the authored contract; the page\'s own contrast in every mode', async () => {
+  const { guidanceView, pageContrast } = await import('../styleguide-data.mjs');
+  const { checkStyleguidePage, failures } = await import('../styleguide-check.mjs');
+  const g = guidanceView({ description: 'A filter.\nWhen to use: to narrow a list.\nWhen not to use:\n- for navigation\n- for one choice', annotations: ['Role: button', 'Limitations: no icon on the right'], authored: { mistakes: 'Using it as a tag' } });
+  assert.deepEqual(g.sections.map((x) => [x.key, x.text, x.from]), [
+    ['whenToUse', ['to narrow a list.'], 'Figma'], ['whenNotToUse', ['for navigation', 'for one choice'], 'Figma'],
+    ['mistakes', ['Using it as a tag'], 'contract.authored.json'], ['limitations', ['no icon on the right'], 'Figma']]);
+  assert.deepEqual(guidanceView({ description: 'A filter.' }).missing, ['whenToUse', 'whenNotToUse', 'mistakes', 'limitations']);
+  assert.deepEqual(guidanceView({ note: 'Avoid: two in one row' }).sections[1].from, 'the code');
+  // Grey #8a8a8a reads on white (3.4:1 fails) and on near-black in Dark (passes): only the failing pair is reported.
+  const byVar = new Map([['--bg', { values: { light: '#ffffff', dark: '#1e1e1e' } }], ['--text', { values: { light: '#111111', dark: '#f0f0f0' } }], ['--muted', { values: { light: '#8a8a8a', dark: '#8a8a8a' } }]]);
+  const low = pageContrast({ bg: 'var(--bg)', 'bg-2': 'var(--bg)', text: 'var(--text)', 'text-2': 'var(--text)', muted: 'var(--muted)' }, byVar);
+  assert.deepEqual(low.map((c) => `${c.text} on ${c.on} in ${c.mode}`), ['muted on bg in light']);
+  const page = `<html lang="en"><head><style>/*sg-contrast:${JSON.stringify(low)}*/</style></head><body><main><h1>S</h1></main></body></html>`;
+  assert.match(failures(checkStyleguidePage(page, { missing: [] })).map((f) => f.why).join(), /muted text on its bg background is 3\.\d:1 in light, below 4\.5:1/);
 });

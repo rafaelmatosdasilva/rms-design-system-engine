@@ -383,6 +383,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           preferred: names, preferredCount: (d.preferredValues ?? []).length, min: st.minChildren ?? null, max: st.maxChildren ?? null };
       });
       if (slots.length) c.slots = slots;
+      // Its anatomy: the contract's named parts (the layer each one draws), a part named as a Figma slot marked as one.
+      const slotNames = new Set(slots.map((sl) => sl.name.toLowerCase().replace(/[\s_-]+/g, '')));
+      const own = (contract.CONTRACT?.[c.name]?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string' && k.cssSelector.trim());
+      if (own.length) c.anatomy = own.map((k) => ({ name: k.name, selector: k.cssSelector, ...(slotNames.has(k.name.toLowerCase().replace(/[\s_-]+/g, '')) || /slot/i.test(k.name) ? { slot: true } : {}) }));
     }
     // Its code API, as whoever uses it writes it: the props (each one the code says must be given marked), the events
     // it sends and its slots, read from the component's own file (component-api.mjs). An HTML and CSS system has none.
@@ -414,6 +418,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE });
       }
     } catch { /* the page shows what it can measure */ }
+    // How to use it: the same four sections on every page, from what Figma, the code and the authored contract say.
+    try {
+      const { guidanceView } = await import('./styleguide-data.mjs');
+      const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
+      for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance });
+    } catch { /* no guidance */ }
     const { segmentedUi, radioGroupUi, buttonsAsSegmentedUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
     // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
@@ -551,7 +561,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const count = {}; for (const b of boxes) count[b] = (count[b] ?? 0) + 1;
     const size = Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0];
     chrome = chromeRoles({ tokens: lastView.tokens, themeCss: themeFiles.map(readText).join('\n'), componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome });
-    return chrome.css;
+    // The page's own contrast in every mode, for the style guide check to read from the page.
+    return chrome.css + (chrome.contrast?.length ? `\n/*sg-contrast:${JSON.stringify(chrome.contrast)}*/` : '');
   }
   // The system's own scripts (ds-config.json → systemScripts): what builds or wires its components at run time (a
   // segmented control made by script, a toggle's click). Inlined after the page's own drawing, each in its own

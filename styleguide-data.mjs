@@ -765,7 +765,35 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   // Declared again on every element that carries its own mode, so a preview in Light on a Dark page resolves the
   // page's roles with its own values (a variable is resolved where it is declared, then inherited as it is).
   const css = Object.keys(roles).length ? `:root, [data-color], [data-size] { ${Object.entries(roles).map(([k, v]) => `--sg-${k}: ${v};`).join(' ')} }` : '';
-  return { roles, from, missing, css };
+  return { roles, from, missing, css, contrast: pageContrast(roles, byVar) };
+}
+
+// The page's own text on its own backgrounds, in every colour mode, from the tokens' values: each pair below WCAG's
+// 4.5:1 for body text (1.4.3), so a page that is hard to read in Dark fails its check. → [{ text, on, mode, ratio }]
+const PAGE_PAIRS = [['text', 'bg'], ['text-2', 'bg'], ['muted', 'bg'], ['text', 'bg-2'], ['text-2', 'bg-2'], ['muted', 'bg-2']];
+export function pageContrast(roles = {}, byVar = new Map()) {
+  const tokenOf = (role) => { const m = /^var\((--[\w-]+)\)$/.exec(roles[role] ?? ''); return m ? byVar.get(m[1]) : null; };
+  const modes = [...new Set(PAGE_PAIRS.flat().flatMap((r) => Object.keys(tokenOf(r)?.values ?? {})))];
+  const out = [], seen = new Set();
+  for (const mode of modes) for (const [fg, bg] of PAGE_PAIRS) {
+    const f = rgbaOf(tokenOf(fg)?.values?.[mode]), b = rgbaOf(tokenOf(bg)?.values?.[mode]);
+    if (!f || !b || b[3] < 1) continue;   // a see-through background depends on what is under it
+    const blend = f.map((c, i) => (i < 3 ? c * f[3] + b[i] * (1 - f[3]) : 1));
+    const lum = (c) => { const [r, g, bl] = c.slice(0, 3).map((x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * bl; };
+    const [hi, lo] = [lum(blend), lum(b)].sort((x, y) => y - x);
+    const ratio = Math.round(((hi + 0.05) / (lo + 0.05)) * 10) / 10;
+    const key = `${mode}:${roles[fg]}:${roles[bg]}`;
+    if (ratio < 4.5 && !seen.has(key)) { seen.add(key); out.push({ text: fg, on: bg, mode, ratio }); }
+  }
+  return out;
+}
+function rgbaOf(v) {
+  const s = String(v ?? '').trim();
+  let m = /^#([0-9a-f]{3,8})$/i.exec(s);
+  if (m) { let h = m[1]; if (h.length <= 4) h = h.split('').map((c) => c + c).join(''); const n = (i) => parseInt(h.slice(i, i + 2), 16); return [n(0), n(2), n(4), h.length === 8 ? n(6) / 255 : 1]; }
+  m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+%?))?\s*\)$/i.exec(s);
+  if (m) return [+m[1], +m[2], +m[3], m[4] == null ? 1 : /%$/.test(m[4]) ? parseFloat(m[4]) / 100 : +m[4]];
+  return null;
 }
 
 // ── The system's own segmented control, for every switch the page offers ────────────────────────────────────────────
@@ -967,6 +995,42 @@ export function fieldUi(components = [], systemCss = '') {
   }
   const best = found.sort((a, b) => a.score - b.score)[0];
   return best ? { from: best.from, markup: best.markup, ...(best.standIn ? { standIn: best.standIn } : {}) } : null;
+}
+
+// ── How to use a component: the same four sections on every page ──────────────────────────────────────────────────
+// Read from what the team already writes: Figma's description and annotations, and the code's own note, where a line
+// starts with the section's name (When not to use: …, or the name on its own line with the text below it); then
+// contract.authored.json → components.<name>.guidance ({ whenToUse, whenNotToUse, mistakes, limitations }, a string or
+// a list). A section nobody has written yet is listed as missing, so the overview can count the gaps.
+export const GUIDANCE = [
+  ['whenToUse', 'When to use', /^(when to use|use (it )?when|usage|quando usar)$/i],
+  ['whenNotToUse', 'When not to use', /^(when not to use|do not use (it )?when|don'?t use (it )?when|avoid|quando n[ãa]o usar)$/i],
+  ['mistakes', 'Common mistakes', /^(common mistakes|mistakes|common errors|erros comuns)$/i],
+  ['limitations', 'Limitations', /^(limitations|limits|known limitations|limita[çc][õo]es)$/i],
+];
+export function guidanceView({ description = '', annotations = [], note = '', authored = null } = {}) {
+  const found = {}, from = {};
+  const take = (text, source) => {
+    let cur = null;
+    for (const raw of String(text ?? '').split(/\r?\n/)) {
+      const line = raw.replace(/^\s*(?:[-*•]|#+)\s*/, '').trim();
+      if (!line) { cur = null; continue; }
+      const m = /^([^:–—-]{3,40}?)\s*[:–—-]\s*(.*)$/.exec(line) ?? (/^[^:]{3,40}:?$/.test(line) ? [line, line.replace(/:$/, ''), ''] : null);
+      const hit = m && GUIDANCE.find(([, , re]) => re.test(m[1].trim()));
+      if (hit) { cur = hit[0]; if (!found[cur]) { found[cur] = []; from[cur] = source; } if (m[2].trim()) found[cur].push(m[2].trim()); continue; }
+      if (cur && from[cur] === source) found[cur].push(line);
+    }
+  };
+  take(description, 'Figma');
+  for (const a of annotations ?? []) take(typeof a === 'string' ? a : a?.label ?? a?.labelMarkdown ?? '', 'Figma');
+  take(note, 'the code');
+  for (const [key] of GUIDANCE) {
+    const v = authored?.[key];
+    const list = Array.isArray(v) ? v.map(String).filter(Boolean) : typeof v === 'string' && v.trim() ? [v.trim()] : [];
+    if (list.length && !found[key]?.length) { found[key] = list; from[key] = 'contract.authored.json'; }
+  }
+  const sections = GUIDANCE.map(([key, title]) => ({ key, title, text: found[key]?.length ? found[key] : null, ...(found[key]?.length ? { from: from[key] } : {}) }));
+  return { sections, missing: sections.filter((x) => !x.text).map((x) => x.key) };
 }
 
 // ── A component's code API, as its page lists it ──────────────────────────────────────────────────────────────────────
