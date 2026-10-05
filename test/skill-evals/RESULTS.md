@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: Figma beside the code, what uses each token, props in search (continuous evaluation)
+
+What changed since the entry below (engine 45caddf): Style guide: Figma beside the code (each variant's Figma image beside or over the live component, from references or the Figma API); what uses each token (linked from every token name, directly or through another token); search finds props; no line under the area switch. The guide changed in `reference/usage.md`.
+
+Guide set measured: `e12f10bfe869` · Project measured: `13d811a9d668`
+
+| Haiku, engine 22050d1 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 107k | 116k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 116k a run against 107k. Records: `records/2026-10-05-style-guide-figma-beside-the`.
+
 ## 2026-10: Style guide: Inspect numbers apart, a link to each variant, accessibility tried on the live variant (continuous evaluation)
 
 What changed since the entry below (engine 659b70b): Style guide: Inspect numbers never cover each other; a link to each variant (its props and width in the address, Copy link); its accessibility tried on the live variant (Tab stops in order, visible focus at 3:1, names, a control drawn disabled that Tab reaches, its role's behaviours). The guide changed in `reference/usage.md`.
