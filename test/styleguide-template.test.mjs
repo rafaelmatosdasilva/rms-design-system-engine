@@ -79,12 +79,13 @@ test('what an option adds comes from the contract\'s selector: a class, an attri
   assert.deepEqual(v.components[0].controls[0].options, [{ label: 'neutral', add: ['none'], attrs: {} }, { label: 'positive', add: ['low'], attrs: {} }]);
 });
 
-test('the mode axes: colour from the config, size from the sizing collection, nesting only where the CSS nests', () => {
+test('the mode axes: colour from the config, size from the sizing collection, each named as Figma names its collection, nesting only where the CSS nests', () => {
   const vars = { modeVariants: { sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { kind: 'scalar', values: { desktop: '12px', phone: '16px' } } } } } };
   assert.deepEqual(modeAxes({}, vars), [
-    { label: 'Color', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true, media: '(prefers-color-scheme: dark)', mediaValue: 'dark', restValue: 'light' },
-    { label: 'Size', attr: 'data-size', scoped: true, values: [{ label: 'Desktop', value: '' }, { label: 'Phone', value: 'phone', notInCode: true }] },
+    { label: 'Mode', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true, media: '(prefers-color-scheme: dark)', mediaValue: 'dark', restValue: 'light' },
+    { label: 'sizing', attr: 'data-size', scoped: true, values: [{ label: 'Desktop', value: '' }, { label: 'Phone', value: 'phone', notInCode: true }] },
   ]);
+  assert.deepEqual(modeAxes({ figma: { colorCollection: 'Styling' } }, { modeVariants: { Sizing: vars.modeVariants.sizing } }).map((a) => a.label), ['Styling', 'Sizing'], 'never Color or Size: the collections\' own names');
   // A mode the code has CSS for (a [data-…] block, or an @media that sets the collection's variables) is drawn.
   assert.equal(modeAxes({}, vars, ':root[data-size="phone"] { --padding-m: 16px; }')[1].values[1].notInCode, undefined);
   const media = modeAxes({}, vars, ':root { --padding-m: 12px; } @media (max-width: 480px) { :root { --padding-m: 16px; } }')[1];
@@ -92,7 +93,7 @@ test('the mode axes: colour from the config, size from the sizing collection, ne
   assert.deepEqual(media.values[0], { label: 'Desktop', value: 'desktop' }, 'a breakpoint mode makes the base a choice of its own');
   assert.deepEqual(media.changes, { phone: [{ name: 'padding/m', from: '12px', to: '16px' }] }, 'the switch says what the mode changes, from the code');
   assert.equal(media.media, '(max-width: 480px)', 'the page starts in the mode its own device or window gets');
-  assert.deepEqual(modeAxes({ figma: { modes: [{ name: 'Day', cssSelector: 'root' }, { name: 'Night', cssSelector: 'class:night' }] } }), [{ label: 'Color', values: [{ label: 'Day', value: '' }, { label: 'Night', value: 'night' }], classes: true }]);
+  assert.deepEqual(modeAxes({ figma: { modes: [{ name: 'Day', cssSelector: 'root' }, { name: 'Night', cssSelector: 'class:night' }] } }), [{ label: 'Mode', values: [{ label: 'Day', value: '' }, { label: 'Night', value: 'night' }], classes: true }]);
 });
 
 test('a component\'s real markup is the first instance in the project\'s own pages, without ids or handlers', () => {
@@ -101,6 +102,14 @@ test('a component\'s real markup is the first instance in the project\'s own pag
   assert.equal(instanceMarkup('<label class="field">Name <input class="field__input"></label>', 'field'), '<label class="field">Name <input class="field__input"></label>');
   assert.equal(instanceMarkup('<div class="ctaX"></div>', 'cta'), null);
   assert.deepEqual(componentTokens('.cta { padding: var(--pad-m); color: var(--text) } .cta:hover { color: var(--text-hover) } .ctaX { color: var(--no) }', 'cta').map((t) => t.var), ['--pad-m', '--text', '--text-hover']);
+});
+
+test('every token a component is drawn with: its parts and states too, never another component\'s, colour first', async () => {
+  const { allComponentTokens } = await import('../styleguide-data.mjs');
+  const css = '.badge { padding: var(--p) var(--q); border-radius: var(--r); background: var(--b-bg); --own: var(--no) } .badge-label { color: var(--b-fg); font-size: var(--fs) } .badge__icon { box-shadow: var(--sh) } .badge:hover { border: var(--line) solid var(--b-line) } .badge-list { gap: var(--g) } .badgeX { color: var(--nope) }';
+  const got = allComponentTokens(css, 'badge', ['badge-list']);
+  assert.deepEqual(got.map((t) => t.var), ['--b-bg', '--b-fg', '--fs', '--p', '--q', '--r', '--line', '--b-line', '--sh']);
+  assert.deepEqual(got.find((t) => t.var === '--b-line').props, ['border']);
 });
 
 test('tokens are shown only when equal to Figma in every mode, grouped like the system names them', () => {
@@ -180,6 +189,15 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(looks, /Spacing.*chip padding.*--padding-[a-z]+/s);
     assert.match(looks, /--chip-[a-z-]+/, 'the colour tokens of what it draws');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-inspect-marks .pg-anat-num')].map((n) => n.textContent).join()`), await run(`[...document.querySelectorAll('#c-chip .pg-inspect-legend b')].map((b) => b.textContent).join()`));
+    // Picked by a click: a part on the component, or a name in the list, shows what it is drawn with; again puts it down.
+    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl').textContent`), /Picked.*Click a part, a padding or a gap/s);
+    await run(`(() => { const m = [...document.querySelectorAll('#c-chip .pg-inspect-marks [data-hit]')].find((x) => /^chip padding/.test(x.dataset.hit)); const r = m.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).click(); })()`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Picked.*chip padding \w+.*--padding-[a-z]+/s);
+    assert.equal(await run(`document.querySelectorAll('#c-chip .pg-inspect-marks .is-picked').length`), 1);
+    await run(`document.querySelector('#c-chip .pg-inspect-legend [data-pick^="part 1"]').click()`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Picked.*background.*--chip-background/s);
+    await run(`document.querySelector('#c-chip .pg-inspect-legend [data-pick^="part 1"]').click()`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Click a part/);
     // No number covers another: one that would is moved beside it, a line back to where it belongs.
     assert.equal(await run(`(() => { const r = [...document.querySelectorAll('#c-chip .pg-inspect-marks .pg-anat-num')].map((n) => n.getBoundingClientRect()); return r.some((a, i) => r.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1)); })()`), false);
     // Width: a chosen width draws it in a frame of that width with the page's own stylesheets (Inspect goes off);
@@ -237,8 +255,13 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
     assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
-    // The code as tall as the tokens beside it, scrolling inside.
-    assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || Math.abs(c.offsetHeight - t.offsetHeight) < 2; })()`), true);
+    // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
+    assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
+    assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || (c.offsetHeight <= t.offsetHeight + 1 && c.offsetHeight < t.offsetHeight - 2); })()`), true, 'one line of code is not stretched to the tokens');
+    // Its tokens: every one it is drawn with, its corners and spacing too, by Figma's name, with what it sets.
+    const own = await run(`document.querySelector('#c-chip .pg-own').textContent`);
+    for (const v of ['--chip-background', '--chip-text', '--gap-s', '--padding-xs', '--padding-s', '--radii-chip']) assert.ok(own.includes(v), v + ' in Its tokens: ' + own);
+    assert.match(own, /border-radius/);
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in,Changelog');
@@ -269,13 +292,12 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + !!document.querySelector('#c-chip .pg-areas [data-v="parity"] .sg-seg-icon') + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|false|false');
     // How to use it: the same four sections on every page, a missing one said; the overview counts them.
     assert.match(await run(`document.querySelector('#c-chip [data-area="docs"]').textContent`), /Usage.*When to use.*When not to use.*Common mistakes.*Limitations.*Not written yet/s);
-    // The menu: worded buttons; on a wide screen it hides and comes back.
+    // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
     assert.equal(await run(`document.getElementById('sg-menu').textContent + '|' + document.getElementById('sg-nav-close').textContent`), 'Menu|Close menu');
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
-    await run(`document.getElementById('sg-hide-nav').click()`);
-    assert.equal(await run(`document.body.classList.contains('sg-nav-hidden') && getComputedStyle(document.getElementById('sg-sidebar')).display === 'none' && getComputedStyle(document.getElementById('sg-topbar')).display !== 'none'`), true);
-    await run(`document.getElementById('sg-menu').click()`);
-    assert.equal(await run(`document.body.classList.contains('sg-nav-hidden')`), false);
+    assert.equal(await run(`!document.getElementById('sg-hide-nav') && getComputedStyle(document.getElementById('sg-sidebar')).display !== 'none' && getComputedStyle(document.getElementById('sg-topbar')).display === 'none'`), true);
+    // The overview holds the cards, never notes on what is left off, usage counts, statuses or a To do button.
+    assert.doesNotMatch(await run(`document.getElementById('overview').textContent`), /Left off this page|Usage written|Status: |Open the To do list/);
     // Disabled set: the native control is disabled too, so Tab passes it by.
     await run(`location.hash = '#c-button?Disabled=true'`); await new Promise((r) => setTimeout(r, 400));
     assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), true);
@@ -631,7 +653,9 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /card\(cGrid, 'c-' \+ c\.name, 'Components', c\.name, about\(c\), '', c\.status\)/);
   assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
   assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
-  assert.match(tpl, /sc\.textContent = 'Status: ' \+ kinds\.stable \+ ' stable, '/);
+  assert.doesNotMatch(tpl, /'Status: ' \+ kinds|Usage written: |Open the To do list/, 'the overview counts nothing of its own');
+  assert.match(tpl, /\.sg-demo\.sg-colors \{ display: grid; grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/, 'six colours a row');
+  assert.match(tpl, /a\.scoped && a\.attr !== 'data-size'; \}, function \(a\) \{ return a\.scoped && a\.attr === 'data-size'/, 'the colour mode top left, a sizing one top right, inside the playground');
   assert.match(tpl, /\.sg-thumb-live \{[^}]*align-self: center/, 'a card preview is centred whatever its own rule says');
 });
 

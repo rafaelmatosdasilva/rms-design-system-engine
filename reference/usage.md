@@ -232,15 +232,24 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   token for is left to the browser's own and listed, never given a value of the engine's.
 - **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; a size that
-  changes with a mode shows the value of the mode its section's size switch picks; icons from the icon sheet.
+  changes with a mode shows the value of the mode its section's size switch picks; icons from the icon sheet. The
+  colours sit six a row, each as wide as the room, so its Figma name and variable read whole (three on a phone).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   An HTML and CSS system has no code props to pair, so a Figma prop is a control when the code realizes it: the
   contract's `propertyMap` (found by its options when the contract spells the prop another way), `htmlRealizations`,
-  a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. Below it, its
-  code beside the tokens behind what is drawn, and every token named after it under them; above it, its documentation, the products it is **used in** (each by
+  a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. The system's
+  modes are switched inside the playground, each named as Figma names its collection (`figma.colorCollection`,
+  Styling; a sizing collection by its own name, Sizing): the colour mode at its top left, the other at its top right,
+  never among the component's props. Below it, the tokens behind what is drawn with its code on their right, and under
+  them **Its tokens**, every token it is drawn with (`allComponentTokens`: each `var()` in a rule for its class or one
+  of its parts, `.badge-label`, `.badge__icon`, in any state, shown in this variant or not, never another component's
+  class), by Figma's name, with the properties it sets, its value in the mode shown and a colour's swatch, ordered
+  colour, type, spacing, radius, border, shadow; a token named after it that its rules reach only through another stays
+  listed. Where two tokens share a value, the tables name the one the component's rules use, then one that names
+  the part. Above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
 - **A component's page in areas**: Playground, Documentation, Accessibility, Parity and Used in, one at a time on
@@ -252,7 +261,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   said to a screen reader. Each section of rows (Anatomy, Usage, Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is two columns of tables
   (what differs, what is not built or compared, the values that agree, its props, its tokens). The code is as tall as
-  the tokens table beside it and scrolls inside. In the controls a text comes right after the boolean that shows it
+  what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
   (`showFirst`: Show Text and Text Content, or both on the same part); the tokens table leaves out the text style and
   colour while no text is shown, and a part no one sees (a native input at no opacity). **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
   classes its markup holds, or the tags and imports of its file), each the overview's card with its own preview.
@@ -263,9 +272,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Usage** (`guidanceView`), in Documentation: When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
-  string or a list); a missing one is said, and the overview counts each section across the components.
-- **The page's own reading**: every button says what it does in words (Menu, Close menu, and a small Hide at the menu's
-  top right that gives the page the whole width; a hidden menu is remembered in the browser), and the style guide check fails when the page's text roles fall below 4.5:1 on its
+  string or a list); a missing one is said in its Documentation.
+- **The page's own reading**: every button says what it does in words (Menu and Close menu, on a phone; on a wide
+  screen the menu is always there), and the style guide check fails when the page's text roles fall below 4.5:1 on its
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
 - **Anatomy**, first in Documentation: an inert copy of the component as the Playground set it, drawn larger, each
   part numbered in reading order (the contract's named parts, `c.anatomy`, a Figma auto name such as Frame 106
@@ -275,7 +284,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   on the measuring page.
 - **Inspect and Width**, in the Playground (none on the measuring page): Inspect marks the live component with the
   anatomy's numbers (`annotate`, shared with the anatomy) and lists below it each part's colours, icon size and text
-  style by their tokens, each padding and gap by its token, and its alignment. Width shows it at Fit (the live
+  style by their tokens, each padding and gap by its token, and its alignment. It is picked by a click: on the
+  component itself, a part, or a padding or gap band (each space over the parts, each part over the component), or on
+  a name in the list, and Picked shows what that one is drawn with (a part's padding, gap, fill, line, corners,
+  shadow, text style and colour; a space's token and value), outlined in the accent; a second click puts it down. Width shows it at Fit (the live
   preview), Phone (375px), Tablet (768px) or Desktop (1280px): a frame of that width written with the page's own
   stylesheets, its icon sheet, the component as drawn now and the system's own scripts (`systemScripts`), so its
   media queries apply and it works there (a click moves a selection, as in the live preview), scaled down to fit the

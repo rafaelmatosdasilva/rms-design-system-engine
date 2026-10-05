@@ -78,13 +78,13 @@ flowchart LR
 
 You need [Claude Code](https://claude.com/claude-code), [Node.js](https://nodejs.org) 22 or newer and Git.
 
-**1. Install it, once per computer.** Paste this line in Claude Code and press Enter, then close Claude Code and open it again.
+**1. Install it, once per computer.** Copy this, paste it in Claude Code and press Enter. Claude installs it for you; say yes when it asks to run the install. Then close Claude Code and open it again.
 
 ```
-! curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.sh | bash
+Install the rms-design-system-engine skill for me by running curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.sh | bash and tell me when it is done.
 ```
 
-**2. Connect your project, once per project.** It asks you for your Figma link.
+**2. Connect your project, once per project.** It asks you only for your Figma link and finds the rest on its own. If Claude Code is open somewhere else, it also asks where your code is (a folder or a GitHub link) and remembers it.
 
 ```
 /rms-design-system-engine set up this project

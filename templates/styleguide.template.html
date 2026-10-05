@@ -136,9 +136,12 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-demo { background: var(--sg-surface); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-space-xl) var(--sg-space-l); display: flex; flex-wrap: wrap; gap: var(--sg-space-m); align-items: flex-start; }
 .sg-demo.sg-demo--col { flex-direction: column; align-items: stretch; gap: var(--sg-space-s); }
 .color-chip { display: flex; flex-direction: column; gap: var(--sg-space-xs); width: 96px; }
+/* Six colours a row, each as wide as the room allows, so its Figma name and variable have room to read. */
+.sg-demo.sg-colors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sg-space-l) var(--sg-space-m); }
+.sg-colors > .color-chip { width: auto; min-width: 0; }
 .color-chip-swatch { height: 72px; border: var(--sg-line); }   /* square corners, as on the overview; the colour twice the height of its label */
 .color-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); line-height: var(--sg-lh); word-break: break-word; }
-.color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: break-all; }
+.color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: normal; overflow-wrap: anywhere; }   /* a long variable breaks after a hyphen, never inside a word when it fits */
 .sg-uses-link { color: inherit; }   /* a token's name, linked to what uses it: underlined, in the colour around it */
 .type-list { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-m); }
 .type-specimen-preview { color: var(--sg-text); padding: var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* the sample on one row, under the style's name */
@@ -255,11 +258,25 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-anatomy-doc .pg-updated { margin-top: var(--sg-space-l); }
 /* Inspect: the anatomy's marks over the live component, and the tokens of each part below the playground. */
 .pg-inspect-marks { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+/* On Inspect a part, a padding or a gap is picked by a click: the component under it, each part over it, each space on top. */
+.pg-inspect-marks [data-hit] { pointer-events: auto; cursor: pointer; }
+.pg-inspect-marks .pg-inspect-root { position: absolute; z-index: 0; }
+.pg-inspect-marks .pg-anat-part { z-index: 1; }
+.pg-inspect-marks .pg-anat-space { z-index: 2; }
+.pg-inspect-marks .pg-anat-num, .pg-inspect-marks .pg-anat-lead { z-index: 3; pointer-events: none; }
+.pg-inspect-marks [data-hit]:hover, .pg-inspect-marks [data-hit].is-picked { outline: 2px solid var(--sg-accent); outline-offset: -1px; }
 .pg-inspect-legend > dl { padding: var(--sg-space-m); margin: 0; }
 .pg-look { display: block; color: var(--sg-muted); }
 /* Width: the component in a frame of that width, scaled to fit when wider than the room. */
 .pg-preview[hidden], .pg-frame[hidden], .pg-inspect-legend[hidden] { display: none; }
-.pg-preview-col { min-width: 0; display: flex; flex-direction: column; }
+.pg-preview-col { min-width: 0; display: flex; flex-direction: column; position: relative; }
+/* The system's modes inside the playground: the colour mode top left, a sizing collection top right, over the stage. */
+.pg-stage-modes { position: absolute; top: var(--sg-space-s); left: var(--sg-space-s); right: var(--sg-space-s); display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sg-space-s); z-index: 6; pointer-events: none; }
+.pg-stage-modes[hidden] { display: none; }
+.pg-stage-mode > * { pointer-events: auto; }
+.pg-stage-mode .sg-mode-ctl { align-items: flex-start; }
+.pg-stage-mode:last-child .sg-mode-ctl { align-items: flex-end; }
+.pg-preview-col.has-modes > .pg-preview, .pg-preview-col.has-modes > .pg-frame { padding-top: calc(var(--pg-modes-h, 0px) + var(--sg-space-l)); }
 .pg-preview-col > .pg-preview { flex: 1; }
 .pg-preview-col > .pg-frame { flex: 1; }
 .pg-frame { display: flex; align-items: safe center; justify-content: safe center; min-width: 0; min-height: 140px; padding: var(--sg-space-l); }
@@ -300,15 +317,9 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-example > .pg-example-caption { margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }
 .pg-own-swatch { display: inline-block; width: var(--sg-space-m); height: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius-s); vertical-align: middle; margin-right: var(--sg-space-xs); }
 .sg-topbar, .sg-nav-close, .sg-scrim { display: none; }
-/* The menu hidden on a wide screen: a bar at the top with the button that brings it back, the page at full width. */
-body.sg-nav-hidden .sg-sidebar { display: none; }
-body.sg-nav-hidden .sg-layout { flex-direction: column; }
-body.sg-nav-hidden .sg-main { width: 100%; box-sizing: border-box; max-width: 1480px; }   /* the room the menu gave back, never less than with it */
-body.sg-nav-hidden .sg-topbar { display: flex; align-items: center; gap: var(--sg-space-s); position: sticky; top: 0; z-index: 20; padding: var(--sg-space-s) var(--sg-space-l); background: var(--sg-bg); border-bottom: var(--sg-line); }
-body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; }
 .sg-sidebar-header { position: relative; }
-.sg-hide-nav { position: absolute; top: var(--sg-space-s); right: var(--sg-space-s); margin: 0; }   /* small, at the menu's top right */
 @media (max-width: 720px) {
+  .sg-demo.sg-colors { grid-template-columns: repeat(3, minmax(0, 1fr)); }   /* three a row on a phone */
   /* A phone: a bar at the top with the menu button; the sidebar is a panel that slides in over the page. */
   .sg-layout { flex-direction: column; }
   .sg-topbar { display: flex; align-items: center; gap: var(--sg-space-s); position: sticky; top: 0; z-index: 20; padding: var(--sg-space-s) var(--sg-space-l); background: var(--sg-bg); border-bottom: var(--sg-line); }
@@ -316,8 +327,6 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   .sg-sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; width: min(320px, 85vw); height: 100vh; transform: translateX(-100%); transition: transform 0.2s ease; visibility: hidden; }
   body.sg-nav-open .sg-sidebar { transform: none; visibility: visible; }
   .sg-nav-close { display: inline-flex; position: absolute; top: var(--sg-space-s); right: var(--sg-space-s); }
-  .sg-hide-nav { display: none; }   /* a phone shows the menu on demand already */
-  body.sg-nav-hidden .sg-sidebar { display: flex; }
   .sg-sidebar-header { position: relative; }
   body.sg-nav-open .sg-scrim { display: block; position: fixed; inset: 0; z-index: 30; }
   .sg-scrim:not([class*=" "]) { background: color-mix(in srgb, var(--sg-text) 40%, transparent); }
@@ -479,26 +488,9 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   var ov = document.getElementById('overview');
   document.getElementById('sg-hero-title').textContent = DATA.title || 'Design system';
   if ((DATA.links || []).length) ov.insertAdjacentHTML('beforeend', linksHTML(DATA.links));
-  if (DATA.notAgreed && (DATA.notAgreed.differences || DATA.notAgreed.unrealized || (DATA.notAgreed.waiting || []).length)) { var pend = document.createElement('p'); pend.className = 'sg-pending'; pend.dataset.todo = '1'; pend.textContent = DATA.notAgreed.line; ov.appendChild(pend); }
   // What the page could not take from the system, in one note: each control it lacks and the stand-in it uses instead.
   var GAPS = (DATA.ui && DATA.ui.gaps) || [];
   if (GAPS.length) { var gp = document.createElement('div'); gp.className = 'sg-pending sg-gap'; gp.innerHTML = '<b>Stand-ins on this page</b><ul>' + GAPS.map(function (g) { return '<li>' + esc(g.say) + '</li>'; }).join('') + '</ul>'; ov.appendChild(gp); }
-  // Usage written so far: how many components have each of the four sections, so the gaps are in view.
-  var GUIDED = COMPONENTS.filter(function (c) { return c.guidance; });
-  if (GUIDED.length && GUIDED.some(function (c) { return c.guidance.missing.length; })) {
-    var ug = document.createElement('p'); ug.className = 'sg-usage-count';
-    ug.textContent = 'Usage written: ' + GUIDED[0].guidance.sections.map(function (x) { return x.title + ' ' + GUIDED.filter(function (c) { return c.guidance.missing.indexOf(x.key) < 0; }).length + ' of ' + GUIDED.length; }).join(', ') + '. Each component\'s Documentation says what is missing.';
-    ov.appendChild(ug);
-  }
-  // How ready the components are: each status the team gave, and how many have none yet.
-  if (COMPONENTS.length) {
-    var kinds = { stable: 0, beta: 0, deprecated: 0 }; COMPONENTS.forEach(function (c) { if (c.status) kinds[c.status.kind]++; });
-    var unset = COMPONENTS.filter(function (c) { return !c.status; }).length;
-    var sc = document.createElement('p'); sc.className = 'sg-usage-count';
-    sc.textContent = 'Status: ' + kinds.stable + ' stable, ' + kinds.beta + ' beta, ' + kinds.deprecated + ' deprecated' + (unset ? ', ' + unset + ' not set. Give one a status with a line in its Figma description (Status: beta), or in contract.authored.json.' : '.');
-    ov.appendChild(sc);
-  }
-  if (TODO.length) { var go = document.createElement('p'); go.innerHTML = sysButton('a', 'Open the To do list (' + TODO.length + ')', ' href="#todo"'); ov.appendChild(go); }
   // Two groups, as the page has them: the foundations, then every component in the order of its sections. Each card
   // is a thumbnail (a few of the real tokens, or the component itself, drawn when its section is built) and its name.
   // Each group says what it holds (styleguide.groups in ds-config.json words it your way).
@@ -590,7 +582,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     var cs = section('colors', 'Foundations', 'Colors', 'Each swatch is the CSS variable itself, so it follows the mode switch.');
     TOKENS.colors.forEach(function (g) {
       var sub = document.createElement('div'); sub.className = 'sg-subsection';
-      sub.innerHTML = '<h3>' + esc(g.group) + '</h3><div class="sg-demo">' + g.items.map(function (t) {
+      sub.innerHTML = '<h3>' + esc(g.group) + '</h3><div class="sg-demo sg-colors">' + g.items.map(function (t) {
         return '<div class="color-chip"><div class="color-chip-swatch" style="background:var(' + esc(t.var) + ')"></div><div class="color-chip-label">' + esc(t.figma) + '</div><div class="color-chip-value">' + usesLink(t.var) + '</div></div>';
       }).join('') + '</div>';
       cs.appendChild(sub);
@@ -725,7 +717,17 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     if (!hits.length && cat !== 'color') hits = VAR_NAMES.filter(function (n) { return norm(resolvedVar(el, n), cat) === target; });
     if (!hits.length) return null;
     var own = compName ? '--' + String(compName).toLowerCase().replace(/[^a-z0-9]+/g, '-') : null;
-    function rank(n) { if (own && n.toLowerCase().indexOf(own + '-') === 0) return 0; if (/semantic|text|surface|background|border|content/.test(n)) return 1; if (/primitive|neutral|gray|grey|[0-9]{2,}/.test(n)) return 3; return 2; }
+    // Several tokens with the same value: the one the component's own rules use first, then one that names the part
+    // (badge/label for .badge-label), so a label's colour is not called the icon's.
+    var comp = compName ? COMPONENTS.find(function (k) { return k.name === compName; }) : COMPONENTS.find(function (k) { return k.cls && !/^#/.test(k.cls) && el.closest && el.closest('.' + k.cls); });
+    var uses = comp && comp.allTokens ? comp.allTokens.map(function (t) { return t.var; }) : [];
+    var words = String(el.getAttribute && el.getAttribute('class') || '').split(/[\s_-]+/).filter(function (w) { return w.length > 2 && (!comp || w.toLowerCase() !== String(comp.cls || '').toLowerCase()); }).map(function (w) { return w.toLowerCase(); });
+    function rank(n) {
+      var l = n.toLowerCase(), r = own && l.indexOf(own + '-') === 0 ? 0 : /semantic|text|surface|background|border|content/.test(n) ? 1 : /primitive|neutral|gray|grey|[0-9]{2,}/.test(n) ? 3 : 2;
+      if (uses.indexOf(n) >= 0) r -= 0.5;
+      if (words.some(function (w) { return l.indexOf(w) >= 0; })) r -= 0.25;
+      return r;
+    }
     return hits.sort(function (a, b) { var d = rank(a) - rank(b); return d || (a.length - b.length); })[0];
   }
   function rgbToHex(c) { return '#' + [c[0], c[1], c[2]].map(function (n) { return ('0' + n.toString(16)).slice(-2); }).join(''); }
@@ -1399,16 +1401,16 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       })) + '</div>' +
       // Playground: the component drawn, its controls, its code and the tokens behind it.
       '<div class="pg-area" data-area="play">' +
-      '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview-col"><div class="pg-preview"></div><div class="pg-frame" hidden></div></div><div class="pg-panel"><div class="pg-actions"></div>' +
+      '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview-col"><div class="pg-stage-modes" hidden><div class="pg-stage-mode"></div><div class="pg-stage-mode"></div></div><div class="pg-preview"></div><div class="pg-frame" hidden></div></div><div class="pg-panel"><div class="pg-actions"></div>' +
         (ALL ? '' : '<div class="pg-ctl pg-width"><div class="pg-ctl-label">Width</div>' + segHTML(WIDTHS.map(function (w) { return { v: w[0], label: w[1] }; })) + '</div>') +
-        '<div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
+        '<div class="pg-controls"></div></div></div>' +
         (ALL ? '' : '<div class="pg-inspect pg-inspect-legend" hidden><div class="pg-inspect-head">Inspect</div><dl class="pg-updated"></dl></div>') +
         (ALL || !(c.figmaShots || []).length ? '' : '<div class="pg-inspect pg-compare" hidden><div class="pg-inspect-head">Figma beside the code</div><div class="pg-compare-bar">' + segHTML([{ v: 'side', label: 'Side by side' }, { v: 'over', label: 'Over' }]) +
           '<label class="pg-ctl-label pg-compare-amount">How much of Figma shows <input type="range" min="0" max="100" value="50"></label></div><div class="pg-compare-body"></div></div>') +
-        // Its code beside the tokens behind what is drawn; every token named after it below them all.
-        '<div class="pg-code-row"><div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div>' +
-        '<div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div></div>' +
-        (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div>' +
+        // The tokens behind what is drawn, its code on their right; every token it uses below them all.
+        '<div class="pg-code-row"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
+        '<div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div></div>' +
+        ((c.allTokens || []).length || (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length)) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div>' +
       '</div>' +
       // Documentation: its API, Figma's and the code's own words, and when each side last changed.
       '<div class="pg-area" data-area="docs"><div class="pg-footer">' +
@@ -1475,12 +1477,13 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       d.appendChild(card);
     });
     var tTokens = sec.querySelector('.pg-tokens'), tOwn = sec.querySelector('.pg-own');
-    // The code as tall as the tokens beside it (they set the height), scrolling inside; on its own row, its own height.
+    // The code as tall as what it holds, never taller than the tokens beside it: past their height it scrolls inside.
+    // On its own row, its own height.
     var codeBox = sec.querySelector('.pg-code'), tokBox = tTokens && tTokens.closest('.pg-inspect');
     function codeHeight() {
       if (!codeBox || !tokBox) return;
-      codeBox.style.height = '';
-      if (tokBox.offsetHeight && Math.abs(codeBox.offsetTop - tokBox.offsetTop) < 2) codeBox.style.height = tokBox.offsetHeight + 'px';
+      codeBox.style.maxHeight = '';
+      if (tokBox.offsetHeight && Math.abs(codeBox.offsetTop - tokBox.offsetTop) < 2) codeBox.style.maxHeight = tokBox.offsetHeight + 'px';
     }
     if (window.ResizeObserver && tokBox) new ResizeObserver(codeHeight).observe(tokBox);
     // The code for what the preview shows now: the component as a product writes it (its tag and the props set here,
@@ -1528,9 +1531,11 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
         var pt = px(cs.paddingTop), pr = px(cs.paddingRight), pb = px(cs.paddingBottom), pl = px(cs.paddingLeft);
         var iw = b.w - bl - br, ih = b.h - bt - bb;
         var band = { top: [b.x + bl, b.y + bt, iw, pt], bottom: [b.x + bl, b.y + b.h - bb - pb, iw, pb], left: [b.x + bl, b.y + bt + pt, pl, ih - pt - pb], right: [b.x + b.w - br - pr, b.y + bt + pt, pr, ih - pt - pb] };
-        Object.keys(band).forEach(function (side) { mark('pg-anat-space', band[side]); });
+        var sideCss = { top: cs.paddingTop, right: cs.paddingRight, bottom: cs.paddingBottom, left: cs.paddingLeft };
+        // Each band says what it is when Inspect picks it: its side and the token behind it.
+        Object.keys(band).forEach(function (side) { mark('pg-anat-space', band[side], { key: label + ' padding ' + side, what: label + ' padding ' + side, value: sideTok(el, sideCss[side], 'pad') }); });
         // Each listed padding is numbered on its own band: top for all four or top and bottom, left for left and right.
-        if (pt || pr || pb || pl) padRows(el, cs).forEach(function (r) { if (r[1] === '0') return; var side = /left/.test(r[0]) ? 'left' : /right/.test(r[0]) ? 'right' : /bottom$/.test(r[0]) && !/top/.test(r[0]) ? 'bottom' : 'top'; spacing.push({ what: label + ' ' + r[0].replace(/-/g, ' '), value: r[1], at: band[side] }); });
+        if (pt || pr || pb || pl) padRows(el, cs).forEach(function (r) { if (r[1] === '0') return; var side = /left/.test(r[0]) ? 'left' : /right/.test(r[0]) ? 'right' : /bottom$/.test(r[0]) && !/top/.test(r[0]) ? 'bottom' : 'top'; spacing.push({ what: label + ' ' + r[0].replace(/-/g, ' '), value: r[1], at: band[side], key: label + ' padding ' + side }); });
         var flex = /flex|grid/.test(cs.display), row = /^row/.test(cs.flexDirection) && !/grid/.test(cs.display);
         if (!flex || !px(row ? cs.columnGap : cs.rowGap)) return;
         var kids = Array.prototype.filter.call(el.children, function (n) { var ncs = getComputedStyle(n); var r = n.getBoundingClientRect(); return ncs.position !== 'absolute' && ncs.position !== 'fixed' && r.width > 0 && r.height > 0 && !n.classList.contains('pg-inspect-marks'); })
@@ -1540,9 +1545,9 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
           var q = kids[i - 1], z = kids[i], at = null;
           if (row && z.x - (q.x + q.w) > 0.5) at = [q.x + q.w, b.y + bt + pt, z.x - q.x - q.w, ih - pt - pb];
           if (!row && z.y - (q.y + q.h) > 0.5) at = [b.x + bl + pl, q.y + q.h, iw - pl - pr, z.y - q.y - q.h];
-          if (at) { mark('pg-anat-space', at); first = first || at; }
+          if (at) { mark('pg-anat-space', at, { key: label + ' gap', what: label + ' gap', value: sideTok(el, row ? cs.columnGap : cs.rowGap, 'gap') }); first = first || at; }
         }
-        if (first) spacing.push({ what: label + ' gap', value: sideTok(el, row ? cs.columnGap : cs.rowGap, 'gap'), at: first });
+        if (first) spacing.push({ what: label + ' gap', value: sideTok(el, row ? cs.columnGap : cs.rowGap, 'gap'), at: first, key: label + ' gap' });
       }
       // Its parts: the contract's named parts, else the elements directly inside it. Seen only: a part drawn hidden (a
       // native input under its drawn box, at no opacity) is not one a person sees.
@@ -1556,7 +1561,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       parts = parts.filter(function (p, i) { return parts.findIndex(function (q) { return q.el === p.el; }) === i; }).slice(0, 12);
       spaces(root, c.name);
       parts.forEach(function (p) { if (p.el.children.length) spaces(p.el, p.name); });
-      parts.forEach(function (p, i) { var b = box(p.el); mark('pg-anat-part' + (p.slot ? ' is-slot' : ''), [b.x, b.y, b.w, b.h]); num(i + 1, b.x, b.y); });
+      parts.forEach(function (p, i) { var b = box(p.el); p.key = 'part ' + (i + 1) + ' ' + p.name; mark('pg-anat-part' + (p.slot ? ' is-slot' : ''), [b.x, b.y, b.w, b.h], { key: p.key, name: p.name, el: p.el }); num(i + 1, b.x, b.y); });
       spacing.forEach(function (sp, i) { num(parts.length + i + 1, sp.at[0] + sp.at[2] / 2, sp.at[1] + sp.at[3] / 2); });
       var cs = getComputedStyle(root), lines = '';
       if (/flex/.test(cs.display)) {
@@ -1567,11 +1572,12 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       }
       return { parts: parts, spacing: spacing, lines: lines };
     }
-    // A layer of marks over a drawing: outlines and numbers, at scale k, never clickable.
+    // A layer of marks over a drawing: outlines and numbers, at scale k. A mark that says what it is (info) can be picked
+    // on Inspect; on the anatomy nothing is clickable.
     function marker(layer, k) {
       var placed = [];
       return {
-        mark: function (cls, at) { if (at[2] < 0.5 || at[3] < 0.5) return; var m = document.createElement('div'); m.className = cls; m.style.left = at[0] * k + 'px'; m.style.top = at[1] * k + 'px'; m.style.width = at[2] * k + 'px'; m.style.height = at[3] * k + 'px'; layer.appendChild(m); },
+        mark: function (cls, at, info) { if (at[2] < 0.5 || at[3] < 0.5) return; var m = document.createElement('div'); m.className = cls; m.style.left = at[0] * k + 'px'; m.style.top = at[1] * k + 'px'; m.style.width = at[2] * k + 'px'; m.style.height = at[3] * k + 'px'; if (info) { m._info = info; m.setAttribute('data-hit', info.key); } layer.appendChild(m); },
         // A number that would cover another moves to the nearest free place around where it belongs, a line back to it.
         num: function (n, x, y) {
           var e = document.createElement('span'); e.className = 'pg-anat-num'; e.textContent = String(n); layer.appendChild(e);
@@ -1593,8 +1599,10 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     }
     // The list beside a drawing: its parts (with what each looks like, for Inspect), its spacing and alignment.
     function legendHTML(r, looks) {
-      return (r.parts.length ? '<div><dt>Parts</dt><dd>' + r.parts.map(function (p, i) { return '<p><b>' + (i + 1) + '</b> ' + esc(p.name) + (p.slot ? ', a slot the product fills' : '') + (looks ? partLook(p.el) : '') + '</p>'; }).join('') + '</dd></div>' : '') +
-        (r.spacing.length ? '<div><dt>Spacing</dt><dd>' + r.spacing.map(function (sp, i) { return '<p><b>' + (r.parts.length + i + 1) + '</b> ' + esc(sp.what) + '  ·  ' + esc(sp.value) + '</p>'; }).join('') + '</dd></div>' : '') +
+      // On Inspect each name picks its part or space, as a click on it does.
+      var name = function (key, text) { return looks ? '<a href="#" class="sg-uses-link" data-pick="' + esc(key) + '">' + esc(text) + '</a>' : esc(text); };
+      return (r.parts.length ? '<div><dt>Parts</dt><dd>' + r.parts.map(function (p, i) { return '<p><b>' + (i + 1) + '</b> ' + name(p.key, p.name) + (p.slot ? ', a slot the product fills' : '') + (looks ? partLook(p.el) : '') + '</p>'; }).join('') + '</dd></div>' : '') +
+        (r.spacing.length ? '<div><dt>Spacing</dt><dd>' + r.spacing.map(function (sp, i) { return '<p><b>' + (r.parts.length + i + 1) + '</b> ' + name(sp.key, sp.what) + '  ·  ' + esc(sp.value) + '</p>'; }).join('') + '</dd></div>' : '') +
         (r.lines ? '<div><dt>Alignment</dt><dd><p>' + esc(r.lines) + '</p></dd></div>' : '');
     }
     // What a part looks like, by the tokens behind it: its text style and colour, an icon's size and colour, a fill, a line.
@@ -1675,7 +1683,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       // A small one drawn larger, both by the same amount, so a pixel of difference can be seen.
       var k = Math.max(1, Math.min(4, Math.floor(120 / Math.max(1, sh.h, src.getBoundingClientRect().height))));
       // Figma draws it in the mode its frame uses there; the page's own mode switch brings the code to the same one.
-      var larger = '<p class="pg-empty">' + (k > 1 ? 'Both drawn ' + k + ' times larger. ' : '') + 'Figma\'s image is in the mode its frame uses in Figma; switch Color above to match it.</p>';
+      var larger = '<p class="pg-empty">' + (k > 1 ? 'Both drawn ' + k + ' times larger. ' : '') + 'Figma\'s image is in the mode its frame uses in Figma; switch ' + esc((AXES.find(function (a) { return a.attr !== 'data-size'; }) || { label: 'the mode' }).label) + ' in the playground to match it.</p>';
       if (compareMode === 'side') {
         body.innerHTML = larger + '<div class="pg-compare-row"><div class="pg-compare-fig"><div class="pg-ctl-label">Figma</div><div class="pg-compare-stage"><div class="pg-compare-layer">' + img + '</div></div></div><div class="pg-compare-fig"><div class="pg-ctl-label">Code</div><div class="pg-compare-stage"><div class="pg-compare-layer pg-compare-code"></div></div></div></div>';
         body.querySelector('.pg-compare-code').appendChild(copy);
@@ -1699,9 +1707,21 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       var layer = document.createElement('div'); layer.className = 'pg-inspect-marks'; layer.setAttribute('aria-hidden', 'true'); preview.appendChild(layer);
       var o = preview.getBoundingClientRect();
       function box(el) { var r = el.getBoundingClientRect(); return { x: r.left - o.left + preview.scrollLeft, y: r.top - o.top + preview.scrollTop, w: r.width, h: r.height }; }
-      var m = marker(layer, 1), r = annotate(cur, box, m.mark, m.num);
-      inspectLegend.querySelector('dl').innerHTML = legendHTML(r, true);
+      var m = marker(layer, 1), b0 = box(cur);
+      m.mark('pg-inspect-root', [b0.x, b0.y, b0.w, b0.h], { key: 'part 0 ' + c.name, name: c.name, el: cur });   // under the rest: a click on the component itself
+      var r = annotate(cur, box, m.mark, m.num);
+      // What is picked: its rows, by the tokens behind them; nothing picked, how to pick.
+      var hit = picked && layer.querySelector('[data-hit="' + (window.CSS && CSS.escape ? CSS.escape(picked) : picked) + '"]'), info = hit && hit._info;
+      if (hit) hit.classList.add('is-picked'); else picked = null;
+      var pick = !info ? '<div><dt>Picked</dt><dd><p>Click a part, a padding or a gap on the component, or a name below, to see the tokens it is drawn with.</p></dd></div>'
+        : info.el ? '<div><dt>Picked</dt><dd><p><b>' + esc(info.name) + '</b></p>' + lookRows(info.el, false).filter(function (x) { return x[1] !== '-' && x[1] !== 'none' && x[1] !== 'transparent' && x[1] !== '0'; }).map(function (x) { return '<p>' + esc(x[0]) + '  ·  ' + esc(x[1]) + '</p>'; }).join('') + '</dd></div>'
+        : '<div><dt>Picked</dt><dd><p><b>' + esc(info.what) + '</b>  ·  ' + esc(info.value) + '</p></dd></div>';
+      inspectLegend.querySelector('dl').innerHTML = pick + legendHTML(r, true);
     }
+    var picked = null;
+    function pickInspect(key) { picked = picked === key ? null : key; drawInspect(); }
+    preview.addEventListener('click', function (e) { var h = e.target.closest && e.target.closest('.pg-inspect-marks [data-hit]'); if (!h) return; e.preventDefault(); e.stopPropagation(); pickInspect(h.getAttribute('data-hit')); }, true);
+    if (inspectLegend) inspectLegend.addEventListener('click', function (e) { var a = e.target.closest && e.target.closest('[data-pick]'); if (!a) return; e.preventDefault(); pickInspect(a.getAttribute('data-pick')); });
     var contrastEl = sec.querySelector('.pg-contrast');
     // On this variant: tried on the live component whenever the Accessibility area shows a variant not tried yet. The
     // Playground is laid out out of sight for it (one task, nothing painted), and what the tries changed (a box ticked)
@@ -1723,17 +1743,37 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       refresh();
       checking = false;
     }
-    // Every token named after this component (its colours and sizes), with the value in the mode it is shown in.
+    // Every token this component is drawn with (its parts and states too, shown in this variant or not): its Figma name,
+    // its variable with the value in the mode it is shown in, a colour's swatch, and what it sets. Without that list, the
+    // tokens named after it.
     function ownRows() {
       if (!tOwn) return;
+      if ((c.allTokens || []).length) {
+        tOwn.innerHTML = c.allTokens.map(function (t) {
+          var v = live(cur || preview, t.var), colour = v && window.CSS && CSS.supports('color', v) && !/^(inherit|initial|unset|currentcolor)$/i.test(v);
+          return '<tr><td>' + esc(t.figma || t.var) + (t.props.length ? '<span class="pg-look">' + esc(t.props.join(', ')) + '</span>' : '') + '</td><td>' + (colour ? '<span class="pg-own-swatch" style="background:var(' + esc(t.var) + ')"></span>' : '') + usesLink(t.var) + (v ? '  ·  ' + esc(v) : '') + '</td></tr>';
+        }).join('');
+        return;
+      }
       var o = c.ownTokens;
       tOwn.innerHTML = o.colors.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td><span class="pg-own-swatch" style="background:var(' + esc(t.var) + ')"></span>' + usesLink(t.var) + '  ·  ' + esc(live(preview, t.var)) + '</td></tr>'; }).join('') +
         o.sizes.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + usesLink(t.var) + '  ·  ' + esc(live(preview, t.var) || t.value) + '</td></tr>'; }).join('');
     }
-    // Per-component mode controls: only the axes that nest, so this preview can differ from the page.
-    if (AXES.some(function (a) { return a.scoped; })) {
-      var modeRow = SGModes.controls(preview, function () { refresh(); }, function (a) { return a.scoped; });
-      sec.querySelector('.pg-modes-slot').appendChild(modeRow); SGModes.register(modeRow);
+    // Per-component mode controls, inside the playground: only the axes that nest, so this preview can differ from the
+    // page. The colour mode at its top left, any other collection (a sizing one) at its top right; they are the
+    // system's modes, not the component's props. The stage keeps room for them above the component.
+    var stageModes = sec.querySelector('.pg-stage-modes');
+    if (stageModes && AXES.some(function (a) { return a.scoped; })) {
+      var slots = stageModes.querySelectorAll('.pg-stage-mode');
+      [function (a) { return a.scoped && a.attr !== 'data-size'; }, function (a) { return a.scoped && a.attr === 'data-size'; }].forEach(function (which, i) {
+        if (!AXES.some(which)) return;
+        var row = SGModes.controls(preview, function () { refresh(); }, which);
+        slots[i].appendChild(row); SGModes.register(row);
+      });
+      stageModes.hidden = false; stageModes.parentNode.classList.add('has-modes');
+      var room = function () { stageModes.parentNode.style.setProperty('--pg-modes-h', stageModes.offsetHeight + 'px'); };
+      if (window.ResizeObserver) new ResizeObserver(room).observe(stageModes);
+      room();
     }
     var cur = null;   // the element the props act on, as last drawn
     var leaves = {};   // the part each text prop wrote into, as last drawn
@@ -1788,19 +1828,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     // The tables beside the preview, read from the component as it is drawn now.
     function inspect(e) {
       var el = (c.cls && (e.classList.contains(c.cls) ? e : e.querySelector('.' + c.cls))) || e;
-      var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px', texted = drawsText(el);
-      tTokens.innerHTML = rowsHTML([].concat(
-        padRows(el, cs),
-        [['gap', hasGap ? tok(el, cs.gap, 'gap') : '-']],
-        [['background', (cs.backgroundColor === 'rgba(0, 0, 0, 0)') ? 'transparent' : tok(el, cs.backgroundColor, 'color', c.name)]],
-        [['border', bw === '0px' ? 'none' : (tok(el, cs.borderTopColor, 'color', c.name) + '  ·  ' + bw + ' ' + cs.borderTopStyle)]],
-        radiusRows(el, cs),
-        texted ? [['color', tok(el, cs.color, 'color', c.name)]] : [],
-        extraColorRows(el, preview, c.name),
-        texted ? [['font', fontTok(el, cs)]] : [],
-        cs.opacity !== '1' ? [['opacity', cs.opacity]] : [],
-        partRows(el, c.name)
-      ));
+      tTokens.innerHTML = rowsHTML(lookRows(el, true).concat(partRows(el, c.name)));
       ownRows(); writeLink(); checkLive(); codeHeight();
       showCode(e);
       if (contrastEl) contrastEl.innerHTML = contrastHTML(e);
@@ -1808,6 +1836,24 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       if (WIDTH !== 'fit') renderFrame();
       if (inspectOn) requestAnimationFrame(drawInspect);
       if (compareOn) requestAnimationFrame(drawCompare);
+    }
+    // What an element is drawn with, by the tokens behind it: its spacing, fill, line, corners, shadow, text. The
+    // component's own rows (whole) add the colours its states set elsewhere; a part picked on Inspect has its own.
+    function lookRows(el, whole) {
+      var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px', texted = drawsText(el);
+      var shadow = cs.boxShadow && cs.boxShadow !== 'none' ? (c.allTokens || []).filter(function (t) { return t.props.some(function (p) { return /shadow/.test(p); }); }) : [];
+      return [].concat(
+        padRows(el, cs),
+        [['gap', hasGap ? tok(el, cs.gap, 'gap') : '-']],
+        [['background', (cs.backgroundColor === 'rgba(0, 0, 0, 0)') ? 'transparent' : tok(el, cs.backgroundColor, 'color', c.name)]],
+        [['border', bw === '0px' ? 'none' : (tok(el, cs.borderTopColor, 'color', c.name) + '  ·  ' + bw + ' ' + cs.borderTopStyle)]],
+        radiusRows(el, cs),
+        cs.boxShadow && cs.boxShadow !== 'none' ? [['shadow', (shadow.length === 1 ? (shadow[0].figma || shadow[0].var) + '  ·  ' : '') + cs.boxShadow]] : [],
+        texted ? [['color', tok(el, cs.color, 'color', c.name)]] : [],
+        whole ? extraColorRows(el, preview, c.name) : [],
+        texted ? [['font', fontTok(el, cs)]] : [],
+        cs.opacity !== '1' ? [['opacity', cs.opacity]] : []
+      );
     }
     // A part no instance in the products holds, made from the selector the code styles it with: an icon from the
     // system's own sheet at its icon size, else an element with the selector's classes and the text its text prop gives.
@@ -2026,33 +2072,26 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   });
   if (!COMPONENTS.length && !FLAT.length) { var empty = document.createElement('p'); empty.className = 'pg-empty'; empty.textContent = 'Nothing agreed yet.'; main.appendChild(empty); }
 
-  // The menu, on every screen: its buttons say what they do in words (the system's own text button), never an icon
-  // alone. On a phone, Menu at the top opens the sidebar as a panel over the page (the system's overlay), closed by
-  // Close menu, the overlay, a link or Escape. On a wide screen, Hide menu gives the page the full width and Menu
-  // at the top brings it back; the choice is remembered in this browser.
+  // The menu: its buttons say what they do in words (the system's own text button), never an icon alone. On a wide
+  // screen it is always there. On a phone, Menu at the top opens the sidebar as a panel over the page (the system's
+  // overlay), closed by Close menu, the overlay, a link or Escape.
   (function () {
     var bar = document.getElementById('sg-topbar'), side = document.getElementById('sg-sidebar'), scrim = document.getElementById('sg-scrim');
     document.getElementById('sg-topbar-title').textContent = DATA.title || 'Design system';
     bar.insertAdjacentHTML('afterbegin', sysButton('button', 'Menu', ' id="sg-menu"'));
     side.querySelector('.sg-sidebar-header').insertAdjacentHTML('afterbegin', sysButton('button', 'Close menu', ' id="sg-nav-close"'));
-    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('afterbegin', '<p class="sg-hide-nav">' + sysButton('button', 'Hide', ' id="sg-hide-nav" aria-label="Hide menu" title="Hide menu"') + '</p>');
-    var menu = document.getElementById('sg-menu'), shut = document.getElementById('sg-nav-close'), hide = document.getElementById('sg-hide-nav');
+    var menu = document.getElementById('sg-menu'), shut = document.getElementById('sg-nav-close');
     shut.classList.add('sg-nav-close');
     if (DATA.ui && DATA.ui.overlay) scrim.classList.add(DATA.ui.overlay);
     menu.setAttribute('aria-controls', 'sg-sidebar'); menu.setAttribute('aria-expanded', 'false');
-    var phone = function () { return window.matchMedia && window.matchMedia('(max-width: 720px)').matches; };
-    var remember = function (on) { try { localStorage.setItem('sg-nav-hidden', on ? '1' : ''); } catch (e) {} };
     // What sticks to the top of a page (a component's areas) sits under the top bar when one shows.
     var stickTop = function () { var h = getComputedStyle(bar).display === 'none' ? 0 : bar.offsetHeight; document.documentElement.style.setProperty('--sg-sticky-top', h + 'px'); };
     window.addEventListener('resize', stickTop); stickTop();
-    var setHidden = function (on) { document.body.classList.toggle('sg-nav-hidden', on); menu.setAttribute('aria-expanded', on ? 'false' : 'true'); remember(on); stickTop(); };
-    try { if (!ALL && localStorage.getItem('sg-nav-hidden') === '1') setHidden(true); } catch (e) {}
-    hide.addEventListener('click', function () { setHidden(true); menu.focus(); });
     var open = function (on) {
       document.body.classList.toggle('sg-nav-open', on); menu.setAttribute('aria-expanded', on ? 'true' : 'false');
       if (on) setTimeout(function () { shut.focus({ preventScroll: true }); }, 50); else menu.focus();   // never the search: no keyboard pops up
     };
-    menu.addEventListener('click', function () { if (phone()) open(true); else { setHidden(false); hide.focus(); } });
+    menu.addEventListener('click', function () { open(true); });
     shut.addEventListener('click', function () { open(false); });
     scrim.addEventListener('click', function () { open(false); });
     side.addEventListener('click', function (e) { if (e.target.closest('.sg-nav a') && document.body.classList.contains('sg-nav-open')) { document.body.classList.remove('sg-nav-open'); menu.setAttribute('aria-expanded', 'false'); } });
