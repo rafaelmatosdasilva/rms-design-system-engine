@@ -1001,3 +1001,61 @@ export function a11yView({ name, cls = null, role = null, annotations = [], part
   for (const x of checked?.issues ?? []) x.wcag = wcagLabel(x.wcag);
   return { role: role ?? null, ...(known ? { element: roleMarkup(role) } : {}), expects, excused, checked };
 }
+
+// ── Parity, per component: what agrees with Figma and what does not ────────────────────────────────────────────────
+// agreed: the agreed record (agreed.mjs) · census: the last audit's census entry for it ({ compared, differ,
+// notComparable, reasons }) · differences: its open differences (each { what, plain?, who?, todo? }) · controls: the
+// props both sides have · unbuilt: Figma props the code does not build · ownTokens: its tokens equal to Figma.
+// → { agreed: [{ what, value, since, commit }], props: [{ figma, code }], tokens: [{ figma, var }], differ, notBuilt:
+// [labels], notCompared: { count, reasons: [[why, n]] } | null, counts: { agree, differ, notBuilt, notCompared } }
+// A fact the record holds that an open difference names is not listed as agreeing: the record is the last agreement.
+export function parityView({ name, agreed = {}, census = null, differences = [], controls = [], unbuilt = [], ownTokens = null } = {}) {
+  const prefix = `${name} · `;
+  const open = differences.map((d) => String(d.what ?? ''));
+  const facts = Object.entries(agreed.facts ?? {})
+    .filter(([k, f]) => k.startsWith(prefix) && f && f.figma !== undefined && String(f.figma) === String(f.code) && !open.some((w) => w.includes(k)))
+    .map(([k, f]) => ({ what: k.slice(prefix.length), value: String(f.code), since: f.at ?? null, commit: f.commit ?? null }))
+    .sort((a, b) => a.what.localeCompare(b.what));
+  const props = controls.map((k) => ({ figma: k.label, code: k.prop ?? k.label }));
+  const tokens = [...(ownTokens?.colors ?? []), ...(ownTokens?.sizes ?? [])].map((t) => ({ figma: t.figma, var: t.var }));
+  const notCompared = census && census.notComparable ? { count: census.notComparable, reasons: Object.entries(census.reasons ?? {}) } : null;
+  const notBuilt = unbuilt.map((u) => u.label ?? u);
+  return { agreed: facts, props, tokens, differ: differences, notBuilt, notCompared,
+    counts: { agree: facts.length + props.length + tokens.length, differ: differences.length, notBuilt: notBuilt.length, notCompared: notCompared?.count ?? 0 } };
+}
+
+// ── How a product brings the component in ─────────────────────────────────────────────────────────────────────────
+// tag, syntax: component-api.mjs callName · file: its path from the project root · text: its source · pkg: { name, dir }
+// of the package the file belongs to, when it is not the project itself · template: ds-config styleguide.importFrom
+// ("@/components/{path}", {path} the file's path from src/ or the package, {name} its tag).
+// → { line, from } | null. A Vue or Svelte file is a default import; a React one is named unless only a default export
+// gives it. Without a template: the package's name and path, else @/ and the path under src/, else ./ and the path.
+export function importOf({ tag, syntax, file, text = '', pkg = null, template = null } = {}) {
+  if (!tag || !file || syntax === 'html') return null;
+  const ext = (file.match(/\.[^./]+$/) ?? [''])[0];
+  const keepExt = /^\.(vue|svelte)$/.test(ext);
+  const strip = (p) => (keepExt ? p : p.slice(0, p.length - ext.length));
+  let from;
+  const underSrc = file.match(/(?:^|\/)src\/(.+)$/);
+  if (template) from = template.replace('{path}', strip(underSrc ? underSrc[1] : file)).replace('{name}', tag);
+  else if (pkg?.name && pkg.dir && file.startsWith(pkg.dir + '/')) from = `${pkg.name}/${strip(file.slice(pkg.dir.length + 1)).replace(/^src\//, '')}`;
+  else if (underSrc) from = `@/${strip(underSrc[1])}`;
+  else from = `./${strip(file)}`;
+  const named = syntax === 'jsx' && new RegExp(`export\\s+(?:function|const|let|class)\\s+${tag}\\b`).test(text);
+  return { line: named ? `import { ${tag} } from '${from}';` : `import ${tag} from '${from}';`, from };
+}
+
+// The system's components a component is built with: those whose class its markup holds (HTML), or that its own file
+// uses (a tag, an import). Itself and its own parts never count. names: [{ name, cls }].
+export function nestedComponents({ name, cls = null, markup = '', text = '', names = [] } = {}) {
+  const classes = new Set([...String(markup).matchAll(/class\s*=\s*["']([^"']*)["']/g)].flatMap((m) => m[1].split(/\s+/)).filter(Boolean));
+  const out = [];
+  for (const o of names) {
+    if (o.name === name || (cls && o.cls === cls)) continue;
+    const inMarkup = o.cls && classes.has(o.cls) && !(cls && o.cls.startsWith(cls + '-') || cls && o.cls.startsWith(cls + '__'));
+    const tagName = o.name.replace(/(^|[-_/\s]+)(\w)/g, (m, s2, ch) => ch.toUpperCase());
+    const inText = text && new RegExp(`<${tagName}\\b|import\\s+\\{?[^;]*\\b${tagName}\\b[^;]*from`).test(text);
+    if (inMarkup || inText) out.push(o.name);
+  }
+  return out;
+}

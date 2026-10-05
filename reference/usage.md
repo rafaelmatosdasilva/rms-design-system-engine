@@ -237,6 +237,17 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   tokens behind what is drawn and its size; above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
+- **A component's page in areas**: Playground, Documentation, Accessibility, Parity and Used in, one at a time on
+  the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
+  (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
+  `styleguide.importFrom` with `{path}` and `{name}`), its file to download, and the system's components it is built
+  with (`nestedComponents`: the classes its markup holds, or the tags and imports of its file).
+- **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
+  out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
+- **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
+  `docs/preview.png`, `docs/screenshot.png`, `preview.png` … beside its page), else its page pictured in Chrome as it
+  opens with the component's places marked (`product-shots.mjs`, window size from its `showUI` call), and how many
+  times its class appears in the product's source page. `styleguide.productShots: false` turns the pictures off.
 - **Code**: the code for what the playground shows, with the system's button to copy it. With a framework file
   (`component-api.mjs` `callName`): the component's tag with the props set, in its syntax (jsx, vue, svelte, a custom
   element), each value as the code spells it, a default left out, every prop the code requires written (`={…}`).

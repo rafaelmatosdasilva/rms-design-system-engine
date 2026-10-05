@@ -152,6 +152,18 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-usage-name { font-size: var(--sg-s); color: var(--sg-text-2); }
 a.pg-usage-name { color: var(--sg-text); }
 .pg-selector { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xs) 0 var(--sg-space-m); }
+/* A component's page in areas (playground, documentation, accessibility, parity), switched by the system's own
+   segmented control; how a product imports it and what it is built with, above them. */
+.pg-areas { margin: var(--sg-space-m) 0 var(--sg-space-l); }
+.pg-import { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); color: var(--sg-text-2); }
+.pg-import code { font-family: inherit; color: var(--sg-text); }
+.pg-parity-sum { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
+.pg-parity td:last-child { word-break: normal; overflow-wrap: anywhere; }
+/* Where it is used: each product's own page pictured, the component marked on it. */
+.pg-usedin { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.pg-shot { position: relative; overflow: hidden; border-radius: var(--sg-radius); border: var(--sg-line); background: var(--sg-bg-2); }
+.pg-shot img { display: block; width: 100%; height: auto; }
+.pg-mark { position: absolute; border: 2px solid var(--sg-accent); border-radius: var(--sg-radius-s); pointer-events: none; }
 /* The code a product writes for what the playground shows, with the system's button to copy it. */
 .pg-code { margin-top: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; }
 .pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
@@ -833,9 +845,10 @@ a.pg-usage-name { color: var(--sg-text); }
     var els = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
     els.forEach(function (el) {
       var own = Array.prototype.some.call(el.childNodes, function (k) { return k.nodeType === 3 && k.textContent.trim(); }) || (el.tagName === 'INPUT' && (el.value || el.placeholder));
-      if (!own || !el.getClientRects().length) return;
+      if (!own) return;
       var cs = getComputedStyle(el);
       if (cs.visibility === 'hidden' || +cs.opacity === 0) return;
+      for (var up = el; up && up !== root.parentElement; up = up.parentElement) if (up.hidden || getComputedStyle(up).display === 'none') return;   // not drawn in this state
       if (el.closest(':disabled, [aria-disabled="true"]')) return;   // WCAG 1.4.3 exempts a control that cannot be used
       var fg = rgba(cs.color); if (!fg) return;
       var bg = behind(el), col = over(fg, bg);
@@ -848,6 +861,69 @@ a.pg-usage-name { color: var(--sg-text); }
     var ok = lowest.ratio >= lowest.need;
     return '<p>' + (ok ? 'Passes' : 'Fails') + ': ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '", needs ' + lowest.need + ':1 (' + (lowest.need === 3 ? 'large text' : 'text') + '), in the mode and state shown.' +
       '<span class="pg-wcag">WCAG 1.4.3 Contrast (Minimum) (AA)</span></p>';
+  }
+
+  // ── Its parity with Figma: what agrees (each value since when), its props and tokens on both sides, what differs
+  // (each with who acts and what to do), what the code does not build yet and what could not be compared ──────────
+  function differencesHTML(c) {
+    return ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '');
+  }
+  function parityHTML(c) {
+    var p = c.parity; if (!p) return differencesHTML(c);
+    var n = p.counts, parts = [n.agree + ' agree', n.differ + ' differ'];
+    if (n.notBuilt) parts.push(n.notBuilt + ' not built yet'); if (n.notCompared) parts.push(n.notCompared + ' not compared');
+    var box = function (head, rows) { return rows ? '<div class="pg-inspect pg-parity"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>' : ''; };
+    var facts = p.agreed.map(function (f) { return '<tr><td>' + esc(f.what) + '</td><td>' + esc(f.value) + (f.since ? '  ·  since ' + esc(when(f.since)) : '') + (f.commit ? ' (' + esc(f.commit) + ')' : '') + '</td></tr>'; }).join('');
+    var props = p.props.map(function (k) { return '<tr><td>' + esc(k.figma) + '</td><td>' + esc(k.code) + '</td></tr>'; }).join('');
+    var toks = p.tokens.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + esc(t.var) + '</td></tr>'; }).join('');
+    return '<div class="pg-doc"><h3>Parity with Figma</h3><p class="pg-parity-sum">' + esc(parts.join('  ·  ')) + '</p>' +
+      ((c.differences || []).length ? differencesHTML(c) : '<p class="pg-parity-sum">Nothing differs from Figma in what the last audit compared.</p>') +
+      '<dl class="pg-updated">' +
+      (p.notBuilt.length ? '<div><dt>Not built yet</dt><dd><p>Figma has ' + esc(p.notBuilt.join(', ')) + '; the code does not build ' + (p.notBuilt.length === 1 ? 'it' : 'them') + ' yet.</p></dd></div>' : '') +
+      (p.notCompared ? '<div><dt>Not compared</dt><dd>' + p.notCompared.reasons.map(function (r) { return '<p>' + esc(r[1] + ' · ' + r[0]) + '</p>'; }).join('') + '</dd></div>' : '') +
+      '</dl>' +
+      '<div class="pg-inspect-grid">' + box('Values that agree', facts) + box('Props (Figma · code)', props) + box('Tokens (Figma · code)', toks) + '</div></div>';
+  }
+  // ── How a product brings it in: its import line (copied), its file (downloaded), and what it is built with ────────
+  function importHTML(c) {
+    var out = '';
+    if (c.import) out += '<div class="pg-import"><span class="pg-usage-label">Import</span><code>' + esc(c.import.line) + '</code>' + sysButton('button', 'Copy import', ' data-copy-text="' + esc(c.import.line) + '"') + (c.source ? sysButton('button', 'Download file', ' data-download="' + esc(c.name) + '"') : '') + '<span class="sg-hidden-text" role="status"></span></div>';
+    if ((c.uses || []).length) out += '<div class="pg-import"><span class="pg-usage-label">Built with</span>' + c.uses.map(function (n) {
+      var o = COMPONENTS.find(function (k) { return k.name === n; });
+      return sysButton('a', n, ' href="#c-' + esc(n) + '"', 'pg-usage-name') + (o && o.source ? sysButton('button', 'Download ' + n, ' data-download="' + esc(n) + '"') : '');
+    }).join('') + '</div>';
+    return out;
+  }
+  // A text copied, the button says so for a moment and a screen reader hears it.
+  function copyText(text, btn, said) {
+    var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
+    var done = function () { label('Copied'); if (said) said.textContent = 'Copied'; setTimeout(function () { label(was); if (said) said.textContent = ''; }, 1500); };
+    var fallback = function () { var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { if (document.execCommand('copy')) done(); } catch (x) {} ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  }
+  // A component's own file, saved as it is in the code.
+  function download(name) {
+    var o = COMPONENTS.find(function (k) { return k.name === name; }); if (!o || !o.source) return;
+    var url = URL.createObjectURL(new Blob([o.source.text], { type: 'text/plain' })), a = document.createElement('a');
+    a.href = url; a.download = o.source.file.split('/').pop(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  // The areas of a component's page, and the one last opened (kept from one component to the next).
+  var AREAS = [['play', 'Playground'], ['docs', 'Documentation'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['used', 'Used in']], AREA = 'play';
+  // ── Where it is used: a card per product, its own page pictured as it opens with each place the component sits on it
+  // marked, linked to the product ─────────────────────────────────────────────────────────────────────────────────────
+  function usedInHTML(c) {
+    var u = (c.usage || []).map(function (k) { return typeof k === 'string' ? { key: k, name: k } : k; });
+    if (!u.length) return '<p class="pg-parity-sum">Not found in any of the products\' pages.</p>';
+    return '<div class="sg-card-grid pg-usedin">' + u.map(function (k) {
+      var p = (DATA.products || {})[k.key] || null, boxes = (p && p.boxes && p.boxes[c.name]) || [];
+      var pct = function (v, of) { return (Math.round(v / of * 10000) / 100) + '%'; };
+      var shot = p ? '<div class="pg-shot"><img src="' + p.shot + '" alt="' + esc(k.name + (boxes.length ? ', with ' + c.name + ' marked' : '')) + '">' +
+        (p.w ? boxes.map(function (b) { return '<span class="pg-mark" style="left:' + pct(b[0], p.w) + ';top:' + pct(b[1], p.h) + ';width:' + pct(b[2], p.w) + ';height:' + pct(b[3], p.h) + '"></span>'; }).join('') : '') + '</div>' : '';
+      var where = k.places ? (k.places === 1 ? 'Once in its code.' : k.places + ' times in its code.') : '';
+      var note = [where, !p || p.from === 'image' ? '' : boxes.length ? (boxes.length === 1 ? 'Marked where it shows when the product opens.' : 'Marked in the ' + boxes.length + ' places it shows when the product opens.') : 'Not on the screen it opens with.'].filter(Boolean).join(' ');
+      var tag = k.href ? 'a' : 'div', cls = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : '');
+      return '<' + tag + ' class="' + cls + '"' + (k.href ? ' href="' + esc(k.href) + '" target="_blank" rel="noopener"' : '') + '>' + shot + '<h3>' + esc(k.name) + '</h3>' + (note ? '<p class="pg-selector">' + esc(note) + '</p>' : '') + '</' + tag + '>';
+    }).join('') + '</div>';
   }
 
   // ── Its code API: the props (a * on each one the code says must be given), the events it sends, its slots ─────────
@@ -904,21 +980,28 @@ a.pg-usage-name { color: var(--sg-text); }
       (c.note ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '');
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
-        '<div class="pg-head"><h2>' + esc(c.name) + '</h2><div class="pg-usage" aria-label="Used in">' + usageBadges(c) + '</div></div>' +
-        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') +
+        '<div class="pg-head"><h2>' + esc(c.name) + '</h2></div>' +
+        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') + importHTML(c) +
       '</div>' +
-        ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '') +
+      ((c.differences || []).length ? '<p class="pg-parity-sum">' + esc(c.differences.length === 1 ? 'One thing differs from Figma.' : c.differences.length + ' things differ from Figma.') + ' ' + sysButton('button', 'See parity', ' data-area-go="parity"') + '</p>' : '') +
+      '<div class="pg-areas">' + segHTML(AREAS.map(function (a) { return { v: a[0], label: a[1] }; })) + '</div>' +
+      // Playground: the component drawn, its controls, its code and the tokens behind it.
+      '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview"></div><div class="pg-panel"><div class="pg-actions"></div><div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
         '<div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div>' +
         '<div class="pg-inspect-grid"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
         (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>' +
-        '<div class="pg-footer">' + apiHTML(c) +
+      '</div>' +
+      // Documentation: its API, Figma's and the code's own words, and when each side last changed.
+      '<div class="pg-area" data-area="docs"><div class="pg-footer">' + apiHTML(c) +
         (docRows ? '<div class="pg-doc"><h3>Documentation</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
         (c.updated ? '<dl class="pg-updated">' +
           (c.updated.uncommitted ? '<div><dt>Code</dt><dd>Changed, not committed yet</dd></div>' : c.updated.code ? '<div><dt>Code last changed</dt><dd>' + esc(when(c.updated.code.time || c.updated.code.date)) + '</dd></div><div><dt>Last change</dt><dd>' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')</dd></div>' : '') +
           (c.updated.figmaRead ? '<div><dt>Figma read</dt><dd>' + esc(when(c.updated.figmaRead)) + '</dd></div>' : '') + '</dl>' : '') +
-        a11yHTML(c) +
-        '</div>';
+        '</div></div>' +
+      '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + a11yHTML(c) + '</div></div>' +
+      '<div class="pg-area" data-area="parity"><div class="pg-footer">' + parityHTML(c) + '</div></div>' +
+      '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc"><h3>Used in</h3>' + usedInHTML(c) + '</div></div></div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls');
     var tTokens = sec.querySelector('.pg-tokens'), tOwn = sec.querySelector('.pg-own');
     // The code for what the preview shows now: the component as a product writes it (its tag and the props set here,
@@ -926,13 +1009,21 @@ a.pg-usage-name { color: var(--sg-text); }
     // else the HTML the preview draws. Copied by the system's own button.
     var codeEl = sec.querySelector('.pg-code code'), copyBtn = sec.querySelector('.pg-code [data-copy]'), copySaid = sec.querySelector('.pg-code [role="status"]');
     function showCode(e) { codeEl.textContent = c.api && c.api.tag ? callCode(c, props, state) : htmlCode(e); }
-    function copyLabel(t) { var leaf = copyBtn.querySelector('*') || copyBtn; leaf.textContent = t; }
-    copyBtn.addEventListener('click', function () {
-      var text = codeEl.textContent;
-      var done = function () { copyLabel('Copied'); copySaid.textContent = 'Code copied'; setTimeout(function () { copyLabel('Copy code'); copySaid.textContent = ''; }, 1500); };
-      var fallback = function () { var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { if (document.execCommand('copy')) done(); } catch (x) {} ta.remove(); };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
-    });
+    copyBtn.addEventListener('click', function () { copyText(codeEl.textContent, copyBtn, copySaid); });
+    Array.prototype.forEach.call(sec.querySelectorAll('[data-copy-text]'), function (b) { b.addEventListener('click', function () { copyText(b.getAttribute('data-copy-text'), b, b.parentNode.querySelector('[role="status"]')); }); });
+    Array.prototype.forEach.call(sec.querySelectorAll('[data-download]'), function (b) { b.addEventListener('click', function () { download(b.getAttribute('data-download')); }); });
+    // One area at a time (every one at once on the measuring page, ?all); the one chosen stays chosen on the next
+    // component. A link to the parity area from the line that says what differs.
+    var areaBar = sec.querySelector('.pg-areas');
+    function showArea(v) {
+      AREA = v;
+      Array.prototype.forEach.call(sec.querySelectorAll('.pg-area'), function (a) { a.hidden = !ALL && a.getAttribute('data-area') !== v; });
+      segItems(areaBar).forEach(function (b) { segSelect(b, b.dataset.v === v); });
+      if (v === 'play') nudge();
+    }
+    segItems(areaBar).forEach(function (b) { b.addEventListener('click', function () { showArea(b.dataset.v); }); });
+    Array.prototype.forEach.call(sec.querySelectorAll('[data-area-go]'), function (b) { b.addEventListener('click', function () { showArea(b.getAttribute('data-area-go')); }); });
+    sec._area = showArea;
     var contrastEl = sec.querySelector('.pg-contrast');
     // Every token named after this component (its colours and sizes), with the value in the mode it is shown in.
     function ownRows() {
@@ -1192,6 +1283,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var cardEl = buildCard(c); main.appendChild(cardEl); cardEl.hidden = false;
       cardEl._refresh();   // measure after it is in the page: a detached node computes to nothing
       thumbOf(c, cardEl.querySelector('.pg-preview').firstElementChild);
+      cardEl._area(AREA);   // drawn with the playground showing, then the area last chosen
       refreshers.push(cardEl._refresh);
       return cardEl;
     };
@@ -1300,7 +1392,9 @@ a.pg-usage-name { color: var(--sg-text); }
   // window narrows), the page and every component not switched by hand follow it.
   AXES.forEach(function (axis) {
     var mq = axis.media && window.matchMedia ? window.matchMedia(axis.media) : null;
-    if (mq && mq.addEventListener) mq.addEventListener('change', function () { refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); });
+    // The measuring page (?all) keeps every drawn component as it is when the colour scheme changes: the engine
+    // switches the scheme while it reads them, and a redraw would replace the very elements it is reading.
+    if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (!ALL) refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); });
   });
 
   // One view at a time: the overview, a foundation or a component, by the address (#c-badge), so each can be shared.
