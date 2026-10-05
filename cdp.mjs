@@ -105,10 +105,14 @@ export async function connectCDP(wsUrl, { timeoutMs = 30000 } = {}) {
     listeners.get(method).add(fn);
     return () => listeners.get(method)?.delete(fn);
   };
+  let closed = false;
   ws.onclose = () => {
+    closed = true;
     for (const [id, fn] of pending) { pending.delete(id); fn({ error: { message: 'the browser connection closed' } }); }
   };
+  // A call on a closed socket fails at once: a send on it is silently dropped, so it would wait out its whole timeout.
   const send = (method, params = {}, sessionId) => new Promise((res, rej) => {
+    if (closed) { rej(new Error(`${method}: the browser connection closed`)); return; }
     const id = ++msgId;
     const timer = setTimeout(() => { pending.delete(id); rej(new Error(`${method}: no answer within ${timeoutMs / 1000}s`)); }, timeoutMs);
     timer.unref?.();
