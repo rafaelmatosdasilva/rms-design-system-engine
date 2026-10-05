@@ -1696,6 +1696,8 @@ function reportFull(label, items, shown) {
   }
 
   // ── Inline gate computations (no subprocess) ─────────────────────────────────
+  // An age in hours, said as people say it: 5 hours, 3 days, 277 days.
+  const ageWords = (h) => (h < 48 ? `${h} hour${h === 1 ? '' : 's'}` : `${Math.floor(h / 24)} days`);   // as the summary counts them
   function computeGate1() {
     const vars      = snapshotAge(SNAP_VARS);
     const struct    = snapshotAge(SNAP_STRUCT);
@@ -1809,7 +1811,7 @@ function reportFull(label, items, shown) {
     if (vars === null) {
       lines.push(C.red(`${SNAP_VARS} ${nullReason(SNAP_VARS)} /rms-design-system-engine Phase 1`)); warn = true;
     } else if (vars > 24) {
-      lines.push(C.yellow(`⚠️  ${SNAP_VARS} is ${vars}h old - refresh with the Phase 1 Plugin API capture`));
+      lines.push(C.yellow(`⚠️  ${SNAP_VARS} is ${ageWords(vars)} old - refresh with the Phase 1 Plugin API capture`));
     } else {
       lines.push(`${SNAP_VARS} ✓ (updated today)`);
     }
@@ -1817,7 +1819,7 @@ function reportFull(label, items, shown) {
     if (struct === null) {
       lines.push(C.red(`${SNAP_STRUCT} ${nullReason(SNAP_STRUCT)} /rms-design-system-engine Phase 1`)); warn = true;
     } else if (struct > 24) {
-      lines.push(C.yellow(`⚠️  ${SNAP_STRUCT} is ${struct}h old - refresh with the Phase 1 Step 1c Plugin API capture`));
+      lines.push(C.yellow(`⚠️  ${SNAP_STRUCT} is ${ageWords(struct)} old - refresh with the Phase 1 Step 1c Plugin API capture`));
     } else {
       lines.push(`${SNAP_STRUCT} ✓ (updated today)`);
     }
@@ -1849,7 +1851,7 @@ function reportFull(label, items, shown) {
       if (age === null) {
         lines.push(C.yellow(`⚠️  ${file} has no _updated stamp - re-run the Phase 1 ${phase} (Plugin API) to start tracking freshness`));
       } else if (age > 24) {
-        lines.push(C.yellow(`⚠️  ${file} is ${age}h old - refresh with the Phase 1 ${phase} (Plugin API)`));
+        lines.push(C.yellow(`⚠️  ${file} is ${ageWords(age)} old - refresh with the Phase 1 ${phase} (Plugin API)`));
       } else {
         lines.push(`${file} ✓ (updated today)`);
       }
@@ -1861,7 +1863,7 @@ function reportFull(label, items, shown) {
       lines.push(C.yellow(`⚠️  ${SNAP_COMP_PROPS} missing - Gate [3g] (component property parity) will be skipped`));
       warn = true;
     } else if (compProps > 24) {
-      lines.push(C.yellow(`⚠️  ${SNAP_COMP_PROPS} is ${compProps}h old - Gate [3g] may miss new/renamed component properties`));
+      lines.push(C.yellow(`⚠️  ${SNAP_COMP_PROPS} is ${ageWords(compProps)} old - Gate [3g] may miss new/renamed component properties`));
       warn = true;
     } else {
       lines.push(`${SNAP_COMP_PROPS} ✓ (updated today)`);
@@ -1876,7 +1878,7 @@ function reportFull(label, items, shown) {
         lines.push(C.yellow(`⚠️  ${SNAP_FRAME_GEOM} missing or unstamped - Gate [16] frameGeom checks will skip`));
         warn = true;
       } else if (fg > 24) {
-        lines.push(C.yellow(`⚠️  ${SNAP_FRAME_GEOM} is ${fg}h old - frameGeom checks may run against a stale frame`));
+        lines.push(C.yellow(`⚠️  ${SNAP_FRAME_GEOM} is ${ageWords(fg)} old - frameGeom checks may run against a stale frame`));
         warn = true;
       } else {
         lines.push(`${SNAP_FRAME_GEOM} ✓ (updated today)`);
