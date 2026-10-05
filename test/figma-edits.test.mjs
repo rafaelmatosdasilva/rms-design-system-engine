@@ -115,3 +115,17 @@ test('router: sending the prototypes\' gaps to Figma goes to the engine\'s edits
   for (const t of ['send the prototype gaps to Figma', 'put the gaps in Figma for the design team', 'manda as lacunas pro figma']) assert.equal(route(t, {}).recipe, 'figma-edits', t);
   assert.equal(route('prototype a settings page with our components', {}).recipe, 'prototype');
 });
+
+test('names written otherwise than the rest of the system are renamed in their component sets, options first, after a yes', async () => {
+  const { renameEdits, applyScript, editLines } = await import('../figma-edits.mjs');
+  const snap = { buttonX: { nodeId: '1:1' } };
+  const edits = renameEdits(snap, [{ component: 'buttonX', kind: 'option', prop: 'state', name: 'default', want: 'Default', why: 'w' }, { component: 'buttonX', kind: 'property', name: 'label-content', want: 'Label Content', why: 'w' }, { component: 'none', kind: 'property', name: 'x', want: 'X' }]);
+  assert.deepEqual(edits.map((e) => [e.what, e.from, e.to]), [['option', 'default', 'Default'], ['property', 'label-content', 'Label Content']], 'a component Figma has no node for is left out');
+  assert.match(editLines(edits).join('\n'), /Names written as the rest of the system writes them \(2\):\n {3}• buttonX: state=default → Default\n {3}• buttonX: "label-content" → "Label Content"/);
+  const set = { children: [{ name: 'state=default, show=true' }], componentPropertyDefinitions: { 'label-content#1:2': {}, state: {} }, editComponentProperty(k, v) { const d = this.componentPropertyDefinitions[k]; delete this.componentPropertyDefinitions[k]; this.componentPropertyDefinitions[v.name + (k.match(/#[\d:]+$/)?.[0] ?? '')] = d; } };
+  const run = new (Object.getPrototypeOf(async function () {}).constructor)('figma', applyScript(edits));
+  const figma = { getNodeByIdAsync: async (id) => (id === '1:1' ? set : null) };
+  assert.deepEqual((await run(figma)).changed, ['buttonX: state=default → Default', 'buttonX: label-content → Label Content']);
+  assert.deepEqual([set.children[0].name, Object.keys(set.componentPropertyDefinitions).join()], ['state=Default, show=true', 'state,Label Content#1:2']);
+  assert.deepEqual((await run(figma)).changed, [], 'run again, nothing changes');
+});

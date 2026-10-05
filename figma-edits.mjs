@@ -109,6 +109,16 @@ export function figmaEdits(propsSnap = {}, components = []) {
   return out;
 }
 
+// One way of writing names: each property or option written otherwise than most of the system's, renamed in its
+// component set (naming-consistency.mjs). → [{ kind: 'rename', component, nodeId, what, prop, from, to, why }]
+export function renameEdits(propsSnap = {}, findings = []) {
+  return findings.map((f) => {
+    const entry = propsSnap?.[f.component];
+    if (!entry?.nodeId) return null;
+    return { kind: 'rename', component: f.component, nodeId: entry.nodeId, what: f.kind, prop: f.kind === 'option' ? f.prop : f.name, from: f.name, to: f.want, why: f.why };
+  }).filter(Boolean);
+}
+
 // The to do list for the design team, from every prototype's gaps (gaps.json → merged): one edit, or none.
 export const TODO_PAGE = 'Design system to do', TODO_FRAME = 'Gaps from prototypes';
 export function gapEdits(merged = []) {
@@ -128,9 +138,29 @@ export function applyScript(edits = []) {
   const todo = edits.filter((e) => e.kind === 'role' && e.nodeId && e.label).map((e) => ({ id: e.nodeId, component: e.component, label: e.label }));
   const list = edits.find((e) => e.kind === 'todo');
   const cards = list ? list.items.map((g) => ({ title: g.need, text: todoText(g) })) : null;
+  const renames = edits.filter((e) => e.kind === 'rename' && e.nodeId).map((e) => ({ id: e.nodeId, component: e.component, what: e.what, prop: e.prop, from: e.from, to: e.to }));
   return `// Written by rms-design-system-engine --figma-edits. Run it with the Figma MCP's use_figma only after the person said yes.
 const edits = ${JSON.stringify(todo, null, 2)};
 const changed = [], skipped = [], missing = [];
+${renames.length ? `// Names written as the rest of the system writes them: options first (in each variant's name), then properties.
+const renames = ${JSON.stringify(renames, null, 2)};
+for (const r of renames.filter((x) => x.what === 'option')) {
+  const set = await figma.getNodeByIdAsync(r.id);
+  if (!set || !('children' in set)) { missing.push(r.component + ' ' + r.prop + '=' + r.from); continue; }
+  let n = 0;
+  for (const v of set.children) { const parts = String(v.name).split(/,\\s*/).map((p) => { const [k, val] = p.split('='); return k && k.trim() === r.prop && val && val.trim() === r.from ? k + '=' + r.to : p; }); const name = parts.join(', '); if (name !== v.name) { v.name = name; n++; } }
+  if (n) changed.push(r.component + ': ' + r.prop + '=' + r.from + ' → ' + r.to); else skipped.push(r.component + ' ' + r.prop + '=' + r.from);
+}
+for (const r of renames.filter((x) => x.what === 'property')) {
+  const set = await figma.getNodeByIdAsync(r.id);
+  const defs = set && set.componentPropertyDefinitions ? set.componentPropertyDefinitions : null;
+  if (!defs) { missing.push(r.component + ' ' + r.from); continue; }
+  const key = Object.keys(defs).find((k) => k.replace(/#[\\d:]+$/, '') === r.from);
+  if (!key) { (Object.keys(defs).some((k) => k.replace(/#[\\d:]+$/, '') === r.to) ? skipped : missing).push(r.component + ' ' + r.from); continue; }
+  try { set.editComponentProperty(key, { name: r.to }); changed.push(r.component + ': ' + r.from + ' → ' + r.to); }
+  catch (e) { missing.push(r.component + ' ' + r.from + ' (' + String(e && e.message || e) + ')'); }
+}
+` : ''}
 for (const e of edits) {
   const node = await figma.getNodeByIdAsync(e.id);
   if (!node || !('annotations' in node)) { missing.push(e.component); continue; }
@@ -172,13 +202,15 @@ return { changed, skipped, missing, todo };` : 'return { changed, skipped, missi
 // The lines the run prints: what would change, what a person decides.
 export function editLines(edits, { fileKey = null } = {}) {
   const roles = edits.filter((e) => e.kind === 'role'), todo = edits.find((e) => e.kind === 'todo'), decide = edits.filter((e) => e.decision);
+  const renames = edits.filter((e) => e.kind === 'rename');
   const apply = edits.filter((e) => !e.decision);
-  if (!edits.length) return ['✅ Figma states every role the code has, and no prototype needs anything the system lacks: nothing to send back.'];
+  if (!edits.length) return ['✅ Figma states every role the code has, writes its names one way, and no prototype needs anything the system lacks: nothing to send back.'];
   return [
     ...(roles.length ? [`Figma changes the engine can make (${roles.length}), each read from the code:`, ...roles.map((e) => `   • ${e.component}: add the annotation "${e.label}" (${e.why})`)] : ['✅ Figma states every role the code has.']),
+    ...(renames.length ? [`Names written as the rest of the system writes them (${renames.length}):`, ...renames.map((e) => `   • ${e.component}: ${e.what === 'option' ? `${e.prop}=${e.from} → ${e.to}` : `"${e.from}" → "${e.to}"`}`), '   Each component\'s code contract follows the new names once Figma is read again.'] : []),
     ...(todo ? [`The design team's to do list in Figma, page "${todo.page}", frame "${todo.frame}" (${todo.why}), written afresh:`, ...todo.items.map((g) => `   • ${g.need}: ${todoText(g)}`)] : []),
     ...(decide.length ? [`For a person to decide (${decide.length}), never applied:`, ...decide.map((e) => `   • ${e.component}: ${e.why}`)] : []),
-    ...(apply.length ? [`NEXT: show the person the ${roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : ''}${roles.length && todo ? ' and ' : ''}${todo ? 'to do list' : ''} above and ask; only when they say yes, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
+    ...(apply.length ? [`NEXT: show the person the ${[roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : '', renames.length ? `${renames.length} rename${renames.length === 1 ? '' : 's'}` : '', todo ? 'to do list' : ''].filter(Boolean).join(' and ')} above and ask; only when they say yes, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
   ];
 }
 
