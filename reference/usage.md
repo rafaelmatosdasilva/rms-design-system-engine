@@ -246,6 +246,18 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
   `styleguide.importFrom` with `{path}` and `{name}`), its file to download, and the system's components it is built
   with (`nestedComponents`: the classes its markup holds, or the tags and imports of its file).
+- **Usage** (`guidanceView`), in Documentation: When to use, When not to use, Common mistakes, Limitations, from a
+  line of Figma's description or annotations or the code's note that starts with the section's name, else
+  `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
+  string or a list); a missing one is said, and the overview counts each section across the components.
+- **The page's own reading**: every button says what it does in words (Menu, Close menu, Hide menu; a hidden menu is
+  remembered in the browser), and the style guide check fails when the page's text roles fall below 4.5:1 on its
+  backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
+- **Anatomy**, first in Documentation: an inert copy of the component as the Playground set it, drawn larger, each
+  part numbered in reading order (the contract's named parts, `c.anatomy`, a Figma auto name such as Frame 106
+  replaced by the part's class, then what sits directly inside it), a slot outlined, padding and gaps tinted and
+  named by their token, and how it lines up its items. A component shown in an overlay is drawn as its own element;
+  none on the measuring page.
 - **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
   out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
 - **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
