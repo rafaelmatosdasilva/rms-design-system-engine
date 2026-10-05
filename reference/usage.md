@@ -244,8 +244,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **A component's page in areas**: Playground, Documentation, Accessibility, Parity and Used in, one at a time on
   the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
-  `styleguide.importFrom` with `{path}` and `{name}`), its file to download, and the system's components it is built
-  with (`nestedComponents`: the classes its markup holds, or the tags and imports of its file).
+  `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
+  page scrolls. **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
+  classes its markup holds, or the tags and imports of its file), each the overview's card with its own preview.
+- **Playground links**: a control and the preview follow each other (a radio picked in the preview sets State); a
+  label edit writes only its words into its part. An option the contract maps to another element's selector (a
+  product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
+  the component's own `:checked` rule, and an option the code does not build is offered as not built.
 - **Usage** (`guidanceView`), in Documentation: When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
