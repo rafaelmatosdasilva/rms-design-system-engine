@@ -312,7 +312,7 @@ test('a component\'s API: a * on each prop the code says must be given, callback
 
 test('the code shown: the tag with the props set, in its framework\'s syntax; a required prop never left out', () => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
-  const src = tpl.slice(tpl.indexOf('var low = function'), tpl.indexOf('// The classes the system\'s CSS styles'));
+  const src = tpl.slice(tpl.indexOf('var low = function'), tpl.indexOf('// The classes and data attributes the system'));
   const callCode = new Function(src + 'return callCode;')();
   const props = [{ label: 'Size', prop: 'size', type: 'VARIANT', default: 'Medium' }, { label: 'Disabled', prop: 'disabled', type: 'BOOLEAN', default: false }, { label: 'Label', prop: 'label', type: 'TEXT', default: 'Save' }];
   const api = (syntax) => ({ tag: syntax === 'html' ? 'ds-button' : 'Button', syntax, props: [{ name: 'size', values: ['sm', 'md'], default: 'md' }, { name: 'label', required: true }, { name: 'icon', required: true }] });
@@ -327,18 +327,19 @@ test('accessibility per component: its role\'s obligations and behaviours with W
   const { a11yView } = await import('../styleguide-data.mjs');
   const result = { checkedAt: '2026-10-05T10:00:00Z', issues: [
     { issue: 'contrast', selector: 'span in .chip', contrast: 3.2, needs: 4.5, theme: 'dark', text: 'Filter', fix: 'Use a darker colour.' },
+    { issue: 'contrast', selector: 'span in .chip', contrast: 2.9, needs: 4.5, theme: 'light', text: 'Off', fix: 'Use a darker colour.' },
     { issue: 'behaviour', selector: 'chip: Space does not flip aria-pressed', component: 'chip', fix: 'Make it do it.' },
     { issue: 'focus', selector: '.chips-row', fix: 'x' },   // another class that starts with the same word: not the chip's
   ] };
   const v = a11yView({ name: 'chip', cls: 'chip', role: 'togglebutton', annotations: ['Escape closes it'], parts: [{ layer: 'Icon', part: 'indicator' }], result,
-    guide: { contrast: { title: () => 'Text is hard to read' } } });
+    guide: { contrast: { title: (n) => `Text is hard to read (${n})` } } });
   assert.equal(v.element, 'a <button type="button"> with aria-pressed="true" or "false" (on or off)');
   assert.deepEqual(v.expects.map((x) => x.wcag), ['WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 4.1.2 Name, Role, Value (A)', 'WCAG 2.1.1 Keyboard (A)', 'WCAG 2.1.1 Keyboard (A)', 'WCAG 1.3.1 Info and Relationships (A)']);
   assert.match(v.expects[3].says, /^Escape closes it\.$/);
-  assert.deepEqual(v.checked.issues.map((i) => [i.kind, i.title, i.wcag, i.detail]), [
-    ['contrast', 'Text is hard to read', 'WCAG 1.4.3 Contrast (Minimum) (AA)', '"Filter" 3.2:1, needs 4.5:1 (dark)'],
-    ['behaviour', 'behaviour', 'WCAG 2.1.1 Keyboard (A)', 'chip: Space does not flip aria-pressed'],
-  ]);
+  assert.deepEqual(v.checked.issues.map((i) => [i.kind, i.title, i.wcag, i.details]), [
+    ['contrast', 'Text is hard to read (2)', 'WCAG 1.4.3 Contrast (Minimum) (AA)', ['"Filter" 3.2:1, needs 4.5:1 (dark)', '"Off" 2.9:1, needs 4.5:1 (light)']],
+    ['behaviour', 'behaviour', 'WCAG 2.1.1 Keyboard (A)', ['chip: Space does not flip aria-pressed']],
+  ], 'one line per kind of problem, each place listed');
   // no role stated: nothing invented; no browser check yet: null, and the page says so
   const none = a11yView({ name: 'card', cls: 'card' });
   assert.deepEqual([none.role, none.expects, none.checked], [null, [], null]);

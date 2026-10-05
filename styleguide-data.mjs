@@ -957,7 +957,7 @@ export const wcagLabel = (id) => (!id ? null : WCAG_CRITERIA[id] ? `WCAG ${id} $
 // notes on it · parts: its part roles ([{ layer, part }]) · exceptions: behaviours the person excused ({ id: reason }) ·
 // result: the last browser check (a11y.json), or null · guide: { kind: { title(n), fix } } (a11y-check.mjs A11Y_GUIDE).
 // → { role, element, expects: [{ says, wcag }], excused: [{ says, reason }], checked: null | { at, notRead?, issues: [{ kind,
-// title, fix, wcag, detail }] } }, each wcag as the page names it ("WCAG 4.1.2 Name, Role, Value (A)").
+// title, fix, wcag, details: [where each one is] }] } }, one issue per kind of problem, each wcag as the page names it ("WCAG 4.1.2 Name, Role, Value (A)").
 export function a11yView({ name, cls = null, role = null, annotations = [], parts = [], exceptions = {}, result = null, guide = {} } = {}) {
   const expects = [];
   const known = role && roleOf(role);
@@ -975,7 +975,7 @@ export function a11yView({ name, cls = null, role = null, annotations = [], part
     if ((result.notRead ?? []).some((x) => String(x).split(' (')[0] === name)) checked = { at, notRead: true, issues: [] };
     else {
       const mine = new RegExp(`\\.${String(cls ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`);
-      const seen = new Set(), issues = [];
+      const seen = new Set(), found = [];
       for (const r of result.issues ?? []) {
         // its own: the check named it, or the finding is on its class, or starts with its name ("stepper: …")
         const sel = String(r.selector ?? '');
@@ -984,8 +984,16 @@ export function a11yView({ name, cls = null, role = null, annotations = [], part
         const k = r.issue + '|' + detail;
         if (seen.has(k)) continue;
         seen.add(k);
-        issues.push({ kind: r.issue, title: guide[r.issue]?.title ? guide[r.issue].title(1) : r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', wcag: A11Y_WCAG[r.issue] ?? null, detail });
+        found.push({ kind: r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', detail });
       }
+      // One line per kind of problem: how many, where each is, the fix and the criterion once.
+      const issues = [];
+      for (const f of found) {
+        const same = issues.find((i) => i.kind === f.kind);
+        if (same) { same.details.push(f.detail); continue; }
+        issues.push({ kind: f.kind, fix: f.fix, wcag: A11Y_WCAG[f.kind] ?? null, details: [f.detail] });
+      }
+      for (const i of issues) i.title = guide[i.kind]?.title ? guide[i.kind].title(i.details.length) : i.kind;
       checked = { at, issues };
     }
   }
