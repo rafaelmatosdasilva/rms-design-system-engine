@@ -25,7 +25,6 @@
 
 ✅  [5] Every mode is covered  (tokens adapt across light/dark and all configured modes)
        ✅ OK        9/9  (adapts across modes, and matches Figma per mode where value-checked)
-       ⏭  SKIPPED   0  (no CSS var, documented)
 
 ✅  [6] Exception lists are valid  (no stale or overly broad entries)
        ⏭  no design-system-engine-map.mjs - no exception list to check.
