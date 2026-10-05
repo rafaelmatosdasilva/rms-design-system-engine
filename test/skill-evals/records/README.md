@@ -29,5 +29,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-04-the-browser-check-can-read` | The 21 guide tasks on Haiku (engine 298b82e) | "The browser check can read a ::before or ::after layer, for components that draw their background or lines as their own layers" |
 | `2026-10-04-style-guide-figma-s-annotations` | The 21 guide tasks on Haiku (engine 58685ab) | "Style guide: Figma's annotations and slots as documentation, times to the minute, every component centred, any state selectable, a nested component drawn once, overlays open in the playground, component-only tokens in their component" |
 | `2026-10-05-guide-loading-the-skill-runs` | The 21 guide tasks on Haiku (engine 53c57b6) | "Guide: loading the skill runs nothing, run the command now; scorer: a token set up in .env is not asked for in the chat; contracts: a component named with a slash gets its own folder" |
+| `2026-10-05-style-guide-a-control-the` | The 21 guide tasks on Haiku (engine c8ec2b2) | "Style guide: stand-ins for a control the system lacks; audit: Figma's fill sizing, own minimum height and default variant compared" |
+| `2026-10-05-style-guide-each-component-s` | The 21 guide tasks on Haiku (engine 1b60458) | "Style guide: anatomy, usage sections, a menu that hides, worded buttons, the page's own contrast in every mode" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

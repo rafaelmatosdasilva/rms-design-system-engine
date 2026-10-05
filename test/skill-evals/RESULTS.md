@@ -1,5 +1,35 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: anatomy, usage sections, a menu that hides, worded buttons, the page's own contrast in every mode (continuous evaluation)
+
+What changed since the entry below (engine c8ec2b2): Style guide: each component's anatomy (parts numbered, a slot outlined, padding and gaps named by their tokens) and its usage (when to use, when not to, common mistakes, limitations, counted on the overview); the menu hides on a wide screen and every button says what it does in words; the check fails the page's own text below 4.5:1 in any colour mode. The guide changed in `reference/usage.md`.
+
+Guide set measured: `25e6f04f89aa` · Project measured: `13d811a9d668`
+
+| Haiku, engine 1b60458 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.056 |
+| Input a run | 106k | 101k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 106k. Records: `records/2026-10-05-style-guide-each-component-s`.
+
+## 2026-10: Style guide: stand-ins for a control the system lacks; audit: Figma's fill sizing, own minimum height and default variant compared (continuous evaluation)
+
+What changed since the entry below (engine 53c57b6): Style guide: each component's code with a copy button, its API (props with the required ones marked, events, slots) and its accessibility (role, what it owes with WCAG, text contrast measured as drawn, the last browser check); Accessibility check: a big page is read role by role (the whole tree in one answer closed the browser socket and stalled the check); a closed socket fails at once; an invalid selector is said not checked instead of failing the page; each finding names its component; Contracts: a text style with Figma variables under its name keeps its token at textStyle.<style>; style guide: one line per kind of accessibility finding, only the data attributes the system styles in the HTML; Style guide: a component's page in areas (Playground, Documentation, Accessibility, Parity, Used in), its import line and file, the components it is built with; Parity lists what agrees since when and what differs; Used in shows each product's own picture. Audit: the browser reading of components no longer fails on a node the page replaced (it fell back to static for every component), an instance with words is measured first, and a height left to content is compared by Figma's sizing, so nothing is left uncompared; Style guide: a control the system lacks gets its nearest stand-in from the system (a segmented control: tabs, a radio group, its buttons), said on the overview and in the To do list; audit: a component Figma sets to fill its container agrees with a code height left to the page, Figma's own minimum height is compared, a state on a part is compared on the whole component, Figma's default variant is measured with its classes. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `121566e89571` · Project measured: `13d811a9d668`
+
+| Haiku, engine c8ec2b2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.056 |
+| Input a run | 104k | 106k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 106k a run against 104k. Records: `records/2026-10-05-style-guide-a-control-the`.
+
 ## 2026-10: Guide: loading the skill runs nothing, run the command now; scorer: a token set up in .env is not asked for in the chat; contracts: a component named with a slash gets its own folder (continuous evaluation)
 
 What changed since the entry below (engine 58685ab): Accessibility check: the page counts as focused, so a focus ring is never read as missing because another tab holds the window; Style guide: using the component in the playground sets its props (a box ticked, a switch flipped, a value typed); Style guide: on a phone the documentation is one column, each name above its text; Test reads the phone rules from the page's own style block; Style guide: controls in Figma's panel order, every text prop writes its own part, a shape part stays empty and leads, overlays open over the whole window, documentation sections spaced apart; Style guide: each type style lists its family, size, weight, line height and letter spacing; titles have no line under them; Style guide: the Computed box is removed; the tokens behind what is drawn and the component's own tokens stay; Style guide: each type style beside a token table, as a component has (property, then variable and value); Style guide: typography by Figma's names and order; the search covers everything and shows only its results below the field; Naming check lists every variable not called by its Figma name (figmaNames strict fails it); style guide: each type sample in its card under the style name, no frame around the list, no device label under the colour switch; Guide: loading the skill runs nothing, run the command now; scorer: a token set up in .env is not asked for in the chat; contracts: a component named with a slash gets its own folder. The guide changed in `reference/config.md`, `rms-design-system-engine.md`.

@@ -296,3 +296,18 @@ test('a page that was not checked says so in --json, with the reason, never as a
   assert.match(d.notChecked, /^Chrome failed to start/);
   assert.equal(d.issues, undefined);
 });
+
+test('page: a component whose selector is not valid CSS is said not checked; the rest of the page is still read, each finding with its component', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 14px sans-serif; background: #fff; } .chip { color: #bbb; }</style></head><body><main><h1>T</h1>
+    <span class="chip">Faint chip</span></main></body></html>`;
+  const dir = makeFixture({ 'page.html': page, 'ds-config.json': { componentSelectors: { Chip: '.chip', 'table/row': '.table/row' } } });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--component', 'Chip', '--component', 'table/row', '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  assert.deepEqual(d.notRead, ['table/row (its selector .table/row is not valid CSS, so it was not checked)'], out);
+  const contrast = d.issues.filter((i) => i.issue === 'contrast');
+  assert.ok(contrast.length, 'the page was still read: ' + out);
+  assert.ok(contrast.every((i) => i.component === 'Chip'), out);
+  assert.match(d.checkedAt, /^\d{4}-\d\d-\d\dT/);
+});

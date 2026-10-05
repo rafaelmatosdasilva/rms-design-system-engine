@@ -222,8 +222,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   component owns, its text styles, radii and spacing scale, its icons' Figma size (`styleguide.chrome` names a role
   by hand: `{ "accent": "--brand" }`). The page's text is the system's body rule, which the components inherit as in
   the product. Its switches are the system's own segmented control and its text inputs its own text field, read from
-  their markup (a row of the same element where one carries the selected class). A role the system has no token for
-  is left to the browser's own and listed, never given a value of the engine's.
+  their markup (a row of the same element where one carries the selected class). A control the system lacks gets
+  its nearest stand-in from the system (a segmented control: its tabs, then its radio group, then its buttons side by
+  side, the selected one in its primary look or, with one button, in it and the others plain; a text field: its
+  search field), else a plain control drawn with its tokens, and each one is said on the overview and in the To do
+  list (`ui.gaps`: "This system has no segmented control, so the page uses its tabs."). A role the system has no
+  token for is left to the browser's own and listed, never given a value of the engine's.
 - **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; a size that
   changes with a mode shows the value of the mode its section's size switch picks; icons from the icon sheet.
@@ -237,6 +241,42 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   tokens behind what is drawn and its size; above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
+- **A component's page in areas**: Playground, Documentation, Accessibility, Parity and Used in, one at a time on
+  the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
+  (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
+  `styleguide.importFrom` with `{path}` and `{name}`), its file to download, and the system's components it is built
+  with (`nestedComponents`: the classes its markup holds, or the tags and imports of its file).
+- **Usage** (`guidanceView`), in Documentation: When to use, When not to use, Common mistakes, Limitations, from a
+  line of Figma's description or annotations or the code's note that starts with the section's name, else
+  `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
+  string or a list); a missing one is said, and the overview counts each section across the components.
+- **The page's own reading**: every button says what it does in words (Menu, Close menu, Hide menu; a hidden menu is
+  remembered in the browser), and the style guide check fails when the page's text roles fall below 4.5:1 on its
+  backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
+- **Anatomy**, first in Documentation: an inert copy of the component as the Playground set it, drawn larger, each
+  part numbered in reading order (the contract's named parts, `c.anatomy`, a Figma auto name such as Frame 106
+  replaced by the part's class, then what sits directly inside it), a slot outlined, padding and gaps tinted and
+  named by their token, and how it lines up its items. A component shown in an overlay is drawn as its own element;
+  none on the measuring page.
+- **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
+  out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
+- **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
+  `docs/preview.png`, `docs/screenshot.png`, `preview.png` … beside its page), else its page pictured in Chrome as it
+  opens with the component's places marked (`product-shots.mjs`, window size from its `showUI` call), and how many
+  times its class appears in the product's source page. `styleguide.productShots: false` turns the pictures off.
+- **Code**: the code for what the playground shows, with the system's button to copy it. With a framework file
+  (`component-api.mjs` `callName`): the component's tag with the props set, in its syntax (jsx, vue, svelte, a custom
+  element), each value as the code spells it, a default left out, every prop the code requires written (`={…}`).
+  Else the HTML the preview draws, keeping only the classes the system's CSS styles.
+- **API**: from the component's file (`component-api.mjs`): its props, each one the code requires marked `*` (a TS
+  member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
+  its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
+  elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
+- **Accessibility**: its role (the Figma annotation, else `contract.authored.json` semantics) and what it asks for
+  (`role-markup.mjs`, `behaviour-contract.mjs`: element, name, keys, part roles), each with its WCAG 2.2 criterion;
+  the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); and the last browser check's
+  findings on it from `.design-system-engine-out/a11y.json` (each finding carries `component` and the file
+  `checkedAt`), or that it has not been checked yet.
 - **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,

@@ -53,6 +53,7 @@ export function cemComponents(manifest, ROOT = '') {
         file: mod.path ? resolve(ROOT, mod.path) : null,
         props,
         slots: { named: (d.slots ?? []).map((s) => s.name).filter(Boolean), default: (d.slots ?? []).some((s) => !s.name) },
+        events: (d.events ?? []).map((e) => e.name).filter(Boolean),
       });
     }
   }
@@ -86,6 +87,7 @@ export function docgenComponents(doc, ROOT = '') {
       else if (/^(bool|boolean)$/.test(p.tsType?.name ?? p.type?.name ?? '')) e.type = 'boolean';
       const def = p.defaultValue?.value;
       if (def != null && def !== 'undefined') e.default = unq(def);
+      if (typeof p.required === 'boolean') e.required = p.required;
       props[name] = e;
     }
     const slotList = Array.isArray(d.slots) ? d.slots : [];
@@ -94,6 +96,7 @@ export function docgenComponents(doc, ROOT = '') {
       file: file ? resolve(ROOT, file) : null,
       props,
       slots: { named: slotList.map((s) => s.name).filter((n) => n && n !== 'default'), default: slotList.some((s) => !s.name || s.name === 'default') },
+      events: (Array.isArray(d.events) ? d.events : []).map((e) => e?.name).filter(Boolean),   // vue-docgen-api
     };
   });
 }
@@ -197,6 +200,7 @@ export function typescriptComponentApi(ts, file, text, componentName) {
       const opts = literals(m.type);
       if (opts) e.options = opts;
       else if (m.type?.kind === ts.SyntaxKind.BooleanKeyword) e.type = 'boolean';
+      e.required = !m.questionToken;
       props[name] = e;
     }
     return props;
@@ -245,6 +249,9 @@ export function mergeApiReadings(readings) {
     if (opts.length) fact.options = opts[0].e.options;
     const type = seen.find((s) => s.e.type)?.e.type;
     if (type) fact.type = type;
+    // Must be given: the best source that says, and never when the code gives it a default (it is filled for you).
+    const req = seen.find((s) => typeof s.e.required === 'boolean');
+    if (req) fact.required = req.e.required && fact.default == null;
     const defDisagree = defs.some((s) => norm(s.e.default) !== norm(defs[0].e.default));
     const optDisagree = opts.some((s) => !sameList(s.e.options, opts[0].e.options));
     if (defDisagree || optDisagree) {
@@ -261,7 +268,25 @@ export function mergeApiReadings(readings) {
     if (r.slots.default) hasDefault = true;
   }
   for (const r of readings) sources.push(r.source);
-  return { props, slots: { named: [...named.values()], default: hasDefault }, readBy: sources };
+  const events = new Map();
+  for (const r of readings) for (const e of r.events ?? []) if (!events.has(norm(e))) events.set(norm(e), e);
+  return { props, slots: { named: [...named.values()], default: hasDefault }, events: [...events.values()], readBy: sources };
+}
+
+// How a product writes the component: its tag (a custom element's, else the name the file exports) and the syntax
+// around it (vue, svelte, jsx or html). → { tag, syntax } | {} when the code names none.
+export function callName(name, file, text = '', cem = null, docgen = null) {
+  const tagName = cem?.names?.find((n) => /-/.test(n));
+  if (tagName) return { tag: tagName, syntax: 'html' };
+  const ext = file ? extname(file) : '';
+  const syntax = ext === '.vue' ? 'vue' : ext === '.svelte' ? 'svelte' : /^\.(jsx|tsx|js|ts)$/.test(ext) ? 'jsx' : null;
+  if (!syntax) return {};
+  const base = file.split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+  const pascal = (x) => String(x).replace(/(^|[-_\s]+)(\w)/g, (m, s, ch) => ch.toUpperCase());
+  if (syntax !== 'jsx') return { tag: /^[A-Z]/.test(base) ? base : pascal(base), syntax };
+  const exported = [...String(text).matchAll(/export\s+(?:default\s+)?(?:function|const|let|class)\s+([A-Z][\w$]*)/g)].map((m) => m[1]);
+  const tag = docgen?.names?.find((n) => /^[A-Z]/.test(n)) ?? exported.find((n) => norm(n) === norm(name)) ?? exported.find((n) => norm(n) === norm(base)) ?? exported[0] ?? (/^[A-Z]/.test(base) ? base : null);
+  return tag ? { tag, syntax } : {};
 }
 
 // ── The whole reading, for a list of component names ──────────────────────────
@@ -315,18 +340,18 @@ export function createApiReader(ROOT, cfg = {}, { classFor, nodeIds = {} } = {})
     const { file, how } = fileFor(name);
     const readings = [];
     const e = cem.find((x) => matches(x.names, name));
-    if (e) readings.push({ source: 'custom-elements', props: e.props, slots: e.slots });
+    if (e) readings.push({ source: 'custom-elements', props: e.props, slots: e.slots, events: e.events });
     const d = docgen.find((x) => matches(x.names, name) || (file && x.file === file));
-    if (d) readings.push({ source: 'docgen', props: d.props, slots: d.slots });
+    if (d) readings.push({ source: 'docgen', props: d.props, slots: d.slots, events: d.events });
     if (file) {
       const text = read(file);
       const t = typescriptComponentApi(ts, file, text, name);
       if (t) readings.push({ source: 'typescript', props: t.props });
       readings.push({ source: 'text', ...textComponentApi(file, text) });
     }
-    if (!readings.length) return { file: null, how, props: {}, slots: { named: [], default: false }, readBy: [], codeConnect: ccFor(name)?.propMap ?? null };
+    if (!readings.length) return { file: null, how, props: {}, slots: { named: [], default: false }, events: [], readBy: [], codeConnect: ccFor(name)?.propMap ?? null };
     const merged = mergeApiReadings(readings);
-    return { file, how, ...merged, codeConnect: ccFor(name)?.propMap ?? null };
+    return { file, how, ...merged, ...callName(name, file, file ? read(file) : '', e, d), codeConnect: ccFor(name)?.propMap ?? null };
   }
 
   return { fileFor, apiFor, sources, read, files };
