@@ -64,6 +64,7 @@
 ❌  [15] Component props match Figma  (names, defaults, variant options & slots vs code)
        ✅ OK        4
        ❌ NAME      1   (the code names a Figma property differently: letter case, spaces)
+       ⚠️  badge property "Tone" is named differently from the rest of the system: rename it "tone" in Figma (4 of the system's 5 property names are lower case words)
          ❌ badge/Tone: the code names it "tone" (letter case T → t)  (src/components/Badge.tsx)
 
 ⏭   [16] Sub-components match Figma  (the sub-components Figma nests are the ones the code uses)
@@ -195,10 +196,10 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: badge 3 · 5 not tied to a component
+📉 Burndown, open findings per component: badge 4 · 5 not tied to a component
    next up: badge. Run with --component badge, fix, run again.
 
-📋 Differences between Figma and the code: 6 open, in one list → .design-system-engine-out/differences.md
+📋 Differences between Figma and the code: 7 open, in one list → .design-system-engine-out/differences.md
 
 ─── SUMMARY (relay this in the chat as is; also in .design-system-engine-out/summary.md) ───
 
@@ -215,10 +216,10 @@
 - **Component props match Figma** fails:
   - badge/Tone: the code names it "tone" (letter case T → t)  (src/components/Badge.tsx)
 
-Burndown, open findings per component: badge 3 · 5 not tied to a component
+Burndown, open findings per component: badge 4 · 5 not tied to a component
 Fix first: badge. Run with --component badge, fix, run again.
 
-Every difference between Figma and the code, 6 open, in one list: .design-system-engine-out/differences.md
+Every difference between Figma and the code, 7 open, in one list: .design-system-engine-out/differences.md
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

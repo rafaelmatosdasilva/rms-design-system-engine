@@ -72,6 +72,7 @@
        ✅ OK        4
        ❌ NAME      1   (the code names a Figma property differently: letter case, spaces)
        ❌ VALUE     2   (wrong default, or a Figma variant the code doesn't accept)
+       ⚠️  badge property "Tone" is named differently from the rest of the system: rename it "tone" in Figma (4 of the system's 5 property names are lower case words)
          ❌ ROLE      1   (the markup does not hold what Figma's role annotation asks for)
          ❌ badge/Tone: the code names it "tone" (letter case T → t)  (components/HbBadge.vue)
          ❌ badge/Tone: default differs - Figma "Neutral" vs code "tone=neutral" (the code writes it "neutral")  (components/HbBadge.vue)
@@ -216,10 +217,10 @@
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: badge 4 · iconButton 3 · 7 not tied to a component
+📉 Burndown, open findings per component: badge 5 · iconButton 3 · 7 not tied to a component
    next up: badge. Run with --component badge, fix, run again.
 
-📋 Differences between Figma and the code: 13 open, in one list → .design-system-engine-out/differences.md
+📋 Differences between Figma and the code: 14 open, in one list → .design-system-engine-out/differences.md
 
 ─── SUMMARY (relay this in the chat as is; also in .design-system-engine-out/summary.md) ───
 
@@ -239,10 +240,10 @@
   - badge/Tone: code prop "tone" is missing Figma variant option(s) "Neutral" (the code writes it "neutral"), "Success" (the code writes it "success"), "Danger" (the code writes it "danger")  (components/HbBadge.vue)
   - iconButton: Figma's annotation says role button; the code needs a spoken name (its text, or aria-label when it shows only an icon) (owed: Figma's annotation or the person says what)  (components/HbIconButton.vue)
 
-Burndown, open findings per component: badge 4 · iconButton 3 · 7 not tied to a component
+Burndown, open findings per component: badge 5 · iconButton 3 · 7 not tied to a component
 Fix first: badge. Run with --component badge, fix, run again.
 
-Every difference between Figma and the code, 13 open, in one list: .design-system-engine-out/differences.md
+Every difference between Figma and the code, 14 open, in one list: .design-system-engine-out/differences.md
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 
