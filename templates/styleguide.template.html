@@ -105,14 +105,19 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-card[hidden], .sg-section[hidden], .sg-hr[hidden], .sg-nav a[hidden] { display: none; }
 .sg-hero > h1[tabindex="-1"]:focus, .pg-head > h2[tabindex="-1"]:focus, .sg-section > h2[tabindex="-1"]:focus { outline: none; }   /* the heading a new view moves focus to, for a screen reader */
 .sg-overview-group { margin-bottom: var(--sg-space-xl); }
-.sg-overview-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-m); }
+.sg-group-desc { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-l); max-width: 720px; }
+.sg-status { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-s-weight); color: var(--sg-text); background: color-mix(in srgb, var(--sg-muted) 14%, transparent); vertical-align: middle; }
+.sg-status--beta { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }
+.sg-status--deprecated { background: color-mix(in srgb, var(--sg-warning) 24%, transparent); }
+.pg-status { display: flex; align-items: center; gap: var(--sg-space-s); flex-wrap: wrap; margin: var(--sg-space-xs) 0 0; font-size: var(--sg-s); color: var(--sg-text-2); }
+.sg-overview-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }
 /* Each card's thumbnail: a few of the real tokens, or the component itself, drawn small on the system's own surface. */
 .sg-thumb { position: relative; height: 180px; overflow: hidden; contain: layout paint; display: flex; align-items: center; justify-content: center; gap: var(--sg-space-s); background: var(--sg-stage, var(--sg-bg)); border-radius: var(--sg-radius); pointer-events: none; }
 .sg-thumb-dot { width: 32px; height: 32px; border: var(--sg-line); flex-shrink: 0; }   /* square, as each colour is on its page */
 .sg-thumb-bar { height: var(--sg-space-s); background: var(--sg-text-2); border-radius: var(--sg-radius-s); }
 .sg-thumb-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sg-space-xs); }
 .sg-thumb-box { width: 36px; height: 36px; border: var(--sg-line); background: var(--sg-bg-2); flex-shrink: 0; }
-.sg-thumb-live { transform-origin: center; flex-shrink: 0; }
+.sg-thumb-live { transform-origin: center; flex-shrink: 0; align-self: center; margin: 0; }   /* centred in its card, whatever its own rule says of where it sits in a row */
 #sg-search { margin-top: var(--sg-space-m); }
 #sg-search > input { font: inherit; width: 100%; }
 .sg-search-none { font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-xs) var(--sg-space-l); }
@@ -424,32 +429,44 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     ug.textContent = 'Usage written: ' + GUIDED[0].guidance.sections.map(function (x) { return x.title + ' ' + GUIDED.filter(function (c) { return c.guidance.missing.indexOf(x.key) < 0; }).length + ' of ' + GUIDED.length; }).join(', ') + '. Each component\'s Documentation says what is missing.';
     ov.appendChild(ug);
   }
+  // How ready the components are: each status the team gave, and how many have none yet.
+  if (COMPONENTS.length) {
+    var kinds = { stable: 0, beta: 0, deprecated: 0 }; COMPONENTS.forEach(function (c) { if (c.status) kinds[c.status.kind]++; });
+    var unset = COMPONENTS.filter(function (c) { return !c.status; }).length;
+    var sc = document.createElement('p'); sc.className = 'sg-usage-count';
+    sc.textContent = 'Status: ' + kinds.stable + ' stable, ' + kinds.beta + ' beta, ' + kinds.deprecated + ' deprecated' + (unset ? ', ' + unset + ' not set. Give one a status with a line in its Figma description (Status: beta), or in contract.authored.json.' : '.');
+    ov.appendChild(sc);
+  }
   if (TODO.length) { var go = document.createElement('p'); go.innerHTML = sysButton('a', 'Open the To do list (' + TODO.length + ')', ' href="#todo"'); ov.appendChild(go); }
   // Two groups, as the page has them: the foundations, then every component in the order of its sections. Each card
   // is a thumbnail (a few of the real tokens, or the component itself, drawn when its section is built) and its name.
-  function group(title) { var g = document.createElement('div'); g.className = 'sg-overview-group'; g.innerHTML = '<h3>' + esc(title) + '</h3>'; var grid = document.createElement('div'); grid.className = 'sg-card-grid'; g.appendChild(grid); ov.appendChild(g); return grid; }
+  // Each group says what it holds (styleguide.groups in ds-config.json words it your way).
+  function group(title, desc) { var g = document.createElement('div'); g.className = 'sg-overview-group'; g.innerHTML = '<h3>' + esc(title) + '</h3>' + (desc ? '<p class="sg-group-desc">' + esc(desc) + '</p>' : ''); var grid = document.createElement('div'); grid.className = 'sg-card-grid'; g.appendChild(grid); ov.appendChild(g); return grid; }
+  var GROUPS = DATA.groups || {};
+  // How ready it is, as a small label: only what the team said, never a guess.
+  function statusPill(st) { return st ? '<span class="sg-status sg-status--' + esc(st.kind) + '">' + esc(st.status) + '</span>' : ''; }
   var THUMBS = {};
-  function card(grid, id, label, title, sub, thumb) {
+  function card(grid, id, label, title, sub, thumb, status) {
     var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ''); a.href = '#' + id; a.dataset.name = title.toLowerCase();
-    // The thumbnail and the name only: the group heading says what it is, its view says the rest.
-    a.innerHTML = '<div class="sg-thumb" aria-hidden="true">' + (thumb || '') + '</div><h3>' + esc(title) + '</h3>';
+    // The thumbnail and the name, with how ready it is when the team said so: the group heading says what it is.
+    a.innerHTML = '<div class="sg-thumb" aria-hidden="true">' + (thumb || '') + '</div><h3>' + esc(title) + (status ? ' ' + statusPill(status) : '') + '</h3>';
     grid.appendChild(a); THUMBS[id] = a.querySelector('.sg-thumb'); return a;
   }
-  var fGrid = group('Foundations');
+  var fGrid = group('Foundations', GROUPS.foundations || 'The values every component is made of: colours, type, spacing, radii and icons, each the CSS variable itself, in every mode.');
   var ramp = ((TOKENS.colors || [])[0] || { items: [] }).items, step = Math.max(1, Math.floor(ramp.length / 5));
   if (FLAT.length) card(fGrid, 'colors', 'Foundations', 'Colors', FLAT.length + ' colour tokens, in every mode.', ramp.filter(function (t, i) { return i % step === 0; }).slice(0, 5).map(function (t) { return '<span class="sg-thumb-dot" style="background:var(' + esc(t.var) + ')"></span>'; }).join(''));
   if ((TOKENS.typography || []).length) card(fGrid, 'typography', 'Foundations', 'Typography', TOKENS.typography.length + ' text styles.', TOKENS.typography.map(function (t) { return '<span style="' + (t.size ? 'font-size:var(' + esc(t.size.var) + ');' : '') + (t.weight ? 'font-weight:var(' + esc(t.weight.var) + ')' : '') + '">Aa</span>'; }).join(''));
   if ((TOKENS.spacing || []).length) card(fGrid, 'spacing', 'Foundations', 'Spacing', TOKENS.spacing.length + ' gap and padding tokens.', '<div class="sg-thumb-col">' + TOKENS.spacing.slice().sort(function (a, b) { return parseFloat(a.value) - parseFloat(b.value); }).filter(function (t, i, all) { return i % Math.max(1, Math.floor(all.length / 4)) === 0; }).slice(0, 4).map(function (t) { return '<span class="sg-thumb-bar" style="width:calc(var(' + esc(t.var) + ') * 4)"></span>'; }).join('') + '</div>');
   if ((TOKENS.radii || []).length) card(fGrid, 'radii', 'Foundations', 'Radii', TOKENS.radii.length + ' radius tokens.', TOKENS.radii.slice(0, 4).map(function (t) { return '<span class="sg-thumb-box" style="border-radius:var(' + esc(t.var) + ')"></span>'; }).join(''));
   if ((DATA.icons || []).length) card(fGrid, 'icons', 'Foundations', 'Icons', DATA.icons.length + ' icons from the system\'s sheet.', DATA.icons.slice(0, 5).map(function (id) { return '<svg width="24" height="24" aria-hidden="true"><use href="#' + esc(id) + '"/></svg>'; }).join(''));
-  var cGrid = COMPONENTS.length ? group('Components') : null;
+  var cGrid = COMPONENTS.length ? group('Components', GROUPS.components || 'Each one drawn from the code itself, with what Figma and the code agree on. Open one to try it, read how to use it and see where it is used.') : null;
   // Its Figma description, else its note, else the props it offers.
   var about = function (c) {
     var d = (c.description || '').replace(/@\w+/g, '').trim() || (c.note || '').trim(); if (d) return d;
     var ps = (c.controls || []).map(function (p) { return p.label; });
     return ps.length ? ps.slice(0, 3).join(', ') + (ps.length > 3 ? ' and ' + (ps.length - 3) + ' more' : '') + '.' : c.role ? 'A ' + c.role + '.' : 'No props yet.';
   };
-  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { card(cGrid, 'c-' + c.name, 'Components', c.name, about(c)); });
+  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { card(cGrid, 'c-' + c.name, 'Components', c.name, about(c), '', c.status); });
   // A component's thumbnail is its own preview, drawn small and inert, once its section has drawn it. Never with ?all:
   // the engine measures that page, and a shrunken copy would be read as the component.
   function thumbOf(c, src) {
@@ -1080,7 +1097,9 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2></div>' +
-        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') + importHTML(c) + linksHTML(c.links) +
+        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') +
+        (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
+        importHTML(c) + linksHTML(c.links) +
       '</div>' +
       ((c.differences || []).length ? '<p class="pg-parity-sum">' + esc(c.differences.length === 1 ? 'One thing differs from Figma.' : c.differences.length + ' things differ from Figma.') + ' ' + sysButton('button', 'See parity', ' data-area-go="parity"') + '</p>' : '') +
       '<div class="pg-areas">' + segHTML(AREAS.filter(function (a) { return a[0] !== 'built' || (c.uses || []).length; }).map(function (a) { return { v: a[0], label: a[1] }; })) + '</div>' +

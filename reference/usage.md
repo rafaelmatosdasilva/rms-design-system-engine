@@ -271,6 +271,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
   `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`) and
   `contract.authored.json` → `components.<name>.links`.
+- **Status and coverage** (`statusView`, `coverageOf`): under its name and on its overview card, stable, beta or
+  deprecated from `contract.authored.json` → `components.<name>.status`, a `Status:` (or `Maturity:`) line in Figma's
+  description or annotations, or `@deprecated` / `@beta` / `@status x` in its code; never guessed. Coverage is its own
+  file's line coverage from Istanbul's json-summary (`styleguide.coverage`, else `coverage/coverage-summary.json`).
+  The overview counts each status and says what each group holds (`styleguide.groups: { foundations, components }`).
 - **Changelog**, an area of its own: when Figma was last read for it, then each commit that changed it (its own file,
   or a line of the shared stylesheet holding its class; the project's own files only), grouped by the release tag
   (`v*`) that holds it, each linked to its commit and its pull request.

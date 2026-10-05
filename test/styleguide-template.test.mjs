@@ -531,3 +531,20 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /importHTML\(c\) \+ linksHTML\(c\.links\)/);
   assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
 });
+
+test('status and coverage: only what the team said (Figma, the code, the authored contract), on the card and under the name; the overview counts them and says what each group holds', async () => {
+  const { statusView, coverageOf } = await import('../styleguide-data.mjs');
+  assert.deepEqual(statusView({ description: 'A chip.\nStatus: beta' }), { status: 'Beta', kind: 'beta', from: 'Figma' });
+  assert.deepEqual(statusView({ annotations: ['Maturity: Stable'] }), { status: 'Stable', kind: 'stable', from: 'Figma' });
+  assert.deepEqual(statusView({ text: '/** @deprecated use Tag */' }), { status: 'Deprecated', kind: 'deprecated', from: 'the code' });
+  assert.deepEqual(statusView({ authored: 'experimental' }), { status: 'Experimental', kind: 'beta', from: 'contract.authored.json' });
+  assert.equal(statusView({ description: 'A chip used for status pills.' }), null, 'never guessed from words that only mention it');
+  assert.deepEqual(coverageOf({ total: {}, '/repo/src/components/Chip.jsx': { lines: { pct: 87.5 } } }, 'src/components/Chip.jsx'), { lines: 87.5 });
+  assert.equal(coverageOf({ total: {} }, 'src/components/Chip.jsx'), null);
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /card\(cGrid, 'c-' \+ c\.name, 'Components', c\.name, about\(c\), '', c\.status\)/);
+  assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
+  assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
+  assert.match(tpl, /sc\.textContent = 'Status: ' \+ kinds\.stable \+ ' stable, '/);
+  assert.match(tpl, /\.sg-thumb-live \{[^}]*align-self: center/, 'a card preview is centred whatever its own rule says');
+});
