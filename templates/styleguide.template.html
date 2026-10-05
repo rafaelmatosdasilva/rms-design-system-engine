@@ -174,6 +174,10 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Its name stays in view: in the sticky bar beside the areas once its heading has scrolled away. */
 .pg-areas-name { display: none; font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
 .pg-areas.is-stuck > .pg-areas-name { display: inline; }
+/* On a narrow screen the areas scroll sideways inside the bar, never wrap or squeeze: the system's segmented control
+   keeps its own size, and the area chosen scrolls into view. */
+.pg-areas-scroll { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.pg-areas-scroll > * { width: max-content; max-width: none; flex-wrap: nowrap; }
 /* A foundation's title stays at the top as its page scrolls. */
 .sg-section:not(.pg-card-section) > h2 { position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); margin: 0; padding: var(--sg-space-s) 0; }
 .pg-import { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); color: var(--sg-text-2); }
@@ -1425,10 +1429,10 @@ a.pg-usage-name { color: var(--sg-text); }
         importHTML(c) + linksHTML(c.links) +
       '</div>' +
       // What differs from Figma is marked on Parity itself: the system's alert icon, its count said to a screen reader.
-      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span>' + segHTML(AREAS.filter(function (a) { return a[0] !== 'built' || (c.uses || []).length; }).map(function (a) {
+      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return a[0] !== 'built' || (c.uses || []).length; }).map(function (a) {
         var n = a[0] === 'parity' ? (c.differences || []).length : 0;
         return { v: a[0], label: a[1], icon: n ? ALERT_ICON : null, say: n ? (n === 1 ? 'one thing differs from Figma' : n + ' things differ from Figma') : null };
-      })) + '</div>' +
+      })) + '</div></div>' +
       // Playground: the component drawn, its controls, its code and the tokens behind it.
       '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview-col"><div class="pg-stage-modes" hidden><div class="pg-stage-mode"></div><div class="pg-stage-mode"></div></div><div class="pg-preview"></div><div class="pg-frame" hidden></div></div><div class="pg-panel"><div class="pg-actions"></div>' +
@@ -1536,6 +1540,9 @@ a.pg-usage-name { color: var(--sg-text); }
       areaNow = v;
       Array.prototype.forEach.call(sec.querySelectorAll('.pg-area'), function (a) { a.hidden = !ALL && a.getAttribute('data-area') !== v; });
       segItems(areaBar).forEach(function (b) { segSelect(b, b.dataset.v === v); });
+      // The area chosen in view in the scrolling bar, the page itself left where it is.
+      var strip = areaBar.querySelector('.pg-areas-scroll'), on = segItems(areaBar).find(function (b) { return b.dataset.v === v; });
+      if (strip && on && strip.scrollWidth > strip.clientWidth) { var sr = strip.getBoundingClientRect(), br = on.getBoundingClientRect(); if (br.left < sr.left || br.right > sr.right) strip.scrollLeft += br.left < sr.left ? br.left - sr.left - 8 : br.right - sr.right + 8; }
       if (v === 'play') { nudge(); codeHeight(); }
       if (v === 'docs') requestAnimationFrame(drawAnatomy);
       if (v === 'a11y') checkLive();
