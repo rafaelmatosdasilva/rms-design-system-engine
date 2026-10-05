@@ -1,6 +1,6 @@
 # Technical details
 
-The [README](../README.md) covers everyday use in plain words. This page is for developers: how the engine works, every check in detail, and the options behind them. The full guide the AI reads is `rms-design-system-engine.md`, with its recipes in `cookbook/` and its reference in `reference/`.
+The [README](../README.md) gives the overview and [Everything it does](features.md) covers everyday use, in plain words. This page is for developers: how the engine works, every check in detail, and the options behind them. The full guide the AI reads is `rms-design-system-engine.md`, with its recipes in `cookbook/` and its reference in `reference/`.
 
 ## How it works
 

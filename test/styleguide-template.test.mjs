@@ -63,7 +63,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   assert.equal(tag.markup, '<span class="tag">New</span>');
   assert.deepEqual(data.components.find((c) => c.name === 'tag').controls.find((c) => c.label === 'Tone').options, [{ label: 'Neutral' }, { label: 'Positive', add: ['tag--positive'], attrs: {} }]);
   assert.deepEqual(data.tokens.radii.map((t) => t.var), ['--radii-button', '--radii-chip', '--radii-field']);
-  assert.deepEqual(data.modes, [{ label: 'Color', values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme' }]);
+  assert.deepEqual(data.modes, [{ label: 'Mode', values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme' }]);
   assert.match(html, /Living style guide/);
 });
 
@@ -79,12 +79,13 @@ test('what an option adds comes from the contract\'s selector: a class, an attri
   assert.deepEqual(v.components[0].controls[0].options, [{ label: 'neutral', add: ['none'], attrs: {} }, { label: 'positive', add: ['low'], attrs: {} }]);
 });
 
-test('the mode axes: colour from the config, size from the sizing collection, nesting only where the CSS nests', () => {
+test('the mode axes: colour from the config, size from the sizing collection, each named as Figma names its collection, nesting only where the CSS nests', () => {
   const vars = { modeVariants: { sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { kind: 'scalar', values: { desktop: '12px', phone: '16px' } } } } } };
   assert.deepEqual(modeAxes({}, vars), [
-    { label: 'Color', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true, media: '(prefers-color-scheme: dark)', mediaValue: 'dark', restValue: 'light' },
-    { label: 'Size', attr: 'data-size', scoped: true, values: [{ label: 'Desktop', value: '' }, { label: 'Phone', value: 'phone', notInCode: true }] },
+    { label: 'Mode', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true, media: '(prefers-color-scheme: dark)', mediaValue: 'dark', restValue: 'light' },
+    { label: 'sizing', attr: 'data-size', scoped: true, values: [{ label: 'Desktop', value: '' }, { label: 'Phone', value: 'phone', notInCode: true }] },
   ]);
+  assert.deepEqual(modeAxes({ figma: { colorCollection: 'Styling' } }, { modeVariants: { Sizing: vars.modeVariants.sizing } }).map((a) => a.label), ['Styling', 'Sizing'], 'never Color or Size: the collections\' own names');
   // A mode the code has CSS for (a [data-…] block, or an @media that sets the collection's variables) is drawn.
   assert.equal(modeAxes({}, vars, ':root[data-size="phone"] { --padding-m: 16px; }')[1].values[1].notInCode, undefined);
   const media = modeAxes({}, vars, ':root { --padding-m: 12px; } @media (max-width: 480px) { :root { --padding-m: 16px; } }')[1];
@@ -92,7 +93,7 @@ test('the mode axes: colour from the config, size from the sizing collection, ne
   assert.deepEqual(media.values[0], { label: 'Desktop', value: 'desktop' }, 'a breakpoint mode makes the base a choice of its own');
   assert.deepEqual(media.changes, { phone: [{ name: 'padding/m', from: '12px', to: '16px' }] }, 'the switch says what the mode changes, from the code');
   assert.equal(media.media, '(max-width: 480px)', 'the page starts in the mode its own device or window gets');
-  assert.deepEqual(modeAxes({ figma: { modes: [{ name: 'Day', cssSelector: 'root' }, { name: 'Night', cssSelector: 'class:night' }] } }), [{ label: 'Color', values: [{ label: 'Day', value: '' }, { label: 'Night', value: 'night' }], classes: true }]);
+  assert.deepEqual(modeAxes({ figma: { modes: [{ name: 'Day', cssSelector: 'root' }, { name: 'Night', cssSelector: 'class:night' }] } }), [{ label: 'Mode', values: [{ label: 'Day', value: '' }, { label: 'Night', value: 'night' }], classes: true }]);
 });
 
 test('a component\'s real markup is the first instance in the project\'s own pages, without ids or handlers', () => {
@@ -101,6 +102,14 @@ test('a component\'s real markup is the first instance in the project\'s own pag
   assert.equal(instanceMarkup('<label class="field">Name <input class="field__input"></label>', 'field'), '<label class="field">Name <input class="field__input"></label>');
   assert.equal(instanceMarkup('<div class="ctaX"></div>', 'cta'), null);
   assert.deepEqual(componentTokens('.cta { padding: var(--pad-m); color: var(--text) } .cta:hover { color: var(--text-hover) } .ctaX { color: var(--no) }', 'cta').map((t) => t.var), ['--pad-m', '--text', '--text-hover']);
+});
+
+test('every token a component is drawn with: its parts and states too, never another component\'s, colour first', async () => {
+  const { allComponentTokens } = await import('../styleguide-data.mjs');
+  const css = '.badge { padding: var(--p) var(--q); border-radius: var(--r); background: var(--b-bg); --own: var(--no) } .badge-label { color: var(--b-fg); font-size: var(--fs) } .badge__icon { box-shadow: var(--sh) } .badge:hover { border: var(--line) solid var(--b-line) } .badge-list { gap: var(--g) } .badgeX { color: var(--nope) }';
+  const got = allComponentTokens(css, 'badge', ['badge-list']);
+  assert.deepEqual(got.map((t) => t.var), ['--b-bg', '--b-fg', '--fs', '--p', '--q', '--r', '--line', '--b-line', '--sh']);
+  assert.deepEqual(got.find((t) => t.var === '--b-line').props, ['border']);
 });
 
 test('tokens are shown only when equal to Figma in every mode, grouped like the system names them', () => {
@@ -137,12 +146,14 @@ test('in the browser: no script error, a control changes the real component, the
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
-  for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
   writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', 'Size=L.png'), shot);
   writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', 'notes.png'), shot);
+  // Do and Don't pictures, each named for its caption.
+  for (const [kind, cap] of [['do', 'One filter per chip'], ['dont', 'A sentence in a chip']]) { mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip', kind), { recursive: true }); writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', kind, `${cap}.png`), shot); }
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
   const c = await launchChrome(chromePath);
   try {
@@ -178,6 +189,15 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(looks, /Spacing.*chip padding.*--padding-[a-z]+/s);
     assert.match(looks, /--chip-[a-z-]+/, 'the colour tokens of what it draws');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-inspect-marks .pg-anat-num')].map((n) => n.textContent).join()`), await run(`[...document.querySelectorAll('#c-chip .pg-inspect-legend b')].map((b) => b.textContent).join()`));
+    // Picked by a click: a part on the component, or a name in the list, shows what it is drawn with; again puts it down.
+    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl').textContent`), /Picked.*Click a part, a padding or a gap/s);
+    await run(`(() => { const m = [...document.querySelectorAll('#c-chip .pg-inspect-marks [data-hit]')].find((x) => /^chip padding/.test(x.dataset.hit)); const r = m.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).click(); })()`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Picked.*chip padding \w+.*--padding-[a-z]+/s);
+    assert.equal(await run(`document.querySelectorAll('#c-chip .pg-inspect-marks .is-picked').length`), 1);
+    await run(`document.querySelector('#c-chip .pg-inspect-legend [data-pick^="part 1"]').click()`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Picked.*color.*--chip-text.*font/s, 'the label: its colour and text style');
+    await run(`document.querySelector('#c-chip .pg-inspect-legend [data-pick^="part 1"]').click()`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-inspect-legend dl > div').textContent`), /Click a part/);
     // No number covers another: one that would is moved beside it, a line back to where it belongs.
     assert.equal(await run(`(() => { const r = [...document.querySelectorAll('#c-chip .pg-inspect-marks .pg-anat-num')].map((n) => n.getBoundingClientRect()); return r.some((a, i) => r.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1)); })()`), false);
     // Width: a chosen width draws it in a frame of that width with the page's own stylesheets (Inspect goes off);
@@ -235,8 +255,13 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
     assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
-    // The code as tall as the tokens beside it, scrolling inside.
-    assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || Math.abs(c.offsetHeight - t.offsetHeight) < 2; })()`), true);
+    // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
+    assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
+    assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || (c.offsetHeight <= t.offsetHeight + 1 && c.offsetHeight < t.offsetHeight - 2); })()`), true, 'one line of code is not stretched to the tokens');
+    // Its tokens: every one it is drawn with, its corners and spacing too, by Figma's name, with what it sets.
+    const own = await run(`document.querySelector('#c-chip .pg-own').textContent`);
+    for (const v of ['--chip-background', '--chip-text', '--gap-s', '--padding-xs', '--padding-s', '--radii-chip']) assert.ok(own.includes(v), v + ' in Its tokens: ' + own);
+    assert.match(own, /border-radius/);
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in,Changelog');
@@ -259,19 +284,25 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(nums, await run(`[...document.querySelectorAll('#c-chip .pg-anat-legend b')].map((b) => b.textContent).join()`), 'every number in the drawing is one in the list, in the same order');
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
     assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
+    // Do and Don't from the references, each with its caption, the do first.
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
     // Each section of rows in the Playground's tables: its title the head (Usage, Accessibility).
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /Anatomy.*Usage/);
     // The name stays beside the areas; nothing differs, so Parity carries no alert and the page no line about it.
     assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + !!document.querySelector('#c-chip .pg-areas [data-v="parity"] .sg-seg-icon') + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|false|false');
     // How to use it: the same four sections on every page, a missing one said; the overview counts them.
     assert.match(await run(`document.querySelector('#c-chip [data-area="docs"]').textContent`), /Usage.*When to use.*When not to use.*Common mistakes.*Limitations.*Not written yet/s);
-    // The menu: worded buttons; on a wide screen it hides and comes back.
+    // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
     assert.equal(await run(`document.getElementById('sg-menu').textContent + '|' + document.getElementById('sg-nav-close').textContent`), 'Menu|Close menu');
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
-    await run(`document.getElementById('sg-hide-nav').click()`);
-    assert.equal(await run(`document.body.classList.contains('sg-nav-hidden') && getComputedStyle(document.getElementById('sg-sidebar')).display === 'none' && getComputedStyle(document.getElementById('sg-topbar')).display !== 'none'`), true);
-    await run(`document.getElementById('sg-menu').click()`);
-    assert.equal(await run(`document.body.classList.contains('sg-nav-hidden')`), false);
+    assert.equal(await run(`!document.getElementById('sg-hide-nav') && getComputedStyle(document.getElementById('sg-sidebar')).display !== 'none' && getComputedStyle(document.getElementById('sg-topbar')).display === 'none'`), true);
+    // The overview holds the cards, never notes on what is left off, usage counts, statuses or a To do button.
+    assert.doesNotMatch(await run(`document.getElementById('overview').textContent`), /Left off this page|Usage written|Status: |Open the To do list/);
+    // Disabled set: the native control is disabled too, so Tab passes it by.
+    await run(`location.hash = '#c-button?Disabled=true'`); await new Promise((r) => setTimeout(r, 400));
+    assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), true);
+    await run(`location.hash = '#c-button?Disabled=false'`); await new Promise((r) => setTimeout(r, 400));
+    assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), false);
     // How a product brings it in: the import line, copied by the system's button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-import code').textContent`), "import { Chip } from '@/components/Chip';");
     assert.deepEqual(errors, []);
@@ -601,6 +632,12 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /\['log', 'Changelog'\]/);
   assert.match(tpl, /importHTML\(c\) \+ linksHTML\(c\.links\)/);
   assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
+  // What's new: every component's changes by release, one row per commit with the components it touched.
+  assert.match(tpl, /navLink\('whats-new', 'what\\'s new'\)/);
+  assert.match(tpl, /One row per commit: the components it changed, then what it says\./);
+  // A Width frame runs the system's own scripts and lets a selection move, as the live preview does.
+  assert.match(tpl, /querySelectorAll\('script\[data-system-script\]'\)/);
+  assert.match(tpl, /selectionMoves\(st\);/);
 });
 
 test('status and coverage: only what the team said (Figma, the code, the authored contract), on the card and under the name; the overview counts them and says what each group holds', async () => {
@@ -616,7 +653,9 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /card\(cGrid, 'c-' \+ c\.name, 'Components', c\.name, about\(c\), '', c\.status\)/);
   assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
   assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
-  assert.match(tpl, /sc\.textContent = 'Status: ' \+ kinds\.stable \+ ' stable, '/);
+  assert.doesNotMatch(tpl, /'Status: ' \+ kinds|Usage written: |Open the To do list/, 'the overview counts nothing of its own');
+  assert.match(tpl, /\.sg-demo\.sg-colors \{ display: grid; grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/, 'six colours a row');
+  assert.match(tpl, /a\.scoped && a\.attr !== 'data-size'; \}, function \(a\) \{ return a\.scoped && a\.attr === 'data-size'/, 'the colour mode top left, a sizing one top right, inside the playground');
   assert.match(tpl, /\.sg-thumb-live \{[^}]*align-self: center/, 'a card preview is centred whatever its own rule says');
 });
 
@@ -661,4 +700,17 @@ test('every box on the page looks like the system\'s own card: its border colour
   assert.equal(cardLook(css, 'tile'), null);
   const r = chromeRoles({ themeCss: css, card: { cls: 'card' } }).roles;
   assert.deepEqual([r.border, r['line-width'], r.radius, r['radius-l'], r.shadow], ['var(--card-border)', 'var(--general-thickness)', 'var(--radii-card)', 'var(--radii-card)', 'none']);
+});
+
+test('Do and Don\'t: pictures in the references, each named for its caption, do\'s first; a variant image can say its scale', async () => {
+  const { exampleImages, figmaVariantImages } = await import('../visual-diff.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'figma-examples-'));
+  try {
+    for (const [kind, f] of [['dont', '2 Two buttons.png'], ['do', '1 One button.png'], ['do', 'notes.txt']]) { mkdirSync(join(dir, 'refs', 'components', 'button', kind), { recursive: true }); writeFileSync(join(dir, 'refs', 'components', 'button', kind, f), 'x'); }
+    const ex = await exampleImages(dir, { visualRefs: 'refs' }, 'button', { token: null });
+    assert.deepEqual(ex.map((e) => [e.kind, e.caption]), [['do', 'One button'], ['dont', 'Two buttons']]);
+    writeFileSync(join(dir, 'refs', 'components', 'button', 'State=Hover@1x.png'), 'x');
+    const r = await figmaVariantImages(dir, { visualRefs: 'refs' }, 'button', { token: null });
+    assert.deepEqual(r.images.map((i) => [i.variant, i.scale]), [['State=Hover', 1]]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

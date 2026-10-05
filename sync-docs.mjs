@@ -6,7 +6,7 @@
 //
 // What it does:
 //   1. Parses audit.mjs to extract the authoritative gate list (labels + scripts).
-//   2. Checks README.md and the guide (rms-design-system-engine.md, reference/, cookbook/) for stale gate counts.
+//   2. Checks README.md, docs/features.md and the guide (rms-design-system-engine.md, reference/, cookbook/) for stale gate counts.
 //   3. Auto-patches all "N automated gates" / "Run all N audit gates" / trend bar
 //      references to match the real count.
 //   4. Checks that each gate label (or a keyword form of it) appears in the doc.
@@ -136,7 +136,9 @@ console.log('');
 const GUIDE_FILES = ['rms-design-system-engine.md', ...['reference', 'cookbook'].flatMap((d) => (existsSync(join(DIR, d)) ? readdirSync(join(DIR, d)).filter((f) => f.endsWith('.md')).sort().map((f) => `${d}/${f}`) : []))];
 const guideText = GUIDE_FILES.map((f) => readFileSync(join(DIR, f), 'utf8')).join('\n');
 const DOCS = [
-  { path: join(DIR, 'README.md'),                        label: 'README.md'       },
+  // The README is the overview and lists no gates; the gate table lives on the features page.
+  { path: join(DIR, 'README.md'),                        label: 'README.md', labelsIn: null },
+  { path: join(DIR, 'docs', 'features.md'),              label: 'docs/features.md' },
   ...GUIDE_FILES.map((f, i) => ({ path: join(DIR, f), label: f, labelsIn: i === 0 ? guideText : null })),
   { path: join(DIR, '.claude/commands/rms-design-system-engine.md'), label: 'rms-design-system-engine.md (commands)' },
 ];
