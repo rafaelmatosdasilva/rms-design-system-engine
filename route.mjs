@@ -104,16 +104,19 @@ const TO_CODE = /\b(turn|convert|transforma\w*|converte\w*)\b[\s\S]{0,60}\b(into
 // A prototype ("prototype a settings page", "mock up a checkout with our components"): made only of the system's
 // components, checked and drawn by the engine; what the system lacks is listed, never invented.
 export const PROTOTYPE = /\b(prototyp\w*|mock[\s-]?ups?|wireframes?|prot[oó]tipos?|maquet\w*)\b/i;
+// The prototypes' gaps sent to Figma as the design team's to do list ("send the gaps to Figma", "manda as lacunas pro
+// Figma"): the same engine-written script, after the same yes.
+export const FIGMA_GAPS = /\b(gaps?|lacunas?|to[\s-]?do( list)?|backlog|what the system lacks|o que (o sistema )?falta)\b[^.\n]{0,40}\b(to|in|into|on|no|na|pro|pra|para o)\s+figma\b/i;
 export const FIGMA_EDITS = /\b(update|align|sync|bring|make|annotat\w*|atualiz\w*|alinh\w*|sincroniz\w*|p[oõ]e)\b[^.\n]{0,20}\bfigma\b[^.\n]{0,60}\b(code|c[oó]digo)\b|\bfigma\b[^.\n]{0,30}\b(match(es)?|in line with|up to date with|aligned with|igual ao|alinhado com)\s+(the\s+|o\s+)?(code|c[oó]digo)\b|\b(add|write|put|set|acrescent\w*|adicion\w*|p[oõ]e|coloca\w*)\b[^.\n]{0,30}\b(the\s+|os?\s+|as?\s+)?(roles?|pap[eé]is|annotations?|anota[çc][õo]es)\b[^.\n]{0,20}\b(in|to|into|no|na|ao)\s+figma\b|--figma-edits/i;
 const RULES = [
   ['guidelines-links', (t) => LINK.test(t)],
-  ['prototype', (t) => PROTOTYPE.test(t) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
+  ['prototype', (t) => PROTOTYPE.test(t) && !FIGMA_GAPS.test(t) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
   // Building from Figma (a project that has only Figma, or a component Figma has and the code does not yet):
   // the engine lists what to build and checks each piece; the agent writes it with the names and values it prints.
   ['build-from-figma', (t, s) => (TO_CODE.test(t) || BUILD_VERB.test(t) && (/\bfrom (the )?(figma|design)\b|\bdo figma\b|design system|sistema de design|\btokens?\b|\b(components?|componentes?)\b|\binto code\b|em c[oó]digo/i.test(t) || (s.build && s.named.length > 0))) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
   // Figma brought in line with what the code already states (a component's role): the engine lists the edits and
   // writes the script; it runs once the person says yes. A value to change in Figma stays the person's (next rule).
-  ['figma-edits', (t) => FIGMA_EDITS.test(t) && !/\b\d+(\.\d+)?\s*(px|rem|%|pt)?\b|#[0-9a-f]{3,8}\b/i.test(t)],
+  ['figma-edits', (t) => FIGMA_GAPS.test(t) || FIGMA_EDITS.test(t) && !/\b\d+(\.\d+)?\s*(px|rem|%|pt)?\b|#[0-9a-f]{3,8}\b/i.test(t)],
   ['fix-a-difference', (t) => /\b(change|set|make|update|muda|mudar|altera|alterar|p[oõ]e|coloca)\w*\b[\s\S]{0,60}\b(in|no|na)\s+figma(?![-\w/.])|\bfigma\b[\s\S]{0,30}\b(to|para)\s+\d/i.test(t), 'figma'],
   ['refresh-figma', (t) => /maxSnapshotAgeDays|go(es)? green|fica(r)? verde|raise the (age|limit)/i.test(t), 'forbidden-green'],
   // Before accept-debt: "que valores aceita o size" asks what a prop accepts, it accepts no debt.

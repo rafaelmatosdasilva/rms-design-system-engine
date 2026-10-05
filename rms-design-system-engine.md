@@ -89,7 +89,7 @@ reference it points to say, never from memory or from this table alone.
 | to know what to fix first, or to work a library down | `burndown` |
 | something in Figma built in code: the tokens, a component, the whole design system, or a screen from them | `build-from-figma` |
 | a prototype, mock-up or wireframe made with the design system | `prototype` |
-| Figma brought in line with what the code already states (a component's role), applied once the person says yes | `figma-edits` |
+| Figma brought in line with what the code already states (a component's role), or the prototypes' gaps sent to Figma as a to do list, applied once the person says yes | `figma-edits` |
 | a component's props and values, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
 

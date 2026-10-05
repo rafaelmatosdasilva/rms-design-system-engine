@@ -55,6 +55,7 @@ When the code already states something Figma does not, the engine can write it i
 | You want to | Type in Claude Code | Or in the terminal |
 |---|---|---|
 | Update Figma to match the code | `/rms-design-system-engine update Figma to match the code` | `rms-design-system-engine --figma-edits` |
+| Send the prototypes' gaps to Figma as a to do list | `/rms-design-system-engine send the gaps to Figma` | `rms-design-system-engine --figma-edits` |
 
 - **You see the list first.** Each change names the component, what it adds and why (what the code renders, in how many places). Nothing changes until you say yes.
 - **The engine writes the change, not the AI.** It writes the script, Claude runs it through the Figma MCP, and the project hooks refuse any other write to Figma.
@@ -96,7 +97,7 @@ Measured on six prototype requests, Claude alone made 13 of 18 right with Opus a
 - **It works.** The page runs your system's own scripts: a selection moves, a field takes typing, and a button can open a dialog or a menu from the prototype, drawn as your system draws it and closed with Escape. Each one is tried in Chrome, and what does not work is listed.
 - **Layout.** Where your system has no layout components, the engine lends neutral ones (a page, a stack, a row, columns) that only take your spacing tokens and your text styles, and puts layout components on the list.
 - **Your screens as starting points.** Each screen designed in Figma becomes a prototype with the same arrangement and your components in place. The capture is read from Figma and never changes it. What a screen uses that the system does not own (a local component, a container with its own look, a typed number) goes on the list too.
-- **The list.** Every prototype's gaps are kept in `.design-system-engine-out/prototypes/gaps.json`, the most needed first.
+- **The list.** Every prototype's gaps are kept in `.design-system-engine-out/prototypes/gaps.json`, the most needed first. Ask to send them to Figma and they become the design team's to do list there, on a page of its own, one card per need, written only after you say yes.
 
 You get a short summary back: what passes, what is different, and how to fix each thing. Nothing is changed until you ask for it.
 

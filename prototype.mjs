@@ -441,7 +441,7 @@ export async function runPrototype(ROOT, argv) {
     (seen?.a11y ?? []).some((i) => i.own) ? 'Fix each ⚠️ line under ♿ in the composition (one main heading: a Text with as h1; a text colour that reads on its surface), or tell the person.' : null,
     works.length ? 'Fix each ⚠️ line under 🖱 in the composition ("opens" names the "id" of the part it opens), or tell the person.' : null,
     seen?.picture ? `Look at ${seen.picture.replace(ROOT + '/', '')} before you answer.` : null,
-    gaps.length ? 'Tell the person each gap above as it is written: the design team decides them; never build one.' : null,
+    gaps.length ? `Tell the person each gap above as it is written: the design team decides them; never build one. Offer to send them to Figma as the design team's to do list (${CLI} --figma-edits writes it; applied only after a yes).` : null,
   ].filter(Boolean);
   console.log(`\nNEXT: open ${page.replace(ROOT + '/', '')} to see it.${next.length ? ` ${next.join(' ')}` : ''}\n`);
   return 0;
