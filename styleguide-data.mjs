@@ -752,7 +752,27 @@ const CHROME_COLOURS = [
   ['positive', [/(positive|success|valid)/, /.*/]],
   ['negative', [/(negative|error|danger|critical)/, /.*/]],
 ];
-export function chromeRoles({ tokens = null, themeCss = '', componentNames = [], icons = {}, override = {} } = {}) {
+// The look of the system's own card (its rule for the class alone): the border's colour and width, its corner radius and
+// shadow, each as the CSS writes it. → { border, width, radius, shadow } (each or null), or null with no rule.
+export function cardLook(themeCss = '', cls = null) {
+  if (!cls) return null;
+  const clean = String(themeCss).replace(/\/\*[\s\S]*?\*\//g, '');
+  const re = new RegExp(`(?:^|[}\\s])\\.${cls.replace(/[-]/g, '\\-')}\\s*\\{([^}]*)\\}`, 'g');
+  const body = [...clean.matchAll(re)].map((m) => m[1]).join(';');
+  if (!body) return null;
+  const decl = (prop) => { const m = new RegExp(`(?:^|[;\\s])${prop}\\s*:\\s*([^;]+)`).exec(body); return m ? m[1].trim().replace(/\\s*!important$/, '') : null; };
+  const out = { border: decl('border-color'), width: decl('border-width'), radius: decl('border-radius'), shadow: decl('box-shadow') };
+  const b = decl('border');
+  if (b && !/^(none|0)$/.test(b)) {
+    const vars = b.match(/var\([^()]*\)|#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/gi) ?? [];
+    const width = /^(var\([^()]*\)|[\d.]+px)\s/.exec(b)?.[1] ?? null;
+    out.width ??= width;
+    out.border ??= vars.filter((v) => v !== width).pop() ?? null;
+  }
+  return out;
+}
+
+export function chromeRoles({ tokens = null, themeCss = '', componentNames = [], icons = {}, override = {}, card = null } = {}) {
   const roles = {}, from = {};
   const comps = new Set(componentNames.map((n) => n.toLowerCase()));
   const flat = (tokens?.colors ?? []).flatMap((g) => g.items).filter((t) => t?.var);
@@ -795,8 +815,8 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   const px = (t) => parseFloat(String(t.value));
   const nearest = (list, want) => list.filter((t) => Number.isFinite(px(t))).sort((a, b) => Math.abs(px(a) - want) - Math.abs(px(b) - want) || px(a) - px(b))[0];
   const radii = (tokens?.radii ?? []).filter((t) => px(t) > 0);
-  const card = radii.find((t) => /card|surface|container|panel/i.test(t.figma));
-  for (const [role, want, t] of [['radius-s', 4], ['radius', 8, card], ['radius-l', 12, card], ['radius-pill', 999]]) {
+  const cardRadius = radii.find((t) => /card|surface|container|panel/i.test(t.figma));
+  for (const [role, want, t] of [['radius-s', 4], ['radius', 8, cardRadius], ['radius-l', 12, cardRadius], ['radius-pill', 999]]) {
     const pick = t ?? nearest(radii, want);
     if (pick) { roles[role] = `var(${pick.var})`; from[role] = pick.figma; }
   }
@@ -806,6 +826,16 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
     if (pick) { roles[role] = `var(${pick.var})`; from[role] = pick.figma; }
   }
   if (icons.size) { roles.icon = `${icons.size}px`; from.icon = 'the size of the system\'s icons'; }
+  // Every box on the page (the Playground, its tables, the code) looks like the system's own card, as the overview's
+  // cards are that card: its border colour and width, its radius and its shadow.
+  const look = cardLook(themeCss, card?.cls);
+  if (look) {
+    const at = `the system's card (.${card.cls})`;
+    if (look.border) { roles.border = look.border; from.border = at; }
+    if (look.width) { roles['line-width'] = look.width; from['line-width'] = at; }
+    if (look.radius) { roles.radius = look.radius; roles['radius-l'] = look.radius; from.radius = from['radius-l'] = at; }
+    roles.shadow = look.shadow ?? 'none'; from.shadow = at;
+  }
   for (const [role, v] of Object.entries(override ?? {})) if (typeof v === 'string' && v) { roles[role] = /^--/.test(v) ? `var(${v})` : v; from[role] = 'styleguide.chrome'; }
   const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
   const missing = NEEDED.filter((r) => !roles[r]);
