@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: links, changelog, Built with area, sticky area switch, square colours and four columns, numbers-only anatomy, a linked playground, a menu that gives the page the whole width (continuous evaluation)
+
+What changed since the entry below (engine 1b60458): Style guide: anatomy marks padding and gaps with numbers only, never colours; the code sits beside the tokens behind what is drawn, its own tokens below them all; a segmented control's sliding pill follows every new selection; Style guide: Built with is its own area of overview cards; the area switch stays at the top on scroll; square colour previews, the colour twice as tall on its page, four overview columns with more room; the playground and the preview stay linked (a part's state set on the part, a product's selector ignored, a chosen state from the component's own :checked rule, an option not built marked so) and a label edit changes only its words; Test: a neutral class name for a product's own markup; Style guide: links (Figma, the code, the team's pages) on the overview and under each component's name; a Changelog area with every commit that changed the component, by release and pull request, the dates moved there from Documentation; hiding the menu gives the page the whole width, from a small Hide at the menu's top right. The guide changed in `reference/usage.md`.
+
+Guide set measured: `2f45b048ab4f` · Project measured: `13d811a9d668`
+
+| Haiku, engine 6fb1975 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.059 |
+| Input a run | 101k | 119k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 119k a run against 101k. Records: `records/2026-10-05-style-guide-links-figma-the`.
+
 ## 2026-10: Style guide: anatomy, usage sections, a menu that hides, worded buttons, the page's own contrast in every mode (continuous evaluation)
 
 What changed since the entry below (engine c8ec2b2): Style guide: each component's anatomy (parts numbered, a slot outlined, padding and gaps named by their tokens) and its usage (when to use, when not to, common mistakes, limitations, counted on the overview); the menu hides on a wide screen and every button says what it does in words; the check fails the page's own text below 4.5:1 in any colour mode. The guide changed in `reference/usage.md`.
