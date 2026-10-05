@@ -10,6 +10,7 @@
 // differ from it.
 //
 // Pure except renderPrototype (Chrome) and the image lookups.
+import { VISUAL_EXPRESSION, visualFindings } from './prototype-visual.mjs';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -372,6 +373,8 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
       // The design's fonts, when the page loads them: measured once they are in (or after 3s without them).
       await cdp.send('Runtime.evaluate', { expression: `Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 3000))]).then(() => true)`, awaitPromise: true, returnByValue: true }, sessionId).catch(() => null);
       const rendered = (await cdp.send('Runtime.evaluate', { expression: RENDER_EXPRESSION, returnByValue: true }, sessionId)).result?.value ?? [];
+      // A design review of the page as drawn: alignment, spacing, one main action, hierarchy, line length.
+      const review = visualFindings((await cdp.send('Runtime.evaluate', { expression: VISUAL_EXPRESSION, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? null);
       // The picture: the page itself, without the engine's bar, at scale 2 as Figma exports.
       const box = (await cdp.send('Runtime.evaluate', { expression: `(() => { const e = document.querySelector('[data-pt-path="0"]'); const kids = [...e.children]; const r = e.getBoundingClientRect(); const pb = parseFloat(getComputedStyle(e).paddingBottom) || 0; const bottom = kids.length ? Math.max(...kids.map((k) => k.getBoundingClientRect().bottom)) + pb : r.bottom; return { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: Math.max(1, bottom - r.top) }; })()`, returnByValue: true }, sessionId)).result?.value;
       const dir = resolve(ROOT, outDir, 'prototypes');
@@ -421,7 +424,7 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
       }
       await cdp.send('Runtime.evaluate', { expression: 'window.__ptShow && window.__ptShow("default")', returnByValue: true }, sessionId).catch(() => null);
       const fit = { widths: widths.map((w) => `${w.name} ${w.px}`), states, findings: fitFindings(runs), pictures };
-      return { rendered, picture, visual, interactions, fit };
+      return { rendered, picture, visual, interactions, fit, review };
     } finally { cdp.close(); }
   } finally { chrome.kill(); }
 }

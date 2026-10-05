@@ -83,6 +83,7 @@ test('--prototype draws each state, owes the states the page lacks, and tries ev
   let r = run('--prototype', 'prototypes/filters.json');
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /⚠️ {2}no error state, and the page owes one \(it takes input \(field\) and sends it \(button\)\)/);
+  assert.match(r.stdout, /🎨 DESIGN REVIEW {2}\d+\/10/, 'the page is reviewed as drawn');
   assert.match(r.stdout, /📱 EVERY SIZE AND STATE {2}Phone 375, Tablet 768, Desktop 1280 · 2 states \(default, empty\)/);
   assert.match(r.stdout, /⚠️ {2}"Weekly summary of your account" in chip wraps onto two lines at Phone, Tablet, in the default state\n/, 'a chip\'s label on two lines on a narrow screen');
   for (const f of ['filters@phone.png', 'filters@desktop.png', 'filters.empty.png']) assert.ok(existsSync(join(dir, '.design-system-engine-out', 'prototypes', f)), f);
