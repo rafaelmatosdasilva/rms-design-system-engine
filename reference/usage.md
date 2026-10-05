@@ -237,29 +237,43 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   An HTML and CSS system has no code props to pair, so a Figma prop is a control when the code realizes it: the
   contract's `propertyMap` (found by its options when the contract spells the prop another way), `htmlRealizations`,
-  a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. Below it, the
-  tokens behind what is drawn and its size; above it, its documentation, the products it is **used in** (each by
+  a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. Below it, its
+  code beside the tokens behind what is drawn, and every token named after it under them; above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
 - **A component's page in areas**: Playground, Documentation, Accessibility, Parity and Used in, one at a time on
   the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
-  `styleguide.importFrom` with `{path}` and `{name}`), its file to download, and the system's components it is built
-  with (`nestedComponents`: the classes its markup holds, or the tags and imports of its file).
+  `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
+  page scrolls. **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
+  classes its markup holds, or the tags and imports of its file), each the overview's card with its own preview.
+- **Playground links**: a control and the preview follow each other (a radio picked in the preview sets State); a
+  label edit writes only its words into its part. An option the contract maps to another element's selector (a
+  product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
+  the component's own `:checked` rule, and an option the code does not build is offered as not built.
 - **Usage** (`guidanceView`), in Documentation: When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said, and the overview counts each section across the components.
-- **The page's own reading**: every button says what it does in words (Menu, Close menu, Hide menu; a hidden menu is
-  remembered in the browser), and the style guide check fails when the page's text roles fall below 4.5:1 on its
+- **The page's own reading**: every button says what it does in words (Menu, Close menu, and a small Hide at the menu's
+  top right that gives the page the whole width; a hidden menu is remembered in the browser), and the style guide check fails when the page's text roles fall below 4.5:1 on its
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
 - **Anatomy**, first in Documentation: an inert copy of the component as the Playground set it, drawn larger, each
   part numbered in reading order (the contract's named parts, `c.anatomy`, a Figma auto name such as Frame 106
-  replaced by the part's class, then what sits directly inside it), a slot outlined, padding and gaps tinted and
-  named by their token, and how it lines up its items. A component shown in an overlay is drawn as its own element;
-  none on the measuring page.
+  replaced by the part's class, then what sits directly inside it), a slot outlined, each padding and gap outlined
+  and numbered after the parts and named by its token in the list (numbers, never colours, so nothing reads as a
+  token's colour), and how it lines up its items. A component shown in an overlay is drawn as its own element; none
+  on the measuring page.
 - **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
   out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
+- **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
+  (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
+  component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
+  `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`) and
+  `contract.authored.json` → `components.<name>.links`.
+- **Changelog**, an area of its own: when Figma was last read for it, then each commit that changed it (its own file,
+  or a line of the shared stylesheet holding its class; the project's own files only), grouped by the release tag
+  (`v*`) that holds it, each linked to its commit and its pull request.
 - **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
   `docs/preview.png`, `docs/screenshot.png`, `preview.png` … beside its page), else its page pictured in Chrome as it
   opens with the component's places marked (`product-shots.mjs`, window size from its `showUI` call), and how many
