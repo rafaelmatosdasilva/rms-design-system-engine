@@ -7,6 +7,7 @@ import {
   parseColor, over, effectiveBg, relLuminance, contrastRatio,
   isLargeText, aaThreshold, contrastFindings, INTERACTIVE_ROLES,
   styleguideTarget, A11Y_GUIDE, a11yItemLine, a11yFindingRecord, summarizeAxe,
+  iconContrastFindings, namedByTitleOnly,
 } from '../a11y-check.mjs';
 
 test('[axe] summarizeAxe collapses per-node rows into one per rule, busiest first', () => {
@@ -142,4 +143,23 @@ test('relLuminance is monotonic (black < grey < white)', () => {
   assert.ok(relLuminance({ r: 0, g: 0, b: 0 }) < relLuminance({ r: 119, g: 119, b: 119 }));
   assert.ok(relLuminance({ r: 119, g: 119, b: 119 }) < relLuminance({ r: 255, g: 255, b: 255 }));
   assert.deepEqual(over({ r: 0, g: 0, b: 0, a: 1 }, { r: 255, g: 255, b: 255 }), { r: 0, g: 0, b: 0 });
+});
+
+test('iconContrastFindings: an icon kept in its light-theme colour on a dark background fails 3:1; one that follows the theme passes', () => {
+  const dark = ['rgb(30, 30, 30)'];
+  const out = iconContrastFindings([
+    { desc: 'button.icon-only', color: 'rgb(40, 40, 40)', bgLayers: dark },
+    { desc: 'button.close', color: 'rgb(240, 240, 240)', bgLayers: dark },
+    { desc: 'button.faded', color: 'rgba(240, 240, 240, 0.1)', bgLayers: dark },
+  ], 'Dark');
+  assert.deepEqual(out.map((f) => [f.desc, f.kind, f.theme, f.threshold]), [['button.icon-only', 'iconcontrast', 'Dark', 3], ['button.faded', 'iconcontrast', 'Dark', 3]]);
+  assert.match(a11yItemLine('iconcontrast', out[0]), /icon scores .* needs at least 3 \(Dark theme\)/);
+  assert.equal(a11yFindingRecord('iconcontrast', out[0]).theme, 'Dark');
+});
+
+test('namedByTitleOnly: the name the browser settled on came from the title', () => {
+  assert.equal(namedByTitleOnly({ name: { value: 'Dark mode', sources: [{ type: 'attribute', attribute: 'aria-labelledby' }, { type: 'attribute', attribute: 'title', value: { value: 'Dark mode' } }] } }), true);
+  assert.equal(namedByTitleOnly({ name: { value: 'Close', sources: [{ type: 'attribute', attribute: 'aria-label', value: { value: 'Close' } }, { type: 'attribute', attribute: 'title', superseded: true, value: { value: 'x' } }] } }), false);
+  assert.equal(namedByTitleOnly({ name: { value: 'Save', sources: [{ type: 'contents', value: { value: 'Save' } }] } }), false);
+  assert.equal(namedByTitleOnly({}), false);
 });

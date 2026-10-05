@@ -539,7 +539,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     try {
       const { repoUrl, changelogs, commitUrl, prUrl, fileUrl, defaultBranch } = await import('./component-changelog.mjs');
       const { figmaLink, figmaNodeIds } = await import('./figma-link.mjs');
-      const { ruleLines } = await import('./styleguide-data.mjs');
+      const { ruleLines, issueLink } = await import('./styleguide-data.mjs');
+      const issues = cfg.styleguide?.issues ?? null;   // the tracker's new-issue address, {name} and {title} filled
       const repo = repoUrl(ROOT), branch = cfg.styleguide?.branch ?? defaultBranch(ROOT), ids = figmaNodeIds(ROOT, cfg);
       // Only the project's own files: a product's stylesheet beside it (../a-product) has its own history and repository.
       const inRepo = (f) => !/^\.\.?[\/]|^\//.test(String(f).replace(/^\.\//, '')) && !String(f).startsWith('..');
@@ -563,12 +564,14 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           { label: 'Code', url: w?.at ? fileUrl(repo, branch, w.at[0], w.at[1]) : null },
           ...(docsUrl ? [{ label: 'Documentation', url: String(docsUrl).replace(/\{name\}/g, encodeURIComponent(c.name)) }] : []),
           ...extra.map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })),
+          { label: 'Report an issue', url: issueLink({ template: issues, repo, name: c.name }) },
         ].filter((l) => l.url);
       }
       view.links = [
         { label: 'Figma file', url: cfg.figmaFileKey ? `https://www.figma.com/design/${cfg.figmaFileKey}` : null },
         { label: 'Code repository', url: repo },
         ...(Array.isArray(cfg.styleguide?.links) ? cfg.styleguide.links.filter((l) => l?.url).map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })) : []),
+        { label: 'Send feedback', url: cfg.styleguide?.feedback ?? issueLink({ template: issues, repo, name: null }) },
       ].filter((l) => l.url);
     } catch { /* no links, no changelog */ }
     // How ready each one is (a status the team gave it) and how much of its own file the tests cover, when the
