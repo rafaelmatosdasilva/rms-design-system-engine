@@ -611,7 +611,11 @@ take; the format; and the prototypes already in `prototypes/`.
 - **What each component is for** comes from everything the team wrote, read as the design intent reads it
   (`intent-gen.mjs`, nothing written): the Figma description and annotations (a `Role:` annotation is shown as its
   role), each option's description, the code's notes and the comment above its CSS rule, the authored contract
-  (`whenNotToUse`, `useInstead`, status, notes) and the guidelines section named after it.
+  (`whenNotToUse`, `useInstead`, status, notes) and the guidelines section named after it. Its usage, as the style
+  guide shows it (When to use, When not to use, Common mistakes, Limitations: a line of Figma's description or
+  annotations, the code's note, else `guidance` in the authored contract), and its Do and Don't (the captions of the
+  pictures in `<refs>/components/<name>/do` and `dont`, and the `examples` the authored contract names) are listed with
+  it. A common mistake and a Don't rule a use out as a never sentence does, when two of their words are in it.
 - **The team's rules** are every other guidelines section, each with its file (`guidelines.sources`, and the files the
   Notion and GitLab links are fetched into), and the authored layers of `design-intent.json` (system, foundations,
   patterns, templates, pages, flows). A link whose file is missing or older than `guidelines.maxAgeHours` (24) is
@@ -661,6 +665,14 @@ The rules are `--check-ui`'s, plus:
 - **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
   `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
   needed first. The Stop hook holds the reply to the gaps of the prototype just drawn.
+- **It works as in the product.** The system's own scripts (`systemScripts`) run on the page, a click moves a
+  selection (tabs, a segmented control, a list), a field takes typing, and a link stays on the page. A part that opens
+  another carries `"opens": "<id>"` and the part it opens has that `"id"`: it is drawn closed and opens on a click, as
+  the system's overlay when its CSS has one (container, layers, open and closing classes, as the style guide plays it),
+  else as a popover under the part; Escape, a click outside or a button inside closes it and the focus goes back. An
+  `opens` that names no part, the page or itself is an error. With Chrome, each one is tried: it must open with the
+  focus inside, close with Escape and give the focus back, and each field must take typing; what does not is a ⚠️ line
+  under 🖱.
 - **A retired component** (status deprecated) is an error that names its replacement.
 - **What the documentation says.** After drawing, each system component the prototype uses is listed beside what it
   uses it for (its labels and stand-ins) and what the documentation says it is for, so a use it is not for stands out:

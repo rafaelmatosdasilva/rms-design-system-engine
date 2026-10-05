@@ -19,7 +19,7 @@ import { checkPrototype, systemScales, nodesOf, mergeGaps, gapLine, pieceCatalog
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
 import { loadContext, purposeLines, ruleLines, usesAgainstPurpose, requestFocus, focusLines, cut } from './prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from './product-conventions.mjs';
-import { screenFor, renderPrototype, compareWithScreen, screenLines, owedFromScreen } from './prototype-render.mjs';
+import { screenFor, renderPrototype, compareWithScreen, screenLines, owedFromScreen, interactionLines } from './prototype-render.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 export const PROTOTYPE_TEMPLATE = join(ENGINE, 'templates', 'prototype.template.html');
@@ -28,7 +28,7 @@ export const PROTOTYPE_TEMPLATE = join(ENGINE, 'templates', 'prototype.template.
 export function treeOf(ui) {
   const { root, nodes } = nodesOf(ui);
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const build = (id) => { const n = byId.get(id); return n ? { component: n.component, props: n.props, children: (n.children ?? []).map((k) => build(typeof k === 'object' ? k.id : k)).filter(Boolean) } : null; };
+  const build = (id) => { const n = byId.get(id); return n ? { id: n.id, component: n.component, props: n.props, children: (n.children ?? []).map((k) => build(typeof k === 'object' ? k.id : k)).filter(Boolean) } : null; };
   return build(root);
 }
 
@@ -57,7 +57,7 @@ export function prototypePage({ name, tree, parts, scales, gaps, note = '', cata
   // The variables each of those classes' rules use (.badge.high { color: var(--semantic-negative) }): an option whose
   // value names none of the classes can still name the colour one of them uses.
   const modVarsOf = (cls, mods) => Object.fromEntries(mods.map((k) => { const vars = new Set(); const sel = new RegExp(`\\.${cls.replace(/[^\w-]/g, '')}\\.${k.replace(/[^\w-]/g, '')}(?![\\w-])`); for (const r of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) if (sel.test(r[1])) for (const v of r[2].matchAll(/var\(\s*(--[\w-]+)/g)) vars.add(v[1]); return [k, [...vars]]; }).filter(([, v]) => v.length));
-  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => { const mods = modsOf(c.cls); return [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, markups: c.markups, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean'), enumProps: opts(c.name, 'enum'), slotProps: opts(c.name, 'slot'), mods, modVars: modVarsOf(c.cls ?? '', mods) }]; }));
+  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => { const mods = modsOf(c.cls); return [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, markups: c.markups, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean'), enumProps: opts(c.name, 'enum'), slotProps: opts(c.name, 'slot'), mods, modVars: modVarsOf(c.cls ?? '', mods), ...(c.motion ? { motion: c.motion } : {}) }]; }));
   const data = { name, tree, components: drawable, scales, modes: parts.view.modes ?? [], pieces: ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'].filter((p) => !drawable[p]), gaps, note };
   return readFileSync(PROTOTYPE_TEMPLATE, 'utf8')
     .split('/*{{THEME_CSS}}*/').join(parts.themeCSS ?? '')
@@ -243,6 +243,7 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
     '',
     'Format: { "component": "Page", "props": { "padding": "<spacing token>" }, "children": [ { "component": "<name>", "props": { "<option>": "<value>" } } ] }',
     'A system component used for a need it does not quite meet carries "standInFor": "<the need>" in its props; a need nothing fits is { "component": "Missing", "props": { "need": "…" } }.',
+    'It works as in the product (the system\'s scripts run, a selection moves, a field takes typing). A part that opens another (a dialog, a menu, a popover) carries "opens": "<id>" in its props, and the part it opens has that "id": it is drawn closed and opens on a click.',
     ...(starts.length ? ['', `Prototypes already here (starting points read from designed screens among them): ${starts.map((f) => `prototypes/${f}`).join(', ')}; copy the closest one`] : []),
     '',
     `NEXT: write prototypes/<name>.json with only the parts above, then run ${cmd} --prototype prototypes/<name>.json and fix each ❌ line until it is drawn.`,
@@ -260,7 +261,7 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
   const pick = screenFor(name, raw, tree, screens ?? sys.context.screens ?? [], sys.catalog, slug);
   const r = await renderPrototype(ROOT, cfg, page, { name, screen: pick?.screen ?? null, mode: pick?.mode ?? 'sibling' }).catch((e) => ({ why: String(e?.message ?? e).split('\n')[0] }));
   if (r.why) return { why: r.why };
-  if (!pick) return { picture: r.picture, cmp: [], a11y: prototypeA11y(ROOT, page) };
+  if (!pick) return { picture: r.picture, cmp: [], a11y: prototypeA11y(ROOT, page), interactions: r.interactions };
   const cmp = compareWithScreen(tree, r.rendered, pick.screen, { mode: pick.mode, catalog: sys.catalog, drawn: new Set((sys.parts.view.components ?? []).map((c) => c.name)) });
   const owed = owedFromScreen(cmp);
   if (owed.length) {
@@ -273,7 +274,7 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
     const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
     try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...ownA11y.map((i) => ({ need: `accessibility ${i.issue}`, kind: 'a11y', line: `${i.issue}: ${i.selector} (${i.fix})` }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
   }
-  return { ...pick, cmp, picture: r.picture, visual: r.visual, a11y };
+  return { ...pick, cmp, picture: r.picture, visual: r.visual, a11y, interactions: r.interactions };
 }
 
 // The drawn page through the accessibility check: contrast in every mode, names, one main heading, the keyboard. The
@@ -423,6 +424,9 @@ export async function runPrototype(ROOT, argv) {
   else if (seen?.picture) console.log(`\n   picture of the page: ${seen.picture.replace(ROOT + '/', '')}`);
   if (seen?.a11y) { console.log(''); for (const l of a11yLines(seen.a11y)) console.log(l); }
   else if (seen?.why) console.log(`\n   ⏭  not measured in the browser (${seen.why})`);
+  const works = interactionLines(seen?.interactions ?? []);
+  const tried = (seen?.interactions ?? []).length;
+  if (tried) { console.log(`\n🖱  HOW IT WORKS  ${tried} tried in the browser${works.length ? '' : ', all as in a product'}`); for (const l of works) console.log(`   ${l}`); }
   const placed = seen?.cmp ? owedFromScreen(seen.cmp) : [];
   const gaps = mergeGaps({ [name]: r.gaps });
   if (gaps.length) {
@@ -435,6 +439,7 @@ export async function runPrototype(ROOT, argv) {
     r.differs.length ? 'Make each 📐 line match the other pages, or tell the person why this page differs.' : null,
     placed.length ? `Make each ⚠️ line under 📏 match "${seen.screen.name}", or tell the person why this page differs from it.` : null,
     (seen?.a11y ?? []).some((i) => i.own) ? 'Fix each ⚠️ line under ♿ in the composition (one main heading: a Text with as h1; a text colour that reads on its surface), or tell the person.' : null,
+    works.length ? 'Fix each ⚠️ line under 🖱 in the composition ("opens" names the "id" of the part it opens), or tell the person.' : null,
     seen?.picture ? `Look at ${seen.picture.replace(ROOT + '/', '')} before you answer.` : null,
     gaps.length ? 'Tell the person each gap above as it is written: the design team decides them; never build one.' : null,
   ].filter(Boolean);
