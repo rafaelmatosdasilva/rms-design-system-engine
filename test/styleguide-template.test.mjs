@@ -235,6 +235,8 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
     assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
+    // The code as tall as the tokens beside it, scrolling inside.
+    assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || Math.abs(c.offsetHeight - t.offsetHeight) < 2; })()`), true);
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in,Changelog');
@@ -257,6 +259,10 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(nums, await run(`[...document.querySelectorAll('#c-chip .pg-anat-legend b')].map((b) => b.textContent).join()`), 'every number in the drawing is one in the list, in the same order');
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
     assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
+    // Each section of rows in the Playground's tables: its title the head (Usage, Accessibility).
+    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /Anatomy.*Usage/);
+    // The name stays beside the areas; nothing differs, so Parity carries no alert and the page no line about it.
+    assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + !!document.querySelector('#c-chip .pg-areas [data-v="parity"] .sg-seg-icon') + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|false|false');
     // How to use it: the same four sections on every page, a missing one said; the overview counts them.
     assert.match(await run(`document.querySelector('#c-chip [data-area="docs"]').textContent`), /Usage.*When to use.*When not to use.*Common mistakes.*Limitations.*Not written yet/s);
     // The menu: worded buttons; on a wide screen it hides and comes back.
@@ -636,4 +642,23 @@ test('Figma images of each variant: the reference folder first, never the networ
     const none = await figmaVariantImages(dir, { visualRefs: 'refs', figmaFileKey: 'K' }, 'tag', { nodeId: '1:2', token: null, fetchImpl: () => { called = true; } });
     assert.deepEqual([none.images, called, /FIGMA_TOKEN/.test(none.why)], [[], false, true]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a text prop comes right after the boolean that shows it; the rest keep Figma\'s order and nothing is dropped', () => {
+  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const src = /  function showFirst\(list, propOf\) \{[\s\S]*?\n  \}\n/.exec(tpl)[0];
+  const showFirst = new Function(`${src}; return showFirst;`)();
+  const order = (props) => showFirst(props, (p) => p).map((p) => p.label).join(' | ');
+  assert.equal(order([{ label: 'State', type: 'VARIANT' }, { label: 'Text Content', type: 'TEXT', part: '.t' }, { label: 'Show Text', type: 'BOOLEAN', part: '.t' }, { label: 'Show Divider', type: 'BOOLEAN' }]), 'State | Show Text | Text Content | Show Divider');
+  assert.equal(order([{ label: 'label-content', type: 'TEXT', part: 'span, [class*="label"]' }, { label: 'show-icon', type: 'BOOLEAN', part: 'svg' }, { label: 'show-label', type: 'BOOLEAN', part: 'span' }]), 'show-icon | show-label | label-content', 'matched by name when the parts are written differently');
+  assert.equal(order([{ label: 'Value Content', type: 'TEXT' }, { label: 'Show Value', type: 'BOOLEAN' }, { label: 'Label', type: 'TEXT' }]), 'Show Value | Value Content | Label', 'a text no boolean shows stays where it is');
+});
+
+test('every box on the page looks like the system\'s own card: its border colour and width, radius and shadow', async () => {
+  const { cardLook, chromeRoles } = await import('../styleguide-data.mjs');
+  const css = '.card-title { color: red } .card { display: flex; border: var(--general-thickness) solid var(--card-border); border-radius: var(--radii-card); }';
+  assert.deepEqual(cardLook(css, 'card'), { border: 'var(--card-border)', width: 'var(--general-thickness)', radius: 'var(--radii-card)', shadow: null });
+  assert.equal(cardLook(css, 'tile'), null);
+  const r = chromeRoles({ themeCss: css, card: { cls: 'card' } }).roles;
+  assert.deepEqual([r.border, r['line-width'], r.radius, r['radius-l'], r.shadow], ['var(--card-border)', 'var(--general-thickness)', 'var(--radii-card)', 'var(--radii-card)', 'none']);
 });
