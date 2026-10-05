@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Setup without technical questions and the style guide's playground batch (continuous evaluation)
+
+What changed since the entry below (engine fc83ee2): Style guide: every box has the system card's border, corners and shadow; documentation, accessibility and changelog in the Playground's tables; Parity marked with the system's alert icon and laid out in two columns; the code as tall as its tokens; a text after the boolean that shows it; a hidden text's style out of the tokens; the name and foundation titles stay at the top; Style guide: Width frames run the system's scripts and move a selection; Do and Don't from references or Figma frames; What's new by release; a Disabled prop disables the native controls; the focus check reads past transitions and passes a disabled control by; README: a short overview of the benefits for designers and developers (quality, style guide, prototypes, accessibility, building from Figma, Claude alone against Claude with the engine), with everything else on a new page, Everything it does; Style guide and setup: modes named after Figma's collections inside the playground, a clickable Inspect, every token a component uses, tokens before the code, six colours a row, no overview notes or Hide; setup takes every hosted mode file, asks where the code is when the folder has none, and installs from one pasted sentence. The guide changed in `cookbook/first-setup.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `6032ffcc1914` · Project measured: `13d811a9d668`
+
+| Haiku, engine cf070d8 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.062 |
+| Input a run | 103k | 121k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 121k a run against 103k. Records: `records/2026-10-05-style-guide-and-setup-modes`.
+
 ## 2026-10: Style guide: system card look, documentation in tables, Parity icon and columns, code height, prop order, sticky titles (continuous evaluation)
 
 What changed since the entry below (engine 22050d1): Style guide: every box has the system card's border, corners and shadow; documentation, accessibility and changelog in the Playground's tables; Parity marked with the system's alert icon and laid out in two columns; the code as tall as its tokens; a text after the boolean that shows it; a hidden text's style out of the tokens; the name and foundation titles stay at the top. The guide changed in `reference/usage.md`.

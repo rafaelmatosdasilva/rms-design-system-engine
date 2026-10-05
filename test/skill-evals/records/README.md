@@ -37,5 +37,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-05-style-guide-inspect-numbers-never` | The 21 guide tasks on Haiku (engine 45caddf) | "Style guide: Inspect numbers apart, a link to each variant, accessibility tried on the live variant" |
 | `2026-10-05-style-guide-figma-beside-the` | The 21 guide tasks on Haiku (engine 22050d1) | "Style guide: Figma beside the code, what uses each token, props in search" |
 | `2026-10-05-style-guide-every-box-has` | The 21 guide tasks on Haiku (engine fc83ee2) | "Style guide: system card look, documentation in tables, Parity icon and columns, code height, prop order, sticky titles" |
+| `2026-10-05-style-guide-and-setup-modes` | The 21 guide tasks on Haiku (engine cf070d8) | "Setup without technical questions and the style guide's playground batch" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
