@@ -22,7 +22,7 @@
 // An element whose attributes are spread ({...props}, v-bind="$attrs") can receive them from outside: it is
 // never reported. A finding that does not say its fix in `desc` carries it in `fix`, for the check of each edit
 // (edit-check.mjs, idea I74), which hands the fix back to the agent that wrote the line.
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
 import { join, relative, extname } from 'node:path';
 import { ENGINE_DIRS } from './names.mjs';
@@ -231,7 +231,8 @@ function walk(ROOT, exts, limit = 4000) {
       const abs = join(dir, n);
       let st; try { st = statSync(abs); } catch { continue; }
       if (st.isDirectory()) go(abs, depth + 1);
-      else if (exts.has(extname(n).toLowerCase()) && st.size < 512 * 1024) files.push(abs);
+      // A built page with its source beside it (ui.html from ui.src.html) is read once, from the source.
+      else if (exts.has(extname(n).toLowerCase()) && st.size < 512 * 1024 && !(/\.html?$/i.test(n) && existsSync(abs.replace(/\.(html?)$/i, '.src.$1')))) files.push(abs);
     }
   };
   for (const root of codeRoots(ROOT)) go(root, 0);
