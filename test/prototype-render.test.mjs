@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { fixtureProject } from './helpers.mjs';
 import { findChrome } from '../cdp.mjs';
-import { screenBoxes, screenInstances, screenFor, compareWithScreen, compositionPaths, owedFromScreen } from '../prototype-render.mjs';
+import { screenBoxes, screenInstances, screenFor, compareWithScreen, compositionPaths, owedFromScreen, interactionLines } from '../prototype-render.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TIDEPOOL = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
@@ -116,4 +116,44 @@ test('--prototype measures the drawn page against the designed screen, saves its
   assert.ok(last.gaps.some((g) => g.kind === 'screen' && /padding/.test(g.line)));
   r = run('--prototype', 'prototypes/notify.json', '--no-browser');
   assert.doesNotMatch(r.stdout, /📏/);
+});
+
+test('a part that opens another opens it in the browser, with the focus inside; Escape closes it and gives the focus back; a field takes typing', { skip: CHROME ? false : 'no Chrome available', timeout: 600000 }, () => {
+  const dir = fixtureProject(TIDEPOOL, 'tp-interact-');
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
+    mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8'));
+  }
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: 300000 });
+  mkdirSync(join(dir, 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, 'prototypes', 'filters.json'), JSON.stringify({ component: 'Page', props: { padding: 'padding/m' }, children: [
+    { component: 'button', props: { Label: 'Rename', opens: 'rename' } },
+    { id: 'rename', component: 'Stack', props: { padding: 'padding/m', gap: 'padding/s' }, children: [{ component: 'field', props: {} }, { component: 'button', props: { Label: 'Save' } }] },
+  ] }));
+  let r = run('--prototype', 'prototypes/filters.json');
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, /🖱  HOW IT WORKS {2}2 tried in the browser, all as in a product/, r.stdout);
+  const page = readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'filters.html'), 'utf8');
+  assert.match(page, /"opens":"rename"/);
+
+  writeFileSync(join(dir, 'prototypes', 'nowhere.json'), JSON.stringify({ component: 'Page', children: [{ component: 'button', props: { Label: 'Rename', opens: 'dialog' } }] }));
+  r = run('--prototype', 'prototypes/nowhere.json', '--no-browser');
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /button\.opens names "dialog", and no part has that id/);
+});
+
+test('what did not work in the browser is named: nothing opened, the focus left outside, no Escape, a field that takes no typing', () => {
+  assert.deepEqual(interactionLines([
+    { kind: 'opens', id: 'menu', by: 'More', opened: false },
+    { kind: 'opens', id: 'rename', by: 'Rename', opened: true, focusInside: false, closed: true, focusBack: false },
+    { kind: 'opens', id: 'help', by: 'Help', opened: true, focusInside: true, closed: false },
+    { kind: 'opens', id: 'ok', by: 'Ok', opened: true, focusInside: true, closed: true, focusBack: true },
+    { kind: 'field', path: '0.2', where: 'rename', takes: false }, { kind: 'field', path: '0.3', takes: true },
+  ]), [
+    '⚠️  "More" does not open menu',
+    '⚠️  rename opens without the focus inside it',
+    '⚠️  closing rename does not give the focus back to "Rename"',
+    '⚠️  help does not close with Escape',
+    '⚠️  the field at 0.2 in rename takes no typing',
+  ]);
 });

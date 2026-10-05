@@ -210,8 +210,58 @@ export const RENDER_EXPRESSION = `(() => {
   });
 })()`;
 
+// How the page works, tried in the browser: each part that opens another (a dialog, a menu) is clicked, the part must
+// show with the focus inside it, Escape must close it and the focus go back; each field must take what is typed.
+// → [{ kind: 'opens', id, by, opened, focusInside, closed, focusBack } | { kind: 'field', path, where, takes }]
+export const INTERACT_EXPRESSION = `(async () => {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const out = [];
+  const shown = (e) => !!e && e.isConnected && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+  const FIELDS = 'input:not([type]), input[type=text], input[type=search], input[type=email], input[type=url], input[type=tel], input[type=password], textarea';
+  const fields = (root, where) => {
+    for (const f of [...root.querySelectorAll(FIELDS)]) {
+      if (f.disabled || !shown(f)) continue;
+      const before = f.value; f.focus();
+      out.push({ kind: 'field', path: (f.closest('[data-pt-path]') || f).getAttribute('data-pt-path'), where, takes: document.activeElement === f && !f.readOnly });
+      f.value = before;
+    }
+  };
+  fields(document.getElementById('pt-canvas'), null);
+  for (const t of [...document.querySelectorAll('#pt-canvas [data-pt-opens]')]) {
+    const id = t.getAttribute('data-pt-opens');
+    const by = (t.getAttribute('aria-label') || t.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 60) || t.getAttribute('data-pt-path');
+    t.click(); await wait(80);
+    const el = document.querySelector('[data-pt-overlay="' + id + '"]');
+    const opened = shown(el);
+    const focusInside = opened && el.contains(document.activeElement);
+    if (opened) fields(el, id);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    let closed = false;
+    for (let i = 0; i < 40 && !closed; i++) { await wait(50); closed = !document.querySelector('[data-pt-layer="' + id + '"]'); }
+    out.push({ kind: 'opens', id, by, opened, focusInside, closed, focusBack: closed && document.activeElement === t });
+  }
+  return out;
+})()`;
+
+// The lines for what did not work: a part that does not open what it names, an overlay that keeps the focus out or
+// does not close with Escape, a field that takes no typing.
+export function interactionLines(list = []) {
+  const out = [];
+  for (const i of list) {
+    if (i.kind === 'opens') {
+      if (!i.opened) out.push(`⚠️  "${i.by}" does not open ${i.id}`);
+      else {
+        if (!i.focusInside) out.push(`⚠️  ${i.id} opens without the focus inside it`);
+        if (!i.closed) out.push(`⚠️  ${i.id} does not close with Escape`);
+        else if (!i.focusBack) out.push(`⚠️  closing ${i.id} does not give the focus back to "${i.by}"`);
+      }
+    } else if (i.kind === 'field' && !i.takes) out.push(`⚠️  the field at ${i.path}${i.where ? ` in ${i.where}` : ''} takes no typing`);
+  }
+  return out;
+}
+
 // Open the drawn page, measure it, save its picture, and compare the picture with the Figma image of the screen when
-// one is at hand. Returns { rendered, picture, visual } or { why } when Chrome is missing or the page did not draw.
+// one is at hand, and try how it works. Returns { rendered, picture, visual, interactions } or { why } when Chrome is missing or the page did not draw.
 export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mode = 'sibling', chromePath = findChrome({ playwright: true }), outDir = OUT_DIR, token, fetchImpl } = {}) {
   if (!chromePath || typeof WebSocket === 'undefined') return { why: 'Chrome not found' };
   const chrome = await launchChrome(chromePath, { tmpPrefix: 'prototype-render-' });
@@ -236,6 +286,7 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
       const picture = join(dir, `${name}.png`);
       const shot = await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: box.x, y: box.y, width: box.w, height: box.h, scale: 1 }, captureBeyondViewport: true }, sessionId);
       writeFileSync(picture, Buffer.from(shot.data, 'base64'));
+      const interactions = (await cdp.send('Runtime.evaluate', { expression: INTERACT_EXPRESSION, awaitPromise: true, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? null;
       let visual = null;
       if (screen && mode === 'redraw') {
         const img = await figmaImage(ROOT, cfg, screen.name, { nodeId: screen.id, folder: 'screens', token, fetchImpl, outDir });
@@ -253,7 +304,7 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
           }
         } else visual = { why: img.why };
       }
-      return { rendered, picture, visual };
+      return { rendered, picture, visual, interactions };
     } finally { cdp.close(); }
   } finally { chrome.kill(); }
 }
