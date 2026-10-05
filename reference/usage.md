@@ -629,8 +629,10 @@ take; the format; and the prototypes already in `prototypes/`.
   page", is a limit: a prototype with more is not drawn, and the error quotes the sentence and its section.
 - **What the request asks for.** A component the request names (every word of its name is in it: "an empty state"
   → emptyState) that the prototype does not use is a warning the reply owes: add it, or say why. A kind of component
-  the request names that the system has none of (a switch, a toast, a dialog, a progress bar), shown neither as a Missing
-  box nor with `standInFor`, is a warning the reply owes too: the system has no such component, say so. A component the
+  the request names that the system has none of (a switch, a toast, a dialog, a progress bar, or a message confirming
+  something saved, sent or done when the system has no toast, banner, alert or notification), shown neither as a
+  Missing box nor with `standInFor` (nor by a part whose `purpose` names it), is a warning the reply owes too: the
+  system has no such component, say so. The same line for several parts is said once, with how many. A component the
   documentation rules out for the request's words ("a message confirming…" and a tag that is never a message that comes
   and goes), used anyway, is an error, unless the node says what else it is for in `"purpose"` (a note, like
   `standInFor`, that the check reads and the drawing ignores).
@@ -654,7 +656,8 @@ The rules are `--check-ui`'s, plus:
 - **The engine's pieces** (Page, Stack, Row, Columns, Text) exist only where the system has no component of that name.
   They carry no colour, border or font of their own: `gap` and `padding` take a spacing token, `Text.style` a text
   style, `Page.width` the screen's width in px; `grow` takes the room a parent leaves. The page takes the system's own
-  page surface, text colour and font family. Each piece used is a layout gap.
+  page surface, text colour and font family. Each piece used is a layout gap, the pieces of one prototype said in one
+  line ("Row, Stack and Page layout components").
 - **A need nothing fits** is `{ "component": "Missing", "props": { "need": "…", "kind": "…", "closest": "…" } }`, drawn
   as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`.
 - **An option Figma and the code do not share by name** is drawn on the part its name points to: a text option
@@ -711,7 +714,9 @@ The rules are `--check-ui`'s, plus:
   arrangement keeps one spacing and the page a few, one part styled as the primary action is in view (the system's
   primary component, or a class or option that says primary), the main heading is the largest text and each heading
   smaller than the one above it and larger or heavier than its text, and a line of text runs under about 90
-  characters. Each ⚠️ line says what to change; the reply owes the ones it keeps.
+  characters. Each ⚠️ line says what to change; the reply owes the ones it keeps. A heading already in the system's
+  largest text style, the same as its body text, cannot be made larger: an ℹ️ line and a gap the reply names (no
+  heading style), never taken off the score.
 - **A retired component** (status deprecated) is an error that names its replacement.
 - **What the documentation says.** After drawing, each system component the prototype uses is listed beside what it
   uses it for (its labels and stand-ins) and what the documentation says it is for, so a use it is not for stands out:
