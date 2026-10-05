@@ -673,6 +673,24 @@ The rules are `--check-ui`'s, plus:
   `opens` that names no part, the page or itself is an error. With Chrome, each one is tried: it must open with the
   focus inside, close with Escape and give the focus back, and each field must take typing; what does not is a ⚠️ line
   under 🖱.
+- **Every state.** A composition names its other states beside it, `"states": { "<name>": { "<id>": { …that part in
+  this state… } } }` (in the composition, or beside `"prototype"` in the file), each naming by `id` only the parts that
+  differ; `null` leaves a part out. Each state is checked as a whole page (a state that names no part is an error), its
+  gaps join the prototype's, and the page has a switch for it (`#state=<name>` opens one). The page owes an empty state
+  when it shows a list (a part holding two or more of the same system component, or a component named or made for a
+  list, table, grid or feed), an error state when it takes input (a field and a button), and each state the request
+  names ("with a loading state") or the team's guidelines ask of the page or of a component it uses ("every list shows
+  an empty state"). A state is found by its kind, whatever its name ("No results" is an empty state). One not given is
+  a ⚠️ line the reply owes.
+- **Every screen size and state, with longer words.** With Chrome, each state is drawn at every screen width (Figma's
+  breakpoints, else Phone 375, Tablet 768 and Desktop 1280; a size mode of the same name is turned on, else the
+  system's media query decides), with the words as written and 40% longer, as a translation makes them. What runs past
+  the screen's edge (measured part by part, since a system often hides the page's overflow), a text cut by a box or an
+  ellipsis, a text that runs out of its component, a control's label on two lines, and on a phone a target under 24px
+  (WCAG 2.5.8) are ⚠️ lines under 📱, each with the widths and states it happens at; the ones that happen with the words
+  as written are owed in the reply. A picture is saved for each width (`<name>@<width>.png`) and each state
+  (`<name>.<state>.png`). Row `wrap` and Columns `minWidth` (the narrowest a column may be, in px) let a layout fit a
+  narrow screen.
 - **A retired component** (status deprecated) is an error that names its replacement.
 - **What the documentation says.** After drawing, each system component the prototype uses is listed beside what it
   uses it for (its labels and stand-ins) and what the documentation says it is for, so a use it is not for stands out:
