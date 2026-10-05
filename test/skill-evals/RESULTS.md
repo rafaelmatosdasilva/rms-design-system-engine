@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: system card look, documentation in tables, Parity icon and columns, code height, prop order, sticky titles (continuous evaluation)
+
+What changed since the entry below (engine 22050d1): Style guide: every box has the system card's border, corners and shadow; documentation, accessibility and changelog in the Playground's tables; Parity marked with the system's alert icon and laid out in two columns; the code as tall as its tokens; a text after the boolean that shows it; a hidden text's style out of the tokens; the name and foundation titles stay at the top. The guide changed in `reference/usage.md`.
+
+Guide set measured: `74dec7cc135a` · Project measured: `13d811a9d668`
+
+| Haiku, engine fc83ee2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.056 |
+| Input a run | 116k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 116k. Records: `records/2026-10-05-style-guide-every-box-has`.
+
 ## 2026-10: Style guide: Figma beside the code, what uses each token, props in search (continuous evaluation)
 
 What changed since the entry below (engine 45caddf): Style guide: Figma beside the code (each variant's Figma image beside or over the live component, from references or the Figma API); what uses each token (linked from every token name, directly or through another token); search finds props; no line under the area switch. The guide changed in `reference/usage.md`.
