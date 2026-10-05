@@ -19,6 +19,7 @@ import { OUT_DIR } from './names.mjs';
 
 const PIECES = new Set(['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing']);
 const key = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const slugOf = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const round = (n) => Math.round(n * 10) / 10;
 
 // Every node of a designed screen with its box on the screen. A capture made since x and y were recorded gives them;
@@ -210,9 +211,151 @@ export const RENDER_EXPRESSION = `(() => {
   });
 })()`;
 
+// How the page works, tried in the browser: each part that opens another (a dialog, a menu) is clicked, the part must
+// show with the focus inside it, Escape must close it and the focus go back; each field must take what is typed.
+// → [{ kind: 'opens', id, by, opened, focusInside, closed, focusBack } | { kind: 'field', path, where, takes }]
+export const INTERACT_EXPRESSION = `(async () => {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const out = [];
+  const shown = (e) => !!e && e.isConnected && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+  const FIELDS = 'input:not([type]), input[type=text], input[type=search], input[type=email], input[type=url], input[type=tel], input[type=password], textarea';
+  const fields = (root, where) => {
+    for (const f of [...root.querySelectorAll(FIELDS)]) {
+      if (f.disabled || !shown(f)) continue;
+      const before = f.value; f.focus();
+      out.push({ kind: 'field', path: (f.closest('[data-pt-path]') || f).getAttribute('data-pt-path'), where, takes: document.activeElement === f && !f.readOnly });
+      f.value = before;
+    }
+  };
+  fields(document.getElementById('pt-canvas'), null);
+  for (const t of [...document.querySelectorAll('#pt-canvas [data-pt-opens]')]) {
+    const id = t.getAttribute('data-pt-opens');
+    const by = (t.getAttribute('aria-label') || t.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 60) || t.getAttribute('data-pt-path');
+    t.click(); await wait(80);
+    const el = document.querySelector('[data-pt-overlay="' + id + '"]');
+    const opened = shown(el);
+    const focusInside = opened && el.contains(document.activeElement);
+    if (opened) fields(el, id);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    let closed = false;
+    for (let i = 0; i < 40 && !closed; i++) { await wait(50); closed = !document.querySelector('[data-pt-layer="' + id + '"]'); }
+    out.push({ kind: 'opens', id, by, opened, focusInside, closed, focusBack: closed && document.activeElement === t });
+  }
+  return out;
+})()`;
+
+// The lines for what did not work: a part that does not open what it names, an overlay that keeps the focus out or
+// does not close with Escape, a field that takes no typing.
+export function interactionLines(list = []) {
+  const out = [];
+  for (const i of list) {
+    if (i.kind === 'opens') {
+      if (!i.opened) out.push(`⚠️  "${i.by}" does not open ${i.id}`);
+      else {
+        if (!i.focusInside) out.push(`⚠️  ${i.id} opens without the focus inside it`);
+        if (!i.closed) out.push(`⚠️  ${i.id} does not close with Escape`);
+        else if (!i.focusBack) out.push(`⚠️  closing ${i.id} does not give the focus back to "${i.by}"`);
+      }
+    } else if (i.kind === 'field' && !i.takes) out.push(`⚠️  the field at ${i.path}${i.where ? ` in ${i.where}` : ''} takes no typing`);
+  }
+  return out;
+}
+
+// Every state at every screen width, with the words as written and 40% longer (as a translation makes them): what
+// runs past the screen's edge, a text cut or spilling out of its box, a control's label on two lines, and on a phone a
+// target smaller than 24px (WCAG 2.5.8). → [{ kind, path, component, text, w, h, over }]
+export const FIT_EXPRESSION = (state, pseudo, phone) => `(async () => {
+  const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  window.__ptShow(${JSON.stringify(state)});
+  const canvas = document.getElementById('pt-canvas'), root = document.querySelector('[data-pt-path="0"]');
+  if (!root) return [];
+  root.style.width = '100%'; root.style.maxWidth = '100%';
+  const orig = new Map();
+  const texts = () => { const out = [], w = document.createTreeWalker(canvas, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (n.textContent.trim() && !n.parentNode.closest('svg, script, style')) out.push(n); return out; };
+  if (${pseudo ? 'true' : 'false'}) {
+    const acc = { a: 'å', e: 'é', i: 'î', o: 'ö', u: 'ü', c: 'ç', n: 'ñ', s: 'š', y: 'ý', A: 'Å', E: 'É', I: 'Î', O: 'Ö', U: 'Ü', C: 'Ç', N: 'Ñ', S: 'Š' };
+    const longer = (t) => { const core = t.trim(); if (!core) return t; const pad = Math.max(2, Math.ceil(core.length * 0.4)); return t.replace(core, core.replace(/[a-zA-Z]/g, (c) => acc[c] || c) + ' ' + 'ẋ'.repeat(pad)); };
+    for (const n of texts()) { orig.set(n, n.textContent); n.textContent = longer(n.textContent); }
+    for (const f of canvas.querySelectorAll('input[placeholder], textarea[placeholder]')) f.placeholder = longer(f.placeholder);
+  }
+  await frame();
+  const out = [];
+  const where = (el) => { const p = el.closest('[data-pt-path]'); const c = el.closest('[data-pt-component]'); return { path: p ? p.getAttribute('data-pt-path') : null, component: c ? c.getAttribute('data-pt-component') : null }; };
+  const say = (n) => (orig.get(n) ?? n.textContent).trim().replace(/\\s+/g, ' ').slice(0, 60);
+  const vw = document.documentElement.clientWidth;
+  const wordsIn = (e) => { const w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT); const out = []; let n; while ((n = w.nextNode())) if (n.textContent.trim() && !n.parentNode.closest('svg')) out.push((orig.get(n) ?? n.textContent).trim()); return out.join(' ').replace(/\\s+/g, ' '); };
+  // Past the screen's edge: the innermost parts that reach beyond it (measured, since a system's CSS often hides the
+  // page's own overflow), unless a part between them and the page scrolls or cuts on purpose.
+  const scrolls = (e) => { for (let a = e.parentElement; a && a !== canvas; a = a.parentElement) { const cs = getComputedStyle(a); if (/auto|scroll|hidden|clip/.test(cs.overflowX) && a.getBoundingClientRect().right <= vw + 1) return true; } return false; };
+  const past = [...canvas.querySelectorAll('[data-pt-path]')].filter((e) => { const b = e.getBoundingClientRect(); return b.width && (b.right > vw + 1 || b.left < -1) && !scrolls(e); });
+  for (const e of past.filter((e) => !past.some((o) => o !== e && e.contains(o))).slice(0, 6)) { const b = e.getBoundingClientRect(); out.push({ kind: 'wide', ...where(e), text: wordsIn(e).slice(0, 40), over: Math.round(Math.max(b.right - vw, -b.left)), screen: vw }); }
+  const CONTROL = 'button, a, label, [role=button], [role=tab], [role=switch], [role=option], [role=menuitem], [role=checkbox], [role=radio]';
+  for (const n of texts()) {
+    const el = n.parentElement; if (!el || !el.getClientRects().length) continue;
+    const r = document.createRange(); r.selectNodeContents(n);
+    const tr = r.getBoundingClientRect(); if (!tr.width) continue;
+    const lines = new Set([...r.getClientRects()].filter((x) => x.width > 1).map((x) => Math.round(x.top))).size;
+    // Cut: a box between the words and the page that hides what does not fit, or an ellipsis.
+    let cut = null;
+    for (let a = el; a && a !== canvas; a = a.parentElement) {
+      const cs = getComputedStyle(a), ar = a.getBoundingClientRect();
+      const hides = /hidden|clip/.test(cs.overflowX + cs.overflow);
+      if ((hides || cs.textOverflow === 'ellipsis') && (tr.right > ar.right + 1 || tr.left < ar.left - 1 || (a === el && a.scrollWidth > a.clientWidth + 1))) { cut = a; break; }
+      if (a.hasAttribute('data-pt-component')) break;
+    }
+    const box = el.closest('[data-pt-component]') || el;
+    if (cut) out.push({ kind: 'cut', ...where(el), text: say(n) });
+    else if (box !== el && tr.right > box.getBoundingClientRect().right + 1) out.push({ kind: 'spill', ...where(el), text: say(n) });
+    else if (lines > 1 && el.closest(CONTROL) && canvas.contains(el.closest(CONTROL))) out.push({ kind: 'wraps', ...where(el), text: say(n), lines });
+  }
+  if (${phone ? 'true' : 'false'}) {
+    for (const t of canvas.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=tab], [role=switch], [role=checkbox], [role=radio], [role=option], [role=link]')) {
+      const b = t.getBoundingClientRect(); if (!b.width || !b.height) continue;
+      const lab = t.closest('label'); const lb = lab && canvas.contains(lab) ? lab.getBoundingClientRect() : null;
+      const w = Math.max(b.width, lb ? lb.width : 0), h = Math.max(b.height, lb ? lb.height : 0);
+      if (w < 24 || h < 24) out.push({ kind: 'target', ...where(t), text: (t.getAttribute('aria-label') || t.textContent || t.getAttribute('placeholder') || '').trim().replace(/\\s+/g, ' ').slice(0, 40), w: Math.round(w), h: Math.round(h) });
+    }
+  }
+  if (orig.size) window.__ptShow(${JSON.stringify(state)});
+  return out;
+})()`;
+
+// The screen widths a prototype is tried at: Figma's breakpoints, else a phone's, a tablet's and a desktop's.
+export function screenWidths(breakpoints = []) {
+  const list = (breakpoints ?? []).filter((b) => Number.isFinite(b.px) && b.px >= 240).map((b) => ({ name: b.name, px: Math.round(b.px) }));
+  return (list.length ? list : [{ name: 'Phone', px: 375 }, { name: 'Tablet', px: 768 }, { name: 'Desktop', px: 1280 }]).sort((a, b) => a.px - b.px);
+}
+
+// Everything found across states, widths and text lengths, one line per problem with where it happens.
+// raw: [{ state, width, longer, issues }] → [{ kind, path, component, text, states, widths, longerOnly, … }]
+export function fitFindings(raw = []) {
+  const by = new Map();
+  for (const run of raw) for (const i of run.issues ?? []) {
+    const key = /^(wide|target)$/.test(i.kind) ? `${i.kind}|${i.path}` : `${i.kind}|${i.path}|${i.text}`;
+    if (!by.has(key)) by.set(key, { ...i, states: [], widths: [], asWritten: false });
+    const f = by.get(key);
+    if (!f.states.includes(run.state)) f.states.push(run.state);
+    if (!f.widths.includes(run.width)) f.widths.push(run.width);
+    if (!run.longer) f.asWritten = true;
+    if (i.over > (f.over ?? 0)) f.over = i.over;
+  }
+  return [...by.values()].sort((a, b) => b.asWritten - a.asWritten);
+}
+const KIND_WORDS = { cut: 'is cut', spill: 'runs out of its box', wraps: 'wraps onto two lines' };
+export function fitLines(list = [], { states = ['default'] } = {}) {
+  return list.map((f) => {
+    const who = `${f.component ?? (f.kind === 'wide' ? `the part at ${f.path}` : 'a control')}${f.text ? ` "${f.text}"` : ''}`;
+    const what = f.kind === 'wide' ? `${who} runs ${f.over ? `${f.over}px ` : ''}past the screen's edge`
+      : f.kind === 'target' ? `${who} is ${f.w}×${f.h}px, smaller than 24px to tap`
+      : `"${f.text}"${f.component ? ` in ${f.component}` : ''} ${KIND_WORDS[f.kind]}`;
+    const st = states.length > 1 && f.states.length < states.length ? `, in the ${f.states.join(', ')} state${f.states.length === 1 ? '' : 's'}` : '';
+    return `⚠️  ${what} at ${f.widths.join(', ')}${st}${f.asWritten ? '' : ', with the words 40% longer (as a translation makes them)'}`;
+  });
+}
+
 // Open the drawn page, measure it, save its picture, and compare the picture with the Figma image of the screen when
-// one is at hand. Returns { rendered, picture, visual } or { why } when Chrome is missing or the page did not draw.
-export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mode = 'sibling', chromePath = findChrome({ playwright: true }), outDir = OUT_DIR, token, fetchImpl } = {}) {
+// one is at hand, and try how it works. Returns { rendered, picture, visual, interactions } or { why } when Chrome is missing or the page did not draw.
+export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mode = 'sibling', chromePath = findChrome({ playwright: true }), outDir = OUT_DIR, token, fetchImpl, widths = screenWidths() } = {}) {
   if (!chromePath || typeof WebSocket === 'undefined') return { why: 'Chrome not found' };
   const chrome = await launchChrome(chromePath, { tmpPrefix: 'prototype-render-' });
   try {
@@ -236,6 +379,7 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
       const picture = join(dir, `${name}.png`);
       const shot = await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: box.x, y: box.y, width: box.w, height: box.h, scale: 1 }, captureBeyondViewport: true }, sessionId);
       writeFileSync(picture, Buffer.from(shot.data, 'base64'));
+      const interactions = (await cdp.send('Runtime.evaluate', { expression: INTERACT_EXPRESSION, awaitPromise: true, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? null;
       let visual = null;
       if (screen && mode === 'redraw') {
         const img = await figmaImage(ROOT, cfg, screen.name, { nodeId: screen.id, folder: 'screens', token, fetchImpl, outDir });
@@ -253,7 +397,31 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
           }
         } else visual = { why: img.why };
       }
-      return { rendered, picture, visual };
+      // Every state at every screen width, as written and with longer words; a picture of each width and each state.
+      const states = (await cdp.send('Runtime.evaluate', { expression: 'window.__ptStates || ["default"]', returnByValue: true }, sessionId)).result?.value ?? ['default'];
+      const runs = [], pictures = [];
+      const shoot = async (file) => {
+        const b = (await cdp.send('Runtime.evaluate', { expression: `(() => { document.documentElement.style.overflow = 'visible'; document.body.style.overflow = 'visible'; const e = document.querySelector('[data-pt-path="0"]'); e.style.width = '100%'; e.style.maxWidth = '100%'; const r = e.getBoundingClientRect(); const bottom = Math.max(r.bottom, ...[...e.querySelectorAll('[data-pt-path]')].map((k) => k.getBoundingClientRect().bottom + (parseFloat(getComputedStyle(e).paddingBottom) || 0))); return { x: r.left + scrollX, y: r.top + scrollY, w: Math.max(1, r.width), h: Math.max(1, bottom - r.top) }; })()`, returnByValue: true }, sessionId)).result?.value;
+        if (!b) return;
+        const shot = await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: b.x, y: b.y, width: b.w, height: b.h, scale: 1 }, captureBeyondViewport: true }, sessionId);
+        writeFileSync(file, Buffer.from(shot.data, 'base64')); pictures.push(file);
+      };
+      for (const w of widths) {
+        await cdp.send('Emulation.setDeviceMetricsOverride', { width: w.px, height: 900, deviceScaleFactor: 1, mobile: w.px < 600 }, sessionId);
+        await cdp.send('Runtime.evaluate', { expression: `window.__ptSize && window.__ptSize(${JSON.stringify(w.name)})`, returnByValue: true }, sessionId);
+        const phone = w.px < 600;
+        for (const st of states) {
+          for (const longer of [false, true]) {
+            const issues = (await cdp.send('Runtime.evaluate', { expression: FIT_EXPRESSION(st, longer, phone), awaitPromise: true, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? [];
+            runs.push({ state: st, width: w.name, longer, issues });
+          }
+          if (st === 'default') await shoot(join(dir, `${name}@${slugOf(w.name)}.png`));
+          else if (w === widths[widths.length - 1]) await shoot(join(dir, `${name}.${slugOf(st)}.png`));
+        }
+      }
+      await cdp.send('Runtime.evaluate', { expression: 'window.__ptShow && window.__ptShow("default")', returnByValue: true }, sessionId).catch(() => null);
+      const fit = { widths: widths.map((w) => `${w.name} ${w.px}`), states, findings: fitFindings(runs), pictures };
+      return { rendered, picture, visual, interactions, fit };
     } finally { cdp.close(); }
   } finally { chrome.kill(); }
 }

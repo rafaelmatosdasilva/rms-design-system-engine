@@ -9,11 +9,16 @@
 //   • what the team authored: contract.authored.json (whenNotToUse, useInstead, status, notes) and the layers of the
 //     design intent (system, foundations, patterns, templates, pages, flows);
 //   • the team's guidelines, committed or fetched from the Notion and GitLab links in ds-config.json: a section
-//     named after a component goes with it, every other section is a rule for the product.
+//     named after a component goes with it, every other section is a rule for the product;
+//   • each component's usage, as the style guide shows it: When to use, When not to use, Common mistakes and
+//     Limitations (from Figma's description and annotations, the code's note, or contract.authored.json guidance),
+//     and its Do and Don't (the captions of the pictures in the references, or contract.authored.json examples).
 // From the guidelines it also reads the rules a check can hold a prototype to ("one button per screen").
 //
 // loadContext reads files (and refreshes a guidelines link whose file is missing or old); the rest is pure.
-import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { guidanceView } from './styleguide-data.mjs';
+import { projectPath } from './names.mjs';
 import { resolve, dirname, join } from 'node:path';
 
 const clean = (s) => String(s ?? '').replace(/@(deprecated|experimental|status|use-?instead|superseded-?by|replaced-?by|since|why|rationale)\b[ \t]*:?[^\n@]*/gi, ' ').replace(/\s+/g, ' ').trim();
@@ -92,7 +97,22 @@ export async function loadContext(ROOT, cfg = {}, catalog = { components: {} }, 
   if (screens.length) sources.push({ what: 'Figma', detail: `${screens.length} designed screen${screens.length === 1 ? '' : 's'} (${screensFile.replace(ROOT + '/', '')})` });
   if (Object.keys(catalog.components ?? {}).length) sources.push({ what: 'the code', detail: `${Object.keys(catalog.components).length} components, what each holds, notes beside them` });
   const authoredFile = cfg.contracts?.authored ? resolve(ROOT, cfg.contracts.authored) : join(ROOT, 'contract.authored.json');
-  if (existsSync(authoredFile)) sources.push({ what: 'the team', detail: `${authoredFile.replace(ROOT + '/', '')} (when not to use, what instead, status, notes)` });
+  const authoredJson = existsSync(authoredFile) ? readJSON(authoredFile) : null;
+  if (existsSync(authoredFile)) sources.push({ what: 'the team', detail: `${authoredFile.replace(ROOT + '/', '')} (when not to use, what instead, status, notes, usage, do and don't)` });
+  // Each component's Do and Don't: the captions of its pictures in the references (do/, dont/), then the examples
+  // contract.authored.json names. The words are what a prototype needs; the pictures stay in the style guide.
+  const refsDir = resolve(ROOT, cfg.visualRefs ?? projectPath(ROOT, 'refs'), 'components');
+  const examples = {};
+  for (const name of Object.keys(catalog.components ?? {})) {
+    const list = [];
+    for (const kind of ['do', 'dont']) {
+      const dir = join(refsDir, name.replace(/[^\w.-]+/g, '_'), kind);
+      try { for (const f of readdirSync(dir).filter((x) => /\.png$/i.test(x)).sort()) list.push({ kind, caption: f.replace(/\.png$/i, '').replace(/^\d+[\s._-]+/, '') }); } catch { /* none */ }
+    }
+    for (const e of authoredJson?.components?.[name]?.examples ?? []) if (e?.caption && /^(do|dont|don't)$/i.test(e.kind ?? '')) list.push({ kind: /^do$/i.test(e.kind) ? 'do' : 'dont', caption: String(e.caption) });
+    if (list.length) examples[name] = list;
+  }
+  if (Object.keys(examples).length) sources.push({ what: 'the team', detail: `Do and Don't of ${Object.keys(examples).length} component${Object.keys(examples).length === 1 ? '' : 's'}` });
   if (intent && LAYERS.some((L) => intent[L]?.authored)) sources.push({ what: 'the team', detail: `the design intent's ${LAYERS.filter((L) => intent[L]?.authored).join(', ')}` });
 
   // The guidelines, section by section, each with where it comes from.
@@ -110,7 +130,7 @@ export async function loadContext(ROOT, cfg = {}, catalog = { components: {} }, 
   }
   for (const n of linkNotes.filter((x) => x.status === 'not fetched yet')) sources.push({ what: 'guidelines', detail: `${n.provider} link ${n.url}: not fetched yet (its token goes in .env; the engine names it when it runs)`, missing: true });
 
-  const ctx = contextFrom(catalog, intent, sections);
+  const ctx = contextFrom(catalog, intent, sections, { authored: authoredJson, examples });
   return { ...ctx, sources, templates, screens, screensFile, breakpoints: breakpointsOf(vars), linkNotes };
 }
 
@@ -120,7 +140,8 @@ export function breakpointsOf(vars = {}) {
 }
 
 // { components: { name: { purpose, role, notes, notFor, useInstead, status, guidelines, options } }, rules, limits }
-export function contextFrom(catalog = { components: {} }, intent = null, sections = null) {
+// extra: { authored: contract.authored.json, examples: { name: [{ kind: 'do' | 'dont', caption }] } }
+export function contextFrom(catalog = { components: {} }, intent = null, sections = null, { authored = null, examples = {} } = {}) {
   const components = {};
   const names = Object.keys(catalog.components ?? {});
   const byKey = new Map(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n]));
@@ -141,9 +162,19 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     const notes = [...annotations.filter((a) => !/^role\s*:/i.test(a)), clean(i.code?.note), clean(i.code?.cssComment), clean(i.authored)].filter(Boolean);
     const options = Object.entries(c.props ?? {}).filter(([, e]) => e.description).map(([p, e]) => `${p}: ${clean(e.description)}`);
     const guidelines = clean(own.has(name) ? own.get(name).join(' ') : i.guidelines) || null;
-    const notFor = clean(c.whenNotToUse ?? i.guidance?.whenNotToUse) || null;
+    // Its usage, as the style guide shows it (When to use, When not to use, Common mistakes, Limitations).
+    const usage = guidanceView({ description: c.description ?? i.design?.description ?? '', annotations: i.design?.annotations ?? [], note: i.code?.note ?? '', authored: { ...(i.guidance ?? {}), ...(authored?.components?.[name]?.guidance ?? {}) } });
+    const said = (key) => (usage.sections.find((x) => x.key === key)?.text ?? []).map(clean).filter(Boolean);
+    const whenToUse = said('whenToUse'), mistakes = said('mistakes'), limitations = said('limitations');
+    const dos = (examples[name] ?? []).filter((e) => e.kind === 'do').map((e) => clean(e.caption)).filter(Boolean);
+    const donts = (examples[name] ?? []).filter((e) => e.kind === 'dont').map((e) => clean(e.caption)).filter(Boolean);
+    const notFor = clean(c.whenNotToUse ?? i.guidance?.whenNotToUse) || said('whenNotToUse').join(' ') || null;
     components[name] = {
-      never: neverOf([guidelines, ...notes].filter(Boolean).join(' '), notFor),
+      // What rules a use out: the documentation's "never" sentences, when not to use it, every common mistake and
+      // every Don't (each a use the team has seen go wrong).
+      never: [...neverOf([guidelines, ...notes].filter(Boolean).join(' '), notFor),
+        ...mistakes.map((m) => ({ sentence: `Common mistake: ${m}`, clause: m, min: 2 })), ...donts.map((d) => ({ sentence: `Don't: ${d}`, clause: d, min: 2 }))],
+      whenToUse, mistakes, limitations, dos, donts,
       purpose: clean(c.description) || clean(i.design?.description) || null,
       role,
       notes: [...new Set(notes)],
@@ -180,11 +211,11 @@ export function neverOf(text, notFor = null) {
 }
 
 // A use the documentation rules out: the words of a stand-in or a label that one of the component's "never" sentences
-// names. Returns [{ sentence, words }].
+// names. A common mistake or a Don't describes a whole use, so it takes two of its words. Returns [{ sentence, words }].
 export function ruledOut(k, text, name = '') {
   const w = wordsOf(text).filter((x) => x !== name.toLowerCase());
   if (!k?.never?.length || !w.length) return [];
-  return k.never.map((n) => ({ sentence: n.sentence, words: w.filter((x) => wordsOf(n.clause).includes(x)) })).filter((r) => r.words.length);
+  return k.never.map((n) => ({ sentence: n.sentence, words: w.filter((x) => wordsOf(n.clause).includes(x)) })).filter((r, i) => r.words.length >= (k.never[i].min ?? 1));
 }
 
 // The rules a check can hold a prototype to, read from the guidelines as written: "one <component> per screen",
@@ -208,7 +239,7 @@ export function limitsFrom(components, rules, names) {
   return out.filter((l) => !seen.has(l.component) && seen.add(l.component));
 }
 
-const said = (k) => k && (k.purpose || k.role || k.notes.length || k.notFor || k.guidelines || k.useInstead?.length || k.status || k.options?.length);
+const said = (k) => k && (k.purpose || k.role || k.notes.length || k.notFor || k.guidelines || k.useInstead?.length || k.status || k.options?.length || k.whenToUse?.length || k.mistakes?.length || k.limitations?.length || k.dos?.length || k.donts?.length);
 
 // One block per component for the catalog: what it is for, its role, its options' meaning, when not to use it, the
 // team's notes and its guidelines.
@@ -223,7 +254,12 @@ export function purposeLines(ctx, names, { width = 400 } = {}) {
     out.push(`  ${n.padEnd(pad)}  ${cut(head || '(no description yet)', width)}`);
     const more = (label, text) => out.push(`  ${' '.repeat(pad)}    ${label} ${cut(text, width)}`);
     for (const o of k.options) more('option', o);
+    for (const u of k.whenToUse ?? []) more('use when', u);
     if (k.notFor) more('not for', `${k.notFor}${k.useInstead?.length && !k.status ? `; use ${k.useInstead.join(' or ')}` : ''}`);
+    for (const m of k.mistakes ?? []) more('mistake', m);
+    for (const l of k.limitations ?? []) more('limit', l);
+    for (const d of k.dos ?? []) more('do', d);
+    for (const d of k.donts ?? []) more('don\'t', d);
     for (const note of k.notes.slice(0, 3)) more('note', note);
     if (k.guidelines) more('guidelines', k.guidelines);
   }
@@ -247,7 +283,7 @@ export function requestFocus(ctx, request, pages = []) {
     const inHead = hit(r.title), inBody = hit(r.text);
     return { ...r, score: inHead.length * 3 + inBody.length, matched: [...new Set([...inHead, ...inBody])] };
   }).filter((r) => r.score >= 2 || r.matched.length >= 2 || r.title === 'guidelines').sort((a, b) => (b.title === 'guidelines') - (a.title === 'guidelines') || b.score - a.score).slice(0, 5);
-  const positive = (k) => [k.purpose, k.role, ...k.options, ...(k.guidelines ?? '').split(/(?<=[.!?])\s+/), ...k.notes].filter((x) => x && !NEVER.test(x)).join(' ');
+  const positive = (k) => [k.purpose, k.role, ...k.options, ...(k.whenToUse ?? []), ...(k.dos ?? []), ...(k.guidelines ?? '').split(/(?<=[.!?])\s+/), ...k.notes].filter((x) => x && !NEVER.test(x)).join(' ');
   // A word many components' notes share (the product's name) points to none of them.
   const docs = Object.entries(ctx.components).map(([name, k]) => [name, hit(positive(k))]);
   const common = new Set(words.filter((w) => docs.filter(([, m]) => m.includes(w)).length > Math.max(2, docs.length / 4)));
@@ -293,7 +329,8 @@ export function usesAgainstPurpose(ctx, nodes) {
   }
   return [...byComponent].filter(([name]) => said(ctx.components[name])).map(([name, uses]) => {
     const k = ctx.components[name];
-    const rule = [k.purpose, k.role ? `Role ${k.role}.` : null, k.notFor ? `Not for ${k.notFor.replace(/^not for\s*/i, '')}` : null, k.guidelines ? `Guidelines: ${cut(k.guidelines, 240)}` : null].filter(Boolean).join(' ');
+    const rule = [k.purpose, k.role ? `Role ${k.role}.` : null, k.whenToUse?.length ? `Use when ${k.whenToUse.join('; ')}.` : null, k.notFor ? `Not for ${k.notFor.replace(/^not for\s*/i, '')}` : null,
+      k.mistakes?.length ? `Common mistakes: ${k.mistakes.join('; ')}.` : null, k.donts?.length ? `Don't: ${k.donts.join('; ')}.` : null, k.guidelines ? `Guidelines: ${cut(k.guidelines, 240)}` : null].filter(Boolean).join(' ');
     return { component: name, uses: [...new Set(uses)], rule };
   });
 }

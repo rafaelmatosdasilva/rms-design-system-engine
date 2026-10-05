@@ -48,3 +48,11 @@ test('script text in an HTML app file is never read as CSS', () => {
   }));
   assert.deepEqual(bindings(r.out), [3, 3], r.out);
 });
+
+test('an inside stroke drawn as an inset ring counts as a stroke on all four sides; no stroke at all still fails', () => {
+  const strokeContract = contract.replace("gapVar: 'gap/s' } };", "gapVar: 'gap/s', strokeSides: 'all' } };");
+  const ring = runGate('structure-check.mjs', files('.chip { padding: var(--padding-s) var(--padding-m); gap: var(--gap-s); box-shadow: inset 0 0 0 var(--line) var(--edge); }', { 'structure-contract.mjs': strokeContract }));
+  assert.doesNotMatch(ring.out, /chip\/stroke-sides: CSS missing/, ring.out);
+  const none = runGate('structure-check.mjs', files('.chip { padding: var(--padding-s) var(--padding-m); gap: var(--gap-s); box-shadow: 0 1px 2px #0003; }', { 'structure-contract.mjs': strokeContract }));
+  assert.match(none.out, /chip\/stroke-sides: CSS missing "border:" shorthand/, 'a drop shadow is no stroke');
+});

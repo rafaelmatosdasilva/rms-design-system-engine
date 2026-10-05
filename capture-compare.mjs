@@ -143,6 +143,20 @@ export function censusLines(c, top = 3) {
 }
 
 // Components: each Figma structure field against the measured and traced code facts.
+// An inset ring, as a box-shadow draws Figma's inside stroke (inset 0 0 0 1.5px, in either order Chrome or CSS
+// writes it): → { width, color } when it is one, with a colour that shows; else null.
+export function insetRingOf(shadow) {
+  for (const one of String(shadow ?? '').split(/,(?![^(]*\))/)) {
+    if (!/\binset\b/i.test(one)) continue;
+    const color = (one.match(/(rgba?|hsla?|color-mix|oklch|lab|lch)\([^)]*(\([^)]*\)[^)]*)*\)|#[0-9a-f]{3,8}\b/i) ?? [''])[0];
+    const lengths = one.replace(color, ' ').replace(/\binset\b/i, ' ').trim().split(/\s+/).filter(Boolean).map((x) => parseFloat(x));
+    if (lengths.length !== 4 || lengths.some((n) => !Number.isFinite(n)) || lengths[0] || lengths[1] || lengths[2] || !(lengths[3] > 0)) continue;
+    if (/^(transparent|rgba\([^)]*,\s*0\))$/i.test(color.replace(/\s+/g, ' '))) continue;
+    return { width: lengths[3], color: color || 'currentcolor' };
+  }
+  return null;
+}
+
 export function compareComponents(code, structure, vars, cfg, maps) {
   const spec = resolveNamingSpec(cfg);
   const sizeVar = (t) => (t ? maps.EXPLICIT_SIZING[t] ?? tokenToVar(t, spec, { raw: true }) : null);
@@ -278,8 +292,11 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       out.notComparable.push({ component: name, field: 'stroke', figma: 'draws a border', why: 'the code root draws nothing (a wrapper); name the part that draws the box in componentSelectors or the contract' });
     } else if (f.strokeOnDefault === true && !low && c.props?.borderTopWidth && !c.before) {
       const visible = (s) => { const w = c.props?.[`border${s}Width`]; return !!w && toNum(w.drawn ?? w.value) > 0; };
-      const colorSeen = !/^(transparent|rgba\([^)]*,\s*0\))$/i.test(String(c.props?.borderTopColor?.value ?? '').replace(/\s+/g, ' ').trim());
-      const drawn = ['Top', 'Right', 'Bottom', 'Left'].filter(visible).map((s) => s.toLowerCase());
+      // A stroke drawn inside the box, as Figma draws an inside stroke: an inset ring (box-shadow: inset 0 0 0 1.5px …)
+      // is a border on every side, in the ring's colour.
+      const insetRing = !!insetRingOf(c.props?.boxShadow?.value);
+      const colorSeen = insetRing || !/^(transparent|rgba\([^)]*,\s*0\))$/i.test(String(c.props?.borderTopColor?.value ?? '').replace(/\s+/g, ' ').trim());
+      const drawn = insetRing && !['Top', 'Right', 'Bottom', 'Left'].some(visible) ? ['top', 'right', 'bottom', 'left'] : ['Top', 'Right', 'Bottom', 'Left'].filter(visible).map((s) => s.toLowerCase());
       const named = f.strokeSides && !['all', 'none'].includes(f.strokeSides) ? [f.strokeSides] : null;
       const ok = named ? drawn.length === named.length && named.every((s) => drawn.includes(s)) : (drawn.length > 0 && colorSeen);
       settle(ok, { component: name, field: 'stroke', figma: named ? `border on ${named.join(', ')}` : 'draws a border', code: drawn.length && colorSeen ? `border on ${drawn.length === 4 ? 'all sides' : drawn.join(', ')}` : 'no visible border', rule: c.props?.borderTopWidth?.rule, at: c.props?.borderTopWidth?.at });

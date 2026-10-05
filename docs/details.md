@@ -66,7 +66,7 @@ Every run compares your code against Figma and reports it in plain words:
 - **No hand-built DS** components: a screen uses the real component, not a hand-styled copy.
 - **Clean CSS:** nothing unused, nothing that contradicts Figma. A focus ring's outline, which Figma has no value for, is listed apart, not failed.
 - **Nested components keep** their own styles: one component's look does not leak into another.
-- **Structure:** the right height, spacing and corners, from the design.
+- **Structure:** the right height, spacing and corners, from the design. A stroke Figma draws inside the box may be an inset ring in the code (`box-shadow: inset 0 0 0 1.5px …`), which adds no size and counts as that stroke.
 - **All states are** built: hover, disabled, selected and the rest, each with the right values.
 - **Component props match** Figma: the same names, defaults and choices, spelled exactly the same. `Size` and `size` are two prop names (a slot's name too), and the finding shows the letters that differ (`letter case S → s`). `L` and `large`, or `Large` and `large`, are two values; the finding says which code value it most likely is. The catalog tells AI tools the right name for each wrong one they are likely to guess (`error` → `danger`).
 - **Sub-components match Figma:** the parts Figma nests are the ones the code uses.
@@ -77,7 +77,7 @@ Every run compares your code against Figma and reports it in plain words:
 - **Transitions:** the durations and easings from the design.
 - **Motion:** movement values match Figma, when your design defines them.
 - **Shadows and blurs:** match Figma, when your design defines them.
-- **Renders correctly in** a browser: checked on the real result, not just the code on paper.
+- **Renders correctly in** a browser: checked on the real result, not just the code on paper. A component the page holds but does not draw on load (in a closed panel) is measured from its sample markup (the rule's `probe`) instead.
 - **What this audit** covered: so you can see nothing slipped through.
 - **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing. A file that only says what not to use is noted too: saying the design system is installed and its components are the ones to use is what moves agents onto it. Advisory; `"steering": false` in `ds-config.json` turns it off.
 

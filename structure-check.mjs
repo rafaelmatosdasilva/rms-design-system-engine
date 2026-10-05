@@ -821,9 +821,13 @@ if (themeCSS && Object.keys(COMPONENT_CSS_SELECTORS).length) {
 
     // \bborder\s*: matches the bare "border:" shorthand but NOT "border-bottom:", "border-radius:", etc.
     const hasShorthand = /\bborder\s*:/.test(mainBlock);
+    // Figma's stroke drawn inside the box, as Figma draws an inside stroke: an inset ring that adds no size
+    // (box-shadow: inset 0 0 0 <width> <colour>) is an all-sides stroke too.
+    const insetRing = /\bbox-shadow\s*:[^;]*\binset\s+0(px)?\s+0(px)?\s+0(px)?\s+(var\([^)]*\)|[\d.]+px)/.test(mainBlock);
 
     if (contract.strokeSides === 'all') {
-      if (!hasShorthand) BSIDES_FAIL.push(`${comp}/stroke-sides: CSS missing "border:" shorthand - contract says all-sides stroke`);
+      if (!hasShorthand && insetRing) BSIDES_PASS.push(`${comp}/stroke-sides (inside, an inset ring)`);
+      else if (!hasShorthand) BSIDES_FAIL.push(`${comp}/stroke-sides: CSS missing "border:" shorthand - contract says all-sides stroke`);
       else BSIDES_PASS.push(`${comp}/stroke-sides`);
     } else if (SIDE_NAMES.has(contract.strokeSides)) {
       const side = contract.strokeSides;

@@ -83,3 +83,35 @@ test('router: bringing Figma in line with the code goes to the engine\'s edits; 
   assert.equal(route('change the chip radius in Figma to 12px so it matches the code', {}).recipe, 'fix-a-difference');
   assert.notEqual(route('update the code to match Figma', {}).recipe, 'figma-edits', 'the code to Figma is the other way');
 });
+
+test('the prototypes\' gaps become the design team\'s to do list in Figma: its own page and frame, one card per need, written afresh', async () => {
+  const { gapEdits } = await import('../figma-edits.mjs');
+  assert.deepEqual(gapEdits([]), [], 'no gap, no list');
+  const merged = [{ need: 'a toggle switch', kind: 'component', closest: null, used: 'chip', prototypes: ['notify', 'settings'] }, { need: 'a Page layout component', kind: 'layout', used: 'the engine\'s Page', prototypes: ['notify'] }];
+  const edits = [...figmaEdits(SNAP, VIEW), ...gapEdits(merged)];
+  const lines = editLines(edits).join('\n');
+  assert.match(lines, /to do list in Figma, page "Design system to do", frame "Gaps from prototypes" \(2 needs the system lacks, from 2 prototypes, the most needed first\)/);
+  assert.match(lines, /• a toggle switch: component · meanwhile: chip · needed in 2 prototypes: notify, settings/);
+  assert.match(lines, /NEXT: show the person the 1 change and to do list above and ask/);
+  const script = applyScript(edits);
+  // A fake Figma: pages, frames and texts that keep what is set on them.
+  const node = (type) => ({ type, name: '', children: [], x: 0, y: 0, appendChild(k) { this.children.push(k); k.parent = this; }, remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); } });
+  const doc = { children: [] };
+  const fake = { root: doc, getNodeByIdAsync: async (id) => ({ '1:1': { annotations: [] } })[id] ?? null, loadFontAsync: async () => {},
+    createPage() { const p = node('PAGE'); p.parent = doc; doc.children.push(p); return p; }, createFrame: () => node('FRAME'), createText: () => node('TEXT') };
+  const go = () => new Function('figma', `return (async () => { ${script} })();`)(fake);
+  const r = await go();
+  assert.equal(r.todo, 'Design system to do › Gaps from prototypes: 2 needs');
+  const page = doc.children.find((p) => p.name === 'Design system to do');
+  const list = page.children.find((n) => n.name === 'Gaps from prototypes');
+  assert.deepEqual(list.children.slice(1).map((c) => c.name), ['a toggle switch', 'a Page layout component']);
+  assert.equal(list.children[1].children[1].characters, 'component · meanwhile: chip · needed in 2 prototypes: notify, settings');
+  await go();
+  assert.equal(doc.children.length, 1, 'the page is found again, not made twice');
+  assert.equal(page.children.length, 1, 'the list is written afresh, not added twice');
+});
+
+test('router: sending the prototypes\' gaps to Figma goes to the engine\'s edits, not to a new prototype', () => {
+  for (const t of ['send the prototype gaps to Figma', 'put the gaps in Figma for the design team', 'manda as lacunas pro figma']) assert.equal(route(t, {}).recipe, 'figma-edits', t);
+  assert.equal(route('prototype a settings page with our components', {}).recipe, 'prototype');
+});
