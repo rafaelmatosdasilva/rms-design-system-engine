@@ -45,10 +45,16 @@ export const VISUAL_EXPRESSION = `(() => {
 const WEIGHT = { align: 1, rhythm: 1, spacings: 1, primary: 2, hierarchy: 2, reading: 1, touching: 1 };
 const label = (b) => `${b.name}${b.path ? ` (${b.path})` : ''}`;
 
-// → { score, findings: [{ kind, message, path }] }
-export function visualFindings(facts) {
-  if (!facts) return { score: null, findings: [] };
-  const out = [];
+// textStyles: the system's text styles ([{ name, size, weight }]). A heading already in the largest of them cannot be
+// made larger: that is the system's limit, said as a gap, never taken off the score.
+// → { score, findings: [{ kind, message, path }], limits: [{ kind, message, need }] }
+export function visualFindings(facts, { textStyles = [] } = {}) {
+  if (!facts) return { score: null, findings: [], limits: [] };
+  const out = [], limits = [];
+  const sizes = textStyles.map((t) => Number(t.size)).filter((n) => n > 0);
+  const top = sizes.length ? Math.max(...sizes) : null;
+  const topStyle = top != null ? textStyles.filter((t) => Number(t.size) === top).sort((a, b) => (Number(b.weight) || 0) - (Number(a.weight) || 0))[0] : null;
+  const atTop = (h) => topStyle && h.size >= top - 0.5 && h.weight >= (Number(topStyle.weight) || 0) - 1;
   const add = (kind, message, path = null) => out.push({ kind, message, path });
   // Alignment: a column whose parts start where it says they start, by more than 2px.
   for (const c of facts.containers ?? []) {
@@ -85,13 +91,17 @@ export function visualFindings(facts) {
     for (const h of here) if (above.length && h.size > Math.min(...above.map((x) => x.size)) + 0.5) add('hierarchy', `the heading "${h.text}" (h${lv}, ${h.size}px) is larger than a heading above it in rank`, h.path);
   }
   const ranked = new Set(out.filter((f) => f.kind === 'hierarchy').map((f) => f.path));
-  if (bodySize) for (const h of heads) if (!ranked.has(h.path) && h.size <= bodySize && h.weight <= Math.max(...body.map((x) => x.weight))) add('hierarchy', `the heading "${h.text}" looks like body text (${h.size}px, weight ${h.weight}): use a larger or heavier text style`, h.path);
+  if (bodySize) for (const h of heads) {
+    if (ranked.has(h.path) || h.size > bodySize || h.weight > Math.max(...body.map((x) => x.weight))) continue;
+    if (atTop(h)) { if (!limits.some((l) => l.need === 'a heading text style')) limits.push({ kind: 'system', need: 'a heading text style', message: `the heading "${h.text}" is in the system's largest text style (${topStyle.name ?? `${top}px`}, ${top}px), the same as its body text: the system has no heading style; say so as a gap` }); continue; }
+    add('hierarchy', `the heading "${h.text}" looks like body text (${h.size}px, weight ${h.weight}): use a larger or heavier text style`, h.path);
+  }
   // Reading: a long line of text.
   for (const x of t) if (!x.level && x.lines >= 1 && x.chars / x.lines > 90 && x.chars > 90) add('reading', `"${x.text.slice(0, 40)}…" runs about ${Math.round(x.chars / x.lines)} characters a line: keep lines under 90 (a narrower column)`, x.path);
   const seen = new Set();
   const findings = out.filter((f) => !seen.has(f.message) && seen.add(f.message));
   const lost = findings.reduce((s, f) => s + (WEIGHT[f.kind] ?? 1), 0);
-  return { score: Math.max(0, 10 - lost), findings };
+  return { score: Math.max(0, 10 - lost), findings, limits };
 }
 
-export const visualLines = (v) => (v?.findings ?? []).map((f) => `⚠️  ${f.message}`);
+export const visualLines = (v) => [...(v?.findings ?? []).map((f) => `⚠️  ${f.message}`), ...(v?.limits ?? []).map((l) => `ℹ️  ${l.message}`)];

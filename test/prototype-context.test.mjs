@@ -293,7 +293,8 @@ test('the request: a component it names that the prototype leaves out is owed; o
   assert.match(asked[0].message, /the request asks for empty state and the system has emptyState, which is not in the prototype/);
   const out = requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { Label: 'Changes saved' } }]);
   assert.ok(out.some((f) => f.level === 'error' && /tag is ruled out for "message" in this request/.test(f.message)));
-  assert.deepEqual(requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { Label: 'Beta', purpose: 'marks the page as beta' } }]), [], 'another purpose, not ruled out');
+  // Another purpose is not ruled out; the confirmation the request asks for is still owed, the system having none.
+  assert.deepEqual(requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { Label: 'Beta', purpose: 'marks the page as beta' } }]).map((f) => [f.level, f.said]), [['warning', 'kind:confirmation message']]);
   assert.equal(requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { purpose: 'the confirmation message' } }]).length, 1, 'a purpose the documentation rules out too');
   const r = checkPrototype({ component: 'Page', children: [{ component: 'tag', props: { purpose: 'marks the page as beta' } }] }, { catalog: cat, view: { components: [{ name: 'tag', controls: [] }] }, scales: { spacing: [], text: [] }, context: ctx, request: 'a message confirming the save' });
   assert.equal(r.ok, true, JSON.stringify(r.findings));
@@ -359,4 +360,18 @@ test('the prototype context reads the Do and Don\'t pictures\' captions from the
   assert.deepEqual(ctx.components.chip.dos, ['One row of chips above the list']);
   assert.deepEqual(ctx.components.chip.whenToUse, ['filtering a list']);
   assert.ok(ctx.sources.some((s) => /Do and Don't of 1 component/.test(s.detail)));
+});
+
+test('a need said in a phrase (a message confirming it was saved) is a kind the system lacks, unless it has a toast or a banner', async () => {
+  const { kindsLacking } = await import('../prototype-context.mjs');
+  const ctx = { components: { button: {}, field: {} } };
+  assert.deepEqual(kindsLacking(ctx, 'a Save button, and a message confirming the changes were saved'), ['confirmation message']);
+  assert.deepEqual(kindsLacking({ components: { toast: {} } }, 'a message confirming the changes were saved'), []);
+  assert.deepEqual(kindsLacking(ctx, 'a list of messages'), []);
+});
+
+test('the engine\'s layout pieces a system lacks are one gap line', async () => {
+  const { groupLayout, gapLine } = await import('../prototype-pieces.mjs');
+  const lines = groupLayout([{ kind: 'component', need: 'toast' }, { kind: 'layout', need: 'a Row layout component' }, { kind: 'layout', need: 'a Stack layout component' }]).map(gapLine);
+  assert.deepEqual(lines, ['component: toast', "layout: Row and Stack layout components; the prototype uses the engine's own meanwhile"]);
 });

@@ -15,7 +15,7 @@ import { join, resolve, basename, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
-import { checkPrototype, systemScales, nodesOf, mergeGaps, gapLine, pieceCatalog } from './prototype-pieces.mjs';
+import { checkPrototype, systemScales, nodesOf, mergeGaps, groupLayout, gapLine, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
 import { loadContext, purposeLines, ruleLines, usesAgainstPurpose, requestFocus, focusLines, cut } from './prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from './product-conventions.mjs';
@@ -297,7 +297,7 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
   if (!browser || !page) return null;
   const tree = treeOf(splitStates(raw).ui);
   const pick = screenFor(name, raw, tree, screens ?? sys.context.screens ?? [], sys.catalog, slug);
-  const r = await renderPrototype(ROOT, cfg, page, { name, screen: pick?.screen ?? null, mode: pick?.mode ?? 'sibling', widths: screenWidths(sys.context.breakpoints) }).catch((e) => ({ why: String(e?.message ?? e).split('\n')[0] }));
+  const r = await renderPrototype(ROOT, cfg, page, { name, screen: pick?.screen ?? null, mode: pick?.mode ?? 'sibling', widths: screenWidths(sys.context.breakpoints), textStyles: sys.scales?.text ?? [] }).catch((e) => ({ why: String(e?.message ?? e).split('\n')[0] }));
   if (r.why) return { why: r.why };
   // What does not fit at some width, in some state, is owed in the reply as the words are written; with longer words, listed.
   const fitOwed = (r.fit?.findings ?? []).filter((f) => f.asWritten);
@@ -310,6 +310,11 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
   if (r.review?.findings?.length) {
     const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
     try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...r.review.findings.map((f) => ({ need: f.message.split(':')[0], kind: 'visual', line: f.message }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
+  }
+  // What the system cannot give the page (no heading style above its body text) is a gap the reply names.
+  if (r.review?.limits?.length) {
+    const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
+    try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...r.review.limits.map((l) => ({ need: l.need, kind: 'text style', line: l.message }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
   }
   if (!pick) return { picture: r.picture, cmp: [], a11y: prototypeA11y(ROOT, page, usedIn(tree)), interactions: r.interactions, fit: r.fit, review: r.review };
   const cmp = compareWithScreen(tree, r.rendered, pick.screen, { mode: pick.mode, catalog: sys.catalog, drawn: new Set((sys.parts.view.components ?? []).map((c) => c.name)) });
@@ -382,7 +387,7 @@ async function fromScreens(ROOT, cfg, file, sys, { force = false, browser = true
   if (h.gaps.length) console.log(`   spacing between parts: ${h.gaps.map((g) => `${g.name} ×${g.n}`).join(', ')}`);
   if (h.components.length) console.log(`   components used: ${h.components.map((c) => `${c.name} (${c.screens.length})`).join(', ')}`);
   if (h.repeated.length) { console.log('   structures that repeat (template candidates):'); for (const t of h.repeated) console.log(`     • ${t.structure} in ${t.screens.join(', ')}`); }
-  const merged = mergeGaps(JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'gaps.json'), 'utf8')).byPrototype);
+  const merged = groupLayout(mergeGaps(JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'gaps.json'), 'utf8')).byPrototype));
   if (merged.length) {
     console.log(`\n🧩 GAPS  ${merged.length}  (what the design system would need; nothing was invented)`);
     for (const g of merged.slice(0, 30)) console.log(`   • ${gapLine(g)}`);
@@ -506,7 +511,10 @@ export async function runPrototype(ROOT, argv) {
   if (JSON_MODE) { process.stdout.write(JSON.stringify({ ok: r.ok, page: page && page.replace(ROOT + '/', ''), findings: r.findings, counts: r.counts, gaps: r.gaps, used, screen: seen?.screen ? { name: seen.screen.name, mode: seen.mode, differences: seen.cmp, picture: seen.picture.replace(ROOT + '/', ''), visual: seen.visual } : null, picture: seen?.picture ? seen.picture.replace(ROOT + '/', '') : null }, null, 2) + '\n'); return r.ok ? 0 : 1; }
 
   console.log(`\nPrototype  ·  ${name}  ·  ${r.counts.components} part(s)`);
-  for (const f of r.findings) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} ${f.message}${f.rule ? `  (rule ${f.rule}: ${RULES[f.rule - 1]})` : f.source ? `  (${f.source})` : ''}`);
+  // The same line for several parts (three tags, each experimental) is said once, with how many.
+  const said = new Map();
+  for (const f of r.findings) { const k = `${f.level}|${f.message}`; if (said.has(k)) said.get(k).n++; else said.set(k, { f, n: 1 }); }
+  for (const { f, n } of said.values()) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} ${f.message}${n > 1 ? ` (${n} places)` : ''}${f.rule ? `  (rule ${f.rule}: ${RULES[f.rule - 1]})` : f.source ? `  (${f.source})` : ''}`);
   if (!r.ok) {
     console.log(`\n❌ ${r.counts.errors} error(s): nothing drawn.`);
     console.log(`\nNEXT: fix each ❌ line in ${input} (only the system's components and their own options; Missing for a need nothing fits), then run ${CLI} --prototype ${input} again.\n`);
@@ -542,7 +550,7 @@ export async function runPrototype(ROOT, argv) {
   const tried = (seen?.interactions ?? []).length;
   if (tried) { console.log(`\n🖱  HOW IT WORKS  ${tried} tried in the browser${works.length ? '' : ', all as in a product'}`); for (const l of works) console.log(`   ${l}`); }
   const placed = seen?.cmp ? owedFromScreen(seen.cmp) : [];
-  const gaps = mergeGaps({ [name]: r.gaps });
+  const gaps = groupLayout(mergeGaps({ [name]: r.gaps }));
   if (gaps.length) {
     console.log(`\n🧩 GAPS  ${gaps.length}  (what the design system would need; nothing was invented)`);
     for (const g of gaps) console.log(`   • ${gapLine(g)}`);

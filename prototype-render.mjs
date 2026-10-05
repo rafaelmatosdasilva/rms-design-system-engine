@@ -356,7 +356,7 @@ export function fitLines(list = [], { states = ['default'] } = {}) {
 
 // Open the drawn page, measure it, save its picture, and compare the picture with the Figma image of the screen when
 // one is at hand, and try how it works. Returns { rendered, picture, visual, interactions } or { why } when Chrome is missing or the page did not draw.
-export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mode = 'sibling', chromePath = findChrome({ playwright: true }), outDir = OUT_DIR, token, fetchImpl, widths = screenWidths() } = {}) {
+export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mode = 'sibling', chromePath = findChrome({ playwright: true }), outDir = OUT_DIR, token, fetchImpl, widths = screenWidths(), textStyles = [] } = {}) {
   if (!chromePath || typeof WebSocket === 'undefined') return { why: 'Chrome not found' };
   const chrome = await launchChrome(chromePath, { tmpPrefix: 'prototype-render-' });
   try {
@@ -374,7 +374,7 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
       await cdp.send('Runtime.evaluate', { expression: `Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 3000))]).then(() => true)`, awaitPromise: true, returnByValue: true }, sessionId).catch(() => null);
       const rendered = (await cdp.send('Runtime.evaluate', { expression: RENDER_EXPRESSION, returnByValue: true }, sessionId)).result?.value ?? [];
       // A design review of the page as drawn: alignment, spacing, one main action, hierarchy, line length.
-      const review = visualFindings((await cdp.send('Runtime.evaluate', { expression: VISUAL_EXPRESSION, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? null);
+      const review = visualFindings((await cdp.send('Runtime.evaluate', { expression: VISUAL_EXPRESSION, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? null, { textStyles });
       // The picture: the page itself, without the engine's bar, at scale 2 as Figma exports.
       const box = (await cdp.send('Runtime.evaluate', { expression: `(() => { const e = document.querySelector('[data-pt-path="0"]'); const kids = [...e.children]; const r = e.getBoundingClientRect(); const pb = parseFloat(getComputedStyle(e).paddingBottom) || 0; const bottom = kids.length ? Math.max(...kids.map((k) => k.getBoundingClientRect().bottom)) + pb : r.bottom; return { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: Math.max(1, bottom - r.top) }; })()`, returnByValue: true }, sessionId)).result?.value;
       const dir = resolve(ROOT, outDir, 'prototypes');
