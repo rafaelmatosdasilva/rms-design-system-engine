@@ -95,6 +95,12 @@ test('the whole project: files found on their own, build output and dependencies
   assert.deepEqual(r.findings.map((f) => [f.file, f.kind]).sort(), [['src/Icon.jsx', 'name'], ['src/theme.css', 'focus']]);
 });
 
+test('a built page with its source beside it is read once, from the source', () => {
+  const page = '<main><h1>T</h1><button><svg></svg></button></main>';
+  const dir = makeFixture({ 'app/ui.src.html': page, 'app/ui.html': page, 'other/page.html': page });
+  assert.deepEqual(staticA11y(dir).findings.map((f) => f.file).sort(), ['app/ui.src.html', 'other/page.html']);
+});
+
 test('a name written after a spread replaces the one the caller passes; before it, or falling back, it does not', () => {
   const after = 'export function Field({ label, ...inputProps }) {\n  return (\n    <input\n      type="text"\n      {...inputProps}\n      onChange={(e) => change(e)}\n      aria-label={label}\n    />\n  );\n}';
   const f = markupFindings(after).filter((x) => /after \{\.\.\.inputProps\}/.test(x.desc));
