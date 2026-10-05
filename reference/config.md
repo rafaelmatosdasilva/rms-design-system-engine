@@ -19,8 +19,8 @@ inputs (auto-detecting what it can):
 4. **DS source file for cross-checking** *(optional)* - if the project's snapshot is taken from a downstream file (e.g. a branded fork), the upstream DS Figma URL parses `figmaSourceKey`. Enables `⏳ PENDING FIGMA SYNC` in Gate [3] - mismatches where code matches the upstream source are flagged as pending rather than failures.
 
 Because the interview reads stdin, **drive it non-interactively with flags** (an agent turn
-or CI cannot answer live prompts). Ask the user only for what you don't have (the Figma URL,
-and the theme CSS path if none is auto-detected), then run:
+or CI cannot answer live prompts). Ask the user only for the Figma URL; find the token CSS
+yourself (local files, else every hosted stylesheet the code loads), then run:
 
 ```bash
 node <install-dir>/audit.mjs --init \
@@ -34,9 +34,21 @@ writing a broken config - that is the signal the DS declares no static token CSS
 values); report it rather than forcing a run. In that case setup also **scans the source for
 runtime-loaded stylesheets** - a dynamic `<link>` whose href is set in code, or a remote
 `…/theme.css` URL built in JS - and lists them (the likely token loader ranked above known CDN
-noise). Those are where the values actually live: download the theme stylesheet(s) locally and
-re-run with `--theme-css` pointing at them. A `FIGMA_TOKEN` in the environment is picked up
+noise). Those are where the values actually live. Setup takes every full stylesheet address it
+finds, and every URL `--theme-css` lists, into one local file (`src/styles/tokens.hosted.css`):
+the light (else first) colour mode at the desktop (else first) size in `:root`, each other colour
+mode in `:root[data-theme="…"]`, each other size mode in `:root[data-size="…"]`, each holding only
+what differs (`hosted-tokens.mjs`). An address built from parts in code is passed as every
+combination it allows. Nothing is asked: every mode is always taken. Run setup again to take
+them afresh. A `FIGMA_TOKEN` in the environment is picked up
 silently; it is never prompted for and never required.
+
+**Where the project is.** The engine works on the folder it runs in. `--project=<folder>` or
+`--project=<git link>` (cloned beside that folder once; `owner/repo` means GitHub) points it at
+another, on any command, and is remembered in the folder it ran from (`.design-system-engine-project`),
+so later runs there need no flag (it says `📁 Project: <folder>` on stderr). In a folder with no code
+(no manifest, stylesheet, page or script) setup does not guess: it exits with a NEXT line asking
+where the code is or whether there is only Figma (`--build`).
 
 **Do not ask for frame node IDs, collection names, or primitive prefixes** - these are either auto-detected or added later.
 

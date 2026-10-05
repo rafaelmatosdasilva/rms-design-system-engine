@@ -19,6 +19,7 @@
 //              gates (freshness, CSS hygiene) are computed on the main thread.
 
 import './stdio-sync.mjs';   // first: a report read through a pipe is never cut off at exit
+import { hasCode }                                              from './project-dir.mjs';   // second: moves to the project (--project, or the one remembered) before anything reads the folder
 import readline                                                  from 'readline';
 import { spawn, spawnSync }                                      from 'child_process';
 import { existsSync, readdirSync, readFileSync, statSync,
@@ -28,6 +29,7 @@ import { join, dirname, resolve, relative }                     from 'path';
 import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
 import { readGateLabels, parseOnly, onlyWords, onlyHelp } from './only.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
+import { takeableUrls, fetchHosted, mergeHosted }               from './hosted-tokens.mjs';
 import { fileURLToPath, pathToFileURL }                         from 'url';
 import { makeFigmaFetch, byNodeId, budgetLine, unchangedSince }  from './figma-fetch.mjs';
 import { createHash }                                           from 'crypto';
@@ -1127,12 +1129,37 @@ async function bootstrapConfig() {
     return null;
   };
 
+  // A folder with no code at all: the code is somewhere else, or there is only Figma. Never guessed: one question.
+  if (!INIT_BUILD && !INIT_THEME_CSS && !hasCode(ROOT)) {
+    console.log(C.yellow(`  ⚠️  This folder has no code: ${ROOT}`));
+    console.log('NEXT: ask the person one question: where is your code (a folder on this computer or a git link), or do you only have Figma? Then run rms-design-system-engine --init --figma-url=<the Figma link> --project=<their folder or link>, or add --build to start from Figma in this folder.');
+    process.exit(2);
+  }
   let figmaRaw, themeCSS, figmaSourceKey = '', buildMode = INIT_BUILD;
+  // Token values the product loads from hosted stylesheets (given as URLs, or found in its code when no local file
+  // declares them): every one is taken, each mode in its own block of one local file, so no mode is left out and
+  // nobody is asked which to take (hosted-tokens.mjs).
+  const HOSTED_FILE = 'src/styles/tokens.hosted.css';
+  const takeHosted = async (theme) => {
+    const given = theme == null ? [] : [theme].flat();
+    const urls = given.length ? given.filter((t) => /^https?:\/\//i.test(t)) : takeableUrls(runtimeHints);
+    if (!urls.length) return theme;
+    const local = given.filter((t) => !/^https?:\/\//i.test(t));
+    const files = await fetchHosted(urls, { log: (m) => console.log(C.yellow(`  ⚠️  Not taken: ${m}`)) });
+    if (!files.length) { console.log(C.yellow('  ⚠️  None of the hosted token stylesheets could be read.')); return local.length ? (local.length === 1 ? local[0] : local) : null; }
+    const merged = mergeHosted(files);
+    mkdirSync(dirname(join(ROOT, HOSTED_FILE)), { recursive: true });
+    writeFileSync(join(ROOT, HOSTED_FILE), merged.css);
+    const modes = [merged.base.colour, ...merged.colours].filter(Boolean).length > 1 || merged.sizes.length ? ` (${[[merged.base.colour, ...merged.colours].filter(Boolean).join(', '), [merged.base.size, ...merged.sizes].filter(Boolean).join(', ')].filter(Boolean).join(' × ')})` : '';
+    console.log(C.green(`  ✅ Took ${files.length} hosted token stylesheet(s), every mode${modes}, into ${HOSTED_FILE}`));
+    const all = [...local, HOSTED_FILE];
+    return all.length === 1 ? all[0] : all;
+  };
 
   if (INIT_NONINTERACTIVE) {
     console.log(C.dim('  Non-interactive setup (flags provided)'));
     figmaRaw = INIT_FIGMA_URL || '';
-    themeCSS = resolveTheme(INIT_THEME_CSS);
+    themeCSS = await takeHosted(resolveTheme(INIT_THEME_CSS));
     if (INIT_SOURCE_URL) figmaSourceKey = parseKey(INIT_SOURCE_URL);
     if (themeCSS == null && (INIT_BUILD || !runtimeHints.length)) { themeCSS = BUILD_THEME_DEFAULT; buildMode = true; }
     if (themeCSS == null) {
@@ -1153,7 +1180,7 @@ async function bootstrapConfig() {
     const themeAns = defaultHint
       ? ((await ask(`Token CSS file(s) [${defaultHint}]: `)).trim() || defaultHint)
       : (await ask(`Token CSS file(s) (e.g. src/styles/theme.css; leave empty if you only have Figma and want to build from it): `)).trim();
-    themeCSS = resolveTheme(themeAns);
+    themeCSS = await takeHosted(resolveTheme(themeAns));
     if (themeCSS == null && (INIT_BUILD || !runtimeHints.length)) { themeCSS = BUILD_THEME_DEFAULT; buildMode = true; }
 
     const isConsumer = (await ask('Is this a Figma consumer file that uses an external DS library? (y/N): ')).trim().toLowerCase();

@@ -150,11 +150,18 @@ node <install-dir>/audit.mjs --init \
 
 `--theme-css` may be omitted when the engine auto-detects a single token CSS file. A project
 with no CSS at all has only Figma: setup starts it in build mode (`--recipe build-from-figma`).
-If no `--theme-css` is given, none is auto-detected **and** the token values look loaded at
-runtime, setup exits with a clear error rather than writing a broken config - the signal that
-the DS declares no static token CSS (its token values are injected at runtime from a backend). The value gates resolve against a
-static `:root { --token: value }` file; a runtime-token DS has nothing local to compare
-against, so say so plainly instead of forcing a green run.
+**Setup asks the person only for the Figma link; every other choice takes the option that keeps
+the most of the system, without asking.** The one exception is a folder with no code: setup stops
+and its NEXT line asks where the code is (a folder or a git link) or whether there is only Figma.
+Pass the answer as `--project=<folder or link>` (a link is cloned beside the folder, `owner/repo`
+means GitHub), or `--build` for only Figma. The project is remembered in the folder it ran from, so
+later runs there go to it without `--project`. Token values loaded from hosted stylesheets (one per
+mode, such as light and dark × desktop, laptop, tablet) are all taken: setup takes every full
+stylesheet address it finds in the code, or the ones `--theme-css` lists (URLs and local files mixed), and writes them
+into one local file, `src/styles/tokens.hosted.css`, each mode in its own block. When the code
+builds the address from parts (`${theme}-${device}.css`), list every combination the code allows
+in `--theme-css`; never ask which modes to keep or whether to merge. Only when no value can be read
+from anywhere does setup exit with a clear error: say so plainly instead of forcing a green run.
 
 Route by intent:
 

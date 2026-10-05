@@ -117,7 +117,8 @@ export function codeSizeCSS(modeVariants = {}, themeCss = '') {
 export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
   const axes = [];
   const modes = cfg.figma?.modes?.length ? cfg.figma.modes : [{ name: 'Light', cssSelector: 'root' }, { name: 'Dark', cssSelector: 'dark-media' }];
-  const colour = { label: 'Color', values: [] };
+  // Each switch is named as Figma names the collection it switches (Styling, Sizing), never by what it is about.
+  const colour = { label: cfg.figma?.colorCollection || 'Mode', values: [] };
   for (const m of modes) {
     const sel = m.cssSelector ?? 'root';
     if (sel === 'root') colour.values.push({ label: m.name, value: '' });
@@ -138,7 +139,7 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
   // The mode the page rests on when the device's media query does not match: the root one, wherever Figma lists it.
   if (colour.media) colour.restValue = colour.values.find((v) => v.value !== colour.mediaValue)?.value ?? '';
   if (colour.values.length > 1) axes.push(colour);
-  for (const def of Object.values(figmaVars.modeVariants ?? {})) {
+  for (const [collection, def] of Object.entries(figmaVars.modeVariants ?? {})) {
     const ms = def?.modes ?? [];
     if (ms.length < 2 || !Object.values(def.vars ?? {}).some((v) => v?.kind === 'scalar')) continue;
     // A mode the code has no CSS for (no @media, [data-…] or class block sets these variables) is offered but not
@@ -149,7 +150,7 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
     // the base is then a value of its own, so a page seen on a phone can still be switched back, and the switch says
     // what the mode changes, from the code's own values.
     const code = codeSizeMode(def, themeCss);
-    const axis = { label: 'Size', attr: 'data-size', scoped: true, values: ms.map((m, i) => ({ label: m.name ?? m.snapshotKey, value: i === 0 ? (code ? String(m.snapshotKey) : '') : m.snapshotKey, ...(i > 0 && !inCode(m) ? { notInCode: true } : {}) })) };
+    const axis = { label: collection || cfg.figma?.sizingCollection || 'Mode', attr: 'data-size', scoped: true, values: ms.map((m, i) => ({ label: m.name ?? m.snapshotKey, value: i === 0 ? (code ? String(m.snapshotKey) : '') : m.snapshotKey, ...(i > 0 && !inCode(m) ? { notInCode: true } : {}) })) };
     if (code) Object.assign(axis, { media: code.block.condition, mediaValue: code.mode });   // the device or window the code draws it on
     if (code) axis.restValue = axis.values.find((v) => v.value !== code.mode && !v.notInCode)?.value ?? axis.values[0].value;
     if (code) axis.changes = { [code.mode]: Object.entries(code.block.decls).filter(([k, v]) => code.block.base[k] != null && code.block.base[k] !== v).map(([k, v]) => ({ name: code.names[k] ?? k, from: code.block.base[k], to: v })) };
@@ -702,6 +703,32 @@ export function componentTokens(cssText, cls) {
     }
   }
   return out;
+}
+
+// Every token a component is drawn with, visible in a variant or not: each var() in a rule for its class or one of its
+// parts (.badge-label, .badge__icon; never another component's class), with the properties it sets, ordered colour,
+// type, spacing, radius, border, shadow, then the rest. → [{ var, props: [prop] }]
+const TOKEN_KINDS = [/^(color|background|background-color|border(-\w+)?-color|outline-color|fill|stroke|caret-color|accent-color|text-decoration-color)$/, /^(font|font-\w+|line-height|letter-spacing|text-\w+)$/, /^(padding|margin|gap|row-gap|column-gap|inset|top|right|bottom|left)(-\w+)*$/, /radius/, /^(border|outline)(-\w+)*$/, /shadow/];
+export function allComponentTokens(cssText, cls, otherClasses = []) {
+  if (!cls) return [];
+  const clean = String(cssText).replace(/\/\*[\s\S]*?\*\//g, '');
+  const q = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const classRe = new RegExp(`\\.(${q(cls)}(?:(?:-|__)[\\w-]+)?)(?![\\w-])`, 'g');
+  const others = new Set(otherClasses.filter((o) => o && o !== cls));
+  const by = new Map();
+  for (const m of clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = m[1].trim();
+    if (selector.startsWith('@')) continue;
+    if (![...selector.matchAll(classRe)].some((h) => !others.has(h[1]))) continue;
+    for (const decl of m[2].split(';')) {
+      const i = decl.indexOf(':'); if (i < 0) continue;
+      const prop = decl.slice(0, i).trim();
+      if (prop.startsWith('--')) continue;   // a variable it sets, not one it draws with
+      for (const v of decl.slice(i + 1).matchAll(/var\(\s*(--[\w-]+)/g)) { const e = by.get(v[1]) ?? by.set(v[1], { var: v[1], props: [] }).get(v[1]); if (!e.props.includes(prop)) e.props.push(prop); }
+    }
+  }
+  const kind = (e) => { const k = e.props.map((p) => TOKEN_KINDS.findIndex((re) => re.test(p))).filter((n) => n >= 0); return k.length ? Math.min(...k) : TOKEN_KINDS.length; };
+  return [...by.values()].map((e, i) => ({ e, i, k: kind(e) })).sort((a, b) => a.k - b.k || a.i - b.i).map((x) => x.e);
 }
 
 // A Figma variant's name as its props: 'Size=L, State=Default' → { Size: 'L', State: 'Default' }; none → null.

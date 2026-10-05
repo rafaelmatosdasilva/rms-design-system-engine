@@ -478,6 +478,24 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const allCss = [systemCss, ...(ctx?.componentSheets ?? []).map(readText)].join('\n');
     // What uses each token, for the page's "What uses it" view.
     try { const { tokenUses } = await import('./styleguide-data.mjs'); view.tokenUses = tokenUses(allCss, view.components); } catch { /* none listed */ }
+    // Every token each component is drawn with (its parts and states too, seen in this variant or not), by Figma's name.
+    try {
+      const { allComponentTokens } = await import('./styleguide-data.mjs');
+      const named = new Map(), put = (t) => { if (t?.var && t.figma && !named.has(t.var)) named.set(t.var, t.figma); };
+      const T = view.tokens ?? {};
+      for (const g of T.colors ?? []) (g.items ?? []).forEach(put);
+      for (const k of ['spacing', 'radii', 'sizing', 'iconStrokes', 'shadows']) (T[k] ?? []).forEach(put);
+      for (const t of T.typography ?? []) for (const k of ['size', 'weight', 'lh', 'family', 'tracking']) put(t[k]);
+      for (const c of view.components) for (const t of [...(c.ownTokens?.colors ?? []), ...(c.ownTokens?.sizes ?? [])]) put(t);
+      const classes = view.components.map((c) => c.cls).filter((x) => x && !/^#/.test(x));
+      for (const c of view.components) {
+        if (!c.cls || /^#/.test(c.cls)) continue;
+        const own = allComponentTokens(allCss, c.cls, classes);
+        // The tokens named after it that its rules reach only through another token stay listed too.
+        for (const t of [...(c.ownTokens?.colors ?? []), ...(c.ownTokens?.sizes ?? [])]) if (!own.some((e) => e.var === t.var)) own.push({ var: t.var, props: [] });
+        if (own.length) c.allTokens = own.map((e) => ({ var: e.var, figma: named.get(e.var) ?? null, props: e.props }));
+      }
+    } catch { /* none listed */ }
     for (const c of view.components) { const m = motionUi(c.cls, allCss); if (m) c.motion = m; }
     // Each icon as Figma has it (the icon snapshot, keyed by the code's symbol id): its Figma name and its size.
     view.iconFigma = Object.fromEntries(Object.entries(readJson(cfg.paths?.snapshotIcons ?? '') ?? {})
