@@ -290,6 +290,14 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /Anatomy.*Usage/);
     // The name stays beside the areas; nothing differs, so Parity carries no alert and the page no line about it.
     assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + !!document.querySelector('#c-chip .pg-areas [data-v="parity"] .sg-seg-icon') + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|false|false');
+    // On a phone the areas scroll sideways in one row, never wrap; the one chosen scrolls into view.
+    await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 800, deviceScaleFactor: 1, mobile: true }, sessionId);
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(await run(`(() => { const s = document.querySelector('#c-chip .pg-areas-scroll'), items = [...s.querySelectorAll('[data-v]')]; return s.scrollWidth > s.clientWidth && new Set(items.map((b) => Math.round(b.getBoundingClientRect().top))).size === 1 && document.documentElement.scrollWidth <= innerWidth; })()`), true, 'one row that scrolls, the page itself no wider than the screen');
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'log').click()`);
+    assert.equal(await run(`(() => { const s = document.querySelector('#c-chip .pg-areas-scroll'), b = s.querySelector('[data-v="log"]').getBoundingClientRect(), r = s.getBoundingClientRect(); return s.scrollLeft > 0 && b.right <= r.right + 1; })()`), true, 'Changelog scrolled into view');
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
+    await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
     // How to use it: the same four sections on every page, a missing one said; the overview counts them.
     assert.match(await run(`document.querySelector('#c-chip [data-area="docs"]').textContent`), /Usage.*When to use.*When not to use.*Common mistakes.*Limitations.*Not written yet/s);
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
