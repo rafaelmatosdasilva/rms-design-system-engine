@@ -110,6 +110,15 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-status--beta { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }
 .sg-status--deprecated { background: color-mix(in srgb, var(--sg-warning) 24%, transparent); }
 .pg-status { display: flex; align-items: center; gap: var(--sg-space-s); flex-wrap: wrap; margin: var(--sg-space-xs) 0 0; font-size: var(--sg-s); color: var(--sg-text-2); }
+/* What a component's page says first, and its overview card under its name: its version, when it last changed, how it
+   stands with Figma and with accessibility, and where it is used. A fact that needs work is marked, never coloured alone. */
+.pg-facts { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs) var(--sg-space-l); margin: var(--sg-space-s) 0 0; font-size: var(--sg-s); color: var(--sg-text-2); }
+.pg-facts > div { display: flex; gap: var(--sg-space-xs); align-items: baseline; }
+.pg-facts dt { color: var(--sg-muted); }
+.pg-facts dd { margin: 0; color: var(--sg-text); }
+.sg-fact-todo { font-weight: var(--sg-heading-weight); }
+.sg-fact-todo::before { content: "! "; }
+.sg-card-facts { font-size: var(--sg-s); color: var(--sg-text-2); margin: 0; }
 .sg-overview-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }
 /* Each card's thumbnail: a few of the real tokens, or the component itself, drawn small on the system's own surface. */
 .sg-thumb { position: relative; height: 180px; overflow: hidden; contain: layout paint; display: flex; align-items: center; justify-content: center; gap: var(--sg-space-s); background: var(--sg-stage, var(--sg-bg)); border-radius: var(--sg-radius); pointer-events: none; }
@@ -238,6 +247,12 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Anatomy: the component as set in the Playground, drawn larger, each part, padding and gap outlined and numbered. */
 .pg-anatomy { display: flex; justify-content: center; padding: var(--sg-space-xxl) var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-l); background: var(--sg-bg); overflow: auto; }
 .pg-anat-stage { position: relative; flex: none; }
+/* Variants: one option per row, its name, the component as drawn with it, and Try it to set it in the Playground. */
+.pg-variants { display: flex; flex-direction: column; gap: var(--sg-space-l); }
+.pg-variant-row { display: grid; grid-template-columns: minmax(120px, 1fr) 3fr auto; gap: var(--sg-space-m); align-items: center; padding: var(--sg-space-m); border-bottom: var(--sg-line); }
+.pg-variant-row:last-child { border-bottom: none; }
+.pg-variant-stage { display: flex; align-items: center; min-width: 0; overflow: auto; }
+@media (max-width: 640px) { .pg-variant-row { grid-template-columns: 1fr auto; } .pg-variant-stage { grid-column: 1 / -1; grid-row: 2; } }
 .pg-anat-wrap { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; }
 .pg-anat-wrap, .pg-anat-wrap * { animation: none !important; transition: none !important; }   /* drawn at rest, never mid-entry */
 .pg-anatomy-doc, .pg-anatomy { min-width: 0; }
@@ -503,11 +518,32 @@ a.pg-usage-name { color: var(--sg-text); }
   var GROUPS = DATA.groups || {};
   // How ready it is, as a small label: only what the team said, never a guess.
   function statusPill(st) { return st ? '<span class="sg-status sg-status--' + esc(st.kind) + '">' + esc(st.status) + '</span>' : ''; }
+  // What a component's header and its card say at a glance, from what the page already holds: the release its last
+  // change shipped in and that change's date (its changelog), how it stands with Figma (Parity: what differs, what the
+  // code does not build) and with accessibility (the last browser check), and how many products use it.
+  // → { version, changed, parity: { say, todo }, a11y: { say, todo }, used }
+  function factsOf(c) {
+    var log = c.changelog || [], rel = log.find(function (r) { return r.release; });
+    var p = c.parity && c.parity.counts, differ = p ? p.differ : (c.differences || []).length, unbuilt = p ? p.notBuilt : (c.unbuilt || []).length;
+    var parity = differ || unbuilt ? { say: [differ ? (differ === 1 ? '1 difference' : differ + ' differences') : '', unbuilt ? unbuilt + ' not built' : ''].filter(Boolean).join(', '), todo: true }
+      : { say: p && p.notCompared ? 'Agrees, ' + p.notCompared + ' not compared' : 'Agrees', todo: false };
+    var ch = c.a11y && c.a11y.checked, n = ch && !ch.notRead ? ch.issues.reduce(function (s, i) { return s + ((i.details || []).length || 1); }, 0) : 0;
+    var a11y = !ch || ch.notRead ? { say: 'Not checked in a browser yet', todo: false } : n ? { say: n === 1 ? '1 problem' : n + ' problems', todo: true } : { say: 'No problem found', todo: false };
+    var used = (c.usage || []).length;
+    return { version: rel ? rel.release : log.length ? 'Not released yet' : null, changed: log.length ? String(log[0].date).slice(0, 10) : null, parity: parity, a11y: a11y, used: used };
+  }
+  function factsHTML(c) {
+    var f = factsOf(c), item = function (k, v, todo) { return '<div><dt>' + esc(k) + '</dt><dd' + (todo ? ' class="sg-fact-todo"' : '') + '>' + esc(v) + '</dd></div>'; };
+    return '<dl class="pg-facts">' + (f.version ? item('Version', f.version) : '') + (f.changed ? item('Last changed', f.changed) : '') +
+      item('Figma', f.parity.say, f.parity.todo) + item('Accessibility', f.a11y.say, f.a11y.todo) + item('Used in', !f.used ? 'No product yet' : f.used === 1 ? '1 product' : f.used + ' products') + '</dl>';
+  }
+  // On its card: only how it stands, in one line (Figma, then accessibility).
+  function cardFacts(c) { var f = factsOf(c); return '<p class="sg-card-facts"><span' + (f.parity.todo ? ' class="sg-fact-todo"' : '') + '>Figma ' + esc(f.parity.say.toLowerCase()) + '</span>  ·  <span' + (f.a11y.todo ? ' class="sg-fact-todo"' : '') + '>' + 'Accessibility ' + esc(f.a11y.todo || /^No problem/.test(f.a11y.say) ? f.a11y.say.toLowerCase() : 'not checked') + '</span></p>'; }
   var THUMBS = {};
-  function card(grid, id, label, title, sub, thumb, status) {
+  function card(grid, id, label, title, sub, thumb, status, facts) {
     var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ''); a.href = '#' + id; a.dataset.name = title.toLowerCase();
     // The thumbnail and the name, with how ready it is when the team said so: the group heading says what it is.
-    a.innerHTML = '<div class="sg-thumb" aria-hidden="true">' + (thumb || '') + '</div><h3>' + esc(title) + (status ? ' ' + statusPill(status) : '') + '</h3>';
+    a.innerHTML = '<div class="sg-thumb" aria-hidden="true">' + (thumb || '') + '</div><h3>' + esc(title) + (status ? ' ' + statusPill(status) : '') + '</h3>' + (facts || '');
     grid.appendChild(a); THUMBS[id] = a.querySelector('.sg-thumb'); return a;
   }
   var fGrid = group('Foundations', GROUPS.foundations || 'The values every component is made of: colours, type, spacing, radii and icons, each the CSS variable itself, in every mode.');
@@ -524,7 +560,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var ps = (c.controls || []).map(function (p) { return p.label; });
     return ps.length ? ps.slice(0, 3).join(', ') + (ps.length > 3 ? ' and ' + (ps.length - 3) + ' more' : '') + '.' : c.role ? 'A ' + c.role + '.' : 'No props yet.';
   };
-  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { card(cGrid, 'c-' + c.name, 'Components', c.name, about(c), '', c.status); });
+  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { card(cGrid, 'c-' + c.name, 'Components', c.name, about(c), '', c.status, cardFacts(c)); });
   // A component's thumbnail is its own preview, drawn small and inert, once its section has drawn it. Never with ?all:
   // the engine measures that page, and a shrunken copy would be read as the component.
   function thumbOf(c, src) {
@@ -1306,7 +1342,9 @@ a.pg-usage-name { color: var(--sg-text); }
   // The widths the playground shows a component at: as it fits (live), or in a frame of a phone's, tablet's or desktop's
   // width, where the system's own media queries apply. The one chosen stays for the next component.
   var WIDTHS = [['fit', 'Fit'], ['phone', 'Phone', 375], ['tablet', 'Tablet', 768], ['desktop', 'Desktop', 1280]], WIDTH = 'fit';
-  var AREAS = [['play', 'Playground'], ['specs', 'Specs'], ['docs', 'Documentation'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['built', 'Built with'], ['used', 'Used in'], ['log', 'Changelog']], AREA = 'play';
+  var AREAS = [['play', 'Playground'], ['specs', 'Specs'], ['variants', 'Variants'], ['docs', 'Documentation'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['built', 'Built with'], ['used', 'Used in'], ['log', 'Changelog']], AREA = 'play';
+  // The props whose options are its variants (two or more built), in Figma's order.
+  function variantProps(c) { return (c.controls || []).filter(function (p) { return p.type === 'VARIANT' && (p.options || []).filter(function (o) { return !o.unbuilt; }).length > 1; }); }
   // ── Where it is used: a card per product, its own page pictured as it opens with each place the component sits on it
   // marked, linked to the product ─────────────────────────────────────────────────────────────────────────────────────
   function usedInHTML(c) {
@@ -1427,10 +1465,11 @@ a.pg-usage-name { color: var(--sg-text); }
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2></div>' +
         (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
+        (ALL ? '' : factsHTML(c)) +
         importHTML(c) + linksHTML(c.links) +
       '</div>' +
       // What differs from Figma is marked on Parity itself: the system's alert icon, its count said to a screen reader.
-      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return a[0] !== 'built' || (c.uses || []).length; }).map(function (a) {
+      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantProps(c).length)); }).map(function (a) {
         var n = a[0] === 'parity' ? (c.differences || []).length : 0;
         return { v: a[0], label: a[1], icon: n ? ALERT_ICON : null, say: n ? (n === 1 ? 'one thing differs from Figma' : n + ' things differ from Figma') : null };
       })) + '</div></div>' +
@@ -1449,6 +1488,8 @@ a.pg-usage-name { color: var(--sg-text); }
       // name in the list) shows the tokens it is drawn with. Every token it uses below.
       (ALL ? '' : '<div class="pg-area" data-area="specs"><div class="pg-footer"><div class="pg-doc pg-anatomy-doc"><h3>Anatomy</h3><div class="pg-anatomy"></div><dl class="pg-updated pg-anat-pick"></dl><dl class="pg-updated pg-anat-legend"></dl></div>' +
         ((c.allTokens || []).length || (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length)) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>') +
+      // Variants: every option of each variant prop, one per row, the other props as the Playground sets them.
+      (ALL || !variantProps(c).length ? '' : '<div class="pg-area" data-area="variants"><div class="pg-footer"><div class="pg-variants"></div></div></div>') +
       // Documentation: its API, Figma's and the code's own words, and when each side last changed.
       '<div class="pg-area" data-area="docs"><div class="pg-footer">' +
         guidanceHTML(c) + examplesHTML(c) + apiHTML(c) +
@@ -1547,6 +1588,7 @@ a.pg-usage-name { color: var(--sg-text); }
       if (strip && on && strip.scrollWidth > strip.clientWidth) { var sr = strip.getBoundingClientRect(), br = on.getBoundingClientRect(); if (br.left < sr.left || br.right > sr.right) strip.scrollLeft += br.left < sr.left ? br.left - sr.left - 8 : br.right - sr.right + 8; }
       if (v === 'play') { nudge(); codeHeight(); }
       if (v === 'specs') requestAnimationFrame(drawAnatomy);
+      if (v === 'variants') requestAnimationFrame(drawVariants);
       if (v === 'a11y') checkLive();
       if (v === 'built') requestAnimationFrame(function () { builtThumbs(sec); });
     }
@@ -1692,6 +1734,38 @@ a.pg-usage-name { color: var(--sg-text); }
         : info.el ? '<div><dt>Picked</dt><dd><p><b>' + esc(info.name) + '</b></p>' + lookRows(info.el, false).filter(function (x) { return x[1] !== '-' && x[1] !== 'none' && x[1] !== 'transparent' && x[1] !== '0'; }).map(function (x) { return '<p>' + esc(x[0]) + '  ·  ' + esc(x[1]) + '</p>'; }).join('') + '</dd></div>'
         : '<div><dt>Picked</dt><dd><p><b>' + esc(info.what) + '</b>  ·  ' + esc(info.value) + '</p></dd></div>';
     }
+    // Variants: each option drawn by the Playground itself (its own refresh), copied still and inert into its row, then
+    // the Playground set back as it was. Each row names its prop and option; a click on Try it sets it in the Playground.
+    var variantsBox = sec.querySelector('.pg-variants'), drawingVariants = false;
+    function drawVariants() {
+      if (!variantsBox || drawingVariants || !cur) return;
+      drawingVariants = true;
+      var keep = {}; Object.keys(state).forEach(function (k) { keep[k] = state[k]; });
+      var html = '';
+      try {
+        variantProps(c).forEach(function (p) {
+          html += '<div class="pg-inspect pg-variant-group"><div class="pg-inspect-head"><h3>' + esc(p.label) + '</h3></div>';
+          (p.options || []).forEach(function (o) {
+            if (o.unbuilt) { html += '<div class="pg-variant-row"><div class="pg-ctl-label">' + esc(o.label) + '</div><p class="pg-empty">Figma has it; the code does not build it yet.</p></div>'; return; }
+            state[p.label] = o.label; refresh();
+            var src = preview.firstElementChild, copy = src ? src.cloneNode(true) : null;
+            if (copy) { copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true'); [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[id]'))).forEach(function (k) { k.removeAttribute('id'); }); }
+            var modes = Array.prototype.filter.call(preview.attributes, function (a) { return /^data-/.test(a.name); }).map(function (a) { return ' ' + a.name + '="' + esc(a.value) + '"'; }).join('');
+            html += '<div class="pg-variant-row"><div class="pg-ctl-label">' + esc(o.label) + (o.label === keep[p.label] ? ' (in the Playground)' : '') + '</div><div class="pg-variant-stage"' + modes + '>' + (copy ? copy.outerHTML : '') + '</div>' +
+              sysButton('button', 'Try it', ' data-try="' + esc(p.label) + '" data-v="' + esc(o.label) + '"') + '</div>';
+          });
+          html += '</div>';
+          state[p.label] = keep[p.label];
+        });
+      } finally { Object.keys(keep).forEach(function (k) { state[k] = keep[k]; }); refresh(); drawingVariants = false; }
+      variantsBox.innerHTML = html;
+    }
+    if (variantsBox) variantsBox.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-try]'); if (!b) return;
+      state[b.getAttribute('data-try')] = b.getAttribute('data-v');
+      Object.keys(syncs).forEach(function (k) { syncs[k](); });
+      showArea('play'); refresh();
+    });
     var anatPicked = null, anatPick = sec.querySelector('.pg-anat-pick');
     function pickAnatomy(key) { anatPicked = anatPicked === key ? null : key; drawAnatomy(); }
     if (anatBox) anatBox.addEventListener('click', function (e) { var h = e.target.closest && e.target.closest('.pg-anat-marks [data-hit]'); if (!h) return; e.preventDefault(); pickAnatomy(h.getAttribute('data-hit')); });
@@ -1853,6 +1927,7 @@ a.pg-usage-name { color: var(--sg-text); }
       inspect(e);
       drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
       if (AREA === 'specs') requestAnimationFrame(drawAnatomy);
+      if (AREA === 'variants' && !drawingVariants) requestAnimationFrame(drawVariants);
     }
     // The tables beside the preview, read from the component as it is drawn now.
     function inspect(e) {

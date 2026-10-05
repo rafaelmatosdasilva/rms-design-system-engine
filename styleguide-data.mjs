@@ -1188,7 +1188,7 @@ export function apiView(api, file = api?.file) {
 // ── Accessibility, per component: what it owes and what the last browser check found ─────────────────────────────────
 // Each check of a11y-check.mjs, by the WCAG 2.2 success criterion it stands for.
 export const A11Y_WCAG = {
-  contrast: '1.4.3', hovercontrast: '1.4.3', focuscontrast: '1.4.11', name: '4.1.2', focus: '2.4.7', ariastate: '4.1.2', keyboard: '2.1.1',
+  contrast: '1.4.3', hovercontrast: '1.4.3', focuscontrast: '1.4.11', iconcontrast: '1.4.11', name: '4.1.2', focus: '2.4.7', ariastate: '4.1.2', keyboard: '2.1.1',
   target: '2.5.8', tabtrap: '2.1.2', tabindex: '2.4.3', escape: '2.1.1', focusreturn: '2.4.3', heading: '1.3.1', motion: '2.3.3', forcedfocus: '2.4.7',
   spacing: '1.4.12', activate: '2.1.1', arrows: '2.1.1', zoom: '1.4.4', obscured: '2.4.11', focusthin: '2.4.13', rolecontract: '4.1.2', annotation: '4.1.2',
   reflow: '1.4.10', partrole: '1.3.1', behaviour: '2.1.1', statefollows: '4.1.2', semantics: '4.1.2',
@@ -1275,6 +1275,19 @@ export function parityView({ name, agreed = {}, census = null, differences = [],
   const notBuilt = unbuilt.map((u) => u.label ?? u);
   return { agreed: facts, props, tokens, differ: differences, notBuilt, notCompared,
     counts: { agree: facts.length + props.length + tokens.length, differ: differences.length, notBuilt: notBuilt.length, notCompared: notCompared?.count ?? 0 } };
+}
+
+// ── Where a person reports a problem: an issue about one component, or feedback on the page ────────────────────────
+// template: ds-config styleguide.issues, the tracker's new-issue address with {name} for the component and {title} for a
+// ready title ("https://redmine.example.com/projects/ds/issues/new?issue[subject]={title}"). Without one, the repository's
+// own tracker when it is on GitHub or GitLab. name: the component, or null for the page. → url | null
+export function issueLink({ template = null, repo = null, name = null } = {}) {
+  const title = name ? `${name}: ` : 'Style guide: ';
+  if (template) return String(template).replace(/\{name\}/g, encodeURIComponent(name ?? '')).replace(/\{title\}/g, encodeURIComponent(title));
+  if (!repo) return null;
+  if (/github\.com/i.test(repo)) return `${repo.replace(/\/$/, '')}/issues/new?title=${encodeURIComponent(title)}`;
+  if (/gitlab/i.test(repo)) return `${repo.replace(/\/$/, '')}/-/issues/new?issue[title]=${encodeURIComponent(title)}`;
+  return null;
 }
 
 // ── How a product brings the component in ─────────────────────────────────────────────────────────────────────────

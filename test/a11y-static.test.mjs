@@ -9,6 +9,15 @@ const kinds = (xs) => xs.map((x) => [x.line, x.kind]);
 test('a control with no accessible name', () => {
   assert.deepEqual(kinds(markupFindings('<button class="x"><svg viewBox="0 0 1 1"/></button>')), [[1, 'name']]);
   assert.deepEqual(kinds(markupFindings('<button aria-label="Close"><svg/></button>')), []);
+  // An icon named only by its title: a tooltip that touch and keyboard users never see.
+  const tip = markupFindings('<button title="Dark mode"><svg/></button>\n<a href="/up" title="Upload tokens"><svg/></a>\n<button title="Save">Save</button>');
+  assert.deepEqual(kinds(tip), [[1, 'name'], [2, 'name']]);
+  assert.match(tip[0].desc, /named only by its title/);
+  assert.match(tip[0].fix, /words beside the icon/);
+  // A sprite icon in one fixed colour of its own stays that colour in the dark theme; currentColor and a logo are fine.
+  const sprite = markupFindings('<svg><symbol id="icon-info"><path fill="#333" d="M0"/></symbol>\n<symbol id="icon-ok"><path fill="currentColor" d="M0"/></symbol>\n<symbol id="logo"><path fill="#f00" d="M0"/><path fill="#00f" d="M1"/></symbol>\n<symbol id="icon-line" stroke="none"><path style="stroke: #222" d="M0"/></symbol></svg>');
+  assert.deepEqual(kinds(sprite), [[1, 'contrast'], [4, 'contrast']]);
+  assert.match(sprite[0].desc, /icon-info paints itself #333/);
   assert.deepEqual(kinds(markupFindings('<button type="button"><span aria-hidden="true"></span><span>Save</span></button>')), []);
   assert.deepEqual(kinds(markupFindings('<button onClick={f}>{label}</button>')), []);           // text from a prop
   assert.deepEqual(kinds(markupFindings('<button {...props}><Icon /></button>')), []);           // attributes from outside

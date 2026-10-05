@@ -6,6 +6,9 @@
 // engine's other source readers, advisory, never a failed build:
 //   • a control with no accessible name: a button with only an icon inside and no aria-label, aria-labelledby or
 //     title; an image with no alt; a text field with no label, aria-label or aria-labelledby;
+//   • an icon button or link named only by its title: a tooltip no one on a touch screen or a keyboard sees;
+//   • a sprite icon (<symbol>) that paints one fixed colour of its own: it keeps it in the dark theme and can
+//     disappear there (one in several colours is an illustration or a logo, left alone);
 //   • CSS that removes the focus outline and never puts a focus style back;
 //   • a positive tabindex (it breaks the reading order);
 //   • a click handler on a div or span with no role and no tabindex (a mouse-only control);
@@ -59,16 +62,20 @@ export function markupFindings(text) {
   const src = String(text ?? '').replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
   for (const m of src.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/gi)) {
     const [, attrs, inner] = m;
-    if (spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'title')) continue;
+    if (spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby')) continue;
     if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
     if (/<\w+\b[^>]*\bid\s*=\s*["'][^"']+["'][^>]*>\s*<\//.test(inner)) continue;   // an empty element with an id: a script fills it
-    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<what it does>"' });
+    if (visibleText(inner) || innerName(inner)) continue;
+    if (has(attrs, 'title')) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside, named only by its title: a tooltip no one sees on a touch screen or with the keyboard', fix: 'put words beside the icon, or at least add aria-label="<what it does>"' });
+    else out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<what it does>"' });
   }
   for (const m of src.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const [, attrs, inner] = m;
-    if (!has(attrs, 'href') || spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'title')) continue;
+    if (!has(attrs, 'href') || spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby')) continue;
     if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
-    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<where it goes>"' });
+    if (visibleText(inner) || innerName(inner)) continue;
+    if (has(attrs, 'title')) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside, named only by its title: a tooltip no one sees on a touch screen or with the keyboard', fix: 'put words beside the icon, or at least add aria-label="<where it goes>"' });
+    else out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<where it goes>"' });
   }
   for (const m of src.matchAll(/<img\b([^>]*)>/gi)) {
     if (!spread(m[1]) && !has(m[1], 'alt') && !has(m[1], 'aria-label') && !has(m[1], 'aria-labelledby') && !/role\s*=\s*["']presentation|role\s*=\s*["']none/i.test(m[1]))
@@ -84,6 +91,13 @@ export function markupFindings(text) {
     const before = src.slice(0, m.index), open = before.lastIndexOf('<label'), close = before.lastIndexOf('</label>');
     if (open > close) continue;   // inside a <label>
     out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a text field with no label, aria-label or aria-labelledby', fix: 'give it a <label>, or aria-label="<what to type>"' });
+  }
+  for (const m of src.matchAll(/<symbol\b([^>]*)>([\s\S]*?)<\/symbol>/gi)) {
+    const id = /\bid\s*=\s*["']([^"']+)["']/i.exec(m[1])?.[1] ?? 'an icon';
+    const paints = [...(m[1] + m[2]).matchAll(/\b(?:fill|stroke)\s*(?:=\s*["']|:\s*)\s*([^"';>\s]+)/gi)].map((p) => p[1].toLowerCase())
+      .filter((v) => !/^(none|currentcolor|inherit|transparent|context-fill|context-stroke|url\(.*)$/.test(v) && !/^var\(/.test(v));
+    const colours = [...new Set(paints)];
+    if (colours.length === 1) out.push({ line: lineAt(src, m.index), kind: 'contrast', desc: `the icon ${id} paints itself ${colours[0]}: it keeps that colour in every theme and can disappear on a dark background`, fix: `write fill="currentColor" (or stroke), so the icon takes the colour of the text around it` });
   }
   for (const m of src.matchAll(/\btab[iI]ndex\s*=\s*\{?\s*["']?([1-9]\d*)/g))
     out.push({ line: lineAt(src, m.index), kind: 'keyboard', desc: `tabindex="${m[1]}": a positive tabindex breaks the order a keyboard moves in (use 0 or -1)` });

@@ -252,7 +252,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the part. Above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
-- **A component's page in areas**: Playground, Specs, Documentation, Accessibility, Parity and Used in, one at a time on
+- **A component's page in areas**: Playground, Specs, Variants, Documentation, Accessibility, Parity and Used in, one at a time on
   the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
   `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
@@ -323,8 +323,19 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
   (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
-  `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`) and
-  `contract.authored.json` → `components.<name>.links`.
+  `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`),
+  `contract.authored.json` → `components.<name>.links`, and Report an issue (`issueLink`): `styleguide.issues`, the
+  tracker's new-issue address with `{name}` and `{title}` (`"https://redmine/…/issues/new?issue[subject]={title}"`),
+  else the repository's own on GitHub or GitLab. The overview adds Send feedback (`styleguide.feedback`, else the
+  same tracker with a Style guide title).
+- **At a glance** (`factsOf`), under its name: Version (the release its last change shipped in), Last changed, Figma
+  (agrees, or how many differences and props not built), Accessibility (no problem found, how many, or not checked in
+  a browser yet) and Used in (how many products); a fact that needs work is marked with ! and in bold, never by colour
+  alone. Its overview card carries the Figma and accessibility facts in one line.
+- **Variants**, an area of its own when a variant prop has two options built: each option of each variant prop, one
+  per row with its name, drawn by the Playground itself (the other props as it sets them) and copied still and inert,
+  the Playground left as it was; Try it sets that option there. An option Figma has and the code does not build says
+  so.
 - **Status and coverage** (`statusView`, `coverageOf`): under its name and on its overview card, stable, beta or
   deprecated from `contract.authored.json` → `components.<name>.status`, a `Status:` (or `Maturity:`) line in Figma's
   description or annotations, or `@deprecated` / `@beta` / `@status x` in its code; never guessed. Coverage is its own
@@ -795,7 +806,13 @@ is shown only by a CSS class — `.selected` / `.checked` / `.disabled` / `.inva
 `aria-*` or native state, so assistive tech never hears it; the state-class→aria map is common-English by
 default, extend via `a11y.stateClasses`), and **keyboard reachability** (an interactive control that cannot
 be reached by keyboard — an interactive role on a non-focusable element, or a native control with
-`tabindex=-1`). Findings come from measured pixels and the a11y tree, no assumed DS shape (No-imposed-structure).
+`tabindex=-1`), **a control said only in a tooltip** (`tooltipname`: an icon whose only name is its `title`, which
+no one on a touch screen or a keyboard sees; words beside the icon, or `aria-label` at least) and **icon contrast**
+(`iconcontrast`, WCAG 1.4.11: an icon that carries meaning, the only content of a control or one with a name of its
+own, at 3:1 against its background in every theme; its colour is its painted fill or stroke, a sprite's
+`<use href>` read from its `<symbol>`, a masked icon's background). The static check adds the same title-only icon
+button or link, and a sprite `<symbol>` painted in one fixed colour of its own (it keeps it in the dark theme).
+Findings come from measured pixels and the a11y tree, no assumed DS shape (No-imposed-structure).
 
 **Advisory by default**, and the report is written in **plain language, no jargon** — each issue says what is
 wrong, why it matters to a real person, and what to do about it. Three audiences, one set of findings:

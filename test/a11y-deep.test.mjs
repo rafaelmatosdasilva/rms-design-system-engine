@@ -311,3 +311,23 @@ test('page: a component whose selector is not valid CSS is said not checked; the
   assert.ok(contrast.every((i) => i.component === 'Chip'), out);
   assert.match(d.checkedAt, /^\d{4}-\d\d-\d\dT/);
 });
+
+test('icons: one that carries meaning and fades into its background, and a control said only in a tooltip, are named; words and a clear icon are left alone', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 14px sans-serif; background: #1e1e1e; color: #f0f0f0; } button { background: #1e1e1e; color: inherit; border: 1px solid #888; width: 40px; height: 40px; }
+    .faint svg { fill: #2a2a2a; } .clear svg { fill: currentColor; } .mask { display: inline-block; width: 16px; height: 16px; background: #2b2b2b; -webkit-mask-image: linear-gradient(#000, #000); mask-image: linear-gradient(#000, #000); }</style></head><body><main><h1>Icons</h1>
+    <button class="faint" aria-label="Upload tokens"><svg width="16" height="16" aria-hidden="true"><path d="M0 0h16v16H0z"/></svg></button>
+    <button class="clear" aria-label="Close"><svg width="16" height="16" aria-hidden="true"><path d="M0 0h16v16H0z"/></svg></button>
+    <button class="masked" aria-label="Feedback"><span class="mask"></span></button>
+    <button class="tip clear" title="Dark mode"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></button>
+    <button class="worded faint" style="width:auto"><svg width="16" height="16" aria-hidden="true"><path d="M0 0h16v16H0z"/></svg> Save</button>
+  </main></body></html>`;
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
+  assert.deepEqual(kinds('iconcontrast').sort(), ['button.faint', 'button.masked'], out);   // a word beside the icon makes it decoration
+  assert.deepEqual(kinds('tooltipname'), ['<button> "Dark mode", named only by its title'], out);
+  assert.equal(kinds('name').length, 0, out);
+});

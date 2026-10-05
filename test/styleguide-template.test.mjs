@@ -245,7 +245,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(own, /border-radius/);
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Specs,Documentation,Accessibility,Parity,Used in,Changelog');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Specs,Variants,Documentation,Accessibility,Parity,Used in,Changelog');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
@@ -277,6 +277,17 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`document.querySelector('#c-chip .pg-anat-legend [data-pick^="part 1"]').click()`);
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-pick').textContent`), /Click a part/);
     assert.ok(await run(`!!document.querySelector('#c-chip [data-area="specs"] .pg-own')`), 'Its tokens, in Specs');
+    // Variants: every option of each variant prop, one per row, drawn by the Playground and copied still; the Playground
+    // keeps what was set, and Try it sets the option there.
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'variants').click()`);
+    for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-variant-row').length`)); i++) await new Promise((r) => setTimeout(r, 50));
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-variant-group')].map((g) => g.querySelector('h3').textContent + ':' + [...g.querySelectorAll('.pg-variant-row > .pg-ctl-label')].map((l) => l.textContent).join('|')).join()`), 'Size:M|L (in the Playground)');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-variant-row')].map((r) => r.querySelector('.pg-variant-stage .chip').classList.contains('chip--l')).join()`), 'false,true');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-variant-row')].map((r) => r.getBoundingClientRect().left).every((x, i, a) => Math.abs(x - a[0]) < 1)`), true, 'one per row, never a grid');
+    assert.equal(await run(`document.querySelector('#c-chip .pg-variant-stage .chip').closest('[inert]') !== null`), true);
+    assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the Playground as it was');
+    await run(`[...document.querySelectorAll('#c-chip .pg-variant-row [data-try]')][1].click()`);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="docs"] .pg-anatomy')`), false, 'Documentation draws nothing of its own');
     // Do and Don't from the references, each with its caption, the do first.
@@ -284,6 +295,9 @@ test('in the browser: no script error, a control changes the real component, the
     // Each section of rows in the Playground's tables: its title the head (Usage, Accessibility).
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /Usage/);
     assert.equal(await run(`document.querySelector('#c-chip [data-area="specs"] .pg-doc-card > .pg-inspect-head > h3').textContent`), 'Anatomy');
+    // Its header says at a glance how it stands: its version, Figma, accessibility and where it is used.
+    assert.match(await run(`document.querySelector('#c-chip .pg-facts').textContent`), /Figma\s*Agrees.*Accessibility\s*Not checked in a browser yet.*Used in\s*(\d+ products?|No product yet)/s);
+    assert.match(await run(`document.querySelector('#overview .sg-card[href="#c-chip"] .sg-card-facts').textContent`), /^Figma agrees.*Accessibility not checked$/s);
     // The name stays beside the areas; nothing differs, so Parity carries no alert and the page no line about it.
     assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + !!document.querySelector('#c-chip .pg-areas [data-v="parity"] .sg-seg-icon') + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|false|false');
     // On a phone the areas scroll sideways in one row, never wrap; the one chosen scrolls into view.
@@ -656,7 +670,13 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.deepEqual(coverageOf({ total: {}, '/repo/src/components/Chip.jsx': { lines: { pct: 87.5 } } }, 'src/components/Chip.jsx'), { lines: 87.5 });
   assert.equal(coverageOf({ total: {} }, 'src/components/Chip.jsx'), null);
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
-  assert.match(tpl, /card\(cGrid, 'c-' \+ c\.name, 'Components', c\.name, about\(c\), '', c\.status\)/);
+  assert.match(tpl, /card\(cGrid, 'c-' \+ c\.name, 'Components', c\.name, about\(c\), '', c\.status, cardFacts\(c\)\)/);
+  // Where a person reports a problem: the team's tracker with the component's name, else the repository's own.
+  const { issueLink } = await import('../styleguide-data.mjs');
+  assert.equal(issueLink({ template: 'https://redmine.example.com/projects/ds/issues/new?issue[subject]={title}', name: 'Chip' }), 'https://redmine.example.com/projects/ds/issues/new?issue[subject]=Chip%3A%20');
+  assert.equal(issueLink({ repo: 'https://github.com/acme/ds', name: 'Chip' }), 'https://github.com/acme/ds/issues/new?title=Chip%3A%20');
+  assert.equal(issueLink({ repo: 'https://gitlab.acme.com/ds/core', name: null }), 'https://gitlab.acme.com/ds/core/-/issues/new?issue[title]=Style%20guide%3A%20');
+  assert.equal(issueLink({ repo: 'https://bitbucket.org/acme/ds', name: 'Chip' }), null);
   assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
   assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
   assert.doesNotMatch(tpl, /'Status: ' \+ kinds|Usage written: |Open the To do list/, 'the overview counts nothing of its own');
