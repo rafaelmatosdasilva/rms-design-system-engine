@@ -73,15 +73,19 @@ test('page facts: the frame, the heading, where the actions sit, and the answer 
   assert.deepEqual(f.needs, [{ need: 'on/off switch for email', answer: 'chip as a stand-in' }, { need: 'an illustration', answer: 'a Missing box' }]);
 });
 
-test('conventions: two pages, or one designed screen, set a decision; a tie sets none; the team\'s file wins', () => {
+test('conventions: two pages, or one designed screen, set a decision; where none is shared the first page made does; the team\'s file wins', () => {
   const A = ['button'];
   const two = { a: pageFacts(page('padding/m', 'm'), { actionNames: A }), b: pageFacts(page('padding/m', 'm'), { actionNames: A }) };
   assert.equal(deriveConventions(two).page.padding.value, 'padding/m');
+  assert.equal(deriveConventions(two).page.padding.first, undefined);
   const one = { a: pageFacts(page('padding/m', 'm'), { actionNames: A }) };
-  assert.equal(deriveConventions(one).page.padding, undefined, 'one page made in a chat is not yet a convention');
-  assert.equal(deriveConventions({ a: { ...one.a, designed: true } }).page.padding.value, 'padding/m', 'a screen a designer made is');
-  const tie = { a: pageFacts(page('padding/m', 'm'), { actionNames: A }), b: pageFacts(page('padding/s', 'm'), { actionNames: A }) };
-  assert.equal(deriveConventions(tie).page.padding, undefined);
+  assert.deepEqual(deriveConventions(one).page.padding, { value: 'padding/m', pages: ['a'], first: true, made: null }, 'one page sets the rule for the next');
+  assert.equal(deriveConventions({ a: { ...one.a, designed: true } }).page.padding.first, undefined, 'a screen a designer made is a convention of its own');
+  const tie = { b: { ...pageFacts(page('padding/s', 'm'), { actionNames: A }), made: 2 }, a: { ...pageFacts(page('padding/m', 'm'), { actionNames: A }), made: 5 } };
+  assert.deepEqual(deriveConventions(tie).page.padding, { value: 'padding/s', pages: ['b'], first: true, made: 2 }, 'a tie: the page made first');
+  assert.deepEqual(consistencyFindings(tie.a, deriveConventions({ b: tie.b })).map((d) => d.what), ['page padding'], 'a page made later is held to it');
+  assert.deepEqual(consistencyFindings({ ...tie.b, made: 2 }, deriveConventions({ a: tie.a })), [], 'never a page made before it');
+  assert.deepEqual(consistencyFindings({ ...tie.a, made: 9, designed: true }, deriveConventions({ b: tie.b })), [], 'nor a screen a designer made');
   const authored = deriveConventions(two, { page: { padding: 'padding/s' }, needs: { 'on/off switch': 'a Missing box' } });
   assert.equal(authored.page.padding.value, 'padding/s');
   assert.equal(authored.page.padding.authored, true);
@@ -100,6 +104,24 @@ test('a page that decides differently from the others is told each difference, w
   assert.ok(lines.includes('page heading style: s here, m on the product\'s other pages (settings)'));
   assert.ok(lines.some((l) => /the answer to "a toggle switch": chip as a stand-in here, a Missing box/.test(l)), 'the same need, answered another way');
   assert.deepEqual(consistencyFindings(pageFacts(page('padding/m', 'm'), { actionNames: A }), deriveConventions(others)), [], 'a page that matches has nothing to change');
+});
+
+test('beyond the frame: body and section text styles, the words for each kind of action and the component it is', () => {
+  const A = ['button', 'chip'];
+  const mk = (save, comp, body, section) => ({ component: 'Page', props: { padding: 'padding/m' }, children: [
+    { component: 'Text', props: { as: 'h1', text: 'Title', style: 'm' } }, { component: 'Text', props: { as: 'h2', text: 'Part', style: section } },
+    { component: 'Text', props: { as: 'p', text: 'Body', style: body } }, { component: 'Row', children: [{ component: comp, props: { Label: save } }, { component: 'button', props: { Label: 'Cancel' } }] }] });
+  const f = pageFacts(mk('Save', 'button', 's', 'm'), { actionNames: A });
+  assert.deepEqual([f.body, f.section, f.intents], ['s', 'm', [{ intent: 'save', label: 'Save', component: 'button' }, { intent: 'cancel', label: 'Cancel', component: 'button' }]]);
+  const conv = deriveConventions({ account: { ...f, made: 1 } });
+  const here = pageFacts(mk('Submit changes', 'chip', 'm', 's'), { actionNames: A });
+  assert.deepEqual(consistencyFindings(here, conv).map(consistencyLine), [
+    'body text style: m here, s on the product\'s other pages (account, the first page made)',
+    'section heading style: s here, m on the product\'s other pages (account, the first page made)',
+    'the words for saving: "Submit changes" here, "Save" on the product\'s other pages (account, the first page made)',
+    'the component for saving ("Submit changes"): chip here, button on the product\'s other pages (account, the first page made)',
+  ]);
+  assert.deepEqual(consistencyFindings(pageFacts(mk('save', 'button', 's', 'm'), { actionNames: A }), conv), [], 'the same words in another case are the same words');
 });
 
 test('guidelines: every section is kept with its file; one named after a component goes with it, the rest are the product\'s rules', () => {

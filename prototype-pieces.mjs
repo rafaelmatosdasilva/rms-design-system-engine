@@ -89,9 +89,9 @@ function withoutNotes(ui) {
     // Notes the check reads and the drawing uses, never options: standInFor, purpose, content (the words a designed
     // instance shows), box (its size on the screen) and, on a component the code has not built, the surface the screen
     // gives it, figmaState (the state a designed screen shows it in) and opens (the id of the part a click opens).
-    const { standInFor, purpose, content, box, textless, figmaState, opens, ...rest } = o;
+    const { standInFor, purpose, content, box, textless, figmaState, opens, goesTo, ...rest } = o;
     for (const k of ['width', 'height']) if (typeof rest[k] === 'number') rest[k] = String(rest[k]);
-    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, ...p } = rest.props; if (!PIECES.includes(rest.component)) delete p.surface; rest.props = p; for (const k of ['width', 'height', 'count', 'minWidth']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
+    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, goesTo: g2, ...p } = rest.props; if (!PIECES.includes(rest.component)) delete p.surface; rest.props = p; for (const k of ['width', 'height', 'count', 'minWidth']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
     if (typeof rest.count === 'number') rest.count = String(rest.count);
     return rest;
   };
@@ -156,7 +156,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const agreed = new Set((v.controls ?? []).flatMap((c) => [c.label, c.prop]));
     const optDefs = catalog.components[node.component]?.props ?? {};
     for (const k of Object.keys(p)) {
-      if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState', 'opens'].includes(k) || agreed.has(k)) continue;
+      if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState', 'opens', 'goesTo'].includes(k) || agreed.has(k)) continue;
       // A value of a choice turns on the class the system's CSS adds for it (.node.node-selected); a default value
       // needs none. One the CSS has no class for is drawn without it, and said.
       if (optDefs[k]?.type === 'enum') {

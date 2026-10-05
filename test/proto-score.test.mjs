@@ -55,8 +55,8 @@ test('a gap is named when the thing and a word saying it is not there are close'
   assert.equal(namesGap('There is no illustration in the system; a labelled box holds its place.', 'illustrations?|images?'), true);
 });
 
-test('six prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
-  assert.deepEqual(PROTO.map((t) => t.id), ['proto-settings', 'proto-search', 'proto-empty', 'proto-profile', 'proto-dialog', 'proto-linked']);
+test('eleven prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
+  assert.deepEqual(PROTO.map((t) => t.id), ['proto-settings', 'proto-search', 'proto-empty', 'proto-profile', 'proto-dialog', 'proto-linked', 'proto-list', 'proto-signin', 'proto-flow', 'proto-phone', 'proto-confirm']);
   assert.ok(PROTO.every((t) => t.mayWriteHtml && t.mayChangeAll && typeof t.setup === 'function'));
 });
 
@@ -81,4 +81,23 @@ test('a component the guidelines rule out for the request is found in a composit
   assert.equal(avoids(ctx({ 'prototypes/a.json': JSON.stringify({ component: 'Page', children: [{ component: 'Missing', props: { need: 'a toast confirming the save' } }] }) }), 'tag', 'x').ok, true);
   assert.equal(avoids(ctx({ 'prototypes/a.json': JSON.stringify({ component: 'Page', children: [{ component: 'tag', props: { Label: 'Saved' } }] }) }), 'tag', 'x').ok, false);
   assert.equal(avoids(ctx({ 'src/screens/A.jsx': "import Tag from '../components/Tag.jsx';\nexport default function A() { return <Tag Label='Saved' />; }" }), 'tag', 'x').ok, false);
+});
+
+test('the newer tasks: an empty state, an error state, linked pages in the team\'s flow, a phone, a confirmation that opens', async () => {
+  const m = await import('./skill-evals/proto-tasks.mjs');
+  const comp = { component: 'Page', children: [{ id: 'list', component: 'Stack', children: [{ component: 'tag', props: { Label: 'Active' } }] }], states: { empty: { list: { component: 'Text', props: { text: 'No projects yet' } } } } };
+  assert.deepEqual([m.hasEmptyState(ctx({ 'prototypes/p.json': JSON.stringify(comp) }), 'projects').ok, m.hasEmptyState(ctx({ 'p.html': '<ul><li>A</li></ul>' }), 'projects').ok], [true, false]);
+  assert.deepEqual([m.hasErrorState(ctx({ 'prototypes/s.json': JSON.stringify({ states: { error: { email: { component: 'field', props: { State: 'Error' } } } } }) })).ok, m.hasErrorState(ctx({ 's.html': '<input>' })).ok], [true, false]);
+  assert.deepEqual([m.linkedPages(ctx({ 'a.json': '{"goesTo":"b"}', 'b.json': '{"goesTo":"c"}' }), 3).ok, m.linkedPages(ctx({ 'a.html': '<a href="b.html">x</a>' }), 3).ok], [true, false]);
+  assert.deepEqual([m.followsFlow({ ...ctx({ 'a.json': '{}' }), final: 'The guidelines add a Payment step I left out' }).ok, m.followsFlow({ ...ctx({ 'a.json': '{}' }), final: 'done' }).ok], [true, false]);
+  assert.deepEqual([m.fitsPhone(ctx({ 'a.json': JSON.stringify({ component: 'Row', props: { wrap: true } }) })).ok, m.fitsPhone(ctx({ 'a.css': '.r{display:flex}' })).ok], [true, false]);
+  assert.deepEqual([m.opensConfirmation(ctx({ 'a.json': '{"opens":"confirm"}' })).ok, m.opensConfirmation(ctx({ 'a.html': '<div>always</div>' })).ok], [true, false]);
+});
+
+test('the pages of a flow match: one wording for going on, one page padding', async () => {
+  const { consistentFlow } = await import('./skill-evals/proto-tasks.mjs');
+  const page = (padding, label) => JSON.stringify({ component: 'Page', props: { padding }, children: [{ component: 'button', props: { Label: label } }] });
+  assert.equal(consistentFlow(ctx({ 'prototypes/a.json': page('padding/m', 'Continue'), 'prototypes/b.json': page('padding/m', 'Continue') })).ok, true);
+  assert.match(consistentFlow(ctx({ 'prototypes/a.json': page('padding/m', 'Continue'), 'prototypes/b.json': page('padding/s', 'Next') })).detail, /going on is continue \/ next; padding padding\/m \/ padding\/s/);
+  assert.equal(consistentFlow(ctx({ 'a.html': '<button>Next</button>', 'b.html': '<button>Continue</button>' })).ok, false);
 });
