@@ -15,7 +15,7 @@ jobs:
       # The build scorer and the component harness read JSX with TypeScript, from the project or a global install.
       - name: Install TypeScript
         run: npm install -g typescript@6
-      # The browser tests use the runner's Chrome (found on PATH); without it they skip.
+      # The browser tests use the runner's Chrome (found on PATH); one that skips without it fails the run.
       # Each failing test is also written as an annotation, so its name and first error lines show on the check.
       - name: Run the test suite
         shell: bash
@@ -28,5 +28,11 @@ jobs:
               n=${line%%:*}
               echo "::error title=${line#*:}::$(sed -n "$((n+1)),$((n+40))p" test.log | grep -E "error|expected|actual|Error|message" | head -6 | tr '\n' ' ' | cut -c1-900)"
             done
+          fi
+          # A browser test that skipped for want of Chrome checked nothing: the run fails, so a missing Chrome can never pass quietly.
+          skipped=$(grep -ciE '# SKIP .*chrome' test.log || true)
+          if [ "$skipped" != 0 ]; then
+            echo "::error title=Browser tests skipped::$skipped browser test(s) skipped because Chrome was not found; they must run."
+            code=1
           fi
           exit $code
