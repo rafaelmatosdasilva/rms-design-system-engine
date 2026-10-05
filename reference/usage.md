@@ -277,8 +277,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   anatomy's numbers (`annotate`, shared with the anatomy) and lists below it each part's colours, icon size and text
   style by their tokens, each padding and gap by its token, and its alignment. Width shows it at Fit (the live
   preview), Phone (375px), Tablet (768px) or Desktop (1280px): a frame of that width written with the page's own
-  stylesheets, its icon sheet and the component as drawn now, so the system's media queries apply, scaled down to
-  fit the room. Turning Inspect on returns to Fit; choosing a width turns Inspect off. A number that would cover
+  stylesheets, its icon sheet, the component as drawn now and the system's own scripts (`systemScripts`), so its
+  media queries apply and it works there (a click moves a selection, as in the live preview), scaled down to fit the
+  room. Turning Inspect on returns to Fit; choosing a width turns Inspect off. A number that would cover
   another moves to the nearest free place around it, with a line back (`marker`, for the anatomy too).
 - **Figma beside the code**, in the Playground (a Figma button, only for a component with a Figma image; none on the
   measuring page): the Figma image of the variant set (its variant props equal to the Playground's; the default image
@@ -289,6 +290,17 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   its component set in one images call, cached under `visual/figma-variants/` until `_figmaVersion` changes). They go
   in the page, up to `styleguide.figmaImagesMB` (8) in all; `styleguide.figmaImages: false` for none. Like Inspect,
   it returns the width to Fit, and a width chosen turns it off.
+- **Do and Don't** (`exampleImages`, `visual-diff.mjs`), in Documentation after Usage: the pictures in
+  `<visualRefs>/components/<name>/do/` and `dont/` (each file named for its caption; a leading number orders them),
+  then the Figma nodes `contract.authored.json` → `components.<name>.examples` names (`[{ "kind": "do" | "dont",
+  "nodeId", "caption" }]`, fetched with `FIGMA_TOKEN`). Within the page's Figma image budget. A variant image of another
+  scale says so in its name (`Size=L@1x.png`); 2x by default. The Figma panel says its image is in the mode its frame
+  uses in Figma.
+- **What's new** (view `#whats-new`, when the code has history): every component's changelog gathered by release, newest
+  first (not released yet on top), one row per commit with the components it changed.
+- **Disabled**: a prop named Disabled, on, disables the native controls inside (`input`, `button`, `select`, `textarea`),
+  as a product sets them; the live accessibility check then says Tab passes it by, as it should, and measures focus
+  with transitions off, so a ring that fades in is read at its end.
 - **What uses a token** (`tokenUses`, view `#uses?t=--name`): every token's name on the page (foundations, a
   component's tables) links to it: the components whose own rules use it, then those that use it through another
   token whose value names it (in any mode), each with the token it came through. Search also finds each component's

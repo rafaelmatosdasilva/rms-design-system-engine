@@ -137,12 +137,14 @@ test('in the browser: no script error, a control changes the real component, the
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
-  for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
   writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', 'Size=L.png'), shot);
   writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', 'notes.png'), shot);
+  // Do and Don't pictures, each named for its caption.
+  for (const [kind, cap] of [['do', 'One filter per chip'], ['dont', 'A sentence in a chip']]) { mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip', kind), { recursive: true }); writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', kind, `${cap}.png`), shot); }
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
   const c = await launchChrome(chromePath);
   try {
@@ -259,6 +261,8 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(nums, await run(`[...document.querySelectorAll('#c-chip .pg-anat-legend b')].map((b) => b.textContent).join()`), 'every number in the drawing is one in the list, in the same order');
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
     assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
+    // Do and Don't from the references, each with its caption, the do first.
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
     // Each section of rows in the Playground's tables: its title the head (Usage, Accessibility).
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /Anatomy.*Usage/);
     // The name stays beside the areas; nothing differs, so Parity carries no alert and the page no line about it.
@@ -272,6 +276,11 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.body.classList.contains('sg-nav-hidden') && getComputedStyle(document.getElementById('sg-sidebar')).display === 'none' && getComputedStyle(document.getElementById('sg-topbar')).display !== 'none'`), true);
     await run(`document.getElementById('sg-menu').click()`);
     assert.equal(await run(`document.body.classList.contains('sg-nav-hidden')`), false);
+    // Disabled set: the native control is disabled too, so Tab passes it by.
+    await run(`location.hash = '#c-button?Disabled=true'`); await new Promise((r) => setTimeout(r, 400));
+    assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), true);
+    await run(`location.hash = '#c-button?Disabled=false'`); await new Promise((r) => setTimeout(r, 400));
+    assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), false);
     // How a product brings it in: the import line, copied by the system's button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-import code').textContent`), "import { Chip } from '@/components/Chip';");
     assert.deepEqual(errors, []);
@@ -601,6 +610,12 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /\['log', 'Changelog'\]/);
   assert.match(tpl, /importHTML\(c\) \+ linksHTML\(c\.links\)/);
   assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
+  // What's new: every component's changes by release, one row per commit with the components it touched.
+  assert.match(tpl, /navLink\('whats-new', 'what\\'s new'\)/);
+  assert.match(tpl, /One row per commit: the components it changed, then what it says\./);
+  // A Width frame runs the system's own scripts and lets a selection move, as the live preview does.
+  assert.match(tpl, /querySelectorAll\('script\[data-system-script\]'\)/);
+  assert.match(tpl, /selectionMoves\(st\);/);
 });
 
 test('status and coverage: only what the team said (Figma, the code, the authored contract), on the card and under the name; the overview counts them and says what each group holds', async () => {
@@ -661,4 +676,17 @@ test('every box on the page looks like the system\'s own card: its border colour
   assert.equal(cardLook(css, 'tile'), null);
   const r = chromeRoles({ themeCss: css, card: { cls: 'card' } }).roles;
   assert.deepEqual([r.border, r['line-width'], r.radius, r['radius-l'], r.shadow], ['var(--card-border)', 'var(--general-thickness)', 'var(--radii-card)', 'var(--radii-card)', 'none']);
+});
+
+test('Do and Don\'t: pictures in the references, each named for its caption, do\'s first; a variant image can say its scale', async () => {
+  const { exampleImages, figmaVariantImages } = await import('../visual-diff.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'figma-examples-'));
+  try {
+    for (const [kind, f] of [['dont', '2 Two buttons.png'], ['do', '1 One button.png'], ['do', 'notes.txt']]) { mkdirSync(join(dir, 'refs', 'components', 'button', kind), { recursive: true }); writeFileSync(join(dir, 'refs', 'components', 'button', kind, f), 'x'); }
+    const ex = await exampleImages(dir, { visualRefs: 'refs' }, 'button', { token: null });
+    assert.deepEqual(ex.map((e) => [e.kind, e.caption]), [['do', 'One button'], ['dont', 'Two buttons']]);
+    writeFileSync(join(dir, 'refs', 'components', 'button', 'State=Hover@1x.png'), 'x');
+    const r = await figmaVariantImages(dir, { visualRefs: 'refs' }, 'button', { token: null });
+    assert.deepEqual(r.images.map((i) => [i.variant, i.scale]), [['State=Hover', 1]]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

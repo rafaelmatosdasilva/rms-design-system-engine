@@ -585,9 +585,22 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
             if (b.length > budget || b.length < 24) break;
             budget -= b.length;
             // Exported at 2x: drawn at half its pixels, its size in CSS pixels as the code's.
-            shots.push({ variant: v, src: `data:image/png;base64,${b.toString('base64')}`, w: b.readUInt32BE(16) / 2, h: b.readUInt32BE(20) / 2 });
+            shots.push({ variant: v, src: `data:image/png;base64,${b.toString('base64')}`, w: b.readUInt32BE(16) / (im.scale ?? 2), h: b.readUInt32BE(20) / (im.scale ?? 2) });
           }
           if (shots.length) c.figmaShots = shots;
+        }
+        // Do and Don't, for each one's Usage: the pictures its references hold and the Figma frames its contract names.
+        const { exampleImages } = await import('./visual-diff.mjs');
+        const authoredAll = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
+        for (const c of view.components) {
+          const ex = [];
+          for (const im of await exampleImages(ROOT, cfg, c.name, { authored: authoredAll[c.name]?.examples })) {
+            const b = readFileSync(im.file);
+            if (b.length > budget || b.length < 24) break;
+            budget -= b.length;
+            ex.push({ kind: im.kind, caption: im.caption, src: `data:image/png;base64,${b.toString('base64')}`, w: b.readUInt32BE(16) / 2, h: b.readUInt32BE(20) / 2 });
+          }
+          if (ex.length) c.examples = ex;
         }
       } catch { /* no Figma images */ }
     }

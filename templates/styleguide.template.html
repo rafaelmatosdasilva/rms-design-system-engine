@@ -293,6 +293,11 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-doc-card > :not(.pg-inspect-head):not(.pg-updated) { margin: var(--sg-space-m); }
 .pg-doc-card > .pg-anatomy { border: none; box-shadow: none; }
 .pg-doc-card > .pg-updated:empty { display: none; }
+.pg-examples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sg-space-l); }
+.pg-example { display: flex; flex-direction: column; gap: var(--sg-space-xs); min-width: 0; }
+.pg-example-stage { display: flex; align-items: center; justify-content: center; padding: var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-stage, var(--sg-bg)); overflow: auto; }
+.pg-example-stage > img { max-width: 100%; height: auto; }
+.pg-example > .pg-example-caption { margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }
 .pg-own-swatch { display: inline-block; width: var(--sg-space-m); height: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius-s); vertical-align: middle; margin-right: var(--sg-space-xs); }
 .sg-topbar, .sg-nav-close, .sg-scrim { display: none; }
 /* The menu hidden on a wide screen: a bar at the top with the button that brings it back, the page at full width. */
@@ -319,8 +324,8 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   .sg-main { padding: var(--sg-space-l); width: 100%; box-sizing: border-box; }
   .pg-preview { overflow-x: auto; }   /* centred like everywhere; a component wider than a phone scrolls from its start (safe center) */
   .pg-preview-card { grid-template-columns: 1fr; } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); }
-  .pg-updated > div { grid-template-columns: 1fr; gap: 0; }
-  .pg-inspect-grid.pg-grid-2 { grid-template-columns: 1fr; }   /* Parity in one column on a phone */   /* the documentation in one column: each name above its text */
+  .pg-updated > div { grid-template-columns: 1fr; gap: 0; }   /* the documentation in one column: each name above its text */
+  .pg-inspect-grid.pg-grid-2, .pg-examples { grid-template-columns: 1fr; }   /* Parity and Do and Don't in one column on a phone */
 }
 </style>
 </head>
@@ -548,6 +553,29 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       }).join('') + '</ol>';
       td.appendChild(g);
     });
+  }
+  // What's new: every component's changes gathered by the release they shipped in, newest first, each a table of
+  // the components it changed and what each change says, linked to its commit.
+  var CHANGES = [];
+  COMPONENTS.forEach(function (c) { (c.changelog || []).forEach(function (r) { CHANGES.push({ comp: c.name, r: r }); }); });
+  if (CHANGES.length) {
+    hr(); navLink('whats-new', 'what\'s new');
+    var wn = section('whats-new', 'Changes', 'What\'s new', 'Each release and what it changed, with the components each change touched, from the code\'s history.');
+    var rel = {}, order = [];
+    CHANGES.forEach(function (x) { var k = x.r.release || ''; if (!rel[k]) { rel[k] = { k: k, rows: [], at: '' }; order.push(rel[k]); } rel[k].rows.push(x); if (String(x.r.date) > rel[k].at) rel[k].at = String(x.r.date); });
+    order.sort(function (a, b) { return (a.k ? 1 : 0) - (b.k ? 1 : 0) || (b.at > a.at ? 1 : b.at < a.at ? -1 : 0); });   // not released yet first, then newest
+    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
+    box.innerHTML = order.map(function (g) {
+      // One row per commit: the components it changed, then what it says.
+      var by = {}, commits = [];
+      g.rows.forEach(function (x) { var k = x.r.sha || x.r.subject; if (!by[k]) { by[k] = { r: x.r, comps: [] }; commits.push(by[k]); } if (by[k].comps.indexOf(x.comp) < 0) by[k].comps.push(x.comp); });
+      commits.sort(function (a, b) { return String(b.r.date) > String(a.r.date) ? 1 : String(b.r.date) < String(a.r.date) ? -1 : 0; });
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + esc(g.k || 'Not released yet') + '  ·  ' + esc(g.at.slice(0, 10)) + '</div><table>' + commits.map(function (x) {
+        var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short) + '</code>';
+        var says = String(x.r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
+        return '<tr><td>' + x.comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#c-' + esc(n) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + esc(says) + ' ' + sha + '</td></tr>';
+      }).join('') + '</table></div>';
+    }).join('');
   }
   if ((DATA.screens || []).length) {
     hr(); navLink('in-use', 'in use');
@@ -1056,12 +1084,15 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     for (var up = el.parentElement; up && root.contains(up); up = up.parentElement) spots.push(up);
     for (var nx = el.nextElementSibling; nx && spots.length < 24; nx = nx.nextElementSibling) spots = spots.concat([nx], Array.prototype.slice.call(nx.querySelectorAll('*'), 0, 4));
     spots = spots.filter(seenBox);
+    // Read at rest and focused, never mid-way: a transition would still show the old colour.
+    var kept = spots.map(function (n) { var t = n.style.getPropertyValue('transition'), p = n.style.getPropertyPriority('transition'); n.style.setProperty('transition', 'none', 'important'); return [t, p]; });
+    var restore = function () { spots.forEach(function (n, i) { if (kept[i][0]) n.style.setProperty('transition', kept[i][0], kept[i][1]); else n.style.removeProperty('transition'); }); };
     var read = function () { return spots.map(function (n) { var cs = getComputedStyle(n), o = {}; LOOK.forEach(function (k) { o[k] = cs[k]; }); return o; }); };
     var was = read();
     el.focus({ focusVisible: true, preventScroll: true });
-    if (document.activeElement !== el) return null;
+    if (document.activeElement !== el) { restore(); return null; }
     var now = read(), changed = false, best = 0;
-    el.blur();
+    el.blur(); restore();
     spots.forEach(function (n, i) {
       var a = was[i], b = now[i], around = behind(n.parentElement || n);
       if (!LOOK.some(function (k) { return a[k] !== b[k]; })) return;
@@ -1110,6 +1141,9 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     var out = [], stops = tabStops(root), had = document.activeElement;
     var interactive = [root].concat(Array.prototype.slice.call(root.querySelectorAll('[role]'))).filter(function (el) { return INTERACTIVE.test(el.getAttribute('role') || '') && shown(el); });
     var wants = a && a.key && INTERACTIVE.test(a.key);
+    // Disabled as set: Tab passes it by, as it should, and its behaviours are not tried.
+    var offAll = !stops.length && [root].concat(Array.prototype.slice.call(root.querySelectorAll('input, button, select, textarea, [aria-disabled="true"]'))).some(function (el) { return el.disabled || el.getAttribute('aria-disabled') === 'true'; });
+    if (offAll) return line(true, 'It is disabled as set, so Tab passes it by and a screen reader says it is unavailable.', 'WCAG 4.1.2 Name, Role, Value (A)');
     if (stops.length) out.push(line(true, 'Tab reaches ' + (stops.length === 1 ? 'it once: ' : stops.length + ' stops in this order: ') + stops.map(function (s, i) { return (stops.length > 1 ? (i + 1) + ' ' : '') + who(s); }).join(', ') + '.', 'WCAG 2.1.1 Keyboard (A)'));
     else if (wants || interactive.length) out.push(line(false, 'Tab never reaches it, so it cannot be used without a mouse.', 'WCAG 2.1.1 Keyboard (A)'));
     else out.push('<p>Nothing in it takes the focus, and as drawn nothing in it needs to.</p>');
@@ -1179,6 +1213,14 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   // ── Changelog: when Figma was last read for it, then every commit that changed it, by the release it shipped in ───
   // Its changelog in the Playground's tables: when Figma was last read, then one table per release, each commit a row
   // (its commit and pull request, what it says, its date).
+  // Its Do and Don't: each example from Figma (or its references) with what it shows, the do's beside the don'ts.
+  function examplesHTML(c) {
+    var ex = c.examples || [];
+    if (!ex.length) return '';
+    return '<div class="pg-doc"><div class="pg-inspect pg-doc-card pg-examples-card"><div class="pg-inspect-head"><h3>Do and Don\'t</h3></div><div class="pg-examples">' + ex.map(function (e) {
+      return '<div class="pg-example"><div class="pg-ctl-label">' + (e.kind === 'do' ? 'Do' : 'Don\'t') + '</div><div class="pg-example-stage"><img alt="' + esc((e.kind === 'do' ? 'Do: ' : 'Don\'t: ') + (e.caption || c.name)) + '" src="' + esc(e.src) + '" width="' + Math.round(e.w) + '" height="' + Math.round(e.h) + '"></div>' + (e.caption ? '<p class="pg-example-caption">' + esc(e.caption) + '</p>' : '') + '</div>';
+    }).join('') + '</div></div></div>';
+  }
   function changelogHTML(c) {
     var u = c.updated || {}, log = c.changelog || [];
     var card = function (head, rows) { return '<div class="pg-inspect"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>'; };
@@ -1370,7 +1412,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       '</div>' +
       // Documentation: its API, Figma's and the code's own words, and when each side last changed.
       '<div class="pg-area" data-area="docs"><div class="pg-footer">' +
-        (ALL ? '' : '<div class="pg-doc pg-anatomy-doc"><h3>Anatomy</h3><div class="pg-anatomy"></div><dl class="pg-updated pg-anat-legend"></dl></div>') + guidanceHTML(c) + apiHTML(c) +
+        (ALL ? '' : '<div class="pg-doc pg-anatomy-doc"><h3>Anatomy</h3><div class="pg-anatomy"></div><dl class="pg-updated pg-anat-legend"></dl></div>') + guidanceHTML(c) + examplesHTML(c) + apiHTML(c) +
         (docRows ? '<div class="pg-doc"><h3>Documentation</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
         '</div></div>' +
       '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + a11yHTML(c) + '</div></div>' +
@@ -1380,7 +1422,8 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc"><h3>Changelog</h3>' + changelogHTML(c) + '</div></div></div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls'), frame = sec.querySelector('.pg-frame');
     // The component at a chosen width: a frame of that width holding the page's own stylesheets, the icon sheet and the
-    // component as drawn now, so the system's media queries apply; scaled down to fit the room, never up. Fit is live.
+    // component as drawn now, so the system's media queries apply; scaled down to fit the room, never up. It is live
+    // too: the system's scripts run in it and it can be used, by mouse or keyboard.
     function renderFrame() {
       if (!frame) return;
       if (WIDTH === 'fit' || ALL) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = false; return; }
@@ -1390,14 +1433,17 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       var attrs = function (el, only) { return Array.prototype.filter.call(el.attributes, function (a) { return !only || only.test(a.name); }).map(function (a) { return ' ' + a.name + '="' + esc(a.value) + '"'; }).join(''); };
       var sheet = document.querySelector('body > svg');
       var html = '<!doctype html><html' + attrs(document.documentElement) + '><head><meta charset="utf-8">' + head + '</head><body style="margin:0">' + (sheet ? sheet.outerHTML : '') +
-        '<div class="pg-frame-stage"' + attrs(preview, /^data-/) + '>' + Array.prototype.filter.call(preview.children, function (n) { return !n.classList.contains('pg-inspect-marks'); }).map(function (n) { return n.outerHTML; }).join('') + '</div></body></html>';
-      frame.innerHTML = '<div class="pg-frame-device"><div class="pg-frame-label">' + esc(w[1] + ' · ' + w[2] + 'px wide') + '</div><div class="pg-frame-box"><iframe title="' + esc(c.name + ' at ' + w[2] + ' pixels wide') + '" tabindex="-1"></iframe></div></div>';
+        '<div class="pg-frame-stage"' + attrs(preview, /^data-/) + '>' + Array.prototype.filter.call(preview.children, function (n) { return !n.classList.contains('pg-inspect-marks'); }).map(function (n) { return n.outerHTML; }).join('') + '</div>' +
+        // The system's own scripts run in the frame too, so it works there as in a product (a selection moves, an overlay opens).
+        Array.prototype.map.call(document.querySelectorAll('script[data-system-script]'), function (n) { return n.outerHTML; }).join('') + '</body></html>';
+      frame.innerHTML = '<div class="pg-frame-device"><div class="pg-frame-label">' + esc(w[1] + ' · ' + w[2] + 'px wide') + '</div><div class="pg-frame-box"><iframe title="' + esc(c.name + ' at ' + w[2] + ' pixels wide') + '"></iframe></div></div>';
       var box = frame.querySelector('.pg-frame-box'), ifr = frame.querySelector('iframe');
       ifr.style.width = w[2] + 'px';
       // Written in at once (a font stylesheet the page links can keep a load waiting), then sized to what it holds,
       // again whenever that or the room changes (a font arriving, the window resized).
       var d = ifr.contentDocument; d.open(); d.write(html); d.close();
       var st = d.querySelector('.pg-frame-stage');
+      selectionMoves(st);   // a click moves a selection here too, as in the live preview
       function fit() {
         var h = Math.max(120, Math.ceil(st.getBoundingClientRect().height)), fcs = getComputedStyle(frame);
         var room = frame.clientWidth - parseFloat(fcs.paddingLeft) - parseFloat(fcs.paddingRight), k = Math.min(1, (room > 0 ? room : w[2]) / w[2]);
@@ -1628,7 +1674,8 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       var img = '<img class="pg-compare-img" alt="' + esc(c.name + ' in Figma') + '" src="' + esc(sh.src) + '" width="' + Math.round(sh.w) + '" height="' + Math.round(sh.h) + '">';
       // A small one drawn larger, both by the same amount, so a pixel of difference can be seen.
       var k = Math.max(1, Math.min(4, Math.floor(120 / Math.max(1, sh.h, src.getBoundingClientRect().height))));
-      var larger = k > 1 ? '<p class="pg-empty">Both drawn ' + k + ' times larger.</p>' : '';
+      // Figma draws it in the mode its frame uses there; the page's own mode switch brings the code to the same one.
+      var larger = '<p class="pg-empty">' + (k > 1 ? 'Both drawn ' + k + ' times larger. ' : '') + 'Figma\'s image is in the mode its frame uses in Figma; switch Color above to match it.</p>';
       if (compareMode === 'side') {
         body.innerHTML = larger + '<div class="pg-compare-row"><div class="pg-compare-fig"><div class="pg-ctl-label">Figma</div><div class="pg-compare-stage"><div class="pg-compare-layer">' + img + '</div></div></div><div class="pg-compare-fig"><div class="pg-ctl-label">Code</div><div class="pg-compare-stage"><div class="pg-compare-layer pg-compare-code"></div></div></div></div>';
         body.querySelector('.pg-compare-code').appendChild(copy);
@@ -1707,6 +1754,12 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       // Shows, hides and options first, text last, so a part a show prop draws gets its text.
       props.slice().sort(function (a, b) { return (a.type === 'TEXT') - (b.type === 'TEXT'); }).forEach(function (p) {
         var v = state[p.label];
+        // Disabled on: the native controls in it are disabled too, as a product sets them, so Tab passes them by and a
+        // screen reader says so; a look of disabled alone leaves them working.
+        if (/^\s*disabled\s*$/i.test(p.label) && (p.type === 'BOOLEAN' || p.type === 'VARIANT')) {
+          var off = p.type === 'BOOLEAN' ? !!v : /^(true|yes|on)$/i.test(String(v));
+          [e].concat(Array.prototype.slice.call(e.querySelectorAll('input, button, select, textarea'))).forEach(function (k) { if (/^(INPUT|BUTTON|SELECT|TEXTAREA)$/.test(k.tagName)) k.disabled = off; });
+        }
         if (p.type === 'VARIANT') (p.options || []).forEach(function (o) { applyEffect(e, o, o.label === v); });
         else if (p.type === 'BOOLEAN') {
           if (p.on || p.off) {
@@ -1812,9 +1865,9 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     // A group of items one of which is selected (a segmented control, tabs): a click moves the selection, as the
     // product's own code would. Native inputs (a radio, a checkbox, a field) already work.
     var MARK = /^(is-)?(selected|active|current|checked|on)$/i;
-    preview.addEventListener('click', function (ev) {
-      for (var n = ev.target; n && n !== preview; n = n.parentElement) {
-        var p = n.parentElement; if (!p || !preview.contains(p)) break;
+    function selectionMoves(box, after) { box.addEventListener('click', function (ev) {
+      for (var n = ev.target; n && n !== box; n = n.parentElement) {
+        var p = n.parentElement; if (!p || !box.contains(p)) break;
         var sibs = Array.prototype.filter.call(p.children, function (k) { return k.tagName === n.tagName; });
         if (sibs.length < 2) continue;
         var marked = sibs.find(function (k) { return Array.prototype.some.call(k.classList, function (x) { return MARK.test(x); }) || /true/.test(k.getAttribute('aria-selected') || k.getAttribute('aria-pressed') || k.getAttribute('aria-checked') || ''); });
@@ -1822,9 +1875,10 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
         if (n.disabled || n.getAttribute('aria-disabled') === 'true' || marked === n) return;
         var cls = Array.prototype.filter.call(marked.classList, function (x) { return MARK.test(x); });
         sibs.forEach(function (k) { cls.forEach(function (x) { k.classList.toggle(x, k === n); }); ['aria-selected', 'aria-pressed', 'aria-checked'].forEach(function (a) { if (marked.hasAttribute(a)) k.setAttribute(a, k === n ? 'true' : 'false'); }); });
-        nudge(); return;
+        if (after) after(); return;
       }
-    });
+    }); }
+    selectionMoves(preview, nudge);
     // Using the component sets its props: a switch flipped, a box ticked, a value typed in the preview shows in the
     // controls, as long as the option it lands on is one the page can read from the component.
     var syncs = {};
