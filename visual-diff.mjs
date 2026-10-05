@@ -12,7 +12,7 @@
 // the other image (anti-aliasing), counts. The result is advisory: two
 // percentages per component, with and without its text, worst first, and a diff image under
 // .design-system-engine-out/visual/diff/. The one without text decides the ⚠️ (codeReading.visualThreshold, default 2%).
-import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
 import { findChrome, launchChrome, connectCDP, openPage } from './cdp.mjs';
 import { OUT_DIR, REFS_DIR, projectPath } from './names.mjs';
@@ -55,6 +55,49 @@ export async function figmaImage(ROOT, cfg, name, { nodeId, defaultVariant, vers
     writeFileSync(meta, JSON.stringify({ nodeId, target, version: version ?? null }) + '\n');
     return { file, from: 'figma' };
   } catch (e) { return { why: `could not fetch the Figma image (${String(e.message || e).split('\n')[0]})` }; }
+}
+
+// Every variant's Figma image of a component, for the style guide's Figma beside the code. From the first of:
+//   1. <visualRefs>/components/<name>/<variant>.png, each variant named as Figma names it (Size=L, State=Default.png),
+//      and <visualRefs>/components/<name>.png for its default variant;
+//   2. the Figma REST API (FIGMA_TOKEN and figmaFileKey): every variant of its component set in one images call, cached
+//      under <out>/visual/figma-variants/<name>/ until the Figma version changes.
+// → { images: [{ variant: 'Size=L, State=Default' | null, file }], from } or { images: [], why }. max: the most taken.
+export async function figmaVariantImages(ROOT, cfg, name, { nodeId, version = null, token = process.env.FIGMA_TOKEN, fetchImpl = fetch, outDir = OUT_DIR, max = 48 } = {}) {
+  const refDir = resolve(ROOT, cfg.visualRefs ?? projectPath(ROOT, 'refs'), 'components');
+  const own = join(refDir, safe(name)), one = join(refDir, `${safe(name)}.png`);
+  const images = [];
+  if (existsSync(own)) for (const f of readdirSync(own).filter((x) => /\.png$/i.test(x)).sort()) images.push({ variant: f.replace(/\.png$/i, ''), file: join(own, f) });
+  if (existsSync(one)) images.unshift({ variant: null, file: one });
+  if (images.length) return { images: images.slice(0, max), from: 'reference' };
+  if (!token) return { images: [], why: 'no reference images and no FIGMA_TOKEN' };
+  if (!cfg.figmaFileKey) return { images: [], why: 'no reference images and no figmaFileKey in ds-config.json' };
+  if (!nodeId) return { images: [], why: 'no reference images and no node id for it' };
+  const dir = resolve(ROOT, outDir, 'visual', 'figma-variants', safe(name)), meta = join(dir, 'images.json');
+  const m = readJson(meta);
+  if (m?.nodeId === nodeId && m?.version === (version ?? null) && m.images?.every((x) => existsSync(join(dir, x.file)))) return { images: m.images.map((x) => ({ variant: x.variant, file: join(dir, x.file) })), from: 'figma (cached)' };
+  const get = async (url) => {
+    const r = await fetchImpl(url, { headers: { 'X-Figma-Token': token }, signal: AbortSignal.timeout(30000) });
+    if (!r.ok) throw new Error(`Figma answered ${r.status}`);
+    return r;
+  };
+  try {
+    const key = cfg.figmaFileKey, id = String(nodeId).replace('-', ':');
+    const doc = (await (await get(`https://api.figma.com/v1/files/${key}/nodes?ids=${encodeURIComponent(id)}&depth=1`)).json())?.nodes?.[id]?.document;
+    const nodes = doc?.type === 'COMPONENT_SET' ? (doc.children ?? []).filter((c) => c.type === 'COMPONENT').slice(0, max).map((c) => ({ id: c.id, variant: c.name })) : [{ id, variant: null }];
+    const urls = (await (await get(`https://api.figma.com/v1/images/${key}?ids=${encodeURIComponent(nodes.map((n) => n.id).join(','))}&format=png&scale=2`)).json())?.images ?? {};
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const kept = [];
+    for (const [i, n] of nodes.entries()) {
+      if (!urls[n.id]) continue;
+      const file = `${i}.png`;
+      writeFileSync(join(dir, file), Buffer.from(await (await fetchImpl(urls[n.id], { signal: AbortSignal.timeout(30000) })).arrayBuffer()));
+      kept.push({ variant: n.variant, file });
+    }
+    writeFileSync(meta, JSON.stringify({ nodeId, version: version ?? null, images: kept }) + '\n');
+    return { images: kept.map((x) => ({ variant: x.variant, file: join(dir, x.file) })), from: 'figma' };
+  } catch (e) { return { images: [], why: `could not fetch the Figma images (${String(e.message || e).split('\n')[0]})` }; }
 }
 
 // Runs in the page: both images on one canvas size, the Figma one over the component's background.

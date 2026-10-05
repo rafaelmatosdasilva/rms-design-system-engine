@@ -271,6 +271,19 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   stylesheets, its icon sheet and the component as drawn now, so the system's media queries apply, scaled down to
   fit the room. Turning Inspect on returns to Fit; choosing a width turns Inspect off. A number that would cover
   another moves to the nearest free place around it, with a line back (`marker`, for the anatomy too).
+- **Figma beside the code**, in the Playground (a Figma button, only for a component with a Figma image; none on the
+  measuring page): the Figma image of the variant set (its variant props equal to the Playground's; the default image
+  only while every variant prop is at its default) beside a still, inert copy of the component as drawn, or over it,
+  clipped by a slider; a small one drawn up to 4 times larger, both alike. A variant with no image says so. Images
+  (`figmaVariantImages`, `visual-diff.mjs`): `<visualRefs>/components/<name>/<Prop=Value, Prop=Value>.png` and
+  `<visualRefs>/components/<name>.png` for its default, else the Figma REST API with `FIGMA_TOKEN` (every variant of
+  its component set in one images call, cached under `visual/figma-variants/` until `_figmaVersion` changes). They go
+  in the page, up to `styleguide.figmaImagesMB` (8) in all; `styleguide.figmaImages: false` for none. Like Inspect,
+  it returns the width to Fit, and a width chosen turns it off.
+- **What uses a token** (`tokenUses`, view `#uses?t=--name`): every token's name on the page (foundations, a
+  component's tables) links to it: the components whose own rules use it, then those that use it through another
+  token whose value names it (in any mode), each with the token it came through. Search also finds each component's
+  props and their options.
 - **A link to each variant**: the address carries the props set away from their defaults and the width
   (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
   the controls follow (a value the component does not have is left at its default). Copy link copies it.
