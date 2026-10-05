@@ -704,6 +704,36 @@ export function componentTokens(cssText, cls) {
   return out;
 }
 
+// A Figma variant's name as its props: 'Size=L, State=Default' → { Size: 'L', State: 'Default' }; none → null.
+export function variantOf(name) {
+  if (!name) return null;
+  const out = {};
+  for (const part of String(name).split(',')) { const i = part.indexOf('='); if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim(); }
+  return Object.keys(out).length ? out : null;
+}
+
+// Which components use each token: in their own rules, or through another token whose value names it
+// (--button-background: var(--neutral-100) makes the button a user of --neutral-100, through --button-background).
+// → { '--var': { direct: [name], via: [{ name, through }] } }, for the style guide's "What uses it" view.
+export function tokenUses(cssText, comps = []) {
+  const clean = String(cssText).replace(/\/\*[\s\S]*?\*\//g, '');
+  const refs = {};   // --x → the variables its value names, in any mode
+  for (const m of clean.matchAll(/(--[\w-]+)\s*:([^;{}]*)/g)) for (const v of m[2].matchAll(/var\(\s*(--[\w-]+)/g)) (refs[m[1]] ??= new Set()).add(v[1]);
+  const out = {}, at = (v) => (out[v] ??= { direct: [], via: [] });
+  for (const c of comps) {
+    if (!c.cls || /^#/.test(c.cls)) continue;
+    const own = [...new Set(componentTokens(clean, c.cls).map((t) => t.var))];
+    for (const v of own) if (!at(v).direct.includes(c.name)) at(v).direct.push(c.name);
+    // Nearest first: each token its own ones name, then the ones those name, each once, with the own one it came through.
+    const seen = new Set(own), queue = own.map((v) => [v, v]);
+    while (queue.length) {
+      const [v, first] = queue.shift();
+      for (const r of refs[v] ?? []) { if (seen.has(r)) continue; seen.add(r); at(r).via.push({ name: c.name, through: first }); queue.push([r, first]); }
+    }
+  }
+  return out;
+}
+
 // ── The page's own look, from the system: each role the template's layout uses, filled with one of the system's own
 // tokens (styleguide.chrome in ds-config.json names one by hand: { "text": "--my-ink" }). A role with no token is left
 // to the browser's own and listed, never given a value of the engine's.

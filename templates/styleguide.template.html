@@ -139,6 +139,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .color-chip-swatch { height: 72px; border: var(--sg-line); }   /* square corners, as on the overview; the colour twice the height of its label */
 .color-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); line-height: var(--sg-lh); word-break: break-word; }
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: break-all; }
+.sg-uses-link { color: inherit; }   /* a token's name, linked to what uses it: underlined, in the colour around it */
 .type-list { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-m); }
 .type-specimen-preview { color: var(--sg-text); padding: var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* the sample on one row, under the style's name */
 .type-specimen.pg-inspect td:last-child { word-break: normal; overflow-wrap: break-word; }   /* a name and its value wrap between words, never inside one */
@@ -166,7 +167,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* A component's page in areas (playground, documentation, accessibility, parity), switched by the system's own
    segmented control; how a product imports it and what it is built with, above them. */
 /* The areas stay at the top while the component's page scrolls, under the top bar when one shows. */
-.pg-areas { margin: var(--sg-space-m) 0 var(--sg-space-l); position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; border-bottom: var(--sg-line); }
+.pg-areas { margin: var(--sg-space-m) 0 var(--sg-space-l); position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; }
 .pg-import { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); color: var(--sg-text-2); }
 .pg-import code { font-family: inherit; color: var(--sg-text); }
 .pg-parity-sum { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
@@ -205,7 +206,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-preview-card { display: grid; grid-template-columns: 1fr minmax(240px, 340px); gap: var(--sg-space-l); align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: var(--sg-space-l); background: var(--sg-bg); box-shadow: var(--sg-shadow); }
 .pg-preview { min-width: 0; min-height: 140px; padding: var(--sg-space-xl); display: flex; align-items: safe center; align-content: safe center; justify-content: safe center; gap: var(--sg-space-m); flex-wrap: wrap; position: relative; isolation: isolate; }
 /* A transparency checkerboard over the system's own page surface: a transparent component shows it, an opaque one covers it. */
-.pg-preview, .pg-frame {
+.pg-preview, .pg-frame, .pg-compare-stage {
   background-color: var(--sg-stage, var(--sg-bg));
   --sg-checker: color-mix(in srgb, var(--sg-text) 7%, transparent);
   background-image: linear-gradient(45deg, var(--sg-checker) 25%, transparent 25%, transparent 75%, var(--sg-checker) 75%), linear-gradient(45deg, var(--sg-checker) 25%, transparent 25%, transparent 75%, var(--sg-checker) 75%);
@@ -231,6 +232,17 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-anat-marks { position: absolute; inset: 0; pointer-events: none; }
 .pg-anat-space { position: absolute; outline: 1px dotted var(--sg-muted); outline-offset: -1px; }   /* a padding or a gap: outlined, never coloured, so no colour is mistaken for a token's */
 .pg-anat-part { position: absolute; outline: 1px dashed var(--sg-text); }
+.pg-compare-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-l); padding: var(--sg-space-m); }
+.pg-compare-bar[hidden], .pg-compare-amount[hidden], .pg-compare[hidden] { display: none; }
+.pg-compare-amount { display: flex; align-items: center; gap: var(--sg-space-s); }
+.pg-compare-body { padding: 0 var(--sg-space-m) var(--sg-space-m); }
+.pg-compare-row { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); justify-content: center; }
+.pg-compare-fig { display: flex; flex-direction: column; gap: var(--sg-space-xs); min-width: 0; max-width: 100%; }
+.pg-compare-stage { display: flex; align-items: center; justify-content: center; padding: var(--sg-space-l); overflow: auto; max-width: 100%; }
+.pg-compare-layer { position: relative; }
+.pg-compare-over > .pg-compare-img { position: absolute; left: 0; top: 0; }
+.pg-compare-cut { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--sg-accent); pointer-events: none; }
+.pg-compare-img { display: block; }
 .pg-offstage { position: absolute !important; left: -100000px; top: 0; width: 100%; }   /* laid out, never seen: the live accessibility check reads it */
 .pg-anat-lead { position: absolute; height: 0; border-top: 1px solid var(--sg-text); transform-origin: 0 0; }
 .pg-anat-part.is-slot { outline: 2px dashed var(--sg-accent); }
@@ -330,6 +342,11 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     main.appendChild(s); return s;
   }
   function hr() { var h = document.createElement('hr'); h.className = 'sg-hr'; main.appendChild(h); }
+  // A token's name, wherever the page shows it, opens what uses it (#uses?t=--name): a plain link.
+  var USES = DATA.tokenUses || {};
+  // Every token links, so one nothing uses says so too.
+  function usesLink(v) { return /[?&]all\b/.test(location.search) ? esc(v) : '<a class="sg-uses-link" href="#uses?t=' + encodeURIComponent(v) + '" title="What uses ' + esc(v) + '">' + esc(v) + '</a>'; }
+  function linkVars(text) { return esc(text).replace(/(^|[^\w-])(--[\w-]+)/g, function (m, pre, v) { return pre + usesLink(v); }); }
   if (DATA.title) { document.getElementById('sg-title').textContent = DATA.title; document.title = DATA.title + ' · Living style guide'; }
 
   /* ── Mode engine: the system's mode collections as axes ─────────────────────────────────────────────────────────
@@ -525,7 +542,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     TOKENS.colors.forEach(function (g) {
       var sub = document.createElement('div'); sub.className = 'sg-subsection';
       sub.innerHTML = '<h3>' + esc(g.group) + '</h3><div class="sg-demo">' + g.items.map(function (t) {
-        return '<div class="color-chip"><div class="color-chip-swatch" style="background:var(' + esc(t.var) + ')"></div><div class="color-chip-label">' + esc(t.figma) + '</div><div class="color-chip-value">' + esc(t.var) + '</div></div>';
+        return '<div class="color-chip"><div class="color-chip-swatch" style="background:var(' + esc(t.var) + ')"></div><div class="color-chip-label">' + esc(t.figma) + '</div><div class="color-chip-value">' + usesLink(t.var) + '</div></div>';
       }).join('') + '</div>';
       cs.appendChild(sub);
     });
@@ -586,7 +603,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       d.innerHTML = fams.map(function (f) {
         var rows = byFam[f].slice().sort(function (a, b) { return (parseFloat(live(d, a.var) || a.value) || 0) - (parseFloat(live(d, b.var) || b.value) || 0); });
         return '<div class="sg-subsection">' + (fams.length > 1 ? '<h3>' + esc(f) + '</h3>' : '') + '<div class="sg-demo sg-demo--col">' + rows.map(function (t) {
-          return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + esc(t.var) + ' · ' + esc(live(d, t.var) || t.value) + '</div></div>';
+          return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + usesLink(t.var) + ' · ' + esc(live(d, t.var) || t.value) + '</div></div>';
         }).join('') + '</div></div>';
       }).join('');
     };
@@ -599,7 +616,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     var rd = document.createElement('div'); rd.className = 'sg-demo';
     var drawRadii = function () {
       rd.innerHTML = TOKENS.radii.map(function (t) {
-        return '<div class="radius-chip"><div class="radius-chip-box" style="border-radius:var(' + esc(t.var) + ')"></div><div class="radius-chip-label">' + esc(t.figma) + '<br>' + esc(live(rd, t.var) || t.value) + '</div></div>';
+        return '<div class="radius-chip"><div class="radius-chip-box" style="border-radius:var(' + esc(t.var) + ')"></div><div class="radius-chip-label">' + esc(t.figma) + '<br>' + usesLink(t.var) + '<br>' + esc(live(rd, t.var) || t.value) + '</div></div>';
       }).join('');
     };
     sizeSwitch(rs, drawRadii); rs.appendChild(rd); drawRadii();
@@ -838,7 +855,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
   }
   // A date and time in the reader's own clock (two changes on one day read apart).
   var when = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
-  function rowsHTML(rows) { return rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>'; }).join(''); }
+  function rowsHTML(rows) { return rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + linkVars(r[1]) + '</td></tr>'; }).join(''); }
 
   // ── The code a product writes ─────────────────────────────────────────────────────────────────────────────────────
   var low = function (x) { return String(x == null ? '' : x).toLowerCase().replace(/[\s_-]+/g, ''); };
@@ -1294,6 +1311,8 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
         (ALL ? '' : '<div class="pg-ctl pg-width"><div class="pg-ctl-label">Width</div>' + segHTML(WIDTHS.map(function (w) { return { v: w[0], label: w[1] }; })) + '</div>') +
         '<div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
         (ALL ? '' : '<div class="pg-inspect pg-inspect-legend" hidden><div class="pg-inspect-head">Inspect</div><dl class="pg-updated"></dl></div>') +
+        (ALL || !(c.figmaShots || []).length ? '' : '<div class="pg-inspect pg-compare" hidden><div class="pg-inspect-head">Figma beside the code</div><div class="pg-compare-bar">' + segHTML([{ v: 'side', label: 'Side by side' }, { v: 'over', label: 'Over' }]) +
+          '<label class="pg-ctl-label pg-compare-amount">How much of Figma shows <input type="range" min="0" max="100" value="50"></label></div><div class="pg-compare-body"></div></div>') +
         // Its code beside the tokens behind what is drawn; every token named after it below them all.
         '<div class="pg-code-row"><div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div>' +
         '<div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div></div>' +
@@ -1339,10 +1358,11 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       ifr.addEventListener('load', fit);
     }
     var widthBar = sec.querySelector('.pg-width');
-    var inspectBtn = null;
+    var inspectBtn = null, compareBtn = null, compareOn = false;
     function showWidth(v) {
       WIDTH = v; writeLink();
       if (v !== 'fit' && inspectOn) { inspectOn = false; if (inspectBtn) inspectBtn.setAttribute('aria-pressed', 'false'); }
+      if (v !== 'fit' && compareOn) { compareOn = false; if (compareBtn) compareBtn.setAttribute('aria-pressed', 'false'); }
       if (widthBar) segItems(widthBar).forEach(function (b) { segSelect(b, b.dataset.v === v); });
       renderFrame(); drawInspect();
     }
@@ -1505,6 +1525,55 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     // Inspect: the same marks on the live component in the playground, as the controls set it, and beside each part the
     // tokens it is drawn with. Redrawn on every change; never on the measuring page (?all).
     var inspectOn = false, inspectLegend = sec.querySelector('.pg-inspect-legend');
+    // Figma beside the code: the Figma image of the variant set (its variant props equal to the Playground's), beside a
+    // still copy of the component as drawn, or over it, as much of it as the slider says. A variant Figma has no image
+    // of is said so, never shown with another's.
+    var compareEl = sec.querySelector('.pg-compare'), compareMode = 'side';
+    function shotFor() {
+      var best = null, bestN = -1, atDefault = props.every(function (p) { return p.type !== 'VARIANT' || state[p.label] === byDefault(p); });
+      (c.figmaShots || []).forEach(function (sh) {
+        if (!sh.variant) { if (atDefault && bestN < 0) { best = sh; bestN = 0; } return; }
+        var n = 0, ok = Object.keys(sh.variant).every(function (k) {
+          var p = props.find(function (q) { return q.type === 'VARIANT' && low(q.label) === low(k); });
+          if (!p) return true;
+          n++; return low(state[p.label]) === low(sh.variant[k]);
+        });
+        if (ok && n > bestN) { best = sh; bestN = n; }
+      });
+      return best;
+    }
+    function drawCompare() {
+      if (!compareEl) return;
+      compareEl.hidden = !compareOn;
+      if (!compareOn || !cur) return;
+      var body = compareEl.querySelector('.pg-compare-body'), sh = shotFor(), amount = compareEl.querySelector('input[type="range"]');
+      compareEl.querySelector('.pg-compare-amount').hidden = compareMode !== 'over' || !sh;
+      if (!sh) { body.innerHTML = '<p class="pg-empty">Figma has no image of this variant yet' + ((c.figmaShots || []).length ? ' (it has ' + c.figmaShots.length + ')' : '') + '.</p>'; return; }
+      var src = preview.firstElementChild;
+      if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + c.cls); if (own) src = own; }
+      var copy = src.cloneNode(true), w = src.getBoundingClientRect().width;
+      if (w) { copy.style.width = w + 'px'; copy.style.boxSizing = 'border-box'; }
+      copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
+      [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[id]'))).forEach(function (k) { k.removeAttribute('id'); });
+      var img = '<img class="pg-compare-img" alt="' + esc(c.name + ' in Figma') + '" src="' + esc(sh.src) + '" width="' + Math.round(sh.w) + '" height="' + Math.round(sh.h) + '">';
+      // A small one drawn larger, both by the same amount, so a pixel of difference can be seen.
+      var k = Math.max(1, Math.min(4, Math.floor(120 / Math.max(1, sh.h, src.getBoundingClientRect().height))));
+      var larger = k > 1 ? '<p class="pg-empty">Both drawn ' + k + ' times larger.</p>' : '';
+      if (compareMode === 'side') {
+        body.innerHTML = larger + '<div class="pg-compare-row"><div class="pg-compare-fig"><div class="pg-ctl-label">Figma</div><div class="pg-compare-stage"><div class="pg-compare-layer">' + img + '</div></div></div><div class="pg-compare-fig"><div class="pg-ctl-label">Code</div><div class="pg-compare-stage"><div class="pg-compare-layer pg-compare-code"></div></div></div></div>';
+        body.querySelector('.pg-compare-code').appendChild(copy);
+        Array.prototype.forEach.call(body.querySelectorAll('.pg-compare-layer'), function (l) { l.style.zoom = k; });
+      } else {
+        body.innerHTML = larger + '<div class="pg-compare-row"><div class="pg-compare-stage"><div class="pg-compare-layer pg-compare-over">' + img + '<div class="pg-compare-cut"></div></div></div></div>';
+        var layer = body.querySelector('.pg-compare-layer'); layer.insertBefore(copy, layer.firstChild); layer.style.zoom = k;
+        var cut = function () { var x = +amount.value; layer.querySelector('.pg-compare-img').style.clipPath = 'inset(0 ' + (100 - x) + '% 0 0)'; layer.querySelector('.pg-compare-cut').style.left = x + '%'; };
+        amount.oninput = cut; cut();
+      }
+    }
+    if (compareEl) {
+      var cmpBar = compareEl.querySelector('.pg-compare-bar');
+      segItems(cmpBar).forEach(function (b) { segSelect(b, b.dataset.v === compareMode); b.addEventListener('click', function () { compareMode = b.dataset.v; segItems(cmpBar).forEach(function (x) { segSelect(x, x === b); }); drawCompare(); }); });
+    }
     function drawInspect() {
       Array.prototype.forEach.call(preview.querySelectorAll('.pg-inspect-marks'), function (n) { n.remove(); });
       if (!inspectLegend) return;
@@ -1541,8 +1610,8 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     function ownRows() {
       if (!tOwn) return;
       var o = c.ownTokens;
-      tOwn.innerHTML = o.colors.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td><span class="pg-own-swatch" style="background:var(' + esc(t.var) + ')"></span>' + esc(t.var) + '  ·  ' + esc(live(preview, t.var)) + '</td></tr>'; }).join('') +
-        o.sizes.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + esc(t.var) + '  ·  ' + esc(live(preview, t.var) || t.value) + '</td></tr>'; }).join('');
+      tOwn.innerHTML = o.colors.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td><span class="pg-own-swatch" style="background:var(' + esc(t.var) + ')"></span>' + usesLink(t.var) + '  ·  ' + esc(live(preview, t.var)) + '</td></tr>'; }).join('') +
+        o.sizes.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + usesLink(t.var) + '  ·  ' + esc(live(preview, t.var) || t.value) + '</td></tr>'; }).join('');
     }
     // Per-component mode controls: only the axes that nest, so this preview can differ from the page.
     if (AXES.some(function (a) { return a.scoped; })) {
@@ -1615,6 +1684,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       nudge();
       if (WIDTH !== 'fit') renderFrame();
       if (inspectOn) requestAnimationFrame(drawInspect);
+      if (compareOn) requestAnimationFrame(drawCompare);
     }
     // A part no instance in the products holds, made from the selector the code styles it with: an icon from the
     // system's own sheet at its icon size, else an element with the selector's classes and the text its text prop gives.
@@ -1731,6 +1801,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       refresh();
     };
     if (!ALL) { action('Inspect', function (b) { inspectOn = !inspectOn; b.setAttribute('aria-pressed', inspectOn ? 'true' : 'false'); if (inspectOn && WIDTH !== 'fit') showWidth('fit'); else drawInspect(); }); inspectBtn = actions.lastElementChild; inspectBtn.setAttribute('aria-pressed', 'false'); }
+    if (!ALL && compareEl) { action('Figma', function (b) { compareOn = !compareOn; b.setAttribute('aria-pressed', compareOn ? 'true' : 'false'); if (compareOn && WIDTH !== 'fit') showWidth('fit'); drawCompare(); }); compareBtn = actions.lastElementChild; compareBtn.setAttribute('aria-pressed', 'false'); }
     function playTime(root) { var ms = 0; [root].concat(Array.prototype.slice.call(root.querySelectorAll('*'))).forEach(function (k) { var cs = getComputedStyle(k); cs.animationDuration.split(',').forEach(function (d, i) { var t = (parseFloat(d) || 0) * (/ms$/.test(d.trim()) ? 1 : 1000) + (parseFloat((cs.animationDelay.split(',')[i] || '0')) || 0) * 1000; ms = Math.max(ms, t); }); }); return ms; }
     if (mv && mv.overlay) action('Open ' + c.name, function (trigger) {
       var o = mv.overlay, src = preview.firstElementChild; if (!src) return;
@@ -1882,6 +1953,7 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
       COMPONENTS.forEach(function (c) {
         add('Component', c.name, '#c-' + c.name, null, [c.description, c.role, c.cls, c.note].concat(c.annotations || [], (c.controls || []).map(function (k) { return k.label + ' ' + (k.options || []).map(function (o) { return o.label; }).join(' '); }), (c.unbuilt || []).map(function (u) { return u.label; }), (c.slots || []).map(function (x) { return x.name; })));
         ((c.ownTokens && c.ownTokens.colors) || []).concat((c.ownTokens && c.ownTokens.sizes) || []).forEach(function (t) { add('Token in ' + c.name, t.figma, '#c-' + c.name, t.figma, [t.var, t.value]); });
+        (c.controls || []).forEach(function (k) { add('Prop of ' + c.name, k.label, '#c-' + c.name, null, [k.prop].concat((k.options || []).map(function (o) { return o.label; }))); });
       });
       FLAT.forEach(function (t) { add('Colour', t.figma, '#colors', t.figma, [t.var]); });
       [['spacing', 'Spacing'], ['radii', 'Radius']].forEach(function (k) { (TOKENS[k[0]] || []).forEach(function (t) { add(k[1], t.figma, '#' + k[0], t.figma, [t.var, t.value]); }); });
@@ -1941,6 +2013,34 @@ body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: v
     // switches the scheme while it reads them, and a redraw would replace the very elements it is reading.
     if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (!ALL) refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); });
   });
+
+  // What uses a token (#uses?t=--name): the components that use it in their own rules, then those that use it through
+  // another token, each linked to its page. Built the first time it is opened, written again for each token.
+  BUILDERS.uses = function () {
+    var s = section('uses', 'Token', 'Token', null);
+    var named = function (v) {
+      var hit = null;
+      (TOKENS.colors || []).forEach(function (g) { g.items.forEach(function (t) { if (t.var === v) hit = t.figma; }); });
+      ['spacing', 'radii', 'sizing', 'iconStrokes'].forEach(function (k) { (TOKENS[k] || []).forEach(function (t) { if (t.var === v) hit = t.figma; }); });
+      (TOKENS.typography || []).forEach(function (t) { ['size', 'weight', 'lh', 'ls', 'family'].forEach(function (k) { if (t[k] && t[k].var === v) hit = t[k].figma; }); });
+      return hit;
+    };
+    var body = document.createElement('div'); body.className = 'sg-uses pg-doc'; s.appendChild(body);
+    s._link = function (q) {
+      var v = (q && q.get('t')) || '', u = USES[v] || { direct: [], via: [] }, fig = named(v), val = v ? getComputedStyle(html).getPropertyValue(v).trim() : '';
+      var link = function (n) { return '<a class="sg-uses-link" href="#c-' + esc(n) + '">' + esc(n) + '</a>'; };
+      var by = function (a, b) { return (a.name || a).localeCompare(b.name || b); }, n = u.direct.length + u.via.length;
+      s.querySelector('h2').textContent = v || 'Token';
+      body.innerHTML = '<p>' + esc(!n ? 'No component uses it.' : (n === 1 ? 'One component uses it' : n + ' components use it') + (u.via.length ? ', ' + (u.direct.length ? u.direct.length + ' in their own rules and ' : '') + u.via.length + ' through another token.' : '.')) + '</p><dl class="pg-updated">' +
+        (fig ? '<div><dt>In Figma</dt><dd><p>' + esc(fig) + '</p></dd></div>' : '') +
+        (val ? '<div><dt>Its value now</dt><dd><p>' + esc(val) + '</p></dd></div>' : '') +
+        '<div><dt>Used by</dt><dd>' + (u.direct.length ? u.direct.slice().sort(by).map(function (x) { return '<p>' + link(x) + '</p>'; }).join('') : '<p>No component uses it in its own rules.</p>') + '</dd></div>' +
+        (u.via.length ? '<div><dt>Through another token</dt><dd>' + u.via.slice().sort(by).map(function (x) { return '<p>' + link(x.name) + ', through ' + usesLink(x.through) + '</p>'; }).join('') + '</dd></div>' : '') +
+        '</dl>';
+    };
+    s._link(hashParts().q);
+    return s;
+  };
 
   // One view at a time: the overview, a foundation or a component, by the address (#c-badge), so each can be shared.
   // With ?all every view shows, one after another, as before.
