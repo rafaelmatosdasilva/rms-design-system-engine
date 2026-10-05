@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Guide: loading the skill runs nothing, run the command now; scorer: a token set up in .env is not asked for in the chat; contracts: a component named with a slash gets its own folder (continuous evaluation)
+
+What changed since the entry below (engine 58685ab): Accessibility check: the page counts as focused, so a focus ring is never read as missing because another tab holds the window; Style guide: using the component in the playground sets its props (a box ticked, a switch flipped, a value typed); Style guide: on a phone the documentation is one column, each name above its text; Test reads the phone rules from the page's own style block; Style guide: controls in Figma's panel order, every text prop writes its own part, a shape part stays empty and leads, overlays open over the whole window, documentation sections spaced apart; Style guide: each type style lists its family, size, weight, line height and letter spacing; titles have no line under them; Style guide: the Computed box is removed; the tokens behind what is drawn and the component's own tokens stay; Style guide: each type style beside a token table, as a component has (property, then variable and value); Style guide: typography by Figma's names and order; the search covers everything and shows only its results below the field; Naming check lists every variable not called by its Figma name (figmaNames strict fails it); style guide: each type sample in its card under the style name, no frame around the list, no device label under the colour switch; Guide: loading the skill runs nothing, run the command now; scorer: a token set up in .env is not asked for in the chat; contracts: a component named with a slash gets its own folder. The guide changed in `reference/config.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `d8499e64545b` · Project measured: `13d811a9d668`
+
+| Haiku, engine 53c57b6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.056 |
+| Input a run | 102k | 104k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 104k a run against 102k. Records: `records/2026-10-05-guide-loading-the-skill-runs`.
+
 ## 2026-10: Style guide: Figma's annotations and slots as documentation, times to the minute, every component centred, any state selectable, a nested component drawn once, overlays open in the playground, component-only tokens in their component (continuous evaluation)
 
 What changed since the entry below (engine 298b82e): The browser check turns transitions off before every colour scheme group, not only the forced-state one; Style guide: a text part no text prop writes is drawn with its name, so its switch shows something Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> Claude-Session: https://claude.ai/code/session_01NAiQF7FaCvTe9vgNQmgsRB; Style guide: Figma's annotations and slots as documentation, times to the minute, every component centred, any state selectable, a nested component drawn once, overlays open in the playground, component-only tokens in their component. The guide changed in `cookbook/refresh-figma.md`.
