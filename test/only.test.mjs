@@ -37,9 +37,9 @@ test('a gate by number or by name, singular or plural; accessibility and parity 
   assert.deepEqual(pick('99').unknown, ['99']);
 });
 
-test('every gate the README lists answers to its own name and number', async () => {
+test('every gate the features page lists answers to its own name and number', async () => {
   const { readFileSync } = await import('node:fs');
-  const rows = [...readFileSync(join(ENGINE, 'README.md'), 'utf8').matchAll(/^\| (\d+) \| ([^|]+?) \|/gm)].map((m) => [Number(m[1]), m[2]]);
+  const rows = [...readFileSync(join(ENGINE, 'docs', 'features.md'), 'utf8').matchAll(/^\| (\d+) \| ([^|]+?) \|/gm)].map((m) => [Number(m[1]), m[2]]);
   assert.equal(rows.length, LABELS.length);
   for (const [n, name] of rows) {
     assert.deepEqual([...pick(name).gates], [n], name);
