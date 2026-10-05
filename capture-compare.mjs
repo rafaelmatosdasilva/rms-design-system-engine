@@ -169,7 +169,10 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       const h = c.props?.height, mh = c.props?.minHeight;
       const setsHeight = h?.rule && h.confidence !== 'default' && toNum(h.value) > 0 && !/min-height|max-height/.test(h.note ?? '');
       const setsMin = mh?.rule && mh.confidence !== 'default' && toNum(mh.value) > 0;
-      if (setsHeight && c.size?.height != null) {
+      if (setsHeight && f.sizingV === 'FILL') {
+        // Figma fills its container, and the code fixes a height of its own: the product's container no longer decides.
+        settle(false, { component: name, field: 'height', figma: 'fills its container', code: toNum(h.value), rule: h.rule, at: h.at, why: 'figma-fill-code-fixed' });
+      } else if (setsHeight && c.size?.height != null) {
         // The rule already says Figma's height and the drawn box is still another: say why, so the fix is not "set
         // the height" again. An inline element ignores a height; with content-box sizing, padding and border add to it.
         const display = String(c.layout?.display ?? ''), sizing = String(c.layout?.boxSizing ?? '');
@@ -178,7 +181,10 @@ export function compareComponents(code, structure, vars, cfg, maps) {
           ? (display === 'inline' ? 'inline' : sizing === 'content-box' && edges > 0 ? 'content-box' : null) : null;
         settle(Math.abs(c.size.height - f.h) < 0.5, { component: name, field: 'height', figma: f.h, code: c.size.height, rule: h.rule, at: h.at, ...(why ? { why } : {}) });
       } else if (setsMin) {
-        settle(Math.abs(toNum(mh.value) - f.h) < 0.5, { component: name, field: 'min height', figma: f.h, code: toNum(mh.value), rule: mh.rule, at: mh.at });
+        // Figma's own minimum when the snapshot has it (minH; null: none), else its frame's height as before.
+        const want = 'minH' in f ? f.minH : f.h;
+        if (want == null) settle(false, { component: name, field: 'min height', figma: 'none', code: toNum(mh.value), rule: mh.rule, at: mh.at, why: 'figma-no-min' });
+        else settle(Math.abs(toNum(mh.value) - want) < 0.5, { component: name, field: 'min height', figma: want, code: toNum(mh.value), rule: mh.rule, at: mh.at });
       } else {
         // No rule fixes it: the code's height follows its content. What Figma says decides the comparison (sizingV, the
         // Default variant's vertical sizing; h 'auto' in an older snapshot is a hug):
@@ -186,6 +192,8 @@ export function compareComponents(code, structure, vars, cfg, maps) {
         //  · Figma hugs too: both let the content decide, which agrees; a horizontal row's drawn height does not depend
         //    on how many items it holds, so it is compared with Figma's as well (a vertical stack grows with its items,
         //    and Figma's sample holds its own number of them, so its drawn height is not);
+        //  · Figma fills its container: a CSS height left to the page fills the container the product gives it (a flex or
+        //    grid parent stretches it), which agrees; Figma's sample height is only the frame it was drawn in;
         //  · the snapshot does not say: not comparable, with the refresh that makes it so.
         const sizing = f.sizingV ?? (f.h === 'auto' ? 'HUG' : null);
         const drawn = c.size?.height;
@@ -194,11 +202,12 @@ export function compareComponents(code, structure, vars, cfg, maps) {
           else out.notComparable.push({ component: name, field: 'height', figma: f.h, why: 'Figma fixes the height and no browser drew the code' });
         } else if (sizing === 'HUG') {
           settle(true, { component: name, field: 'height sizing', figma: 'follows its content', code: 'follows its content' });
-          if ((f.layout ?? 'HORIZONTAL') === 'HORIZONTAL' && typeof f.h === 'number') {
+          // A slot's content is a product's, so Figma's sample height says nothing about the component's own.
+          if ((f.layout ?? 'HORIZONTAL') === 'HORIZONTAL' && typeof f.h === 'number' && !f.slot) {
             if (drawn != null) settle(Math.abs(drawn - f.h) < 0.5, { component: name, field: 'height (drawn)', figma: f.h, code: drawn });
             else out.notComparable.push({ component: name, field: 'height (drawn)', figma: f.h, why: 'no browser drew the code' });
           }
-        } else if (sizing === 'FILL') out.notComparable.push({ component: name, field: 'height', figma: 'fills its container', why: 'Figma fills its container: the code\'s height comes from where a product places it' });
+        } else if (sizing === 'FILL') settle(true, { component: name, field: 'height sizing', figma: 'fills its container', code: 'set by its container' });
         else out.notComparable.push({ component: name, field: 'height', figma: f.h, why: 'Figma\'s sizing is not in the structure snapshot (refresh it: sizingV)' });
       }
     }
@@ -316,9 +325,17 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     // capture produced (labels matched without case or spaces: "State=hover" = "State=Hover").
     const key = (s) => String(s).toLowerCase().replace(/\s+/g, '');
     const states = Object.fromEntries(Object.entries(c.states ?? {}).map(([k, v]) => [key(k), v]));
+    // A state the contract writes on a part (a checkbox's box) changes that part, not the component's height: Figma's
+    // variant height is the whole component's, so it is compared with the component as drawn.
+    const rootClasses = (String(c.selector ?? '').trim().split(/\s+/).pop().match(/\.[\w-]+/g) ?? []);
+    const onRoot = (sel) => { if (!sel) return true; const last = String(sel).trim().split(/\s*[\s>+~]\s*/).pop().match(/\.[\w-]+/g) ?? []; return rootClasses.every((k) => last.includes(k)); };
     for (const [variant, h] of Object.entries(f.variantHeight ?? {})) {
       const st = states[key(variant)];
       if (!st || typeof h !== 'number') continue;
+      if (!onRoot(st.selector)) {
+        if (c.size?.height != null) settle(Math.abs(c.size.height - h) < 0.5, { component: name, field: `height (${variant})`, figma: h, code: c.size.height, why: 'drawn' });
+        continue;
+      }
       const hh = st.changed?.height ?? st.changed?.minHeight;
       if (!hh || !hh.rule) continue;                       // same as the default, or only its content's height
       settle(Math.abs(toNum(hh.value) - h) < 0.5, { component: name, field: `height (${variant})`, figma: h, code: toNum(hh.value), rule: hh.rule, at: hh.at });
@@ -555,6 +572,8 @@ export function measuredLine(d, moved = null) {
     + (d.confidence === 'single-source' ? '  [read from one source]' : '')
     + (moved === 'code-moved' ? `  → in Figma, set it to ${d.codeVar ? `the token behind ${d.codeVar}` : d.code}`
       : moved === 'both-moved' ? '  → decide which value wins'
+      : d.why === 'figma-no-min' ? `  → Figma sets no minimum height (its content decides); remove min-height from the code, or give the component a minimum height in Figma`
+      : d.why === 'figma-fill-code-fixed' ? `  → Figma fills its container; the code fixes ${d.code}px: remove the height so the product's container sets it, or fix the height in Figma`
       : d.why === 'figma-fixed-code-hugs' ? `  → Figma fixes its height at ${want}; the code sets none, so its content decides (${d.code}px drawn): set height: ${want}, or make it hug its content in Figma`
       : d.why === 'inline' ? `  → the rule sets ${want}, but the element is inline and ignores a height: give it display: inline-flex (or block)`
       : d.why === 'content-box' ? `  → the rule sets ${want}, but padding and border add to it: set box-sizing: border-box`

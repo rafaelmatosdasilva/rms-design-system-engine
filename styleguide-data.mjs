@@ -794,17 +794,65 @@ export function segmentedUi(components = []) {
     const selected = selectedIdx >= 0 ? { add: odd[selectedIdx].filter((x) => /^(is-)?(selected|active|current|checked|on)$/i.test(x)), attrs: {} }
       : { add: [], attrs: { [/aria-(selected|pressed|checked)/i.exec(items[attrSel].attrs)[0].toLowerCase()]: 'true' } };
     const label = /<span\b[^>]*\bclass\s*=\s*["']([^"']*(?:label|text)[^"']*)["']/i.exec(items[0].inner)?.[1]?.split(/\s+/)[0] ?? null;
-    const score = (/(segment|toggle|tabs?|switcher|picker|chooser)/i.test(c.name) ? 0 : 10) + (items[0].tag === 'button' ? 0 : 2);
+    // A segmented control by name first; then tabs, the same choice drawn another way; then any group with a selected
+    // item. Anything but a segmented control is a stand-in, and the page says so.
+    const own = /(segment|toggle|switcher|picker|chooser)/i.test(c.name), tabs = !own && /tab/i.test(c.name);
+    const score = (own ? 0 : tabs ? 1 : 10) + (items[0].tag === 'button' ? 0 : 2);
     const base = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(rootAttrs)?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
     // The control itself, without the modifiers one product gave it (full-width, compact): only its own class.
     // Its decoration too (an empty aria-hidden part, as a sliding pill the system's script places).
     const deco = [...inner.matchAll(/<span\b[^>]*aria-hidden\s*=\s*["']true["'][^>]*>\s*<\/span>/gi)].map((d) => d[0]).join('');
-    found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>${deco}`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected });
+    found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>${deco}`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected, standIn: own ? null : tabs ? 'tabs' : c.name });
   }
   const best = found.sort((a, b) => a.score - b.score)[0];
   if (!best) return null;
   const { score, ...ui } = best;
   return ui;
+}
+
+// With no segmented control and no tabs: the system's radio group, one radio per choice (a component whose markup holds
+// a radio input, its label part kept), then its buttons side by side, the selected one in its strongest look (primary)
+// and the others in its quietest, or, with a single button, the selected one in it and the others plain. Same shape as
+// segmentedUi, with standIn saying what stands in. → object | null (the page then draws plain buttons with its tokens).
+export function radioGroupUi(components = [], systemCss = '') {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  const keep = (attrs) => (/\bclass\s*=\s*["']([^"']*)["']/i.exec(attrs ?? '')?.[1] ?? '').split(/\s+/).filter((k) => k && defined(k));
+  for (const c of components) {
+    const m = /^\s*<(label|div|span)\b([^>]*)>([\s\S]*)<\/\1>\s*$/i.exec(c.markup ?? '');
+    const input = m && /<input\b([^>]*\btype\s*=\s*["']?radio\b[^>]*)>/i.exec(m[3]);
+    if (!input) continue;
+    const lab = /<(span|strong|em|b)\b([^>]*)>[^<]*<\/\1>/i.exec(m[3].replace(/<svg[\s\S]*?<\/svg>/gi, ''));
+    return { from: c.name, open: '<div class="sg-seg" role="radiogroup">', close: '</div>', item: { tag: m[1].toLowerCase(), classes: keep(m[2]), label: lab ? keep(lab[2]).join(' ') || null : null, radio: keep(input[1]) }, selected: { add: [], attrs: {} }, standIn: 'radio group' };
+  }
+  return null;
+}
+
+export function buttonsAsSegmentedUi(components = [], systemCss = '') {
+  const all = [];
+  for (const c of components) { const b = buttonUi([c], systemCss); if (b && !all.some((x) => x.cls === b.cls)) all.push({ ...b, name: c.name }); }
+  if (!all.length) return null;
+  const strong = all.find((b) => /(primary|cta)/i.test(b.name)) ?? null;
+  const quiet = [...all].filter((b) => b !== strong).sort((a, b) => (/(secondary|outline)/i.test(a.name) ? 0 : 1) - (/(secondary|outline)/i.test(b.name) ? 0 : 1))[0] ?? strong;
+  const on = strong && quiet && strong !== quiet ? strong : null;
+  // One look only: the selected choice wears it and the others are plain, so which one is chosen still shows.
+  if (!on) return { from: quiet.from, open: '<div class="sg-seg">', close: '</div>', item: { tag: 'button', classes: [], label: null }, selected: { add: [quiet.cls], attrs: {} }, standIn: 'buttons' };
+  return { from: `${on.from} and ${quiet.from}`, open: '<div class="sg-seg">', close: '</div>', item: { tag: 'button', classes: [quiet.cls], label: quiet.label?.cls || null },
+    selected: { add: [on.cls], remove: [quiet.cls], attrs: {} }, standIn: 'buttons' };
+}
+
+// What the page could not take from the system, and what it used instead: one line each, for the overview and the To
+// do list. ui: the picks above (segmented, field, button, card, iconButton, overlay).
+export function standInGaps(ui = {}) {
+  const gaps = [];
+  const seg = ui.segmented;
+  if (!seg) gaps.push({ control: 'segmented control', uses: 'plain buttons drawn with its tokens' });
+  else if (seg.standIn) gaps.push({ control: 'segmented control', uses: seg.standIn === 'tabs' ? 'its tabs' : seg.standIn === 'radio group' ? 'its radio group' : seg.standIn === 'buttons' ? 'its buttons side by side' : `its ${seg.standIn}` });
+  if (!ui.field) gaps.push({ control: 'text field', uses: 'a plain text input drawn with its tokens' });
+  else if (ui.field.standIn) gaps.push({ control: 'text field', uses: `its ${ui.field.standIn}` });
+  if (!ui.button) gaps.push({ control: 'text button', uses: 'plain links and buttons drawn with its tokens' });
+  if (!ui.card) gaps.push({ control: 'card', uses: 'plain blocks drawn with its tokens' });
+  if (!ui.iconButton) gaps.push({ control: 'icon button', uses: 'plain buttons drawn with its tokens' });
+  return gaps.map((g) => ({ ...g, say: `This system has no ${g.control}, so the page uses ${g.uses}.`, todo: `Design ${/^[aeiou]/i.test(g.control) ? 'an' : 'a'} ${g.control} in Figma and build it, and the page uses it; or keep the stand-in.` }));
 }
 
 // The system's own text field, for the page's text inputs: a component's markup holding a text <input> (role
@@ -913,11 +961,12 @@ export function fieldUi(components = [], systemCss = '') {
     const ic = keep(input[1]), rc = keep(root[2]);
     const inputTag = `<input type="text" aria-label="Value"${ic.length ? ` class="${ic.join(' ')}"` : ''}>`;
     const markup = root[1].toLowerCase() === 'input' ? inputTag : `<${root[1]}${rc.length ? ` class="${rc.join(' ')}"` : ''}>${inputTag}</${root[1]}>`;
-    const score = (c.role === 'textbox' || /input|field|text/i.test(c.name) ? 0 : 10) + (ic.length || rc.length ? 0 : 5);
-    found.push({ score, from: c.name, markup });
+    const field = c.role === 'textbox' || /input|field|text/i.test(c.name);
+    const score = (field ? 0 : 10) + (ic.length || rc.length ? 0 : 5);
+    found.push({ score, from: c.name, markup, standIn: field ? null : /search/i.test(c.name) || type === 'search' ? 'search field' : c.name });
   }
   const best = found.sort((a, b) => a.score - b.score)[0];
-  return best ? { from: best.from, markup: best.markup } : null;
+  return best ? { from: best.from, markup: best.markup, ...(best.standIn ? { standIn: best.standIn } : {}) } : null;
 }
 
 // ── A component's code API, as its page lists it ──────────────────────────────────────────────────────────────────────

@@ -150,12 +150,15 @@ function locateExpression(specs) {
     return specs.map((s, i) => {
       let el = null, how = null, count = 0, stripped = null;
       try {
-        const all = [...document.querySelectorAll(s.selector)].filter((e) => !host.contains(e));
+        // On the engine's style guide the system's own controls also draw the page (its switches, its copy and
+        // download buttons): only what its previews draw is the component, so only those are measured there.
+        const previews = document.querySelector('.pg-preview') ? '.pg-preview' : null;
+        const all = [...document.querySelectorAll(s.selector)].filter((e) => !host.contains(e) && (!previews || e.closest(previews)));
         count = all.length;
         // A plain instance carries only the component's own classes. One with extra classes or an id is
         // a particular usage (an app styles it for that spot), so it is copied into a neutral host with
         // those extras removed, and the removed extras are recorded.
-        const own = new Set((s.selector.split(/\\s+/).pop().match(/\\.[\\w-]+/g) || []).map((c) => c.slice(1)));
+        const own = new Set([...(s.selector.split(/\\s+/).pop().match(/\\.[\\w-]+/g) || []).map((c) => c.slice(1)), ...(s.defaultClasses || [])]);
         const extras = (e) => [...e.classList].filter((c) => !own.has(c) && !c.startsWith('data-design-system-engine'));
         const visible = all.filter(shown);
         // Rank: a plain instance first, then one that carries text (a design's default variant has
@@ -187,6 +190,8 @@ function locateExpression(specs) {
         host.appendChild(b.root); el = b.target.matches(s.selector) ? b.target : null; if (el) how = 'bare';
       }
       if (!el) return { i, how: null, count };
+      // Figma's default variant (the contract's classes for it): put on, so that variant is what is measured.
+      for (const c of s.defaultClasses || []) el.classList.add(c);
       // An empty element a script fills later (a tooltip's popover) is given a word, so its padding and height are those
       // of the component with its label, as Figma's default variant has it.
       if (!el.children.length && !el.textContent.trim() && !/^(input|img|hr|br|svg)$/i.test(el.tagName)) el.textContent = 'Label';
@@ -590,7 +595,7 @@ export async function captureComponents(ctx) {
     if (!P) { notes.push(`${page.label}: page did not load`); continue; }
     const list = [...pending.values()];
     // Only the last page builds bare elements, so a real instance anywhere always wins.
-    const specs = list.map((c) => ({ selector: c.selector, probe: c.probe ?? null, allowBare: pi === pages.length - 1, children: c.children ?? [], parts: c.parts ?? {} }));
+    const specs = list.map((c) => ({ selector: c.selector, probe: c.probe ?? null, allowBare: pi === pages.length - 1, children: c.children ?? [], parts: c.parts ?? {}, defaultClasses: c.defaultClasses ?? [] }));
     const located = (await P.evaluate(locateExpression(specs))) ?? [];
     // Every located instance and part, measured in each mode at once, before any state is applied.
     const partSel = (i, kind) => `[data-design-system-engine-part~="${i}-${kind}"]`;
@@ -632,6 +637,14 @@ export async function captureComponents(ctx) {
   for (const c of pending.values()) notes.push(`${c.name}: no instance found (selector ${c.selector})`);
   return pass2(notes);
 
+  // A ::before paints the component's background only when it covers it: a 1.5px line along an edge (a divider
+  // drawn as a pseudo-element) is a line, not a fill.
+  function coversBox(base) {
+    const b = base?.before, H = base?.rect?.height, W = base?.rect?.width;
+    if (!b || !H || !W) return true;
+    const px = (v) => (/px$/.test(String(v)) ? parseFloat(v) : 0);
+    return px(b.top) + px(b.bottom) < H / 2 && px(b.left) + px(b.right) < W / 2;
+  }
   async function captureOne(P, page, comp, loc, pre = new Map(), stateJobs = []) {
     {
       const perMode = pre.get(capSel(loc.i)) ?? await P.measureAll(capSel(loc.i));
@@ -661,7 +674,7 @@ export async function captureComponents(ctx) {
         size: { height: base?.rect?.height, width: base?.rect?.width },
         // How the box is laid out: an inline element ignores a height; content-box adds padding and border to it.
         layout: { display: base?.cs?.display ?? null, boxSizing: base?.cs?.boxSizing ?? null },
-        props, fill: bg && bg[3] > 0 ? 'direct' : beforeBg && beforeBg[3] > 0 ? 'before' : 'none', colors: colorsOf(perMode),
+        props, fill: bg && bg[3] > 0 ? 'direct' : beforeBg && beforeBg[3] > 0 && coversBox(base) ? 'before' : 'none', colors: colorsOf(perMode),
       };
       if (base?.before) entry.before = base.before;
       if (ctx.visual) {
