@@ -61,6 +61,20 @@ test('components: a height the code leaves to its content is compared by what Fi
   assert.ok(facts.includes('menu · height sizing=true'));
 });
 
+test('components: Figma fills its container: a height left to the page agrees, a fixed one differs', () => {
+  const code = { components: {
+    panel: { confidence: 'high', instance: { hasText: true }, size: { height: 32 }, props: {} },
+    sheet: { confidence: 'high', instance: { hasText: true }, size: { height: 300 }, props: { height: { value: '300px', rule: '.sheet', at: 'theme.css:9' } } },
+  } };
+  const structure = { panel: { h: 460, sizingV: 'FILL', layout: 'VERTICAL', slot: true }, sheet: { h: 460, sizingV: 'FILL', layout: 'VERTICAL' } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  const facts = r.facts.map((f) => `${f.key}=${f.same}`);
+  assert.ok(facts.includes('panel · height sizing=true'));
+  assert.ok(facts.includes('sheet · height=false'));
+  assert.match(measuredLine(r.differ.find((d) => d.component === 'sheet')), /Figma fills its container; the code fixes 300px/);
+  assert.deepEqual(r.notComparable, []);
+});
+
 test('components: a real difference names the token, the rule and the source line', () => {
   const code = { components: { bar: { confidence: 'high', instance: { hasText: true }, props: { columnGap: { value: '8px', var: '--gap-m', rule: '.bar', at: 'theme.css:12', confidence: 'verified' } } } } };
   const r = compareComponents(code, { bar: { gapVar: 'gap/xl' } }, { sizing: { 'gap/xl': '16px' } }, cfg, maps());
@@ -216,4 +230,29 @@ test('variant combinations: built from propertyMap selectors; compared with heig
     'height (Size=L, Icon=True, State=Default): 40 vs 32px',
     'layer "Icon" (Size=L, Icon=True, State=Default): shown vs hidden',
   ], JSON.stringify(r.differ));
+});
+
+test('components: Figma\'s own minimum height, and a state set on a part compared on the whole component as drawn', () => {
+  const code = { components: {
+    row: { confidence: 'high', instance: { hasText: true }, size: { height: 24 }, props: { minHeight: { value: '32px', rule: '.row', at: 'theme.css:3' } } },
+    tag: { confidence: 'high', instance: { hasText: true }, size: { height: 24 }, props: { minHeight: { value: '24px', rule: '.tag', at: 'theme.css:5' } } },
+    checkbox: { confidence: 'high', selector: '.checkbox', instance: { hasText: true }, size: { height: 16 }, props: {},
+      states: { 'State=Checked': { selector: '.checkbox-input:checked + .checkbox-box', changed: { height: { value: '14px', rule: '.checkbox-box' } } } } },
+  } };
+  const structure = { row: { h: 24, sizingV: 'HUG', minH: null }, tag: { h: 24, sizingV: 'HUG', minH: 24 }, checkbox: { variantHeight: { 'State=Checked': 16 } } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  const facts = r.facts.map((f) => `${f.key}=${f.same}`);
+  assert.ok(facts.includes('row · min height=false') && facts.includes('tag · min height=true'));
+  assert.match(measuredLine(r.differ.find((d) => d.component === 'row')), /Figma sets no minimum height \(its content decides\); remove min-height/);
+  // The box's own 14px is the part's; Figma's 16 is the whole checkbox's, and the whole is drawn at 16.
+  assert.ok(facts.includes('checkbox · height (State=Checked)=true'));
+});
+
+test('capture: Figma\'s default variant is drawn with the classes the contract gives it, never a state or a part', async () => {
+  const { defaultVariantClasses } = await import('../code-capture.mjs');
+  const props = { properties: { Type: { type: 'VARIANT', defaultValue: 'Negative' }, State: { type: 'VARIANT', defaultValue: 'Hover' }, 'Size#1:2': { type: 'VARIANT', defaultValue: 'M' }, Label: { type: 'TEXT', defaultValue: 'x' } } };
+  const map = { Type: { Negative: '.badge.high', Positive: '.badge.low' }, State: { Hover: '.badge:hover' }, Size: { M: '.badge .badge-icon' } };
+  assert.deepEqual(defaultVariantClasses(props, map, '.badge'), ['high']);
+  assert.deepEqual(defaultVariantClasses(props, { Type: { Negative: '.chip.high' } }, '.badge'), [], 'another component\'s classes add nothing');
+  assert.deepEqual(defaultVariantClasses(null, map, '.badge'), []);
 });

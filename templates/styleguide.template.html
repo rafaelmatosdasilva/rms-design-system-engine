@@ -93,6 +93,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-hero > h1 { font-size: var(--sg-h1); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-s); }
 .sg-hero > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); max-width: 500px; }
 .sg-pending { font-size: var(--sg-m); color: var(--sg-text); background: color-mix(in srgb, var(--sg-warning) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sg-warning) 40%, transparent); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-xl); max-width: 720px; }
+.sg-gap ul { margin: var(--sg-space-xs) 0 0; padding-left: var(--sg-space-l); }
 .sg-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sg-space-m); margin-bottom: var(--sg-space-xxl); }
 /* Each overview link is the system's own card (DATA.ui.card); with none, a plain block link. Never a box of the page's. */
 .sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
@@ -277,20 +278,27 @@ a.pg-usage-name { color: var(--sg-text); }
      scoped (its CSS nests, as a Figma mode does on a frame); a class axis toggles a class on <html>. The first value
      is the base: choosing it clears the attribute so the :root defaults apply. */
   var AXES = DATA.modes || [];
-  /* ── Every switch on the page is the system's own segmented control (DATA.ui.segmented, read from its markup), else
-     a plain row of buttons the browser draws. ─────────────────────────────────────────────────────────────────── */
-  var SEG = DATA.ui && DATA.ui.segmented;
+  /* ── Every switch on the page is the system's own segmented control (DATA.ui.segmented, read from its markup). With
+     none, its stand-in (tabs, a radio group, its buttons side by side), else a plain row of buttons the browser draws;
+     DATA.ui.gaps says which, on the overview and in the To do list. ─────────────────────────────────────────────── */
+  var SEG = DATA.ui && DATA.ui.segmented, RADIO = SEG && SEG.item.radio, RADIO_NO = 0;
   function segHTML(items) {
-    var tag = SEG ? SEG.item.tag : 'button', cls = SEG ? SEG.item.classes.join(' ') : '';
+    var tag = SEG ? SEG.item.tag : 'button', cls = SEG ? SEG.item.classes.join(' ') : '', group = 'sg-r' + (++RADIO_NO);
     return (SEG ? SEG.open : '<div class="sg-seg">') + items.map(function (o) {
       var text = SEG && SEG.item.label ? '<span class="' + esc(SEG.item.label) + '">' + esc(o.label) + '</span>' : esc(o.label);
-      return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '"' + (o.off ? ' disabled aria-disabled="true" title="' + esc(o.title || '') + '"' : '') + '>' + text + '</' + tag + '>';
+      // A radio: its input carries the choice and the label around it is what a click lands on.
+      if (RADIO) text = '<input type="radio" name="' + group + '"' + (RADIO.length ? ' class="' + esc(RADIO.join(' ')) + '"' : '') + (o.off ? ' disabled' : '') + '>' + text;
+      return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '"' + (o.off ? (RADIO ? '' : ' disabled') + ' aria-disabled="true" title="' + esc(o.title || '') + '"' : '') + '>' + text + '</' + tag + '>';
     }).join('') + (SEG ? SEG.close : '</div>');
   }
   function segSelect(el, on) {
-    if (SEG) { (SEG.selected.add || []).forEach(function (k) { el.classList.toggle(k, on); }); Object.keys(SEG.selected.attrs || {}).forEach(function (a) { if (on) el.setAttribute(a, SEG.selected.attrs[a]); else el.removeAttribute(a); }); }
-    else el.classList.toggle('selected', on);
-    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (SEG) {
+      (SEG.selected.add || []).forEach(function (k) { el.classList.toggle(k, on); });
+      (SEG.selected.remove || []).forEach(function (k) { el.classList.toggle(k, !on); });   // a stand-in button's quiet look, off when selected
+      Object.keys(SEG.selected.attrs || {}).forEach(function (a) { if (on) el.setAttribute(a, SEG.selected.attrs[a]); else el.removeAttribute(a); });
+    } else el.classList.toggle('selected', on);
+    if (RADIO) { var r = el.querySelector('input'); if (r) r.checked = on; el.dataset.on = on ? '1' : ''; }
+    else el.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
   function segItems(box) { return Array.prototype.slice.call(box.querySelectorAll('[data-v]')); }
 
@@ -329,7 +337,7 @@ a.pg-usage-name { color: var(--sg-text); }
         diff.hidden = !list.length;
       };
       wrap._sync();
-      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (b.getAttribute('aria-pressed') === 'true') return;   // the choice already set changes nothing
+      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (b.getAttribute('aria-pressed') === 'true' || b.dataset.on === '1') return;   // the choice already set changes nothing
       if (b.dataset.v === '__auto') scope.removeAttribute(axis.attr); else apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(axis); }); });
       return wrap;
     }
@@ -356,6 +364,8 @@ a.pg-usage-name { color: var(--sg-text); }
     (c.differences || []).forEach(function (x) { TODO.push({ who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.unbuilt || []).forEach(function (u) { TODO.push({ who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell me to do it.' }); });
   });
+  // A control the page needs and the system lacks: drawn with a stand-in until the system has one.
+  ((DATA.ui && DATA.ui.gaps) || []).forEach(function (g) { TODO.push({ who: 'both', comp: null, say: g.say, todo: g.todo }); });
   ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. Tell me to do it.' }); });
   var ORDER = ['figma', 'code', 'both'];
   TODO.sort(function (a, b) { return ORDER.indexOf(a.who) - ORDER.indexOf(b.who); });
@@ -366,6 +376,9 @@ a.pg-usage-name { color: var(--sg-text); }
   var ov = document.getElementById('overview');
   document.getElementById('sg-hero-title').textContent = DATA.title || 'Design system';
   if (DATA.notAgreed && (DATA.notAgreed.differences || DATA.notAgreed.unrealized || (DATA.notAgreed.waiting || []).length)) { var pend = document.createElement('p'); pend.className = 'sg-pending'; pend.dataset.todo = '1'; pend.textContent = DATA.notAgreed.line; ov.appendChild(pend); }
+  // What the page could not take from the system, in one note: each control it lacks and the stand-in it uses instead.
+  var GAPS = (DATA.ui && DATA.ui.gaps) || [];
+  if (GAPS.length) { var gp = document.createElement('div'); gp.className = 'sg-pending sg-gap'; gp.innerHTML = '<b>Stand-ins on this page</b><ul>' + GAPS.map(function (g) { return '<li>' + esc(g.say) + '</li>'; }).join('') + '</ul>'; ov.appendChild(gp); }
   if (TODO.length) { var go = document.createElement('p'); go.innerHTML = sysButton('a', 'Open the To do list (' + TODO.length + ')', ' href="#todo"'); ov.appendChild(go); }
   // Two groups, as the page has them: the foundations, then every component in the order of its sections. Each card
   // is a thumbnail (a few of the real tokens, or the component itself, drawn when its section is built) and its name.

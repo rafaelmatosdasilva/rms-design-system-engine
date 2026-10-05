@@ -222,8 +222,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   component owns, its text styles, radii and spacing scale, its icons' Figma size (`styleguide.chrome` names a role
   by hand: `{ "accent": "--brand" }`). The page's text is the system's body rule, which the components inherit as in
   the product. Its switches are the system's own segmented control and its text inputs its own text field, read from
-  their markup (a row of the same element where one carries the selected class). A role the system has no token for
-  is left to the browser's own and listed, never given a value of the engine's.
+  their markup (a row of the same element where one carries the selected class). A control the system lacks gets
+  its nearest stand-in from the system (a segmented control: its tabs, then its radio group, then its buttons side by
+  side, the selected one in its primary look or, with one button, in it and the others plain; a text field: its
+  search field), else a plain control drawn with its tokens, and each one is said on the overview and in the To do
+  list (`ui.gaps`: "This system has no segmented control, so the page uses its tabs."). A role the system has no
+  token for is left to the browser's own and listed, never given a value of the engine's.
 - **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; a size that
   changes with a mode shows the value of the mode its section's size switch picks; icons from the icon sheet.
