@@ -53,6 +53,9 @@ test('a gap is named when the thing and a word saying it is not there are close'
   assert.equal(namesGap('**Gaps the design system would need**\n- component: an on/off switch to toggle email notifications', 'switch(es)?|toggle(s)?'), true);
   assert.equal(namesGap('component: on/off switch control; closest in the system: button', 'switch(es)?|toggle(s)?'), true);
   assert.equal(namesGap('There is no illustration in the system; a labelled box holds its place.', 'illustrations?|images?'), true);
+  // A gap listed under a heading that says what the system lacks counts, however far down the list it sits.
+  assert.equal(namesGap('## GAPS\n\nThe design system would need these components to fully implement this flow (the design team decides whether to build them):\n\n1. **component:** Error message for invalid input\n2. **component:** Confirmation message that appears and disappears', 'toasts?|banners?|confirmation (message|component)'), true);
+  assert.equal(namesGap('## Summary\n\nThe page shows a confirmation message once saved.', 'toasts?|banners?|confirmation (message|component)'), false);
 });
 
 test('eleven prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
@@ -91,6 +94,9 @@ test('the newer tasks: an empty state, an error state, linked pages in the team\
   assert.deepEqual([m.linkedPages(ctx({ 'a.json': '{"goesTo":"b"}', 'b.json': '{"goesTo":"c"}' }), 3).ok, m.linkedPages(ctx({ 'a.html': '<a href="b.html">x</a>' }), 3).ok], [true, false]);
   assert.deepEqual([m.followsFlow({ ...ctx({ 'a.json': '{}' }), final: 'The guidelines add a Payment step I left out' }).ok, m.followsFlow({ ...ctx({ 'a.json': '{}' }), final: 'done' }).ok], [true, false]);
   assert.deepEqual([m.fitsPhone(ctx({ 'a.json': JSON.stringify({ component: 'Row', props: { wrap: true } }) })).ok, m.fitsPhone(ctx({ 'a.css': '.r{display:flex}' })).ok], [true, false]);
+  // What holds the chips decides, not another row on the page (one holding the Save button).
+  const chips = (holder) => JSON.stringify({ component: 'Page', children: [{ ...holder, children: [{ component: 'chip' }, { component: 'chip' }] }, { component: 'Row', children: [{ component: 'button' }] }] });
+  assert.deepEqual([chips({ component: 'Stack' }), chips({ component: 'Row', props: { wrap: true } }), chips({ component: 'Row' })].map((t) => m.fitsPhone(ctx({ 'prototypes/p.json': t })).ok), [true, true, false]);
   assert.deepEqual([m.opensConfirmation(ctx({ 'a.json': '{"opens":"confirm"}' })).ok, m.opensConfirmation(ctx({ 'a.html': '<div>always</div>' })).ok], [true, false]);
 });
 

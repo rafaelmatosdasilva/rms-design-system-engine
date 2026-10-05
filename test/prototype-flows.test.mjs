@@ -64,11 +64,11 @@ test('--prototype --flow lists the links and holds them to the guidelines\' flow
   assert.equal(r.status, 0, r.stdout);
   assert.match(readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'account.html'), 'utf8'), /"goesTo":"plan"/);
   r = run('--prototype', '--flow');
-  assert.equal(r.status, 0, r.stdout);
+  assert.equal(r.status, 1, 'a flow with a step not drawn is not done: ' + r.stdout);
   assert.match(r.stdout, /🔗 FLOWS {2}2 page\(s\) in prototypes\/, 1 link\(s\)/);
   assert.match(r.stdout, /account → plan {2}by "Continue"/);
   assert.match(r.stdout, /the team's flow "Sign-up flow" \(guidelines\.md\): Account → Plan → Welcome/);
-  assert.match(r.stdout, /⚠️ {2}the flow "Sign-up flow" \(guidelines\.md\) has a step "Welcome" and no prototype for it/);
+  assert.match(r.stdout, /❌ the flow "Sign-up flow" \(guidelines\.md\) has a step "Welcome" and no prototype for it/);
   const last = JSON.parse(readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'last.json'), 'utf8'));
   assert.ok(last.gaps.some((g) => g.kind === 'flow' && /Welcome/.test(g.line)));
   writeFileSync(join(dir, 'prototypes', 'plan.json'), JSON.stringify(step('Choose a plan', 'welcome')));
@@ -88,10 +88,15 @@ test('--prototype --flow holds the pages of a flow to each other: the frame, the
   writeFileSync(join(dir, 'prototypes', 'plan.json'), JSON.stringify(step('padding/m', 'Choose a plan', [['Back', 'account'], ['Continue', 'payment']])));
   writeFileSync(join(dir, 'prototypes', 'payment.json'), JSON.stringify(step('padding/s', 'Payment', [['Next', 'welcome']])));
   writeFileSync(join(dir, 'prototypes', 'welcome.json'), JSON.stringify(step('padding/m', 'Welcome', [['Back', 'payment']])));
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  let r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  assert.equal(r.status, 1, 'pages that decide differently are not a finished flow: ' + r.stdout);
+  assert.match(r.stdout, /❌ payment: page padding: padding\/s here, padding\/m on the other pages of the flow/);
+  assert.match(r.stdout, /❌ payment: the words for going on: "Next" here, "Continue" on the other pages of the flow/);
+  assert.match(r.stdout, /❌ payment has no way back to plan, and plan, welcome has one/);
+  assert.doesNotMatch(r.stdout, /❌ (account|plan|welcome):/, 'the pages that match say nothing');
+  // Brought in line, the flow holds.
+  writeFileSync(join(dir, 'prototypes', 'payment.json'), JSON.stringify(step('padding/m', 'Payment', [['Back', 'plan'], ['Continue', 'welcome']])));
+  r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
   assert.equal(r.status, 0, r.stdout);
-  assert.match(r.stdout, /⚠️ {2}payment: page padding: padding\/s here, padding\/m on the other pages of the flow/);
-  assert.match(r.stdout, /⚠️ {2}payment: the words for going on: "Next" here, "Continue" on the other pages of the flow/);
-  assert.match(r.stdout, /⚠️ {2}payment has no way back to plan, and plan, welcome has one/);
-  assert.doesNotMatch(r.stdout, /⚠️ {2}(account|plan|welcome):/, 'the pages that match say nothing');
+  assert.match(r.stdout, /✅ the flow holds/);
 });

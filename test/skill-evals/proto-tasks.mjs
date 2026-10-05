@@ -122,7 +122,10 @@ export function usesSystem(ctx, names) {
 export function namesGap(text, thing) {
   const t = String(text ?? '');
   const NOT = "\\b(no|not|n['’]t|missing|lacks?|lacking|without|none|gaps?|closest|would need|doesn['’]t|does not|isn['’]t|is not|stand-?in|instead|placeholder|substitut\\w*)\\b";
-  return new RegExp(`(${thing})[\\s\\S]{0,160}${NOT}|${NOT}[\\s\\S]{0,160}(${thing})`, 'i').test(t);
+  if (new RegExp(`(${thing})[\\s\\S]{0,160}${NOT}|${NOT}[\\s\\S]{0,160}(${thing})`, 'i').test(t)) return true;
+  // Or listed under a heading that says what the system lacks (## Gaps, **What the system would need**).
+  const sections = t.split(/\n(?=#{1,6}\s|\*\*[^*\n]+\*\*\s*:?\s*\n)/);
+  return sections.some((sec) => new RegExp(`^(#{1,6}\\s|\\*\\*)[^\\n]*\\b(gaps?|missing|would need|lacks?|not in the (design )?system)\\b`, 'i').test(sec.trim()) && new RegExp(`(${thing})`, 'i').test(sec));
 }
 
 // The made page's frame and heading, from a composition or from CSS: { padding, gap, heading } as spacing token or
@@ -225,6 +228,20 @@ export function followsFlow(ctx) {
 }
 // On a phone the chips may not fit one row: they wrap or stack.
 export function fitsPhone(ctx) {
+  // A composition says it: what holds the chips stacks them, or wraps them.
+  const verdicts = [];
+  for (const f of made(ctx)) {
+    if (!/\.json$/.test(f.path)) continue;
+    let tree; try { tree = JSON.parse(f.text); } catch { continue; }
+    (function walk(n) {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      const kids = Array.isArray(n.children) ? n.children.filter((k) => k && typeof k === 'object') : [];
+      if (kids.filter((k) => /chip/i.test(String(k.component ?? ''))).length >= 2) verdicts.push(/^(Stack|Columns)$/.test(n.component) || (n.component === 'Row' && (n.props?.wrap === true || n.wrap === true)));
+      for (const v of Object.values(n)) walk(v);
+    })(tree);
+  }
+  if (verdicts.length) return check('fits a phone: the chips wrap or stack instead of running off the screen', verdicts.every(Boolean));
   const t = madeText(ctx);
   const ok = /flex-wrap\s*:\s*wrap|flexWrap\s*:\s*['"]wrap|"wrap"\s*:\s*true|flex-direction\s*:\s*column|flexDirection\s*:\s*['"]column|auto-(fit|fill)|"minWidth"\s*:/i.test(t)
     || (/"component"\s*:\s*"Stack"/.test(t) && !/"component"\s*:\s*"Row"(?![^}]*"wrap")/.test(t));
