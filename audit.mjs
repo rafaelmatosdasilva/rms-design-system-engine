@@ -2538,9 +2538,23 @@ function reportFull(label, items, shown) {
       return parts.length ? C.dim(`       ↳ ${parts.join(';  ')}`) : null;
     }
 
+    // Each one says where it is and which value has no Figma value, so the summary can carry it as it is.
+    function offending(h) {
+      const m = /^(.*?):(\d+):(.*)$/.exec(h);
+      if (!m) return h;
+      const where = `${m[1].replace(ROOT + '/', '')}:${m[2]}`, rule = m[3].replace(/\/\*[^*]*\*\//g, '');
+      const { nums, colors } = scopedSets(h);
+      // The declarations holding a literal the same matcher finds in no Figma value.
+      const decls = [...rule.matchAll(/([a-z-]+)\s*:\s*([^;{}]+)/gi)].filter(([, , v]) => {
+        const bare = v.replace(/var\([^)]*\)/g, '');
+        const lits = [...bare.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((x) => x[0]).concat([...bare.matchAll(/(?<![\w.-])(-?\d+(?:\.\d+)?)(px|rem|em|%|vh|vw|vmin|vmax|ch|ex)\b/g)].map((x) => x[1] + x[2]));
+        return lits.some((l) => !matchesFigmaValue(l, nums, colors));
+      }).map(([, p, v]) => `${p}: ${v.trim()}`);
+      return `${where} ${decls.length ? `${decls.join('; ')} (no Figma value)` : rule.trim().slice(0, 140)}`;
+    }
     const hitLines = [];
     for (const h of divergent.slice(0, 20)) {
-      hitLines.push('  ' + h);
+      hitLines.push(`  ❌ ${offending(h)}`);
       const s2 = suggest(h);
       if (s2) hitLines.push(s2);
     }
@@ -2551,12 +2565,12 @@ function reportFull(label, items, shown) {
     if (matchedFigma.length) {
       const mode = compValues ? 'per-component sweep' : 'global snapshot values';
       matchNotes.push(C.dim(`ℹ️  ${matchedFigma.length} hardcoded literal(s) match the Figma value - parity OK, not failed (${mode}):`));
-      for (const h of matchedFigma.slice(0, 20)) matchNotes.push(C.dim(`     [${scopedSets(h).scope}] ${h}`));
+      for (const h of matchedFigma.slice(0, 20)) matchNotes.push(C.dim(`     [${scopedSets(h).scope}] ${h.replace(ROOT + '/', '')}`));
       matchNotes.push(...reportFull('hardcoded-matches-figma', matchedFigma, 20));
     }
     if (focusRings.length) {
       matchNotes.push(C.dim(`ℹ️  ${focusRings.length} focus ring literal(s) set apart - an outline in a :focus rule has no Figma value to compare with, not failed:`));
-      for (const h of focusRings.slice(0, 20)) matchNotes.push(C.dim(`     ${h}`));
+      for (const h of focusRings.slice(0, 20)) matchNotes.push(C.dim(`     ${h.replace(ROOT + '/', '')}`));
     }
 
     const pass  = divergent.length === 0;
