@@ -178,9 +178,18 @@ test('in the browser: no script error, a control changes the real component, the
     // system's own button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-code code').textContent`), '<Chip Size="L" />');
     assert.equal(await run(`document.querySelector('#c-chip .pg-code [data-copy]').tagName`), 'BUTTON');
-    // No Inspect over the live component: its specs are their own area, opened from the Playground.
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].map((b) => b.textContent).filter((x) => /Inspect|See specs/.test(x)).join()`), 'See specs');
+    // No Inspect over the live component and no button for its specs: they are their own area, beside the Playground.
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].map((b) => b.textContent).filter((x) => /Inspect|specs/i.test(x)).join()`), '');
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-preview [data-hit]').length`), 0);
+    // Full width: the component across the whole card, its controls below; again puts it back.
+    const wideBtn = `[...document.querySelectorAll('#c-chip .pg-actions button')].find((b) => b.textContent === 'Full width')`;
+    const w0 = await run(`document.querySelector('#c-chip .pg-preview').getBoundingClientRect().width`);
+    await run(`${wideBtn}.click()`);
+    assert.equal(await run(`${wideBtn}.getAttribute('aria-pressed')`), 'true');
+    assert.ok(await run(`document.querySelector('#c-chip .pg-preview').getBoundingClientRect().width`) > w0 + 100, 'wider');
+    assert.ok(await run(`document.querySelector('#c-chip .pg-panel').getBoundingClientRect().top >= document.querySelector('#c-chip .pg-preview').getBoundingClientRect().bottom - 1`), 'the controls below it');
+    await run(`${wideBtn}.click()`);
+    assert.equal(await run(`Math.round(document.querySelector('#c-chip .pg-preview').getBoundingClientRect().width)`), Math.round(w0));
     // Width: a chosen width draws it in a frame of that width with the page's own stylesheets; Fit brings the live
     // preview back.
     await run(`document.querySelector('#c-chip .pg-width [data-v="phone"]').click()`);
@@ -212,8 +221,17 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(`document.querySelector('#c-chip .pg-compare').textContent`), /Figma has no image of this variant yet \(it has 1\)/);
     await run(`${figmaBtn}.click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
-    // What uses a token: its name links from the tables to a view of the components that use it, and through which token.
-    assert.equal(await run(`!!document.querySelector('#c-chip .pg-tokens a.sg-uses-link[href="#uses?t=--chip-background"]')`), true);
+    // A token's name opens a panel in place: its value, the components that use it and a copy button; the page stays where
+    // it is, and Escape closes it, the focus back on the name.
+    const tokenBtn = `document.querySelector('#c-chip .pg-tokens .sg-token-link[data-token="--chip-background"]')`;
+    const hashBefore = await run(`location.hash`);
+    await run(`${tokenBtn}.click()`);
+    assert.equal(await run(`${tokenBtn}.getAttribute('aria-expanded') + '|' + document.querySelector('.sg-token-pop').hidden + '|' + location.hash`), 'true|false|' + hashBefore);
+    assert.match(await run(`document.querySelector('.sg-token-pop').textContent`), /--chip-background.*Used by.*chip.*Copy --chip-background/s);
+    assert.equal(await run(`document.activeElement === document.querySelector('.sg-token-pop')`), true);
+    await run(`document.querySelector('.sg-token-pop').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+    assert.equal(await run(`document.querySelector('.sg-token-pop').hidden + '|' + (document.activeElement === ${tokenBtn})`), 'true|true');
+    // The full view of what uses a token stays at its address.
     await run(`location.hash = '#uses?t=--chip-background'`); await new Promise((r) => setTimeout(r, 300));
     assert.match(await run(`document.getElementById('uses').textContent`), /--chip-background.*One component uses it.*Used by.*chip/s);
     await run(`location.hash = '#c-chip?Size=L'`); await new Promise((r) => setTimeout(r, 300));
@@ -592,6 +610,10 @@ test('usage on every component, from Figma, the code or the authored contract; t
     ['whenToUse', ['to narrow a list.'], 'Figma'], ['whenNotToUse', ['for navigation', 'for one choice'], 'Figma'],
     ['mistakes', ['Using it as a tag'], 'contract.authored.json'], ['limitations', ['no icon on the right'], 'Figma']]);
   assert.deepEqual(guidanceView({ description: 'A filter.' }).missing, ['whenToUse', 'whenNotToUse', 'mistakes', 'limitations']);
+  // What the products get wrong with it fills Common mistakes when the team wrote none; the team's own words win.
+  const seen = guidanceView({ description: 'A filter.', seen: ['In a product, .x is placed on top of it (app.css).'] }).sections.find((x) => x.key === 'mistakes');
+  assert.deepEqual([seen.text, seen.from], [['In a product, .x is placed on top of it (app.css).'], "the products' code, as the last audit found it"]);
+  assert.deepEqual(guidanceView({ authored: { mistakes: 'Using it as a tag' }, seen: ['x'] }).sections.find((x) => x.key === 'mistakes').text, ['Using it as a tag']);
   assert.deepEqual(guidanceView({ note: 'Avoid: two in one row' }).sections[1].from, 'the code');
   // Grey #8a8a8a reads on white (3.4:1 fails) and on near-black in Dark (passes): only the failing pair is reported.
   const byVar = new Map([['--bg', { values: { light: '#ffffff', dark: '#1e1e1e' } }], ['--text', { values: { light: '#111111', dark: '#f0f0f0' } }], ['--muted', { values: { light: '#8a8a8a', dark: '#8a8a8a' } }]]);

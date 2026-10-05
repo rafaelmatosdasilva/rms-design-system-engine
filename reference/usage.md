@@ -272,11 +272,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Usage** (`guidanceView`), in Documentation: When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
-  string or a list); a missing one is said in its Documentation.
+  string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
+  last audit found the products doing with it (a rule laid over it, a look-alike built by hand, a parent's rule
+  overriding it), said so.
 - **The page's own reading**: every button says what it does in words (Menu and Close menu, on a phone; on a wide
   screen the menu is always there), and the style guide check fails when the page's text roles fall below 4.5:1 on its
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
-- **Specs**, an area of its own (none on the measuring page; the Playground's See specs opens it): an inert copy of
+- **Specs**, an area of its own (none on the measuring page): an inert copy of
   the component as the Playground set it, drawn larger, each part numbered in reading order (the contract's named
   parts, `c.anatomy`, a Figma auto name such as Frame 106 replaced by the part's class, then what sits directly inside
   it), a slot outlined, each padding and gap outlined and numbered after the parts and named by its token in the list
@@ -287,6 +289,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   style and colour; a space's token and value), outlined in the accent; a second click puts it down. A number that
   would cover another moves to the nearest free place around it, with a line back (`marker`). A component shown in an
   overlay is drawn as its own element. Nothing is drawn over the live component in the Playground.
+- **Full width**, in the Playground (none on the measuring page): the component across the whole card, its controls
+  below it; again puts it back.
+- **Simplify** (`simplifyView`), a page of its own when it has something to say: components that are one component
+  in several copies (names that differ in their last word, with half their props or more the same: one component with
+  a Type option), a variant prop with one option, or with one option built, and, when the products' code was read and
+  something uses the system, a component no product uses. Each says what to do.
 - **Width**, in the Playground (none on the measuring page): Fit (the live preview), Phone (375px), Tablet (768px) or
   Desktop (1280px), a frame of that width written with the page's own stylesheets, its icon sheet, the component as
   drawn now and the system's own scripts (`systemScripts`), so its media queries apply and it works there (a click
@@ -311,10 +319,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Disabled**: a prop named Disabled, on, disables the native controls inside (`input`, `button`, `select`, `textarea`),
   as a product sets them; the live accessibility check then says Tab passes it by, as it should, and measures focus
   with transitions off, so a ring that fades in is read at its end.
-- **What uses a token** (`tokenUses`, view `#uses?t=--name`): every token's name on the page (foundations, a
-  component's tables) links to it: the components whose own rules use it, then those that use it through another
-  token whose value names it (in any mode), each with the token it came through. Search also finds each component's
-  props and their options.
+- **A token's panel** (`tokenUses`): every token's name on the page (foundations, a component's tables) opens a panel
+  in place, the page left where it is: its Figma name, its value in each mode, the components whose own rules use it
+  and those that use it through another token whose value names it (in any mode, with the token it came through),
+  each linked to its page, and a button to copy it. Escape or a click outside closes it, the focus back on the name.
+  The full list stays at `#uses?t=--name`. Search also finds each component's props and their options.
 - **A link to each variant**: the address carries the props set away from their defaults and the width
   (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
   the controls follow (a value the component does not have is left at its default). Copy link copies it.
