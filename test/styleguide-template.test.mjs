@@ -493,13 +493,13 @@ test('the playground and the preview stay linked: a part\'s state set on the par
   const { optionEffect, ownSelector, realizedControls } = await import('../styleguide-data.mjs');
   assert.deepEqual(optionEffect('.radioButton', '.radioButton-input:checked'), { add: [], attrs: { checked: '' }, target: '.radioButton-input' });
   assert.deepEqual(optionEffect('.badge', '.badge.high'), { add: ['high'], attrs: {} });
-  assert.equal(ownSelector('radioButton', '.depth-option.done'), false);
+  assert.equal(ownSelector('radioButton', '.step-item.done'), false);
   assert.equal(ownSelector('radioButton', '.radioButton-input:checked'), true);
-  // A contract mapping State to a product's own markup (.depth-option) is not the component's: Selected falls back to its
+  // A contract mapping State to a product's own markup (.step-item) is not the component's: Selected falls back to its
   // own :checked rule, and an option the code does not build is offered as not built, never drawn with another's look.
   const r = realizedControls({ name: 'radioButton', cls: 'radioButton',
     defs: { State: { type: 'VARIANT', defaultValue: 'Default', variantOptions: ['Default', 'Selected', 'Unselected'] } },
-    propertyMap: { State: { Default: '.depth-option', Selected: '.depth-option.done', Unselected: '.depth-option.unavailable' } },
+    propertyMap: { State: { Default: '.step-item', Selected: '.step-item.done', Unselected: '.step-item.unavailable' } },
     cssText: '.radioButton { display: flex } .radioButton-input:checked + .radioButton-circle { border-color: red }' });
   assert.deepEqual(r.controls[0].options, [{ label: 'Default' }, { label: 'Selected', add: [], attrs: { checked: '' }, target: '.radioButton-input' }, { label: 'Unselected', unbuilt: true }]);
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
