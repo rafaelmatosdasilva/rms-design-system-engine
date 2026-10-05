@@ -689,6 +689,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     const prev = readJSON(file);                                              // previous emit (for the diff)
     const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames });
     const errs = validateContract(contract);
+    mkdirSync(dirname(file), { recursive: true });   // a component named with a slash (table/row) gets its folder
     writeFileSync(file, JSON.stringify(contract, null, 2) + '\n');
     emitted.push(name);
     built.push({ name, contract });
