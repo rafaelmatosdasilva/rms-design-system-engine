@@ -88,10 +88,15 @@ test('the next step builds the tokens first, then a component only when the pers
   assert.equal(buildLine({ tokens: 0, components: [] }), null);
 });
 
-test('setup on a project with no CSS at all starts in build mode', { timeout: 120000 }, () => {
+test('setup in a folder with no code asks where the code is; told there is only Figma, it starts in build mode', { timeout: 120000 }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'build-init-'));
   execFileSync('git', ['init', '-q'], { cwd: dir });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const init = (...more) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool', '--no-hooks', ...more], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const asked = init();
+  assert.equal(asked.status, 2, 'never build mode by a guess');
+  assert.match(asked.stdout, /This folder has no code.*\nNEXT: ask the person one question: where is your code \(a folder on this computer or a git link\), or do you only have Figma\?/s);
+  assert.ok(!existsSync(join(dir, 'ds-config.json')));
+  const r = init('--build');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const cfg = cfgOf(dir);
   assert.equal(cfg.build, true);
