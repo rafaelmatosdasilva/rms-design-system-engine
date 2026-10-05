@@ -183,6 +183,16 @@ test('a component built into its own stylesheet is found, recorded as a theme fi
   assert.match(r.stdout, /tag: CSS height is 24px - contract expects 20px/);
 });
 
+test('a literal with no Figma value is named by its file, line and declaration, in the gate and in the summary', { timeout: 300000 }, () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-lit-');
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  writeFileSync(join(dir, 'src/components/tag.css'), readFileSync(join(dir, 'src/components/tag.css'), 'utf8').replace(/\.tag \{/, '.tag { width: 243px;'));
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.match(r.stdout, /❌ src\/components\/tag\.css:1 width: 243px \(no Figma value\)/);
+  assert.match(readFileSync(join(dir, '.design-system-engine-out', 'summary.md'), 'utf8'), /- src\/components\/tag\.css:1 width: 243px \(no Figma value\)/);
+});
+
 test('the build sheet asks for a variant selector only when the variant changes a style, and names raw colours', () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sheet-');
   execFileSync('git', ['init', '-q'], { cwd: dir });
