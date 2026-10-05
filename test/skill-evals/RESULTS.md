@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: Inspect numbers apart, a link to each variant, accessibility tried on the live variant (continuous evaluation)
+
+What changed since the entry below (engine 659b70b): Style guide: Inspect numbers never cover each other; a link to each variant (its props and width in the address, Copy link); its accessibility tried on the live variant (Tab stops in order, visible focus at 3:1, names, a control drawn disabled that Tab reaches, its role's behaviours). The guide changed in `reference/usage.md`.
+
+Guide set measured: `9847ee43506c` · Project measured: `13d811a9d668`
+
+| Haiku, engine 45caddf | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.057 |
+| Input a run | 101k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 107k a run against 101k. Records: `records/2026-10-05-style-guide-inspect-numbers-never`.
+
 ## 2026-10: Style guide: Inspect and Width in the Playground (continuous evaluation)
 
 What changed since the entry below (engine 5597eda): Skill evaluation: status and test coverage, 70/70 on Haiku, no rule broken; a record never written over an earlier one of the same day; Style guide: Inspect marks each part, padding and gap on the live component with the tokens behind them; Width shows it at Phone, Tablet and Desktop widths in a frame with the system's own stylesheets. The guide changed in `reference/usage.md`.
