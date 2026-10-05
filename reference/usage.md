@@ -734,11 +734,14 @@ text fields still a text field) gives a role in the engine's vocabulary (`button
 `textbox`, `checkbox`, `radio`, `switch`, `spinbutton`, `link`, `dialog`, `tab`). A Figma component that states no role
 gets the annotation `Role: <role>`; one whose Figma role differs from the code is listed for a person to decide and
 never changed. A wrapper around several controls (a stepper, a group) has no single role and is left out, as is a
-component the code does not show.
+component the code does not show. Every need the prototypes found the system lacks (`prototypes/gaps.json`, merged) becomes
+the design team's to do list: a page "Design system to do" with a frame "Gaps from prototypes", one card per need (what
+kind, what the prototypes use meanwhile or the closest component, and which prototypes need it), the most needed first,
+written afresh each time; nothing else in the file is touched. With gaps and no Figma snapshot, only the list is written.
 
 It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its Figma node, what it adds and why) and
 `figma-apply.js`, a Figma plugin script that makes exactly those edits, leaves a component that already states a role
-as it is, and returns `{ changed, skipped, missing }`. The agent shows the list, and only when the person says yes runs
+as it is, and returns `{ changed, skipped, missing }` (and `todo`, the list it wrote). The agent shows the list, and only when the person says yes runs
 the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
 and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
 Descriptions, missing components and layout are never written: they stay in `figma-changes.md`.
