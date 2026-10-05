@@ -55,7 +55,7 @@ export function pieceCatalog(scales, systemNames = []) {
     Page: { description: 'The engine\'s page: the system\'s page surface and text colour, its children one under another; width and height are the screen\'s, in px; clip cuts what overflows; mode names the system\'s modes it is drawn in.', props: { padding: spacing, gap: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch'] }, width: { type: 'text' }, height: { type: 'text' }, clip: { type: 'boolean' }, mode: { type: 'text' }, ...sides } },
     Stack: { description: 'The engine\'s vertical arrangement; grow takes the room its parent leaves; surface is a colour token\'s Figma name for its background.', props: { gap: spacing, padding: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch'] }, grow: { type: 'boolean' }, stretch: { type: 'boolean' }, clip: { type: 'boolean' }, ...sides, surface: { type: 'text' } } },
     Row: { description: 'The engine\'s horizontal arrangement; grow takes the room its parent leaves; surface is a colour token\'s Figma name for its background.', props: { gap: spacing, padding: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch', 'baseline'] }, justify: { type: 'enum', values: ['start', 'center', 'end', 'between'] }, wrap: { type: 'boolean' }, grow: { type: 'boolean' }, stretch: { type: 'boolean' }, clip: { type: 'boolean' }, ...sides, surface: { type: 'text' } } },
-    Columns: { description: 'The engine\'s equal columns.', props: { count: { type: 'enum', values: ['2', '3', '4'] }, gap: spacing, grow: { type: 'boolean' }, stretch: { type: 'boolean' } } },
+    Columns: { description: 'The engine\'s equal columns; minWidth is the narrowest a column may be, in px: on a narrower screen the columns wrap, fewer to a row.', props: { count: { type: 'enum', values: ['2', '3', '4'] }, minWidth: { type: 'text' }, gap: spacing, grow: { type: 'boolean' }, stretch: { type: 'boolean' } } },
     Text: { description: 'Copy in one of the system\'s text styles; color is a colour token\'s Figma name.', props: { text: { type: 'text' }, style: { type: 'enum', values: scales.text.map((t) => t.name) }, as: { type: 'enum', values: ['h1', 'h2', 'h3', 'p', 'span'] }, color: { type: 'text' } } },
     Missing: { description: 'A need the system has nothing for: a labelled empty box, and a line on the gaps list.', props: { need: { type: 'text' }, kind: { type: 'enum', values: GAP_KINDS }, closest: { type: 'text' } } },
   };
@@ -91,7 +91,7 @@ function withoutNotes(ui) {
     // gives it, figmaState (the state a designed screen shows it in) and opens (the id of the part a click opens).
     const { standInFor, purpose, content, box, textless, figmaState, opens, ...rest } = o;
     for (const k of ['width', 'height']) if (typeof rest[k] === 'number') rest[k] = String(rest[k]);
-    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, ...p } = rest.props; if (!PIECES.includes(rest.component)) delete p.surface; rest.props = p; for (const k of ['width', 'height', 'count']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
+    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, ...p } = rest.props; if (!PIECES.includes(rest.component)) delete p.surface; rest.props = p; for (const k of ['width', 'height', 'count', 'minWidth']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
     if (typeof rest.count === 'number') rest.count = String(rest.count);
     return rest;
   };
@@ -131,6 +131,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
       if (!p.need) findings.push({ rule: 2, level: 'error', id: node.id, message: 'a Missing box must say the need it stands for (need)' });
       continue;
     }
+    if (node.component === 'Columns' && pieces.Columns && p.minWidth != null && !/^\d{2,4}$/.test(String(p.minWidth))) findings.push({ rule: 2, level: 'error', id: node.id, message: `Columns.minWidth is the narrowest a column may be, in px (like "240"), not ${JSON.stringify(p.minWidth)}` });
     if (node.component === 'Page' && pieces.Page && p.width != null && !/^\d{2,4}$/.test(String(p.width))) findings.push({ rule: 2, level: 'error', id: node.id, message: `Page.width is the screen's width in px (like "820"), not ${JSON.stringify(p.width)}` });
     // A stand-in is a gap whatever stands in, the engine's own Text included.
     if (pieces[node.component] && p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: null, used: `the engine's ${node.component}`, prototype: name, node: node.id });
