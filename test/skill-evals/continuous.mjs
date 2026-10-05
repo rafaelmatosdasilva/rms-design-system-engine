@@ -61,7 +61,10 @@ await step(['--runs', '3', '--set', 'all', '--jobs', '3']);
 await step(['--runs', '10', '--only', 'new-ui-saved', '--jobs', '3']);
 
 const slug = git('log', '-1', '--format=%s').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/).slice(0, 5).join('-');
-const name = opt('name', `${new Date().toISOString().slice(0, 10)}-${slug}`);
+// Never over an earlier record: a day's runs from commits worded alike get -2, -3.
+const base = `${new Date().toISOString().slice(0, 10)}-${slug}`;
+let free = base; for (let n = 2; existsSync(join(HERE, 'records', free)); n++) free = `${base}-${n}`;
+const name = opt('name', free);
 const rec = spawnSync(process.execPath, [join(HERE, 'record.mjs'), name, file, '--entry',
   ...(opt('title') ? ['--title', opt('title')] : []), ...(opt('what') ? ['--what', opt('what')] : [])], { cwd: ENGINE, stdio: 'inherit' });
 process.exit(rec.status ?? 2);
