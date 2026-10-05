@@ -2,22 +2,22 @@
 
 **Your design system, kept true in code, for your whole team and the AI tools they use.**
 
-It works inside Claude Code. It reads your design in Figma and your code, keeps them matching, and turns them into a living style guide, prototypes made of your real components, and accessibility checks. Designers, developers and AI all work from the same, checked design system.
+It works inside Claude Code. It keeps your code matching your Figma design, and gives your team a living style guide, prototypes made of your real components and accessibility checks.
 
 **[See a style guide it built](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)**
 
 ## What you get
 
-- **High quality, every time.** Every colour, size, font, spacing and component state in the code is checked against Figma. When something differs, you get what it is, where it is and how to fix it, in plain words. The checks are fixed rules, so the answer is the same every time.
-- **A living style guide.** One page with every token and component, made from what Figma and the code agree on, never written by hand. Try each component, see the tokens behind it, compare it with Figma, see which products use it and what changed in each release. It looks like your system, because it is built from your system.
-- **Prototypes from your real system.** Ask for a screen in your own words and get one made only of your components and tokens, in light and dark. Nothing is invented. What your system is missing is listed for your design team to decide.
-- **Accessibility tested.** Text that is hard to read, controls with no name, focus you cannot see, things you cannot reach with the keyboard. Each component is held to its role, tried in a real browser, and each finding says how to fix it.
-- **Build from Figma.** Have only the design? It helps Claude build your design system in code, piece by piece, checking each piece against Figma before it is called done.
-- **You stay in control.** It reads Figma and never changes your design or your code unless you ask. An AI cannot accept a difference or switch a check off without asking you first.
+- **High quality.** Every colour, size, font and state in your code is checked against Figma, with the fix in plain words.
+- **A living style guide.** One page with every token and component, built from your system, never written by hand.
+- **Prototypes from your real system.** Describe a screen in your own words and get it made only of your components.
+- **Accessibility tested.** Each component is tried in a real browser, and every problem comes with its fix.
+- **Build from Figma.** Only have the design? Claude builds it in code, piece by piece, each piece checked.
+- **You stay in control.** Nothing in your design or code changes unless you ask.
 
 ## Why not just Claude with your code?
 
-Claude on its own guesses. It reads a picture of your design, invents a colour or a size when it is unsure, and cannot tell when it got something wrong. The engine gives Claude the exact facts from Figma and your code first, then checks everything it makes.
+Claude on its own guesses and cannot tell when it got something wrong. The engine gives it the exact facts from Figma and your code, then checks everything it makes.
 
 | | Claude alone | Claude with the engine |
 |---|---|---|
@@ -27,11 +27,11 @@ Claude on its own guesses. It reads a picture of your design, invents a colour o
 | Accessibility checked | only if asked, and not tried in a browser | always, tried in a browser |
 | One reference for the whole team | no | the style guide, the documentation and the contracts |
 
-The [case study](CASE-STUDY.md) tells the full story in a few pages.
+The [case study](CASE-STUDY.md) tells the full story.
 
 ## How it works
 
-A short view of the flow. A more detailed flow can be seen on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1) (Ctrl or Cmd click to open it in a new tab).
+A short view of the flow. The detailed flow is on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1) (Ctrl or Cmd click to open it in a new tab).
 
 ```mermaid
 %%{init: {"themeCSS": "[id*=L_P1_P3], [id*=L-P1-P3], [id*=L_CODE_AI], [id*=L-CODE-AI], [id*=L_PROTO_AI], [id*=L-PROTO-AI] { marker-end: none !important; }"}}%%
@@ -78,19 +78,19 @@ flowchart LR
 
 You need [Claude Code](https://claude.com/claude-code), [Node.js](https://nodejs.org) 22 or newer and Git.
 
-**1. Install it, once per computer.** Copy this, paste it in Claude Code and press Enter. Claude installs it for you; say yes when it asks to run the install. Then close Claude Code and open it again.
+**1. Install it, once per computer.** Copy this, paste it in Claude Code and press Enter. Say yes when Claude asks to run the install, then close Claude Code and open it again.
 
 ```
 Install the rms-design-system-engine skill for me by running curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.sh | bash and tell me when it is done.
 ```
 
-**2. Connect your project, once per project.** It asks you only for your Figma link and finds the rest on its own. If Claude Code is open somewhere else, it also asks where your code is (a folder or a GitHub link) and remembers it.
+**2. Connect your project, once per project.** It asks for your Figma link and finds the rest on its own.
 
 ```
 /rms-design-system-engine set up this project
 ```
 
-Then ask in your own words, for example
+**3. Ask in your own words.**
 
 ```
 /rms-design-system-engine check everything
@@ -103,9 +103,9 @@ It updates itself once a day, so you never install it again.
 
 ## Learn more
 
-- **[Everything it does](docs/features.md).** How to use each part, what the style guide holds, prototypes, every check, in plain words.
-- **[Technical details](docs/details.md).** For developers, every option and how each check works.
-- **[Case study](CASE-STUDY.md)** and **[every measurement](test/skill-evals/RESULTS.md)**. How it was tested against Claude alone.
+- **[Everything it does](docs/features.md)**, in plain words.
+- **[Technical details](docs/details.md)**, for developers.
+- **[Case study](CASE-STUDY.md)** and **[every measurement](test/skill-evals/RESULTS.md)**, how it was tested against Claude alone.
 
 ## License
 
