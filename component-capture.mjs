@@ -49,6 +49,7 @@ export const TRACE = {
   fontFamily: ['font-family', 'font'],
   letterSpacing: ['letter-spacing'],
   textTransform: ['text-transform'],
+  boxShadow: ['box-shadow'],   // an inside stroke can be drawn as an inset ring
 };
 const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'boxSizing', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
 const COLOR_PROPS = new Set(['color', 'backgroundColor', 'borderTopColor']);

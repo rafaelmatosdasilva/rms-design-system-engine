@@ -37,7 +37,7 @@ import { conceptOf } from './state-concepts.mjs';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
 import { codeSnapshotPath } from './names.mjs';
 
-export const CAPTURE_VERSION = 2;
+export const CAPTURE_VERSION = 3;   // 3: each component's box-shadow, so an inside stroke drawn as an inset ring is seen
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
 
 // ── Inputs ────────────────────────────────────────────────────────────────────

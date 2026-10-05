@@ -500,7 +500,9 @@ export function agreedTokens(check = {}, figmaVars = {}) {
     for (const [prop, v] of Object.entries(t)) {
       if (prop === 'scale' || !v) continue;
       const name = `typography/${t.scale}/${FIG_PROP[prop] ?? prop}`;
+      // A value Figma keeps in the text style itself, with no variable of its own (a weight): named by that style.
       if (sized.has(name)) v.figma = name;
+      else if ((figmaVars.typography ?? {})[t.scale]) v.figma = `text style ${t.scale}`;
     }
     const fam = Object.keys(figmaVars.strings ?? {}).find((k) => /(^|\/)font-?family$/i.test(k));
     if (fam && !t.family) t.family = { figma: fam, value: figmaVars.strings[fam] };
@@ -713,7 +715,8 @@ export function allComponentTokens(cssText, cls, otherClasses = []) {
   if (!cls) return [];
   const clean = String(cssText).replace(/\/\*[\s\S]*?\*\//g, '');
   const q = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const classRe = new RegExp(`\\.(${q(cls)}(?:(?:-|__)[\\w-]+)?)(?![\\w-])`, 'g');
+  // A component the system defines by id (#tt) is matched by that id; any other by its class and its parts' classes.
+  const classRe = /^#/.test(cls) ? new RegExp(`#(${q(cls.slice(1))})(?![\\w-])`, 'g') : new RegExp(`\\.(${q(cls)}(?:(?:-|__)[\\w-]+)?)(?![\\w-])`, 'g');
   const others = new Set(otherClasses.filter((o) => o && o !== cls));
   const by = new Map();
   for (const m of clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
