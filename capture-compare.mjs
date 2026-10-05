@@ -179,7 +179,28 @@ export function compareComponents(code, structure, vars, cfg, maps) {
         settle(Math.abs(c.size.height - f.h) < 0.5, { component: name, field: 'height', figma: f.h, code: c.size.height, rule: h.rule, at: h.at, ...(why ? { why } : {}) });
       } else if (setsMin) {
         settle(Math.abs(toNum(mh.value) - f.h) < 0.5, { component: name, field: 'min height', figma: f.h, code: toNum(mh.value), rule: mh.rule, at: mh.at });
-      } else out.notComparable.push({ component: name, field: 'height', figma: f.h, why: 'the code height follows its content' });
+      } else {
+        // No rule fixes it: the code's height follows its content. What Figma says decides the comparison (sizingV, the
+        // Default variant's vertical sizing; h 'auto' in an older snapshot is a hug):
+        //  · Figma fixes it: the height the browser draws is compared with Figma's, a difference when they differ;
+        //  · Figma hugs too: both let the content decide, which agrees; a horizontal row's drawn height does not depend
+        //    on how many items it holds, so it is compared with Figma's as well (a vertical stack grows with its items,
+        //    and Figma's sample holds its own number of them, so its drawn height is not);
+        //  · the snapshot does not say: not comparable, with the refresh that makes it so.
+        const sizing = f.sizingV ?? (f.h === 'auto' ? 'HUG' : null);
+        const drawn = c.size?.height;
+        if (sizing === 'FIXED') {
+          if (drawn != null) settle(Math.abs(drawn - f.h) < 0.5, { component: name, field: 'height', figma: f.h, code: drawn, why: 'figma-fixed-code-hugs' });
+          else out.notComparable.push({ component: name, field: 'height', figma: f.h, why: 'Figma fixes the height and no browser drew the code' });
+        } else if (sizing === 'HUG') {
+          settle(true, { component: name, field: 'height sizing', figma: 'follows its content', code: 'follows its content' });
+          if ((f.layout ?? 'HORIZONTAL') === 'HORIZONTAL' && typeof f.h === 'number') {
+            if (drawn != null) settle(Math.abs(drawn - f.h) < 0.5, { component: name, field: 'height (drawn)', figma: f.h, code: drawn });
+            else out.notComparable.push({ component: name, field: 'height (drawn)', figma: f.h, why: 'no browser drew the code' });
+          }
+        } else if (sizing === 'FILL') out.notComparable.push({ component: name, field: 'height', figma: 'fills its container', why: 'Figma fills its container: the code\'s height comes from where a product places it' });
+        else out.notComparable.push({ component: name, field: 'height', figma: f.h, why: 'Figma\'s sizing is not in the structure snapshot (refresh it: sizingV)' });
+      }
     }
     const tokenValue = (t) => (t ? vars.sizing?.[t] ?? null : null);
     // The design's default variant has a label; if every instance in the code is icon-only, its
@@ -534,6 +555,7 @@ export function measuredLine(d, moved = null) {
     + (d.confidence === 'single-source' ? '  [read from one source]' : '')
     + (moved === 'code-moved' ? `  → in Figma, set it to ${d.codeVar ? `the token behind ${d.codeVar}` : d.code}`
       : moved === 'both-moved' ? '  → decide which value wins'
+      : d.why === 'figma-fixed-code-hugs' ? `  → Figma fixes its height at ${want}; the code sets none, so its content decides (${d.code}px drawn): set height: ${want}, or make it hug its content in Figma`
       : d.why === 'inline' ? `  → the rule sets ${want}, but the element is inline and ignores a height: give it display: inline-flex (or block)`
       : d.why === 'content-box' ? `  → the rule sets ${want}, but padding and border add to it: set box-sizing: border-box`
       : reset && want ? `  → give ${d.component}'s own rule ${want} (not the reset)`

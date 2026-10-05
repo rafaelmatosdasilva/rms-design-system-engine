@@ -162,9 +162,13 @@ function locateExpression(specs) {
         // its label; an icon-only usage is a variant of its own), then the rest.
         const score = (e) => extras(e).length * 10 + (e.id ? 5 : 0) + (e.textContent.trim() ? 0 : 3);
         const ranked = (list) => [...list].sort((a, b) => score(a) - score(b));
-        el = ranked(visible).find((e) => !extras(e).length && !e.id) || null; if (el) how = 'found';
+        // Words come first: the design's default variant has its label, so an icon-only instance is used only when no
+        // instance on the page has words (a text field's words are its input).
+        const words = (e) => !!(e.textContent.trim() || e.querySelector('input:not([type=checkbox]):not([type=radio]):not([type=hidden]),textarea'));
+        const withWords = visible.filter(words);
+        el = ranked(visible).find((e) => !extras(e).length && !e.id && (words(e) || !withWords.length)) || null; if (el) how = 'found';
         if (!el && all.length) {
-          const src = ranked(visible)[0] || ranked(all)[0];
+          const src = ranked(withWords)[0] || ranked(visible)[0] || ranked(all)[0];
           const copy = src.cloneNode(true);
           stripped = [...extras(src).map((c) => '.' + c), ...(src.id ? ['#' + src.id] : [])];
           for (const c of extras(src)) copy.classList.remove(c);
@@ -183,6 +187,9 @@ function locateExpression(specs) {
         host.appendChild(b.root); el = b.target.matches(s.selector) ? b.target : null; if (el) how = 'bare';
       }
       if (!el) return { i, how: null, count };
+      // An empty element a script fills later (a tooltip's popover) is given a word, so its padding and height are those
+      // of the component with its label, as Figma's default variant has it.
+      if (!el.children.length && !el.textContent.trim() && !/^(input|img|hr|br|svg)$/i.test(el.tagName)) el.textContent = 'Label';
       el.setAttribute('data-design-system-engine-cap', ((el.getAttribute('data-design-system-engine-cap') || '') + ' ' + i).trim());   // two names can share one element
       // The parts the contract names (fontSel / radiusSel / gapSel / beforeSel), found inside the instance.
       const parts = {};
@@ -199,7 +206,7 @@ function locateExpression(specs) {
       for (let t = field ? null : walker.nextNode(); t; t = walker.nextNode()) {
         if (t.textContent.trim() && t.parentElement) { t.parentElement.setAttribute('data-design-system-engine-part', ((t.parentElement.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; break; }
       }
-      return { i, how, count, stripped, parts, hasText: !!el.textContent.trim() };
+      return { i, how, count, stripped, parts, hasText: !!(el.textContent.trim() || field) };
     });
   })()`;
 }
@@ -627,10 +634,21 @@ export async function captureComponents(ctx) {
 
   async function captureOne(P, page, comp, loc, pre = new Map(), stateJobs = []) {
     {
-      const nodeId = await P.nodeOf(capSel(loc.i));
       const perMode = pre.get(capSel(loc.i)) ?? await P.measureAll(capSel(loc.i));
       const atBreakpoints = ctx.breakpoints?.length ? await P.measureAt(capSel(loc.i), ctx.breakpoints) : null;
-      const traced = nodeId ? await P.trace(nodeId) : {};
+      // Its node asked for after measuring (switching a mode can redraw a page and replace it), and asked again once
+      // if it is gone by the time its rules are read; still gone, only this component's rules go untraced.
+      const traceOf = async (sel) => {
+        for (let tries = 0; tries < 2; tries++) {
+          const id = await P.nodeOf(sel);
+          if (!id) return {};
+          try { return await P.trace(id); } catch (e) { if (!/Could not find node/i.test(String(e?.message ?? e))) throw e; }
+        }
+        notes.push(`${comp.name}: its rules could not be traced (the page replaced it while it was read)`);
+        return {};
+      };
+      const nodeId = await P.nodeOf(capSel(loc.i));
+      const traced = nodeId ? await traceOf(capSel(loc.i)) : {};
       const base = perMode[firstMode];
       const stat = staticComponentReading(staticSources, comp.selector, staticRootVars);
       const props = facts(comp, loc.how, base, traced, stat);
@@ -661,7 +679,7 @@ export async function captureComponents(ctx) {
         const pNode = await P.nodeOf(sel);
         if (!pNode) continue;
         const pMode = pre.get(sel) ?? await P.measureAll(sel);
-        const pTraced = await P.trace(pNode);
+        const pTraced = await P.trace(pNode).catch(() => ({}));   // a part the page replaced: untraced, the rest still read
         const pSel = kind === 'text' ? null : comp.parts?.[kind];
         const pStat = pSel ? staticComponentReading(staticSources, pSel, staticRootVars) : {};
         const pFacts = facts({ ...comp, selector: pSel ?? comp.selector }, loc.how, pMode[firstMode], pTraced, pStat);
@@ -714,7 +732,7 @@ export async function captureComponents(ctx) {
       const sNode = found ? await P.nodeOf(`[data-design-system-engine-state="${tag}"]`) : null;
       if (!sNode) { still.push(d); continue; }
       const sMode = await P.measureAll(`[data-design-system-engine-state="${tag}"]`);
-      const sTrace = await P.trace(sNode);
+      const sTrace = await P.trace(sNode).catch(() => ({}));
       (result[d.comp].states ??= {})[d.st.label] = stateEntry(d.st, `found an element already in this state (${pages[pi].label})`, sMode, sTrace, result[d.comp].props);
     }
     left = still;

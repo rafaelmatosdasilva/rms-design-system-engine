@@ -472,6 +472,56 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       .filter(([, i]) => i && typeof i === 'object' && (i.name || i.viewBox))
       .map(([id, i]) => [id, { name: i.name ?? '', size: Number(String(i.viewBox ?? '').split(/[\s,]+/)[2]) || null }]));
     view.ui = { segmented: segmentedUi(view.components), field: fieldUi(view.components, systemCss), button: buttonUi(view.components, systemCss, sh.ui?.button ?? null), card: cardUi(view.components, systemCss), iconButton: iconButtonUi(view.components, systemCss), overlay: view.components.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
+    // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
+    // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
+    // product brings it in (its import line and its file) and the system's components it is built with.
+    try {
+      const { parityView, importOf, nestedComponents } = await import('./styleguide-data.mjs');
+      const { loadAgreed } = await import('./agreed.mjs');
+      const agreedRec = loadAgreed(ROOT);
+      const census = readJson(join(OUT_DIR, 'census.json'))?.components ?? {};
+      const names = view.components.map((c) => ({ name: c.name, cls: c.cls }));
+      // the package a file belongs to (a package.json between it and the project root, the root's own not counted)
+      const pkgOf = (file) => {
+        for (let d = dirname(file); d && d !== '.' && d !== '/'; d = dirname(d)) {
+          const j = readJson(join(d, 'package.json'));
+          if (j?.name) return { name: j.name, dir: d };
+        }
+        return null;
+      };
+      for (const c of view.components) {
+        c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
+        const text = c.api?.file ? readText(c.api.file) : '';
+        const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names });
+        if (uses.length) c.uses = uses;
+        if (c.api?.tag) {
+          const imp = importOf({ tag: c.api.tag, syntax: c.api.syntax, file: c.api.file, text, pkg: pkgOf(c.api.file), template: cfg.styleguide?.importFrom ?? null });
+          if (imp) c.import = imp;
+          if (text && text.length <= 200000) c.source = { file: c.api.file, text };
+        }
+      }
+    } catch { /* the page shows what it has */ }
+    // Each product's own page, pictured as it opens, with where each component sits on it (product-shots.mjs), for the
+    // "Used in" area. A product that gives a picture of its own (styleguide.plugins[].image) is shown with that one.
+    if ((cfg.paths?.plugins ?? []).length && cfg.styleguide?.productShots !== false) {
+      try {
+        const { productShots } = await import('./product-shots.mjs');
+        const plugs = cfg.styleguide?.plugins ?? appLabels(cfg.paths?.plugins ?? []).map(([n, key]) => ({ key, match: n }));
+        const used = new Set(view.components.flatMap((c) => (c.usage ?? []).map((u) => u.key ?? u)));
+        const products = plugs.filter((g) => used.has(g.key)).map((g) => ({ key: g.key, image: g.image ?? null,
+          page: appPages.find((p) => p.includes(g.match ?? g.key) && !/\.src\.html$/.test(p) && existsSync(resolve(ROOT, p))) ?? appPages.find((p) => p.includes(g.match ?? g.key) && existsSync(resolve(ROOT, p))) ?? null }));
+        const shots = await productShots(ROOT, products, view.components.map((c) => ({ name: c.name, cls: c.cls })));
+        if (Object.keys(shots).length) view.products = shots;
+        // How many times each component appears in each product's own code (its class, in its source page).
+        const srcOf = (g) => readText(appPages.find((p) => p.includes(g.match ?? g.key) && /\.src\.html$/.test(p)) ?? appPages.find((p) => p.includes(g.match ?? g.key)) ?? '');
+        const texts = Object.fromEntries(plugs.filter((g) => used.has(g.key)).map((g) => [g.key, srcOf(g)]));
+        for (const c of view.components) {
+          if (!c.cls || !/^[\w-]+$/.test(c.cls)) continue;
+          const re = new RegExp(`(?<![\\w-])${c.cls}(?![\\w-])`, 'g');
+          for (const u of c.usage ?? []) { const t = texts[u.key ?? u]; const n = t ? (t.match(re) ?? []).length : 0; if (n && typeof u === 'object') u.places = n; }
+        }
+      } catch { /* no pictures: the cards show the names */ }
+    }
     lastView = view;
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');

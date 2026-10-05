@@ -1,7 +1,8 @@
 // The engine's default style guide: only what Figma and the code agree on, controls labelled with Figma's names.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -172,6 +173,14 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Passes|Fails/, 'measured again in the other mode');
+    // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Documentation,Accessibility,Parity,Used in');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
+    assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity with Figma.*agree/s);
+    // How a product brings it in: the import line, copied by the system's button.
+    assert.equal(await run(`document.querySelector('#c-chip .pg-import code').textContent`), "import { Chip } from '@/components/Chip';");
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
@@ -344,4 +353,41 @@ test('accessibility per component: its role\'s obligations and behaviours with W
   const none = a11yView({ name: 'card', cls: 'card' });
   assert.deepEqual([none.role, none.expects, none.checked], [null, [], null]);
   assert.deepEqual(a11yView({ name: 'card', result: { checkedAt: 't', notRead: ['card (not rendered)'], issues: [] } }).checked, { at: 't', notRead: true, issues: [] });
+});
+
+test('parity per component: what agrees (since when), its props and tokens, what differs, not built, not compared', async () => {
+  const { parityView } = await import('../styleguide-data.mjs');
+  const v = parityView({ name: 'chip',
+    agreed: { facts: { 'chip · height': { figma: '24', code: '24', at: '2026-10-04T12:00:00Z', commit: 'a1b2c3d' }, 'chip · radius': { figma: '16px', code: '16px' }, 'chip · gap': { figma: '4', code: '6' }, 'chips · height': { figma: '1', code: '1' } } },
+    differences: [{ what: '· chip · radius: Figma 16px, code 12px' }], controls: [{ label: 'Size', prop: 'size' }], unbuilt: [{ label: 'Badge' }],
+    ownTokens: { colors: [{ figma: 'chip/background', var: '--chip-background' }], sizes: [] }, census: { notComparable: 0, reasons: {} } });
+  // the record's radius is the last agreement, and an open difference names it now: not listed as agreeing
+  assert.deepEqual(v.agreed, [{ what: 'height', value: '24', since: '2026-10-04T12:00:00Z', commit: 'a1b2c3d' }]);
+  assert.deepEqual(v.counts, { agree: 3, differ: 1, notBuilt: 1, notCompared: 0 });
+  assert.equal(v.notCompared, null);
+});
+
+test('import line and nesting: as a product writes the import, and the system\'s components it is built with', async () => {
+  const { importOf, nestedComponents } = await import('../styleguide-data.mjs');
+  assert.deepEqual(importOf({ tag: 'ModalGeneral', syntax: 'vue', file: 'src/components/library/modals/General.vue' }), { line: "import ModalGeneral from '@/components/library/modals/General.vue';", from: '@/components/library/modals/General.vue' });
+  assert.equal(importOf({ tag: 'Chip', syntax: 'jsx', file: 'src/components/Chip.jsx', text: 'export function Chip() {}' }).line, "import { Chip } from '@/components/Chip';");
+  assert.equal(importOf({ tag: 'Chip', syntax: 'jsx', file: 'packages/ui/src/Chip.tsx', text: 'export default function Chip() {}', pkg: { name: '@acme/ui', dir: 'packages/ui' } }).line, "import Chip from '@acme/ui/Chip';");
+  assert.equal(importOf({ tag: 'Chip', syntax: 'jsx', file: 'lib/Chip.jsx', template: '~/ui/{path}' }).line, "import Chip from '~/ui/lib/Chip';");
+  assert.equal(importOf({ tag: 'ds-chip', syntax: 'html', file: 'x.js' }), null, 'a custom element is used by its tag, not imported by name');
+  const names = [{ name: 'buttonSecondary', cls: 'buttonSecondary' }, { name: 'buttonPrimary', cls: 'buttonPrimary' }, { name: 'modal', cls: 'modal-card' }, { name: 'modalHeader', cls: 'modal-card-header' }];
+  assert.deepEqual(nestedComponents({ name: 'modal', cls: 'modal-card', markup: '<div class="modal-card"><div class="modal-card-header"></div><button class="buttonSecondary modal-close">x</button></div>', names }), ['buttonSecondary'], 'its own parts never count');
+  assert.deepEqual(nestedComponents({ name: 'Dialog', text: "import { ButtonPrimary } from './ButtonPrimary';\nexport const Dialog = () => <ButtonPrimary />;", names }), ['buttonPrimary']);
+});
+
+test('product pictures: a product\'s own picture first, its window from its code, a picture of the page otherwise', async () => {
+  const { windowSize, productShots } = await import('../product-shots.mjs');
+  assert.deepEqual(windowSize('figma.showUI(__html__,{width:1e3,height:540,title:"Demo"})'), { w: 1000, h: 540 });
+  assert.equal(windowSize('no window here'), null);
+  const dir = mkdtempSync(join(tmpdir(), 'shots-'));
+  mkdirSync(join(dir, 'app', 'docs'), { recursive: true });
+  writeFileSync(join(dir, 'app', 'ui.html'), '<!doctype html><button class="btn">Go</button>');
+  writeFileSync(join(dir, 'app', 'docs', 'preview.png'), Buffer.from('89504e470d0a1a0a', 'hex'));
+  const r = await productShots(dir, [{ key: 'A', page: 'app/ui.html' }], [{ name: 'button', cls: 'btn' }], { chromePath: '/nonexistent' });
+  assert.equal(r.A.from, 'image');
+  assert.match(r.A.shot, /^data:image\/png;base64,/);
 });

@@ -32,8 +32,33 @@ test('components: heights only when the code fixes one; min-height by its value;
   const structure = { bar: { h: 48 }, card: { h: 248 }, btn: { h: 24, fillStructure: 'before' } };
   const r = compareComponents(code, structure, {}, cfg, maps());
   assert.equal(r.match, 3);                                    // bar min-height 48, btn height 24, btn paints (before ≈ direct)
-  assert.deepEqual(r.notComparable.map((n) => `${n.component}:${n.why}`), ['card:the code height follows its content']);
+  // Figma's sizing not in the snapshot: the one height left uncompared says how to make it comparable.
+  assert.deepEqual(r.notComparable.map((n) => `${n.component}:${n.why}`), ['card:Figma\'s sizing is not in the structure snapshot (refresh it: sizingV)']);
   assert.equal(r.differ.length, 0);
+});
+
+test('components: a height the code leaves to its content is compared by what Figma says about it', () => {
+  const code = { components: {
+    card: { confidence: 'high', instance: { hasText: true }, size: { height: 76 }, props: {} },
+    chip: { confidence: 'high', instance: { hasText: true }, size: { height: 20 }, props: {} },
+    tag: { confidence: 'high', instance: { hasText: true }, size: { height: 24 }, props: {} },
+    group: { confidence: 'high', instance: { hasText: true }, size: { height: 23 }, props: {} },
+    menu: { confidence: 'static-only', props: {} },
+  } };
+  const structure = { card: { h: 248, sizingV: 'FIXED', layout: 'VERTICAL' }, chip: { h: 19, sizingV: 'HUG', layout: 'HORIZONTAL' }, tag: { h: 24, sizingV: 'HUG', layout: 'HORIZONTAL' },
+    group: { h: 53, sizingV: 'HUG', layout: 'VERTICAL' }, menu: { h: 'auto' } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  const facts = r.facts.map((f) => `${f.key}=${f.same}`);
+  // Figma fixes the card's height and the code lets its content decide: compared as drawn, a difference with its fix.
+  assert.ok(facts.includes('card · height=false'));
+  assert.match(measuredLine(r.differ.find((d) => d.component === 'card')), /Figma fixes its height at 248px; the code sets none, so its content decides \(76px drawn\)/);
+  // Both hug: agreed; a row's drawn height is compared too (chip 20 against 19 differs, tag agrees).
+  assert.ok(facts.includes('chip · height sizing=true') && facts.includes('chip · height (drawn)=false') && facts.includes('tag · height (drawn)=true'));
+  // A vertical stack grows with its items: its sizing is compared, not Figma's sample height.
+  assert.ok(facts.includes('group · height sizing=true') && !facts.some((f) => f.startsWith('group · height (drawn)')));
+  // 'auto' in an older snapshot is a hug; with no browser drawing, the row's drawn height says so.
+  assert.deepEqual(r.notComparable.map((n) => `${n.component}:${n.why}`), []);
+  assert.ok(facts.includes('menu · height sizing=true'));
 });
 
 test('components: a real difference names the token, the rule and the source line', () => {
