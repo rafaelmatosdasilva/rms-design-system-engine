@@ -8,7 +8,7 @@
 //
 // Pure: agreedView takes what the generator read and returns { components, notAgreed, modes }.
 import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
-import { behavioursFor, partSheetLines } from './behaviour-contract.mjs';
+import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs';
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // A Figma prop name without its node suffix ("Label#3:4" → "Label").
@@ -704,6 +704,36 @@ export function componentTokens(cssText, cls) {
   return out;
 }
 
+// A Figma variant's name as its props: 'Size=L, State=Default' → { Size: 'L', State: 'Default' }; none → null.
+export function variantOf(name) {
+  if (!name) return null;
+  const out = {};
+  for (const part of String(name).split(',')) { const i = part.indexOf('='); if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim(); }
+  return Object.keys(out).length ? out : null;
+}
+
+// Which components use each token: in their own rules, or through another token whose value names it
+// (--button-background: var(--neutral-100) makes the button a user of --neutral-100, through --button-background).
+// → { '--var': { direct: [name], via: [{ name, through }] } }, for the style guide's "What uses it" view.
+export function tokenUses(cssText, comps = []) {
+  const clean = String(cssText).replace(/\/\*[\s\S]*?\*\//g, '');
+  const refs = {};   // --x → the variables its value names, in any mode
+  for (const m of clean.matchAll(/(--[\w-]+)\s*:([^;{}]*)/g)) for (const v of m[2].matchAll(/var\(\s*(--[\w-]+)/g)) (refs[m[1]] ??= new Set()).add(v[1]);
+  const out = {}, at = (v) => (out[v] ??= { direct: [], via: [] });
+  for (const c of comps) {
+    if (!c.cls || /^#/.test(c.cls)) continue;
+    const own = [...new Set(componentTokens(clean, c.cls).map((t) => t.var))];
+    for (const v of own) if (!at(v).direct.includes(c.name)) at(v).direct.push(c.name);
+    // Nearest first: each token its own ones name, then the ones those name, each once, with the own one it came through.
+    const seen = new Set(own), queue = own.map((v) => [v, v]);
+    while (queue.length) {
+      const [v, first] = queue.shift();
+      for (const r of refs[v] ?? []) { if (seen.has(r)) continue; seen.add(r); at(r).via.push({ name: c.name, through: first }); queue.push([r, first]); }
+    }
+  }
+  return out;
+}
+
 // ── The page's own look, from the system: each role the template's layout uses, filled with one of the system's own
 // tokens (styleguide.chrome in ds-config.json names one by hand: { "text": "--my-ink" }). A role with no token is left
 // to the browser's own and listed, never given a value of the engine's.
@@ -1050,6 +1080,37 @@ export function guidanceView({ description = '', annotations = [], note = '', au
   return { sections, missing: sections.filter((x) => !x.text).map((x) => x.key) };
 }
 
+// ── How ready a component is: stable, beta or deprecated ─────────────────────────────────────────────────────────────
+// From where the team already says it: contract.authored.json → components.<name>.status, a line of Figma's description
+// or annotations (Status: beta), else its code (@deprecated, @beta, @status beta). Nothing said, nothing shown: a status
+// is never guessed. → { status: 'Beta', kind: 'stable' | 'beta' | 'deprecated', from } | null
+const STATUS_KIND = [['deprecated', /^(deprecated|obsolete|retired|legacy)$/i], ['beta', /^(beta|alpha|experimental|preview|draft|wip|new)$/i], ['stable', /^(stable|ready|released|production|done)$/i]];
+export function statusView({ description = '', annotations = [], note = '', authored = null, text = '' } = {}) {
+  const pick = (word, from) => { const k = STATUS_KIND.find(([, re]) => re.test(String(word).trim())); return k ? { status: String(word).trim().replace(/^\w/, (ch) => ch.toUpperCase()).toLowerCase().replace(/^\w/, (ch) => ch.toUpperCase()), kind: k[0], from } : null; };
+  if (authored) { const r = pick(authored, 'contract.authored.json'); if (r) return r; }
+  for (const t of [description, ...(annotations ?? []).map((a) => (typeof a === 'string' ? a : a?.label ?? ''))]) {
+    const m = /(?:^|\n)\s*(?:status|maturity|stage)\s*[:=–—-]\s*([A-Za-z]+)/i.exec(String(t ?? ''));
+    if (m) { const r = pick(m[1], 'Figma'); if (r) return r; }
+  }
+  for (const [t, from] of [[note, 'the code'], [text, 'the code']]) {
+    const s = String(t ?? '');
+    if (/@deprecated\b/.test(s)) return { status: 'Deprecated', kind: 'deprecated', from };
+    const m = /@status\s+([A-Za-z]+)/.exec(s) ?? /@(beta|alpha|experimental)\b/.exec(s);
+    if (m) { const r = pick(m[1], from); if (r) return r; }
+  }
+  return null;
+}
+
+// Its test coverage, from the coverage summary the project's tests write (Istanbul's json-summary: { "<file>": { lines:
+// { pct } } }): the entry for its own file. → { lines: 87.5 } | null
+export function coverageOf(summary, file) {
+  if (!summary || !file) return null;
+  const want = String(file).replace(/^\.\//, '');
+  const key = Object.keys(summary).find((k) => k !== 'total' && (k === want || k.endsWith('/' + want)));
+  const pct = key ? summary[key]?.lines?.pct : null;
+  return typeof pct === 'number' ? { lines: pct } : null;
+}
+
 // ── A component's code API, as its page lists it ──────────────────────────────────────────────────────────────────────
 // api: component-api.mjs apiFor(). → { file, tag?, syntax?, props: [{ name, values?, type?, default?, required? }],
 // events: [names], slots: [names] } | null when the code states none. A callback prop (onChange) is listed once, as an
@@ -1129,7 +1190,9 @@ export function a11yView({ name, cls = null, role = null, annotations = [], part
   }
   for (const x of expects) x.wcag = wcagLabel(x.wcag);
   for (const x of checked?.issues ?? []) x.wcag = wcagLabel(x.wcag);
-  return { role: role ?? null, ...(known ? { element: roleMarkup(role) } : {}), expects, excused, checked };
+  // What the page tries on the live component: each behaviour its role and Figma's notes ask for.
+  const behaviours = b.rows.map((r) => ({ id: r.id, says: r.says, act: r.act, expect: r.expect }));
+  return { role: role ?? null, ...(known ? { element: roleMarkup(role), key: roleKey(role) } : {}), expects, excused, checked, behaviours };
 }
 
 // ── Parity, per component: what agrees with Figma and what does not ────────────────────────────────────────────────

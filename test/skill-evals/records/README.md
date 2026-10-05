@@ -32,5 +32,9 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-05-style-guide-a-control-the` | The 21 guide tasks on Haiku (engine c8ec2b2) | "Style guide: stand-ins for a control the system lacks; audit: Figma's fill sizing, own minimum height and default variant compared" |
 | `2026-10-05-style-guide-each-component-s` | The 21 guide tasks on Haiku (engine 1b60458) | "Style guide: anatomy, usage sections, a menu that hides, worded buttons, the page's own contrast in every mode" |
 | `2026-10-05-style-guide-links-figma-the` | The 21 guide tasks on Haiku (engine 6fb1975) | "Style guide: links, changelog, Built with area, sticky area switch, square colours and four columns, numbers-only anatomy, a linked playground, a menu that gives the page the whole width" |
+| `2026-10-05-style-guide-status-coverage` | The 21 guide tasks on Haiku (engine 5597eda) | "Style guide: each component's status and test coverage, the overview counting statuses and describing its groups" |
+| `2026-10-05-style-guide-inspect-marks-each` | The 21 guide tasks on Haiku (engine 659b70b) | "Style guide: Inspect and Width in the Playground" |
+| `2026-10-05-style-guide-inspect-numbers-never` | The 21 guide tasks on Haiku (engine 45caddf) | "Style guide: Inspect numbers apart, a link to each variant, accessibility tried on the live variant" |
+| `2026-10-05-style-guide-figma-beside-the` | The 21 guide tasks on Haiku (engine 22050d1) | "Style guide: Figma beside the code, what uses each token, props in search" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

@@ -264,6 +264,29 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   and numbered after the parts and named by its token in the list (numbers, never colours, so nothing reads as a
   token's colour), and how it lines up its items. A component shown in an overlay is drawn as its own element; none
   on the measuring page.
+- **Inspect and Width**, in the Playground (none on the measuring page): Inspect marks the live component with the
+  anatomy's numbers (`annotate`, shared with the anatomy) and lists below it each part's colours, icon size and text
+  style by their tokens, each padding and gap by its token, and its alignment. Width shows it at Fit (the live
+  preview), Phone (375px), Tablet (768px) or Desktop (1280px): a frame of that width written with the page's own
+  stylesheets, its icon sheet and the component as drawn now, so the system's media queries apply, scaled down to
+  fit the room. Turning Inspect on returns to Fit; choosing a width turns Inspect off. A number that would cover
+  another moves to the nearest free place around it, with a line back (`marker`, for the anatomy too).
+- **Figma beside the code**, in the Playground (a Figma button, only for a component with a Figma image; none on the
+  measuring page): the Figma image of the variant set (its variant props equal to the Playground's; the default image
+  only while every variant prop is at its default) beside a still, inert copy of the component as drawn, or over it,
+  clipped by a slider; a small one drawn up to 4 times larger, both alike. A variant with no image says so. Images
+  (`figmaVariantImages`, `visual-diff.mjs`): `<visualRefs>/components/<name>/<Prop=Value, Prop=Value>.png` and
+  `<visualRefs>/components/<name>.png` for its default, else the Figma REST API with `FIGMA_TOKEN` (every variant of
+  its component set in one images call, cached under `visual/figma-variants/` until `_figmaVersion` changes). They go
+  in the page, up to `styleguide.figmaImagesMB` (8) in all; `styleguide.figmaImages: false` for none. Like Inspect,
+  it returns the width to Fit, and a width chosen turns it off.
+- **What uses a token** (`tokenUses`, view `#uses?t=--name`): every token's name on the page (foundations, a
+  component's tables) links to it: the components whose own rules use it, then those that use it through another
+  token whose value names it (in any mode), each with the token it came through. Search also finds each component's
+  props and their options.
+- **A link to each variant**: the address carries the props set away from their defaults and the width
+  (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
+  the controls follow (a value the component does not have is left at its default). Copy link copies it.
 - **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
   out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
@@ -271,6 +294,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
   `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`) and
   `contract.authored.json` → `components.<name>.links`.
+- **Status and coverage** (`statusView`, `coverageOf`): under its name and on its overview card, stable, beta or
+  deprecated from `contract.authored.json` → `components.<name>.status`, a `Status:` (or `Maturity:`) line in Figma's
+  description or annotations, or `@deprecated` / `@beta` / `@status x` in its code; never guessed. Coverage is its own
+  file's line coverage from Istanbul's json-summary (`styleguide.coverage`, else `coverage/coverage-summary.json`).
+  The overview counts each status and says what each group holds (`styleguide.groups: { foundations, components }`).
 - **Changelog**, an area of its own: when Figma was last read for it, then each commit that changed it (its own file,
   or a line of the shared stylesheet holding its class; the project's own files only), grouped by the release tag
   (`v*`) that holds it, each linked to its commit and its pull request.
@@ -290,7 +318,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`role-markup.mjs`, `behaviour-contract.mjs`: element, name, keys, part roles), each with its WCAG 2.2 criterion;
   the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); and the last browser check's
   findings on it from `.design-system-engine-out/a11y.json` (each finding carries `component` and the file
-  `checkedAt`), or that it has not been checked yet.
+  `checkedAt`), or that it has not been checked yet. **On this variant** (none on the measuring page): tried on the
+  live component whenever the area shows a variant not tried yet, the Playground laid out out of sight for it and
+  drawn again as set afterwards: the Tab stops in order (a radio group one stop, a positive tabindex reported),
+  a control with an interactive role Tab does not reach, a name on each stop, a stop drawn as disabled (its class)
+  that Tab still reaches, the focus change on it, a box holding it or what follows it (at least 3:1 against what is
+  around it, 2.4.7 and 1.4.11), and each behaviour of `a11yView().behaviours` tried with the page's own events (a key
+  only a native element answers is said to be given by the browser).
 - **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,
