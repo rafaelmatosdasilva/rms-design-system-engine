@@ -237,8 +237,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   An HTML and CSS system has no code props to pair, so a Figma prop is a control when the code realizes it: the
   contract's `propertyMap` (found by its options when the contract spells the prop another way), `htmlRealizations`,
-  a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. Below it, the
-  tokens behind what is drawn and its size; above it, its documentation, the products it is **used in** (each by
+  a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. Below it, its
+  code beside the tokens behind what is drawn, and every token named after it under them; above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
 - **A component's page in areas**: Playground, Documentation, Accessibility, Parity and Used in, one at a time on
@@ -255,9 +255,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
 - **Anatomy**, first in Documentation: an inert copy of the component as the Playground set it, drawn larger, each
   part numbered in reading order (the contract's named parts, `c.anatomy`, a Figma auto name such as Frame 106
-  replaced by the part's class, then what sits directly inside it), a slot outlined, padding and gaps tinted and
-  named by their token, and how it lines up its items. A component shown in an overlay is drawn as its own element;
-  none on the measuring page.
+  replaced by the part's class, then what sits directly inside it), a slot outlined, each padding and gap outlined
+  and numbered after the parts and named by its token in the list (numbers, never colours, so nothing reads as a
+  token's colour), and how it lines up its items. A component shown in an overlay is drawn as its own element; none
+  on the measuring page.
 - **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
   out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
 - **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
