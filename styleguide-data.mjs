@@ -7,7 +7,8 @@
 // one side) is not shown: it is counted in one line, and the person decides it before it appears.
 //
 // Pure: agreedView takes what the generator read and returns { components, notAgreed, modes }.
-import { roleWord } from './role-markup.mjs';
+import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
+import { behavioursFor, partSheetLines } from './behaviour-contract.mjs';
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // A Figma prop name without its node suffix ("Label#3:4" → "Label").
@@ -764,7 +765,35 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   // Declared again on every element that carries its own mode, so a preview in Light on a Dark page resolves the
   // page's roles with its own values (a variable is resolved where it is declared, then inherited as it is).
   const css = Object.keys(roles).length ? `:root, [data-color], [data-size] { ${Object.entries(roles).map(([k, v]) => `--sg-${k}: ${v};`).join(' ')} }` : '';
-  return { roles, from, missing, css };
+  return { roles, from, missing, css, contrast: pageContrast(roles, byVar) };
+}
+
+// The page's own text on its own backgrounds, in every colour mode, from the tokens' values: each pair below WCAG's
+// 4.5:1 for body text (1.4.3), so a page that is hard to read in Dark fails its check. → [{ text, on, mode, ratio }]
+const PAGE_PAIRS = [['text', 'bg'], ['text-2', 'bg'], ['muted', 'bg'], ['text', 'bg-2'], ['text-2', 'bg-2'], ['muted', 'bg-2']];
+export function pageContrast(roles = {}, byVar = new Map()) {
+  const tokenOf = (role) => { const m = /^var\((--[\w-]+)\)$/.exec(roles[role] ?? ''); return m ? byVar.get(m[1]) : null; };
+  const modes = [...new Set(PAGE_PAIRS.flat().flatMap((r) => Object.keys(tokenOf(r)?.values ?? {})))];
+  const out = [], seen = new Set();
+  for (const mode of modes) for (const [fg, bg] of PAGE_PAIRS) {
+    const f = rgbaOf(tokenOf(fg)?.values?.[mode]), b = rgbaOf(tokenOf(bg)?.values?.[mode]);
+    if (!f || !b || b[3] < 1) continue;   // a see-through background depends on what is under it
+    const blend = f.map((c, i) => (i < 3 ? c * f[3] + b[i] * (1 - f[3]) : 1));
+    const lum = (c) => { const [r, g, bl] = c.slice(0, 3).map((x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * bl; };
+    const [hi, lo] = [lum(blend), lum(b)].sort((x, y) => y - x);
+    const ratio = Math.round(((hi + 0.05) / (lo + 0.05)) * 10) / 10;
+    const key = `${mode}:${roles[fg]}:${roles[bg]}`;
+    if (ratio < 4.5 && !seen.has(key)) { seen.add(key); out.push({ text: fg, on: bg, mode, ratio }); }
+  }
+  return out;
+}
+function rgbaOf(v) {
+  const s = String(v ?? '').trim();
+  let m = /^#([0-9a-f]{3,8})$/i.exec(s);
+  if (m) { let h = m[1]; if (h.length <= 4) h = h.split('').map((c) => c + c).join(''); const n = (i) => parseInt(h.slice(i, i + 2), 16); return [n(0), n(2), n(4), h.length === 8 ? n(6) / 255 : 1]; }
+  m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+%?))?\s*\)$/i.exec(s);
+  if (m) return [+m[1], +m[2], +m[3], m[4] == null ? 1 : /%$/.test(m[4]) ? parseFloat(m[4]) / 100 : +m[4]];
+  return null;
 }
 
 // ── The system's own segmented control, for every switch the page offers ────────────────────────────────────────────
@@ -793,17 +822,65 @@ export function segmentedUi(components = []) {
     const selected = selectedIdx >= 0 ? { add: odd[selectedIdx].filter((x) => /^(is-)?(selected|active|current|checked|on)$/i.test(x)), attrs: {} }
       : { add: [], attrs: { [/aria-(selected|pressed|checked)/i.exec(items[attrSel].attrs)[0].toLowerCase()]: 'true' } };
     const label = /<span\b[^>]*\bclass\s*=\s*["']([^"']*(?:label|text)[^"']*)["']/i.exec(items[0].inner)?.[1]?.split(/\s+/)[0] ?? null;
-    const score = (/(segment|toggle|tabs?|switcher|picker|chooser)/i.test(c.name) ? 0 : 10) + (items[0].tag === 'button' ? 0 : 2);
+    // A segmented control by name first; then tabs, the same choice drawn another way; then any group with a selected
+    // item. Anything but a segmented control is a stand-in, and the page says so.
+    const own = /(segment|toggle|switcher|picker|chooser)/i.test(c.name), tabs = !own && /tab/i.test(c.name);
+    const score = (own ? 0 : tabs ? 1 : 10) + (items[0].tag === 'button' ? 0 : 2);
     const base = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(rootAttrs)?.[1] ?? '').split(/\s+/).filter(Boolean)[0];
     // The control itself, without the modifiers one product gave it (full-width, compact): only its own class.
     // Its decoration too (an empty aria-hidden part, as a sliding pill the system's script places).
     const deco = [...inner.matchAll(/<span\b[^>]*aria-hidden\s*=\s*["']true["'][^>]*>\s*<\/span>/gi)].map((d) => d[0]).join('');
-    found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>${deco}`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected });
+    found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>${deco}`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected, standIn: own ? null : tabs ? 'tabs' : c.name });
   }
   const best = found.sort((a, b) => a.score - b.score)[0];
   if (!best) return null;
   const { score, ...ui } = best;
   return ui;
+}
+
+// With no segmented control and no tabs: the system's radio group, one radio per choice (a component whose markup holds
+// a radio input, its label part kept), then its buttons side by side, the selected one in its strongest look (primary)
+// and the others in its quietest, or, with a single button, the selected one in it and the others plain. Same shape as
+// segmentedUi, with standIn saying what stands in. → object | null (the page then draws plain buttons with its tokens).
+export function radioGroupUi(components = [], systemCss = '') {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  const keep = (attrs) => (/\bclass\s*=\s*["']([^"']*)["']/i.exec(attrs ?? '')?.[1] ?? '').split(/\s+/).filter((k) => k && defined(k));
+  for (const c of components) {
+    const m = /^\s*<(label|div|span)\b([^>]*)>([\s\S]*)<\/\1>\s*$/i.exec(c.markup ?? '');
+    const input = m && /<input\b([^>]*\btype\s*=\s*["']?radio\b[^>]*)>/i.exec(m[3]);
+    if (!input) continue;
+    const lab = /<(span|strong|em|b)\b([^>]*)>[^<]*<\/\1>/i.exec(m[3].replace(/<svg[\s\S]*?<\/svg>/gi, ''));
+    return { from: c.name, open: '<div class="sg-seg" role="radiogroup">', close: '</div>', item: { tag: m[1].toLowerCase(), classes: keep(m[2]), label: lab ? keep(lab[2]).join(' ') || null : null, radio: keep(input[1]) }, selected: { add: [], attrs: {} }, standIn: 'radio group' };
+  }
+  return null;
+}
+
+export function buttonsAsSegmentedUi(components = [], systemCss = '') {
+  const all = [];
+  for (const c of components) { const b = buttonUi([c], systemCss); if (b && !all.some((x) => x.cls === b.cls)) all.push({ ...b, name: c.name }); }
+  if (!all.length) return null;
+  const strong = all.find((b) => /(primary|cta)/i.test(b.name)) ?? null;
+  const quiet = [...all].filter((b) => b !== strong).sort((a, b) => (/(secondary|outline)/i.test(a.name) ? 0 : 1) - (/(secondary|outline)/i.test(b.name) ? 0 : 1))[0] ?? strong;
+  const on = strong && quiet && strong !== quiet ? strong : null;
+  // One look only: the selected choice wears it and the others are plain, so which one is chosen still shows.
+  if (!on) return { from: quiet.from, open: '<div class="sg-seg">', close: '</div>', item: { tag: 'button', classes: [], label: null }, selected: { add: [quiet.cls], attrs: {} }, standIn: 'buttons' };
+  return { from: `${on.from} and ${quiet.from}`, open: '<div class="sg-seg">', close: '</div>', item: { tag: 'button', classes: [quiet.cls], label: quiet.label?.cls || null },
+    selected: { add: [on.cls], remove: [quiet.cls], attrs: {} }, standIn: 'buttons' };
+}
+
+// What the page could not take from the system, and what it used instead: one line each, for the overview and the To
+// do list. ui: the picks above (segmented, field, button, card, iconButton, overlay).
+export function standInGaps(ui = {}) {
+  const gaps = [];
+  const seg = ui.segmented;
+  if (!seg) gaps.push({ control: 'segmented control', uses: 'plain buttons drawn with its tokens' });
+  else if (seg.standIn) gaps.push({ control: 'segmented control', uses: seg.standIn === 'tabs' ? 'its tabs' : seg.standIn === 'radio group' ? 'its radio group' : seg.standIn === 'buttons' ? 'its buttons side by side' : `its ${seg.standIn}` });
+  if (!ui.field) gaps.push({ control: 'text field', uses: 'a plain text input drawn with its tokens' });
+  else if (ui.field.standIn) gaps.push({ control: 'text field', uses: `its ${ui.field.standIn}` });
+  if (!ui.button) gaps.push({ control: 'text button', uses: 'plain links and buttons drawn with its tokens' });
+  if (!ui.card) gaps.push({ control: 'card', uses: 'plain blocks drawn with its tokens' });
+  if (!ui.iconButton) gaps.push({ control: 'icon button', uses: 'plain buttons drawn with its tokens' });
+  return gaps.map((g) => ({ ...g, say: `This system has no ${g.control}, so the page uses ${g.uses}.`, todo: `Design ${/^[aeiou]/i.test(g.control) ? 'an' : 'a'} ${g.control} in Figma and build it, and the page uses it; or keep the stand-in.` }));
 }
 
 // The system's own text field, for the page's text inputs: a component's markup holding a text <input> (role
@@ -912,9 +989,186 @@ export function fieldUi(components = [], systemCss = '') {
     const ic = keep(input[1]), rc = keep(root[2]);
     const inputTag = `<input type="text" aria-label="Value"${ic.length ? ` class="${ic.join(' ')}"` : ''}>`;
     const markup = root[1].toLowerCase() === 'input' ? inputTag : `<${root[1]}${rc.length ? ` class="${rc.join(' ')}"` : ''}>${inputTag}</${root[1]}>`;
-    const score = (c.role === 'textbox' || /input|field|text/i.test(c.name) ? 0 : 10) + (ic.length || rc.length ? 0 : 5);
-    found.push({ score, from: c.name, markup });
+    const field = c.role === 'textbox' || /input|field|text/i.test(c.name);
+    const score = (field ? 0 : 10) + (ic.length || rc.length ? 0 : 5);
+    found.push({ score, from: c.name, markup, standIn: field ? null : /search/i.test(c.name) || type === 'search' ? 'search field' : c.name });
   }
   const best = found.sort((a, b) => a.score - b.score)[0];
-  return best ? { from: best.from, markup: best.markup } : null;
+  return best ? { from: best.from, markup: best.markup, ...(best.standIn ? { standIn: best.standIn } : {}) } : null;
+}
+
+// ── How to use a component: the same four sections on every page ──────────────────────────────────────────────────
+// Read from what the team already writes: Figma's description and annotations, and the code's own note, where a line
+// starts with the section's name (When not to use: …, or the name on its own line with the text below it); then
+// contract.authored.json → components.<name>.guidance ({ whenToUse, whenNotToUse, mistakes, limitations }, a string or
+// a list). A section nobody has written yet is listed as missing, so the overview can count the gaps.
+export const GUIDANCE = [
+  ['whenToUse', 'When to use', /^(when to use|use (it )?when|usage|quando usar)$/i],
+  ['whenNotToUse', 'When not to use', /^(when not to use|do not use (it )?when|don'?t use (it )?when|avoid|quando n[ãa]o usar)$/i],
+  ['mistakes', 'Common mistakes', /^(common mistakes|mistakes|common errors|erros comuns)$/i],
+  ['limitations', 'Limitations', /^(limitations|limits|known limitations|limita[çc][õo]es)$/i],
+];
+export function guidanceView({ description = '', annotations = [], note = '', authored = null } = {}) {
+  const found = {}, from = {};
+  const take = (text, source) => {
+    let cur = null;
+    for (const raw of String(text ?? '').split(/\r?\n/)) {
+      const line = raw.replace(/^\s*(?:[-*•]|#+)\s*/, '').trim();
+      if (!line) { cur = null; continue; }
+      const m = /^([^:–—-]{3,40}?)\s*[:–—-]\s*(.*)$/.exec(line) ?? (/^[^:]{3,40}:?$/.test(line) ? [line, line.replace(/:$/, ''), ''] : null);
+      const hit = m && GUIDANCE.find(([, , re]) => re.test(m[1].trim()));
+      if (hit) { cur = hit[0]; if (!found[cur]) { found[cur] = []; from[cur] = source; } if (m[2].trim()) found[cur].push(m[2].trim()); continue; }
+      if (cur && from[cur] === source) found[cur].push(line);
+    }
+  };
+  take(description, 'Figma');
+  for (const a of annotations ?? []) take(typeof a === 'string' ? a : a?.label ?? a?.labelMarkdown ?? '', 'Figma');
+  take(note, 'the code');
+  for (const [key] of GUIDANCE) {
+    const v = authored?.[key];
+    const list = Array.isArray(v) ? v.map(String).filter(Boolean) : typeof v === 'string' && v.trim() ? [v.trim()] : [];
+    if (list.length && !found[key]?.length) { found[key] = list; from[key] = 'contract.authored.json'; }
+  }
+  const sections = GUIDANCE.map(([key, title]) => ({ key, title, text: found[key]?.length ? found[key] : null, ...(found[key]?.length ? { from: from[key] } : {}) }));
+  return { sections, missing: sections.filter((x) => !x.text).map((x) => x.key) };
+}
+
+// ── A component's code API, as its page lists it ──────────────────────────────────────────────────────────────────────
+// api: component-api.mjs apiFor(). → { file, tag?, syntax?, props: [{ name, values?, type?, default?, required? }],
+// events: [names], slots: [names] } | null when the code states none. A callback prop (onChange) is listed once, as an
+// event; "required" is only what the code says (a default makes a prop not required), never a guess.
+export function apiView(api, file = api?.file) {
+  if (!api?.file) return null;
+  const events = api.events ?? [];
+  const props = Object.entries(api.props ?? {}).filter(([n]) => !events.includes(n)).map(([n, f]) => ({ name: n,
+    ...(f.options ? { values: f.options } : f.type ? { type: f.type } : {}), ...(f.default != null ? { default: String(f.default) } : {}), ...(typeof f.required === 'boolean' ? { required: f.required } : {}) }));
+  const slots = [...(api.slots?.default ? ['default'] : []), ...(api.slots?.named ?? [])];
+  if (!props.length && !events.length && !slots.length) return null;
+  return { file, ...(api.tag ? { tag: api.tag, syntax: api.syntax } : {}), props, events, slots };
+}
+
+// ── Accessibility, per component: what it owes and what the last browser check found ─────────────────────────────────
+// Each check of a11y-check.mjs, by the WCAG 2.2 success criterion it stands for.
+export const A11Y_WCAG = {
+  contrast: '1.4.3', hovercontrast: '1.4.3', focuscontrast: '1.4.11', name: '4.1.2', focus: '2.4.7', ariastate: '4.1.2', keyboard: '2.1.1',
+  target: '2.5.8', tabtrap: '2.1.2', tabindex: '2.4.3', escape: '2.1.1', focusreturn: '2.4.3', heading: '1.3.1', motion: '2.3.3', forcedfocus: '2.4.7',
+  spacing: '1.4.12', activate: '2.1.1', arrows: '2.1.1', zoom: '1.4.4', obscured: '2.4.11', focusthin: '2.4.13', rolecontract: '4.1.2', annotation: '4.1.2',
+  reflow: '1.4.10', partrole: '1.3.1', behaviour: '2.1.1', statefollows: '4.1.2', semantics: '4.1.2',
+};
+// The criteria the page names, with their WCAG 2.2 title and level.
+export const WCAG_CRITERIA = {
+  '1.3.1': ['Info and Relationships', 'A'], '1.4.3': ['Contrast (Minimum)', 'AA'], '1.4.4': ['Resize Text', 'AA'], '1.4.10': ['Reflow', 'AA'],
+  '1.4.11': ['Non-text Contrast', 'AA'], '1.4.12': ['Text Spacing', 'AA'], '2.1.1': ['Keyboard', 'A'], '2.1.2': ['No Keyboard Trap', 'A'],
+  '2.3.3': ['Animation from Interactions', 'AAA'], '2.4.3': ['Focus Order', 'A'], '2.4.7': ['Focus Visible', 'AA'], '2.4.11': ['Focus Not Obscured (Minimum)', 'AA'],
+  '2.4.13': ['Focus Appearance', 'AAA'], '2.5.8': ['Target Size (Minimum)', 'AA'], '3.3.1': ['Error Identification', 'A'], '4.1.2': ['Name, Role, Value', 'A'],
+};
+const wcagOfLine = (line) => (/error/i.test(line) ? '3.3.1' : '4.1.2');
+// "WCAG 2.1.1 Keyboard (A)": a criterion as the page names it.
+export const wcagLabel = (id) => (!id ? null : WCAG_CRITERIA[id] ? `WCAG ${id} ${WCAG_CRITERIA[id][0]} (${WCAG_CRITERIA[id][1]})` : `WCAG ${id}`);
+
+// name, cls: the component · role: its role word (Figma's annotation, else the authored contract) · annotations: Figma's
+// notes on it · parts: its part roles ([{ layer, part }]) · exceptions: behaviours the person excused ({ id: reason }) ·
+// result: the last browser check (a11y.json), or null · guide: { kind: { title(n), fix } } (a11y-check.mjs A11Y_GUIDE).
+// → { role, element, expects: [{ says, wcag }], excused: [{ says, reason }], checked: null | { at, notRead?, issues: [{ kind,
+// title, fix, wcag, details: [where each one is] }] } }, one issue per kind of problem, each wcag as the page names it ("WCAG 4.1.2 Name, Role, Value (A)").
+export function a11yView({ name, cls = null, role = null, annotations = [], parts = [], exceptions = {}, result = null, guide = {} } = {}) {
+  const expects = [];
+  const known = role && roleOf(role);
+  if (role) {
+    expects.push({ says: known ? `It is ${roleMarkup(role)}.` : `It carries role="${role}".`, wcag: '4.1.2' });
+    for (const line of roleSheetLines(role)) expects.push({ says: `It has ${line}.`, wcag: wcagOfLine(line) });
+  }
+  const b = behavioursFor(role, annotations.map((a) => (typeof a === 'string' ? { label: a } : a)), exceptions);
+  for (const r of b.rows) expects.push({ says: (r.sheet ?? r.says).replace(/^\w/, (ch) => ch.toUpperCase()) + '.', wcag: r.act?.keys ? '2.1.1' : '4.1.2' });
+  for (const line of partSheetLines(parts)) expects.push({ says: line.replace(/^\w/, (ch) => ch.toUpperCase()) + '.', wcag: '1.3.1' });
+  const excused = b.excepted.map((x) => ({ says: x.id, reason: x.reason }));
+  let checked = null;
+  if (result) {
+    const at = result.checkedAt ?? null;
+    if ((result.notRead ?? []).some((x) => String(x).split(' (')[0] === name)) checked = { at, notRead: true, issues: [] };
+    else {
+      const mine = new RegExp(`\\.${String(cls ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`);
+      const seen = new Set(), found = [];
+      for (const r of result.issues ?? []) {
+        // its own: the check named it, or the finding is on its class, or starts with its name ("stepper: …")
+        const sel = String(r.selector ?? '');
+        if (!(r.component === name || (!r.component && ((cls && mine.test(sel)) || sel.startsWith(`${name}: `))))) continue;
+        const detail = r.contrast != null ? `${r.text ? `"${r.text}" ` : ''}${r.contrast}:1, needs ${r.needs}:1${r.theme ? ` (${r.theme})` : ''}` : String(r.selector ?? '');
+        const k = r.issue + '|' + detail;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        found.push({ kind: r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', detail });
+      }
+      // One line per kind of problem: how many, where each is, the fix and the criterion once.
+      const issues = [];
+      for (const f of found) {
+        const same = issues.find((i) => i.kind === f.kind);
+        if (same) { same.details.push(f.detail); continue; }
+        issues.push({ kind: f.kind, fix: f.fix, wcag: A11Y_WCAG[f.kind] ?? null, details: [f.detail] });
+      }
+      for (const i of issues) i.title = guide[i.kind]?.title ? guide[i.kind].title(i.details.length) : i.kind;
+      checked = { at, issues };
+    }
+  }
+  for (const x of expects) x.wcag = wcagLabel(x.wcag);
+  for (const x of checked?.issues ?? []) x.wcag = wcagLabel(x.wcag);
+  return { role: role ?? null, ...(known ? { element: roleMarkup(role) } : {}), expects, excused, checked };
+}
+
+// ── Parity, per component: what agrees with Figma and what does not ────────────────────────────────────────────────
+// agreed: the agreed record (agreed.mjs) · census: the last audit's census entry for it ({ compared, differ,
+// notComparable, reasons }) · differences: its open differences (each { what, plain?, who?, todo? }) · controls: the
+// props both sides have · unbuilt: Figma props the code does not build · ownTokens: its tokens equal to Figma.
+// → { agreed: [{ what, value, since, commit }], props: [{ figma, code }], tokens: [{ figma, var }], differ, notBuilt:
+// [labels], notCompared: { count, reasons: [[why, n]] } | null, counts: { agree, differ, notBuilt, notCompared } }
+// A fact the record holds that an open difference names is not listed as agreeing: the record is the last agreement.
+export function parityView({ name, agreed = {}, census = null, differences = [], controls = [], unbuilt = [], ownTokens = null } = {}) {
+  const prefix = `${name} · `;
+  const open = differences.map((d) => String(d.what ?? ''));
+  const facts = Object.entries(agreed.facts ?? {})
+    .filter(([k, f]) => k.startsWith(prefix) && f && f.figma !== undefined && String(f.figma) === String(f.code) && !open.some((w) => w.includes(k)))
+    .map(([k, f]) => ({ what: k.slice(prefix.length), value: String(f.code), since: f.at ?? null, commit: f.commit ?? null }))
+    .sort((a, b) => a.what.localeCompare(b.what));
+  const props = controls.map((k) => ({ figma: k.label, code: k.prop ?? k.label }));
+  const tokens = [...(ownTokens?.colors ?? []), ...(ownTokens?.sizes ?? [])].map((t) => ({ figma: t.figma, var: t.var }));
+  const notCompared = census && census.notComparable ? { count: census.notComparable, reasons: Object.entries(census.reasons ?? {}) } : null;
+  const notBuilt = unbuilt.map((u) => u.label ?? u);
+  return { agreed: facts, props, tokens, differ: differences, notBuilt, notCompared,
+    counts: { agree: facts.length + props.length + tokens.length, differ: differences.length, notBuilt: notBuilt.length, notCompared: notCompared?.count ?? 0 } };
+}
+
+// ── How a product brings the component in ─────────────────────────────────────────────────────────────────────────
+// tag, syntax: component-api.mjs callName · file: its path from the project root · text: its source · pkg: { name, dir }
+// of the package the file belongs to, when it is not the project itself · template: ds-config styleguide.importFrom
+// ("@/components/{path}", {path} the file's path from src/ or the package, {name} its tag).
+// → { line, from } | null. A Vue or Svelte file is a default import; a React one is named unless only a default export
+// gives it. Without a template: the package's name and path, else @/ and the path under src/, else ./ and the path.
+export function importOf({ tag, syntax, file, text = '', pkg = null, template = null } = {}) {
+  if (!tag || !file || syntax === 'html') return null;
+  const ext = (file.match(/\.[^./]+$/) ?? [''])[0];
+  const keepExt = /^\.(vue|svelte)$/.test(ext);
+  const strip = (p) => (keepExt ? p : p.slice(0, p.length - ext.length));
+  let from;
+  const underSrc = file.match(/(?:^|\/)src\/(.+)$/);
+  if (template) from = template.replace('{path}', strip(underSrc ? underSrc[1] : file)).replace('{name}', tag);
+  else if (pkg?.name && pkg.dir && file.startsWith(pkg.dir + '/')) from = `${pkg.name}/${strip(file.slice(pkg.dir.length + 1)).replace(/^src\//, '')}`;
+  else if (underSrc) from = `@/${strip(underSrc[1])}`;
+  else from = `./${strip(file)}`;
+  const named = syntax === 'jsx' && new RegExp(`export\\s+(?:function|const|let|class)\\s+${tag}\\b`).test(text);
+  return { line: named ? `import { ${tag} } from '${from}';` : `import ${tag} from '${from}';`, from };
+}
+
+// The system's components a component is built with: those whose class its markup holds (HTML), or that its own file
+// uses (a tag, an import). Itself and its own parts never count. names: [{ name, cls }].
+export function nestedComponents({ name, cls = null, markup = '', text = '', names = [] } = {}) {
+  const classes = new Set([...String(markup).matchAll(/class\s*=\s*["']([^"']*)["']/g)].flatMap((m) => m[1].split(/\s+/)).filter(Boolean));
+  const out = [];
+  for (const o of names) {
+    if (o.name === name || (cls && o.cls === cls)) continue;
+    const inMarkup = o.cls && classes.has(o.cls) && !(cls && o.cls.startsWith(cls + '-') || cls && o.cls.startsWith(cls + '__'));
+    const tagName = o.name.replace(/(^|[-_/\s]+)(\w)/g, (m, s2, ch) => ch.toUpperCase());
+    const inText = text && new RegExp(`<${tagName}\\b|import\\s+\\{?[^;]*\\b${tagName}\\b[^;]*from`).test(text);
+    if (inMarkup || inText) out.push(o.name);
+  }
+  return out;
 }

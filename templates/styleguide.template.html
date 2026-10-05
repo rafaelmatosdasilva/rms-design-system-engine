@@ -93,6 +93,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-hero > h1 { font-size: var(--sg-h1); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-s); }
 .sg-hero > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); max-width: 500px; }
 .sg-pending { font-size: var(--sg-m); color: var(--sg-text); background: color-mix(in srgb, var(--sg-warning) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sg-warning) 40%, transparent); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-xl); max-width: 720px; }
+.sg-usage-count { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-l); max-width: 720px; }
+.sg-gap ul { margin: var(--sg-space-xs) 0 0; padding-left: var(--sg-space-l); }
 .sg-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sg-space-m); margin-bottom: var(--sg-space-xxl); }
 /* Each overview link is the system's own card (DATA.ui.card); with none, a plain block link. Never a box of the page's. */
 .sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
@@ -152,6 +154,29 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-usage-name { font-size: var(--sg-s); color: var(--sg-text-2); }
 a.pg-usage-name { color: var(--sg-text); }
 .pg-selector { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xs) 0 var(--sg-space-m); }
+/* A component's page in areas (playground, documentation, accessibility, parity), switched by the system's own
+   segmented control; how a product imports it and what it is built with, above them. */
+.pg-areas { margin: var(--sg-space-m) 0 var(--sg-space-l); }
+.pg-import { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); color: var(--sg-text-2); }
+.pg-import code { font-family: inherit; color: var(--sg-text); }
+.pg-parity-sum { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
+.pg-parity td:last-child { word-break: normal; overflow-wrap: anywhere; }
+/* Where it is used: each product's own page pictured, the component marked on it. */
+.pg-usedin { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.pg-shot { position: relative; overflow: hidden; border-radius: var(--sg-radius); border: var(--sg-line); background: var(--sg-bg-2); }
+.pg-shot img { display: block; width: 100%; height: auto; }
+.pg-mark { position: absolute; border: 2px solid var(--sg-accent); border-radius: var(--sg-radius-s); pointer-events: none; }
+/* The code a product writes for what the playground shows, with the system's button to copy it. */
+.pg-code { margin-top: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; }
+.pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
+.pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+.pg-code pre { margin: 0; padding: var(--sg-space-m); overflow-x: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
+.pg-code pre, .pg-code code { font-family: inherit; white-space: pre; }
+/* Words for a screen reader only (a mark's meaning, a copy confirmed). */
+.sg-hidden-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.pg-req { color: var(--sg-text); font-weight: var(--sg-heading-weight); }
+.pg-legend { font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-xs) var(--sg-space-m); border-top: var(--sg-line); }
+.pg-wcag { display: block; font-size: var(--sg-s); color: var(--sg-muted); }
 .pg-note { display: flex; gap: var(--sg-space-s); font-size: var(--sg-m); line-height: var(--sg-lh); color: var(--sg-text-2); background: var(--sg-bg-2); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-s); }
 .pg-note b { color: var(--sg-text); font-weight: var(--sg-heading-weight); white-space: nowrap; }
 .pg-diff-list { margin: 0; padding-left: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-xs); }
@@ -185,6 +210,24 @@ a.pg-usage-name { color: var(--sg-text); }
 /* With no text field in the system, the browser's own (never styled here, so it cannot sit inside the system's field). */
 .pg-ctl > input[type="text"] { font: inherit; }
 .pg-empty { font-size: var(--sg-s); color: var(--sg-muted); }
+/* Anatomy: the component as set in the Playground, drawn larger, each part numbered, padding and gaps tinted. */
+.pg-anatomy { display: flex; justify-content: center; padding: var(--sg-space-xxl) var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-l); background: var(--sg-bg); overflow: auto; }
+.pg-anat-stage { position: relative; flex: none; }
+.pg-anat-wrap { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; }
+.pg-anat-wrap, .pg-anat-wrap * { animation: none !important; transition: none !important; }   /* drawn at rest, never mid-entry */
+.pg-anatomy-doc, .pg-anatomy { min-width: 0; }
+.pg-anat-marks { position: absolute; inset: 0; pointer-events: none; }
+.pg-anat-pad { position: absolute; background: color-mix(in srgb, var(--sg-accent) 22%, transparent); }
+.pg-anat-gap { position: absolute; background: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
+.pg-anat-part { position: absolute; outline: 1px dashed var(--sg-text); }
+.pg-anat-part.is-slot { outline: 2px dashed var(--sg-accent); }
+.pg-anat-num { position: absolute; transform: translate(-50%, -50%); min-width: 18px; height: 18px; padding: 0 var(--sg-space-xxs); box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: var(--sg-radius-pill); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); }
+.pg-anat-key { display: inline-block; width: 12px; height: 12px; margin-right: var(--sg-space-xs); vertical-align: -1px; border-radius: var(--sg-radius-s); }
+.pg-anat-key.is-pad { background: color-mix(in srgb, var(--sg-accent) 22%, transparent); } .pg-anat-key.is-gap { background: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
+.pg-anatomy-doc .pg-updated { margin-top: var(--sg-space-l); }
+.pg-from, .pg-missing { color: var(--sg-muted); }
+.pg-missing { font-style: italic; }
+.pg-doc > .pg-from { margin-top: var(--sg-space-s); }
 .pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sg-space-m); align-items: start; }
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; box-shadow: var(--sg-shadow); }
 .pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
@@ -195,6 +238,12 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect tr:last-child td { border-bottom: none; }
 .pg-own-swatch { display: inline-block; width: var(--sg-space-m); height: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius-s); vertical-align: middle; margin-right: var(--sg-space-xs); }
 .sg-topbar, .sg-nav-close, .sg-scrim { display: none; }
+/* The menu hidden on a wide screen: a bar at the top with the button that brings it back, the page at full width. */
+body.sg-nav-hidden .sg-sidebar { display: none; }
+body.sg-nav-hidden .sg-layout { flex-direction: column; }
+body.sg-nav-hidden .sg-topbar { display: flex; align-items: center; gap: var(--sg-space-s); position: sticky; top: 0; z-index: 20; padding: var(--sg-space-s) var(--sg-space-l); background: var(--sg-bg); border-bottom: var(--sg-line); }
+body.sg-nav-hidden .sg-topbar .sg-title { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; }
+.sg-hide-nav { margin-top: var(--sg-space-s); }
 @media (max-width: 720px) {
   /* A phone: a bar at the top with the menu button; the sidebar is a panel that slides in over the page. */
   .sg-layout { flex-direction: column; }
@@ -203,6 +252,8 @@ a.pg-usage-name { color: var(--sg-text); }
   .sg-sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; width: min(320px, 85vw); height: 100vh; transform: translateX(-100%); transition: transform 0.2s ease; visibility: hidden; }
   body.sg-nav-open .sg-sidebar { transform: none; visibility: visible; }
   .sg-nav-close { display: inline-flex; position: absolute; top: var(--sg-space-s); right: var(--sg-space-s); }
+  .sg-hide-nav { display: none; }   /* a phone shows the menu on demand already */
+  body.sg-nav-hidden .sg-sidebar { display: flex; }
   .sg-sidebar-header { position: relative; }
   body.sg-nav-open .sg-scrim { display: block; position: fixed; inset: 0; z-index: 30; }
   .sg-scrim:not([class*=" "]) { background: color-mix(in srgb, var(--sg-text) 40%, transparent); }
@@ -254,20 +305,27 @@ a.pg-usage-name { color: var(--sg-text); }
      scoped (its CSS nests, as a Figma mode does on a frame); a class axis toggles a class on <html>. The first value
      is the base: choosing it clears the attribute so the :root defaults apply. */
   var AXES = DATA.modes || [];
-  /* ── Every switch on the page is the system's own segmented control (DATA.ui.segmented, read from its markup), else
-     a plain row of buttons the browser draws. ─────────────────────────────────────────────────────────────────── */
-  var SEG = DATA.ui && DATA.ui.segmented;
+  /* ── Every switch on the page is the system's own segmented control (DATA.ui.segmented, read from its markup). With
+     none, its stand-in (tabs, a radio group, its buttons side by side), else a plain row of buttons the browser draws;
+     DATA.ui.gaps says which, on the overview and in the To do list. ─────────────────────────────────────────────── */
+  var SEG = DATA.ui && DATA.ui.segmented, RADIO = SEG && SEG.item.radio, RADIO_NO = 0;
   function segHTML(items) {
-    var tag = SEG ? SEG.item.tag : 'button', cls = SEG ? SEG.item.classes.join(' ') : '';
+    var tag = SEG ? SEG.item.tag : 'button', cls = SEG ? SEG.item.classes.join(' ') : '', group = 'sg-r' + (++RADIO_NO);
     return (SEG ? SEG.open : '<div class="sg-seg">') + items.map(function (o) {
       var text = SEG && SEG.item.label ? '<span class="' + esc(SEG.item.label) + '">' + esc(o.label) + '</span>' : esc(o.label);
-      return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '"' + (o.off ? ' disabled aria-disabled="true" title="' + esc(o.title || '') + '"' : '') + '>' + text + '</' + tag + '>';
+      // A radio: its input carries the choice and the label around it is what a click lands on.
+      if (RADIO) text = '<input type="radio" name="' + group + '"' + (RADIO.length ? ' class="' + esc(RADIO.join(' ')) + '"' : '') + (o.off ? ' disabled' : '') + '>' + text;
+      return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '"' + (o.off ? (RADIO ? '' : ' disabled') + ' aria-disabled="true" title="' + esc(o.title || '') + '"' : '') + '>' + text + '</' + tag + '>';
     }).join('') + (SEG ? SEG.close : '</div>');
   }
   function segSelect(el, on) {
-    if (SEG) { (SEG.selected.add || []).forEach(function (k) { el.classList.toggle(k, on); }); Object.keys(SEG.selected.attrs || {}).forEach(function (a) { if (on) el.setAttribute(a, SEG.selected.attrs[a]); else el.removeAttribute(a); }); }
-    else el.classList.toggle('selected', on);
-    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (SEG) {
+      (SEG.selected.add || []).forEach(function (k) { el.classList.toggle(k, on); });
+      (SEG.selected.remove || []).forEach(function (k) { el.classList.toggle(k, !on); });   // a stand-in button's quiet look, off when selected
+      Object.keys(SEG.selected.attrs || {}).forEach(function (a) { if (on) el.setAttribute(a, SEG.selected.attrs[a]); else el.removeAttribute(a); });
+    } else el.classList.toggle('selected', on);
+    if (RADIO) { var r = el.querySelector('input'); if (r) r.checked = on; el.dataset.on = on ? '1' : ''; }
+    else el.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
   function segItems(box) { return Array.prototype.slice.call(box.querySelectorAll('[data-v]')); }
 
@@ -306,7 +364,7 @@ a.pg-usage-name { color: var(--sg-text); }
         diff.hidden = !list.length;
       };
       wrap._sync();
-      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (b.getAttribute('aria-pressed') === 'true') return;   // the choice already set changes nothing
+      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (b.getAttribute('aria-pressed') === 'true' || b.dataset.on === '1') return;   // the choice already set changes nothing
       if (b.dataset.v === '__auto') scope.removeAttribute(axis.attr); else apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(axis); }); });
       return wrap;
     }
@@ -333,6 +391,8 @@ a.pg-usage-name { color: var(--sg-text); }
     (c.differences || []).forEach(function (x) { TODO.push({ who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.unbuilt || []).forEach(function (u) { TODO.push({ who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell me to do it.' }); });
   });
+  // A control the page needs and the system lacks: drawn with a stand-in until the system has one.
+  ((DATA.ui && DATA.ui.gaps) || []).forEach(function (g) { TODO.push({ who: 'both', comp: null, say: g.say, todo: g.todo }); });
   ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. Tell me to do it.' }); });
   var ORDER = ['figma', 'code', 'both'];
   TODO.sort(function (a, b) { return ORDER.indexOf(a.who) - ORDER.indexOf(b.who); });
@@ -343,6 +403,16 @@ a.pg-usage-name { color: var(--sg-text); }
   var ov = document.getElementById('overview');
   document.getElementById('sg-hero-title').textContent = DATA.title || 'Design system';
   if (DATA.notAgreed && (DATA.notAgreed.differences || DATA.notAgreed.unrealized || (DATA.notAgreed.waiting || []).length)) { var pend = document.createElement('p'); pend.className = 'sg-pending'; pend.dataset.todo = '1'; pend.textContent = DATA.notAgreed.line; ov.appendChild(pend); }
+  // What the page could not take from the system, in one note: each control it lacks and the stand-in it uses instead.
+  var GAPS = (DATA.ui && DATA.ui.gaps) || [];
+  if (GAPS.length) { var gp = document.createElement('div'); gp.className = 'sg-pending sg-gap'; gp.innerHTML = '<b>Stand-ins on this page</b><ul>' + GAPS.map(function (g) { return '<li>' + esc(g.say) + '</li>'; }).join('') + '</ul>'; ov.appendChild(gp); }
+  // Usage written so far: how many components have each of the four sections, so the gaps are in view.
+  var GUIDED = COMPONENTS.filter(function (c) { return c.guidance; });
+  if (GUIDED.length && GUIDED.some(function (c) { return c.guidance.missing.length; })) {
+    var ug = document.createElement('p'); ug.className = 'sg-usage-count';
+    ug.textContent = 'Usage written: ' + GUIDED[0].guidance.sections.map(function (x) { return x.title + ' ' + GUIDED.filter(function (c) { return c.guidance.missing.indexOf(x.key) < 0; }).length + ' of ' + GUIDED.length; }).join(', ') + '. Each component\'s Documentation says what is missing.';
+    ov.appendChild(ug);
+  }
   if (TODO.length) { var go = document.createElement('p'); go.innerHTML = sysButton('a', 'Open the To do list (' + TODO.length + ')', ' href="#todo"'); ov.appendChild(go); }
   // Two groups, as the page has them: the foundations, then every component in the order of its sections. Each card
   // is a thumbnail (a few of the real tokens, or the component itself, drawn when its section is built) and its name.
@@ -720,7 +790,233 @@ a.pg-usage-name { color: var(--sg-text); }
       return k.href ? sysButton('a', k.name, ' href="' + esc(k.href) + '" target="_blank" rel="noopener"', 'pg-usage-name') : '<span class="pg-usage-name">' + esc(k.name) + '</span>';
     }).join('');
   }
+  // A date and time in the reader's own clock (two changes on one day read apart).
+  var when = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
   function rowsHTML(rows) { return rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>'; }).join(''); }
+
+  // ── The code a product writes ─────────────────────────────────────────────────────────────────────────────────────
+  var low = function (x) { return String(x == null ? '' : x).toLowerCase().replace(/[\s_-]+/g, ''); };
+  var attrText = function (x) { return String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); };
+  // The component's own tag with the props set in the playground, in its framework's syntax. A value equal to the
+  // code's default (else Figma's) is left out, as a product leaves it out.
+  function callCode(c, props, state) {
+    var api = c.api, syn = api.syntax, attrs = [];
+    var codeProp = function (n) { return (api.props || []).find(function (q) { return low(q.name) === low(n); }); };
+    props.forEach(function (p) {
+      var name = p.prop || p.label, q = codeProp(name), v = state[p.label];
+      if (p.type === 'BOOLEAN') {
+        var def = q && q.default != null ? /^true$/i.test(q.default) : !!p.default;
+        if (!!v === def) return;
+        attrs.push(v ? name : syn === 'vue' ? ':' + name + '="false"' : syn === 'html' ? null : name + '={false}');
+      } else if (p.type === 'VARIANT') {
+        var val = q && q.values ? (q.values.find(function (x) { return low(x) === low(v); }) || v) : v;
+        var dv = q && q.default != null ? q.default : p.default;
+        if (dv != null && low(val) === low(dv)) return;
+        attrs.push(name + '="' + attrText(val) + '"');
+      } else if (p.type === 'TEXT' && v) {
+        var tv = q && q.default != null ? q.default : p.default;
+        if (tv == null || String(v) !== String(tv)) attrs.push(name + '="' + attrText(v) + '"');
+      }
+    });
+    (api.props || []).forEach(function (q) {
+      if (q.required && !attrs.some(function (a) { return a && low(a.replace(/^:/, '').split(/[=\s]/)[0]) === low(q.name); })) attrs.push(q.name + (syn === 'vue' || syn === 'html' ? '="…"' : '={…}'));
+    });
+    attrs = attrs.filter(Boolean);
+    var one = attrs.length ? ' ' + attrs.join(' ') : '';
+    var open = '<' + api.tag + (one.length > 60 ? '\n  ' + attrs.join('\n  ') + '\n' : one);
+    return syn === 'html' ? open + '></' + api.tag + '>' : open + (one.length > 60 ? '/>' : ' />');
+  }
+  // The HTML the preview draws, indented, without what the page itself set on it (its centring margin).
+  var VOID_TAG = /^(area|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/;
+  // The classes and data attributes the system's CSS styles: one the product put on its instance (a hook of its own) is
+  // not shown.
+  var SYS_CLASSES = null;
+  function systemClasses() {
+    if (SYS_CLASSES) return SYS_CLASSES;
+    SYS_CLASSES = {};
+    var walk = function (rules) { Array.prototype.forEach.call(rules || [], function (r) {
+      if (r.selectorText) {
+        (r.selectorText.match(/\.[\w-]+/g) || []).forEach(function (k) { SYS_CLASSES[k.slice(1)] = 1; });
+        (r.selectorText.match(/\[\s*(data-[\w-]+)/g) || []).forEach(function (k) { SYS_CLASSES['[' + k.replace(/^\[\s*/, '')] = 1; });   // a data attribute the CSS styles by
+      }
+      if (r.cssRules) walk(r.cssRules);
+    }); };
+    Array.prototype.forEach.call(document.styleSheets, function (sh) { try { walk(sh.cssRules); } catch (x) { /* a sheet the page cannot read */ } });
+    return SYS_CLASSES;
+  }
+  function htmlCode(e) {
+    var copy = e.cloneNode(true);
+    copy.style.removeProperty('margin'); copy.style.removeProperty('width');
+    if (!copy.getAttribute('style')) copy.removeAttribute('style');
+    var known = systemClasses();
+    [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('*'))).forEach(function (n) {
+      Array.prototype.slice.call(n.classList).forEach(function (k) { if (!known[k]) n.classList.remove(k); });
+      Array.prototype.slice.call(n.attributes).forEach(function (at) { if (/^data-/.test(at.name) && !known['[' + at.name]) n.removeAttribute(at.name); });
+      if (n.hasAttribute('class') && !n.getAttribute('class').trim()) n.removeAttribute('class');
+    });
+    var text = function (t) { return t.replace(/\s+/g, ' ').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+    var attrs = function (n) { return Array.prototype.map.call(n.attributes, function (a) { return a.value === '' ? ' ' + a.name : ' ' + a.name + '="' + attrText(a.value) + '"'; }).join(''); };
+    function out(n, depth) {
+      var pad = new Array(depth + 1).join('  ');
+      if (n.nodeType === 3) { var t = text(n.textContent); return t ? pad + t : ''; }
+      if (n.nodeType !== 1) return '';
+      var tag = n.tagName.toLowerCase(), open = '<' + tag + attrs(n) + '>';
+      if (VOID_TAG.test(tag)) return pad + open;
+      var kids = Array.prototype.filter.call(n.childNodes, function (k) { return k.nodeType === 1 || (k.nodeType === 3 && k.textContent.trim()); });
+      if (!kids.length) return pad + open + '</' + tag + '>';
+      if (kids.length === 1 && kids[0].nodeType === 3) return pad + open + text(kids[0].textContent) + '</' + tag + '>';
+      return pad + open + '\n' + kids.map(function (k) { return out(k, depth + 1); }).filter(Boolean).join('\n') + '\n' + pad + '</' + tag + '>';
+    }
+    return out(copy, 0);
+  }
+  // ── The contrast of its text, measured as it is drawn now (this mode, these props) ─────────────────────────────────
+  // Every colour read through a 1×1 canvas, so any colour syntax the browser accepts is read the same way.
+  var px = (function () { try { var cv = document.createElement('canvas'); cv.width = cv.height = 1; return cv.getContext('2d', { willReadFrequently: true }); } catch (e) { return null; } })();
+  function rgba(col) {
+    if (!px || !col) return null;
+    px.clearRect(0, 0, 1, 1); px.fillStyle = '#000'; px.fillStyle = col; px.fillRect(0, 0, 1, 1);
+    var d = px.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255];
+  }
+  function lum(c) { var f = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+  function over(top, under) { var a = top[3]; return [top[0] * a + under[0] * (1 - a), top[1] * a + under[1] * (1 - a), top[2] * a + under[2] * (1 - a), 1]; }
+  // What is behind an element: the backgrounds of it and every box above it, laid over each other.
+  function behind(el) {
+    var layers = [];
+    for (var n = el; n && n.nodeType === 1; n = n.parentElement) { var b = rgba(getComputedStyle(n).backgroundColor); if (b && b[3] > 0) { layers.push(b); if (b[3] >= 1) break; } }
+    var base = [255, 255, 255, 1];
+    for (var i = layers.length - 1; i >= 0; i--) base = over(layers[i], base);
+    return base;
+  }
+  function contrastHTML(root) {
+    var lowest = null;
+    var els = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
+    els.forEach(function (el) {
+      var own = Array.prototype.some.call(el.childNodes, function (k) { return k.nodeType === 3 && k.textContent.trim(); }) || (el.tagName === 'INPUT' && (el.value || el.placeholder));
+      if (!own) return;
+      var cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || +cs.opacity === 0) return;
+      for (var up = el; up && up !== root.parentElement; up = up.parentElement) if (up.hidden || getComputedStyle(up).display === 'none') return;   // not drawn in this state
+      if (el.closest(':disabled, [aria-disabled="true"]')) return;   // WCAG 1.4.3 exempts a control that cannot be used
+      var fg = rgba(cs.color); if (!fg) return;
+      var bg = behind(el), col = over(fg, bg);
+      var l1 = lum(col), l2 = lum(bg), ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+      var size = parseFloat(cs.fontSize), large = size >= 24 || (size >= 18.66 && (+cs.fontWeight || 400) >= 700);
+      var need = large ? 3 : 4.5, words = (el.tagName === 'INPUT' ? (el.value || el.placeholder) : el.textContent).replace(/\s+/g, ' ').trim().slice(0, 40);
+      if (!lowest || ratio / need < lowest.ratio / lowest.need) lowest = { ratio: ratio, need: need, words: words };
+    });
+    if (!lowest) return '<p>No text drawn in this state.</p>';
+    var ok = lowest.ratio >= lowest.need;
+    return '<p>' + (ok ? 'Passes' : 'Fails') + ': ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '", needs ' + lowest.need + ':1 (' + (lowest.need === 3 ? 'large text' : 'text') + '), in the mode and state shown.' +
+      '<span class="pg-wcag">WCAG 1.4.3 Contrast (Minimum) (AA)</span></p>';
+  }
+
+  // ── Its parity with Figma: what agrees (each value since when), its props and tokens on both sides, what differs
+  // (each with who acts and what to do), what the code does not build yet and what could not be compared ──────────
+  function differencesHTML(c) {
+    return ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '');
+  }
+  function parityHTML(c) {
+    var p = c.parity; if (!p) return differencesHTML(c);
+    var n = p.counts, parts = [n.agree + ' agree', n.differ + ' differ'];
+    if (n.notBuilt) parts.push(n.notBuilt + ' not built yet'); if (n.notCompared) parts.push(n.notCompared + ' not compared');
+    var box = function (head, rows) { return rows ? '<div class="pg-inspect pg-parity"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>' : ''; };
+    var facts = p.agreed.map(function (f) { return '<tr><td>' + esc(f.what) + '</td><td>' + esc(f.value) + (f.since ? '  ·  since ' + esc(when(f.since)) : '') + (f.commit ? ' (' + esc(f.commit) + ')' : '') + '</td></tr>'; }).join('');
+    var props = p.props.map(function (k) { return '<tr><td>' + esc(k.figma) + '</td><td>' + esc(k.code) + '</td></tr>'; }).join('');
+    var toks = p.tokens.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + esc(t.var) + '</td></tr>'; }).join('');
+    return '<div class="pg-doc"><h3>Parity with Figma</h3><p class="pg-parity-sum">' + esc(parts.join('  ·  ')) + '</p>' +
+      ((c.differences || []).length ? differencesHTML(c) : '<p class="pg-parity-sum">Nothing differs from Figma in what the last audit compared.</p>') +
+      '<dl class="pg-updated">' +
+      (p.notBuilt.length ? '<div><dt>Not built yet</dt><dd><p>Figma has ' + esc(p.notBuilt.join(', ')) + '; the code does not build ' + (p.notBuilt.length === 1 ? 'it' : 'them') + ' yet.</p></dd></div>' : '') +
+      (p.notCompared ? '<div><dt>Not compared</dt><dd>' + p.notCompared.reasons.map(function (r) { return '<p>' + esc(r[1] + ' · ' + r[0]) + '</p>'; }).join('') + '</dd></div>' : '') +
+      '</dl>' +
+      '<div class="pg-inspect-grid">' + box('Values that agree', facts) + box('Props (Figma · code)', props) + box('Tokens (Figma · code)', toks) + '</div></div>';
+  }
+  // ── How a product brings it in: its import line (copied), its file (downloaded), and what it is built with ────────
+  function importHTML(c) {
+    var out = '';
+    if (c.import) out += '<div class="pg-import"><span class="pg-usage-label">Import</span><code>' + esc(c.import.line) + '</code>' + sysButton('button', 'Copy import', ' data-copy-text="' + esc(c.import.line) + '"') + (c.source ? sysButton('button', 'Download file', ' data-download="' + esc(c.name) + '"') : '') + '<span class="sg-hidden-text" role="status"></span></div>';
+    if ((c.uses || []).length) out += '<div class="pg-import"><span class="pg-usage-label">Built with</span>' + c.uses.map(function (n) {
+      var o = COMPONENTS.find(function (k) { return k.name === n; });
+      return sysButton('a', n, ' href="#c-' + esc(n) + '"', 'pg-usage-name') + (o && o.source ? sysButton('button', 'Download ' + n, ' data-download="' + esc(n) + '"') : '');
+    }).join('') + '</div>';
+    return out;
+  }
+  // A text copied, the button says so for a moment and a screen reader hears it.
+  function copyText(text, btn, said) {
+    var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
+    var done = function () { label('Copied'); if (said) said.textContent = 'Copied'; setTimeout(function () { label(was); if (said) said.textContent = ''; }, 1500); };
+    var fallback = function () { var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { if (document.execCommand('copy')) done(); } catch (x) {} ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  }
+  // A component's own file, saved as it is in the code.
+  function download(name) {
+    var o = COMPONENTS.find(function (k) { return k.name === name; }); if (!o || !o.source) return;
+    var url = URL.createObjectURL(new Blob([o.source.text], { type: 'text/plain' })), a = document.createElement('a');
+    a.href = url; a.download = o.source.file.split('/').pop(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  // The areas of a component's page, and the one last opened (kept from one component to the next).
+  var AREAS = [['play', 'Playground'], ['docs', 'Documentation'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['used', 'Used in']], AREA = 'play';
+  // ── Where it is used: a card per product, its own page pictured as it opens with each place the component sits on it
+  // marked, linked to the product ─────────────────────────────────────────────────────────────────────────────────────
+  function usedInHTML(c) {
+    var u = (c.usage || []).map(function (k) { return typeof k === 'string' ? { key: k, name: k } : k; });
+    if (!u.length) return '<p class="pg-parity-sum">Not found in any of the products\' pages.</p>';
+    return '<div class="sg-card-grid pg-usedin">' + u.map(function (k) {
+      var p = (DATA.products || {})[k.key] || null, boxes = (p && p.boxes && p.boxes[c.name]) || [];
+      var pct = function (v, of) { return (Math.round(v / of * 10000) / 100) + '%'; };
+      var shot = p ? '<div class="pg-shot"><img src="' + p.shot + '" alt="' + esc(k.name + (boxes.length ? ', with ' + c.name + ' marked' : '')) + '">' +
+        (p.w ? boxes.map(function (b) { return '<span class="pg-mark" style="left:' + pct(b[0], p.w) + ';top:' + pct(b[1], p.h) + ';width:' + pct(b[2], p.w) + ';height:' + pct(b[3], p.h) + '"></span>'; }).join('') : '') + '</div>' : '';
+      var where = k.places ? (k.places === 1 ? 'Once in its code.' : k.places + ' times in its code.') : '';
+      var note = [where, !p || p.from === 'image' ? '' : boxes.length ? (boxes.length === 1 ? 'Marked where it shows when the product opens.' : 'Marked in the ' + boxes.length + ' places it shows when the product opens.') : 'Not on the screen it opens with.'].filter(Boolean).join(' ');
+      var tag = k.href ? 'a' : 'div', cls = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : '');
+      return '<' + tag + ' class="' + cls + '"' + (k.href ? ' href="' + esc(k.href) + '" target="_blank" rel="noopener"' : '') + '>' + shot + '<h3>' + esc(k.name) + '</h3>' + (note ? '<p class="pg-selector">' + esc(note) + '</p>' : '') + '</' + tag + '>';
+    }).join('') + '</div>';
+  }
+
+  // ── Its code API: the props (a * on each one the code says must be given), the events it sends, its slots ─────────
+  function apiHTML(c) {
+    var api = c.api; if (!api) return '';
+    var req = (api.props || []).some(function (p) { return p.required; });
+    var props = (api.props || []).map(function (p) {
+      var what = p.values ? p.values.join(', ') : p.type || '';
+      var def = p.default != null ? 'default ' + p.default : '';
+      return '<tr><td>' + esc(p.name) + (p.required ? '<span class="pg-req" aria-hidden="true"> *</span><span class="sg-hidden-text"> (required)</span>' : '') + '</td><td>' + esc([what, def].filter(Boolean).join('  ·  ') || '-') + '</td></tr>';
+    }).join('');
+    var box = function (head, body, legend) { return '<div class="pg-inspect"><div class="pg-inspect-head">' + head + '</div><table>' + body + '</table>' + (legend || '') + '</div>'; };
+    var list = function (xs) { return xs.map(function (x) { return '<tr><td>' + esc(x) + '</td></tr>'; }).join(''); };
+    return '<div class="pg-doc"><h3>API</h3><div class="pg-inspect-grid">' +
+      (props ? box('Props', props, req ? '<div class="pg-legend"><span aria-hidden="true">* </span>Must be given</div>' : '') : '') +
+      ((api.events || []).length ? box('Events', list(api.events)) : '') +
+      ((api.slots || []).length ? box('Slots', list(api.slots)) : '') +
+      '</div><p class="pg-selector">Read from <code>' + esc(api.file) + '</code></p></div>';
+  }
+  // ── Its accessibility: its role, what it owes (each with its WCAG criterion), the contrast of its text as drawn, and
+  // what the last browser check found on it ──────────────────────────────────────────────────────────────────────────
+  // How to use it: the same four sections on every component, each from where it was written; a missing one says so
+  // and where to write it.
+  function guidanceHTML(c) {
+    var g = c.guidance; if (!g) return '';
+    return '<div class="pg-doc"><h3>Usage</h3><dl class="pg-updated">' + g.sections.map(function (x) {
+      return '<div><dt>' + esc(x.title) + '</dt><dd>' + (x.text ? x.text.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '<p class="pg-from">From ' + esc(x.from) + '</p>' : '<p class="pg-missing">Not written yet.</p>') + '</dd></div>';
+    }).join('') + '</dl>' + (g.missing.length ? '<p class="pg-from">Write a missing one in Figma, as a line of the component\'s description that starts with its name (' + esc(g.sections.filter(function (x) { return !x.text; })[0].title) + ': …), or in contract.authored.json under guidance.</p>' : '') + '</div>';
+  }
+  function a11yHTML(c) {
+    var a = c.a11y; if (!a) return '';
+    var p = function (x) { return '<p>' + esc(x.says) + (x.wcag ? '<span class="pg-wcag">' + esc(x.wcag) + '</span>' : '') + '</p>'; };
+    var role = a.role ? '<p>' + esc(a.role) + (a.element ? ': ' + esc(a.element) : '') + '</p>' : '<p>Not stated. Add an annotation to the component in Figma that says its role (role: button), and the page lists what that role asks for.</p>';
+    var ch = a.checked, last;
+    if (!ch) last = '<p>Not checked in a browser yet. The audit checks it and this page shows what it found.</p>';
+    else if (ch.notRead) last = '<p>' + esc(when(ch.at)) + ': it could not be checked (not drawn on the page that was checked).</p>';
+    else if (!ch.issues.length) last = '<p>' + esc(when(ch.at)) + ': nothing found on it.</p>';
+    else last = '<p>' + esc(when(ch.at)) + ':</p>' + ch.issues.map(function (i) { return '<p><b>' + esc(i.title) + '</b>: ' + esc(i.details.join('; ')) + '. ' + esc(i.fix) + (i.wcag ? '<span class="pg-wcag">' + esc(i.wcag) + '</span>' : '') + '</p>'; }).join('');
+    return '<div class="pg-doc"><h3>Accessibility</h3><dl class="pg-updated">' +
+      '<div><dt>Role</dt><dd>' + role + '</dd></div>' +
+      (a.expects.length ? '<div><dt>What it does</dt><dd>' + a.expects.map(p).join('') + '</dd></div>' : '') +
+      ((a.excused || []).length ? '<div><dt>Not asked of it</dt><dd>' + a.excused.map(function (x) { return '<p>' + esc(x.says) + ': ' + esc(x.reason) + '</p>'; }).join('') + '</dd></div>' : '') +
+      '<div><dt>Text contrast</dt><dd class="pg-contrast"></dd></div>' +
+      '<div><dt>Browser check</dt><dd>' + last + '</dd></div>' +
+      '</dl></div>';
+  }
 
   function buildCard(c) {
     var props = c.controls || [];
@@ -737,25 +1033,139 @@ a.pg-usage-name { color: var(--sg-text); }
         return '<p><b>' + esc(sl.name) + '</b> ' + esc(what + count + '.' + (sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
       }).join('') + '</dd></div>' : '') +
       (c.note ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '');
-    // A date and time in the reader's own clock (two changes on one day read apart).
-    var when = function (iso) { var d = new Date(iso); if (isNaN(d)) return String(iso || ''); var z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); };
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
-        '<div class="pg-head"><h2>' + esc(c.name) + '</h2><div class="pg-usage" aria-label="Used in">' + usageBadges(c) + '</div></div>' +
-        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') +
+        '<div class="pg-head"><h2>' + esc(c.name) + '</h2></div>' +
+        (c.cls ? '<p class="pg-selector"><code>.' + esc(c.cls) + '</code></p>' : '') + importHTML(c) +
       '</div>' +
-        ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '') +
+      ((c.differences || []).length ? '<p class="pg-parity-sum">' + esc(c.differences.length === 1 ? 'One thing differs from Figma.' : c.differences.length + ' things differ from Figma.') + ' ' + sysButton('button', 'See parity', ' data-area-go="parity"') + '</p>' : '') +
+      '<div class="pg-areas">' + segHTML(AREAS.map(function (a) { return { v: a[0], label: a[1] }; })) + '</div>' +
+      // Playground: the component drawn, its controls, its code and the tokens behind it.
+      '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview"></div><div class="pg-panel"><div class="pg-actions"></div><div class="pg-modes-slot"></div><div class="pg-controls"></div></div></div>' +
+        '<div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div>' +
         '<div class="pg-inspect-grid"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
         (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '') + '</div></div>' +
-        '<div class="pg-footer">' +
+      '</div>' +
+      // Documentation: its API, Figma's and the code's own words, and when each side last changed.
+      '<div class="pg-area" data-area="docs"><div class="pg-footer">' +
+        (ALL ? '' : '<div class="pg-doc pg-anatomy-doc"><h3>Anatomy</h3><div class="pg-anatomy"></div><dl class="pg-updated pg-anat-legend"></dl></div>') + guidanceHTML(c) + apiHTML(c) +
         (docRows ? '<div class="pg-doc"><h3>Documentation</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
         (c.updated ? '<dl class="pg-updated">' +
           (c.updated.uncommitted ? '<div><dt>Code</dt><dd>Changed, not committed yet</dd></div>' : c.updated.code ? '<div><dt>Code last changed</dt><dd>' + esc(when(c.updated.code.time || c.updated.code.date)) + '</dd></div><div><dt>Last change</dt><dd>' + esc(c.updated.code.subject || '') + ' (' + esc(c.updated.code.hash) + ')</dd></div>' : '') +
           (c.updated.figmaRead ? '<div><dt>Figma read</dt><dd>' + esc(when(c.updated.figmaRead)) + '</dd></div>' : '') + '</dl>' : '') +
-        '</div>';
+        '</div></div>' +
+      '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + a11yHTML(c) + '</div></div>' +
+      '<div class="pg-area" data-area="parity"><div class="pg-footer">' + parityHTML(c) + '</div></div>' +
+      '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc"><h3>Used in</h3>' + usedInHTML(c) + '</div></div></div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls');
     var tTokens = sec.querySelector('.pg-tokens'), tOwn = sec.querySelector('.pg-own');
+    // The code for what the preview shows now: the component as a product writes it (its tag and the props set here,
+    // each value as the code spells it; a prop the code requires and the playground does not set is written with …),
+    // else the HTML the preview draws. Copied by the system's own button.
+    var codeEl = sec.querySelector('.pg-code code'), copyBtn = sec.querySelector('.pg-code [data-copy]'), copySaid = sec.querySelector('.pg-code [role="status"]');
+    function showCode(e) { codeEl.textContent = c.api && c.api.tag ? callCode(c, props, state) : htmlCode(e); }
+    copyBtn.addEventListener('click', function () { copyText(codeEl.textContent, copyBtn, copySaid); });
+    Array.prototype.forEach.call(sec.querySelectorAll('[data-copy-text]'), function (b) { b.addEventListener('click', function () { copyText(b.getAttribute('data-copy-text'), b, b.parentNode.querySelector('[role="status"]')); }); });
+    Array.prototype.forEach.call(sec.querySelectorAll('[data-download]'), function (b) { b.addEventListener('click', function () { download(b.getAttribute('data-download')); }); });
+    // One area at a time (every one at once on the measuring page, ?all); the one chosen stays chosen on the next
+    // component. A link to the parity area from the line that says what differs.
+    var areaBar = sec.querySelector('.pg-areas');
+    function showArea(v) {
+      AREA = v;
+      Array.prototype.forEach.call(sec.querySelectorAll('.pg-area'), function (a) { a.hidden = !ALL && a.getAttribute('data-area') !== v; });
+      segItems(areaBar).forEach(function (b) { segSelect(b, b.dataset.v === v); });
+      if (v === 'play') nudge();
+      if (v === 'docs') requestAnimationFrame(drawAnatomy);
+    }
+    segItems(areaBar).forEach(function (b) { b.addEventListener('click', function () { showArea(b.dataset.v); }); });
+    Array.prototype.forEach.call(sec.querySelectorAll('[data-area-go]'), function (b) { b.addEventListener('click', function () { showArea(b.getAttribute('data-area-go')); }); });
+    sec._area = showArea;
+    // Anatomy: a copy of the component as the Playground draws it now, larger, with each part numbered (a slot outlined
+    // in the accent), its padding and gaps tinted and named by the token behind them, and how it lines its items up.
+    // One that covers the window has none (a modal is drawn as its card). Never on the measuring page (?all).
+    var anatBox = sec.querySelector('.pg-anatomy'), anatLegend = sec.querySelector('.pg-anat-legend'), drawnWidth = 0;
+    function drawAnatomy() {
+      if (!anatBox || !cur || !preview.firstElementChild || anatBox.offsetParent === null) return;
+      anatBox.innerHTML = ''; anatLegend.innerHTML = '';
+      // A component shown in an overlay (a modal over the window) is drawn as itself: its own element, without the layer.
+      var src = preview.firstElementChild;
+      if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + c.cls); if (own) src = own; }
+      var copy = src.cloneNode(true);
+      // At the width the Playground last drew it (it is hidden while this area shows), so the copy lays out the same.
+      var pw = src.getBoundingClientRect().width || (src === preview.firstElementChild ? drawnWidth : 0);
+      if (pw) { copy.style.width = pw + 'px'; copy.style.boxSizing = 'border-box'; }
+      copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
+      [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[id]'))).forEach(function (k) { k.removeAttribute('id'); });
+      var stage = document.createElement('div'); stage.className = 'pg-anat-stage';
+      var wrap = document.createElement('div'); wrap.className = 'pg-anat-wrap'; wrap.appendChild(copy);
+      var marks = document.createElement('div'); marks.className = 'pg-anat-marks'; marks.setAttribute('aria-hidden', 'true');
+      stage.appendChild(wrap); stage.appendChild(marks); anatBox.appendChild(stage);
+      var root = c.only ? (copy.querySelector(c.only) || copy) : copy;
+      var doc = anatBox.closest('.pg-anatomy-doc');
+      if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { doc.hidden = true; return; }
+      doc.hidden = false;
+      var whole = copy.getBoundingClientRect(), rr = root.getBoundingClientRect();
+      var k = Math.max(1, Math.min(4, 160 / Math.max(1, rr.height), (anatBox.clientWidth - 64) / Math.max(1, whole.width)));
+      stage.style.width = whole.width * k + 'px'; stage.style.height = whole.height * k + 'px';
+      // Measured from where the copy sits now (the stage moves once it is sized), before it is scaled.
+      function box(el) { var r = el.getBoundingClientRect(), o = wrap.getBoundingClientRect(); return { x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height }; }
+      function mark(cls, x, y, w, h) { if (w < 0.5 || h < 0.5) return null; var m = document.createElement('div'); m.className = cls; m.style.left = x * k + 'px'; m.style.top = y * k + 'px'; m.style.width = w * k + 'px'; m.style.height = h * k + 'px'; marks.appendChild(m); return m; }
+      function px(v) { return parseFloat(v) || 0; }
+      var spacing = [];
+      // Padding and gaps of one element, drawn and listed under its name.
+      function spaces(el, label) {
+        var b = box(el), cs = getComputedStyle(el);
+        var bt = px(cs.borderTopWidth), br = px(cs.borderRightWidth), bb = px(cs.borderBottomWidth), bl = px(cs.borderLeftWidth);
+        var pt = px(cs.paddingTop), pr = px(cs.paddingRight), pb = px(cs.paddingBottom), pl = px(cs.paddingLeft);
+        var iw = b.w - bl - br, ih = b.h - bt - bb;
+        mark('pg-anat-pad', b.x + bl, b.y + bt, iw, pt); mark('pg-anat-pad', b.x + bl, b.y + b.h - bb - pb, iw, pb);
+        mark('pg-anat-pad', b.x + bl, b.y + bt + pt, pl, ih - pt - pb); mark('pg-anat-pad', b.x + b.w - br - pr, b.y + bt + pt, pr, ih - pt - pb);
+        if (pt || pr || pb || pl) padRows(el, cs).forEach(function (r) { if (r[1] !== '0') spacing.push(['pad', label + ' ' + r[0].replace(/-/g, ' '), r[1]]); });
+        var flex = /flex|grid/.test(cs.display), row = /^row/.test(cs.flexDirection) && !/grid/.test(cs.display);
+        var g = px(row ? cs.columnGap : cs.rowGap);
+        if (!flex || !g) return;
+        var kids = Array.prototype.filter.call(el.children, function (n) { var ncs = getComputedStyle(n); var r = n.getBoundingClientRect(); return ncs.position !== 'absolute' && ncs.position !== 'fixed' && r.width > 0 && r.height > 0; })
+          .map(box).sort(function (a, z) { return row ? a.x - z.x : a.y - z.y; });
+        var drew = false;
+        for (var i = 1; i < kids.length; i++) {
+          var a = kids[i - 1], z = kids[i];
+          if (row && z.x - (a.x + a.w) > 0.5) { mark('pg-anat-gap', a.x + a.w, b.y + bt + pt, z.x - a.x - a.w, ih - pt - pb); drew = true; }
+          if (!row && z.y - (a.y + a.h) > 0.5) { mark('pg-anat-gap', b.x + bl + pl, a.y + a.h, iw - pl - pr, z.y - a.y - a.h); drew = true; }
+        }
+        if (drew) spacing.push(['gap', label + ' gap', sideTok(el, row ? cs.columnGap : cs.rowGap, 'gap')]);
+      }
+      // Its parts: the contract's named parts, else the elements directly inside it; each numbered where it sits.
+      // Seen only: a part drawn hidden (a native input under its drawn box, at no opacity) is not one a person sees.
+      function seen(n) { var r = n.getBoundingClientRect(), ncs = getComputedStyle(n); return r.width > 1 && r.height > 1 && ncs.visibility !== 'hidden' && ncs.opacity !== '0'; }
+      function nameOf(n) { var cls = (n.getAttribute('class') || '').split(/\s+/).filter(Boolean)[0]; return n.tagName.toLowerCase() === 'svg' ? 'icon' : cls || (n.children.length ? 'group' : n.textContent.trim() ? 'text' : n.tagName.toLowerCase()); }
+      // A layer Figma named on its own (Frame 106) says nothing: its class names it instead.
+      var named = (c.anatomy || []).map(function (p) { var hit = partsOf(root, p.selector).filter(function (n) { return n !== root && seen(n); })[0]; return hit ? { el: hit, name: /^(frame|group|rectangle|ellipse|vector|instance)\s*\d+$/i.test(p.name) ? nameOf(hit) : p.name, slot: p.slot || (!!c.slots && /slot/i.test(nameOf(hit))) } : null; }).filter(Boolean);
+      // Then what sits directly inside it and no named part covers.
+      var parts = named.concat(Array.prototype.filter.call(root.children, function (n) { return seen(n) && !named.some(function (p) { return p.el === n || p.el.contains(n) || n.contains(p.el); }); }).map(function (n) { return { el: n, name: nameOf(n), slot: !!c.slots && /slot/i.test(nameOf(n)) }; }));
+      // Numbered in reading order: top to bottom, then start to end.
+      parts.sort(function (a, z) { var ra = a.el.getBoundingClientRect(), rz = z.el.getBoundingClientRect(); var sameLine = ra.top < rz.bottom && rz.top < ra.bottom; return sameLine ? ra.left - rz.left : ra.top - rz.top; });
+      parts = parts.filter(function (p, i) { return parts.findIndex(function (q) { return q.el === p.el; }) === i; }).slice(0, 12);
+      spaces(root, c.name);
+      parts.forEach(function (p) { if (p.el.children.length) spaces(p.el, p.name); });
+      parts.forEach(function (p, i) {
+        var b = box(p.el); mark('pg-anat-part' + (p.slot ? ' is-slot' : ''), b.x, b.y, b.w, b.h);
+        var n = document.createElement('span'); n.className = 'pg-anat-num'; n.textContent = String(i + 1); n.style.left = b.x * k + 'px'; n.style.top = b.y * k + 'px'; marks.appendChild(n);
+      });
+      wrap.style.transform = 'scale(' + k + ')';
+      var cs = getComputedStyle(root), lines = '';
+      if (/flex/.test(cs.display)) {
+        var rowDir = /^row/.test(cs.flexDirection);
+        var along = { center: 'centred', 'flex-end': 'from the end', end: 'from the end', 'space-between': 'spread to both ends', 'space-around': 'spread evenly', 'space-evenly': 'spread evenly' }[cs.justifyContent] || 'from the start';
+        var across = { center: 'centred', 'flex-end': 'at the end', end: 'at the end', baseline: 'on the text baseline', stretch: 'stretched', normal: 'stretched' }[cs.alignItems] || 'at the start';
+        lines = 'Its items sit in a ' + (rowDir ? 'row' : 'column') + ', ' + along + ', ' + across + (rowDir ? ' up and down.' : ' side to side.');
+      }
+      anatLegend.innerHTML =
+        (parts.length ? '<div><dt>Parts</dt><dd>' + parts.map(function (p, i) { return '<p><b>' + (i + 1) + '</b> ' + esc(p.name) + (p.slot ? ', a slot the product fills' : '') + '</p>'; }).join('') + '</dd></div>' : '') +
+        (spacing.length ? '<div><dt>Spacing</dt><dd>' + spacing.map(function (r) { return '<p><span class="pg-anat-key is-' + r[0] + '"></span>' + esc(r[1]) + '  ·  ' + esc(r[2]) + '</p>'; }).join('') + '</dd></div>' : '') +
+        (lines ? '<div><dt>Alignment</dt><dd><p>' + esc(lines) + '</p></dd></div>' : '');
+    }
+    var contrastEl = sec.querySelector('.pg-contrast');
     // Every token named after this component (its colours and sizes), with the value in the mode it is shown in.
     function ownRows() {
       if (!tOwn) return;
@@ -808,6 +1218,8 @@ a.pg-usage-name { color: var(--sg-text); }
         }
       });
       inspect(e);
+      drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
+      if (AREA === 'docs') requestAnimationFrame(drawAnatomy);
     }
     // The tables beside the preview, read from the component as it is drawn now.
     function inspect(e) {
@@ -826,6 +1238,8 @@ a.pg-usage-name { color: var(--sg-text); }
         partRows(el, c.name)
       ));
       ownRows();
+      showCode(e);
+      if (contrastEl) contrastEl.innerHTML = contrastHTML(e);
       nudge();
     }
     // A part no instance in the products holds, made from the selector the code styles it with: an icon from the
@@ -1012,6 +1426,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var cardEl = buildCard(c); main.appendChild(cardEl); cardEl.hidden = false;
       cardEl._refresh();   // measure after it is in the page: a detached node computes to nothing
       thumbOf(c, cardEl.querySelector('.pg-preview').firstElementChild);
+      cardEl._area(AREA);   // drawn with the playground showing, then the area last chosen
       refreshers.push(cardEl._refresh);
       return cardEl;
     };
@@ -1020,26 +1435,30 @@ a.pg-usage-name { color: var(--sg-text); }
   });
   if (!COMPONENTS.length && !FLAT.length) { var empty = document.createElement('p'); empty.className = 'pg-empty'; empty.textContent = 'Nothing agreed yet.'; main.appendChild(empty); }
 
-  // On a phone, a menu button at the top left opens the sidebar as a panel over the page: the system's own icon-only
-  // button and overlay, the search field focused, closed by its close button, the overlay, a link or Escape.
+  // The menu, on every screen: its buttons say what they do in words (the system's own text button), never an icon
+  // alone. On a phone, Menu at the top opens the sidebar as a panel over the page (the system's overlay), closed by
+  // Close menu, the overlay, a link or Escape. On a wide screen, Hide menu gives the page the full width and Menu
+  // at the top brings it back; the choice is remembered in this browser.
   (function () {
-    var ib = DATA.ui && DATA.ui.iconButton, icons = DATA.icons || [];
-    var pick = function (re) { return icons.find(function (id) { return re.test(id); }); };
-    var menuIcon = pick(/menu|hamburger|burger/i) || pick(/-list$/i), closeIcon = pick(/close|clear|cross|-x$/i);
-    var btn = function (id, label, icon) { return '<button type="button" id="' + id + '"' + (ib ? ' class="' + esc(ib.cls) + '"' : '') + ' aria-label="' + esc(label) + '">' + (icon ? '<svg width="16" height="16" aria-hidden="true"><use href="#' + esc(icon) + '"/></svg>' : esc(label)) + '</button>'; };
     var bar = document.getElementById('sg-topbar'), side = document.getElementById('sg-sidebar'), scrim = document.getElementById('sg-scrim');
     document.getElementById('sg-topbar-title').textContent = DATA.title || 'Design system';
-    bar.insertAdjacentHTML('afterbegin', btn('sg-menu', 'Open the menu', menuIcon));
-    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('afterbegin', btn('sg-nav-close', 'Close the menu', closeIcon));
-    var menu = document.getElementById('sg-menu'), shut = document.getElementById('sg-nav-close');
+    bar.insertAdjacentHTML('afterbegin', sysButton('button', 'Menu', ' id="sg-menu"'));
+    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('afterbegin', sysButton('button', 'Close menu', ' id="sg-nav-close"'));
+    side.querySelector('.sg-sidebar-header').insertAdjacentHTML('beforeend', '<p class="sg-hide-nav">' + sysButton('button', 'Hide menu', ' id="sg-hide-nav"') + '</p>');
+    var menu = document.getElementById('sg-menu'), shut = document.getElementById('sg-nav-close'), hide = document.getElementById('sg-hide-nav');
     shut.classList.add('sg-nav-close');
     if (DATA.ui && DATA.ui.overlay) scrim.classList.add(DATA.ui.overlay);
     menu.setAttribute('aria-controls', 'sg-sidebar'); menu.setAttribute('aria-expanded', 'false');
+    var phone = function () { return window.matchMedia && window.matchMedia('(max-width: 720px)').matches; };
+    var remember = function (on) { try { localStorage.setItem('sg-nav-hidden', on ? '1' : ''); } catch (e) {} };
+    var setHidden = function (on) { document.body.classList.toggle('sg-nav-hidden', on); menu.setAttribute('aria-expanded', on ? 'false' : 'true'); remember(on); };
+    try { if (!ALL && localStorage.getItem('sg-nav-hidden') === '1') setHidden(true); } catch (e) {}
+    hide.addEventListener('click', function () { setHidden(true); menu.focus(); });
     var open = function (on) {
       document.body.classList.toggle('sg-nav-open', on); menu.setAttribute('aria-expanded', on ? 'true' : 'false');
       if (on) setTimeout(function () { shut.focus({ preventScroll: true }); }, 50); else menu.focus();   // never the search: no keyboard pops up
     };
-    menu.addEventListener('click', function () { open(true); });
+    menu.addEventListener('click', function () { if (phone()) open(true); else { setHidden(false); hide.focus(); } });
     shut.addEventListener('click', function () { open(false); });
     scrim.addEventListener('click', function () { open(false); });
     side.addEventListener('click', function (e) { if (e.target.closest('.sg-nav a') && document.body.classList.contains('sg-nav-open')) { document.body.classList.remove('sg-nav-open'); menu.setAttribute('aria-expanded', 'false'); } });
@@ -1120,7 +1539,9 @@ a.pg-usage-name { color: var(--sg-text); }
   // window narrows), the page and every component not switched by hand follow it.
   AXES.forEach(function (axis) {
     var mq = axis.media && window.matchMedia ? window.matchMedia(axis.media) : null;
-    if (mq && mq.addEventListener) mq.addEventListener('change', function () { refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); });
+    // The measuring page (?all) keeps every drawn component as it is when the colour scheme changes: the engine
+    // switches the scheme while it reads them, and a redraw would replace the very elements it is reading.
+    if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (!ALL) refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); });
   });
 
   // One view at a time: the overview, a foundation or a component, by the address (#c-badge), so each can be shared.

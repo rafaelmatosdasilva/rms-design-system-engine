@@ -68,7 +68,7 @@ test('the page\'s look is the system\'s: its page colours, a shared token before
 test('the page\'s switches and text fields are the system\'s own components, read from their markup', () => {
   const seg = segmentedUi([{ name: 'card', markup: '<div class="card"><button>A</button></div>' },
     { name: 'segmentedControl', markup: '<div class="segmented-control full-width"><span class="seg-pill"></span><button class="selected"><span class="tab-label">A</span></button><button><span class="tab-label">B</span></button></div>' }]);
-  assert.deepEqual(seg, { from: 'segmentedControl', open: '<div class="segmented-control">', close: '</div>', item: { tag: 'button', classes: [], label: 'tab-label' }, selected: { add: ['selected'], attrs: {} } });
+  assert.deepEqual(seg, { from: 'segmentedControl', open: '<div class="segmented-control">', close: '</div>', item: { tag: 'button', classes: [], label: 'tab-label' }, selected: { add: ['selected'], attrs: {} }, standIn: null });
   assert.equal(segmentedUi([{ name: 'x', markup: '<div><button>A</button><button>B</button></div>' }]), null, 'no selected state, not a segmented control');
   const field = fieldUi([{ name: 'input', markups: ['<div class="fieldWrap product-x"><input type="number" class="fieldInput"></div>', '<div class="fieldWrap"><svg></svg><input type="text" class="fieldInput extra" value="v"></div>'] }], '.fieldWrap{} .fieldInput{}');
   assert.deepEqual(field, { from: 'input', markup: '<div class="fieldWrap"><input type="text" aria-label="Value" class="fieldInput"></div>' });

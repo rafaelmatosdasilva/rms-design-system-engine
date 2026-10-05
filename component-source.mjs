@@ -96,6 +96,18 @@ export function resolveComponentFile(name, { ROOT, cfg = {}, files, read, classF
 // ── Props (text patterns) ─────────────────────────────────────────────────────
 // Union of everything found; over-collecting a few names is fine (only unmatched Figma
 // properties fail, and extra code props are advisory).
+// The keys of the object literal whose { is at `open`, at its own level only (nested objects skipped).
+export function topKeys(text, open) {
+  const keys = [];
+  let depth = 0, start = open + 1;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '{' || ch === '[' || ch === '(') depth++;
+    else if (ch === '}' || ch === ']' || ch === ')') { depth--; if (depth === 0) { const k = /^\s*['"`]?([A-Za-z_$][\w$]*)['"`]?\s*:/.exec(text.slice(start, i)); if (k) keys.push(k[1]); break; } }
+    else if (ch === ',' && depth === 1) { const k = /^\s*['"`]?([A-Za-z_$][\w$]*)['"`]?\s*:/.exec(text.slice(start, i)); if (k) keys.push(k[1]); start = i + 1; }
+  }
+  return keys;
+}
 function idsFromDestructure(block) {
   const out = [];
   // The terminator is looked at, not consumed: `{ a, b }` must leave the comma before b for b's own match.
@@ -109,9 +121,9 @@ export function extractVue(text) {
   // defineProps<{ ... }>()
   for (const m of text.matchAll(/defineProps\s*<\s*\{([\s\S]*?)\}\s*>\s*\(/g))
     for (const p of m[1].matchAll(/([A-Za-z_$][\w$]*)\s*[?:]/g)) names.add(p[1]);
-  // defineProps({ ... })  and options  props: { ... }
-  for (const m of text.matchAll(/(?:defineProps\s*\(|[^.\w]props\s*:)\s*\{([\s\S]*?)\}\s*[),]/g))
-    for (const p of m[1].matchAll(/(?:^|[,{])\s*([A-Za-z_$][\w$]*)\s*:/g)) names.add(p[1]);
+  // defineProps({ ... })  and options  props: { ... }: the object's own keys, not the keys inside a prop's options
+  // ({ value: { type: String, required: true } } is the prop value alone)
+  for (const m of text.matchAll(/(?:defineProps\s*\(|[^.\w]props\s*:)\s*\{/g)) for (const k of topKeys(text, m.index + m[0].length - 1)) names.add(k);
   // defineProps([ 'a', 'b' ])  and options  props: [ 'a', 'b' ]
   for (const m of text.matchAll(/(?:defineProps\s*\(|[^.\w]props\s*:)\s*\[([\s\S]*?)\]/g))
     for (const p of m[1].matchAll(/['"`]([A-Za-z_$][\w$]*)['"`]/g)) names.add(p[1]);
@@ -186,19 +198,48 @@ export function extractSlots(text) {
   return { named: new Set(byKey.values()), hasDefault };
 }
 
+// Best-effort: which props the code says must be given (normalised name -> true, or false when it says optional).
+// A TS member without "?" (interface XProps, type XProps, defineProps<{…}>), a Vue prop with required: true, a
+// PropTypes entry ending in .isRequired. Unstated props are left out: the page never guesses that one is required.
+export function extractRequired(text) {
+  const out = new Map();
+  const blocks = [...text.matchAll(/(?:interface|type)\s+\w*Props\b[^{]*\{([\s\S]*?)\}/g), ...text.matchAll(/defineProps\s*<\s*\{([\s\S]*?)\}\s*>\s*\(/g)];
+  for (const m of blocks) for (const p of m[1].matchAll(/(?:^|[;,{\n])\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*(\?)?\s*:/g)) out.set(norm(p[1]), !p[2]);
+  for (const m of text.matchAll(/([A-Za-z_$][\w$]*)\s*:\s*\{[^{}]*\brequired\s*:\s*(true|false)/g)) out.set(norm(m[1]), m[2] === 'true');
+  for (const m of text.matchAll(/([A-Za-z_$][\w$]*)\s*:\s*PropTypes\.[\w.()'"`\[\], ]*?\.isRequired\b/g)) out.set(norm(m[1]), true);
+  return out;
+}
+// Best-effort: the events a component sends, in the order the code first names them. Vue: defineEmits([…]),
+// defineEmits<{ (e: 'x', …): void }>() or <{ x: […] }>(), options emits: […], emit('x') and $emit('x'); Svelte:
+// dispatch('x'); React and the rest: a prop named on + a capital (onChange), the callback a parent passes in.
+export function extractEvents(file, text, propNames = []) {
+  const out = new Map();
+  const add = (n) => { if (n && !out.has(norm(n))) out.set(norm(n), n); };
+  for (const m of text.matchAll(/(?:defineEmits\s*\(|[^.\w]emits\s*:)\s*\[([\s\S]*?)\]/g)) for (const q of m[1].matchAll(/['"`]([\w:-]+)['"`]/g)) add(q[1]);
+  for (const m of text.matchAll(/defineEmits\s*<\s*\{([\s\S]*?)\}\s*>\s*\(/g)) {
+    for (const q of m[1].matchAll(/\(\s*\w+\s*:\s*['"`]([\w:-]+)['"`]/g)) add(q[1]);
+    for (const q of m[1].matchAll(/(?:^|[;,{\n])\s*['"`]?([\w:-]+)['"`]?\s*:\s*\[/g)) add(q[1]);
+  }
+  for (const m of text.matchAll(/(?:^|[^\w$.])\$?emit\s*\(\s*['"`]([\w:-]+)['"`]/g)) add(m[1]);
+  if (/\.svelte$/.test(file)) for (const m of text.matchAll(/\bdispatch\s*\(\s*['"`]([\w:-]+)['"`]/g)) add(m[1]);
+  if (!/\.(vue|svelte)$/.test(file)) for (const p of propNames) if (/^on[A-Z]\w*$/.test(p)) add(p);
+  return [...out.values()];
+}
+
 // The text reading of one component file, in the shape component-api.mjs merges.
-//   { props: { name: { default?, options? } }, slots: { named: [...], default: bool } }
+//   { props: { name: { default?, options?, required? } }, slots: { named: [...], default: bool }, events: [names] }
 export function textComponentApi(file, text) {
-  const defaults = extractDefaults(text), options = extractOptions(text);
+  const defaults = extractDefaults(text), options = extractOptions(text), required = extractRequired(text);
   const props = {};
   for (const p of extractProps(file, text)) {
     const e = {};
     if (defaults.has(norm(p))) e.default = defaults.get(norm(p));
     if (options.has(norm(p))) e.options = [...options.get(norm(p))];
+    if (required.has(norm(p))) e.required = required.get(norm(p));
     props[p] = e;
   }
   const s = extractSlots(text);
-  return { props, slots: { named: [...s.named], default: s.hasDefault } };
+  return { props, slots: { named: [...s.named], default: s.hasDefault }, events: extractEvents(file, text, Object.keys(props)) };
 }
 
 // ── Nesting (text patterns) ───────────────────────────────────────────────────

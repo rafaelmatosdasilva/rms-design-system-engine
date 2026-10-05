@@ -366,9 +366,16 @@ return {motion:motionOut,effects:effectsOut};
 Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the `State=Default` child (never the SET - its height equals all variants stacked), and extract structural facts:
 
 ```js
-// Extract: h, paddingVar {tb,lr}, gapVar, fontSizeVar, fontWeightVar,
+// Extract: h, sizingV, layout, paddingVar {tb,lr}, gapVar, fontSizeVar, fontWeightVar,
 //          fillStructure ('direct' | 'before' | 'none'), innerRadiusVar,
 //          strokeOnDefault, strokeOnAnyState, childFramePadding, childFrameGaps
+// sizingV = the State=Default variant's layoutSizingVertical ('HUG' | 'FIXED' | 'FILL'): whether its
+//           height follows its content. layout = its layoutMode ('HORIZONTAL' | 'VERTICAL' | 'NONE').
+//           Without them a code height left to its content cannot be compared: a fixed Figma height
+//           is compared as drawn, a hugging row by its drawn height, a hugging stack by its sizing,
+//           and a fill agrees with a code height left to the page. A component outside any auto
+//           layout cannot be set to fill in Figma: record 'FILL' when its annotation says
+//           "Sizing: fill", else what Figma reports.
 // fillStructure = 'before' when fill is on a child "Background" rect (→ CSS ::before)
 //                 'direct' when on the frame itself
 //                 'none' when default state has no fill (fills === [] - an empty array is a real

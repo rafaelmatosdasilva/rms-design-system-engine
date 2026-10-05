@@ -89,6 +89,9 @@ export function checkStyleguidePage(html, { missing = missingRoles(html) } = {})
   // The page is held to the accessibility rules it checks others by: what the static check finds in its own markup.
   const markup = String(html).replace(/<script\b[\s\S]*?<\/script>/gi, '').replace(/<style\b[\s\S]*?<\/style>/gi, '');
   for (const f of markupFindings(markup)) found.push({ selector: `line ${f.line ?? '?'}`, property: 'accessibility', value: f.kind ?? '', why: f.desc ?? 'an accessibility problem in the page itself' });
+  // Its own text on its own backgrounds, in every mode (the build writes what falls short: styleguide-data pageContrast).
+  const low = /\/\*sg-contrast:(\[[\s\S]*?\])\*\//.exec(String(html));
+  if (low) { try { for (const c of JSON.parse(low[1])) found.push({ selector: `--sg-${c.text} on --sg-${c.on}`, property: 'contrast', value: `${c.ratio}:1 in ${c.mode}`, why: `the page's ${c.text} text on its ${c.on} background is ${c.ratio}:1 in ${c.mode}, below 4.5:1 (WCAG 1.4.3): pick a darker or lighter token for that role (styleguide.chrome)` }); } catch { /* unreadable: nothing to add */ } }
   for (const role of missing) found.push({ selector: ':root', property: `--sg-${role}`, value: 'the browser\'s own', why: `the system has no token the page could use for ${role}`, warning: true });
   return found;
 }

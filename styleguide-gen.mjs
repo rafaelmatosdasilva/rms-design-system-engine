@@ -24,7 +24,7 @@
 import { appDir } from './code-roots.mjs';
 import { codeSizeCSS, modeRootCSS } from './styleguide-data.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
-import { join, dirname, resolve } from 'path';
+import { join, dirname, resolve, relative } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import { OUT_DIR } from './names.mjs';
@@ -383,8 +383,48 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           preferred: names, preferredCount: (d.preferredValues ?? []).length, min: st.minChildren ?? null, max: st.maxChildren ?? null };
       });
       if (slots.length) c.slots = slots;
+      // Its anatomy: the contract's named parts (the layer each one draws), a part named as a Figma slot marked as one.
+      const slotNames = new Set(slots.map((sl) => sl.name.toLowerCase().replace(/[\s_-]+/g, '')));
+      const own = (contract.CONTRACT?.[c.name]?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string' && k.cssSelector.trim());
+      if (own.length) c.anatomy = own.map((k) => ({ name: k.name, selector: k.cssSelector, ...(slotNames.has(k.name.toLowerCase().replace(/[\s_-]+/g, '')) || /slot/i.test(k.name) ? { slot: true } : {}) }));
     }
-    const { segmentedUi, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
+    // Its code API, as whoever uses it writes it: the props (each one the code says must be given marked), the events
+    // it sends and its slots, read from the component's own file (component-api.mjs). An HTML and CSS system has none.
+    if (cfg.frameworkComponents !== false) {
+      try {
+        const { createApiReader } = await import('./component-api.mjs');
+        const { apiView } = await import('./styleguide-data.mjs');
+        const nodeIds = Object.fromEntries(Object.entries(ctx?.propsSnap ?? {}).filter(([, e]) => e?.nodeId).map(([n, e]) => [n, e.nodeId]));
+        const reader = createApiReader(ROOT, cfg, { classFor: (n) => locator.classFor(n), nodeIds });
+        for (const c of view.components) {
+          const api = reader.apiFor(c.name);
+          const v = api.file && apiView(api, relative(ROOT, api.file));
+          if (v) c.api = v;
+        }
+      } catch { /* no component sources */ }
+    }
+    // Its accessibility: what its role and Figma's notes ask of it, each with the WCAG criterion, and what the last
+    // browser check (the audit's a11y.json) found on it. The page measures the text contrast itself, as it is drawn.
+    try {
+      const { a11yView } = await import('./styleguide-data.mjs');
+      const { contractSemantics, A11Y_GUIDE } = await import('./a11y-check.mjs');
+      const { partRolesOf } = await import('./behaviour-contract.mjs');
+      const authoredRoles = contractSemantics(ROOT, cfg);
+      const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
+      const result = readJson(join(OUT_DIR, 'a11y.json'));
+      for (const c of view.components) {
+        const entry = ctx?.propsSnap?.[c.name] ?? {};
+        c.a11y = a11yView({ name: c.name, cls: c.cls, role: c.role ?? authoredRoles[c.name] ?? null, annotations: entry.annotations ?? [], parts: partRolesOf(entry),
+          exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE });
+      }
+    } catch { /* the page shows what it can measure */ }
+    // How to use it: the same four sections on every page, from what Figma, the code and the authored contract say.
+    try {
+      const { guidanceView } = await import('./styleguide-data.mjs');
+      const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
+      for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance });
+    } catch { /* no guidance */ }
+    const { segmentedUi, radioGroupUi, buttonsAsSegmentedUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
     // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
     // every mode), the semantic roles, then each component's own.
@@ -441,7 +481,60 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     view.iconFigma = Object.fromEntries(Object.entries(readJson(cfg.paths?.snapshotIcons ?? '') ?? {})
       .filter(([, i]) => i && typeof i === 'object' && (i.name || i.viewBox))
       .map(([id, i]) => [id, { name: i.name ?? '', size: Number(String(i.viewBox ?? '').split(/[\s,]+/)[2]) || null }]));
-    view.ui = { segmented: segmentedUi(view.components), field: fieldUi(view.components, systemCss), button: buttonUi(view.components, systemCss, sh.ui?.button ?? null), card: cardUi(view.components, systemCss), iconButton: iconButtonUi(view.components, systemCss), overlay: view.components.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
+    // Each control the page needs is the system's own; where it has none, its nearest stand-in (a segmented control:
+    // tabs, then a radio group, then its buttons side by side), and the page says so (view.ui.gaps).
+    view.ui = { segmented: segmentedUi(view.components) ?? radioGroupUi(view.components, systemCss) ?? buttonsAsSegmentedUi(view.components, systemCss), field: fieldUi(view.components, systemCss), button: buttonUi(view.components, systemCss, sh.ui?.button ?? null), card: cardUi(view.components, systemCss), iconButton: iconButtonUi(view.components, systemCss), overlay: view.components.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
+    view.ui.gaps = standInGaps(view.ui);
+    // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
+    // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
+    // product brings it in (its import line and its file) and the system's components it is built with.
+    try {
+      const { parityView, importOf, nestedComponents } = await import('./styleguide-data.mjs');
+      const { loadAgreed } = await import('./agreed.mjs');
+      const agreedRec = loadAgreed(ROOT);
+      const census = readJson(join(OUT_DIR, 'census.json'))?.components ?? {};
+      const names = view.components.map((c) => ({ name: c.name, cls: c.cls }));
+      // the package a file belongs to (a package.json between it and the project root, the root's own not counted)
+      const pkgOf = (file) => {
+        for (let d = dirname(file); d && d !== '.' && d !== '/'; d = dirname(d)) {
+          const j = readJson(join(d, 'package.json'));
+          if (j?.name) return { name: j.name, dir: d };
+        }
+        return null;
+      };
+      for (const c of view.components) {
+        c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
+        const text = c.api?.file ? readText(c.api.file) : '';
+        const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names });
+        if (uses.length) c.uses = uses;
+        if (c.api?.tag) {
+          const imp = importOf({ tag: c.api.tag, syntax: c.api.syntax, file: c.api.file, text, pkg: pkgOf(c.api.file), template: cfg.styleguide?.importFrom ?? null });
+          if (imp) c.import = imp;
+          if (text && text.length <= 200000) c.source = { file: c.api.file, text };
+        }
+      }
+    } catch { /* the page shows what it has */ }
+    // Each product's own page, pictured as it opens, with where each component sits on it (product-shots.mjs), for the
+    // "Used in" area. A product that gives a picture of its own (styleguide.plugins[].image) is shown with that one.
+    if ((cfg.paths?.plugins ?? []).length && cfg.styleguide?.productShots !== false) {
+      try {
+        const { productShots } = await import('./product-shots.mjs');
+        const plugs = cfg.styleguide?.plugins ?? appLabels(cfg.paths?.plugins ?? []).map(([n, key]) => ({ key, match: n }));
+        const used = new Set(view.components.flatMap((c) => (c.usage ?? []).map((u) => u.key ?? u)));
+        const products = plugs.filter((g) => used.has(g.key)).map((g) => ({ key: g.key, image: g.image ?? null,
+          page: appPages.find((p) => p.includes(g.match ?? g.key) && !/\.src\.html$/.test(p) && existsSync(resolve(ROOT, p))) ?? appPages.find((p) => p.includes(g.match ?? g.key) && existsSync(resolve(ROOT, p))) ?? null }));
+        const shots = await productShots(ROOT, products, view.components.map((c) => ({ name: c.name, cls: c.cls })));
+        if (Object.keys(shots).length) view.products = shots;
+        // How many times each component appears in each product's own code (its class, in its source page).
+        const srcOf = (g) => readText(appPages.find((p) => p.includes(g.match ?? g.key) && /\.src\.html$/.test(p)) ?? appPages.find((p) => p.includes(g.match ?? g.key)) ?? '');
+        const texts = Object.fromEntries(plugs.filter((g) => used.has(g.key)).map((g) => [g.key, srcOf(g)]));
+        for (const c of view.components) {
+          if (!c.cls || !/^[\w-]+$/.test(c.cls)) continue;
+          const re = new RegExp(`(?<![\\w-])${c.cls}(?![\\w-])`, 'g');
+          for (const u of c.usage ?? []) { const t = texts[u.key ?? u]; const n = t ? (t.match(re) ?? []).length : 0; if (n && typeof u === 'object') u.places = n; }
+        }
+      } catch { /* no pictures: the cards show the names */ }
+    }
     lastView = view;
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
@@ -468,7 +561,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const count = {}; for (const b of boxes) count[b] = (count[b] ?? 0) + 1;
     const size = Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0];
     chrome = chromeRoles({ tokens: lastView.tokens, themeCss: themeFiles.map(readText).join('\n'), componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome });
-    return chrome.css;
+    // The page's own contrast in every mode, for the style guide check to read from the page.
+    return chrome.css + (chrome.contrast?.length ? `\n/*sg-contrast:${JSON.stringify(chrome.contrast)}*/` : '');
   }
   // The system's own scripts (ds-config.json → systemScripts): what builds or wires its components at run time (a
   // segmented control made by script, a toggle's click). Inlined after the page's own drawing, each in its own

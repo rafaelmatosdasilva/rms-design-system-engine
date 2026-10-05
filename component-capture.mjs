@@ -150,21 +150,28 @@ function locateExpression(specs) {
     return specs.map((s, i) => {
       let el = null, how = null, count = 0, stripped = null;
       try {
-        const all = [...document.querySelectorAll(s.selector)].filter((e) => !host.contains(e));
+        // On the engine's style guide the system's own controls also draw the page (its switches, its copy and
+        // download buttons): only what its previews draw is the component, so only those are measured there.
+        const previews = document.querySelector('.pg-preview') ? '.pg-preview' : null;
+        const all = [...document.querySelectorAll(s.selector)].filter((e) => !host.contains(e) && (!previews || e.closest(previews)));
         count = all.length;
         // A plain instance carries only the component's own classes. One with extra classes or an id is
         // a particular usage (an app styles it for that spot), so it is copied into a neutral host with
         // those extras removed, and the removed extras are recorded.
-        const own = new Set((s.selector.split(/\\s+/).pop().match(/\\.[\\w-]+/g) || []).map((c) => c.slice(1)));
+        const own = new Set([...(s.selector.split(/\\s+/).pop().match(/\\.[\\w-]+/g) || []).map((c) => c.slice(1)), ...(s.defaultClasses || [])]);
         const extras = (e) => [...e.classList].filter((c) => !own.has(c) && !c.startsWith('data-design-system-engine'));
         const visible = all.filter(shown);
         // Rank: a plain instance first, then one that carries text (a design's default variant has
         // its label; an icon-only usage is a variant of its own), then the rest.
         const score = (e) => extras(e).length * 10 + (e.id ? 5 : 0) + (e.textContent.trim() ? 0 : 3);
         const ranked = (list) => [...list].sort((a, b) => score(a) - score(b));
-        el = ranked(visible).find((e) => !extras(e).length && !e.id) || null; if (el) how = 'found';
+        // Words come first: the design's default variant has its label, so an icon-only instance is used only when no
+        // instance on the page has words (a text field's words are its input).
+        const words = (e) => !!(e.textContent.trim() || e.querySelector('input:not([type=checkbox]):not([type=radio]):not([type=hidden]),textarea'));
+        const withWords = visible.filter(words);
+        el = ranked(visible).find((e) => !extras(e).length && !e.id && (words(e) || !withWords.length)) || null; if (el) how = 'found';
         if (!el && all.length) {
-          const src = ranked(visible)[0] || ranked(all)[0];
+          const src = ranked(withWords)[0] || ranked(visible)[0] || ranked(all)[0];
           const copy = src.cloneNode(true);
           stripped = [...extras(src).map((c) => '.' + c), ...(src.id ? ['#' + src.id] : [])];
           for (const c of extras(src)) copy.classList.remove(c);
@@ -183,6 +190,11 @@ function locateExpression(specs) {
         host.appendChild(b.root); el = b.target.matches(s.selector) ? b.target : null; if (el) how = 'bare';
       }
       if (!el) return { i, how: null, count };
+      // Figma's default variant (the contract's classes for it): put on, so that variant is what is measured.
+      for (const c of s.defaultClasses || []) el.classList.add(c);
+      // An empty element a script fills later (a tooltip's popover) is given a word, so its padding and height are those
+      // of the component with its label, as Figma's default variant has it.
+      if (!el.children.length && !el.textContent.trim() && !/^(input|img|hr|br|svg)$/i.test(el.tagName)) el.textContent = 'Label';
       el.setAttribute('data-design-system-engine-cap', ((el.getAttribute('data-design-system-engine-cap') || '') + ' ' + i).trim());   // two names can share one element
       // The parts the contract names (fontSel / radiusSel / gapSel / beforeSel), found inside the instance.
       const parts = {};
@@ -199,7 +211,7 @@ function locateExpression(specs) {
       for (let t = field ? null : walker.nextNode(); t; t = walker.nextNode()) {
         if (t.textContent.trim() && t.parentElement) { t.parentElement.setAttribute('data-design-system-engine-part', ((t.parentElement.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; break; }
       }
-      return { i, how, count, stripped, parts, hasText: !!el.textContent.trim() };
+      return { i, how, count, stripped, parts, hasText: !!(el.textContent.trim() || field) };
     });
   })()`;
 }
@@ -583,7 +595,7 @@ export async function captureComponents(ctx) {
     if (!P) { notes.push(`${page.label}: page did not load`); continue; }
     const list = [...pending.values()];
     // Only the last page builds bare elements, so a real instance anywhere always wins.
-    const specs = list.map((c) => ({ selector: c.selector, probe: c.probe ?? null, allowBare: pi === pages.length - 1, children: c.children ?? [], parts: c.parts ?? {} }));
+    const specs = list.map((c) => ({ selector: c.selector, probe: c.probe ?? null, allowBare: pi === pages.length - 1, children: c.children ?? [], parts: c.parts ?? {}, defaultClasses: c.defaultClasses ?? [] }));
     const located = (await P.evaluate(locateExpression(specs))) ?? [];
     // Every located instance and part, measured in each mode at once, before any state is applied.
     const partSel = (i, kind) => `[data-design-system-engine-part~="${i}-${kind}"]`;
@@ -625,12 +637,31 @@ export async function captureComponents(ctx) {
   for (const c of pending.values()) notes.push(`${c.name}: no instance found (selector ${c.selector})`);
   return pass2(notes);
 
+  // A ::before paints the component's background only when it covers it: a 1.5px line along an edge (a divider
+  // drawn as a pseudo-element) is a line, not a fill.
+  function coversBox(base) {
+    const b = base?.before, H = base?.rect?.height, W = base?.rect?.width;
+    if (!b || !H || !W) return true;
+    const px = (v) => (/px$/.test(String(v)) ? parseFloat(v) : 0);
+    return px(b.top) + px(b.bottom) < H / 2 && px(b.left) + px(b.right) < W / 2;
+  }
   async function captureOne(P, page, comp, loc, pre = new Map(), stateJobs = []) {
     {
-      const nodeId = await P.nodeOf(capSel(loc.i));
       const perMode = pre.get(capSel(loc.i)) ?? await P.measureAll(capSel(loc.i));
       const atBreakpoints = ctx.breakpoints?.length ? await P.measureAt(capSel(loc.i), ctx.breakpoints) : null;
-      const traced = nodeId ? await P.trace(nodeId) : {};
+      // Its node asked for after measuring (switching a mode can redraw a page and replace it), and asked again once
+      // if it is gone by the time its rules are read; still gone, only this component's rules go untraced.
+      const traceOf = async (sel) => {
+        for (let tries = 0; tries < 2; tries++) {
+          const id = await P.nodeOf(sel);
+          if (!id) return {};
+          try { return await P.trace(id); } catch (e) { if (!/Could not find node/i.test(String(e?.message ?? e))) throw e; }
+        }
+        notes.push(`${comp.name}: its rules could not be traced (the page replaced it while it was read)`);
+        return {};
+      };
+      const nodeId = await P.nodeOf(capSel(loc.i));
+      const traced = nodeId ? await traceOf(capSel(loc.i)) : {};
       const base = perMode[firstMode];
       const stat = staticComponentReading(staticSources, comp.selector, staticRootVars);
       const props = facts(comp, loc.how, base, traced, stat);
@@ -643,7 +674,7 @@ export async function captureComponents(ctx) {
         size: { height: base?.rect?.height, width: base?.rect?.width },
         // How the box is laid out: an inline element ignores a height; content-box adds padding and border to it.
         layout: { display: base?.cs?.display ?? null, boxSizing: base?.cs?.boxSizing ?? null },
-        props, fill: bg && bg[3] > 0 ? 'direct' : beforeBg && beforeBg[3] > 0 ? 'before' : 'none', colors: colorsOf(perMode),
+        props, fill: bg && bg[3] > 0 ? 'direct' : beforeBg && beforeBg[3] > 0 && coversBox(base) ? 'before' : 'none', colors: colorsOf(perMode),
       };
       if (base?.before) entry.before = base.before;
       if (ctx.visual) {
@@ -661,7 +692,7 @@ export async function captureComponents(ctx) {
         const pNode = await P.nodeOf(sel);
         if (!pNode) continue;
         const pMode = pre.get(sel) ?? await P.measureAll(sel);
-        const pTraced = await P.trace(pNode);
+        const pTraced = await P.trace(pNode).catch(() => ({}));   // a part the page replaced: untraced, the rest still read
         const pSel = kind === 'text' ? null : comp.parts?.[kind];
         const pStat = pSel ? staticComponentReading(staticSources, pSel, staticRootVars) : {};
         const pFacts = facts({ ...comp, selector: pSel ?? comp.selector }, loc.how, pMode[firstMode], pTraced, pStat);
@@ -714,7 +745,7 @@ export async function captureComponents(ctx) {
       const sNode = found ? await P.nodeOf(`[data-design-system-engine-state="${tag}"]`) : null;
       if (!sNode) { still.push(d); continue; }
       const sMode = await P.measureAll(`[data-design-system-engine-state="${tag}"]`);
-      const sTrace = await P.trace(sNode);
+      const sTrace = await P.trace(sNode).catch(() => ({}));
       (result[d.comp].states ??= {})[d.st.label] = stateEntry(d.st, `found an element already in this state (${pages[pi].label})`, sMode, sTrace, result[d.comp].props);
     }
     left = still;

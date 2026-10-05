@@ -257,6 +257,8 @@ export async function componentSpecs(ROOT, cfg) {
   let snapNames = [], snap = {};
   try { snap = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {}; snapNames = Object.keys(snap); } catch { /* optional */ }
   const maxCombos = Number.isFinite(cfg.codeReading?.maxCombinations) ? cfg.codeReading.maxCombinations : 12;
+  let propsSnap = {};
+  try { propsSnap = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8')); } catch { /* optional */ }
   const names = [...new Set([...snapNames, ...Object.keys(CONTRACT), ...Object.keys(SELECTORS), ...Object.keys(cfg.componentSelectors ?? {})])];
   const probes = new Map();
   for (const a of [...(contract.RENDERED_ASSERTIONS ?? []), ...(contract.CROSS_PLUGIN_CONSISTENCY ?? [])]) {
@@ -294,8 +296,30 @@ export async function componentSpecs(ROOT, cfg) {
     // Named parts (the contract's children with a name and a selector), so the capture can say which
     // are visible in each state and variant.
     const childParts = (CONTRACT[name]?.children ?? []).filter((c) => c?.name && typeof c.cssSelector === 'string' && c.cssSelector.trim()).map((c) => ({ name: c.name, selector: c.cssSelector.replace(/\s+/g, ' ').trim() }));
-    return { name, selector, locatedBy: locator.sourceOf(name), probe: probes.get(selector) ?? null, states, children, parts, childParts, combos: variantCombos(snap[name], states, maxCombos), unbuilt: unbuilt.has(name) };
+    return { name, selector, locatedBy: locator.sourceOf(name), probe: probes.get(selector) ?? null, states, children, parts, childParts, combos: variantCombos(snap[name], states, maxCombos), unbuilt: unbuilt.has(name),
+      defaultClasses: defaultVariantClasses(propsSnap[name], CONTRACT[name]?.propertyMap, selector) };
   });
+}
+
+// The classes that draw Figma's default variant, from the contract's propertyMap: each variant property's default
+// option whose selector is the component's own with classes added (Type=negative → .badge.high gives ['high']). A
+// state (:hover), a part (a descendant) or an option the map does not name adds nothing. The capture measures an
+// instance with these classes on, so it compares Figma's default variant with the code's.
+export function defaultVariantClasses(figmaProps, propertyMap, selector) {
+  const out = new Set();
+  const own = String(selector ?? '').trim().split(/\s+/).pop();
+  const base = new Set((own.match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1)));
+  const clean = (k) => String(k).split('#')[0].trim().toLowerCase();
+  for (const [prop, def] of Object.entries(figmaProps?.properties ?? {})) {
+    if (def?.type !== 'VARIANT' || def.defaultValue == null) continue;
+    const map = Object.entries(propertyMap ?? {}).find(([k, v]) => clean(k) === clean(prop) && v && typeof v === 'object')?.[1];
+    const sel = map && Object.entries(map).find(([o]) => o.toLowerCase() === String(def.defaultValue).toLowerCase())?.[1];
+    if (typeof sel !== 'string' || /[:\s>+~\[]/.test(sel.trim())) continue;
+    const classes = (sel.match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1));
+    if (![...base].every((b) => classes.includes(b))) continue;
+    for (const c of classes) if (!base.has(c)) out.add(c);
+  }
+  return [...out];
 }
 
 // Figma variants that change two or more axes from the default variant, when every changed axis value

@@ -42,5 +42,10 @@ test('launch, open a file:// page, wait for load and evaluate', { skip: !CHROME 
     await assert.rejects(() => send('No.suchMethod'), /No\.suchMethod/);
     await send('Target.closeTarget', { targetId });
     close();
+    // A call on a closed socket fails at once, never waits out its timeout (a huge answer closes the socket).
+    await new Promise((r) => setTimeout(r, 200));
+    const t0 = Date.now();
+    await assert.rejects(() => send('Runtime.evaluate', { expression: '1' }, sessionId), /connection closed/);
+    assert.ok(Date.now() - t0 < 1000);
   } finally { browser.kill(); }
 });
