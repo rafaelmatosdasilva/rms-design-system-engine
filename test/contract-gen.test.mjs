@@ -333,3 +333,22 @@ test('a component named with a slash (table/row) gets its own folder, not a fail
   assert.ok(r.components.includes('table/row'), JSON.stringify(r.components));
   assert.ok(existsSync(join(r.outDir, 'table', 'row.contract.json')));
 });
+
+test('a text style keeps a token when Figma also has variables under its name (typography/m/font-size): textStyle.m, and the contract points there', async () => {
+  const dir = makeFixture({
+    'theme.css': ':root{}\n',
+    'vars.json': { color: { light: {}, dark: {} }, sizing: { 'typography/m/font-size': '11px', 'typography/m/line-height': '16px' }, typography: { m: { size: '11px', weight: '600', lh: '16px' }, s: { size: '10px', weight: '700', lh: '15px' } } },
+    'struct.json': { components: { label: { nodeId: '1:3', h: 16, fontSizeVar: 'm' }, tag: { nodeId: '1:4', h: 16, fontSizeVar: 's' } } },
+    'props.json': { label: { nodeId: '1:3', properties: {}, annotations: [] }, tag: { nodeId: '1:4', properties: {}, annotations: [] } },
+    'structure-contract.mjs': "export const CONTRACT = { label: { h: 16, fontSizeVar: 'm' }, tag: { h: 16, fontSizeVar: 's' } };\n",
+  });
+  const r = await generateContracts(dir, { paths: cfg.paths, figma: cfg.figma }, {});
+  assert.deepEqual(r.undefinedRefs, []);
+  assert.deepEqual(r.droppedTokens ?? [], []);
+  const tokens = JSON.parse(readFileSync(r.tokensOut, 'utf8'));
+  assert.equal(tokens.typography.m['font-size'].$value, '11px', 'the variables keep their own path');
+  assert.equal(tokens.textStyle.m.$value.fontSize, '11px');
+  assert.equal(tokens.typography.s.$type, 'typography', 'a style with no variables under it stays where it was');
+  assert.equal(JSON.parse(readFileSync(join(r.outDir, 'label.contract.json'), 'utf8')).anatomy.root.typographyToken, '{textStyle.m}');
+  assert.equal(JSON.parse(readFileSync(join(r.outDir, 'tag.contract.json'), 'utf8')).anatomy.root.typographyToken, '{typography.s}');
+});

@@ -68,6 +68,12 @@ const stripFigmaId = (key) => String(key).split('#')[0].trim();
 const STATE_NAMES = new Set(['state', 'disabled', 'hover', 'focus', 'active', 'selected', 'pressed', 'loading', 'checked', 'filled']);
 
 // ── DTCG token dictionary ────────────────────────────────────────────────────
+// Where a text style's composite token lives: typography.<style>, or textStyle.<style> when Figma also has variables
+// named under it (typography/m/font-size makes typography.m a group, which a token cannot also be).
+export function textStylePath(style, vars = {}) {
+  const grouped = Object.keys(vars?.sizing ?? {}).some((k) => k.startsWith(`typography/${style}/`));
+  return grouped ? ['textStyle', style] : ['typography', style];
+}
 function buildTokens(vars, modes) {
   const out = {
     $description: 'Design-system tokens (W3C DTCG). Auto-generated from the Figma snapshot by rms-design-system-engine — do not edit by hand. Project-specific DS data: keep LOCAL, never commit to the public skill.',
@@ -120,7 +126,7 @@ function buildTokens(vars, modes) {
   // typography — DTCG composite type.
   for (const [name, val] of Object.entries(vars.typography || {})) {
     if (val && typeof val === 'object') {
-      place(name, ['typography', name], applyMeta({
+      place(name, textStylePath(name, vars), applyMeta({
         $type: 'typography',
         $value: { fontSize: val.size, fontWeight: String(val.weight), lineHeight: val.lh },
         $deprecated: false,
@@ -169,7 +175,7 @@ function insetOf(paddingVar) {
   return Object.keys(inset).length ? inset : null;
 }
 
-function buildAnatomy(contract, structure) {
+function buildAnatomy(contract, structure, vars = {}) {
   const c = contract || {};
   const s = structure || {};
   const root = {};
@@ -190,7 +196,7 @@ function buildAnatomy(contract, structure) {
   if (h != null) root.height = h;
 
   const fontSize = c.fontSizeVar || s.fontSizeVar;
-  if (fontSize) root.typographyToken = tokenRef('typography/' + fontSize);
+  if (fontSize) root.typographyToken = '{' + textStylePath(fontSize, vars).join('.') + '}';
 
   const anatomy = { root };
 
@@ -226,7 +232,7 @@ function buildStatesVariants(contract, props) {
   return { states, variants };
 }
 
-function buildContract(name, { contract, structure, props, authored, composition, componentNames }) {
+function buildContract(name, { contract, structure, props, authored, composition, componentNames, vars = {} }) {
   const c = contract?.[name];
   const s = structure?.[name];
   const p = props?.[name];
@@ -243,7 +249,7 @@ function buildContract(name, { contract, structure, props, authored, composition
                  : `${name} — captured from Figma by rms-design-system-engine.`)),
     figmaNodeId: p?.nodeId || s?.nodeId || null,                                    // CAPTURED
     props: buildProps(p, a.propDescriptions),                                        // CAPTURED (+ bindings.code + authored descriptions)
-    anatomy: buildAnatomy(c, s),                                                     // CAPTURED
+    anatomy: buildAnatomy(c, s, vars),                                               // CAPTURED
     states,                                                                          // CAPTURED
     variants,                                                                        // CAPTURED
     semantics: a.semantics || { element: null, aria: {} },                          // AUTHORED
@@ -687,7 +693,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   for (const name of targets) {
     const file = join(outDir, name + '.contract.json');
     const prev = readJSON(file);                                              // previous emit (for the diff)
-    const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames });
+    const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars });
     const errs = validateContract(contract);
     mkdirSync(dirname(file), { recursive: true });   // a component named with a slash (table/row) gets its folder
     writeFileSync(file, JSON.stringify(contract, null, 2) + '\n');

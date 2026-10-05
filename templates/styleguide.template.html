@@ -769,12 +769,19 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   // The HTML the preview draws, indented, without what the page itself set on it (its centring margin).
   var VOID_TAG = /^(area|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/;
-  // The classes the system's CSS styles: a class the product put on its instance (a hook of its own) is not shown.
+  // The classes and data attributes the system's CSS styles: one the product put on its instance (a hook of its own) is
+  // not shown.
   var SYS_CLASSES = null;
   function systemClasses() {
     if (SYS_CLASSES) return SYS_CLASSES;
     SYS_CLASSES = {};
-    var walk = function (rules) { Array.prototype.forEach.call(rules || [], function (r) { if (r.selectorText) (r.selectorText.match(/\.[\w-]+/g) || []).forEach(function (k) { SYS_CLASSES[k.slice(1)] = 1; }); if (r.cssRules) walk(r.cssRules); }); };
+    var walk = function (rules) { Array.prototype.forEach.call(rules || [], function (r) {
+      if (r.selectorText) {
+        (r.selectorText.match(/\.[\w-]+/g) || []).forEach(function (k) { SYS_CLASSES[k.slice(1)] = 1; });
+        (r.selectorText.match(/\[\s*(data-[\w-]+)/g) || []).forEach(function (k) { SYS_CLASSES['[' + k.replace(/^\[\s*/, '')] = 1; });   // a data attribute the CSS styles by
+      }
+      if (r.cssRules) walk(r.cssRules);
+    }); };
     Array.prototype.forEach.call(document.styleSheets, function (sh) { try { walk(sh.cssRules); } catch (x) { /* a sheet the page cannot read */ } });
     return SYS_CLASSES;
   }
@@ -783,8 +790,9 @@ a.pg-usage-name { color: var(--sg-text); }
     copy.style.removeProperty('margin'); copy.style.removeProperty('width');
     if (!copy.getAttribute('style')) copy.removeAttribute('style');
     var known = systemClasses();
-    [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[class]'))).forEach(function (n) {
+    [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('*'))).forEach(function (n) {
       Array.prototype.slice.call(n.classList).forEach(function (k) { if (!known[k]) n.classList.remove(k); });
+      Array.prototype.slice.call(n.attributes).forEach(function (at) { if (/^data-/.test(at.name) && !known['[' + at.name]) n.removeAttribute(at.name); });
       if (n.hasAttribute('class') && !n.getAttribute('class').trim()) n.removeAttribute('class');
     });
     var text = function (t) { return t.replace(/\s+/g, ' ').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
@@ -869,7 +877,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (!ch) last = '<p>Not checked in a browser yet. The audit checks it and this page shows what it found.</p>';
     else if (ch.notRead) last = '<p>' + esc(when(ch.at)) + ': it could not be checked (not drawn on the page that was checked).</p>';
     else if (!ch.issues.length) last = '<p>' + esc(when(ch.at)) + ': nothing found on it.</p>';
-    else last = '<p>' + esc(when(ch.at)) + ':</p>' + ch.issues.map(function (i) { return '<p><b>' + esc(i.title) + '</b> ' + esc(i.detail) + '. ' + esc(i.fix) + (i.wcag ? '<span class="pg-wcag">' + esc(i.wcag) + '</span>' : '') + '</p>'; }).join('');
+    else last = '<p>' + esc(when(ch.at)) + ':</p>' + ch.issues.map(function (i) { return '<p><b>' + esc(i.title) + '</b>: ' + esc(i.details.join('; ')) + '. ' + esc(i.fix) + (i.wcag ? '<span class="pg-wcag">' + esc(i.wcag) + '</span>' : '') + '</p>'; }).join('');
     return '<div class="pg-doc"><h3>Accessibility</h3><dl class="pg-updated">' +
       '<div><dt>Role</dt><dd>' + role + '</dd></div>' +
       (a.expects.length ? '<div><dt>What it does</dt><dd>' + a.expects.map(p).join('') + '</dd></div>' : '') +
