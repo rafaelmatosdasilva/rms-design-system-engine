@@ -32,7 +32,7 @@
 // Exit 1 = invented / dangling DS references found.
 
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 
 const ROOT = process.cwd();
 
@@ -83,9 +83,16 @@ try {
 // ── Scan each surface ─────────────────────────────────────────────────────────
 const findings = [];
 const advisories = [];
+let readCount = 0;
 for (const surface of SURFACES) {
   const doc = readLocal(surface);
-  if (doc == null) { console.log(`⚠️  [docs-truth] surface not found, skipped: ${surface}`); continue; }
+  if (doc == null) {
+    // A surface that moved: the style guide the engine writes is the likely new place of a style guide page.
+    const moved = [cfg.styleguide?.out].flat().find((o) => o && o !== surface && basename(o) === basename(surface) && existsSync(join(ROOT, o)));
+    console.log(`⚠️  [docs-truth] surface not found, skipped: ${surface} (${moved ? `the style guide is now ${moved}: point ds-config.json docs.surfaces at it` : 'point ds-config.json docs.surfaces at the file, or take it out'})`);
+    continue;
+  }
+  readCount++;
 
   // The doc's OWN declarations count as real (inlined theme copy + chrome vars).
   // Declarations are read from the RAW doc (comments can't declare, but a comment
@@ -177,8 +184,14 @@ function printAdvisories() {
   }
 }
 
+// Nothing read is nothing checked: not a pass.
+if (!readCount) {
+  console.log(`⏭ [docs-truth] ${SURFACES.length > 1 ? `none of the ${SURFACES.length} documentation surfaces in ds-config.json exists` : 'the documentation surface in ds-config.json does not exist'}, so no doc was checked`);
+  console.log('(exit 2 - not run)');
+  process.exit(2);
+}
 if (!findings.length) {
-  console.log(`✅ [docs-truth] every DS reference resolves (${SURFACES.length} surface${SURFACES.length > 1 ? 's' : ''})`);
+  console.log(`✅ [docs-truth] every DS reference resolves (${readCount} surface${readCount > 1 ? 's' : ''})`);
   printAdvisories();
   process.exit(0);
 }
