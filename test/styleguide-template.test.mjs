@@ -328,6 +328,11 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`(() => { const f = [...document.querySelectorAll('#c-chip .pg-ctl')].find((c) => c.querySelector('.pg-ctl-label').textContent.startsWith('Label')).querySelector('input'); f.value = 'Typed words'; f.dispatchEvent(new Event('input')); })()`);
     for (let i = 0; i < 60 && !/Typed words/.test(await run(`document.querySelector('#c-chip .pg-anatomy').textContent`)); i++) await new Promise((r) => setTimeout(r, 50));
     assert.match(await run(`document.querySelector('#c-chip .pg-anatomy').textContent`), /Typed words/, 'the inspector follows a text typed');
+    // A Width chosen while inspecting: the anatomy is drawn at that width, never beside the width's frame.
+    await run(`[...document.querySelectorAll('#c-chip .pg-width [data-v]')].find((b) => b.dataset.v === 'phone').click()`);
+    for (let i = 0; i < 60 && (await run(`(document.querySelector('#c-chip .pg-anat-wrap') || {}).style?.width || ''`)) !== '375px'; i++) await new Promise((r) => setTimeout(r, 50));
+    assert.equal(await run(`['.pg-preview', '.pg-frame', '.pg-anatomy'].map((q) => getComputedStyle(document.querySelector('#c-chip ' + q)).display).join() + '|' + document.querySelector('#c-chip .pg-anat-wrap').style.width`), 'none,none,flex|375px');
+    await run(`[...document.querySelectorAll('#c-chip .pg-width [data-v]')].find((b) => b.dataset.v === 'fit').click()`);
     // Done inspecting: the live component back in its place.
     await run(`document.querySelector('#c-chip .pg-stage-tools button').click()`);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview').hidden + '|' + document.querySelector('#c-chip .pg-anatomy').hidden + '|' + document.querySelector('#c-chip .pg-stage-tools button').textContent`), 'false|true|Inspect');
@@ -626,6 +631,15 @@ test('parity, what goes inside: a slot or swap in an HTML and CSS system is the 
   // With code props (a list, as the API reader gives them): a slot is the children it takes, a swap needs a prop of its own.
   const jsx = parityRows({ name: 'panel', propsSnap: { panel: { properties: props } }, codeProps: [{ name: 'children' }, { name: 'Badge', default: 'false' }, { name: 'pressed', default: 'false' }] });
   assert.deepEqual(jsx.map((r) => [r.figma?.name ?? '-', r.code?.name ?? '-', r.status]), [['Main Content', 'children', 'match'], ['Icon Content', '-', 'figma'], ['Badge', 'Badge', 'match'], ['-', 'pressed', 'code']]);
+});
+
+test('a Figma slot the code holds in a part of its own is paired with that part, and said under the component\'s name', async () => {
+  const { parityRows } = await import('../styleguide-data.mjs');
+  const rows = parityRows({ name: 'modal', propsSnap: { modal: { properties: { 'Slot#1:0': { type: 'SLOT' } } } }, slotParts: [{ name: 'Slot', selector: '.modal-slot', slot: true }] });
+  assert.deepEqual(rows.map((r) => [r.figma.name, r.code.name, r.status, r.slot]), [['Slot', '.modal-slot', 'match', true]]);
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /function slotsHTML\(c\)/);
+  assert.match(tpl, /factsHTML\(c\)\) \+\s*slotsHTML\(c\) \+/, 'under its name');
 });
 
 test('import line and nesting: as a product writes the import, and the system\'s components it is built with', async () => {
