@@ -6,6 +6,9 @@
 // engine's other source readers, advisory, never a failed build:
 //   • a control with no accessible name: a button with only an icon inside and no aria-label, aria-labelledby or
 //     title; an image with no alt; a text field with no label, aria-label or aria-labelledby;
+//   • an icon button or link named only by its title: a tooltip no one on a touch screen or a keyboard sees;
+//   • a sprite icon (<symbol>) that paints one fixed colour of its own: it keeps it in the dark theme and can
+//     disappear there (one in several colours is an illustration or a logo, left alone);
 //   • CSS that removes the focus outline and never puts a focus style back;
 //   • a positive tabindex (it breaks the reading order);
 //   • a click handler on a div or span with no role and no tabindex (a mouse-only control);
@@ -19,7 +22,7 @@
 // An element whose attributes are spread ({...props}, v-bind="$attrs") can receive them from outside: it is
 // never reported. A finding that does not say its fix in `desc` carries it in `fix`, for the check of each edit
 // (edit-check.mjs, idea I74), which hands the fix back to the agent that wrote the line.
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
 import { join, relative, extname } from 'node:path';
 import { ENGINE_DIRS } from './names.mjs';
@@ -59,16 +62,20 @@ export function markupFindings(text) {
   const src = String(text ?? '').replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
   for (const m of src.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/gi)) {
     const [, attrs, inner] = m;
-    if (spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'title')) continue;
+    if (spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby')) continue;
     if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
     if (/<\w+\b[^>]*\bid\s*=\s*["'][^"']+["'][^>]*>\s*<\//.test(inner)) continue;   // an empty element with an id: a script fills it
-    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<what it does>"' });
+    if (visibleText(inner) || innerName(inner)) continue;
+    if (has(attrs, 'title')) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside, named only by its title: a tooltip no one sees on a touch screen or with the keyboard', fix: 'put words beside the icon, or at least add aria-label="<what it does>"' });
+    else out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<what it does>"' });
   }
   for (const m of src.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const [, attrs, inner] = m;
-    if (!has(attrs, 'href') || spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'title')) continue;
+    if (!has(attrs, 'href') || spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby')) continue;
     if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
-    if (!visibleText(inner) && !innerName(inner)) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<where it goes>"' });
+    if (visibleText(inner) || innerName(inner)) continue;
+    if (has(attrs, 'title')) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside, named only by its title: a tooltip no one sees on a touch screen or with the keyboard', fix: 'put words beside the icon, or at least add aria-label="<where it goes>"' });
+    else out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<where it goes>"' });
   }
   for (const m of src.matchAll(/<img\b([^>]*)>/gi)) {
     if (!spread(m[1]) && !has(m[1], 'alt') && !has(m[1], 'aria-label') && !has(m[1], 'aria-labelledby') && !/role\s*=\s*["']presentation|role\s*=\s*["']none/i.test(m[1]))
@@ -84,6 +91,13 @@ export function markupFindings(text) {
     const before = src.slice(0, m.index), open = before.lastIndexOf('<label'), close = before.lastIndexOf('</label>');
     if (open > close) continue;   // inside a <label>
     out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a text field with no label, aria-label or aria-labelledby', fix: 'give it a <label>, or aria-label="<what to type>"' });
+  }
+  for (const m of src.matchAll(/<symbol\b([^>]*)>([\s\S]*?)<\/symbol>/gi)) {
+    const id = /\bid\s*=\s*["']([^"']+)["']/i.exec(m[1])?.[1] ?? 'an icon';
+    const paints = [...(m[1] + m[2]).matchAll(/\b(?:fill|stroke)\s*(?:=\s*["']|:\s*)\s*([^"';>\s]+)/gi)].map((p) => p[1].toLowerCase())
+      .filter((v) => !/^(none|currentcolor|inherit|transparent|context-fill|context-stroke|url\(.*)$/.test(v) && !/^var\(/.test(v));
+    const colours = [...new Set(paints)];
+    if (colours.length === 1) out.push({ line: lineAt(src, m.index), kind: 'contrast', desc: `the icon ${id} paints itself ${colours[0]}: it keeps that colour in every theme and can disappear on a dark background`, fix: `write fill="currentColor" (or stroke), so the icon takes the colour of the text around it` });
   }
   for (const m of src.matchAll(/\btab[iI]ndex\s*=\s*\{?\s*["']?([1-9]\d*)/g))
     out.push({ line: lineAt(src, m.index), kind: 'keyboard', desc: `tabindex="${m[1]}": a positive tabindex breaks the order a keyboard moves in (use 0 or -1)` });
@@ -217,7 +231,8 @@ function walk(ROOT, exts, limit = 4000) {
       const abs = join(dir, n);
       let st; try { st = statSync(abs); } catch { continue; }
       if (st.isDirectory()) go(abs, depth + 1);
-      else if (exts.has(extname(n).toLowerCase()) && st.size < 512 * 1024) files.push(abs);
+      // A built page with its source beside it (ui.html from ui.src.html) is read once, from the source.
+      else if (exts.has(extname(n).toLowerCase()) && st.size < 512 * 1024 && !(/\.html?$/i.test(n) && existsSync(abs.replace(/\.(html?)$/i, '.src.$1')))) files.push(abs);
     }
   };
   for (const root of codeRoots(ROOT)) go(root, 0);

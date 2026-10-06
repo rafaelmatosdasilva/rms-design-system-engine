@@ -2,7 +2,7 @@
 // survives an environment without `node` on PATH.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, chmodSync } from 'node:fs';
+import { writeFileSync, chmodSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -55,4 +55,20 @@ test('audit: runs its gates with its own Node, so a PATH without node does not c
   const out = (r.stdout ?? '') + (r.stderr ?? '');
   assert.doesNotMatch(out, /spawn node ENOENT|Unhandled 'error' event/, out.slice(-2000));
   assert.match(out, /PARITY AUDIT/, out.slice(-2000));
+});
+
+test('audit: a property written otherwise than the rest of the system reaches the report and the differences list', () => {
+  const props = {
+    button: { properties: { 'Show Icon': { type: 'BOOLEAN' }, 'Label Content': { type: 'TEXT' }, Size: { type: 'VARIANT', variantOptions: ['Small', 'Large'] } } },
+    card: { properties: { 'show-footer': { type: 'BOOLEAN' }, 'Title Content': { type: 'TEXT' } } },
+  };
+  const dir = makeFixture({
+    'ds-config.json': JSON.stringify({ paths: { themeCSS: 'theme.css', compPropsSnapshot: 'props.json' }, frameworkComponents: false, htmlRealization: true, codeReading: { capture: 'off' } }),
+    'theme.css': ':root { --a: 1px; }',
+    'props.json': JSON.stringify(props),
+  });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1' }, timeout: 240000 });
+  const out = (r.stdout ?? '') + (r.stderr ?? '');
+  assert.match(out, /card property "show-footer" is named differently from the rest of the system: rename it "Show Footer"/, out.slice(-3000));
+  assert.match(readFileSync(join(dir, '.design-system-engine-out', 'differences.md'), 'utf8'), /show-footer/);
 });

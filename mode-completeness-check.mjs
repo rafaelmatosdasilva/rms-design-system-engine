@@ -224,7 +224,7 @@ const total = OK.length + MISSING.length;
 const axisLabel = CHECKABLE.map(c => `${c.label}[${c.modes.map(m => m.snapshotKey).join('/')}]`).join('  ');
 console.log(`\n✅ OK        ${OK.length}/${total}  (adapts across modes, and matches Figma per mode where value-checked)`);
 console.log(`❌ FAIL      ${MISSING.length}/${total}  (missing per-mode override, or CSS ≠ Figma in a mode)`);
-console.log(`⏭  SKIPPED   ${SKIPPED.length}  (no CSS var, documented)`);
+if (SKIPPED.length) console.log(`⏭  SKIPPED   ${SKIPPED.length}  (no CSS var, documented)`);
 console.log(`   collections: ${axisLabel}`);
 
 if (MISSING.length) {

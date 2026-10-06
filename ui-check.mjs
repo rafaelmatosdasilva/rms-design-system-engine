@@ -29,6 +29,16 @@ if (!input || !existsSync(resolve(ROOT, input))) {
   console.log('   list (A2UI style) or a nested { component, props, children } tree.\n');
   process.exit(2);
 }
+// A page or a component file (HTML, JSX, Vue, CSS) is not a generated UI: it gets the check every edit gets, on what
+// changed since the last commit (all of it for a file not committed yet), instead of failing as JSON.
+if (/\.(html?|jsx|tsx|vue|svelte|css|scss|less)$/i.test(input)) {
+  const { editCheck } = await import('./edit-check.mjs');
+  const abs = resolve(ROOT, input);
+  const out = editCheck({ tool_name: 'Write', tool_input: { file_path: abs, content: readFileSync(abs, 'utf8') } }, { root: ROOT, cfg: { ...cfg, hooks: true, editCheck: true } });
+  if (!out) { console.log(`\n✅ ${input}: what changed since the last commit uses only the system (the check every edit gets). --check-ui is for a generated UI in JSON.\n`); process.exit(0); }
+  console.log(`\n${out}\n`);
+  process.exit(1);
+}
 if (!existsSync(catalogPath)) {
   console.log(`\n⏭  ${catalogPath.replace(ROOT + '/', '')} not found. Run the audit once: it writes the catalog beside the contracts.\n`);
   process.exit(2);

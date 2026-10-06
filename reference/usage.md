@@ -242,8 +242,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   contract's `propertyMap` (found by its options when the contract spells the prop another way), `htmlRealizations`,
   a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. The system's
   modes are switched inside the playground, each named as Figma names its collection (`figma.colorCollection`,
-  Styling; a sizing collection by its own name, Sizing): the colour mode at its top left, the other at its top right,
-  never among the component's props. Below it, the tokens behind what is drawn with its code on their right, and under
+  Styling; a sizing collection by its own name, Sizing, the name kept for screen readers and not shown): the colour
+  mode at its top left, the other at its bottom right, never among the component's props. Below it, the tokens behind what is drawn with its code on their right, and under
   them **Its tokens**, every token it is drawn with (`allComponentTokens`: each `var()` in a rule for its class or one
   of its parts, `.badge-label`, `.badge__icon`, in any state, shown in this variant or not, never another component's
   class), by Figma's name, with the properties it sets, its value in the mode shown and a colour's swatch, ordered
@@ -252,13 +252,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the part. Above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
-- **A component's page in areas**: Playground, Documentation, Accessibility, Parity and Used in, one at a time on
+- **A component's page in areas**: Playground, Specs, Variants, Documentation, Accessibility, Parity and Used in, one at a time on
   the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
   `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
   page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
   top too); Parity carries the system's alert icon (an icon named warning or alert) while something differs, its count
-  said to a screen reader. Each section of rows (Anatomy, Usage, Documentation, Accessibility) is one of the
+  said to a screen reader. Each section of rows (Anatomy in Specs, Usage, Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is two columns of tables
   (what differs, what is not built or compared, the values that agree, its props, its tokens). The code is as tall as
   what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
@@ -272,27 +272,33 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Usage** (`guidanceView`), in Documentation: When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
-  string or a list); a missing one is said in its Documentation.
+  string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
+  last audit found the products doing with it (a rule laid over it, a look-alike built by hand, a parent's rule
+  overriding it), said so.
 - **The page's own reading**: every button says what it does in words (Menu and Close menu, on a phone; on a wide
   screen the menu is always there), and the style guide check fails when the page's text roles fall below 4.5:1 on its
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
-- **Anatomy**, first in Documentation: an inert copy of the component as the Playground set it, drawn larger, each
-  part numbered in reading order (the contract's named parts, `c.anatomy`, a Figma auto name such as Frame 106
-  replaced by the part's class, then what sits directly inside it), a slot outlined, each padding and gap outlined
-  and numbered after the parts and named by its token in the list (numbers, never colours, so nothing reads as a
-  token's colour), and how it lines up its items. A component shown in an overlay is drawn as its own element; none
-  on the measuring page.
-- **Inspect and Width**, in the Playground (none on the measuring page): Inspect marks the live component with the
-  anatomy's numbers (`annotate`, shared with the anatomy) and lists below it each part's colours, icon size and text
-  style by their tokens, each padding and gap by its token, and its alignment. It is picked by a click: on the
-  component itself, a part, or a padding or gap band (each space over the parts, each part over the component), or on
-  a name in the list, and Picked shows what that one is drawn with (a part's padding, gap, fill, line, corners,
-  shadow, text style and colour; a space's token and value), outlined in the accent; a second click puts it down. Width shows it at Fit (the live
-  preview), Phone (375px), Tablet (768px) or Desktop (1280px): a frame of that width written with the page's own
-  stylesheets, its icon sheet, the component as drawn now and the system's own scripts (`systemScripts`), so its
-  media queries apply and it works there (a click moves a selection, as in the live preview), scaled down to fit the
-  room. Turning Inspect on returns to Fit; choosing a width turns Inspect off. A number that would cover
-  another moves to the nearest free place around it, with a line back (`marker`, for the anatomy too).
+- **Specs**, an area of its own (none on the measuring page): an inert copy of
+  the component as the Playground set it, drawn larger, each part numbered in reading order (the contract's named
+  parts, `c.anatomy`, a Figma auto name such as Frame 106 replaced by the part's class, then what sits directly inside
+  it), a slot outlined, each padding and gap outlined and numbered after the parts and named by its token in the list
+  (numbers, never colours, so nothing reads as a token's colour), each part's colours, icon size and text style by
+  their tokens, and how it lines up its items (`annotate`); then Its tokens. It is picked by a click: on the component
+  itself, a part, or a padding or gap band (each space over the parts, each part over the component), or on a name in
+  the list, and Picked shows what that one is drawn with (a part's padding, gap, fill, line, corners, shadow, text
+  style and colour; a space's token and value), outlined in the accent; a second click puts it down. A number that
+  would cover another moves to the nearest free place around it, with a line back (`marker`). A component shown in an
+  overlay is drawn as its own element. Nothing is drawn over the live component in the Playground.
+- **Full width**, in the Playground (none on the measuring page): the component across the whole card, its controls
+  below it; again puts it back.
+- **Simplify** (`simplifyView`), a page of its own when it has something to say: components that are one component
+  in several copies (names that differ in their last word, with half their props or more the same: one component with
+  a Type option), a variant prop with one option, or with one option built, and, when the products' code was read and
+  something uses the system, a component no product uses. Each says what to do.
+- **Width**, in the Playground (none on the measuring page): Fit (the live preview), Phone (375px), Tablet (768px) or
+  Desktop (1280px), a frame of that width written with the page's own stylesheets, its icon sheet, the component as
+  drawn now and the system's own scripts (`systemScripts`), so its media queries apply and it works there (a click
+  moves a selection, as in the live preview), scaled down to fit the room.
 - **Figma beside the code**, in the Playground (a Figma button, only for a component with a Figma image; none on the
   measuring page): the Figma image of the variant set (its variant props equal to the Playground's; the default image
   only while every variant prop is at its default) beside a still, inert copy of the component as drawn, or over it,
@@ -300,8 +306,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`figmaVariantImages`, `visual-diff.mjs`): `<visualRefs>/components/<name>/<Prop=Value, Prop=Value>.png` and
   `<visualRefs>/components/<name>.png` for its default, else the Figma REST API with `FIGMA_TOKEN` (every variant of
   its component set in one images call, cached under `visual/figma-variants/` until `_figmaVersion` changes). They go
-  in the page, up to `styleguide.figmaImagesMB` (8) in all; `styleguide.figmaImages: false` for none. Like Inspect,
-  it returns the width to Fit, and a width chosen turns it off.
+  in the page, up to `styleguide.figmaImagesMB` (8) in all; `styleguide.figmaImages: false` for none. It returns the
+  width to Fit, and a width chosen turns it off.
 - **Do and Don't** (`exampleImages`, `visual-diff.mjs`), in Documentation after Usage: the pictures in
   `<visualRefs>/components/<name>/do/` and `dont/` (each file named for its caption; a leading number orders them),
   then the Figma nodes `contract.authored.json` → `components.<name>.examples` names (`[{ "kind": "do" | "dont",
@@ -313,10 +319,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Disabled**: a prop named Disabled, on, disables the native controls inside (`input`, `button`, `select`, `textarea`),
   as a product sets them; the live accessibility check then says Tab passes it by, as it should, and measures focus
   with transitions off, so a ring that fades in is read at its end.
-- **What uses a token** (`tokenUses`, view `#uses?t=--name`): every token's name on the page (foundations, a
-  component's tables) links to it: the components whose own rules use it, then those that use it through another
-  token whose value names it (in any mode), each with the token it came through. Search also finds each component's
-  props and their options.
+- **A token's panel** (`tokenUses`): every token's name on the page (foundations, a component's tables) opens a panel
+  in place, the page left where it is: its Figma name, its value in each mode, the components whose own rules use it
+  and those that use it through another token whose value names it (in any mode, with the token it came through),
+  each linked to its page, and a button to copy it. Escape or a click outside closes it, the focus back on the name.
+  The full list stays at `#uses?t=--name`. Search also finds each component's props and their options.
 - **A link to each variant**: the address carries the props set away from their defaults and the width
   (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
   the controls follow (a value the component does not have is left at its default). Copy link copies it.
@@ -325,8 +332,19 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
   (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
-  `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`) and
-  `contract.authored.json` → `components.<name>.links`.
+  `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`),
+  `contract.authored.json` → `components.<name>.links`, and Report an issue (`issueLink`): `styleguide.issues`, the
+  tracker's new-issue address with `{name}` and `{title}` (`"https://redmine/…/issues/new?issue[subject]={title}"`),
+  else the repository's own on GitHub or GitLab. The overview adds Send feedback (`styleguide.feedback`, else the
+  same tracker with a Style guide title).
+- **At a glance** (`factsOf`), under its name: Version (the release its last change shipped in), Last changed, Figma
+  (agrees, or how many differences and props not built), Accessibility (no problem found, how many, or not checked in
+  a browser yet) and Used in (how many products); a fact that needs work is marked with ! and in bold, never by colour
+  alone. Its overview card carries the Figma and accessibility facts in one line.
+- **Variants**, an area of its own when a variant prop has two options built: each option of each variant prop, one
+  per row with its name, drawn by the Playground itself (the other props as it sets them) and copied still and inert,
+  the Playground left as it was; Try it sets that option there. An option Figma has and the code does not build says
+  so.
 - **Status and coverage** (`statusView`, `coverageOf`): under its name and on its overview card, stable, beta or
   deprecated from `contract.authored.json` → `components.<name>.status`, a `Status:` (or `Maturity:`) line in Figma's
   description or annotations, or `@deprecated` / `@beta` / `@status x` in its code; never guessed. Coverage is its own
@@ -594,7 +612,9 @@ repairs the UI and never adds anything, so it can be run on every generation. It
 down once (only catalog components; only listed props and values; booleans are true or false; unique
 ids, one root, existing children, one parent each, no cycles; nothing inside a component it must never
 combine with), and every finding names the rule it breaks. A deprecated component, a node not attached
-to the tree, or a child the design system never nests there is a warning. Findings are also written to
+to the tree, or a child the design system never nests there is a warning; an experimental one is a warning that
+says it may be used for what it is for. Given a page or a component file instead (HTML, JSX, Vue, CSS), it runs the
+check every edit gets on what changed since the last commit, never failing the file as JSON. Findings are also written to
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
@@ -674,7 +694,10 @@ The rules are `--check-ui`'s, plus:
   the system's overlay when its CSS has one (container, layers, open and closing classes, as the style guide plays it),
   else as a popover under the part; Escape, a click outside or a button inside closes it and the focus goes back. An
   `opens` that names no part, the page or itself is an error. A part it opens drawn with the engine's layout pieces
-  (a Stack of buttons, not a Missing box or a stand-in) goes on the gaps list as a dialog or menu the system lacks. With Chrome, each one is tried: it must open with the
+  (a Stack of buttons, not a Missing box or a stand-in) goes on the gaps list as a dialog or menu the system lacks. A
+  request that has a part open another (a button that opens a confirmation, a menu) owes an `opens`: a state alone is a
+  ⚠️ line. Each state is held to the request and the documentation as the page is: a tag a "saved" state adds where
+  the guidelines rule a tag out for a message is an error. With Chrome, each one is tried: it must open with the
   focus inside, close with Escape and give the focus back, and each field must take typing; what does not is a ⚠️ line
   under 🖱.
 - **Every state.** A composition names its other states beside it, `"states": { "<name>": { "<id>": { …that part in
@@ -784,7 +807,10 @@ text fields still a text field) gives a role in the engine's vocabulary (`button
 `textbox`, `checkbox`, `radio`, `switch`, `spinbutton`, `link`, `dialog`, `tab`). A Figma component that states no role
 gets the annotation `Role: <role>`; one whose Figma role differs from the code is listed for a person to decide and
 never changed. A wrapper around several controls (a stepper, a group) has no single role and is left out, as is a
-component the code does not show. Every need the prototypes found the system lacks (`prototypes/gaps.json`, merged) becomes
+component the code does not show. Each property or option named otherwise than most of the system's names
+(`naming-consistency.mjs`, the same list the props check prints) is renamed in its component set: an option in each
+variant's name (`state=default` → `state=Default`), then a property (`editComponentProperty`, "show-icon" → "Show
+Icon"); one already renamed is skipped. Every need the prototypes found the system lacks (`prototypes/gaps.json`, merged) becomes
 the design team's to do list: a page "Design system to do" with a frame "Gaps from prototypes", one card per need (what
 kind, what the prototypes use meanwhile or the closest component, and which prototypes need it), the most needed first,
 written afresh each time; nothing else in the file is touched. With gaps and no Figma snapshot, only the list is written.
@@ -829,7 +855,13 @@ is shown only by a CSS class — `.selected` / `.checked` / `.disabled` / `.inva
 `aria-*` or native state, so assistive tech never hears it; the state-class→aria map is common-English by
 default, extend via `a11y.stateClasses`), and **keyboard reachability** (an interactive control that cannot
 be reached by keyboard — an interactive role on a non-focusable element, or a native control with
-`tabindex=-1`). Findings come from measured pixels and the a11y tree, no assumed DS shape (No-imposed-structure).
+`tabindex=-1`), **a control said only in a tooltip** (`tooltipname`: an icon whose only name is its `title`, which
+no one on a touch screen or a keyboard sees; words beside the icon, or `aria-label` at least) and **icon contrast**
+(`iconcontrast`, WCAG 1.4.11: an icon that carries meaning, the only content of a control or one with a name of its
+own, at 3:1 against its background in every theme; its colour is its painted fill or stroke, a sprite's
+`<use href>` read from its `<symbol>`, a masked icon's background). The static check adds the same title-only icon
+button or link, and a sprite `<symbol>` painted in one fixed colour of its own (it keeps it in the dark theme).
+Findings come from measured pixels and the a11y tree, no assumed DS shape (No-imposed-structure).
 
 **Advisory by default**, and the report is written in **plain language, no jargon** — each issue says what is
 wrong, why it matters to a real person, and what to do about it. Three audiences, one set of findings:

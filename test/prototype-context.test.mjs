@@ -100,8 +100,8 @@ test('a page that decides differently from the others is told each difference, w
   const here = pageFacts(page('padding/s', 's', [{ component: 'chip', props: { standInFor: 'switch to toggle push' } }]), { actionNames: A });
   const d = consistencyFindings(here, deriveConventions(others));
   const lines = d.map(consistencyLine);
-  assert.ok(lines.includes('page padding: padding/s here, padding/m on the product\'s other pages (settings)'), lines.join('\n'));
-  assert.ok(lines.includes('page heading style: s here, m on the product\'s other pages (settings)'));
+  assert.ok(lines.includes('page padding: padding/s here, padding/m on the product\'s other pages (settings): give the Page padding "padding/m"'), lines.join('\n'));
+  assert.ok(lines.includes('page heading style: s here, m on the product\'s other pages (settings): give that Text style "m"'));
   assert.ok(lines.some((l) => /the answer to "a toggle switch": chip as a stand-in here, a Missing box/.test(l)), 'the same need, answered another way');
   assert.deepEqual(consistencyFindings(pageFacts(page('padding/m', 'm'), { actionNames: A }), deriveConventions(others)), [], 'a page that matches has nothing to change');
 });
@@ -116,9 +116,9 @@ test('beyond the frame: body and section text styles, the words for each kind of
   const conv = deriveConventions({ account: { ...f, made: 1 } });
   const here = pageFacts(mk('Submit changes', 'chip', 'm', 's'), { actionNames: A });
   assert.deepEqual(consistencyFindings(here, conv).map(consistencyLine), [
-    'body text style: m here, s on the product\'s other pages (account, the first page made)',
-    'section heading style: s here, m on the product\'s other pages (account, the first page made)',
-    'the words for saving: "Submit changes" here, "Save" on the product\'s other pages (account, the first page made)',
+    'body text style: m here, s on the product\'s other pages (account, the first page made): give that Text style "s"',
+    'section heading style: s here, m on the product\'s other pages (account, the first page made): give that Text style "m"',
+    'the words for saving: "Submit changes" here, "Save" on the product\'s other pages (account, the first page made): label it "Save"',
     'the component for saving ("Submit changes"): chip here, button on the product\'s other pages (account, the first page made)',
   ]);
   assert.deepEqual(consistencyFindings(pageFacts(mk('save', 'button', 's', 'm'), { actionNames: A }), conv), [], 'the same words in another case are the same words');
@@ -374,4 +374,25 @@ test('the engine\'s layout pieces a system lacks are one gap line', async () => 
   const { groupLayout, gapLine } = await import('../prototype-pieces.mjs');
   const lines = groupLayout([{ kind: 'component', need: 'toast' }, { kind: 'layout', need: 'a Row layout component' }, { kind: 'layout', need: 'a Stack layout component' }]).map(gapLine);
   assert.deepEqual(lines, ['component: toast', "layout: Row and Stack layout components; the prototype uses the engine's own meanwhile"]);
+});
+
+test('a difference between pages says how to match it in the composition', async () => {
+  const { howToMatch } = await import('../product-conventions.mjs');
+  assert.equal(howToMatch({ what: 'where the actions sit', here: 'middle', product: 'end' }), "make the group of actions the page's last part");
+  assert.equal(howToMatch({ what: 'how the actions line up', here: 'start', product: 'end' }), 'give the Row that holds the actions justify "end"');
+  assert.equal(howToMatch({ what: 'page alignment', here: 'center', product: 'stretch' }), 'give the Page align "stretch"');
+  assert.equal(howToMatch({ what: "the page's frame", here: 'no header', product: 'header' }), null);
+});
+
+test('a request that has a part open another owes an "opens"; a state alone is not it', async () => {
+  const { requestFindings } = await import('../prototype-context.mjs');
+  const ctx = { components: { button: { purpose: 'The main action on a screen.' } }, rules: [] };
+  const req = 'a project page with a Delete project button that opens a confirmation';
+  const without = requestFindings(ctx, req, [{ id: 'b', component: 'button', props: { Label: 'Delete project' } }]);
+  assert.ok(without.some((f) => f.said === 'opens'), JSON.stringify(without));
+  const withOpens = requestFindings(ctx, req, [{ id: 'b', component: 'button', props: { Label: 'Delete project', opens: 'c' } }, { id: 'c', component: 'Stack', props: {} }]);
+  assert.ok(!withOpens.some((f) => f.said === 'opens'));
+  assert.ok(!requestFindings(ctx, 'a settings page with a Save button', []).some((f) => f.said === 'opens'));
+  assert.ok(!requestFindings(ctx, 'a page that opens with a heading', []).some((f) => f.said === 'opens'));
+  assert.ok(requestFindings(ctx, 'a row whose More button opens a small menu', []).some((f) => f.said === 'opens'));
 });

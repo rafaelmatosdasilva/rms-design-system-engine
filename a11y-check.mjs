@@ -32,6 +32,12 @@
 //                   is common-English by default; extend via ds-config.json → a11y.stateClasses.
 //   5. Keyboard   — an interactive control that cannot be reached by keyboard (an interactive
 //                   role on a non-focusable element, or a native control with tabindex=-1).
+//   6. Tooltip    — a control whose only name is its title (an icon with a tooltip): touch and keyboard
+//                   users never see the tooltip, so they cannot tell what it does. Words beside the icon,
+//                   or aria-label at least.
+//   7. Icons      — an icon that carries meaning (the only content of a control, or one with a name of
+//                   its own) at less than 3:1 against its background, in every theme (WCAG 1.4.11): an
+//                   icon drawn for the light theme that disappears in the dark one.
 //
 // Output is plain language, no jargon: each issue says what is wrong, why it matters, and what to
 // do. `--a11y` adds the exact elements; `--json` emits a machine-readable record for an agent/CI.
@@ -49,8 +55,8 @@
 // come from measured pixels and the accessibility tree, not from any presumed token/tier model.
 //
 // NOT yet (v2, by design):
-//   - Non-text / component contrast (WCAG 1.4.11, >= 3:1): the FOCUS RING is now checked natively
-//     (see check 3); the rest (control borders, icons, graphics) comes from --axe.
+//   - Non-text / component contrast (WCAG 1.4.11, >= 3:1): the focus ring (check 3) and icons (check 7)
+//     are checked natively; the rest (control borders, graphics) comes from --axe.
 //   - Live pseudo-class states (:hover / :active) — the styleguide target below renders every
 //     variant state (disabled / checked / selected / error) as its OWN instance, so those are
 //     covered in the resting DOM; forcing true interaction pseudo-states is the remaining step.
@@ -148,6 +154,26 @@ export function contrastFindings(textEls, theme) {
   return out;
 }
 
+// An icon's colour against what it sits on, in one theme: 3:1 at least (WCAG 1.4.11). Pure, like contrastFindings.
+export function iconContrastFindings(iconEls, theme) {
+  const out = [];
+  for (const el of iconEls) {
+    if (el.bgImage) continue;
+    const fg = parseColor(el.color);
+    if (!fg || fg.a === 0) continue;
+    const bg = effectiveBg(el.bgLayers);
+    const ratio = contrastRatio(fg.a < 1 ? over(fg, bg) : fg, bg);
+    if (ratio + 1e-9 < 3) out.push({ kind: 'iconcontrast', theme, desc: el.desc, ratio: Math.round(ratio * 100) / 100, threshold: 3 });
+  }
+  return out;
+}
+
+// A name that comes only from the title attribute: the AX node's winning name source. → true | false
+export function namedByTitleOnly(axNode) {
+  const won = (axNode?.name?.sources ?? []).find((s) => !s.superseded && (s.value?.value || s.attributeValue?.value));
+  return !!won && won.type === 'attribute' && won.attribute === 'title';
+}
+
 // ── Plain-language reporting (pure; exported for tests) ─────────────────────────
 // No jargon: every issue says what is wrong, why it matters to a real person, and what to
 // do about it. `title` returns the count sentence, singular/plural aware.
@@ -197,6 +223,16 @@ export const A11Y_GUIDE = {
     title: (n) => `${plural(n, 'place traps', 'places trap')} the keyboard`,
     why: 'Pressing Tab stops moving at some point, so someone using only a keyboard cannot get past it.',
     fix: 'Let Tab move on (or Escape close) whatever is holding the focus.',
+  },
+  tooltipname: {
+    title: (n) => `${plural(n, 'control says', 'controls say')} what it does only in a tooltip`,
+    why: 'The control is an icon whose name is only its title, shown as a tooltip when a mouse rests on it. On a touch screen, or moving with the keyboard, no one sees it, so they cannot tell what the control does.',
+    fix: 'Put words beside the icon (a visible label); at least give it aria-label.',
+  },
+  iconcontrast: {
+    title: (n) => `${plural(n, 'icon is', 'icons are')} hard to see`,
+    why: 'The icon is the only thing that says what the control or the message is, and its colour is too close to its background (often only in the dark theme, when the icon kept its light-theme colour).',
+    fix: 'Draw the icon in currentColor or a token that changes with the theme, at least three times the contrast of its background.',
   },
   tabindex: {
     title: (n) => `${plural(n, 'control jumps', 'controls jump')} the Tab order`,
@@ -302,6 +338,7 @@ export function a11yItemLine(kind, f) {
     return `${what} — its readability score is ${f.ratio} out of 21, needs at least ${f.threshold} (${f.theme} theme)${f.places > 1 ? `, in ${f.places} places` : ''}`;
   }
   if (kind === 'focuscontrast') return `${f.desc} — its focus outline scores ${f.ratio} out of 21, needs at least ${f.threshold}`;
+  if (kind === 'iconcontrast') return `${f.desc} — the icon scores ${f.ratio} out of 21 against its background, needs at least ${f.threshold} (${f.theme} theme)${f.places > 1 ? `, in ${f.places} places` : ''}`;
   if (kind === 'hovercontrast') { const what = f.text ? `the text "${f.text}"` : (f.desc || 'text'); return `${what} on hover — its readability score is ${f.ratio} out of 21, needs at least ${f.threshold}`; }
   if (kind === 'name') return `${A11Y_ROLE_WORD[f.role] || `A ${f.role || 'control'}`} with no label`;
   if (kind === 'target') return `${f.desc} — ${f.size} with another control within 24 pixels`;
@@ -328,6 +365,7 @@ export function a11yFindingRecord(kind, f) {
   const rec = { issue: kind, selector: f.desc ?? null, fix: A11Y_GUIDE[kind]?.fix ?? null };
   if (kind === 'contrast' || kind === 'hovercontrast') { rec.theme = f.theme ?? null; rec.text = f.text ?? null; rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
   if (kind === 'focuscontrast') { rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
+  if (kind === 'iconcontrast') { rec.theme = f.theme ?? null; rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
   if (kind === 'name') rec.role = f.role ?? null;
   if (kind === 'target') rec.size = f.size ?? null;
   if (kind === 'semantics') { rec.rendered = f.got ?? null; rec.contract = f.want ?? null; }
@@ -464,6 +502,50 @@ function sweepExpression(roots, doFocus, stateMap) {
         bgImage: !!(cs.backgroundImage && cs.backgroundImage !== 'none'),
       });
     }
+    // Icons that carry meaning: the only content of a control, or named themselves (role="img", aria-label, a <title>).
+    // Their colour: an svg's painted fill or stroke, a masked icon's background, an icon font's text colour.
+    const iconEls = [];
+    const CONTROL = 'a[href],button,[role=button],[role=link],[role=tab],[role=menuitem],[role=switch]';
+    for (const el of scope) {
+      const svg = el.tagName && el.tagName.toLowerCase() === 'svg' && !el.parentElement?.closest('svg');
+      const mcs = getComputedStyle(el), mask = (mcs.maskImage && mcs.maskImage !== 'none') || (mcs.webkitMaskImage && mcs.webkitMaskImage !== 'none');
+      if (!(svg || mask) || !vis(el) || disabled(el) || el.closest('[disabled],[aria-disabled="true"]')) continue;
+      const ctl = el.closest(CONTROL);
+      const words = ctl && [...ctl.querySelectorAll('*'), ctl].some((n) => [...n.childNodes].some((t) => t.nodeType === 3 && t.textContent.trim()) && vis(n));
+      const named = el.getAttribute('role') === 'img' || el.hasAttribute('aria-label') || !!(svg && el.querySelector(':scope > title'));
+      if (!(named || (ctl && !words))) continue;
+      let color = null;
+      if (mask) color = mcs.backgroundColor;
+      else {
+        // A sprite icon (<use href="#icon-x">) is painted from its symbol: a fill or stroke written there, else what the
+        // <use> passes down (currentColor its text colour).
+        const paint = (v, ctx) => (!v || v === 'none' || /^url/.test(v) ? null : /^currentcolor$/i.test(v) ? getComputedStyle(ctx).color : v);
+        const SHAPES = 'path,circle,rect,ellipse,line,polyline,polygon,text';
+        for (const sh of el.querySelectorAll(SHAPES + ',use')) {
+          if (sh.tagName.toLowerCase() === 'use') {
+            const ref = document.getElementById(String(sh.getAttribute('href') || sh.getAttribute('xlink:href') || '').replace(/^#/, ''));
+            const inner = ref ? [...ref.querySelectorAll(SHAPES)] : [];
+            const own = (n, a) => { for (let x = n; x && x !== ref?.parentElement; x = x.parentElement) { const v = x.getAttribute(a) || (x.style && x.style.getPropertyValue(a)); if (v && v !== 'inherit') return v; } return null; };
+            const uc = getComputedStyle(sh);
+            for (const n of inner) { const f = own(n, 'fill'), st = own(n, 'stroke'); color = f ? paint(f, sh) : st ? paint(st, sh) : (paint(uc.fill, sh) || paint(uc.stroke, sh)); if (color) break; }
+          } else { const c = getComputedStyle(sh); color = paint(c.fill, sh) || paint(c.stroke, sh); }
+          if (color) break;
+        }
+        if (!color) { const c = getComputedStyle(el); color = (c.fill && c.fill !== 'none' && !/^url/.test(c.fill)) ? c.fill : c.color; }
+      }
+      const layers = []; let node = mask ? el.parentElement : el;
+      while (node && node.nodeType===1) {
+        const b = getComputedStyle(node).backgroundColor; layers.push(b);
+        const mm = b.match(/^rgba?\\(([^)]+)\\)/);
+        const parts = mm ? mm[1].split(',') : null;
+        const a = parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0;
+        if (a === 1) break;
+        node = node.parentElement;
+      }
+      const host = ctl || el;
+      const cls = (host.className && typeof host.className==='string') ? '.'+host.className.trim().split(/\\s+/).join('.') : '';
+      iconEls.push({ desc: (host.tagName.toLowerCase() + (host.id?('#'+host.id):'') + cls).slice(0,80) + ownerOf(host), color, bgLayers: layers, bgImage: false });
+    }
     let noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [];
     if (${doFocus ? 'true' : 'false'}) {
       const STATE_MAP = ${JSON.stringify(stateMap || {})};
@@ -542,7 +624,7 @@ function sweepExpression(roots, doFocus, stateMap) {
         }
       }
     }
-    return { textEls, noFocus, faintFocus, thinFocus, ariaState, notKeyboard, scanned: rootEls.length };
+    return { textEls, iconEls, noFocus, faintFocus, thinFocus, ariaState, notKeyboard, scanned: rootEls.length };
   })()`;
 }
 
@@ -1133,6 +1215,7 @@ async function main() {
         if (!INTERACTIVE_ROLES.has(role)) continue;
         const name = (n.name?.value || '').trim();
         if (!name) findings.push({ kind: 'name', plugin: label, role, desc: `<${role}> with no accessible name` });
+        else if (namedByTitleOnly(n)) findings.push({ kind: 'tooltipname', plugin: label, role, desc: `<${role}> "${name.slice(0, 40)}", named only by its title` });
       }
     } catch { /* Accessibility domain unavailable — skip name/role, not a fail */ }
 
@@ -1171,7 +1254,8 @@ async function main() {
       if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
       const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, true, STATE_MAP), returnByValue: true }, sessionId).catch((e) => ({ error: e.message }));
       if (!r.result?.value) { const why = r.error ?? r.exceptionDetails?.exception?.description?.split('\n')[0]; unread.push(`${label} (${mode.name}${why ? `: ${why}` : ''})`); if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); first = false; continue; }
-      const { textEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [] } = r.result.value;
+      const { textEls = [], iconEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [] } = r.result.value;
+      for (const f of iconContrastFindings(iconEls, mode.name)) findings.push({ plugin: label, ...f });
       for (const t of thinFocus) note('focusthin', t.desc, mode.name, { px: t.px });
       for (const f of contrastFindings(textEls, mode.name)) findings.push({ plugin: label, ...f });
       for (const desc of noFocus) note('focus', desc, mode.name);
@@ -1482,6 +1566,7 @@ async function main() {
   const contrast = groupSame(findings.filter((f) => f.kind === 'contrast' && !f.cannotCompute));
   const cannot   = findings.filter((f) => f.kind === 'contrast' && f.cannotCompute);
   const names    = findings.filter((f) => f.kind === 'name');
+  const iconCon  = groupSame(findings.filter((f) => f.kind === 'iconcontrast'));
   const focus    = findings.filter((f) => f.kind === 'focus');
   const focusCon = findings.filter((f) => f.kind === 'focuscontrast');
   const hoverCon = groupSame(findings.filter((f) => f.kind === 'hovercontrast'));
@@ -1489,8 +1574,8 @@ async function main() {
   const keyboard = findings.filter((f) => f.kind === 'keyboard');
   const themes   = [...new Set(modes.map((m) => m.name))];
 
-  const more = ['target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'behaviour', 'statefollows'].map((k) => [k, findings.filter((f) => f.kind === k)]);
-  const buckets = [['contrast', contrast], ['hovercontrast', hoverCon], ['name', names], ['focus', focus], ['focuscontrast', focusCon], ['ariastate', state], ['keyboard', keyboard], ...more].filter(([, l]) => l.length);
+  const more = ['tooltipname', 'target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'behaviour', 'statefollows'].map((k) => [k, findings.filter((f) => f.kind === k)]);
+  const buckets = [['contrast', contrast], ['hovercontrast', hoverCon], ['iconcontrast', iconCon], ['name', names], ['focus', focus], ['focuscontrast', focusCon], ['ariastate', state], ['keyboard', keyboard], ...more].filter(([, l]) => l.length);
   const total = buckets.reduce((n, [, l]) => n + l.length, 0);
   const inThemes = themes.length > 1 ? ` (checked in ${themes.length} themes)` : '';
 
@@ -1561,7 +1646,7 @@ async function main() {
         console.log(`     Where:`);
         for (const f of list.slice(0, 100)) {
           const inSel = String(f.desc ?? '').match(/ in (.+)$/)?.[1];
-          const where = kind === 'contrast' || kind === 'hovercontrast' ? (inSel ? ` · in ${ownerName(f.desc) ?? inSel}` : f.desc ? ` · ${f.desc}` : '') : '';
+          const where = kind === 'contrast' || kind === 'hovercontrast' || kind === 'iconcontrast' ? (inSel ? ` · in ${ownerName(f.desc) ?? inSel}` : f.desc ? ` · ${f.desc}` : '') : '';
           console.log(`       - ${a11yItemLine(kind, f)}${where}`);
         }
         if (list.length > 100) console.log(`       - ...and ${list.length - 100} more`);

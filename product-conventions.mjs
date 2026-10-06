@@ -178,6 +178,19 @@ function prune(conv, binds) {
     intents: Object.fromEntries(Object.entries(conv.intents ?? {}).map(([k, v]) => [k, { label: binds(v.label) ? v.label : null, component: binds(v.component) ? v.component : null }])) };
 }
 
+// How to make the page match, in the composition's own words, for the differences a prop or an order settles.
+const PAGE_PROP = { 'page padding': 'padding', 'space between sections': 'gap', 'screen width': 'width', 'page alignment': 'align' };
+const PLACE = { end: "the page's last part", start: "the page's first part", middle: 'between its other parts' };
+export function howToMatch(d) {
+  const want = String(d.product ?? '').replace(/^"|"$/g, '');
+  if (PAGE_PROP[d.what]) return `give the Page ${PAGE_PROP[d.what]} "${want}"`;
+  if (d.what === 'where the actions sit' && PLACE[want]) return `make the group of actions ${PLACE[want]}`;
+  if (d.what === 'how the actions line up') return `give the Row that holds the actions justify "${want}"`;
+  if (/style$/.test(d.what)) return `give that Text style "${want}"`;
+  if (/^the words for /.test(d.what)) return `label it "${want}"`;
+  return null;
+}
 export function consistencyLine(d) {
-  return `${d.what}: ${d.here} here, ${d.product} on the product's other pages (${d.from})`;
+  const how = howToMatch(d);
+  return `${d.what}: ${d.here} here, ${d.product} on the product's other pages (${d.from})${how ? `: ${how}` : ''}`;
 }

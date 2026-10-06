@@ -422,7 +422,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     try {
       const { guidanceView } = await import('./styleguide-data.mjs');
       const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
-      for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance });
+      // What the products get wrong with it, from the last audit: a rule laid over it, a look-alike, a parent overriding it.
+      const PRODUCT_MISUSE = /hand-built|look-?alike|Nested components keep|Templates compose/i;
+      const seenIn = (c) => (c.differences ?? []).filter((d) => PRODUCT_MISUSE.test(d.check ?? '') || / laid over it /.test(d.what ?? '')).map((d) => d.plain ?? d.what);
+      for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c) });
     } catch { /* no guidance */ }
     const { segmentedUi, radioGroupUi, buttonsAsSegmentedUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
@@ -539,7 +542,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     try {
       const { repoUrl, changelogs, commitUrl, prUrl, fileUrl, defaultBranch } = await import('./component-changelog.mjs');
       const { figmaLink, figmaNodeIds } = await import('./figma-link.mjs');
-      const { ruleLines } = await import('./styleguide-data.mjs');
+      const { ruleLines, issueLink } = await import('./styleguide-data.mjs');
+      const issues = cfg.styleguide?.issues ?? null;   // the tracker's new-issue address, {name} and {title} filled
       const repo = repoUrl(ROOT), branch = cfg.styleguide?.branch ?? defaultBranch(ROOT), ids = figmaNodeIds(ROOT, cfg);
       // Only the project's own files: a product's stylesheet beside it (../a-product) has its own history and repository.
       const inRepo = (f) => !/^\.\.?[\/]|^\//.test(String(f).replace(/^\.\//, '')) && !String(f).startsWith('..');
@@ -563,12 +567,14 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           { label: 'Code', url: w?.at ? fileUrl(repo, branch, w.at[0], w.at[1]) : null },
           ...(docsUrl ? [{ label: 'Documentation', url: String(docsUrl).replace(/\{name\}/g, encodeURIComponent(c.name)) }] : []),
           ...extra.map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })),
+          { label: 'Report an issue', url: issueLink({ template: issues, repo, name: c.name }) },
         ].filter((l) => l.url);
       }
       view.links = [
         { label: 'Figma file', url: cfg.figmaFileKey ? `https://www.figma.com/design/${cfg.figmaFileKey}` : null },
         { label: 'Code repository', url: repo },
         ...(Array.isArray(cfg.styleguide?.links) ? cfg.styleguide.links.filter((l) => l?.url).map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })) : []),
+        { label: 'Send feedback', url: cfg.styleguide?.feedback ?? issueLink({ template: issues, repo, name: null }) },
       ].filter((l) => l.url);
     } catch { /* no links, no changelog */ }
     // How ready each one is (a status the team gave it) and how much of its own file the tests cover, when the
@@ -643,6 +649,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         }
       } catch { /* no pictures: the cards show the names */ }
     }
+    // Where the system could be simpler: one component in several copies, props with nothing to choose, unused ones.
+    try {
+      const { simplifyView } = await import('./styleguide-data.mjs');
+      const usedBy = new Map();
+      for (const c of view.components) for (const u of c.uses ?? []) { const n = typeof u === 'string' ? u : u?.name; if (n) usedBy.set(n, [...(usedBy.get(n) ?? []), c.name]); }
+      view.simplify = simplifyView(view.components.map((c) => ({ ...c, usedBy: usedBy.get(c.name) ?? [] })), { products: view.components.some((c) => (c.usage ?? []).length) });
+    } catch { /* nothing to say */ }
     lastView = view;
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
