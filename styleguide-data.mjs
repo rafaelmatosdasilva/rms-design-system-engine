@@ -119,7 +119,7 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
   const axes = [];
   const modes = cfg.figma?.modes?.length ? cfg.figma.modes : [{ name: 'Light', cssSelector: 'root' }, { name: 'Dark', cssSelector: 'dark-media' }];
   // Each switch is named as Figma names the collection it switches (Styling, Sizing), never by what it is about.
-  const colour = { label: cfg.figma?.colorCollection || 'Mode', values: [] };
+  const colour = { label: cfg.figma?.colorCollection || 'Mode', colour: true, values: [] };
   for (const m of modes) {
     const sel = m.cssSelector ?? 'root';
     if (sel === 'root') colour.values.push({ label: m.name, value: '' });
@@ -1433,6 +1433,22 @@ export function importOf({ tag, syntax, file, text = '', pkg = null, template = 
   else from = `./${strip(file)}`;
   const named = syntax === 'jsx' && new RegExp(`export\\s+(?:function|const|let|class)\\s+${tag}\\b`).test(text);
   return { line: named ? `import { ${tag} } from '${from}';` : `import ${tag} from '${from}';`, from };
+}
+
+// How a product brings in a system whose components are CSS classes (no module to import): its stylesheet, by the name
+// the package gives it. file: the stylesheet's path from the project root · pkg: { name, dir, exports } of the package
+// it belongs to (the root's own counts). → { line, from, css: true } | null. The package's exports name it when they map
+// a path to the file (@acme/ds/theme.css), else the package's name and the path, else the path itself.
+export function stylesheetImport({ file, pkg = null } = {}) {
+  if (!file) return null;
+  const rel = String(file).replace(/^\.\//, '');
+  const inPkg = pkg?.name ? (pkg.dir && pkg.dir !== '.' ? (rel.startsWith(pkg.dir + '/') ? rel.slice(pkg.dir.length + 1) : null) : rel) : null;
+  let from;
+  if (inPkg != null) {
+    const ex = pkg.exports && typeof pkg.exports === 'object' ? Object.entries(pkg.exports).find(([, v]) => typeof v === 'string' && v.replace(/^\.\//, '') === inPkg) : null;
+    from = ex ? `${pkg.name}/${ex[0].replace(/^\.\//, '')}` : `${pkg.name}/${inPkg}`;
+  } else from = `./${rel}`;
+  return { line: `@import '${from}';`, from, css: true };
 }
 
 // The system's components a component is built with: those whose class its markup holds (HTML), or that its own file

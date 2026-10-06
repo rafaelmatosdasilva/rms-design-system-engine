@@ -7,8 +7,13 @@ import {
   parseColor, over, effectiveBg, relLuminance, contrastRatio,
   isLargeText, aaThreshold, contrastFindings, INTERACTIVE_ROLES,
   styleguideTarget, A11Y_GUIDE, a11yItemLine, a11yFindingRecord, summarizeAxe,
-  iconContrastFindings, namedByTitleOnly,
+  iconContrastFindings, namedByTitleOnly, SETTLE_TRANSITIONS,
 } from '../a11y-check.mjs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
 
 test('[axe] summarizeAxe collapses per-node rows into one per rule, busiest first', () => {
   const s = summarizeAxe([
@@ -162,4 +167,25 @@ test('namedByTitleOnly: the name the browser settled on came from the title', ()
   assert.equal(namedByTitleOnly({ name: { value: 'Close', sources: [{ type: 'attribute', attribute: 'aria-label', value: { value: 'Close' } }, { type: 'attribute', attribute: 'title', superseded: true, value: { value: 'x' } }] } }), false);
   assert.equal(namedByTitleOnly({ name: { value: 'Save', sources: [{ type: 'contents', value: { value: 'Save' } }] } }), false);
   assert.equal(namedByTitleOnly({}), false);
+});
+
+// A mode switch starts the component's own transitions: its colours are read once they settle. A button whose text
+// colour transitions and whose background does not read 1:1 for a moment in the dark mode (a false contrast failure).
+const CHROME = findChrome({ playwright: true });
+test('[modes] after a mode switch the colours are read settled, never halfway through a transition', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'settle-test-'));
+  const page = join(dir, 'p.html');
+  writeFileSync(page, '<!doctype html><style>b{color:#111;background:#fff;transition:color 5s}:root[data-c=dark] b{color:#eee;background:#111}</style><b id="x">Cancel</b>');
+  const browser = await launchChrome(CHROME, { tmpPrefix: 'settle-test-' });
+  try {
+    const { send, close } = await connectCDP(browser.wsUrl);
+    const { sessionId } = await openPage(send, pathToFileURL(page).href);
+    assert.equal(await waitForTrue(send, sessionId, FILE_PAGE_LOADED), true);
+    const read = async () => (await send('Runtime.evaluate', { expression: 'getComputedStyle(document.getElementById("x")).color', returnByValue: true }, sessionId)).result.value;
+    await send('Runtime.evaluate', { expression: 'document.documentElement.setAttribute("data-c", "dark")' }, sessionId);
+    assert.equal(await read(), 'rgb(17, 17, 17)', 'mid-transition: the old text colour on the new dark background');
+    await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId);
+    assert.equal(await read(), 'rgb(238, 238, 238)');
+    close();
+  } finally { browser.kill(); }
 });
