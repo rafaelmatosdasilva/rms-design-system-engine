@@ -291,8 +291,6 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   style and colour; a space's token and value), outlined in the accent; a second click puts it down. A number that
   would cover another moves to the nearest free place around it, with a line back (`marker`). A component shown in an
   overlay is drawn as its own element. Nothing is drawn over the live component.
-- **Full width**, in the Playground (none on the measuring page): the component across the whole card, its controls
-  below it; again puts it back.
 - **Width**, in the Playground (none on the measuring page): Fit (the live preview), Phone (375px), Tablet (768px) or
   Desktop (1280px), a frame of that width written with the page's own stylesheets, its icon sheet, the component as
   drawn now and the system's own scripts (`systemScripts`), so its media queries apply and it works there (a click

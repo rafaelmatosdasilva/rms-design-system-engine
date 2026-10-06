@@ -235,7 +235,6 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-note:last-child { margin-bottom: var(--sg-space-m); }
 .pg-header { background: var(--sg-bg); padding: var(--sg-space-s) 0 var(--sg-space-m); margin-bottom: var(--sg-space-xs); }   /* scrolls away; the areas below it stay */
 .pg-stage { display: flex; flex-direction: column; gap: var(--sg-space-l); }
-.pg-preview-card.is-wide { grid-template-columns: 1fr; }   /* Full width: the component across the whole card, its controls below */
 .pg-preview-card { display: grid; grid-template-columns: 1fr minmax(240px, 340px); gap: var(--sg-space-l); align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: var(--sg-space-l); background: var(--sg-bg); box-shadow: var(--sg-shadow); }
 .pg-preview { min-width: 0; min-height: 140px; padding: var(--sg-space-xl); display: flex; align-items: safe center; align-content: safe center; justify-content: safe center; gap: var(--sg-space-m); flex-wrap: wrap; position: relative; isolation: isolate; }
 /* A transparency checkerboard over the system's own page surface: a transparent component shows it, an opaque one covers it. */
@@ -2009,11 +2008,14 @@ a.pg-usage-name { color: var(--sg-text); }
       });
       inspect(e);
       drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
-      if (areaNow === 'play') requestAnimationFrame(drawAnatomy);
       if (AREA === 'variants' && !drawingVariants) requestAnimationFrame(drawVariants);
     }
     // The tables beside the preview, read from the component as it is drawn now.
+    // Every change in the Playground passes here (a control, a text typed, the component used in the preview), so the
+    // anatomy is drawn again from it, once a frame.
+    var anatQueued = false;
     function inspect(e) {
+      if (areaNow === 'play' && !anatQueued) { anatQueued = true; requestAnimationFrame(function () { anatQueued = false; drawAnatomy(); }); }
       var el = (c.cls && (e.classList.contains(clsName(c)) ? e : e.querySelector('.' + clsName(c)))) || e;
       tTokens.innerHTML = rowsHTML(lookRows(el, true).concat(partRows(el, c.name)));
       ownRows(); writeLink(); checkLive(); codeHeight();
@@ -2149,8 +2151,6 @@ a.pg-usage-name { color: var(--sg-text); }
     // container, layers and open and closing classes. Each button is the system's own.
     var actions = sec.querySelector('.pg-actions'), mv = c.motion;
     function action(label, fn) { actions.insertAdjacentHTML('beforeend', sysButton('button', label)); var b = actions.lastElementChild; b.addEventListener('click', function () { fn(b); }); }
-    // Full width: the component across the whole card, for one that needs the room (a bar, a table); again puts it back.
-    if (!ALL) { action('Full width', function (b) { var card = sec.querySelector('.pg-preview-card'), on = !card.classList.contains('is-wide'); card.classList.toggle('is-wide', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); if (WIDTH !== 'fit') renderFrame(); nudge(); }); actions.lastElementChild.setAttribute('aria-pressed', 'false'); }
     // Opened again by a link: its variant set, the controls following.
     sec._link = function (q) {
       if (!fromLink(q)) { writeLink(); return; }
