@@ -1299,6 +1299,8 @@ export function splitFindings(list = []) {
 export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], codeProps = {}, allTokens = [], check = null, agreed = {}, propsAt = null, checkedAt = null } = {}) {
   const lc = (x) => String(x ?? '').toLowerCase().replace(/[\s_-]+/g, '');
   const rows = [];
+  // The code's props as the API reader gives them (a list, each with its name) or keyed by name.
+  if (Array.isArray(codeProps)) codeProps = Object.fromEntries(codeProps.filter((d) => d?.name).map((d) => [d.name, d]));
   // Props: each Figma property, paired with the code prop that realizes it, then the code's own props Figma lacks.
   const fprops = propsSnap[name]?.properties ?? {};
   const say = (d) => {
@@ -1310,11 +1312,16 @@ export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], 
   };
   const paired = new Set();
   const notBuilt = new Set(unbuilt.map((u) => lc(u.label ?? u)));
+  // What goes inside it: in an HTML and CSS system (no code props) the markup puts any content in, so a Figma slot or
+  // component swap is realized by what the markup holds; with code props, a slot by the children it takes.
+  const html = !Object.keys(codeProps).length;
   for (const [key, d] of Object.entries(fprops)) {
     const label = key.split('#')[0];
     const ctl = controls.find((k) => lc(k.label) === lc(label));
     const own = ctl ? null : Object.keys(codeProps).find((n) => lc(n) === lc(label));
     const codeName = ctl ? (ctl.prop ?? ctl.label) : own;
+    const inside = !codeName && !notBuilt.has(lc(label)) && (html ? d.type === 'SLOT' || d.type === 'INSTANCE_SWAP' : d.type === 'SLOT' && 'children' in codeProps);
+    if (inside) { rows.push({ type: 'Prop', figma: { name: label, value: say(d) }, code: html ? { name: 'its content', value: 'what the markup puts inside' } : { name: 'children', value: 'what it wraps' }, status: 'match', at: propsAt }); continue; }
     if (codeName && !notBuilt.has(lc(label))) {
       paired.add(lc(codeName));
       const def = codeProps[codeName]?.default;
