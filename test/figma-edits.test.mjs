@@ -129,3 +129,38 @@ test('names written otherwise than the rest of the system are renamed in their c
   assert.deepEqual([set.children[0].name, Object.keys(set.componentPropertyDefinitions).join()], ['state=Default, show=true', 'state,Label Content#1:2']);
   assert.deepEqual((await run(figma)).changed, [], 'run again, nothing changes');
 });
+
+test('each annotation no check reads goes to Figma with the wording a check reads, beside the to do list; the annotation is not changed', async () => {
+  const { annotationEdits, annotationWording, gapEdits } = await import('../figma-edits.mjs');
+  const { annotationUses } = await import('../a11y-check.mjs');
+  assert.equal(annotationWording('This is a button'), 'Role: button');
+  assert.equal(annotationWording('acts like a toggle'), 'Role: togglebutton');
+  assert.equal(annotationWording('Pressing Esc'), 'Escape closes it');
+  assert.equal(annotationWording('Title is H2'), 'Heading level 2');
+  assert.equal(annotationWording('Screen reader says "Close panel"'), 'aria-label: Close panel');
+  assert.equal(annotationWording('red text under the field', 'Error'), 'Role: errormessage');
+  assert.equal(annotationWording('Sizing: fill'), null);
+  const snap = { dialog: { nodeId: '2:2', annotations: [{ label: 'Role: dialog' }, { label: 'Esc' }, { label: 'Sizing: fill' }], layerAnnotations: [{ layer: 'Hint', annotations: [{ label: 'shown under the field' }] }] } };
+  const edits = annotationEdits(snap, annotationUses);
+  assert.equal(edits.length, 1);
+  assert.deepEqual(edits[0].items.map((i) => [i.text, i.layer ?? null, i.wording]), [['Esc', null, 'Escape closes it'], ['Sizing: fill', null, null], ['shown under the field', 'Hint', 'Role: description']]);
+  assert.deepEqual(annotationEdits({ x: { annotations: [{ label: 'Role: button' }] } }, annotationUses), [], 'every annotation read: nothing to send');
+  const lines = editLines(edits).join('\n');
+  assert.match(lines, /Annotations no check reads, listed in Figma on the page "Design system to do", frame "Annotations no check reads" \(3 annotations no check reads, 2 with a wording a check reads\)/);
+  assert.match(lines, /• dialog: "Esc" → write it as "Escape closes it"/);
+  assert.match(lines, /• dialog › Hint: "shown under the field" → write it as "Role: description"/);
+  assert.match(lines, /• dialog: "Sizing: fill" \(a note for people\)/);
+  const all = [...edits, ...gapEdits([{ need: 'a toggle switch', kind: 'component', prototypes: ['notify'] }])];
+  const node = (type) => ({ type, name: '', children: [], x: 0, y: 0, appendChild(k) { this.children.push(k); k.parent = this; }, remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); } });
+  const doc = { children: [] };
+  const fake = { root: doc, getNodeByIdAsync: async () => null, loadFontAsync: async () => {},
+    createPage() { const p = node('PAGE'); p.parent = doc; doc.children.push(p); return p; }, createFrame: () => node('FRAME'), createText: () => node('TEXT') };
+  const go = () => new Function('figma', `return (async () => { ${applyScript(all)} })();`)(fake);
+  const r = await go();
+  assert.equal(r.todo, 'Design system to do › Gaps from prototypes: 1 need; Design system to do › Annotations no check reads: 3 annotations');
+  const page = doc.children[0];
+  const notes = page.children.find((n) => n.name === 'Annotations no check reads');
+  assert.equal(notes.children[1].children[1].characters, 'on the component · says: Esc · a check reads it written as: Escape closes it');
+  await go();
+  assert.deepEqual([doc.children.length, page.children.length], [1, 2], 'written afresh, not added twice');
+});

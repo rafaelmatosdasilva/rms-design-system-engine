@@ -92,5 +92,9 @@ export function stateContrastFindings(code, cfg = {}) {
       else check(label, modes[0], ch.color?.value ?? base.color, ch.backgroundColor?.value ?? base.backgroundColor, src);
     }
   }
-  return { findings, checked };
+  // A contrast the team keeps on purpose (ds-config knownLowContrast: "badge" for every state, or one state as the
+  // audit writes it, "badge [Type=Warning · light]") is left out, and counted as kept.
+  const keep = new Set(cfg.knownLowContrast ?? []);
+  const kept = findings.filter((f) => keep.has(f.component) || keep.has(`${f.component} [${f.state} · ${f.mode}]`));
+  return { findings: findings.filter((f) => !kept.includes(f)), checked, kept: kept.length };
 }

@@ -24,3 +24,13 @@ test('state contrast skips the declared disabled state, however it is named', ()
   assert.equal(stateContrastFindings(code).findings.length, 1);
   assert.equal(stateContrastFindings(code, { states: { disabled: { prop: 'Status', value: 'Off' } } }).findings.length, 0);
 });
+
+test('a contrast the team keeps on purpose (knownLowContrast) is left out and counted as kept', () => {
+  const code = { components: { chip: { instance: { hasText: true }, props: { fontSize: { value: '12px' } },
+    colors: { light: { color: 'rgb(0, 0, 0)', backgroundColor: 'rgb(255, 255, 255)' } },
+    states: { 'Status=Off': { produced: 'class .off', changed: { color: { value: 'rgb(240, 240, 240)' } } } } } } };
+  const one = stateContrastFindings(code, { knownLowContrast: ['chip [Status=Off · light]'] });
+  assert.deepEqual([one.findings.length, one.kept], [0, 1]);
+  assert.equal(stateContrastFindings(code, { knownLowContrast: ['chip'] }).kept, 1);
+  assert.deepEqual([stateContrastFindings(code, { knownLowContrast: ['chip [Status=Off · dark]'] }).findings.length], [1]);
+});
