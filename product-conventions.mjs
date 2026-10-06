@@ -4,7 +4,11 @@
 // sections, the screen width, the style of the page heading, where the actions go, and the answer given to a need the
 // system lacks (one page must not use a chip for a switch while another shows a Missing box). These are read from the
 // pages already made (the prototypes, the starting points read from designed screens) and from
-// prototypes/conventions.json, which the team may edit: what it writes wins over what the pages show.
+// prototypes/conventions.json, which the team may edit: what it writes wins over what the pages show. Beyond the frame,
+// they share the text styles of body text and section headings, and what each kind of action is called and made with
+// (Save on every page, never Submit on one; a button for it everywhere, never a chip on one page). Where no value is
+// shared yet (one page, or pages that disagree evenly), the first page made sets it: a product without patterns or
+// templates still gets pages that match each other.
 //
 // Pure: no I/O. prototype.mjs reads the files.
 
@@ -16,7 +20,7 @@ const words = (s) => [...new Set((String(s).toLowerCase().match(/[a-z][a-z0-9]{2
 // actionNames: the system components that are actions (a role of button, or described as an action).
 export function pageFacts(tree, { actionNames = [] } = {}) {
   const actions = new Set(actionNames);
-  const facts = { page: null, heading: null, actions: null, needs: [], frame: [] };
+  const facts = { page: null, heading: null, actions: null, needs: [], frame: [], body: null, section: null, intents: [] };
   if (!tree) return facts;
   if (tree.component === 'Page') facts.page = { padding: tree.props?.padding ?? null, gap: tree.props?.gap ?? null, width: tree.props?.width != null ? String(tree.props.width) : null, align: tree.props?.align ?? null };
   const texts = [];
@@ -37,6 +41,14 @@ export function pageFacts(tree, { actionNames = [] } = {}) {
   facts.frame = [...new Set(top(tree, 0))];
   const h = texts.find((t) => t.as === 'h1') ?? texts.find((t) => /^h[1-3]$/.test(t.as ?? '')) ?? null;
   if (h) facts.heading = { style: h.style ?? null, as: h.as ?? null };
+  // Body text: the style most of its plain text is set in; a section heading: the style of its first h2.
+  const plain = texts.filter((t) => !/^h[1-6]$/.test(t.as ?? '') && t.style);
+  if (plain.length) { const c = new Map(); for (const t of plain) c.set(t.style, (c.get(t.style) ?? 0) + 1); facts.body = [...c].sort((a, b) => b[1] - a[1])[0][0]; }
+  const h2 = texts.find((t) => t.as === 'h2' && t.style);
+  if (h2) facts.section = h2.style;
+  // Each action by what it does (save, cancel, next, back, delete, create): its words and the component it is.
+  const each = (n) => { if (!n) return; if (!PIECE.has(n.component) && actions.has(n.component)) { const label = labelOf(n.props); const intent = intentOf(label); if (intent) facts.intents.push({ intent, label, component: n.component }); } (n.children ?? []).forEach(each); };
+  each(tree);
   // The actions: the last group of the page made only of actions (or a lone action at the end), and how it is placed.
   const kids = tree.children ?? [];
   const isAction = (n) => n && !PIECE.has(n.component) && actions.has(n.component);
@@ -51,6 +63,13 @@ export function pageFacts(tree, { actionNames = [] } = {}) {
   return facts;
 }
 
+// What an action does, from its words: save, cancel, next, back, delete or create; null for anything else.
+const INTENTS = [['save', /^(save|submit|apply|confirm|done|update|send|ok)\b/i], ['cancel', /^(cancel|discard|dismiss|close|never ?mind)\b/i], ['next', /^(next|continue|proceed|go on|get started)\b/i],
+  ['back', /^(back|previous|go back|return)\b/i], ['delete', /^(delete|remove|erase)\b/i], ['create', /^(new|create|add)\b/i]];
+export const intentOf = (label) => (label ? INTENTS.find(([, re]) => re.test(String(label).trim()))?.[0] ?? null : null);
+const labelOf = (p = {}) => Object.entries(p).find(([k, v]) => typeof v === 'string' && v.trim() && /label|text|content|title/i.test(k) && !/show|icon/i.test(k))?.[1]?.trim() ?? null;
+const INTENT_WORDS = { save: 'saving', cancel: 'cancelling', next: 'going on', back: 'going back', delete: 'deleting', create: 'creating' };
+
 // What the product's pages agree on. pages: { name: facts }. A screen a designer made in Figma (facts.designed) weighs
 // two, any other page one; a value counts at a weight of two and above, and only when no other value weighs as much.
 // Authored (prototypes/conventions.json) wins. Each convention says where it comes from.
@@ -60,11 +79,23 @@ export function deriveConventions(pages = {}, authored = {}) {
     const count = new Map();
     for (const [name, f] of Object.entries(pages)) { const v = get(f); if (v != null) { if (!count.has(v)) count.set(v, { pages: [], weight: 0 }); const c = count.get(v); c.pages.push(name); c.weight += f.designed ? 2 : 1; } }
     const ranked = [...count].sort((a, b) => b[1].weight - a[1].weight);
-    if (!ranked.length || ranked[0][1].weight < 2 || (ranked[1] && ranked[1][1].weight === ranked[0][1].weight)) return null;
-    return { value: ranked[0][0], pages: ranked[0][1].pages };
+    if (!ranked.length) return null;
+    if (ranked[0][1].weight >= 2 && !(ranked[1] && ranked[1][1].weight === ranked[0][1].weight)) return { value: ranked[0][0], pages: ranked[0][1].pages };
+    // Nothing shared yet: the first page made sets it.
+    const order = Object.entries(pages).filter(([, f]) => get(f) != null).sort((a, b) => (a[1].made ?? Infinity) - (b[1].made ?? Infinity) || a[0].localeCompare(b[0]));
+    return { value: get(order[0][1]), pages: [order[0][0]], first: true, made: order[0][1].made ?? null };
   };
   for (const k of ['padding', 'gap', 'width', 'align']) { const v = vote((f) => f.page?.[k]); if (v) out.page[k] = v; }
   const hs = vote((f) => f.heading?.style); if (hs) out.heading.style = hs;
+  out.text = {};
+  const bs = vote((f) => f.body); if (bs) out.text.body = bs;
+  const ss = vote((f) => f.section); if (ss) out.text.section = ss;
+  out.intents = {};
+  for (const intent of Object.keys(INTENT_WORDS)) {
+    const label = vote((f) => (f.intents ?? []).find((x) => x.intent === intent)?.label ?? null);
+    const component = vote((f) => (f.intents ?? []).find((x) => x.intent === intent)?.component ?? null);
+    if (label || component) out.intents[intent] = { label, component };
+  }
   const at = vote((f) => f.actions?.at); if (at) out.actions.at = at;
   const j = vote((f) => f.actions?.justify); if (j) out.actions.justify = j;
   // Frame components most of the weight shares (two pages, or a designed screen, at least).
@@ -108,12 +139,16 @@ function overlap(a, b) {
 }
 
 const LABEL = { padding: 'page padding', gap: 'space between sections', width: 'screen width', align: 'page alignment' };
-const from = (c) => (c.authored ? 'prototypes/conventions.json' : `${c.pages.join(', ')}`);
+const from = (c) => (c.authored ? 'prototypes/conventions.json' : c.first ? `${c.pages.join(', ')}, the first page made` : `${c.pages.join(', ')}`);
 
 // Where one page departs from the product's conventions: { what, here, product, from } per difference.
 export function consistencyFindings(facts, conv) {
   const out = [];
   if (!conv) return out;
+  // A decision set only by the first page made binds the pages made after it, never a screen a designer made or a page
+  // made before it.
+  const binds = (c) => !c?.first || (!facts.designed && (facts.made == null || c.made == null || c.made <= facts.made));
+  conv = prune(conv, binds);
   for (const k of ['padding', 'gap', 'width', 'align']) {
     const c = conv.page?.[k];
     if (c && facts.page && (facts.page[k] ?? null) !== c.value) out.push({ what: LABEL[k], here: facts.page[k] ?? 'none', product: c.value, from: from(c) });
@@ -122,11 +157,25 @@ export function consistencyFindings(facts, conv) {
   if (conv.actions?.at && facts.actions && facts.actions.at !== conv.actions.at.value) out.push({ what: 'where the actions sit', here: facts.actions.at, product: conv.actions.at.value, from: from(conv.actions.at) });
   if (conv.actions?.justify && facts.actions && facts.actions.justify !== conv.actions.justify.value) out.push({ what: 'how the actions line up', here: facts.actions.justify, product: conv.actions.justify.value, from: from(conv.actions.justify) });
   for (const c of conv.frame ?? []) if (facts.frame && !facts.frame.includes(c.component)) out.push({ what: 'the page\'s frame', here: `no ${c.component}`, product: c.component, from: from(c) });
+  if (conv.text?.body && facts.body && facts.body !== conv.text.body.value) out.push({ what: 'body text style', here: facts.body, product: conv.text.body.value, from: from(conv.text.body) });
+  if (conv.text?.section && facts.section && facts.section !== conv.text.section.value) out.push({ what: 'section heading style', here: facts.section, product: conv.text.section.value, from: from(conv.text.section) });
+  for (const x of facts.intents ?? []) {
+    const c = conv.intents?.[x.intent];
+    if (c?.label && x.label.toLowerCase() !== String(c.label.value).toLowerCase()) out.push({ what: `the words for ${INTENT_WORDS[x.intent]}`, here: `"${x.label}"`, product: `"${c.label.value}"`, from: from(c.label) });
+    if (c?.component && x.component !== c.component.value) out.push({ what: `the component for ${INTENT_WORDS[x.intent]} ("${x.label}")`, here: x.component, product: c.component.value, from: from(c.component) });
+  }
   for (const n of facts.needs ?? []) {
     const c = (conv.needs ?? []).find((x) => overlap(x.words, words(n.need)));
     if (c && c.answer !== n.answer) out.push({ what: `the answer to "${c.need}"`, here: n.answer, product: c.answer, from: from(c) });
   }
   return out;
+}
+
+// The conventions a page is held to: those that bind it.
+function prune(conv, binds) {
+  const keep = (o) => Object.fromEntries(Object.entries(o ?? {}).filter(([, c]) => binds(c)));
+  return { ...conv, page: keep(conv.page), heading: keep(conv.heading), actions: keep(conv.actions), text: keep(conv.text),
+    intents: Object.fromEntries(Object.entries(conv.intents ?? {}).map(([k, v]) => [k, { label: binds(v.label) ? v.label : null, component: binds(v.component) ? v.component : null }])) };
 }
 
 export function consistencyLine(d) {

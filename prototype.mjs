@@ -10,17 +10,19 @@
 //
 // Exit 0 = drawn. Exit 1 = the composition breaks a rule (nothing drawn). Exit 2 = no input, no catalog.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve, basename, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
-import { checkPrototype, systemScales, nodesOf, mergeGaps, gapLine, pieceCatalog } from './prototype-pieces.mjs';
+import { checkPrototype, systemScales, nodesOf, mergeGaps, groupLayout, gapLine, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
 import { loadContext, purposeLines, ruleLines, usesAgainstPurpose, requestFocus, focusLines, cut } from './prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from './product-conventions.mjs';
-import { splitStates, applyState, statesOwed, stateFindings } from './prototype-states.mjs';
+import { splitStates, applyState, statesOwed, stateFindings, normaliseValues } from './prototype-states.mjs';
+import { linksOf, flowGraph, teamFlows, flowFindings } from './prototype-flows.mjs';
 import { screenFor, renderPrototype, compareWithScreen, screenLines, owedFromScreen, interactionLines, screenWidths, fitLines } from './prototype-render.mjs';
+import { visualLines } from './prototype-visual.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 export const PROTOTYPE_TEMPLATE = join(ENGINE, 'templates', 'prototype.template.html');
@@ -154,7 +156,9 @@ export function productPages(ROOT, sys, except = null) {
       const raw = JSON.parse(readFileSync(join(dir, f), 'utf8'));
       // A starting point read from a designed screen carries the designer's decisions.
       const tree = treeOf(splitStates(raw).ui);
-      pages[name] = { ...pageFacts(tree, { actionNames: sys.actionNames }), designed: /^Starting point read from the screen/.test(raw?.$note ?? ''), label: name, text: textsOf(tree), file: `prototypes/${f}` };
+      // When it was first made: where nothing is shared yet, the first page made sets the product's decisions.
+      let made = null; try { const st = statSync(join(dir, f)); made = st.birthtimeMs || st.mtimeMs; } catch { /* unknown */ }
+      pages[name] = { ...pageFacts(tree, { actionNames: sys.actionNames }), designed: /^Starting point read from the screen/.test(raw?.$note ?? ''), label: name, text: textsOf(tree), file: `prototypes/${f}`, made };
     } catch { /* not a composition */ }
   }
   // A screen designed in Figma and not brought into prototypes/ yet still says how the product's pages look.
@@ -168,6 +172,7 @@ export function productPages(ROOT, sys, except = null) {
 
 // Check one prototype and, when it holds, draw it and keep its gaps. raw is the composition, or { prototype, gaps }.
 function drawOne(ROOT, name, raw, sys) {
+  normaliseValues(raw, sys.catalog);   // "false" for False: what was meant, never a stop
   const split = splitStates(raw);
   const ui = split.ui;
   const declared = Array.isArray(raw?.gaps) ? raw.gaps : [];
@@ -187,13 +192,19 @@ function drawOne(ROOT, name, raw, sys) {
   }
   // The states the page owes (an empty list, a form sent with a mistake, what the request and the guidelines name).
   r.findings.push(...stateFindings(statesOwed(ui, { context: sys.context, request, catalog: sys.catalog }), split.states));
+  // A link to a page of the flow that is not drawn yet.
+  for (const l of linksOf(name, ui)) if (l.to !== name && !existsSync(join(ROOT, 'prototypes', `${l.to}.json`))) r.findings.push({ rule: null, source: 'the flow', level: 'warning', id: l.id, kind: 'flow', need: `${l.to} page`, message: `"${l.label}" goes to "${l.to}", which is not drawn yet: draw prototypes/${l.to}.json, or the flow stops there` });
   r.counts.errors = r.findings.filter((f) => f.level === 'error').length;
   r.counts.warnings = r.findings.length - r.counts.errors;
   r.ok = r.counts.errors === 0;
   // The same decisions as the product's other pages (frame, heading, actions, the answer to each missing need).
   const { pages, authored } = productPages(ROOT, sys, name);
-  const conventions = deriveConventions(pages, authored);
-  const differs = r.ok ? consistencyFindings(pageFacts(treeOf(ui), { actionNames: sys.actionNames }), conventions) : [];
+  // This page votes too: where the other pages are split, the decision most pages share wins, never the first page
+  // made over two that agree.
+  let made = Date.now(); try { const st = statSync(join(ROOT, 'prototypes', `${name}.json`)); made = st.birthtimeMs || st.mtimeMs; } catch { /* not saved yet */ }
+  const self = { ...pageFacts(treeOf(ui), { actionNames: sys.actionNames }), made };
+  const conventions = deriveConventions({ ...pages, [name]: self }, authored);
+  const differs = r.ok ? consistencyFindings(self, conventions) : [];
   // What the documentation says about each component this prototype uses, beside what it uses it for.
   const uses = usesAgainstPurpose(sys.context, nodesOf(ui).nodes);
   const outDir = join(ROOT, OUT_DIR, 'prototypes');
@@ -208,7 +219,7 @@ function drawOne(ROOT, name, raw, sys) {
     page = join(outDir, `${name}.html`);
     const mine = mergeGaps({ [name]: r.gaps }).map(gapLine);
     // What the reply owes the person: every gap of the prototype just drawn (the Stop hook holds the reply to it).
-    writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name, pending: true, gaps: [...mergeGaps({ [name]: r.gaps }).map((g) => ({ need: g.need, kind: g.kind, line: gapLine(g) })), ...differs.map((d) => ({ need: `${d.what} ${d.product}`, kind: 'consistency', line: consistencyLine(d) })), ...r.findings.filter((f) => f.kind === 'request').map((f) => ({ need: f.message.replace(/^the request asks for /, '').split(' and ')[0], kind: 'request', line: f.message })), ...r.findings.filter((f) => f.kind === 'state').map((f) => ({ need: `${f.state} state`, kind: 'state', line: f.message }))] }, null, 2) + '\n');
+    writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name, pending: true, gaps: [...mergeGaps({ [name]: r.gaps }).map((g) => ({ need: g.need, kind: g.kind, line: gapLine(g) })), ...differs.map((d) => ({ need: `${d.what} ${d.product}`, kind: 'consistency', line: consistencyLine(d) })), ...r.findings.filter((f) => f.kind === 'request').map((f) => ({ need: f.message.replace(/^the request asks for /, '').split(' and ')[0], kind: 'request', line: f.message })), ...r.findings.filter((f) => f.kind === 'state').map((f) => ({ need: `${f.state} state`, kind: 'state', line: f.message })), ...r.findings.filter((f) => f.kind === 'flow').map((f) => ({ need: f.need, kind: 'flow', line: f.message }))] }, null, 2) + '\n');
     writeFileSync(page, prototypePage({ name, tree: treeOf(ui), states, parts: sys.parts, scales: sys.scales, gaps: mine, catalog: sys.catalog, fonts: sys.fonts !== false, note: `${r.counts.components} parts · only the design system's own components${r.gaps.some((g) => g.kind === 'layout') ? ', with the engine\'s neutral layout' : ''}` }));
   }
   return { ...r, page, differs, uses, used: [...new Set(nodesOf(ui).nodes.map((n) => n.component))] };
@@ -224,12 +235,15 @@ export function sourceLines(ctx) {
 export function conventionLines(conv) {
   if (!conv) return [];
   const LABEL = { padding: 'page padding', gap: 'space between sections', width: 'screen width', align: 'alignment' };
-  const src = (c) => (c.authored ? 'the team' : c.pages.join(', '));
+  const src = (c) => (c.authored ? 'the team' : c.first ? `${c.pages.join(', ')}, the first page made` : c.pages.join(', '));
   const lines = [
     ...Object.entries(conv.page ?? {}).map(([k, c]) => `${LABEL[k]} ${c.value} (${src(c)})`),
     ...(conv.heading?.style ? [`page heading in ${conv.heading.style.value} (${src(conv.heading.style)})`] : []),
     ...(conv.actions?.at ? [`actions at the ${conv.actions.at.value}${conv.actions.justify ? `, lined up ${conv.actions.justify.value}` : ''} (${src(conv.actions.at)})`] : []),
     ...((conv.frame ?? []).length ? [`frame: ${conv.frame.map((c) => c.component).join(', ')} (${src(conv.frame[0])})`] : []),
+    ...(conv.text?.body ? [`body text in ${conv.text.body.value} (${src(conv.text.body)})`] : []),
+    ...(conv.text?.section ? [`section headings in ${conv.text.section.value} (${src(conv.text.section)})`] : []),
+    ...Object.entries(conv.intents ?? {}).map(([intent, c]) => `the action for ${({ save: 'saving', cancel: 'cancelling', next: 'going on', back: 'going back', delete: 'deleting', create: 'creating' })[intent]}: ${[c.label ? `"${c.label.value}"` : null, c.component ? c.component.value : null].filter(Boolean).join(', a ')} (${src(c.label ?? c.component)})`),
     ...(conv.needs ?? []).map((n) => `"${n.need}" is ${n.answer} (${src(n)})`),
   ];
   return lines.length ? ['', 'How this product\'s pages are arranged (keep a new page the same):', ...lines.map((l) => `  ${l}`)] : [];
@@ -263,8 +277,10 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
     '',
     'Format: { "component": "Page", "props": { "padding": "<spacing token>" }, "children": [ { "component": "<name>", "props": { "<option>": "<value>" } } ] }',
     'A system component used for a need it does not quite meet carries "standInFor": "<the need>" in its props; a need nothing fits is { "component": "Missing", "props": { "need": "…" } }.',
+    `A flow is one prototype per page, linked: a part that leads to the next page carries "goesTo": "<prototype name>" ("<name>#<state>" for one of its states); ${cmd} --prototype --flow checks the links against the flows the team wrote down.`,
     'It works as in the product (the system\'s scripts run, a selection moves, a field takes typing). A part that opens another (a dialog, a menu, a popover) carries "opens": "<id>" in its props, and the part it opens has that "id": it is drawn closed and opens on a click.',
     'Its other states go beside it: "states": { "empty": { "<id>": { …that part in this state… } }, "error": { … }, "loading": { … } }, each naming by "id" only the parts that differ (null leaves one out). A page with a list owes an empty state, one that takes input an error state, and each state the request or the guidelines name.',
+    'It is reviewed as drawn: the parts of a column start on one line, one spacing per arrangement, one primary action in view, the main heading the largest text and each heading above its text, lines under 90 characters.',
     'It is tried at every screen width, in every state, with the words as written and 40% longer: nothing may run past the screen, be cut or spill, a control\'s label stays on one line, and on a phone every target is 24px or more. Row "wrap" and Columns "minWidth" let a layout fit a narrow screen.',
     ...(starts.length ? ['', `Prototypes already here (starting points read from designed screens among them): ${starts.map((f) => `prototypes/${f}`).join(', ')}; copy the closest one`] : []),
     '',
@@ -281,7 +297,7 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
   if (!browser || !page) return null;
   const tree = treeOf(splitStates(raw).ui);
   const pick = screenFor(name, raw, tree, screens ?? sys.context.screens ?? [], sys.catalog, slug);
-  const r = await renderPrototype(ROOT, cfg, page, { name, screen: pick?.screen ?? null, mode: pick?.mode ?? 'sibling', widths: screenWidths(sys.context.breakpoints) }).catch((e) => ({ why: String(e?.message ?? e).split('\n')[0] }));
+  const r = await renderPrototype(ROOT, cfg, page, { name, screen: pick?.screen ?? null, mode: pick?.mode ?? 'sibling', widths: screenWidths(sys.context.breakpoints), textStyles: sys.scales?.text ?? [] }).catch((e) => ({ why: String(e?.message ?? e).split('\n')[0] }));
   if (r.why) return { why: r.why };
   // What does not fit at some width, in some state, is owed in the reply as the words are written; with longer words, listed.
   const fitOwed = (r.fit?.findings ?? []).filter((f) => f.asWritten);
@@ -290,27 +306,39 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
     const lines = fitLines(fitOwed, { states: r.fit.states });
     try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...fitOwed.map((f, i) => ({ need: f.text || f.component || f.path, kind: 'fit', line: lines[i].replace(/^⚠️\s+/, '') }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
   }
-  if (!pick) return { picture: r.picture, cmp: [], a11y: prototypeA11y(ROOT, page), interactions: r.interactions, fit: r.fit };
+  // The design review's findings are owed in the reply too: fixed in the composition, or said.
+  if (r.review?.findings?.length) {
+    const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
+    try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...r.review.findings.map((f) => ({ need: f.message.split(':')[0], kind: 'visual', line: f.message }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
+  }
+  // What the system cannot give the page (no heading style above its body text) is a gap the reply names.
+  if (r.review?.limits?.length) {
+    const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
+    try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...r.review.limits.map((l) => ({ need: l.need, kind: 'text style', line: l.message }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
+  }
+  if (!pick) return { picture: r.picture, cmp: [], a11y: prototypeA11y(ROOT, page, usedIn(tree)), interactions: r.interactions, fit: r.fit, review: r.review };
   const cmp = compareWithScreen(tree, r.rendered, pick.screen, { mode: pick.mode, catalog: sys.catalog, drawn: new Set((sys.parts.view.components ?? []).map((c) => c.name)) });
   const owed = owedFromScreen(cmp);
   if (owed.length) {
     const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
     try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...owed.map((d) => ({ need: `${d.what} ${pick.screen.name}`, kind: 'screen', line: d.message }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
   }
-  const a11y = prototypeA11y(ROOT, page);
+  const a11y = prototypeA11y(ROOT, page, usedIn(tree));
   const ownA11y = (a11y ?? []).filter((i) => i.own);
   if (ownA11y.length) {
     const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
     try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...ownA11y.map((i) => ({ need: `accessibility ${i.issue}`, kind: 'a11y', line: `${i.issue}: ${i.selector} (${i.fix})` }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
   }
-  return { ...pick, cmp, picture: r.picture, visual: r.visual, a11y, interactions: r.interactions, fit: r.fit };
+  return { ...pick, cmp, picture: r.picture, visual: r.visual, a11y, interactions: r.interactions, fit: r.fit, review: r.review };
 }
 
+// The components a composition uses, by name.
+const usedIn = (tree) => { const out = new Set(); const walk = (n) => { if (!n) return; if (n.component) out.add(n.component); (n.children ?? []).forEach(walk); }; walk(tree); return out; };
 // The drawn page through the accessibility check: contrast in every mode, names, one main heading, the keyboard. The
 // engine's own bar (pt-…) is left out. Returns [{ issue, selector, fix }] or null when the check could not run.
 // The page's own composition (its main heading, a text's colour on its surface) is owed in the reply; what a system
 // component does is the component's, for the audit.
-export function prototypeA11y(ROOT, page) {
+export function prototypeA11y(ROOT, page, used = null) {
   const r = spawnSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(page).href, '--json'], { cwd: ROOT, encoding: 'utf8', timeout: 240000, env: process.env });
   const out = String(r.stdout ?? '');
   const at = out.indexOf('{');
@@ -318,7 +346,9 @@ export function prototypeA11y(ROOT, page) {
   try {
     const d = JSON.parse(out.slice(at));
     if (d.notChecked) return null;
-    return (d.issues ?? []).filter((i) => !/(^|[#. ])pt-(bar|outline|gaps|modes|title|note|seg)/.test(String(i.selector ?? ''))).map((i) => ({ issue: i.issue, selector: String(i.selector ?? ''), fix: i.fix, own: i.issue === 'heading' || (i.issue === 'contrast' && /pt-text/.test(String(i.selector ?? ''))) }));
+    // Only what is on the page: a note that a component the page does not use was not checked is not about it.
+    return (d.issues ?? []).filter((i) => !/(^|[#. ])pt-(bar|outline|gaps|modes|title|note|seg)/.test(String(i.selector ?? '')) && !/no instance shows its .*not checked/.test(String(i.selector ?? ''))
+      && !(used && /^([\w-]+): /.test(String(i.selector ?? '')) && !used.has(/^([\w-]+): /.exec(String(i.selector))[1]))).map((i) => ({ issue: i.issue, selector: String(i.selector ?? ''), fix: i.fix, own: i.issue === 'heading' || (i.issue === 'contrast' && /pt-text/.test(String(i.selector ?? ''))) }));
   } catch { return null; }
 }
 export function a11yLines(list) {
@@ -357,7 +387,7 @@ async function fromScreens(ROOT, cfg, file, sys, { force = false, browser = true
   if (h.gaps.length) console.log(`   spacing between parts: ${h.gaps.map((g) => `${g.name} ×${g.n}`).join(', ')}`);
   if (h.components.length) console.log(`   components used: ${h.components.map((c) => `${c.name} (${c.screens.length})`).join(', ')}`);
   if (h.repeated.length) { console.log('   structures that repeat (template candidates):'); for (const t of h.repeated) console.log(`     • ${t.structure} in ${t.screens.join(', ')}`); }
-  const merged = mergeGaps(JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'gaps.json'), 'utf8')).byPrototype);
+  const merged = groupLayout(mergeGaps(JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'gaps.json'), 'utf8')).byPrototype));
   if (merged.length) {
     console.log(`\n🧩 GAPS  ${merged.length}  (what the design system would need; nothing was invented)`);
     for (const g of merged.slice(0, 30)) console.log(`   • ${gapLine(g)}`);
@@ -365,6 +395,54 @@ async function fromScreens(ROOT, cfg, file, sys, { force = false, browser = true
   }
   console.log(`\nNEXT: open the drawn screens to compare them with Figma; start a new prototype from the closest one in prototypes/, then run ${CLI} --prototype prototypes/<name>.json.\n`);
   return results.every((r) => r.ok) ? 0 : 1;
+}
+
+// --flow: how the prototypes link, against the flows the team wrote down.
+function flowReport(ROOT, sys) {
+  const dir = join(ROOT, 'prototypes');
+  let files = [];
+  try { files = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'conventions.json'); } catch { /* none yet */ }
+  const pages = {};
+  for (const f of files) {
+    try {
+      const ui = splitStates(JSON.parse(readFileSync(join(dir, f), 'utf8'))).ui;
+      const tree = treeOf(ui);
+      const head = (function find(n) { if (!n) return null; if (n.component === 'Text' && /^h[12]$/.test(n.props?.as ?? '')) return n.props.text; for (const k of n.children ?? []) { const h = find(k); if (h) return h; } return null; })(tree);
+      pages[f.replace(/\.json$/, '')] = { ui, heading: head };
+    } catch { /* not a composition */ }
+  }
+  const g = flowGraph(Object.fromEntries(Object.entries(pages).map(([n, p]) => [n, p.ui])));
+  const flows = teamFlows(sys.context?.rules ?? []);
+  const findings = flowFindings(pages, flows);
+  console.log(`\n🔗 FLOWS  ${g.names.length} page(s) in prototypes/, ${g.links.length} link(s)`);
+  for (const l of g.links) console.log(`   ${l.from} → ${l.to}${l.state ? ` (its ${l.state} state)` : ''}  by "${l.label}"`);
+  if (g.starts.length) console.log(`   starts: ${g.starts.join(', ')}`);
+  if (g.deadEnds.length) console.log(`   ends: ${g.deadEnds.join(', ')} (nothing leads on from there: the end of a flow, or a page that needs a way on or back)`);
+  for (const f of flows) console.log(`   the team's flow "${f.name}" (${f.from}): ${f.steps.join(' → ')}`);
+  if (!flows.length) console.log('   no flow written in the guidelines or the design intent: the links above are the flow');
+  // The pages of a flow match each other, the first page made setting what none share yet, and each page after the
+  // first has a way back when one of them has.
+  const { pages: facts } = productPages(ROOT, sys);
+  const inFlow = [...new Set(g.links.flatMap((l) => [l.from, l.to]))].filter((n) => facts[n]);
+  // Within a flow its order decides which page came first: the start sets what no two pages share yet.
+  const placed = (x) => ({ ...facts[x], made: g.order[x] ?? Number.MAX_SAFE_INTEGER, designed: facts[x].designed });
+  for (const n of inFlow) {
+    const all = Object.fromEntries(inFlow.map((x) => [x, placed(x)]));
+    for (const d of consistencyFindings(placed(n), deriveConventions(all, {}))) findings.push({ level: 'error', kind: 'flow', need: `${n} ${d.what}`, message: `${n}: ${consistencyLine(d).replace("on the product's other pages", 'on the other pages of the flow')}` });
+  }
+  const before = (n) => g.forward.filter((l) => l.to === n).map((l) => l.from);
+  const hasBack = (n) => (facts[n]?.intents ?? []).some((x) => x.intent === 'back') || g.links.some((l) => l.from === n && before(n).includes(l.to));
+  const later = inFlow.filter((n) => !g.starts.includes(n) && before(n).length);
+  if (later.some(hasBack)) for (const n of later.filter((x) => !hasBack(x))) findings.push({ level: 'warning', kind: 'flow', need: `${n} way back`, message: `${n} has no way back to ${before(n).join(' or ')}, and ${later.filter(hasBack).join(', ')} has one: give it the same back action ("goesTo": "${before(n)[0]}")` });
+  // A flow that does not hold (a page not drawn, a step that does not link, pages that decide differently) is not done.
+  for (const f of findings) console.log(`   ❌ ${f.message}`);
+  if (findings.length) {
+    const outDir = join(ROOT, OUT_DIR, 'prototypes'); mkdirSync(outDir, { recursive: true });
+    writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name: 'flow', pending: true, gaps: findings.map((f) => ({ need: f.need, kind: 'flow', line: f.message })) }, null, 2) + '\n');
+  }
+  if (!findings.length) console.log('   ✅ the flow holds: every step drawn and linked, its pages decide alike');
+  console.log(`\nNEXT: ${findings.length ? 'fix each ❌ line in the page it names (the same words for the same action on every page of the flow, draw the missing page, give the action that leads on "goesTo"), draw the changed pages again, and run this again until the flow holds; tell the person only what cannot be fixed.' : `open the first page${g.starts.length ? ` (.design-system-engine-out/prototypes/${g.starts[0]}.html)` : ''} and click through.`}\n`);
+  return findings.length ? 1 : 0;
 }
 
 // --consistency: every page of the product against the others: where one decides differently.
@@ -395,10 +473,10 @@ export async function runPrototype(ROOT, argv) {
   let cfg = {};
   try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* defaults */ }
   const file = screensFile ?? input;
-  if (!args.includes('--catalog') && !args.includes('--consistency') && (!file || !existsSync(resolve(ROOT, file)))) {
+  if (!args.includes('--catalog') && !args.includes('--consistency') && !args.includes('--flow') && (!file || !existsSync(resolve(ROOT, file)))) {
     console.log(`\nUsage: ${CLI} --prototype <composition.json>`);
     console.log(`       ${CLI} --prototype --from-screens <screen-capture.json>`);
-    console.log(`       ${CLI} --prototype --catalog | --consistency`);
+    console.log(`       ${CLI} --prototype --catalog | --consistency | --flow`);
     console.log('   --no-browser draws without measuring the page in Chrome against the designed screens.');
     console.log('   The composition names the design system\'s components and their options, in the format --check-ui reads,');
     console.log('   plus the engine\'s layout pieces (Page, Stack, Row, Columns, Text) and Missing for a need nothing fits.');
@@ -418,6 +496,7 @@ export async function runPrototype(ROOT, argv) {
     return 0;
   }
   if (args.includes('--consistency')) return consistencyReport(ROOT, sys);
+  if (args.includes('--flow')) return flowReport(ROOT, sys);
   if (screensFile) return fromScreens(ROOT, cfg, screensFile, sys, { force: args.includes('--force'), browser: !args.includes('--no-browser') });
 
   let raw;
@@ -432,7 +511,10 @@ export async function runPrototype(ROOT, argv) {
   if (JSON_MODE) { process.stdout.write(JSON.stringify({ ok: r.ok, page: page && page.replace(ROOT + '/', ''), findings: r.findings, counts: r.counts, gaps: r.gaps, used, screen: seen?.screen ? { name: seen.screen.name, mode: seen.mode, differences: seen.cmp, picture: seen.picture.replace(ROOT + '/', ''), visual: seen.visual } : null, picture: seen?.picture ? seen.picture.replace(ROOT + '/', '') : null }, null, 2) + '\n'); return r.ok ? 0 : 1; }
 
   console.log(`\nPrototype  ·  ${name}  ·  ${r.counts.components} part(s)`);
-  for (const f of r.findings) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} ${f.message}${f.rule ? `  (rule ${f.rule}: ${RULES[f.rule - 1]})` : f.source ? `  (${f.source})` : ''}`);
+  // The same line for several parts (three tags, each experimental) is said once, with how many.
+  const said = new Map();
+  for (const f of r.findings) { const k = `${f.level}|${f.message}`; if (said.has(k)) said.get(k).n++; else said.set(k, { f, n: 1 }); }
+  for (const { f, n } of said.values()) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} ${f.message}${n > 1 ? ` (${n} places)` : ''}${f.rule ? `  (rule ${f.rule}: ${RULES[f.rule - 1]})` : f.source ? `  (${f.source})` : ''}`);
   if (!r.ok) {
     console.log(`\n❌ ${r.counts.errors} error(s): nothing drawn.`);
     console.log(`\nNEXT: fix each ❌ line in ${input} (only the system's components and their own options; Missing for a need nothing fits), then run ${CLI} --prototype ${input} again.\n`);
@@ -453,6 +535,11 @@ export async function runPrototype(ROOT, argv) {
   else if (seen?.picture) console.log(`\n   picture of the page: ${seen.picture.replace(ROOT + '/', '')}`);
   if (seen?.a11y) { console.log(''); for (const l of a11yLines(seen.a11y)) console.log(l); }
   else if (seen?.why) console.log(`\n   ⏭  not measured in the browser (${seen.why})`);
+  if (seen?.review && seen.review.score != null) {
+    const v = seen.review;
+    console.log(`\n🎨 DESIGN REVIEW  ${v.score}/10${v.findings.length ? '' : ': aligned, one spacing rhythm, one main action, a clear hierarchy, lines that read'}`);
+    for (const l of visualLines(v)) console.log(`   ${l}`);
+  }
   if (seen?.fit) {
     const f = seen.fit, lines = fitLines(f.findings, { states: f.states });
     console.log(`\n📱 EVERY SIZE AND STATE  ${f.widths.join(', ')} · ${f.states.length} state${f.states.length === 1 ? '' : 's'} (${f.states.join(', ')}) · the words as written and 40% longer${lines.length ? `: ${lines.length} problem(s)` : ', all fit'}`);
@@ -463,7 +550,7 @@ export async function runPrototype(ROOT, argv) {
   const tried = (seen?.interactions ?? []).length;
   if (tried) { console.log(`\n🖱  HOW IT WORKS  ${tried} tried in the browser${works.length ? '' : ', all as in a product'}`); for (const l of works) console.log(`   ${l}`); }
   const placed = seen?.cmp ? owedFromScreen(seen.cmp) : [];
-  const gaps = mergeGaps({ [name]: r.gaps });
+  const gaps = groupLayout(mergeGaps({ [name]: r.gaps }));
   if (gaps.length) {
     console.log(`\n🧩 GAPS  ${gaps.length}  (what the design system would need; nothing was invented)`);
     for (const g of gaps) console.log(`   • ${gapLine(g)}`);
@@ -474,6 +561,7 @@ export async function runPrototype(ROOT, argv) {
     r.differs.length ? 'Make each 📐 line match the other pages, or tell the person why this page differs.' : null,
     placed.length ? `Make each ⚠️ line under 📏 match "${seen.screen.name}", or tell the person why this page differs from it.` : null,
     (seen?.a11y ?? []).some((i) => i.own) ? 'Fix each ⚠️ line under ♿ in the composition (one main heading: a Text with as h1; a text colour that reads on its surface), or tell the person.' : null,
+    (seen?.review?.findings ?? []).length ? 'Fix each ⚠️ line under 🎨 in the composition (one primary action, one spacing per arrangement, a heading style above its text, a narrower column) and draw it again until it scores 10, or tell the person why a line stays.' : null,
     (seen?.fit?.findings ?? []).length ? 'Fix each ⚠️ line under 📱 in the composition (a shorter label, Row wrap, Columns minWidth, fewer parts in a row) and draw it again, or tell the person; a line that happens only with longer words is for a translated product: tell the person.' : null,
     works.length ? 'Fix each ⚠️ line under 🖱 in the composition ("opens" names the "id" of the part it opens), or tell the person.' : null,
     seen?.picture ? `Look at ${seen.picture.replace(ROOT + '/', '')} before you answer.` : null,

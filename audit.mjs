@@ -4275,7 +4275,7 @@ function reportFull(label, items, shown) {
   // The plain result to relay in the chat as is, and one NEXT line with the exact command, so an agent
   // relays the engine's words instead of its own reading. Also kept for `--summary`.
   try {
-    const { nextStep, buildSummary } = await import('./next-step.mjs');
+    const { nextStep, buildSummary, measuredLines } = await import('./next-step.mjs');
     const outDir = dirname(codeSnapshotPath(cfg));
     const hb = (f) => (existsSync(join(ROOT, outDir, 'handback', f)) ? join(outDir, 'handback', f) : null);
     const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
@@ -4290,7 +4290,7 @@ function reportFull(label, items, shown) {
     }
     let a11yFound = null;
     try { a11yFound = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
-    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true, a11y: a11yFound });
+    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true, a11y: a11yFound, measured: measuredLines(gates).length });
     const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
     const { dataStateLine } = await import('./next-step.mjs');
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };

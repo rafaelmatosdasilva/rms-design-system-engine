@@ -348,11 +348,18 @@ const nameWords = (n) => wordsOf(String(n).replace(/^[._]+/, ''));
 // with "standInFor", never a component passed off as it.
 const KINDS = ['switch', 'toggle', 'toast', 'snackbar', 'dialog', 'modal', 'tabs', 'checkbox', 'radio', 'slider', 'progress bar', 'spinner', 'tooltip', 'avatar',
   'badge', 'table', 'menu', 'dropdown', 'select', 'stepper', 'accordion', 'banner', 'alert', 'breadcrumb', 'pagination', 'date picker', 'search field', 'empty state', 'divider'];
+// Needs a request says in a phrase rather than by a component's name: "a message confirming the changes were saved"
+// is a toast or a banner. Each holds when the system has a component named for one of its kinds.
+const PHRASES = [
+  { kind: 'confirmation message', re: /\b(messages?|notices?|notifications?)\b[^.;]{0,50}\b(confirm\w*|saved|success\w*|done|sent)\b|\bconfirm\w*\b[^.;]{0,30}\b(messages?|notices?)\b|\b(success|saved) (messages?|notices?)\b/i, by: ['toast', 'snackbar', 'banner', 'alert', 'notification', 'message'] },
+];
 export function kindsLacking(ctx, request) {
   const asked = wordsOf(request);
   const names = Object.keys(ctx.components ?? {}).map(nameWords);
-  return KINDS.filter((kind) => { const w = wordsOf(kind); return w.length && w.every((x) => asked.includes(x)) && !names.some((n) => w.every((x) => n.includes(x))); })
+  const kinds = KINDS.filter((kind) => { const w = wordsOf(kind); return w.length && w.every((x) => asked.includes(x)) && !names.some((n) => w.every((x) => n.includes(x))); })
     .filter((kind, i, all) => !all.some((o) => o !== kind && o.includes(kind) && all.includes(o)));   // a toggle switch is one need
+  for (const p of PHRASES) if (p.re.test(String(request ?? '')) && !kinds.some((k) => p.by.includes(k)) && !names.some((n) => p.by.some((b) => n.includes(b)))) kinds.push(p.kind);
+  return kinds;
 }
 export function requestFindings(ctx, request, nodes) {
   const out = [];
@@ -368,7 +375,8 @@ export function requestFindings(ctx, request, nodes) {
   // reply owes it.
   for (const kind of kindsLacking(ctx, request)) {
     const w = wordsOf(kind);
-    const named = nodes.some((n) => { const t = wordsOf(`${n.props?.standInFor ?? ''} ${n.component === 'Missing' ? n.props?.need ?? '' : ''}`); return w.every((x) => t.includes(x)); });
+    // Said by a stand-in, a Missing box, or a part whose purpose names it (judged by its own rules).
+    const named = nodes.some((n) => { const t = wordsOf(`${n.props?.standInFor ?? ''} ${n.props?.purpose ?? ''} ${n.component === 'Missing' ? n.props?.need ?? '' : ''}`); return w.every((x) => t.includes(x)); });
     if (!named) out.push({ rule: null, source: 'the request', level: 'warning', id: null, said: `kind:${kind}`, kind: 'request', message: `the request asks for a ${kind} and the system has none: show it as a Missing box, or a component with "standInFor": "${kind}", and say the system has no ${kind}` });
   }
   for (const n of nodes) {

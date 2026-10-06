@@ -53,3 +53,10 @@ test('the summary says whether the Figma data was refreshed, so no one has to in
   assert.ok(s.indexOf('**In parity.**') < s.indexOf('**Figma data was not refreshed'));
   assert.doesNotMatch(buildSummary({ verdict: 'pass', gates: [] }), /Figma data/);
 });
+
+test('NEXT names the measured differences beside the failing gates, so a relay keeps them', () => {
+  const failing = [{ label: 'Token values  (color · sizing)', lines: ['❌ radii/chip'] }];
+  assert.match(nextStep({ failing, measured: 2 }), /and the fix it names, and the 2 differences under "Measured differences"\./);
+  assert.match(nextStep({ failing, measured: 1 }), /the 1 difference under "Measured differences"/);
+  assert.doesNotMatch(nextStep({ failing }), /Measured differences/);
+});
