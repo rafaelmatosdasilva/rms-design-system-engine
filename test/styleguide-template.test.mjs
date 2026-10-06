@@ -184,8 +184,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').getBoundingClientRect().height`), 24);
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true);
-    // No tokens tables in the Playground: Parity lists every token, Inspect gives a part's value.
-    assert.equal(await run(`document.querySelectorAll('#c-chip [data-area="play"] .pg-tokens, #c-chip [data-area="play"] .pg-own').length`), 0);
+    // The tokens behind what is drawn follow the control just set; every token it has is in Parity, not here.
+    assert.match(await run(`document.querySelector('#c-chip .pg-tokens').textContent`), /--chip-background/);
+    assert.equal(await run(`document.querySelectorAll('#c-chip [data-area="play"] .pg-own').length`), 0, 'no Its tokens table');
     // The code a product writes for what is shown: its own tag, the prop just set, a default left out; copied by the
     // system's own button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-code code').textContent`), '<Chip Size="L" />');
@@ -249,9 +250,18 @@ test('in the browser: no script error, a control changes the real component, the
     // lists everything: the chip's Size, Icon and pressed sides, each check said once with the variants it holds in.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const a11y = await run(`[...document.querySelectorAll('#c-chip .pg-doc')].find((d) => /Accessibility/.test(d.querySelector('h3').textContent)).textContent`);
-    // One table by WCAG criterion: what it means, what was found with where it comes from, the status; a count above it
-    // and when the audit last ran. Only what applies: no row is said not to be needed.
-    assert.match(a11y, /WCAG.*What it means.*What was found.*Status/);
+    // One table by WCAG criterion, in the Playground's card: what was found, where it is read from, the status; a count
+    // above it and when the audit last ran. Only what applies: no row is said not to be needed. No separate table of
+    // sources.
+    assert.match(a11y, /WCAG.*What was found.*Source.*Status/);
+    assert.doesNotMatch(a11y, /What it means|Where it is read from/);
+    assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
+    // What a criterion means opens from its name, by a click (the focus in it, Escape gives it back) or a rest of the pointer.
+    const tip = `[...document.querySelectorAll('#c-chip .pg-wcag-tip')].find((b) => /^2\.1\.1/.test(b.textContent))`;
+    await run(`${tip}.click()`);
+    assert.match(await run(`document.querySelector('.sg-token-pop').hidden + '|' + document.querySelector('.sg-token-pop').textContent`), /^false\|WCAG 2\.1\.1 Keyboard \(A\)What it means.*How it is checked/);
+    await run(`document.querySelector('.sg-token-pop').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+    assert.equal(await run(`document.querySelector('.sg-token-pop').hidden + '|' + (document.activeElement === ${tip})`), 'true|true');
     assert.match(a11y, /2\.1\.1 Keyboard \(A\)/);
     assert.match(a11y, /a <button type="button"> with aria-pressed/);
     assert.match(a11y, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
@@ -261,7 +271,9 @@ test('in the browser: no script error, a control changes the real component, the
     const live = await run(`document.querySelector('#c-chip .pg-a11y-rows').textContent`);
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
-    assert.match(live, /This page, in the browser/, 'each finding says where it comes from');
+    assert.match(live, /The style guide, in the browser/, 'each finding says where it comes from');
+    // What a person checks names the component and the part it is about.
+    assert.match(live, /On chip, its (\w+ part|text)[^.]*, a person checks that/);
     // Each area has its own address, to send someone to it.
     assert.match(await run(`location.hash`), /^#c-chip\/accessibility/);
     // What it does when used is tried on a few variants after that, one at a time: then the Playground is drawn as set.
@@ -275,8 +287,9 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /^1\.4\.3/.test(r.cells[0].textContent)).textContent`), /\d+\.\d:1.*(Done|To fix)/s, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
-    // The code under the stage, as tall as what it holds.
-    assert.equal(await run(`(() => { const c = document.querySelector('#c-chip [data-area="play"] .pg-code'); return !!c && c.offsetHeight < 200; })()`), true, 'one line of code is not stretched');
+    // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
+    assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
+    assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || (c.offsetHeight <= t.offsetHeight + 1 && c.offsetHeight < t.offsetHeight - 2); })()`), true, 'one line of code is not stretched to the tokens');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Documentation,Accessibility,Parity,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
@@ -384,6 +397,14 @@ test('in the browser: no script error, a control changes the real component, the
     assert.ok(await run(`(() => { const p = document.querySelector('#c-chip .pg-preview').getBoundingClientRect(), t = document.querySelector('#c-chip .pg-stage-bar--top').getBoundingClientRect(); return t.bottom <= p.top + 1; })()`), 'the bar sits above the stage, never over the component');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'log').click()`);
     assert.equal(await run(`(() => { const s = document.querySelector('#c-chip .pg-areas-scroll'), b = s.querySelector('[data-v="log"]').getBoundingClientRect(), r = s.getBoundingClientRect(); return s.scrollLeft > 0 && b.right <= r.right + 1; })()`), true, 'Changelog scrolled into view');
+    // On a phone a table of several columns is a block per row: no head row over the text, each value under the name of its
+    // column, no cell narrower than the card, nothing wider than the screen.
+    for (const area of ['parity', 'a11y']) {
+      await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === '${area}').click()`);
+      await new Promise((r) => setTimeout(r, 150));
+      assert.equal(await run(`(() => { const t = document.querySelector('#c-chip [data-area="${area}"] .pg-par-table'), rows = [...t.querySelectorAll('tbody tr')], card = t.closest('.pg-par-card').getBoundingClientRect();
+        return getComputedStyle(t.querySelector('thead')).position === 'absolute' && rows.length > 0 && rows.every((r) => getComputedStyle(r).display === 'block' && [...r.cells].every((td, i) => i === 0 || !td.textContent.trim() || td.getAttribute('data-label')) && [...r.cells].every((td) => td.getBoundingClientRect().width >= card.width - 64 || !td.textContent.trim())) && document.documentElement.scrollWidth <= innerWidth; })()`), true, area + ' reads as blocks on a phone');
+    }
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
     // How to use it: the same four sections on every page, a missing one said; the overview counts them.
@@ -509,10 +530,11 @@ test('a title in the style guide has no line under it; each type style lists its
   assert.match(tpl, /row\.querySelector\('table'\)\.innerHTML = rowsHTML\(lines\);/);   // a token table, as a component has
 });
 
-test('the Playground has no Computed box and no tokens tables: Parity lists every token, Inspect a part\'s value', () => {
+test('the Playground has the tokens behind what is drawn, no Computed box and no Its tokens table: Parity lists every token', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   assert.doesNotMatch(tpl, /pg-computed|>Computed</);
-  assert.doesNotMatch(tpl, /class="pg-tokens"|class="pg-own"|>Its tokens</);
+  assert.match(tpl, /<div class="pg-inspect-head">Tokens<\/div><table class="pg-tokens">/);
+  assert.doesNotMatch(tpl, /class="pg-own"|>Its tokens</);
 });
 
 test('typography follows Figma: its text styles in Figma\'s order, each value named by the Figma variable it binds', () => {
