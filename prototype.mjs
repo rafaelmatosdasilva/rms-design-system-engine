@@ -185,7 +185,8 @@ function drawOne(ROOT, name, raw, sys) {
   for (const s of split.states) {
     const { ui: sui, unknown } = applyState(ui, s.overrides);
     for (const id of unknown) r.findings.push({ rule: 2, level: 'error', id, message: `state "${s.name}" names "${id}", and no part has that id: give the part that differs an "id" and name it there` });
-    const rs = checkPrototype(sui, opts);
+    // The request holds each state too: a part a state adds is checked against what the documentation rules out.
+    const rs = checkPrototype(sui, { ...opts, request });
     for (const f of rs.findings) { const message = `state "${s.name}": ${f.message}`; if (!r.findings.some((x) => x.message === f.message || x.message === message)) r.findings.push({ ...f, message, ...(f.said ? { said: `${s.name}:${f.said}` } : {}) }); }
     for (const g of rs.gaps) if (!r.gaps.some((x) => x.kind === g.kind && x.need === g.need)) r.gaps.push(g);
     states.push({ name: s.name, tree: treeOf(sui) });

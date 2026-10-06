@@ -1,5 +1,29 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: specs, every variant, a token panel, names held to one style (continuous evaluation)
+
+What changed since the entry below (engine e67aeb3): reference/usage.md, reference/config.md and the Figma edits recipe: the style guide's Specs area, every variant at once, a token panel in place, Full width, Simplify, issue links, common mistakes from the products; property and option names held to the style most of the system writes, listed in the differences and renamed in Figma after a yes; icon contrast and title-only names in the accessibility check; a docs surface that is not there is not a pass; an experimental component may be used and one a part never holds goes beside it; each state held to the request and the documentation; a request that opens a part owes an opens; --check-ui on a page checks it as an edit. The guide changed in `cookbook/figma-edits.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `05eea94dbbcb` · Project measured: `13d811a9d668`
+
+| Haiku, engine b454dee | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.055 |
+| Input a run | 95k | 96k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 95k. Records: `records/2026-10-06-check-ui-on-a-page`.
+
+The eleven prototype tasks with the skill on Haiku, this engine: 33/33 ($3.70, 3 runs each). On the way here the
+measurement found four engine gaps, each now a check with its test: a run read "tag is experimental" (filed under
+rule 1) as forbidden and left the New label as a Missing box (32/33); a tag a saved state added passed unchecked
+though the guidelines rule a tag out for a message, and a confirmation was drawn as a state after an id written inside
+props (31/33, engine 4b9460f); and on engine a13db77 (70/70, 33/33) the guide runs read 112k a run, because
+`--check-ui` on the gallery page failed as not valid JSON (36 times in ten new-ui-saved runs, the same on the
+engine before) and the agent fell back to a full audit. Each sentence the engine prints for these now says what to
+do; this version reads 96k a run.
+
 ## 2026-10: Prototypes: flows that hold, lists owe an empty state, what the system cannot give said once (continuous evaluation)
 
 What changed since the entry below (engine ce48769): the prototype recipe and reference/usage.md: --flow stops with ❌ until its pages decide alike, every page voting; a list owes an empty state; a state's part changes props; false read as False; a heading at the largest text style and a missing confirmation message are said once as gaps; a part opened from layout pieces is a dialog the system lacks; NEXT names the measured differences; a Missing box carries what the guidelines say the system lacks; the router row for the visual comparison names where the Figma image comes from. The guide changed in `cookbook/prototype.md`, `reference/usage.md`, `rms-design-system-engine.md`.

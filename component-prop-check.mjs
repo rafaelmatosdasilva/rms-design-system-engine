@@ -65,6 +65,17 @@ if (!Object.entries(SNAP).some(([k, v]) => k !== '_updated' && v?.properties && 
   process.exit(2);
 }
 
+// One way of writing names across the system: each property and option written otherwise than most of the system's
+// is a difference the Figma file owns, with its rename (naming-consistency.mjs). Printed with every result, never a
+// failure of the props check itself.
+const { namingFindings, namingLine } = await import('./naming-consistency.mjs');
+const NAMING = cfg.namingConsistency === false ? [] : namingFindings(SNAP).findings;
+function printNaming() {
+  if (!NAMING.length) return;
+  console.log(`\n─── Named differently from the rest of the system (${NAMING.length}: rename in Figma, then the code's contract follows) ──`);
+  for (const f of NAMING) console.log(`  ⚠️  ${namingLine(f)}`);
+}
+
 const KNOWN_UNIMPLEMENTED = await inProgressNames(ROOT, cfg);
 const KNOWN_PROP_EXCEPTIONS = new Set(cfg.knownPropExceptions ?? []);   // "Component/prop"
 const COMPONENT_SELECTORS = cfg.componentSelectors ?? {};
@@ -216,6 +227,7 @@ if (cfg.frameworkComponents === false && cfg.htmlRealization) {
   if (UNMAPPED.length && STRICT) for (const u of UNMAPPED) console.log(`     ❌ UNMAPPED ${u} (htmlRealizationStrict)`);
   else if (UNMAPPED.length) console.log(`     ⚠️  author ds-config.json → htmlRealizations to verify these: ${UNMAPPED.slice(0, 12).join(', ')}${UNMAPPED.length > 12 ? ` … (+${UNMAPPED.length - 12})` : ''}`);
   const hardFail = UNREALIZED.length + (STRICT ? UNMAPPED.length : 0);
+  printNaming();
   console.log(hardFail ? `\n❌ HTML realization: ${hardFail} unrealized/unmapped\n` : `\n✅ HTML realization: every mapped Figma property is realized in code\n`);
   process.exit(hardFail ? 1 : 0);
 }
@@ -403,6 +415,7 @@ if (ROLE_FAIL.length)  { console.log('\n─── Role (Figma\'s annotation says
 if (SUGGEST.length)    { console.log('\n─── Possible renames (advisory) ──'); for (const l of SUGGEST) console.log(`  ℹ️ ${l}`); }
 if (VALUE_INFO.length) { console.log('\n─── Values not verified (advisory) ──'); for (const l of VALUE_INFO.slice(0, 20)) console.log(`  ℹ️ ${l}`); }
 if (EXTRA.length)      { console.log('\n─── Extra code props (advisory) ──'); for (const l of EXTRA.slice(0, 20)) console.log(`  ℹ️ ${l}`); }
+printNaming();
 
 if (fail) { console.log(''); process.exit(1); }
 console.log('\nEvery Figma component property maps to a matching code prop, with the right default and variants. ✓\n');

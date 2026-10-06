@@ -25,7 +25,6 @@
 
 ✅  [5] Every mode is covered  (tokens adapt across light/dark and all configured modes)
        ✅ OK        9/9  (adapts across modes, and matches Figma per mode where value-checked)
-       ⏭  SKIPPED   0  (no CSS var, documented)
 
 ✅  [6] Exception lists are valid  (no stale or overly broad entries)
        ⏭  no design-system-engine-map.mjs - no exception list to check.
@@ -48,15 +47,15 @@
        ✅ 0 dead CSS classes  (every rule matches something in the markup)
        ✅ Clean - no literal diverges from Figma
        ℹ️  9 hardcoded literal(s) match the Figma value - parity OK, not failed (global snapshot values):
-            [global] <DIR>/src/theme.css:37:  height: 32px; box-sizing: border-box; flex-shrink: 0;
-            [global] <DIR>/src/theme.css:41:  font-size: 14px; font-weight: 500; line-height: 20px;
-            [global] <DIR>/src/theme.css:49:  height: 24px; box-sizing: border-box; flex-shrink: 0;
-            [global] <DIR>/src/theme.css:53:  font-size: 12px; font-weight: 500; line-height: 16px;
-            [global] <DIR>/src/theme.css:56:.tp-chip .tp-chip__icon { display: none; width: 12px; height: 12px; background: currentColor; }
-            [global] <DIR>/src/theme.css:57:.tp-chip.tp-chip--l { height: 32px; }
-            [global] <DIR>/src/theme.css:60:.tp-chip.tp-chip--l.tp-chip--icon { height: 36px; }
-            [global] <DIR>/src/theme.css:64:  height: 36px; box-sizing: border-box; flex-shrink: 0;
-            [global] <DIR>/src/theme.css:67:  font-size: 14px; line-height: 20px;
+            [global] src/theme.css:37:  height: 32px; box-sizing: border-box; flex-shrink: 0;
+            [global] src/theme.css:41:  font-size: 14px; font-weight: 500; line-height: 20px;
+            [global] src/theme.css:49:  height: 24px; box-sizing: border-box; flex-shrink: 0;
+            [global] src/theme.css:53:  font-size: 12px; font-weight: 500; line-height: 16px;
+            [global] src/theme.css:56:.tp-chip .tp-chip__icon { display: none; width: 12px; height: 12px; background: currentColor; }
+            [global] src/theme.css:57:.tp-chip.tp-chip--l { height: 32px; }
+            [global] src/theme.css:60:.tp-chip.tp-chip--l.tp-chip--icon { height: 36px; }
+            [global] src/theme.css:64:  height: 36px; box-sizing: border-box; flex-shrink: 0;
+            [global] src/theme.css:67:  font-size: 14px; line-height: 20px;
        ✅ 0 container-type declaration(s) safe (definite width or block-level); 0 exempt
 
 ✅  [12] Nested components keep their own styles  (no parent rule overrides a child component)

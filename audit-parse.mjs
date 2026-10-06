@@ -46,7 +46,7 @@ export const GATE_SUMMARY = {
   'state-check.mjs': /COVERED|UNCOVERED|⚠️|⏭ HIDDEN/,
   'state-binding-check.mjs': /COVERED|MISSING/,
   'state-opacity-check.mjs': /CORRECT|MISMATCH/,
-  'component-prop-check.mjs': /OK|MISSING|NAME|VALUE|SLOT|NO FILE|EXTRA|RENAME\?|REALIZED|UNREALIZED|UNMAPPED|VIA STATE/,
+  'component-prop-check.mjs': /OK|MISSING|NAME|VALUE|SLOT|NO FILE|EXTRA|RENAME\?|REALIZED|UNREALIZED|UNMAPPED|VIA STATE|named differently from the rest/,
   'component-composition-check.mjs': /OK|MISSING|NO FILE|EXTRA|SKIP/,
   'template-composition-check.mjs': /USES|MISSING|NO FILE|ORDER|skipped/,
   'html-structure-check.mjs': /✅|❌|ℹ️  \[15\]/,

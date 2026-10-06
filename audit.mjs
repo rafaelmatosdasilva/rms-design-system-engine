@@ -495,7 +495,7 @@ if (process.argv.includes('--figma-edits')) {
   let feConfig = {};
   try { feConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   try {
-    const { figmaEdits, gapEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const { figmaEdits, gapEdits, renameEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
     // What the prototypes needed and the system lacks: the design team's to do list.
     let gaps = [];
@@ -503,7 +503,10 @@ if (process.argv.includes('--figma-edits')) {
     let propsSnap = null;
     try { propsSnap = JSON.parse(readFileSync(resolve(ROOT, feConfig.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { if (!gaps.length) { console.error('❌ no Figma component snapshot: refresh Figma first (rms-design-system-engine --refresh-figma).'); process.exit(1); } }
     const parts = propsSnap ? await generateStyleguide(ROOT, feConfig, { partsOnly: true, names: Object.keys(propsSnap).filter((k) => !k.startsWith('_')) }) : null;
-    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []) : []), ...gapEdits(gaps)];
+    // Names written otherwise than most of the system's: renamed in their component sets, after the same yes.
+    let renames = [];
+    if (propsSnap && feConfig.namingConsistency !== false) { const { namingFindings } = await import('./naming-consistency.mjs'); renames = renameEdits(propsSnap, namingFindings(propsSnap).findings); }
+    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []) : []), ...renames, ...gapEdits(gaps)];
     const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits);
     for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null })) console.log(l);
     if (edits.length) console.log(`   (${relative(ROOT, files.json)} · ${relative(ROOT, files.script)})`);
@@ -1589,8 +1592,10 @@ function reportFull(label, items, shown) {
     const perComponent = (l) => /⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🖼  (⚠️|✓) /.test(l);
     const summary    = out.split('\n').filter(l => /✅|❌|⚠️  MEASURED|⚠️  VARIANTS|⚠️  NO-SHRINK|⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🔗 .* in Figma: |↳ |📋 census: |least checked: |🖼  /.test(l) && l.trim())
       .filter(l => !_scopeForms.length || !perComponent(l) || _lineInScope(l)).map(l => l.trim());
+    // A ❌ line the summary already shows is not said again under it.
+    const inSummary = new Set(summary);
     const failDetails = pass ? [] : out.split('\n')
-      .filter(l => l.trim().startsWith('❌') && !l.includes('FAIL  0'))
+      .filter(l => l.trim().startsWith('❌') && !l.includes('FAIL  0') && !inSummary.has(l.trim()))
       .map(l => '  ' + l.trim()).slice(0, 20);
     return { pass, lines: [...summary, ...failDetails] };
   }
@@ -1694,6 +1699,8 @@ function reportFull(label, items, shown) {
   }
 
   // ── Inline gate computations (no subprocess) ─────────────────────────────────
+  // An age in hours, said as people say it: 5 hours, 3 days, 277 days.
+  const ageWords = (h) => (h < 48 ? `${h} hour${h === 1 ? '' : 's'}` : `${Math.floor(h / 24)} days`);   // as the summary counts them
   function computeGate1() {
     const vars      = snapshotAge(SNAP_VARS);
     const struct    = snapshotAge(SNAP_STRUCT);
@@ -1807,7 +1814,7 @@ function reportFull(label, items, shown) {
     if (vars === null) {
       lines.push(C.red(`${SNAP_VARS} ${nullReason(SNAP_VARS)} /rms-design-system-engine Phase 1`)); warn = true;
     } else if (vars > 24) {
-      lines.push(C.yellow(`⚠️  ${SNAP_VARS} is ${vars}h old - refresh with the Phase 1 Plugin API capture`));
+      lines.push(C.yellow(`⚠️  ${SNAP_VARS} is ${ageWords(vars)} old - refresh with the Phase 1 Plugin API capture`));
     } else {
       lines.push(`${SNAP_VARS} ✓ (updated today)`);
     }
@@ -1815,7 +1822,7 @@ function reportFull(label, items, shown) {
     if (struct === null) {
       lines.push(C.red(`${SNAP_STRUCT} ${nullReason(SNAP_STRUCT)} /rms-design-system-engine Phase 1`)); warn = true;
     } else if (struct > 24) {
-      lines.push(C.yellow(`⚠️  ${SNAP_STRUCT} is ${struct}h old - refresh with the Phase 1 Step 1c Plugin API capture`));
+      lines.push(C.yellow(`⚠️  ${SNAP_STRUCT} is ${ageWords(struct)} old - refresh with the Phase 1 Step 1c Plugin API capture`));
     } else {
       lines.push(`${SNAP_STRUCT} ✓ (updated today)`);
     }
@@ -1847,7 +1854,7 @@ function reportFull(label, items, shown) {
       if (age === null) {
         lines.push(C.yellow(`⚠️  ${file} has no _updated stamp - re-run the Phase 1 ${phase} (Plugin API) to start tracking freshness`));
       } else if (age > 24) {
-        lines.push(C.yellow(`⚠️  ${file} is ${age}h old - refresh with the Phase 1 ${phase} (Plugin API)`));
+        lines.push(C.yellow(`⚠️  ${file} is ${ageWords(age)} old - refresh with the Phase 1 ${phase} (Plugin API)`));
       } else {
         lines.push(`${file} ✓ (updated today)`);
       }
@@ -1859,7 +1866,7 @@ function reportFull(label, items, shown) {
       lines.push(C.yellow(`⚠️  ${SNAP_COMP_PROPS} missing - Gate [3g] (component property parity) will be skipped`));
       warn = true;
     } else if (compProps > 24) {
-      lines.push(C.yellow(`⚠️  ${SNAP_COMP_PROPS} is ${compProps}h old - Gate [3g] may miss new/renamed component properties`));
+      lines.push(C.yellow(`⚠️  ${SNAP_COMP_PROPS} is ${ageWords(compProps)} old - Gate [3g] may miss new/renamed component properties`));
       warn = true;
     } else {
       lines.push(`${SNAP_COMP_PROPS} ✓ (updated today)`);
@@ -1874,7 +1881,7 @@ function reportFull(label, items, shown) {
         lines.push(C.yellow(`⚠️  ${SNAP_FRAME_GEOM} missing or unstamped - Gate [16] frameGeom checks will skip`));
         warn = true;
       } else if (fg > 24) {
-        lines.push(C.yellow(`⚠️  ${SNAP_FRAME_GEOM} is ${fg}h old - frameGeom checks may run against a stale frame`));
+        lines.push(C.yellow(`⚠️  ${SNAP_FRAME_GEOM} is ${ageWords(fg)} old - frameGeom checks may run against a stale frame`));
         warn = true;
       } else {
         lines.push(`${SNAP_FRAME_GEOM} ✓ (updated today)`);
@@ -2538,9 +2545,23 @@ function reportFull(label, items, shown) {
       return parts.length ? C.dim(`       ↳ ${parts.join(';  ')}`) : null;
     }
 
+    // Each one says where it is and which value has no Figma value, so the summary can carry it as it is.
+    function offending(h) {
+      const m = /^(.*?):(\d+):(.*)$/.exec(h);
+      if (!m) return h;
+      const where = `${m[1].replace(ROOT + '/', '')}:${m[2]}`, rule = m[3].replace(/\/\*[^*]*\*\//g, '');
+      const { nums, colors } = scopedSets(h);
+      // The declarations holding a literal the same matcher finds in no Figma value.
+      const decls = [...rule.matchAll(/([a-z-]+)\s*:\s*([^;{}]+)/gi)].filter(([, , v]) => {
+        const bare = v.replace(/var\([^)]*\)/g, '');
+        const lits = [...bare.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((x) => x[0]).concat([...bare.matchAll(/(?<![\w.-])(-?\d+(?:\.\d+)?)(px|rem|em|%|vh|vw|vmin|vmax|ch|ex)\b/g)].map((x) => x[1] + x[2]));
+        return lits.some((l) => !matchesFigmaValue(l, nums, colors));
+      }).map(([, p, v]) => `${p}: ${v.trim()}`);
+      return `${where} ${decls.length ? `${decls.join('; ')} (no Figma value)` : rule.trim().slice(0, 140)}`;
+    }
     const hitLines = [];
     for (const h of divergent.slice(0, 20)) {
-      hitLines.push('  ' + h);
+      hitLines.push(`  ❌ ${offending(h)}`);
       const s2 = suggest(h);
       if (s2) hitLines.push(s2);
     }
@@ -2551,12 +2572,12 @@ function reportFull(label, items, shown) {
     if (matchedFigma.length) {
       const mode = compValues ? 'per-component sweep' : 'global snapshot values';
       matchNotes.push(C.dim(`ℹ️  ${matchedFigma.length} hardcoded literal(s) match the Figma value - parity OK, not failed (${mode}):`));
-      for (const h of matchedFigma.slice(0, 20)) matchNotes.push(C.dim(`     [${scopedSets(h).scope}] ${h}`));
+      for (const h of matchedFigma.slice(0, 20)) matchNotes.push(C.dim(`     [${scopedSets(h).scope}] ${h.replace(ROOT + '/', '')}`));
       matchNotes.push(...reportFull('hardcoded-matches-figma', matchedFigma, 20));
     }
     if (focusRings.length) {
       matchNotes.push(C.dim(`ℹ️  ${focusRings.length} focus ring literal(s) set apart - an outline in a :focus rule has no Figma value to compare with, not failed:`));
-      for (const h of focusRings.slice(0, 20)) matchNotes.push(C.dim(`     ${h}`));
+      for (const h of focusRings.slice(0, 20)) matchNotes.push(C.dim(`     ${h.replace(ROOT + '/', '')}`));
     }
 
     const pass  = divergent.length === 0;
@@ -2943,8 +2964,8 @@ function reportFull(label, items, shown) {
   // rather than collapsing the gate to SKIPPED.
   addGate('Component props match Figma  (names, defaults, variant options & slots vs code)',
     (cfg.frameworkComponents === false && cfg.htmlRealization)
-      ? parseGeneric(rCompProp, /REALIZED|UNREALIZED|UNMAPPED|VIA STATE/)
-      : parseComponentFrameworkGate(rCompProp, /OK|MISSING|NAME|VALUE|SLOT|NO FILE|RENAME/));
+      ? parseGeneric(rCompProp, /REALIZED|UNREALIZED|UNMAPPED|VIA STATE|named differently from the rest/)
+      : parseComponentFrameworkGate(rCompProp, /OK|MISSING|NAME|VALUE|SLOT|NO FILE|RENAME|named differently from the rest/));
   addGate('Sub-components match Figma  (the sub-components Figma nests are the ones the code uses)',
     (cfg.frameworkComponents === false && cfg.htmlRealization)
       ? parseGeneric(rCompose, /OK|MISSING|SKIP/)

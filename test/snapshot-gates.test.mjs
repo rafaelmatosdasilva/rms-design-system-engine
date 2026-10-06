@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { makeFixture, EMPTY_ENGINE_MAP } from './helpers.mjs';
+import { makeFixture, EMPTY_ENGINE_MAP, runGate } from './helpers.mjs';
 import { captureCode, readFreshSnapshot } from '../code-capture.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -111,4 +111,15 @@ test('structure gate: renderedParityStrict makes a measured difference fail the 
   const r = run(dir, 'structure-check.mjs');
   assert.match(r.out, /❌ MEASURED 1/, r.out);
   assert.equal(r.code, 1);
+});
+
+test('docs truth: a documentation surface that is not there is not a pass, and a moved style guide is named', () => {
+  const cfg = { paths: { themeCSS: 'theme.css' }, docs: { surfaces: ['apps/styleguide/index.html'] }, styleguide: { out: 'apps/style-guide/index.html' } };
+  const r = runGate('docs-truth-check.mjs', { 'ds-config.json': cfg, 'theme.css': ':root { --a: 1px; }', 'apps/style-guide/index.html': '<p>doc</p>' });
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.out, /the style guide is now apps\/style-guide\/index\.html/);
+  assert.doesNotMatch(r.out, /every DS reference resolves/);
+  const ok = runGate('docs-truth-check.mjs', { 'ds-config.json': { ...cfg, docs: { surfaces: ['apps/style-guide/index.html'] } }, 'theme.css': ':root { --a: 1px; }', 'apps/style-guide/index.html': '<p style="color: var(--a)">doc</p>' });
+  assert.equal(ok.code, 0, ok.out);
+  assert.match(ok.out, /every DS reference resolves \(1 surface\)/);
 });

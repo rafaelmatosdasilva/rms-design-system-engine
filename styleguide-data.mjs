@@ -1115,7 +1115,9 @@ export const GUIDANCE = [
   ['mistakes', 'Common mistakes', /^(common mistakes|mistakes|common errors|erros comuns)$/i],
   ['limitations', 'Limitations', /^(limitations|limits|known limitations|limita[çc][õo]es)$/i],
 ];
-export function guidanceView({ description = '', annotations = [], note = '', authored = null } = {}) {
+// seen: what the last audit found the products doing with the component (a rule laid over it, a look-alike built by
+// hand, a parent's rule overriding it), said plainly; it fills Common mistakes when the team wrote none.
+export function guidanceView({ description = '', annotations = [], note = '', authored = null, seen = [] } = {}) {
   const found = {}, from = {};
   const take = (text, source) => {
     let cur = null;
@@ -1136,6 +1138,7 @@ export function guidanceView({ description = '', annotations = [], note = '', au
     const list = Array.isArray(v) ? v.map(String).filter(Boolean) : typeof v === 'string' && v.trim() ? [v.trim()] : [];
     if (list.length && !found[key]?.length) { found[key] = list; from[key] = 'contract.authored.json'; }
   }
+  if (!found.mistakes?.length && seen.length) { found.mistakes = [...new Set(seen.map(String))].slice(0, 6); from.mistakes = "the products' code, as the last audit found it"; }
   const sections = GUIDANCE.map(([key, title]) => ({ key, title, text: found[key]?.length ? found[key] : null, ...(found[key]?.length ? { from: from[key] } : {}) }));
   return { sections, missing: sections.filter((x) => !x.text).map((x) => x.key) };
 }
@@ -1188,7 +1191,7 @@ export function apiView(api, file = api?.file) {
 // ── Accessibility, per component: what it owes and what the last browser check found ─────────────────────────────────
 // Each check of a11y-check.mjs, by the WCAG 2.2 success criterion it stands for.
 export const A11Y_WCAG = {
-  contrast: '1.4.3', hovercontrast: '1.4.3', focuscontrast: '1.4.11', name: '4.1.2', focus: '2.4.7', ariastate: '4.1.2', keyboard: '2.1.1',
+  contrast: '1.4.3', hovercontrast: '1.4.3', focuscontrast: '1.4.11', iconcontrast: '1.4.11', name: '4.1.2', focus: '2.4.7', ariastate: '4.1.2', keyboard: '2.1.1',
   target: '2.5.8', tabtrap: '2.1.2', tabindex: '2.4.3', escape: '2.1.1', focusreturn: '2.4.3', heading: '1.3.1', motion: '2.3.3', forcedfocus: '2.4.7',
   spacing: '1.4.12', activate: '2.1.1', arrows: '2.1.1', zoom: '1.4.4', obscured: '2.4.11', focusthin: '2.4.13', rolecontract: '4.1.2', annotation: '4.1.2',
   reflow: '1.4.10', partrole: '1.3.1', behaviour: '2.1.1', statefollows: '4.1.2', semantics: '4.1.2',
@@ -1277,6 +1280,19 @@ export function parityView({ name, agreed = {}, census = null, differences = [],
     counts: { agree: facts.length + props.length + tokens.length, differ: differences.length, notBuilt: notBuilt.length, notCompared: notCompared?.count ?? 0 } };
 }
 
+// ── Where a person reports a problem: an issue about one component, or feedback on the page ────────────────────────
+// template: ds-config styleguide.issues, the tracker's new-issue address with {name} for the component and {title} for a
+// ready title ("https://redmine.example.com/projects/ds/issues/new?issue[subject]={title}"). Without one, the repository's
+// own tracker when it is on GitHub or GitLab. name: the component, or null for the page. → url | null
+export function issueLink({ template = null, repo = null, name = null } = {}) {
+  const title = name ? `${name}: ` : 'Style guide: ';
+  if (template) return String(template).replace(/\{name\}/g, encodeURIComponent(name ?? '')).replace(/\{title\}/g, encodeURIComponent(title));
+  if (!repo) return null;
+  if (/github\.com/i.test(repo)) return `${repo.replace(/\/$/, '')}/issues/new?title=${encodeURIComponent(title)}`;
+  if (/gitlab/i.test(repo)) return `${repo.replace(/\/$/, '')}/-/issues/new?issue[title]=${encodeURIComponent(title)}`;
+  return null;
+}
+
 // ── How a product brings the component in ─────────────────────────────────────────────────────────────────────────
 // tag, syntax: component-api.mjs callName · file: its path from the project root · text: its source · pkg: { name, dir }
 // of the package the file belongs to, when it is not the project itself · template: ds-config styleguide.importFrom
@@ -1310,5 +1326,43 @@ export function nestedComponents({ name, cls = null, markup = '', text = '', nam
     const inText = text && new RegExp(`<${tagName}\\b|import\\s+\\{?[^;]*\\b${tagName}\\b[^;]*from`).test(text);
     if (inMarkup || inText) out.push(o.name);
   }
+  return out;
+}
+
+// ── Where the system could be simpler ─────────────────────────────────────────────────────────────────────────────
+// What a team reviewing its system asks first: components that are one component in several copies, props that say
+// nothing, components no product uses. components: the page's view ([{ name, controls: [{ label, type, options }],
+// usage }]); products: whether the products' code was read (so "no product uses it" means something).
+// → [{ kind: 'family' | 'one-option' | 'unused', components: [names], say, todo }]
+export function simplifyView(components = [], { products = false } = {}) {
+  const out = [];
+  const words = (n) => String(n).replace(/#[\d:]+$/, '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[\s_\-/]+/).map((w) => w.toLowerCase()).filter(Boolean);
+  const propSet = (c) => new Set((c.controls ?? []).map((p) => words(p.label).filter((w) => !/^(show|content)$/.test(w)).join(' ')).filter(Boolean));
+  // A family: names that differ only in their last word (buttonPrimary, buttonSecondary), with mostly the same props.
+  const byStem = new Map();
+  for (const c of components) { const w = words(c.name); if (w.length < 2) continue; const stem = w.slice(0, -1).join(' '); if (!byStem.has(stem)) byStem.set(stem, []); byStem.get(stem).push(c); }
+  const jac = (a, b) => { const u = new Set([...a, ...b]); return u.size ? [...a].filter((x) => b.has(x)).length / u.size : 0; };
+  for (const [stem, members] of byStem) {
+    // The members alike: around the one most others resemble (a menu of buttons beside four buttons is not of the family).
+    const withProps = members.filter((c) => propSet(c).size);
+    const centre = withProps.map((c) => ({ c, n: withProps.filter((o) => o !== c && jac(propSet(c), propSet(o)) >= 0.5).length })).sort((x, y) => y.n - x.n)[0];
+    const list = centre ? withProps.filter((o) => o === centre.c || jac(propSet(centre.c), propSet(o)) >= 0.5) : [];
+    if (list.length < 2) continue;
+    const sets = list.map(propSet), all = new Set(sets.flatMap((x) => [...x]));
+    const shared = [...all].filter((p) => sets.every((x) => x.has(p)));
+    if (!all.size || shared.length / all.size < 0.5) continue;
+    const kinds = list.map((c) => { const w = words(c.name); return w[w.length - 1].replace(/^\w/, (ch) => ch.toUpperCase()); });
+    const name = words(list[0].name).slice(0, -1).map((w, i) => (i ? w.replace(/^\w/, (ch) => ch.toUpperCase()) : w)).join('');
+    out.push({ kind: 'family', components: list.map((c) => c.name), say: `${list.map((c) => c.name).join(', ')} share ${shared.length} of their ${all.size} props: one ${stem} with a Type option (${kinds.join(', ')}) would say the same with one component.`, todo: `In Figma, make ${name} one component set with a Type variant, then tell me to fold the code into one component.` });
+  }
+  // A variant prop with one option built: nothing to choose.
+  for (const c of components) for (const p of c.controls ?? []) {
+    if (p.type !== 'VARIANT') continue;
+    const built = (p.options ?? []).filter((o) => !o.unbuilt);
+    if ((p.options ?? []).length === 1) out.push({ kind: 'one-option', components: [c.name], say: `${c.name}'s ${p.label} has one option (${p.options[0].label}): there is nothing to choose.`, todo: `In Figma, remove ${p.label} from ${c.name}, or add the options it is for.` });
+    else if (built.length === 1 && (p.options ?? []).length > 1) out.push({ kind: 'one-option', components: [c.name], say: `${c.name}'s ${p.label} has ${p.options.length} options in Figma and the code builds one (${built[0].label}).`, todo: `Decide: build the other options of ${p.label}, or remove them from Figma.` });
+  }
+  // A component no product uses, when the products were read.
+  if (products) for (const c of components) if (!(c.usage ?? []).length && !(c.usedBy ?? []).length) out.push({ kind: 'unused', components: [c.name], say: `No product uses ${c.name}.`, todo: `Decide: retire ${c.name}, or tell the products what it is for.` });
   return out;
 }

@@ -72,7 +72,7 @@ test('Harbor, scoped to one component: a page showing several components and a n
   const r = auditFixture(FIXTURE, bareEnv(), 'harbor-ds-', ['--component', 'badge']);
   assert.match(r.out, /SCOPED TO: badge/);
   assert.doesNotMatch(r.out, /nested components pulled in/);
-  assert.match(r.out, /📉 Burndown, open findings per component: badge 4 · /);
+  assert.match(r.out, /📉 Burndown, open findings per component: badge 5 · /);
   assert.match(r.out, /🎨 Figma file hygiene: 1 of 1 component \(1 value with no variable or style\)/);
   assert.doesNotMatch(r.out, /iconButton: /);
 });
