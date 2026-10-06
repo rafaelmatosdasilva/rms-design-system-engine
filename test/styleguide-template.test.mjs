@@ -544,6 +544,16 @@ test('parity per component: what agrees (since when), its props and tokens, what
   assert.equal(v.notCompared, null);
 });
 
+test('an accessibility finding goes to Accessibility, a difference from Figma to Parity', async () => {
+  const { splitFindings } = await import('../styleguide-data.mjs');
+  const { parity, a11y } = splitFindings([{ check: 'State contrast', what: 'badge [Type=Warning · light]: 2.04:1 (needs 4.5:1)' }, { check: 'Structure', what: 'badge · height: Figma 20, code 22' }, { check: 'Token layering', what: 'x' }]);
+  assert.deepEqual(parity.map((x) => x.check), ['Structure', 'Token layering']);
+  assert.deepEqual(a11y.map((x) => x.check), ['State contrast']);
+  const html = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  assert.match(html, /<dt>To fix<\/dt>/, 'the Accessibility area lists what to fix');
+  assert.match(html, /a\[0\] === 'a11y' \? \(c\.a11yFindings/, 'the Accessibility tab carries the alert icon');
+});
+
 test('parity, one table: every prop, variable and value, Figma beside code, with a status and when', async () => {
   const { parityRows } = await import('../styleguide-data.mjs');
   const rows = parityRows({ name: 'chip',

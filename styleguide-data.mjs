@@ -1280,6 +1280,13 @@ export function parityView({ name, agreed = {}, census = null, differences = [],
     counts: { agree: facts.length + props.length + tokens.length, differ: differences.length, notBuilt: notBuilt.length, notCompared: notCompared?.count ?? 0 } };
 }
 
+// ── What the audit found on a component, split by where it belongs: a difference from Figma goes to Parity, an
+// accessibility problem (a text's contrast) to Accessibility. list: [{ check, … }] → { parity: [...], a11y: [...] }
+export const A11Y_CHECK = /contrast|accessib|focus|keyboard|target size|screen reader/i;
+export function splitFindings(list = []) {
+  return { parity: list.filter((x) => !A11Y_CHECK.test(x.check ?? '')), a11y: list.filter((x) => A11Y_CHECK.test(x.check ?? '')) };
+}
+
 // ── Parity, one table: every prop, variable and value of the component, Figma beside code ──────────────────────────
 // Everything the component has, whatever the Playground shows. propsSnap: the Figma props snapshot · controls: the props
 // both sides have ({ label, prop }) · unbuilt: Figma props the code does not build · codeProps: the code's own props

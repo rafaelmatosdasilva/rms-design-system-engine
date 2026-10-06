@@ -259,8 +259,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
   `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
   page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
-  top too); Parity carries the system's alert icon (an icon named warning or alert) while something differs, its count
-  said to a screen reader. Each section of rows (Anatomy in the Playground, Usage, Documentation, Accessibility) is one of the
+  top too); Parity carries the system's alert icon (an icon named warning or alert) while something differs, and
+  Accessibility while the audit found a problem on it, each count said to a screen reader. Each section of rows (Anatomy in the Playground, Usage, Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares): its type,
   Figma's name and value, the code's, a status as a sign and the system's colour (the same, differs, only in Figma, only
@@ -371,7 +371,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
 - **Accessibility**: its role (the Figma annotation, else `contract.authored.json` semantics) and what it asks for
   (`role-markup.mjs`, `behaviour-contract.mjs`: element, name, keys, part roles), each with its WCAG 2.2 criterion;
-  the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); and the last browser check's
+  the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); **To fix**, what the audit found
+  on it that is about accessibility rather than Figma (a text's contrast in one variant and mode, `splitFindings`),
+  each with who acts and its To do number; and the last browser check's
   findings on it from `.design-system-engine-out/a11y.json` (each finding carries `component` and the file
   `checkedAt`), or that it has not been checked yet. **On this variant** (none on the measuring page): tried on the
   live component whenever the area shows a variant not tried yet, the Playground laid out out of sight for it and
