@@ -107,7 +107,7 @@ checks each piece once it exists.
 - **A token an edit invents.** In any project, a custom property an edit adds with a value of its own (a colour, a size) that Figma has no variable for is handed back, in the theme too; one that only points at the system's tokens, or that Figma has, is not.
 - **A last check before the agent finishes.** The Stop hook runs the edit check once more over every UI file the session changed, against the last commit; a value the system does not have that an edit left in place goes back once, with the file and the line. Lines that were already in the commit do not count.
 - **Never a secret in the chat.** Whatever the request, the Stop hook sends back once a final reply that asks the person for a token, key or password: the person puts it in the project's `.env` themselves. A design token named in a question is not a secret.
-- **Measured differences fail.** In build mode a value the browser measures on the rendered component that differs from Figma (a height, a line height, a colour) fails Gate [13], and its direction is always back to Figma's value: the code was just written from it. A value the page could only read as the browser's default is shown, not failed. `renderedParityStrict: false` keeps them advisory.
+- **Measured differences fail.** In build mode a value the browser measures on the rendered component that differs from Figma (a height, a line height, a colour) fails Gate [13] (Structure), and its direction is always back to Figma's value: the code was just written from it. A value the page could only read as the browser's default is shown, not failed. `renderedParityStrict: false` keeps them advisory.
 - **The role, even with only states.** Figma's role annotation is read in the markup of every component that has one, also when all its props are states (a field whose only prop is `State` still has to be a real `<input>`).
 - **The sentence owed.** Building a component Figma paints with a colour that has no variable, the route asks for one line in the reply saying so, and the Stop hook sends the agent back when the reply leaves it out: twice at most, so a first hand-back spent on something else does not lose it.
 - **While building.** The edit check counts the tokens still to build as the system's own, so a component written
@@ -235,7 +235,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   changes with a mode shows the value of the mode its section's size switch picks; icons from the icon sheet. The
   colours sit six a row, each as wide as the room, so its Figma name and variable read whole (three on a phone).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
-  own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15]
+  own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15] (Component props match Figma)
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   An HTML and CSS system has no code props to pair, so a Figma prop is a control when the code realizes it: the
@@ -376,7 +376,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   that Tab still reaches, the focus change on it, a box holding it or what follows it (at least 3:1 against what is
   around it, 2.4.7 and 1.4.11), and each behaviour of `a11yView().behaviours` tried with the page's own events (a key
   only a native element answers is said to be given by the browser).
-- **In use**: the approved pictures of `frames[]` (Gate [2]'s references in `visualRefs`), six at most.
+- **In use**: the approved pictures of `frames[]` (Gate [2] (Figma frame unchanged)'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,
   not in the code yet"): the page never draws Figma's values as if the code had them.
@@ -513,7 +513,7 @@ it) before the gates start, and every fact in it says **where it came from** and
 is**. It is cached by content, so an unchanged project reuses it at once; after a code change the
 browser part takes a few seconds per component. `rms-design-system-engine --capture-code` runs it on its
 own. `ds-config.json → codeReading.capture: "off"` skips it in the audit (the gates then keep their own
-readings, and Gate [17] says the capture did not run). Inside a git hook the capture is static only, so a
+readings, and Gate [25] (What this audit actually checked) says the capture did not run). Inside a git hook the capture is static only, so a
 commit never waits for the browser: a pre-commit hook is detected on its own, any other hook passes
 `--hook`, and `codeReading.hookBrowser: true` brings the browser back. The next normal run redoes the
 capture with the browser.
@@ -566,21 +566,21 @@ capture with the browser.
   props are read (the components are markup and CSS).
 - **Icons.** Every sprite `<symbol>` with its file and line, `viewBox`, path data and fill/stroke flags,
   and every literal use (`file:line`).
-- **Markup.** Each app's fingerprint, the same one Gate [12] compares.
+- **Markup.** Each app's fingerprint, the same one Gate [18] (Markup) compares.
 - **Nesting.** Which DS components sit inside which, read in the rendered page (so markup built by
   JavaScript counts) and in the component's source file. Both readings agree: `verified`.
 
 **The gates read the same way.** The props, nesting, icon and markup gates use the capture's readers
-(`component-api.mjs`, `component-source.mjs`, `icon-source.mjs`, `markup-source.mjs`), and Gate [3]
+(`component-api.mjs`, `component-source.mjs`, `icon-source.mjs`, `markup-source.mjs`), and Gate [3] (Token values)
 reads the theme with the capture's cascade-aware reader: every `:root` block, local `@import`, and each
 mode resolved as the browser resolves it (a `:root` written after a dark block wins in dark mode too, and
-Gate [3] now reports that). Where a gate needs a fact only the capture has, it reads the snapshot, and
+Gate [3] (Token values) now reports that). Where a gate needs a fact only the capture has, it reads the snapshot, and
 only while the snapshot still matches the code:
-- Gate [3]: a token the browser and the CSS text disagree on is listed as "could not read reliably"
+- Gate [3] (Token values): a token the browser and the CSS text disagree on is listed as "could not read reliably"
   (not verified, so the gate stays red) instead of blaming the design.
-- Gate [11c]: a sub-component the rendered page shows inside its parent counts as used, so JavaScript-built
+- Gate [16] (Sub-components match Figma): a sub-component the rendered page shows inside its parent counts as used, so JavaScript-built
   nesting passes, and a parent with no source file is judged by what renders.
-- Gate [17]: one `CODE CAPTURE` line with what was read (tokens, components measured, states, props,
+- Gate [25] (What this audit actually checked): one `CODE CAPTURE` line with what was read (tokens, components measured, states, props,
   icons, nesting) and how, or that the capture is missing or out of date.
 
 **`--capture-code --compare`** lays the capture beside the Figma snapshots, field by field, and writes
@@ -984,7 +984,7 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **On an inner layer.** A note on a layer inside the component's default variant (the first one) is checked on
   the part the contract names the same way: `CONTRACT[component].children` with that `name` and a
   `cssSelector`. A layer with no such part is listed as not checked, with what to add.
-- **No Gate [10g] entry needed.** A note the accessibility check can verify passes Gate [10g] on its own; only
+- **No Gate [13] (Structure) entry needed.** A note the accessibility check can verify passes Gate [13] (Structure) on its own; only
   prose notes still need `CONTRACT.annotations`.
 - **Where the notes come from.** The component-props snapshot, refreshed with `FIGMA_TOKEN` or the Plugin API
   capture below (both record `annotations` on the component and `layerAnnotations` on its inner layers).
