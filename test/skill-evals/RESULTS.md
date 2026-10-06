@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: one Accessibility table by WCAG criterion; every slot marked; an address per area; full width (continuous evaluation)
+
+What changed since the entry below (engine 7447255): The Accessibility area is one table by WCAG 2.1 criterion with only what applies; every Figma slot is marked in the Playground; each area of a component has its own address; the page takes the full width. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `297fdab59a8e` · Project measured: `13d811a9d668`
+
+| Haiku, engine 0d370b4 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.054 |
+| Input a run | 86k | 93k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 86k. Records: `records/2026-10-06-style-guide-one-accessibility-table`.
+
 ## 2026-10: Style guide: a slot is an area named Slot; ids an instance points to are kept; square checkerboard (continuous evaluation)
 
 What changed since the entry below (engine e84f729): The Playground marks a slot as the area it takes, named Slot inside; an instance copied from a page keeps the ids it points to, made unique; a control given visible words loses an aria-label that leaves them out; the checkerboard is square; the WCAG hover check waits for a fade. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
