@@ -42,5 +42,5 @@ test('a naming difference reads plainly, belongs to its component, and the Figma
   const what = 'buttonPrimary option "hover" of State is named differently from the rest of the system: rename it "Hover" in Figma (31 of the system\'s 52 options are Title Case words)';
   assert.equal(componentOf(`Component props match Figma :: ⚠️  ${what}`, ['buttonPrimary', 'badge']), 'buttonPrimary');
   assert.match(plainDifference(what), /^In Figma, the option "hover" of State is written differently from the rest of the system: 31 of/);
-  assert.deepEqual(plainAction(what, 'buttonPrimary'), { who: 'figma', todo: 'In Figma, rename the option "hover" of buttonPrimary\'s State to "Hover". Then tell me to update the code\'s contract to the new name.' });
+  assert.deepEqual(plainAction(what, 'buttonPrimary'), { who: 'figma', todo: 'In Figma, rename the option "hover" of buttonPrimary\'s State to "Hover". Then tell Claude to update the code\'s contract to the new name.' });
 });
