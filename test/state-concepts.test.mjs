@@ -24,3 +24,10 @@ test('state contrast skips the declared disabled state, however it is named', ()
   assert.equal(stateContrastFindings(code).findings.length, 1);
   assert.equal(stateContrastFindings(code, { states: { disabled: { prop: 'Status', value: 'Off' } } }).findings.length, 0);
 });
+
+test('a failing contrast is never silenced, whatever the config says: Figma\'s colours are deliberate, and still flagged', () => {
+  const code = { components: { chip: { instance: { hasText: true }, props: { fontSize: { value: '12px' } },
+    colors: { light: { color: 'rgb(0, 0, 0)', backgroundColor: 'rgb(255, 255, 255)' } },
+    states: { 'Status=Off': { produced: 'class .off', changed: { color: { value: 'rgb(240, 240, 240)' } } } } } } };
+  assert.equal(stateContrastFindings(code, { knownLowContrast: ['chip'], knownRawTokens: ['chip/label'] }).findings.length, 1);
+});

@@ -92,5 +92,6 @@ export function stateContrastFindings(code, cfg = {}) {
       else check(label, modes[0], ch.color?.value ?? base.color, ch.backgroundColor?.value ?? base.backgroundColor, src);
     }
   }
+  // Never silenced: a colour Figma chose on purpose is still flagged when it fails, for the design team to fix.
   return { findings, checked };
 }
