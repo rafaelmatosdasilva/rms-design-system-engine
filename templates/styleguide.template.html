@@ -224,6 +224,9 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par--figma .pg-par-sign, .pg-par--code .pg-par-sign { background: var(--sg-warning); }
 .pg-par--figma, .pg-par--code { color: var(--sg-warning); }
 .pg-par--none .pg-par-sign { background: var(--sg-muted); }
+.pg-slots { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) var(--sg-space-m); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); }
+.pg-slot-code { color: var(--sg-text-2); }
+.pg-slot-code code { font-family: inherit; color: var(--sg-text); }
 .pg-par--none { color: var(--sg-muted); }
 .pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text-2); }
 /* Wide enough, the table never scrolls on its own (a box that scrolls would hold its head back); on a phone it does. */
@@ -620,6 +623,17 @@ a.pg-usage-name { color: var(--sg-text); }
     var a11y = n ? { say: n === 1 ? '1 problem' : n + ' problems', todo: true } : !ch || ch.notRead ? { say: 'Not checked in a browser yet', todo: false } : { say: 'No problem found', todo: false };
     var used = (c.usage || []).length;
     return { version: rel ? rel.release : log.length ? 'Not released yet' : null, changed: log.length ? String(log[0].date).slice(0, 10) : null, changedAt: log.length ? log[0].date : null, parity: parity, a11y: a11y, used: used };
+  }
+  // Its slots, under its name: each Figma slot beside what holds it in the code (its own part, .modal-slot, or the
+  // markup's content), signed as Parity signs them; a Figma slot the code does not hold, signed as only in Figma.
+  function slotsHTML(c) {
+    var rows = ((c.parity && c.parity.rows) || []).filter(function (r) { return r.type === 'Prop' && r.figma && /^slot$/.test(r.figma.value); });
+    if (!rows.length) return '';
+    return '<p class="pg-slots">' + rows.map(function (r) {
+      var st = PAR[r.status] || ['?', r.status];
+      return '<span class="pg-par-status pg-par--' + esc(r.status) + '"><span class="pg-par-sign" aria-hidden="true">' + st[0] + '</span>' + esc(/^slot$/i.test(r.figma.name) ? 'Slot' : 'Slot ' + r.figma.name) + '</span>' +
+        '<span class="pg-slot-code">' + (r.code ? (/^[.#]/.test(r.code.name) ? 'in the code <code>' + esc(r.code.name) + '</code>' : 'in the code, ' + esc(r.code.value)) : 'only in Figma') + '</span>';
+    }).join('') + '</p>';
   }
   function factsHTML(c) {
     var f = factsOf(c), item = function (k, v, todo) { return '<div><dt>' + esc(k) + '</dt><dd' + (todo ? ' class="sg-fact-todo"' : '') + '>' + esc(v) + '</dd></div>'; };
@@ -1185,7 +1199,8 @@ a.pg-usage-name { color: var(--sg-text); }
     for (var i = layers.length - 1; i >= 0; i--) base = over(layers[i], base);
     return base;
   }
-  function contrastHTML(root) {
+  // The text that stands out least against what is behind it, and what it needs (4.5:1, 3:1 when large).
+  function contrastLowest(root) {
     var lowest = null;
     var els = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
     els.forEach(function (el) {
@@ -1202,6 +1217,10 @@ a.pg-usage-name { color: var(--sg-text); }
       var need = large ? 3 : 4.5, words = (el.tagName === 'INPUT' ? (el.value || el.placeholder) : el.textContent).replace(/\s+/g, ' ').trim().slice(0, 40);
       if (!lowest || ratio / need < lowest.ratio / lowest.need) lowest = { ratio: ratio, need: need, words: words };
     });
+    return lowest;
+  }
+  function contrastHTML(root) {
+    var lowest = contrastLowest(root);
     if (!lowest) return a11yRow('none', 'Text contrast', 'No text drawn in this state.', 'WCAG 1.4.3 Contrast (Minimum) (AA)');
     var ok = lowest.ratio >= lowest.need;
     return a11yRow(ok ? 'done' : 'todo', 'Text contrast', esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '", needs ' + lowest.need + ':1 (' + (lowest.need === 3 ? 'large text' : 'text') + '), in the mode and state shown.', 'WCAG 1.4.3 Contrast (Minimum) (AA)');
@@ -1313,7 +1332,7 @@ a.pg-usage-name { color: var(--sg-text); }
     return { ok: ok, saw: saw };
   }
   function liveA11yHTML(root, a) {
-    var line = function (ok, text, wcag) { return a11yRow(ok ? 'done' : 'todo', 'On this variant', esc(text), wcag); };
+    var line = function (ok, text, wcag) { return a11yRow(ok ? 'done' : 'todo', 'In the browser', esc(text), wcag); };
     var out = [], stops = tabStops(root), had = document.activeElement;
     var interactive = [root].concat(Array.prototype.slice.call(root.querySelectorAll('[role]'))).filter(function (el) { return INTERACTIVE.test(el.getAttribute('role') || '') && shown(el); });
     var wants = a && a.key && INTERACTIVE.test(a.key);
@@ -1322,7 +1341,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (offAll) return line(true, 'It is disabled as set, so Tab passes it by and a screen reader says it is unavailable.', 'WCAG 4.1.2 Name, Role, Value (A)');
     if (stops.length) out.push(line(true, 'Tab reaches ' + (stops.length === 1 ? 'it once: ' : stops.length + ' stops in this order: ') + stops.map(function (s, i) { return (stops.length > 1 ? (i + 1) + ' ' : '') + who(s); }).join(', ') + '.', 'WCAG 2.1.1 Keyboard (A)'));
     else if (wants || interactive.length) out.push(line(false, 'Tab never reaches it, so it cannot be used without a mouse.', 'WCAG 2.1.1 Keyboard (A)'));
-    else out.push(a11yRow('none', 'On this variant', 'Nothing in it takes the focus, and as drawn nothing in it needs to.', 'WCAG 2.1.1 Keyboard (A)'));
+    else out.push(a11yRow('none', 'In the browser', 'Nothing in it takes the focus, and as drawn nothing in it needs to.', 'WCAG 2.1.1 Keyboard (A)'));
     interactive.filter(function (el) { return stops.indexOf(el) < 0 && !el.closest('[disabled], [aria-disabled="true"]') && !(el.type === 'radio' && el.name); }).forEach(function (el) { out.push(line(false, who(el) + ' acts as a ' + el.getAttribute('role') + ' but Tab does not reach it.', 'WCAG 2.1.1 Keyboard (A)')); });
     stops.filter(function (el) { return el.tabIndex > 0; }).forEach(function (el) { out.push(line(false, who(el) + ' sets its own place in the Tab order (tabindex="' + el.tabIndex + '"), ahead of the page.', 'WCAG 2.4.3 Focus Order (A)')); });
     // Drawn as disabled (its class says so) while Tab still reaches it: a screen reader offers a control that does nothing.
@@ -1342,7 +1361,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (stops.length && !out.some(function (h) { return /Focus Visible|Non-text|Name, Role/.test(h); })) out.push(line(true, (stops.length === 1 ? 'It shows its focus' : 'Each stop shows its focus') + ' and has a name.', 'WCAG 2.4.7 Focus Visible (AA)'));
     ((a && a.behaviours) || []).forEach(function (row) {
       var r = tryBehaviour(root, row, a.key);
-      out.push(r.given ? a11yRow('done', 'On this variant', 'Given by the browser: ' + esc(row.says) + ' (' + esc(r.given) + ').', row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)') : line(r.ok, row.says.replace(/^\w/, function (ch) { return ch.toUpperCase(); }) + (r.ok ? '.' : ', but ' + r.saw + '.'), row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)'));
+      out.push(r.given ? a11yRow('done', 'In the browser', 'Given by the browser: ' + esc(row.says) + ' (' + esc(r.given) + ').', row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)') : line(r.ok, row.says.replace(/^\w/, function (ch) { return ch.toUpperCase(); }) + (r.ok ? '.' : ', but ' + r.saw + '.'), row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)'));
     });
     if (had && had.focus && document.activeElement !== had) had.focus({ preventScroll: true, focusVisible: false });
     return out.join('');
@@ -1609,6 +1628,7 @@ a.pg-usage-name { color: var(--sg-text); }
         (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
         (ALL ? '' : factsHTML(c)) +
+        slotsHTML(c) +
         importHTML(c) +
       '</div>' +
       // What is left to do is marked on its area, the system's alert icon before the label and what it is said to a
@@ -1649,6 +1669,8 @@ a.pg-usage-name { color: var(--sg-text); }
     // too: the system's scripts run in it and it can be used, by mouse or keyboard.
     function renderFrame() {
       if (!frame || probing) return;
+      // Inspecting: the anatomy stands in for both, drawn at the Width chosen.
+      if (inspecting) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = true; requestAnimationFrame(drawAnatomy); return; }
       if (WIDTH === 'fit' || ALL) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = false; return; }
       var w = WIDTHS.find(function (x) { return x[0] === WIDTH; });
       preview.hidden = true; frame.hidden = false;
@@ -1849,8 +1871,11 @@ a.pg-usage-name { color: var(--sg-text); }
       if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + clsName(c)); if (own) src = own; }
       var copy = src.cloneNode(true);
       // At the width the Playground last drew it (it is hidden while this area shows), so the copy lays out the same.
+      // At the Width chosen (Phone, Tablet, Desktop): laid out as that width's frame lays it out, whole; at Fit, at the
+      // width the Playground last drew it (it is hidden while inspecting), so the copy lays out the same.
+      var wv = WIDTH !== 'fit' && WIDTHS.find(function (x) { return x[0] === WIDTH; });
       var pw = src.getBoundingClientRect().width || (src === preview.firstElementChild ? drawnWidth : 0);
-      if (pw) { copy.style.width = pw + 'px'; copy.style.boxSizing = 'border-box'; }
+      if (!wv && pw) { copy.style.width = pw + 'px'; copy.style.boxSizing = 'border-box'; }
       copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
       [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[id]'))).forEach(function (k) { k.removeAttribute('id'); });
       var stage = document.createElement('div'); stage.className = 'pg-anat-stage';
@@ -1859,7 +1884,8 @@ a.pg-usage-name { color: var(--sg-text); }
       stage.appendChild(wrap); stage.appendChild(marks); anatBox.appendChild(stage);
       var root = c.only ? (copy.querySelector(c.only) || copy) : copy;
       if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { anatBox.textContent = 'This component sits over the page, so it is inspected in the browser rather than here.'; return; }
-      var whole = copy.getBoundingClientRect(), rr = root.getBoundingClientRect();
+      if (wv) { wrap.classList.add('pg-frame-stage'); wrap.style.width = wv[2] + 'px'; wrap.style.boxSizing = 'border-box'; }
+      var whole = (wv ? wrap : copy).getBoundingClientRect(), rr = root.getBoundingClientRect();
       // At the size the Playground draws it: inspecting never makes it bigger, and makes it smaller only to fit.
       var k = Math.min(1, (anatBox.clientWidth - 64) / Math.max(1, whole.width));
       stage.style.width = whole.width * k + 'px'; stage.style.height = whole.height * k + 'px';
@@ -1947,7 +1973,8 @@ a.pg-usage-name { color: var(--sg-text); }
       }
       drawAnatomy();
     }
-    if (anatBox) anatBox.addEventListener('click', function (e) { var h = e.target.closest && e.target.closest('.pg-anat-marks [data-hit]'); if (!h) return; e.preventDefault(); pickAnatomy(h.getAttribute('data-hit')); });
+    // A click outside the component (the stage around it) lets go of what is picked.
+    if (anatBox) anatBox.addEventListener('click', function (e) { var h = e.target.closest && e.target.closest('.pg-anat-marks [data-hit]'); if (!h) { if (anatPath.length) { anatPath = []; drawAnatomy(); } return; } e.preventDefault(); pickAnatomy(h.getAttribute('data-hit')); });
     // Figma beside the code: the Figma image of the variant set (its variant props equal to the Playground's), beside a
     // still copy of the component as drawn, or over it, as much of it as the slider says. A variant Figma has no image
     // of is said so, never shown with another's.
@@ -2009,26 +2036,82 @@ a.pg-usage-name { color: var(--sg-text); }
         .map(function (x) { return '<span class="pg-par-status pg-par--' + A11Y[x[0]][2] + '"><span class="pg-par-sign" aria-hidden="true">' + A11Y[x[0]][0] + '</span>' + n[x[0]] + ' ' + x[1] + '</span>'; }).join('');
     }
     a11ySum();
-    // On this variant: tried on the live component whenever the Accessibility area shows a variant not tried yet. The
-    // Playground is laid out out of sight for it (one task, nothing painted), and what the tries changed (a box ticked)
-    // is drawn again as set.
+    // Every variant tried in the browser (checkLive, below), its rows in the Accessibility table.
     var liveEl = sec.querySelector('.pg-a11y-live'), liveSig = null, checking = false, areaNow = null;
+    // Every variant, as Parity lists everything the component has: each one tried on the live component whenever the
+    // Accessibility area shows (the Playground laid out out of sight for it, one task, nothing painted), the text
+    // contrast measured in each colour mode too, and what each check found said once, with the variants it holds in.
+    // Every combination when there are 32 or fewer, else each option on its own beside the defaults. The Playground is
+    // drawn again as it was set.
+    function a11yCombos() {
+      var axes = variantRows(c).map(function (p) { return { label: p.label, opts: (p.options || []).filter(function (o) { return !o.unbuilt; }).map(function (o) { return { label: o.label, val: 'value' in o ? o.value : o.label }; }) }; }).filter(function (a) { return a.opts.length; });
+      var total = axes.reduce(function (n, a) { return n * a.opts.length; }, 1), combos = [];
+      if (total <= 32) (function rec(i, set, names) {
+        if (i === axes.length) { combos.push({ set: set, name: names.join(', ') || 'as it is' }); return; }
+        axes[i].opts.forEach(function (o) { var next = {}; Object.keys(set).forEach(function (k) { next[k] = set[k]; }); next[axes[i].label] = o.val; rec(i + 1, next, names.concat(axes[i].label + '=' + o.label)); });
+      })(0, {}, []);
+      else { combos.push({ set: {}, name: 'its defaults' }); axes.forEach(function (a) { a.opts.forEach(function (o) { var one = {}; one[a.label] = o.val; combos.push({ set: one, name: a.label + '=' + o.label }); }); }); }
+      return { combos: combos, every: total <= 32 };
+    }
     function checkLive() {
       if (ALL || !liveEl || checking || !cur || areaNow !== 'a11y') return;
-      var sig = JSON.stringify(state) + Array.prototype.map.call(document.documentElement.attributes, function (x) { return x.name + x.value; }).join() + Array.prototype.map.call(preview.attributes, function (x) { return x.name + x.value; }).join();
+      var sig = Array.prototype.map.call(document.documentElement.attributes, function (x) { return x.name + x.value; }).join();
       if (sig === liveSig) return;
       checking = true; liveSig = sig;
       var play = sec.querySelector('[data-area="play"]'), keep = {}, wasPreview = preview.hidden, wasPlay = play.hidden;
       Object.keys(state).forEach(function (k) { keep[k] = state[k]; });
+      var colours = AXES.filter(function (a) { return a.scoped && a.attr !== 'data-size' && !a.classes; });
+      var keptAttrs = colours.map(function (a) { return [a.attr, preview.getAttribute(a.attr)]; });
+      var modeSets = [[]];
+      colours.forEach(function (a) { var next = []; modeSets.forEach(function (ms) { a.values.forEach(function (v) { if (v.value) next.push(ms.concat([[a, v]])); }); }); if (next.length) modeSets = next; });
       play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false;
-      // All it draws, the box around its control too.
-      try { liveEl.innerHTML = liveA11yHTML(preview.firstElementChild || cur, c.a11y); } catch (e) { liveEl.innerHTML = a11yRow('check', 'On this variant', 'It could not be tried here.', ''); }
+      var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0;
+      try {
+        plan.combos.forEach(function (cb) {
+          props.forEach(function (p) { state[p.label] = byDefault(p); });
+          Object.keys(cb.set).forEach(function (k) { state[k] = cb.set[k]; });
+          refresh();
+          var root = preview.firstElementChild || cur, tb = document.createElement('tbody');
+          try { tb.innerHTML = liveA11yHTML(root, c.a11y); } catch (e) { tb.innerHTML = a11yRow('check', 'In the browser', 'It could not be tried here.', ''); }
+          // The same check with only the words of its control differing (Tab reaches "Text", Tab reaches "Description")
+          // is one row: what it found, in the variants it holds in.
+          Array.prototype.forEach.call(tb.rows, function (tr) {
+            var html = tr.cells[1].innerHTML, plain = html.replace(/"[^"]*"/g, '"…"');
+            var key = tr.dataset.status + '|' + plain + '|' + tr.cells[3].textContent;
+            if (!byKey[key]) { byKey[key] = { st: tr.dataset.status, html: html, plain: plain, wcag: tr.cells[3].textContent, where: [] }; groups.push(byKey[key]); }
+            if (byKey[key].html !== html) byKey[key].mixed = true;
+            byKey[key].where.push(cb.name);
+          });
+          modeSets.forEach(function (ms) {
+            ms.forEach(function (m) { preview.setAttribute(m[0].attr, m[1].value); });
+            var lo = contrastLowest(root); if (!lo) return;
+            measured++; if (lo.ratio < lo.need) failing++;
+            if (!lowest || lo.ratio / lo.need < lowest.ratio / lowest.need) { lowest = lo; lowest.where = cb.name + ms.map(function (m) { return ' · ' + (m[1].label || m[1].value); }).join(''); }
+          });
+          keptAttrs.forEach(function (k) { if (k[1] == null) preview.removeAttribute(k[0]); else preview.setAttribute(k[0], k[1]); });
+        });
+      } finally {
+        keptAttrs.forEach(function (k) { if (k[1] == null) preview.removeAttribute(k[0]); else preview.setAttribute(k[0], k[1]); });
+        play.classList.remove('pg-offstage'); play.hidden = wasPlay; preview.hidden = wasPreview;
+        Object.keys(keep).forEach(function (k) { state[k] = keep[k]; });
+        Object.keys(syncs).forEach(function (k) { syncs[k](); });
+        refresh();
+        checking = false;
+      }
+      var n = plan.combos.length, scope = function (where) {
+        if (where.length === n) return n === 1 ? '' : plan.every ? ' In all ' + n + ' variants.' : ' In every option.';
+        return ' In ' + where.slice(0, 3).join('; ') + (where.length > 3 ? ' and ' + (where.length - 3) + ' more' : '') + '.';
+      };
+      // What to fix first, then what holds, then what is not needed.
+      var order = { todo: 0, check: 1, done: 2, none: 3 };
+      groups.sort(function (p, q) { return order[p.st] - order[q.st]; });
+      liveEl.innerHTML = groups.map(function (g) { return a11yRow(g.st, 'In the browser', (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + esc(scope(g.where)), g.wcag); }).join('');
+      if (contrastEl) contrastEl.innerHTML = !lowest ? a11yRow('none', 'Text contrast', 'No text drawn in any variant.', 'WCAG 1.4.3 Contrast (Minimum) (AA)')
+        : a11yRow(failing ? 'todo' : 'done', 'Text contrast', failing
+          ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
+          : 'At least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.',
+          'WCAG 1.4.3 Contrast (Minimum) (AA)');
       a11ySum();
-      play.classList.remove('pg-offstage'); play.hidden = wasPlay; preview.hidden = wasPreview;
-      Object.keys(keep).forEach(function (k) { state[k] = keep[k]; });
-      Object.keys(syncs).forEach(function (k) { syncs[k](); });
-      refresh();
-      checking = false;
     }
     // Every token this component is drawn with (its parts and states too, shown in this variant or not): its Figma name,
     // its variable with the value in the mode it is shown in, a colour's swatch, and what it sets. Without that list, the
@@ -2127,7 +2210,6 @@ a.pg-usage-name { color: var(--sg-text); }
       tTokens.innerHTML = rowsHTML(lookRows(el, true).concat(partRows(el, c.name)));
       ownRows(); writeLink(); checkLive(); codeHeight();
       showCode(e);
-      if (contrastEl) { contrastEl.innerHTML = contrastHTML(e); a11ySum(); }
       nudge();
       if (WIDTH !== 'fit') renderFrame();
       if (compareOn) requestAnimationFrame(drawCompare);
@@ -2268,12 +2350,14 @@ a.pg-usage-name { color: var(--sg-text); }
         inspecting = !inspecting;
         inspectBtn.setAttribute('aria-pressed', inspecting ? 'true' : 'false');
         (inspectBtn.querySelector('span') || inspectBtn).textContent = inspecting ? 'Done inspecting' : 'Inspect';
-        if (inspecting && WIDTH !== 'fit') showWidth('fit');   // it inspects the live component, at its own width
         drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
-        preview.hidden = inspecting; anatBox.hidden = !inspecting; if (anatLine) anatLine.hidden = !inspecting;
+        // One of the two at a time, whatever the Width: the anatomy in the stage, or the Playground (live, or in its
+        // Width's frame).
+        anatBox.hidden = !inspecting; if (anatLine) anatLine.hidden = !inspecting;
         if (!inspecting) { anatPicked = null; anatPath = []; anatBox.innerHTML = ''; }
         bottomBar();
-        if (inspecting) requestAnimationFrame(drawAnatomy); else nudge();
+        renderFrame();
+        if (!inspecting) nudge();
       });
     }
     // Opened again by a link: its variant set, the controls following.

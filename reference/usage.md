@@ -295,9 +295,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   space over the parts, each part over the component) says in one line what it is and its value (a part's padding,
   gap, fill, line, corners, shadow, text style and colour; an icon's size and colour; a space's token and value),
   outlined in the accent, the rest of the component dimmed around it and the other boxes faded; a second click goes
-  back up a level. What sits inside the part picked is drawn as parts too, one level per click, as a double click in
+  back up a level, and a click on the stage outside the component lets go of it. What sits inside the part picked is drawn as parts too, one level per click, as a double click in
   Figma reaches a layer in a group, and the line names the path (`Actions › buttonSecondary › text`). The modes
-  switched while inspecting (Light, Dark, Desktop, Phone) redraw it in that mode, what is picked kept. Done inspecting
+  switched while inspecting (Light, Dark, Desktop, Phone) redraw it in that mode, what is picked kept, and a Width
+  chosen while inspecting (Phone, Tablet, Desktop) draws it at that width, never beside the width's frame. Done inspecting
   brings the live component back and leaves nothing of the anatomy beside it. A component
   shown in an overlay is drawn as its own element.
 - **Width**, in the Playground (none on the measuring page): Fit (the live preview), Phone (375px), Tablet (768px) or
@@ -333,7 +334,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
   the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
   button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
-- **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma; in an
+- **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma; a Figma
+  slot the contract gives a part of its own is paired with that part (`.modal-slot`), said under the component's name
+  as well (`slotsHTML`); in an
   HTML and CSS system a slot or component swap is the markup's content, with code props a slot is `children`) and
   per code prop Figma lacks; per CSS variable its rules use (the token check's values in each mode, the same or differs;
   no Figma variable, only in code) and per Figma variable named after it with no CSS variable; per value the agreed
@@ -377,7 +380,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
 - **Accessibility**, one table like Parity's (`a11yRow`): What, What it means (in plain words), Status (✓ Done, ✕ To fix,
   ! Not checked yet, – Not needed, a sign and the system's colour) and WCAG, with a count of each above it, kept as
-  the live rows change; what to fix first, then the variant shown and its text contrast, then what the role asks for
+  the live rows change; what to fix first, then every variant tried in the browser (every combination up to 32,
+  else each option beside the defaults, whatever the Playground has set, as Parity lists everything; each check
+  said once with the variants it holds in) and the text contrast in every variant and colour mode, then what the role asks for
   (done once the last browser check ran with nothing found under its criterion). Its rows: its role (the Figma annotation, else `contract.authored.json` semantics) and what it asks for
   (`role-markup.mjs`, `behaviour-contract.mjs`: element, name, keys, part roles), each with its WCAG 2.2 criterion;
   the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); **To fix**, what the audit found
