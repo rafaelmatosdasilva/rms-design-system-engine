@@ -247,17 +247,21 @@ test('in the browser: no script error, a control changes the real component, the
     // lists everything: the chip's Size, Icon and pressed sides, each check said once with the variants it holds in.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const a11y = await run(`[...document.querySelectorAll('#c-chip .pg-doc')].find((d) => /Accessibility/.test(d.querySelector('h3').textContent)).textContent`);
-    assert.match(a11y, /togglebutton: a <button type="button"> with aria-pressed/);
-    assert.match(a11y, /WCAG 2\.1\.1 Keyboard \(A\)/);
-    assert.match(a11y, /Text contrast(At least )?\d+\.\d:1 .*in (all )?\d+ (of \d+ )?variants and colour modes/);
-    assert.match(a11y, /Browser checkNot run yet.*Not checked yet/s);
-    // One table like Parity's: what, what it means, a status with its sign, the WCAG criterion; a count above it.
-    assert.match(a11y, /What.*What it means.*Status.*WCAG/);
-    assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /\d+ done.*\d+ not checked yet/);
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
-    const live = await run(`document.querySelector('#c-chip .pg-a11y-live').textContent`);
+    // One table by WCAG criterion: what it means, what was found with where it comes from, the status; a count above it
+    // and when the audit last ran. Only what applies: no row is said not to be needed.
+    assert.match(a11y, /WCAG.*What it means.*What was found.*Status/);
+    assert.match(a11y, /2\.1\.1 Keyboard \(A\)/);
+    assert.match(a11y, /a <button type="button"> with aria-pressed/);
+    assert.match(a11y, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
+    assert.match(a11y, /The audit has not run in a browser yet/);
+    assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /\d+ done/);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
+    const live = await run(`document.querySelector('#c-chip .pg-a11y-rows').textContent`);
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
+    assert.match(live, /This page, in the browser/, 'each finding says where it comes from');
+    // Each area has its own address, to send someone to it.
+    assert.match(await run(`location.hash`), /^#c-chip\/accessibility/);
     // What it does when used is tried on a few variants after that, one at a time: then the Playground is drawn as set.
     for (let i = 0; i < 120 && await run(`!!document.querySelector('#c-chip .pg-offstage')`); i++) await new Promise((r) => setTimeout(r, 250));
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
@@ -267,7 +271,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
-    assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Text contrast.*(Done|To fix)/, 'measured again in the other mode');
+    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /^1\.4\.3/.test(r.cells[0].textContent)).textContent`), /\d+\.\d:1.*(Done|To fix)/s, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
     assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
@@ -285,7 +289,7 @@ test('in the browser: no script error, a control changes the real component, the
     // Parity: one table of everything the chip has (props, variables, values), Figma beside code, a status and when.
     const parRows = await run(`[...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].map((r) => r.dataset.type + ':' + r.dataset.status)`);
     assert.ok(parRows.some((r) => /^Prop:/.test(r)) && parRows.some((r) => /^Variable:/.test(r)), 'props and variables: ' + parRows);
-    assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity with Figma.*the same.*differ.*only in Figma.*only in code.*Type.*Figma.*Code.*Status.*Updated/s);
+    assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity.*the same.*differ.*only in Figma.*only in code.*Type.*Figma.*Code.*Status.*Updated/s);
     // The filter shows one type at a time.
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'Prop').click()`);
     // The filter acts on Parity's own table, never on the Accessibility tables beside it.
@@ -598,7 +602,7 @@ test('an accessibility finding goes to Accessibility, a difference from Figma to
   assert.deepEqual(parity.map((x) => x.check), ['Structure', 'Token layering']);
   assert.deepEqual(a11y.map((x) => x.check), ['State contrast']);
   const html = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
-  assert.match(html, /a11yRow\('todo', contrast \? 'Text contrast' : 'To fix'/, 'the Accessibility area lists what to fix');
+  assert.match(html, /add\(x\.wcag \|\| \(contrast \? 'WCAG 1\.4\.3 Contrast \(Minimum\) \(AA\)' : ''\), 'todo'/, 'the Accessibility area lists what to fix, under its criterion');
   assert.match(html, /a\[0\] === 'a11y' \? facts\.a11y/, 'the Accessibility tab carries the alert icon');
   assert.match(html, /if \(o\.icon\) text = '<svg class="sg-seg-icon"[^\n]*' \+ text;/, 'the icon before the label');
   assert.match(html, /n \+= \(c\.a11yFindings \|\| \[\]\)\.length/, 'counting what the audit found with what the browser check found');

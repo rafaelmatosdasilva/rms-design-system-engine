@@ -282,6 +282,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
   last audit found the products doing with it (a rule laid over it, a look-alike built by hand, a parent's rule
   overriding it), said so.
+- **An address for each area**: a component's area is in the address after a slash (`#c-chip/accessibility`, `/documentation`, `/parity`, `/variants`, `/built-with`, `/used-in`, `/changelog`; the Playground has none), kept as the areas are switched and opened directly from a shared link, before the props of the variant (`#c-chip/accessibility?Size=L`).
+- **The page's width**: the content takes the whole width the screen gives beside the menu, with no cap, so a wide screen shows wider tables and stages.
 - **The page's own reading**: every button says what it does in words (Menu and Close menu, on a phone; on a wide
   screen the menu is always there), and the style guide check fails when the page's text roles fall below 4.5:1 on its
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
@@ -341,10 +343,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
   button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
 - **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma; a Figma
-  slot the contract gives a part of its own is paired with that part (`.modal-slot`), and marked in the Playground as the
-  area it takes, dashed and named Slot inside, in place of the placeholder its markup holds (`drawSlots`, the
-  `.pg-slot-area` class: the placeholder kept unseen so the component keeps its size, at least 40 by 96 pixels so an
-  empty one is seen; the HTML shown drops the mark);
+  slot the contract gives a part of its own is paired with that part (`.modal-slot`); every slot is marked in the
+  Playground as the area it takes, dashed and named Slot inside, in place of the placeholder its markup holds
+  (`drawSlots`): its own part (`.pg-slot-area`, at least 40 by 96 pixels so an empty one is seen), or, for a slot whose
+  content the markup puts straight inside the component (a card, a status bar), the area that content takes drawn over
+  it inside the component's frame (`.pg-slot-host`), the parts of its other slots left as they are; the placeholder is
+  kept unseen so the component keeps its size, and the HTML shown drops the mark;
   a slot only Figma has is said under the component's name (`slotsHTML`); in an
   HTML and CSS system a slot or component swap is the markup's content, with code props a slot is `children`) and
   per code prop Figma lacks; per CSS variable its rules use (the token check's values in each mode, the same or differs;
@@ -387,31 +391,30 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Accessibility**, one table like Parity's (`a11yRow`): What, What it means (in plain words), Status (✓ Done, ✕ To fix,
-  ! Not checked yet, – Not needed, a sign and the system's colour) and WCAG, with a count of each above it, kept as
-  the live rows change; what to fix first, then every variant tried in the browser (every combination up to 32,
-  else each option beside the defaults, whatever the Playground has set, as Parity lists everything; each check
-  said once with the variants it holds in) and the text contrast in every variant and colour mode, then what the role asks for
-  (done once the last browser check ran with nothing found under its criterion). Its rows: its role (the Figma annotation, else `contract.authored.json` semantics) and what it asks for
-  (`role-markup.mjs`, `behaviour-contract.mjs`: element, name, keys, part roles), each with its WCAG 2.2 criterion;
-  the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); **To fix**, what the audit found
-  on it that is about accessibility rather than Figma (a text's contrast in one variant and mode, `splitFindings`),
-  each with who acts and its To do number; and the last browser check's
-  findings on it from `.design-system-engine-out/a11y.json` (each finding carries `component` and the file
-  `checkedAt`), or that it has not been checked yet. **On this variant** (none on the measuring page): tried on the
-  live component whenever the area shows a variant not tried yet, the Playground laid out out of sight for it and
-  drawn again as set afterwards: the Tab stops in order (a radio group one stop, a positive tabindex reported),
-  a control with an interactive role Tab does not reach, a name on each stop, a stop drawn as disabled (its class)
-  that Tab still reaches, the focus change on it, a box holding it or what follows it (at least 3:1 against what is
-  around it, 2.4.7 and 1.4.11), and each behaviour of `a11yView().behaviours` tried with the page's own events (a key
-  only a native element answers is said to be given by the browser). The WCAG 2.1 checks of `wcag-page.js` (inlined
-  in the page) run on every variant too, and what the component does when used (hover, focus, input, press) on its
-  first six, one at a time, their findings joining the table; a code finding of `a11y-static.mjs` (a shortcut, a
-  timer, a gesture, device motion) sits at the top when its file is named after the component or the code around
-  it names the component's class (`wcagStatics`).
-- **From**: each row of the Accessibility table says where its information is read: the Figma annotation that states the
-  role (`Figma annotation Role: button`), a Figma annotation on a layer for a part's role, `contract.authored.json`
-  (semantics, behaviourExceptions), its code, this page in the browser, the last audit, or the audit's code capture.
+- **Accessibility**, one table by WCAG criterion (`a11yRows`): WCAG (the criterion and its level), What it means (in
+  plain words, with how it is known and the Figma annotations that feed it), What was found (each finding or duty on
+  its own line with its sign and where it comes from, a Figma annotation, `contract.authored.json`, its code, this
+  page in the browser, the last audit or the audit's code capture) and Status (✕ To fix, ! To check, ✓ Done, a sign
+  and the system's colour). Only what applies to the component is listed: a criterion of the page that uses it (a
+  title, a skip link, orientation, consistent navigation), video and sound it does not play, what it has nothing for
+  (no link for 2.4.4), and what asks of controls or fields on a component with none in any variant (keyboard,
+  focus, labels, errors) are left out. To fix first, then to check, then done; a WCAG 2.2 or AAA criterion a check
+  stands for (target size, motion from interactions) comes last as advisory and is not counted. Above it a count of
+  each status, and when the audit last ran (or that it has not), with what is excused (`behaviourExceptions`).
+  Under each criterion: what the audit found on it that is about accessibility rather than Figma (a text's contrast
+  in one variant and mode, `splitFindings`, with who acts and its To do number); the last browser check's findings
+  from `.design-system-engine-out/a11y.json`; what its code does (`a11y-static.mjs` findings given to it by
+  `wcagStatics`); its role's duties and Figma's notes (`role-markup.mjs`, `behaviour-contract.mjs`: element, name,
+  keys, part roles), to fix only when the audit found that kind of problem; and what this page finds trying every
+  variant (none on the measuring page): every combination up to 32, else each option beside the defaults, the
+  Playground laid out out of sight and drawn again as set, each result said once with the variants it holds in.
+  The tries are the Tab stops in order, a name and a visible focus on each stop, a stop drawn as disabled that Tab
+  still reaches, each behaviour tried with the page's own events (a key only a native element answers is said to be
+  given by the browser), the text contrast in every variant and colour mode, the WCAG 2.1 checks of `wcag-page.js`,
+  and what it does when used (hover, focus, input, press) on six variants that can be used. A criterion is done when
+  its check ran and found nothing (the page's run, `ran` in the last audit's `a11y.json` for zoom, spacing, reflow
+  and a keyboard trap, the code read for the rest) and to check when only a person can judge it, with what to look
+  at.
 - **Where it is read from** (`a11yView().sources`, built in `styleguide-gen.mjs`): a table of every source of the
   component's accessibility, what each holds and what uses it, each Used by a check, Read by the agents only, or
   Nothing there. Each Figma annotation on it and on its layers (`annotationUses` in `a11y-check.mjs`): the role it
@@ -420,14 +423,6 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   so, and how to write it so one does. The team's guidelines (`guidelines.sources`, the Notion and GitLab pages fetched
   into files): the section named after the component, with its lines about accessibility, read by the agents as design
   intent and by no check. The contract, its code, this page and the last audit (the page it opened and when).
-- **WCAG 2.1, level A and AA**: a second table below, every one of the 50 success criteria for the component
-  (`wcag21.mjs`), with what it asks in plain words, a status and how it is known. To fix when a check found something
-  under it (the page's, the audit's or the code's); for a person to check when only a person can judge it (an
-  instruction that relies on shape, an image of text, the words of a heading), with what to look at; Not needed for
-  what belongs to the page that uses the component (a page title, a skip link, orientation, consistent navigation),
-  for video and sound when the component plays none, and when the component has nothing it asks about (no link for
-  2.4.4); met when its check ran and found nothing (the page's own run, `ran` in the last audit's `a11y.json` for
-  zoom, spacing, reflow and a keyboard trap, the code read for the rest). A count of each sits above it.
 - **In use**: the approved pictures of `frames[]` (Gate [2] (Figma frame unchanged)'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,
