@@ -182,6 +182,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* ── Component playground ────────────────────────────────────────────────── */
 .pg-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
 .pg-head > h2 { margin: 0; }
+.pg-head-links { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-left: auto; }
 .pg-usage { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); align-items: center; }
 .pg-usage-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-usage-name { font-size: var(--sg-s); color: var(--sg-text-2); }
@@ -275,7 +276,6 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-ctl > input[type="text"] { font: inherit; }
 .pg-empty { font-size: var(--sg-s); color: var(--sg-muted); }
 /* Anatomy: the component as set in the Playground, drawn larger, each part, padding and gap outlined and numbered. */
-.pg-anatomy { display: flex; justify-content: center; padding: var(--sg-space-xxl) var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-l); background: var(--sg-bg); overflow: auto; }
 .pg-anat-stage { position: relative; flex: none; }
 /* Variants: one option per row, its name, the component as drawn with it, and Try it to set it in the Playground. */
 .pg-variants { display: flex; flex-direction: column; gap: var(--sg-space-l); }
@@ -285,7 +285,7 @@ a.pg-usage-name { color: var(--sg-text); }
 @media (max-width: 640px) { .pg-variant-row { grid-template-columns: 1fr auto; } .pg-variant-stage { grid-column: 1 / -1; grid-row: 2; } }
 .pg-anat-wrap { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; }
 .pg-anat-wrap, .pg-anat-wrap * { animation: none !important; transition: none !important; }   /* drawn at rest, never mid-entry */
-.pg-anatomy-doc, .pg-anatomy { min-width: 0; }
+.pg-anatomy { min-width: 0; overflow: auto; }
 .pg-anat-marks { position: absolute; inset: 0; pointer-events: none; }
 .pg-anat-marks [data-hit] { pointer-events: auto; cursor: pointer; }
 .pg-anat-marks .pg-anat-root { position: absolute; z-index: 0; }
@@ -310,20 +310,21 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-anat-lead { position: absolute; height: 0; border-top: 1px solid var(--sg-text); transform-origin: 0 0; }
 .pg-anat-part.is-slot { outline: 2px dashed var(--sg-accent); }
 .pg-anat-num { position: absolute; transform: translate(-50%, -50%); min-width: 18px; height: 18px; padding: 0 var(--sg-space-xxs); box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: var(--sg-radius-pill); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); }
-.pg-anatomy-doc .pg-updated { margin-top: var(--sg-space-l); }
-.pg-look { display: block; color: var(--sg-muted); }
 /* Width: the component in a frame of that width, scaled to fit when wider than the room. */
 .pg-preview[hidden], .pg-frame[hidden] { display: none; }
 .pg-preview-col { min-width: 0; display: flex; flex-direction: column; position: relative; }
 /* The system's modes inside the playground: the colour mode top left, a sizing collection top right, over the stage. */
-.pg-stage-modes { position: absolute; inset: var(--sg-space-s); display: flex; flex-direction: column; justify-content: space-between; gap: var(--sg-space-s); z-index: 6; pointer-events: none; }
-.pg-stage-modes[hidden] { display: none; }
-.pg-stage-mode > * { pointer-events: auto; }
-.pg-stage-mode:first-child { align-self: flex-start; }   /* the sizing mode, top left */
-.pg-stage-mode:last-child { align-self: flex-end; }   /* the colour mode, bottom right */
-/* The switches carry no visible label inside the playground: the modes speak for themselves; a screen reader still hears the name. */
+.pg-stage-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sg-space-s); padding: var(--sg-space-s) var(--sg-space-m); background: var(--sg-bg-2); border: var(--sg-line); }
+.pg-stage-bar--top { border-bottom: none; border-radius: var(--sg-radius-l) var(--sg-radius-l) 0 0; }
+.pg-stage-bar--bottom { border-top: none; border-radius: 0 0 var(--sg-radius-l) var(--sg-radius-l); }
+.pg-stage-bar--bottom > .pg-stage-mode { margin-left: auto; }   /* the colour mode at the bottom right */
+.pg-stage-bar[hidden], .pg-anat-line[hidden], .pg-anatomy[hidden] { display: none; }
+.pg-stage-tools { display: flex; gap: var(--sg-space-xs); margin-left: auto; }
+.pg-preview-col > .pg-preview, .pg-preview-col > .pg-frame, .pg-preview-col > .pg-anatomy { border-left: var(--sg-line); border-right: var(--sg-line); }
+.pg-anat-line { margin: 0; font-size: var(--sg-s); color: var(--sg-text); min-width: 0; }
+.pg-preview-col > .pg-anatomy { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 140px; padding: var(--sg-space-xl); background-color: var(--sg-stage, var(--sg-bg)); }
+.pg-preview-col > .pg-anatomy .pg-anat-num, .pg-preview-col > .pg-anatomy .pg-anat-lead { display: none; }   /* the inspector names what is clicked, not a numbered list */
 .pg-stage-mode .sg-mode-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.pg-preview-col.has-modes > .pg-preview, .pg-preview-col.has-modes > .pg-frame { padding-top: calc(var(--pg-modes-top, 0px) + var(--sg-space-l)); padding-bottom: calc(var(--pg-modes-bottom, 0px) + var(--sg-space-l)); }
 .pg-preview-col > .pg-preview { flex: 1; }
 .pg-preview-col > .pg-frame { flex: 1; }
 .pg-frame { display: flex; align-items: safe center; justify-content: safe center; min-width: 0; min-height: 140px; padding: var(--sg-space-l); }
@@ -355,7 +356,6 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-doc-card > .pg-updated > div:last-child { border-bottom: none; }
 .pg-doc-card > .pg-updated dt { color: var(--sg-muted); font-weight: inherit; }
 .pg-doc-card > :not(.pg-inspect-head):not(.pg-updated) { margin: var(--sg-space-m); }
-.pg-doc-card > .pg-anatomy { border: none; box-shadow: none; }
 .pg-doc-card > .pg-updated:empty { display: none; }
 .pg-examples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sg-space-l); }
 .pg-example { display: flex; flex-direction: column; gap: var(--sg-space-xs); min-width: 0; }
@@ -381,7 +381,6 @@ a.pg-usage-name { color: var(--sg-text); }
   .pg-preview { overflow-x: auto; }   /* centred like everywhere; a component wider than a phone scrolls from its start (safe center) */
   /* On a phone the stage gives the component room of its own below the mode switches, never squeezed under them. */
   .pg-preview, .pg-frame { min-height: 220px; }
-  .pg-preview-col.has-modes > .pg-preview, .pg-preview-col.has-modes > .pg-frame { min-height: calc(var(--pg-modes-top, 0px) + var(--pg-modes-bottom, 0px) + 220px); }
   .pg-preview-card { grid-template-columns: 1fr; } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); }
   .pg-updated > div { grid-template-columns: 1fr; gap: 0; }   /* the documentation in one column: each name above its text */
   .pg-inspect-grid.pg-grid-2, .pg-examples { grid-template-columns: 1fr; }   /* Parity and Do and Don't in one column on a phone */
@@ -606,12 +605,13 @@ a.pg-usage-name { color: var(--sg-text); }
     n += (c.a11yFindings || []).length;   // what the audit found (a text's contrast) counts too
     var a11y = n ? { say: n === 1 ? '1 problem' : n + ' problems', todo: true } : !ch || ch.notRead ? { say: 'Not checked in a browser yet', todo: false } : { say: 'No problem found', todo: false };
     var used = (c.usage || []).length;
-    return { version: rel ? rel.release : log.length ? 'Not released yet' : null, changed: log.length ? String(log[0].date).slice(0, 10) : null, parity: parity, a11y: a11y, used: used };
+    return { version: rel ? rel.release : log.length ? 'Not released yet' : null, changed: log.length ? String(log[0].date).slice(0, 10) : null, changedAt: log.length ? log[0].date : null, parity: parity, a11y: a11y, used: used };
   }
   function factsHTML(c) {
     var f = factsOf(c), item = function (k, v, todo) { return '<div><dt>' + esc(k) + '</dt><dd' + (todo ? ' class="sg-fact-todo"' : '') + '>' + esc(v) + '</dd></div>'; };
-    return '<dl class="pg-facts">' + (f.version ? item('Version', f.version) : '') + (f.changed ? item('Last changed', f.changed) : '') +
-      item('Figma', f.parity.say, f.parity.todo) + item('Accessibility', f.a11y.say, f.a11y.todo) + item('Used in', !f.used ? 'No product yet' : f.used === 1 ? '1 product' : f.used + ' products') + '</dl>';
+    // Under its name, only its version and when it last changed (date and time); how it stands with Figma and with
+    // accessibility is on its areas (their alert icons) and its overview card.
+    return (f.version || f.changedAt) ? '<dl class="pg-facts">' + (f.version ? item('Version', f.version) : '') + (f.changedAt ? item('Last changed', when(f.changedAt)) : '') + '</dl>' : '';
   }
   // On its card: only how it stands, in one line (Figma, then accessibility).
   function cardFacts(c) { var f = factsOf(c); return '<p class="sg-card-facts"><span' + (f.parity.todo ? ' class="sg-fact-todo"' : '') + '>Figma ' + esc(f.parity.say.toLowerCase()) + '</span>  ·  <span' + (f.a11y.todo ? ' class="sg-fact-todo"' : '') + '>' + 'Accessibility ' + esc(f.a11y.todo || /^No problem/.test(f.a11y.say) ? f.a11y.say.toLowerCase() : 'not checked') + '</span></p>'; }
@@ -1380,6 +1380,10 @@ a.pg-usage-name { color: var(--sg-text); }
     }).join('') + '</div>';
   }
   // ── Links: where else it lives (Figma, its code, the team's documentation), each opening in a new tab ────────────
+  function headLinksHTML(list) {
+    if (!(list || []).length) return '';
+    return '<div class="pg-head-links">' + list.map(function (l) { return sysButton('a', l.label, ' href="' + esc(l.url) + '" target="_blank" rel="noopener"'); }).join('') + '</div>';
+  }
   function linksHTML(list) {
     if (!(list || []).length) return '';
     return '<div class="pg-import pg-links"><span class="pg-usage-label">Links</span>' + list.map(function (l) { return sysButton('a', l.label, ' href="' + esc(l.url) + '" target="_blank" rel="noopener"'); }).join('') + '</div>';
@@ -1571,11 +1575,12 @@ a.pg-usage-name { color: var(--sg-text); }
       (c.note ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '');
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
-        '<div class="pg-head"><h2>' + esc(c.name) + '</h2></div>' +
+        // Its name, and at its top right where else it lives (its Figma node, its code, the team's pages).
+        '<div class="pg-head"><h2>' + esc(c.name) + '</h2>' + headLinksHTML(c.links) + '</div>' +
         (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
         (ALL ? '' : factsHTML(c)) +
-        importHTML(c) + linksHTML(c.links) +
+        importHTML(c) +
       '</div>' +
       // What differs from Figma is marked on Parity itself: the system's alert icon, its count said to a screen reader.
       '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantProps(c).length)); }).map(function (a) {
@@ -1585,12 +1590,9 @@ a.pg-usage-name { color: var(--sg-text); }
       })) + '</div></div>' +
       // Playground: the component drawn, its controls, its code and the tokens behind it.
       '<div class="pg-area" data-area="play">' +
-      '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview-col"><div class="pg-stage-modes" hidden><div class="pg-stage-mode"></div><div class="pg-stage-mode"></div></div><div class="pg-preview"></div><div class="pg-frame" hidden></div></div><div class="pg-panel"><div class="pg-actions"></div>' +
+      '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview-col"><div class="pg-stage-bar pg-stage-bar--top"><div class="pg-stage-mode"></div><div class="pg-stage-tools"></div></div><div class="pg-preview"></div><div class="pg-frame" hidden></div><div class="pg-anatomy" hidden></div><div class="pg-stage-bar pg-stage-bar--bottom"><p class="pg-anat-line" hidden></p><div class="pg-stage-mode"></div></div></div><div class="pg-panel"><div class="pg-actions"></div>' +
         (ALL ? '' : '<div class="pg-ctl pg-width"><div class="pg-ctl-label">Width</div>' + segHTML(WIDTHS.map(function (w) { return { v: w[0], label: w[1] }; })) + '</div>') +
         '<div class="pg-controls"></div></div></div>' +
-        // Specs, under the component as the controls set it: each part, padding and gap numbered; a click on one (or
-        // on its name in the list) shows the tokens it is drawn with. Changing a control redraws them.
-        (ALL ? '' : '<div class="pg-footer pg-play-specs"><div class="pg-doc pg-anatomy-doc"><h3>Anatomy</h3><div class="pg-anatomy"></div><dl class="pg-updated pg-anat-pick"></dl><dl class="pg-updated pg-anat-legend"></dl></div></div>') +
         (ALL || !(c.figmaShots || []).length ? '' : '<div class="pg-inspect pg-compare" hidden><div class="pg-inspect-head">Figma beside the code</div><div class="pg-compare-bar">' + segHTML([{ v: 'side', label: 'Side by side' }, { v: 'over', label: 'Over' }]) +
           '<label class="pg-ctl-label pg-compare-amount">How much of Figma shows <input type="range" min="0" max="100" value="50"></label></div><div class="pg-compare-body"></div></div>') +
         // The tokens behind what is drawn, its code on their right; every token it uses below them all.
@@ -1711,7 +1713,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // The area chosen in view in the scrolling bar, the page itself left where it is.
       var strip = areaBar.querySelector('.pg-areas-scroll'), on = segItems(areaBar).find(function (b) { return b.dataset.v === v; });
       if (strip && on && strip.scrollWidth > strip.clientWidth) { var sr = strip.getBoundingClientRect(), br = on.getBoundingClientRect(); if (br.left < sr.left || br.right > sr.right) strip.scrollLeft += br.left < sr.left ? br.left - sr.left - 8 : br.right - sr.right + 8; }
-      if (v === 'play') { nudge(); codeHeight(); requestAnimationFrame(drawAnatomy); }
+      if (v === 'play') { nudge(); codeHeight(); if (inspecting) requestAnimationFrame(drawAnatomy); }
       if (v === 'variants') requestAnimationFrame(drawVariants);
       if (v === 'a11y') checkLive();
       if (v === 'built') requestAnimationFrame(function () { builtThumbs(sec); });
@@ -1723,7 +1725,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // in the accent), each padding and gap outlined and numbered after them and named by its token in the list (numbers,
     // never colours, so nothing reads as a token's colour), and how it lines its items up.
     // One that covers the window has none (a modal is drawn as its card). Never on the measuring page (?all).
-    var anatBox = sec.querySelector('.pg-anatomy'), anatLegend = sec.querySelector('.pg-anat-legend'), drawnWidth = 0;
+    var anatBox = sec.querySelector('.pg-anatomy'), drawnWidth = 0;
     // Its parts, paddings and gaps, measured on root (a copy of the live component, as the Playground sets it): each part
     // outlined and numbered in reading order (a slot in the accent), each padding and gap outlined and numbered after
     // them, and how it lines up its items. box(el) gives a rect in the drawing's own coordinates, mark and num draw.
@@ -1801,29 +1803,9 @@ a.pg-usage-name { color: var(--sg-text); }
         }
       };
     }
-    // The list beside a drawing: its parts (with what each looks like, on Specs), its spacing and alignment.
-    function legendHTML(r, looks) {
-      // Each name picks its part or space, as a click on it does.
-      var name = function (key, text) { return looks ? '<a href="#" class="sg-uses-link" data-pick="' + esc(key) + '">' + esc(text) + '</a>' : esc(text); };
-      return (r.parts.length ? '<div><dt>Parts</dt><dd>' + r.parts.map(function (p, i) { return '<p><b>' + (i + 1) + '</b> ' + name(p.key, p.name) + (p.slot ? ', a slot the product fills' : '') + (looks ? partLook(p.el) : '') + '</p>'; }).join('') + '</dd></div>' : '') +
-        (r.spacing.length ? '<div><dt>Spacing</dt><dd>' + r.spacing.map(function (sp, i) { return '<p><b>' + (r.parts.length + i + 1) + '</b> ' + name(sp.key, sp.what) + '  ·  ' + esc(sp.value) + '</p>'; }).join('') + '</dd></div>' : '') +
-        (r.lines ? '<div><dt>Alignment</dt><dd><p>' + esc(r.lines) + '</p></dd></div>' : '');
-    }
-    // What a part looks like, by the tokens behind it: its text style and colour, an icon's size and colour, a fill, a line.
-    function partLook(el) {
-      var cs = getComputedStyle(el), bits = [], r = el.getBoundingClientRect();
-      if (el.tagName.toLowerCase() === 'svg') bits.push(Math.round(r.width) + '×' + Math.round(r.height) + 'px', tok(el, cs.color, 'color', c.name));
-      else {
-        var words = Array.prototype.some.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); }) || (!el.children.length && el.textContent.trim());
-        if (words) bits.push(fontTok(el, cs), tok(el, cs.color, 'color', c.name));
-        if (cs.backgroundColor !== 'rgba(0, 0, 0, 0)') bits.push('fill ' + tok(el, cs.backgroundColor, 'color', c.name));
-        if (parseFloat(cs.borderTopWidth)) bits.push('line ' + tok(el, cs.borderTopColor, 'color', c.name) + ' ' + cs.borderTopWidth);
-      }
-      return bits.length ? '<span class="pg-look">' + esc(bits.join('  ·  ')) + '</span>' : '';
-    }
     function drawAnatomy() {
       if (!anatBox || !cur || !preview.firstElementChild || anatBox.offsetParent === null) return;
-      anatBox.innerHTML = ''; anatLegend.innerHTML = '';
+      anatBox.innerHTML = '';
       // A component shown in an overlay (a modal over the window) is drawn as itself: its own element, without the layer.
       var src = preview.firstElementChild;
       if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + clsName(c)); if (own) src = own; }
@@ -1838,9 +1820,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var marks = document.createElement('div'); marks.className = 'pg-anat-marks'; marks.setAttribute('aria-hidden', 'true');
       stage.appendChild(wrap); stage.appendChild(marks); anatBox.appendChild(stage);
       var root = c.only ? (copy.querySelector(c.only) || copy) : copy;
-      var doc = anatBox.closest('.pg-anatomy-doc');
-      if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { doc.hidden = true; return; }
-      doc.hidden = false;
+      if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { anatBox.textContent = 'This component sits over the page, so it is inspected in the browser rather than here.'; return; }
       var whole = copy.getBoundingClientRect(), rr = root.getBoundingClientRect();
       var k = Math.max(1, Math.min(4, 160 / Math.max(1, rr.height), (anatBox.clientWidth - 64) / Math.max(1, whole.width)));
       stage.style.width = whole.width * k + 'px'; stage.style.height = whole.height * k + 'px';
@@ -1850,13 +1830,13 @@ a.pg-usage-name { color: var(--sg-text); }
       m.mark('pg-anat-root', [b0.x, b0.y, b0.w, b0.h], { key: 'part 0 ' + c.name, name: c.name, el: root });   // under the rest: a click on the component itself
       var r = annotate(root, box, m.mark, m.num);
       wrap.style.transform = 'scale(' + k + ')';
-      anatLegend.innerHTML = legendHTML(r, true);
       // What is picked: the tokens it is drawn with; nothing picked, how to pick.
       var hit = anatPicked && marks.querySelector('[data-hit="' + (window.CSS && CSS.escape ? CSS.escape(anatPicked) : anatPicked) + '"]'), info = hit && hit._info;
       if (hit) hit.classList.add('is-picked'); else anatPicked = null;
-      if (anatPick) anatPick.innerHTML = !info ? '<div><dt>Picked</dt><dd><p>Click a part, a padding or a gap on the drawing, or a name below, to see the tokens it is drawn with.</p></dd></div>'
-        : info.el ? '<div><dt>Picked</dt><dd><p><b>' + esc(info.name) + '</b></p>' + lookRows(info.el, false).filter(function (x) { return x[1] !== '-' && x[1] !== 'none' && x[1] !== 'transparent' && x[1] !== '0'; }).map(function (x) { return '<p>' + esc(x[0]) + '  ·  ' + esc(x[1]) + '</p>'; }).join('') + '</dd></div>'
-        : '<div><dt>Picked</dt><dd><p><b>' + esc(info.what) + '</b>  ·  ' + esc(info.value) + '</p></dd></div>';
+      // One line: what is picked and its values; nothing picked, how to pick.
+      if (anatLine) anatLine.innerHTML = !info ? 'Click a part, a padding or a gap to see what it is and its value.'
+        : info.el ? '<b>' + esc(info.name) + '</b>  ·  ' + esc(pickedValues(info.el).join('  ·  ') || 'nothing of its own')
+        : '<b>' + esc(info.what) + '</b>  ·  ' + esc(info.value);
     }
     // Variants: each option drawn by the Playground itself (its own refresh), copied still and inert into its row, then
     // the Playground set back as it was. Each row names its prop and option; a click on Try it sets it in the Playground.
@@ -1892,10 +1872,15 @@ a.pg-usage-name { color: var(--sg-text); }
       Object.keys(syncs).forEach(function (k) { syncs[k](); });
       showArea('play'); refresh();
     });
-    var anatPicked = null, anatPick = sec.querySelector('.pg-anat-pick');
+    var anatPicked = null, anatLine = sec.querySelector('.pg-anat-line');
+    // What a picked part is drawn with, by its tokens: an icon's size and colour; else its padding, gap, fill, line,
+    // corners, shadow, text style and colour (what it has of them).
+    function pickedValues(el) {
+      if (el.tagName.toLowerCase() === 'svg') { var r = el.getBoundingClientRect(), k = parseFloat((anatBox.querySelector('.pg-anat-wrap') || {}).style ? (anatBox.querySelector('.pg-anat-wrap').style.transform.match(/scale\(([\d.]+)\)/) || [0, 1])[1] : 1) || 1; return ['size ' + Math.round(r.width / k) + '×' + Math.round(r.height / k) + 'px', 'colour ' + tok(el, getComputedStyle(el).color, 'color', c.name)]; }
+      return lookRows(el, false).filter(function (x) { return x[1] !== '-' && x[1] !== 'none' && x[1] !== 'transparent' && x[1] !== '0'; }).map(function (x) { return x[0] + ' ' + x[1]; });
+    }
     function pickAnatomy(key) { anatPicked = anatPicked === key ? null : key; drawAnatomy(); }
     if (anatBox) anatBox.addEventListener('click', function (e) { var h = e.target.closest && e.target.closest('.pg-anat-marks [data-hit]'); if (!h) return; e.preventDefault(); pickAnatomy(h.getAttribute('data-hit')); });
-    if (anatLegend) anatLegend.addEventListener('click', function (e) { var a = e.target.closest && e.target.closest('[data-pick]'); if (!a) return; e.preventDefault(); pickAnatomy(a.getAttribute('data-pick')); });
     // Figma beside the code: the Figma image of the variant set (its variant props equal to the Playground's), beside a
     // still copy of the component as drawn, or over it, as much of it as the slider says. A variant Figma has no image
     // of is said so, never shown with another's.
@@ -1986,19 +1971,19 @@ a.pg-usage-name { color: var(--sg-text); }
     // Per-component mode controls, inside the playground: only the axes that nest, so this preview can differ from the
     // page. The sizing mode (Desktop, Phone) at its top left, the colour mode and any other collection at its bottom right; they are the
     // system's modes, not the component's props. The stage keeps room for them above and below the component.
-    var stageModes = sec.querySelector('.pg-stage-modes');
-    if (stageModes && AXES.some(function (a) { return a.scoped; })) {
-      var slots = stageModes.querySelectorAll('.pg-stage-mode');
+    var stageCol = sec.querySelector('.pg-preview-col'), barBottom = sec.querySelector('.pg-stage-bar--bottom');
+    if (stageCol && AXES.some(function (a) { return a.scoped; })) {
+      var slots = stageCol.querySelectorAll('.pg-stage-mode');
       [function (a) { return a.scoped && a.attr === 'data-size'; }, function (a) { return a.scoped && a.attr !== 'data-size'; }].forEach(function (which, i) {
         if (!AXES.some(which)) return;
         var row = SGModes.controls(preview, function () { refresh(); }, which);
         slots[i].appendChild(row); SGModes.register(row);
       });
-      stageModes.hidden = false; stageModes.parentNode.classList.add('has-modes');
-      var room = function () { stageModes.parentNode.style.setProperty('--pg-modes-top', (slots[0].children.length ? slots[0].offsetHeight : 0) + 'px'); stageModes.parentNode.style.setProperty('--pg-modes-bottom', (slots[1].children.length ? slots[1].offsetHeight : 0) + 'px'); };
-      if (window.ResizeObserver) { var ro = new ResizeObserver(room); ro.observe(slots[0]); ro.observe(slots[1]); }
-      room();
     }
+    // The bottom bar shows while it holds something: the colour mode, or what the inspector picked.
+    function bottomBar() { if (barBottom) barBottom.hidden = !barBottom.querySelector('.pg-stage-mode').children.length && !inspecting; }
+    var inspecting = false;
+    bottomBar();
     var cur = null;   // the element the props act on, as last drawn
     var leaves = {};   // the part each text prop wrote into, as last drawn
     function refresh() {
@@ -2059,7 +2044,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // anatomy is drawn again from it, once a frame.
     var anatQueued = false;
     function inspect(e) {
-      if (areaNow === 'play' && !anatQueued) { anatQueued = true; requestAnimationFrame(function () { anatQueued = false; drawAnatomy(); }); }
+      if (inspecting && !anatQueued) { anatQueued = true; requestAnimationFrame(function () { anatQueued = false; drawAnatomy(); }); }
       var el = (c.cls && (e.classList.contains(clsName(c)) ? e : e.querySelector('.' + clsName(c)))) || e;
       tTokens.innerHTML = rowsHTML(lookRows(el, true).concat(partRows(el, c.name)));
       ownRows(); writeLink(); checkLive(); codeHeight();
@@ -2195,6 +2180,24 @@ a.pg-usage-name { color: var(--sg-text); }
     // container, layers and open and closing classes. Each button is the system's own.
     var actions = sec.querySelector('.pg-actions'), mv = c.motion;
     function action(label, fn) { actions.insertAdjacentHTML('beforeend', sysButton('button', label)); var b = actions.lastElementChild; b.addEventListener('click', function () { fn(b); }); }
+    // Inspect: the Playground turns into its anatomy, the component as set, larger, each part, padding and gap outlined;
+    // a click on one says in one line what it is and its value. Again puts the live component back.
+    var tools = sec.querySelector('.pg-stage-tools');
+    if (!ALL && tools && anatBox) {
+      tools.insertAdjacentHTML('beforeend', sysButton('button', 'Inspect', ' aria-pressed="false"'));
+      var inspectBtn = tools.lastElementChild;
+      inspectBtn.addEventListener('click', function () {
+        inspecting = !inspecting;
+        inspectBtn.setAttribute('aria-pressed', inspecting ? 'true' : 'false');
+        (inspectBtn.querySelector('span') || inspectBtn).textContent = inspecting ? 'Done inspecting' : 'Inspect';
+        if (inspecting && WIDTH !== 'fit') showWidth('fit');   // it inspects the live component, at its own width
+        drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
+        preview.hidden = inspecting; anatBox.hidden = !inspecting; if (anatLine) anatLine.hidden = !inspecting;
+        if (!inspecting) anatPicked = null;
+        bottomBar();
+        if (inspecting) requestAnimationFrame(drawAnatomy); else nudge();
+      });
+    }
     // Opened again by a link: its variant set, the controls following.
     sec._link = function (q) {
       if (!fromLink(q)) { writeLink(); return; }
