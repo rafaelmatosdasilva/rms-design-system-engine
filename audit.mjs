@@ -467,11 +467,19 @@ if (process.argv.includes('--from-figma-cli') || process.argv.includes('--refres
 if (process.argv.includes('--styleguide')) {
   let sgConfig = {};
   try { sgConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  // With --component: the audit of those components first (the gates against Figma and the accessibility check in a
+  // browser, as any scoped run), so the page shows their Parity and Accessibility as of now; then the whole page.
+  // A finding does not stop the page: it is what the page shows.
+  if (SCOPE_COMPONENTS.length) {
+    console.log(`Auditing ${SCOPE_COMPONENTS.join(', ')}, then building the style guide.`);
+    spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...process.argv.slice(2).filter((a) => a !== '--styleguide')], { cwd: ROOT, stdio: 'inherit' });
+  }
   try {
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
     const r = await generateStyleguide(ROOT, sgConfig, {});
     console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${r.components} component${r.components === 1 ? '' : 's'} agreed · ${r.template === 'engine' ? "the engine's template" : "the project's template"})`);
     if (r.notAgreed) console.log(`   ${r.notAgreed}`);
+    for (const name of SCOPE_COMPONENTS) console.log(`   ${name}: ${relative(ROOT, r.out)}#c-${name}  (its Accessibility and Parity areas)`);
     // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
     const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
     const found = checkFile(r.out);

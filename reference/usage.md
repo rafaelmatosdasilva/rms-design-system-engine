@@ -65,6 +65,7 @@ rms-design-system-engine --no-docs                       # skip the design-inten
 rms-design-system-engine --refresh-figma                 # read Figma the best way there is: design.json, figma-cli, else says how
 rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
+rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then the style guide, its address printed
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
