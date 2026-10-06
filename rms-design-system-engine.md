@@ -85,7 +85,7 @@ reference it points to say, never from memory or from this table alone.
 | known differences accepted as debt | `accept-debt` |
 | states, variants or combinations mapped or explained | `states-and-variants` |
 | a note in Figma about what a component is or does (a toggle, a button, a heading, its label), accessibility notes, or an accessibility finding explained | `a11y-notes` |
-| components compared with their Figma images | `visual-diff` |
+| components compared with their Figma images (`codeReading.visual`; each image from `.design-system-engine-refs/components/` or the Figma API with `FIGMA_TOKEN`) | `visual-diff` |
 | to know what to fix first, or to work a library down | `burndown` |
 | something in Figma built in code: the tokens, a component, the whole design system, or a screen from them | `build-from-figma` |
 | a prototype, mock-up or wireframe made with the design system | `prototype` |

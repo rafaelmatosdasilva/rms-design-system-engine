@@ -314,3 +314,13 @@ test('what a button opens, drawn with the engine\'s layout pieces, is a dialog o
   ] };
   assert.ok(!checkPrototype(said, { catalog, view, scales, name: 'project' }).gaps.some((x) => /dialog or menu/.test(x.need)));
 });
+
+test('a Missing box carries what the guidelines say the system lacks, so the reply names it', () => {
+  const context = { components: { button: { guidelines: 'One button per screen, for its main action. Any other action is a link. Tidepool has no link component yet.' } } };
+  const ui = { component: 'Page', children: [{ component: 'button', props: { Label: 'Delete' } }, { component: 'Missing', props: { need: 'Cancel or dismiss action', closest: 'button' } }] };
+  const g = checkPrototype(ui, { catalog, view, scales, name: 'confirm', context }).gaps.find((x) => x.need === 'Cancel or dismiss action');
+  assert.equal(g.note, 'the guidelines: "Any other action is a link. Tidepool has no link component yet."');
+  assert.match(gapLine(g), /component: Cancel or dismiss action; closest in the system: button \(the guidelines: "Any other action is a link\./);
+  const named = { component: 'Page', children: [{ component: 'Missing', props: { need: 'a link for Cancel', closest: 'button' } }] };
+  assert.equal(checkPrototype(named, { catalog, view, scales, name: 'confirm', context }).gaps[0].note, undefined);
+});

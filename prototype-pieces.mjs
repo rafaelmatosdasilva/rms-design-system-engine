@@ -134,7 +134,8 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
   for (const node of nodes) {
     const p = node.props ?? {};
     if (node.component === 'Missing' && pieces.Missing) {
-      gaps.push({ need: String(p.need ?? 'unnamed need'), kind: p.kind ?? 'component', closest: p.closest ?? null, used: null, prototype: name, node: node.id });
+      const said = lackSaid(context, String(p.need ?? ''), p.closest);
+      gaps.push({ need: String(p.need ?? 'unnamed need'), kind: p.kind ?? 'component', closest: p.closest ?? null, used: null, prototype: name, node: node.id, ...(said ? { note: `the guidelines: "${said}"` } : {}) });
       if (!p.need) findings.push({ rule: 2, level: 'error', id: node.id, message: 'a Missing box must say the need it stands for (need)' });
       continue;
     }
@@ -206,6 +207,22 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
   for (const [piece, ids] of Object.entries(used)) gaps.push({ need: `a ${piece} layout component`, kind: 'layout', closest: null, used: `the engine's ${piece}`, prototype: name, node: ids.join(', '), count: ids.length });
   const errors = findings.filter((f) => f.level === 'error').length;
   return { ok: errors === 0, findings, counts: { components: r.counts.components, errors, warnings: findings.length - errors }, gaps, drawable, pieces: Object.keys(pieces) };
+}
+
+// What the guidelines say the system lacks, for a Missing box ("Any other action is a link. Tidepool has no link component
+// yet."): the sentence and the one before it, from the closest component's guidelines, else from a component's whose
+// sentence before shares a word with the need. Null when the need already names it.
+export function lackSaid(context, need, closest) {
+  const words = (t) => String(t ?? '').toLowerCase().match(/[a-z]{4,}/g) ?? [];
+  const needWords = new Set(words(need));
+  const said = [];
+  for (const [name, k] of Object.entries(context?.components ?? {})) {
+    const sentences = String(k.guidelines ?? '').split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+    sentences.forEach((x, i) => { const m = /\bno ([a-z]+(?: [a-z]+)?) (?:component|yet)\b/i.exec(x); if (m) said.push({ name, lacks: m[1].toLowerCase().replace(/ component$/, ''), text: [sentences[i - 1], x].filter(Boolean).join(' '), before: sentences[i - 1] ?? '' }); });
+  }
+  const hit = said.find((x) => x.name === closest) ?? said.find((x) => words(x.before).some((w) => needWords.has(w)));
+  if (!hit || words(hit.lacks).every((w) => needWords.has(w))) return null;
+  return hit.text;
 }
 
 // The class the system's CSS adds to a component's class for a value (the same reading the page does), or null.
