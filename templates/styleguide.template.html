@@ -568,7 +568,7 @@ a.pg-usage-name { color: var(--sg-text); }
   function doWhat(t) { var r = String(t || '').replace(/^In (the code|Figma), /, ''); return r.charAt(0).toUpperCase() + r.slice(1); }   // the label already says where
   var TODO = [], TODO_NO = {};
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
-    (c.differences || []).forEach(function (x) { TODO.push({ who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
+    (c.differences || []).concat(c.a11yFindings || []).forEach(function (x) { TODO.push({ who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.unbuilt || []).forEach(function (u) { TODO.push({ who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell me to do it.' }); });
   });
   // A control the page needs and the system lacks: drawn with a stand-in until the system has one.
@@ -603,7 +603,8 @@ a.pg-usage-name { color: var(--sg-text); }
     var parity = differ || unbuilt ? { say: [differ ? (differ === 1 ? '1 difference' : differ + ' differences') : '', unbuilt ? unbuilt + ' not built' : ''].filter(Boolean).join(', '), todo: true }
       : { say: p && p.notCompared ? 'Agrees, ' + p.notCompared + ' not compared' : 'Agrees', todo: false };
     var ch = c.a11y && c.a11y.checked, n = ch && !ch.notRead ? ch.issues.reduce(function (s, i) { return s + ((i.details || []).length || 1); }, 0) : 0;
-    var a11y = !ch || ch.notRead ? { say: 'Not checked in a browser yet', todo: false } : n ? { say: n === 1 ? '1 problem' : n + ' problems', todo: true } : { say: 'No problem found', todo: false };
+    n += (c.a11yFindings || []).length;   // what the audit found (a text's contrast) counts too
+    var a11y = n ? { say: n === 1 ? '1 problem' : n + ' problems', todo: true } : !ch || ch.notRead ? { say: 'Not checked in a browser yet', todo: false } : { say: 'No problem found', todo: false };
     var used = (c.usage || []).length;
     return { version: rel ? rel.release : log.length ? 'Not released yet' : null, changed: log.length ? String(log[0].date).slice(0, 10) : null, parity: parity, a11y: a11y, used: used };
   }
@@ -1509,6 +1510,8 @@ a.pg-usage-name { color: var(--sg-text); }
       ((a.excused || []).length ? '<div><dt>Not asked of it</dt><dd>' + a.excused.map(function (x) { return '<p>' + esc(x.says) + ': ' + esc(x.reason) + '</p>'; }).join('') + '</dd></div>' : '') +
       (ALL ? '' : '<div><dt>On this variant</dt><dd class="pg-a11y-live"></dd></div>') +
       '<div><dt>Text contrast</dt><dd class="pg-contrast"></dd></div>' +
+      // What the audit found that needs fixing (a text's contrast in one variant and mode), each with who acts and its number.
+      ((c.a11yFindings || []).length ? '<div><dt>To fix</dt><dd>' + c.a11yFindings.map(function (x) { return '<p>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</p>'; }).join('') + '</dd></div>' : '') +
       '<div><dt>Last audit</dt><dd>' + last + '</dd></div>' +
       '</dl></div>';
   }
@@ -1576,8 +1579,9 @@ a.pg-usage-name { color: var(--sg-text); }
       '</div>' +
       // What differs from Figma is marked on Parity itself: the system's alert icon, its count said to a screen reader.
       '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantProps(c).length)); }).map(function (a) {
-        var n = a[0] === 'parity' ? (c.differences || []).length : 0;
-        return { v: a[0], label: a[1], icon: n ? ALERT_ICON : null, say: n ? (n === 1 ? 'one thing differs from Figma' : n + ' things differ from Figma') : null };
+        var n = a[0] === 'parity' ? (c.differences || []).length : a[0] === 'a11y' ? (c.a11yFindings || []).length : 0;
+        var what = a[0] === 'a11y' ? (n === 1 ? 'one accessibility problem' : n + ' accessibility problems') : (n === 1 ? 'one thing differs from Figma' : n + ' things differ from Figma');
+        return { v: a[0], label: a[1], icon: n ? ALERT_ICON : null, say: n ? what : null };
       })) + '</div></div>' +
       // Playground: the component drawn, its controls, its code and the tokens behind it.
       '<div class="pg-area" data-area="play">' +
