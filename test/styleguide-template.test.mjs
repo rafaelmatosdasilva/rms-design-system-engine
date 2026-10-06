@@ -260,7 +260,14 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
-    assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity with Figma.*agree/s);
+    // Parity: one table of everything the chip has (props, variables, values), Figma beside code, a status and when.
+    const parRows = await run(`[...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].map((r) => r.dataset.type + ':' + r.dataset.status)`);
+    assert.ok(parRows.some((r) => /^Prop:/.test(r)) && parRows.some((r) => /^Variable:/.test(r)), 'props and variables: ' + parRows);
+    assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity with Figma.*the same.*differ.*only in Figma.*only in code.*Type.*Figma.*Code.*Status.*Updated/s);
+    // The filter shows one type at a time.
+    await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'Prop').click()`);
+    assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].filter((r) => !r.hidden).map((r) => r.dataset.type))]`), ['Prop']);
+    await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'all').click()`);
     // Specs, in the Playground under the component: a copy drawn larger as the controls set it, each part numbered, its padding outlined and
     // numbered after the parts and named by its token in the list (numbers, never colours), how it lines its items up;
     // never a second live component. A click on a part, a padding or a gap (or its name in the list) shows the tokens
@@ -535,6 +542,36 @@ test('parity per component: what agrees (since when), its props and tokens, what
   assert.deepEqual(v.agreed, [{ what: 'height', value: '24', since: '2026-10-04T12:00:00Z', commit: 'a1b2c3d' }]);
   assert.deepEqual(v.counts, { agree: 3, differ: 1, notBuilt: 1, notCompared: 0 });
   assert.equal(v.notCompared, null);
+});
+
+test('parity, one table: every prop, variable and value, Figma beside code, with a status and when', async () => {
+  const { parityRows } = await import('../styleguide-data.mjs');
+  const rows = parityRows({ name: 'chip',
+    propsSnap: { chip: { properties: { 'Size': { type: 'VARIANT', defaultValue: 'M', variantOptions: ['M', 'L'] }, 'Label#1:0': { type: 'TEXT', defaultValue: 'Hi' }, 'Badge#2:0': { type: 'BOOLEAN', defaultValue: false } } } },
+    controls: [{ label: 'Size', prop: 'size' }, { label: 'Label', prop: 'label' }], unbuilt: [{ label: 'Badge' }],
+    codeProps: { size: { default: 'M' }, label: {}, tone: { default: 'neutral' }, onClick: {} },
+    allTokens: [{ var: '--chip-background', figma: 'chip/background' }, { var: '--chip-text', figma: 'chip/text' }, { var: '--chip-extra', figma: null }],
+    check: { passVars: [{ cssVar: '--chip-background', token: 'chip/background/color', mode: 'light', value: '#fff' }, { cssVar: '--chip-background', token: 'chip/background/color', mode: 'dark', value: '#000' }],
+      fail: [{ cssVar: '--chip-text', token: 'chip/text/color', mode: 'Light', figma: '#111111', css: '#222222' }],
+      skip: [{ token: 'chip/border', mode: 'Light', reason: 'no dedicated CSS var' }, { token: 'chips/other', reason: 'x' }] },
+    agreed: { facts: { 'chip · height': { figma: '24', code: '24', at: '2026-10-04T12:00:00Z' } }, seen: { 'chip · height': { figma: '24', code: '24', same: true }, 'chip · gap': { figma: '4', code: '6', same: false, moves: [{ at: '2026-10-05T08:00:00Z', side: 'code' }] } } },
+    propsAt: '2026-10-06T06:00:00Z', checkedAt: '2026-10-06T07:00:00Z' });
+  const brief = rows.map((r) => [r.type, r.figma?.name ?? '-', r.code?.name ?? '-', r.status, r.at]);
+  assert.deepEqual(brief, [
+    ['Prop', 'Size', 'size', 'match', '2026-10-06T06:00:00Z'],
+    ['Prop', 'Label', 'label', 'match', '2026-10-06T06:00:00Z'],
+    ['Prop', 'Badge', '-', 'figma', '2026-10-06T06:00:00Z'],
+    ['Prop', '-', 'tone', 'code', '2026-10-06T06:00:00Z'],
+    ['Variable', 'chip/background', '--chip-background', 'match', '2026-10-06T07:00:00Z'],
+    ['Variable', 'chip/text', '--chip-text', 'differs', '2026-10-06T07:00:00Z'],
+    ['Variable', '-', '--chip-extra', 'code', '2026-10-06T07:00:00Z'],
+    ['Variable', 'chip/border', '-', 'figma', '2026-10-06T07:00:00Z'],
+    ['Value', 'gap', 'gap', 'differs', '2026-10-05T08:00:00Z'],
+    ['Value', 'height', 'height', 'match', '2026-10-04T12:00:00Z'],
+  ]);
+  assert.equal(rows[0].figma.value, 'M, L · default M');
+  assert.equal(rows[4].figma.value, 'light #fff · dark #000', 'each mode');
+  assert.deepEqual([rows[5].figma.value, rows[5].code.value], ['Light #111111', 'Light #222222']);
 });
 
 test('import line and nesting: as a product writes the import, and the system\'s components it is built with', async () => {

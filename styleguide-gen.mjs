@@ -523,7 +523,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
     // product brings it in (its import line and its file) and the system's components it is built with.
     try {
-      const { parityView, importOf, nestedComponents } = await import('./styleguide-data.mjs');
+      const { parityView, parityRows, importOf, nestedComponents } = await import('./styleguide-data.mjs');
+      const checkedAt = new Date().toISOString();   // the token check ran just now, for this page
       const { loadAgreed } = await import('./agreed.mjs');
       const agreedRec = loadAgreed(ROOT);
       const census = readJson(join(OUT_DIR, 'census.json'))?.components ?? {};
@@ -538,6 +539,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       };
       for (const c of view.components) {
         c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
+        c.parity.rows = parityRows({ name: c.name, propsSnap, controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], codeProps: c.api?.props ?? {}, allTokens: c.allTokens ?? [], check, agreed: agreedRec, propsAt: propsSnap._updated ?? null, checkedAt });
         const text = c.api?.file ? readText(c.api.file) : '';
         const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names });
         if (uses.length) c.uses = uses;

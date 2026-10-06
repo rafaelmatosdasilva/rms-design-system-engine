@@ -261,8 +261,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
   top too); Parity carries the system's alert icon (an icon named warning or alert) while something differs, its count
   said to a screen reader. Each section of rows (Anatomy in the Playground, Usage, Documentation, Accessibility) is one of the
-  Playground's tables, its title the head; the Changelog is a table per release; Parity is two columns of tables
-  (what differs, what is not built or compared, the values that agree, its props, its tokens). The code is as tall as
+  Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
+  component has, whatever the Playground shows (each prop, each variable, each value the audit compares): its type,
+  Figma's name and value, the code's, a status as a sign and the system's colour (the same, differs, only in Figma, only
+  in code) and when it last held, with a filter by type above it and what differs, with who acts, below it. The code is as tall as
   what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
   (`showFirst`: Show Text and Text Content, or both on the same part); the tokens table leaves out the text style and
   colour while no text is shown, and a part no one sees (a native input at no opacity). **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
@@ -324,8 +326,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
   the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
   button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
-- **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
-  out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
+- **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma) and
+  per code prop Figma lacks; per CSS variable its rules use (the token check's values in each mode, the same or differs;
+  no Figma variable, only in code) and per Figma variable named after it with no CSS variable; per value the agreed
+  record has seen (the same since both sides agreed, or differs since it last moved). Its open differences, with who acts.
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
   (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
