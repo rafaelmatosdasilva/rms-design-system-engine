@@ -207,6 +207,13 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-parity td:last-child { word-break: normal; overflow-wrap: anywhere; }
 /* Parity, one table: every prop, variable and value, Figma beside code, a status marked by a sign and its colour. */
 .pg-par-filter { margin: 0 0 var(--sg-space-m); }
+/* Parity's and Accessibility's tables in the Playground's card: the system card's border, corners and shadow, the head
+   row as the card's head. overflow: clip keeps the corners and the head row sticky. */
+.pg-par-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); overflow: clip; background: var(--sg-bg); }
+.pg-par-card + .pg-par-card { margin-top: var(--sg-space-m); }
+.pg-par-card .pg-par-table th { background: var(--sg-bg-2); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
+.pg-par-card .pg-par-table tr:last-child td { border-bottom: none; }
+.pg-wcag-tip { text-align: left; }
 .pg-par-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--sg-m); }
 /* Its head stays in view under the component's areas as the rows scroll by (the line under it moves with it). */
 .pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
@@ -242,7 +249,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-shot img { display: block; width: 100%; height: auto; }
 .pg-mark { position: absolute; border: 2px solid var(--sg-accent); border-radius: var(--sg-radius-s); pointer-events: none; }
 /* The code a product writes for what the playground shows, with the system's button to copy it. */
-.pg-code { max-height: 28em; border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; min-width: 0; display: flex; flex-direction: column; box-shadow: var(--sg-shadow); }
+.pg-code-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-m); align-items: start; }
+.pg-code { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; min-width: 0; display: flex; flex-direction: column; box-shadow: var(--sg-shadow); }
 .pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-code pre { flex: 1; min-height: 0; margin: 0; padding: var(--sg-space-m); overflow: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
@@ -461,12 +469,50 @@ a.pg-usage-name { color: var(--sg-text); }
   })();
   var tokenPop = null, tokenFrom = null;
   function closeToken(back) { if (!tokenPop || tokenPop.hidden) return; tokenPop.hidden = true; if (tokenFrom) { tokenFrom.setAttribute('aria-expanded', 'false'); if (back) tokenFrom.focus(); } tokenFrom = null; }
-  function openToken(btn) {
-    var v = btn.getAttribute('data-token'), t = TOKEN_INFO[v] || {}, u = USES[v] || { direct: [], via: [] };
+  function popPanel() {
     if (!tokenPop) {
       tokenPop = document.createElement('div'); tokenPop.className = 'sg-token-pop'; tokenPop.setAttribute('role', 'dialog'); tokenPop.hidden = true; document.body.appendChild(tokenPop);
       tokenPop.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); closeToken(true); } });
+      // A panel opened by the pointer resting on its button stays while the pointer is on the panel.
+      tokenPop.addEventListener('mouseenter', function () { clearTimeout(tipTimer); });
+      tokenPop.addEventListener('mouseleave', function () { if (tokenPop.dataset.byHover) tipSoon(); });
     }
+    return tokenPop;
+  }
+  // The panel under (or over) the button that opened it, the focus in it when a click or a key opened it.
+  function placePop(btn, focus) {
+    tokenPop.hidden = false;
+    var r = btn.getBoundingClientRect(), w = Math.min(360, window.innerWidth - 32);
+    tokenPop.style.width = w + 'px';
+    tokenPop.style.left = Math.max(16, Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - w - 16)) + 'px';
+    var below = r.bottom + window.scrollY + 6, h = tokenPop.offsetHeight;
+    tokenPop.style.top = (r.bottom + h + 6 > window.innerHeight && r.top - h - 6 > 0 ? r.top + window.scrollY - h - 6 : below) + 'px';
+    if (tokenFrom && tokenFrom !== btn) tokenFrom.setAttribute('aria-expanded', 'false');
+    tokenFrom = btn; btn.setAttribute('aria-expanded', 'true');
+    if (focus) { delete tokenPop.dataset.byHover; tokenPop.setAttribute('tabindex', '-1'); tokenPop.focus({ preventScroll: true }); } else tokenPop.dataset.byHover = '1';
+  }
+  // What a WCAG criterion means, from its name in the Accessibility table: on a click or a key, and while the pointer
+  // rests on the name (it stays while the pointer moves onto it, Escape closes it).
+  var WCAG_TIP = {}, tipTimer = null;
+  function tipSoon() { clearTimeout(tipTimer); tipTimer = setTimeout(function () { if (tokenPop && tokenPop.dataset.byHover) closeToken(false); }, 300); }
+  function openTip(btn, focus) {
+    var t = WCAG_TIP[btn.getAttribute('data-wcag')]; if (!t) return;
+    popPanel().setAttribute('aria-label', t.name);
+    tokenPop.innerHTML = '<p class="sg-token-pop-name"><b>' + esc(t.name) + '</b></p><dl class="pg-updated"><div><dt>What it means</dt><dd><p>' + esc(t.says) + '</p></dd></div>' +
+      (t.how ? '<div><dt>How it is checked</dt><dd><p>' + esc(t.how) + '</p></dd></div>' : '') + '</dl>';
+    placePop(btn, focus);
+  }
+  document.addEventListener('mouseover', function (e) {
+    var b = e.target.closest && e.target.closest('.pg-wcag-tip');
+    if (b) { clearTimeout(tipTimer); if (tokenFrom !== b) tipTimer = setTimeout(function () { if (!tokenPop || tokenPop.hidden || tokenPop.dataset.byHover) openTip(b, false); }, 400); }
+  });
+  document.addEventListener('mouseout', function (e) {
+    var b = e.target.closest && e.target.closest('.pg-wcag-tip');
+    if (b && !(e.relatedTarget && (b.contains(e.relatedTarget) || (tokenPop && tokenPop.contains(e.relatedTarget))))) { clearTimeout(tipTimer); if (tokenPop && tokenPop.dataset.byHover) tipSoon(); }
+  });
+  function openToken(btn) {
+    var v = btn.getAttribute('data-token'), t = TOKEN_INFO[v] || {}, u = USES[v] || { direct: [], via: [] };
+    popPanel();
     var now = getComputedStyle(document.documentElement).getPropertyValue(v).trim();
     var values = t.values ? Object.keys(t.values).map(function (m) { return '<p>' + esc(m) + '  ·  ' + esc(t.values[m]) + '</p>'; }).join('') : '<p>' + esc(t.value || now || '-') + '</p>';
     var comps = u.direct.map(function (n) { return { n: n }; }).concat(u.via.map(function (x) { return { n: x.name, through: x.through }; }));
@@ -479,19 +525,11 @@ a.pg-usage-name { color: var(--sg-text); }
       '<div class="sg-token-pop-actions">' + sysButton('button', 'Copy ' + v, ' data-copy-token') + '</div>';
     tokenPop.querySelector('[data-copy-token]').addEventListener('click', function (e) { copyText('var(' + v + ')', e.currentTarget); });
     Array.prototype.forEach.call(tokenPop.querySelectorAll('a'), function (a) { a.addEventListener('click', function () { closeToken(false); }); });
-    tokenPop.hidden = false;
-    var r = btn.getBoundingClientRect(), w = Math.min(360, window.innerWidth - 32);
-    tokenPop.style.width = w + 'px';
-    tokenPop.style.left = Math.max(16, Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - w - 16)) + 'px';
-    var below = r.bottom + window.scrollY + 6, h = tokenPop.offsetHeight;
-    tokenPop.style.top = (r.bottom + h + 6 > window.innerHeight && r.top - h - 6 > 0 ? r.top + window.scrollY - h - 6 : below) + 'px';
-    if (tokenFrom && tokenFrom !== btn) tokenFrom.setAttribute('aria-expanded', 'false');
-    tokenFrom = btn; btn.setAttribute('aria-expanded', 'true');
-    tokenPop.setAttribute('tabindex', '-1'); tokenPop.focus({ preventScroll: true });
+    placePop(btn, true);
   }
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('.sg-token-link');
-    if (b) { e.preventDefault(); if (tokenFrom === b && tokenPop && !tokenPop.hidden) closeToken(true); else openToken(b); return; }
+    if (b) { e.preventDefault(); clearTimeout(tipTimer); if (tokenFrom === b && tokenPop && !tokenPop.hidden && !tokenPop.dataset.byHover) closeToken(true); else if (b.hasAttribute('data-wcag')) openTip(b, true); else openToken(b); return; }
     if (tokenPop && !tokenPop.hidden && !tokenPop.contains(e.target)) closeToken(false);
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeToken(true); });
@@ -938,12 +976,51 @@ a.pg-usage-name { color: var(--sg-text); }
       return b.width > 2 && b.height > 2 && cs.visibility !== 'hidden' && +cs.opacity > 0;
     });
   }
+  function partRows(root, compName) {
+    var rows = [], seen = {};
+    root.querySelectorAll('*').forEach(function (k) {
+      if (rows.length >= 10 || k.closest('svg') !== k && k.closest('svg')) return;
+      var b = k.getBoundingClientRect(); if (b.width <= 2 || b.height <= 2) return;
+      var kcs = getComputedStyle(k); if (kcs.visibility === 'hidden' || +kcs.opacity === 0) return;   // a part no one sees (a native input under its drawn box) is not listed
+      var name = (k.getAttribute('class') || '').split(/\s+/).filter(Boolean)[0] || k.tagName.toLowerCase();
+      var v;
+      if (k.tagName.toLowerCase() === 'svg') {
+        var col = [kcs.color, kcs.stroke, kcs.fill].filter(function (x) { return x && x !== 'none' && x !== 'rgba(0, 0, 0, 0)'; })[0];
+        v = Math.round(b.width) + '×' + Math.round(b.height) + 'px' + (col ? '  ·  ' + tok(k, col, 'color', compName) : '');
+        name = name === 'svg' ? 'icon' : name;
+      } else if (Array.prototype.some.call(k.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); }) || /^(INPUT|TEXTAREA)$/.test(k.tagName)) {
+        v = fontTok(k, kcs) + '  ·  ' + tok(k, kcs.color, 'color', compName);
+      } else return;
+      var key = name + v; if (seen[key]) return; seen[key] = 1;
+      rows.push([name, v]);
+    });
+    return rows;
+  }
+  function extraColorRows(el, preview, compName) {
+    var rows = [], seen = {};
+    function mark(node, v) { var t = tokenName(node, v, 'color', compName); if (t) seen[t] = 1; }
+    var rcs = getComputedStyle(el); mark(el, rcs.color); mark(el, rcs.backgroundColor); mark(el, rcs.borderTopColor);
+    var iconN = 0;
+    preview.querySelectorAll('svg').forEach(function (svg) {
+      var scs = getComputedStyle(svg);
+      var cands = [scs.color, scs.stroke, scs.fill].filter(function (v) { return v && v !== 'none' && v !== 'rgb(0, 0, 0)' && v !== 'rgba(0, 0, 0, 0)'; });
+      for (var i = 0; i < cands.length; i++) { var t = tokenName(svg, cands[i], 'color', compName); if (t && !seen[t]) { seen[t] = 1; iconN++; rows.push([iconN > 1 ? 'icon ' + iconN : 'icon', tok(svg, cands[i], 'color', compName)]); break; } }
+    });
+    preview.querySelectorAll('*').forEach(function (node) {
+      if (node === el || node.tagName.toLowerCase() === 'svg' || node.closest('svg')) return;
+      var ownText = false; for (var i = 0; i < node.childNodes.length; i++) if (node.childNodes[i].nodeType === 3 && node.childNodes[i].textContent.trim()) ownText = true;
+      if (!ownText) return;
+      var col = getComputedStyle(node).color, t = tokenName(node, col, 'color', compName);
+      if (t && !seen[t]) { seen[t] = 1; var cl = (typeof node.className === 'string' && node.className) ? node.className.split(' ')[0].replace(/^[a-zA-Z]+-/, '') : node.tagName.toLowerCase(); rows.push([(cl || 'text') + ' color', tok(node, col, 'color', compName)]); }
+    });
+    return rows;
+  }
 
   /* ── Component playground ─────────────────────────────────────────────────────────────────────────────────
      Each component is drawn from the project's own markup (the contract's probe, or the first instance in its own
      pages), else the element its Figma role asks for. Its controls are the props Figma and the code agree on; an
      option applies what the contract's propertyMap says it adds (a class, an attribute), a boolean shows or hides
-     the part it names. Below: its code. */
+     the part it names. Below: the tokens behind what is drawn, with its code. */
   // The class a preview draws a component with: its own, or, for one the system defines by id (#tt, kept once in
   // the page for the system's scripts), a class standing for that id whose rules are the id's (idAliasRules).
   function clsName(c) { return /^#/.test(c.cls || '') ? 'sg-id-' + c.cls.slice(1) : c.cls; }
@@ -1356,8 +1433,13 @@ a.pg-usage-name { color: var(--sg-text); }
 
   // ── Its parity with Figma: what agrees (each value since when), its props and tokens on both sides, what differs
   // (each with who acts and what to do), what the code does not build yet and what could not be compared ──────────
+  // What differs from Figma, one row each: what differs (on the component or part it is about), who acts and what to do,
+  // in the same card table as the rest.
   function differencesHTML(c) {
-    return ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '');
+    if (!(c.differences || []).length) return '';
+    return '<div class="pg-par-card pg-diff"><table class="pg-par-table"><thead><tr><th>Differs from Figma</th><th>Who acts</th><th>What to do</th></tr></thead><tbody>' + c.differences.map(function (x) {
+      return '<tr data-status="differs"><td>' + (x.new ? '<b>New.</b> ' : '') + onWhat(c, x.plain || x.what) + '</td><td class="pg-par-type">' + (x.todo ? esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')' : '') + '</td><td>' + (x.todo ? esc(doWhat(x.todo)) : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
   }
   // One table of everything the component has (each prop, variable and value, whatever the Playground shows): its type,
   // Figma's name and value, the code's, a status as a sign and its colour (in both and the same, differs, only in Figma,
@@ -1382,7 +1464,7 @@ a.pg-usage-name { color: var(--sg-text); }
       .map(function (x) { return '<span class="pg-par-status pg-par--' + x[0] + '"><span class="pg-par-sign" aria-hidden="true">' + PAR[x[0]][0] + '</span>' + esc(x[1]) + '</span>'; }).join('');
     var filter = types.length > 1 ? '<div class="pg-par-filter">' + segHTML([{ label: 'All (' + rows.length + ')', v: 'all' }].concat(types.map(function (t) { return { label: plural[t] + ' (' + rows.filter(function (r) { return r.type === t; }).length + ')', v: t }; }))) + '</div>' : '';
     return '<div class="pg-doc pg-par"><h3>Parity</h3><div class="pg-par-sum">' + sum + '</div>' + filter +
-      '<div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Type</th><th>Figma</th><th>Code</th><th>Status</th><th>Updated</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Type</th><th>Figma</th><th>Code</th><th>Status</th><th>Updated</th></tr></thead><tbody>' + body + '</tbody></table></div></div>' +
       differencesHTML(c) + '</div>';
   }
   // ── How a product brings it in: its import line (copied), its file (downloaded), and what it is built with ────────
@@ -1533,60 +1615,60 @@ a.pg-usage-name { color: var(--sg-text); }
       '<td><span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span></td>' +
       '<td class="pg-par-at">' + esc(wcag || '') + '</td>' + (from === undefined ? '' : '<td class="pg-a11y-from">' + esc(from) + '</td>') + '</tr>';
   }
-  var FROM_PAGE = 'This page, in the browser', FROM_AUDIT = 'The last audit, in a browser';
+  var FROM_PAGE = 'The style guide, in the browser', FROM_AUDIT = 'The last audit, in a browser';
   // One Accessibility table, by WCAG criterion: only the criteria that apply to the component (a page's own, video and
-  // sound it does not play, what it has nothing for, are left out), to fix first, then to check, then done; each with what
-  // it asks in plain words, what was found and where each finding comes from, and its status. Above it a count of each,
-  // and when the last audit ran.
+  // sound it does not play, what it has nothing for, are left out), to fix first, then to check, then done; each with
+  // what was found (on the component or the part it is about), where it is read from, and its status. What a criterion
+  // means opens from its name. Above it a count of each, and when the last audit ran; below it what Figma and the team
+  // wrote that no check reads.
   function a11yHTML(c) {
     var a = c.a11y; if (!a) return '';
     return '<div class="pg-doc pg-par pg-a11y"><h3>Accessibility</h3><div class="pg-par-sum pg-a11y-sum"></div><p class="pg-wcag-note pg-a11y-note"></p>' +
-      '<div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>WCAG</th><th>What it means</th><th>What was found</th><th>Status</th></tr></thead>' +
-      '<tbody class="pg-a11y-rows"></tbody></table></div></div>' + sourcesHTML(a);
+      '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>WCAG</th><th>What was found</th><th>Source</th><th>Status</th></tr></thead>' +
+      '<tbody class="pg-a11y-rows"></tbody></table></div></div>' + unreadHTML(c) + '</div>';
   }
+  // What no check reads, said under the table: each Figma annotation on it a check does not read (with the wording one
+  // reads, when the engine can tell what it means) and the team's guidelines, which the agents read as design intent.
+  function unreadHTML(c) {
+    var src = ((c.a11y || {}).sources || []).filter(function (x) { return x.st === 'agents'; });
+    if (!src.length) return '';
+    return '<div class="pg-par-card pg-a11y-unread"><table class="pg-par-table"><thead><tr><th>Read by the agents, no check uses it</th><th>What it holds</th><th>For a check to read it</th></tr></thead><tbody>' + src.map(function (x) {
+      return '<tr><td class="pg-par-type">' + esc(x.from) + '</td><td>' + esc(x.what) + '</td><td>' + (x.wording ? 'Write it in Figma as ' + esc(x.wording) + ' (--figma-edits lists it).' : /annotation/.test(x.from) ? 'Write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer.' : 'Nothing: the agents read it as design intent.') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  }
+  // Where a finding or a duty is, said with it: the component, its variant or the part it is on.
+  function figmaOf(c) { var l = (c.links || []).find(function (x) { return /figma/i.test(x.label); }); return l ? l.url : null; }
   // What the data says about the component, each finding or duty as an item under its criterion: what the audit found
   // (from the code capture and in a browser), what its code does, its role and what that role and Figma's notes ask.
   // { sc, label (as WCAG names it), st, html, from }
+  // A text that does not name the component starts with it ("On badge, ...").
+  function onWhat(c, text) {
+    var t = String(text || '');
+    return new RegExp('(^|[^\\w-])' + c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\w-]|$)', 'i').test(t) ? esc(t.replace(/^\w/, function (k) { return k.toUpperCase(); })) : 'On <b>' + esc(c.name) + '</b>, ' + esc(t.replace(/^[A-Z](?=[a-z]*[\s,])/, function (k) { return k.toLowerCase(); }));
+  }
   function scOfLabel(label) { var m = /WCAG (\d+\.\d+\.\d+)/.exec(label || ''); return m ? m[1] : null; }
   function a11yStaticItems(c) {
     var a = c.a11y || {}, ch = a.checked, ran = ch && !ch.notRead, items = [];
     var add = function (label, st, html, from) { var sc = scOfLabel(label); if (sc) items.push({ sc: sc, label: label, st: st, html: html, from: from }); };
     (c.a11yFindings || []).forEach(function (x) {
       var contrast = /contrast/i.test((x.check || '') + ' ' + (x.what || ''));
-      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : ''), 'The audit, from the code capture');
+      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', (x.new ? '<b>New.</b> ' : '') + onWhat(c, x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : ''), 'The audit, from the code capture');
     });
-    if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', esc(i.title + '. ' + i.details.join('; ') + '. ' + i.fix), FROM_AUDIT + ', ' + when(ch.at)); });
+    if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '. ' + i.details.join('; ') + '. ' + i.fix), FROM_AUDIT + ', ' + when(ch.at)); });
     var stat = {};
     (a.static || []).forEach(function (f) { (stat[f.kind] = stat[f.kind] || []).push(f); });
     Object.keys(stat).forEach(function (k) { add(wcagLabelOf(wcagScOf(k)), 'todo', esc(wcagTitle(k, stat[k].length) + '. ' + stat[k].map(function (f) { return f.file + ':' + f.line + ', ' + f.desc; }).join('; ') + '. ' + wcagFix(k, stat[k][0].fix)), 'Its code'); });
     // Its role: what it is and what that role and Figma's notes ask of it (the first duty says what it is).
-    if (!a.role) add('WCAG 4.1.2 Name, Role, Value (A)', 'check', 'Its role is not stated yet. Add an annotation to the component in Figma that says its role (Role: button), and its duties are listed here.', 'Figma, once annotated');
+    if (!a.role) add('WCAG 4.1.2 Name, Role, Value (A)', 'check', 'The role of ' + esc(c.name) + ' is not stated yet. In Figma, add an annotation to the ' + esc(c.name) + ' component' + (figmaOf(c) ? ' (<a href="' + esc(figmaOf(c)) + '" target="_blank" rel="noopener">open it in Figma</a>)' : '') + ' that says its role (Role: button), and its duties are listed here.', 'Figma, once annotated');
     // A duty fails when the audit found its own kind of problem (the role's markup, a behaviour, a part, a name, the
     // keys), not when another finding shares its criterion.
     var DUTY = /^(rolecontract|behaviour|partrole|annotation|semantics|name|keyboard|activate|arrows|escape|focusreturn)$/;
     (a.expects || []).forEach(function (x) {
       var failed = ran && ch.issues.some(function (i) { return i.wcag && x.wcag && i.wcag === x.wcag && DUTY.test(i.kind); });
-      add(x.wcag, !ran ? 'check' : failed ? 'todo' : 'done', esc(x.says.replace(/^\w/, function (k) { return k.toUpperCase(); })) + (ran ? '' : ' Tried once the audit runs it in a browser.'), x.from || '');
+      add(x.wcag, !ran ? 'check' : failed ? 'todo' : 'done', (!ran || failed ? onWhat(c, x.says) : esc(x.says.replace(/^\w/, function (k) { return k.toUpperCase(); }))) + (ran ? '' : ' Tried once the audit runs it in a browser.'), x.from || '');
     });
     return items;
   }
-  // Where its accessibility is read from: each Figma annotation on it (and on its layers), the team's guidelines (a
-  // Notion or GitLab page, or a committed file), the authored contract, its code, this page and the last audit, with
-  // what each one holds and what uses it. An annotation no check reads says so, and how to write it so one does.
-  var SRC = { done: ['✓', 'Used by a check', 'match'], agents: ['!', 'Read by the agents only', 'figma'], none: ['–', 'Nothing there', 'none'] };
-  function sourcesHTML(a) {
-    if (!a.sources || !a.sources.length) return '';
-    var rows = a.sources.map(function (x) {
-      var k = SRC[x.st] || SRC.none;
-      var used = x.used && x.used.length ? x.used.join('; ') + '.' : x.st === 'agents' ? (x.wording ? 'No accessibility check reads it as written. Written as ' + x.wording + ', a check reads it; --figma-edits lists it in Figma.' : /annotation/.test(x.from) ? 'No accessibility check reads it. The agents read it as design intent, and Documentation shows it. Written as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer, a check reads it.' : 'No accessibility check reads it. The agents read it as design intent.') : '';
-      used = used.replace(/^\w/, function (ch) { return ch.toUpperCase(); });
-      return '<tr data-status="' + (x.st === 'done' ? 'done' : x.st === 'agents' ? 'check' : 'none') + '"><td class="pg-par-type">' + esc(x.from) + '</td><td>' + esc(x.what) + '</td>' +
-        '<td><span class="pg-par-status pg-par--' + k[2] + '"><span class="pg-par-sign" aria-hidden="true">' + k[0] + '</span>' + esc(k[1]) + '</span></td><td>' + esc(used) + '</td></tr>';
-    }).join('');
-    return '<div class="pg-doc pg-par pg-a11y-src"><h3>Where it is read from</h3><p class="pg-wcag-note">Every source of its accessibility, what each one holds, and whether a check uses it.</p>' +
-      '<div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Source</th><th>What it holds</th><th>Status</th><th>What uses it</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-  }
-
   // WCAG 2.1 at level A and AA (DATA.wcag21, from wcag21.mjs): each criterion, how the engine covers it, and the plain
   // words of each new check. The page runs the in-page checks itself (window.__wcag21, wcag-page.js) on every variant.
   var WCAG = DATA.wcag21 && DATA.wcag21.criteria ? DATA.wcag21 : null;
@@ -1605,6 +1687,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // Each criterion's status for the component. live: what this page's run found on every variant ({ kinds: { kind: n },
   // sc: { sc: n }, ran: { check: 1 }, tried: n }), or null before it ran (and on the page of every component).
   var WCAG_HOW = { auto: 'Tried in the browser on every variant', audit: 'Tried by the audit in a browser', static: 'Read in the code', person: 'A person checks', page: 'The page that uses it', media: 'Video and sound only' };
+  var WCAG_SRC = { auto: 'The style guide, in the browser', audit: 'The last audit, in a browser', static: 'Its code', person: 'A person', page: 'The page that uses it', media: 'Video and sound only' };
   var WCAG_AUDIT = { '1.4.4': 'zoom', '1.4.10': 'reflow', '1.4.12': 'spacing', '2.1.2': 'tabtrap' };
   // The criteria with their status for the component, from its items and how each criterion is known. live: what this
   // page's run tried ({ ran: { check: 1 }, tried, usedN }), or null before it ran (and on the page of every component).
@@ -1625,7 +1708,8 @@ a.pg-usage-name { color: var(--sg-text); }
       var its = (by[k.sc] || []).filter(function (it) { return it.st !== 'none'; }), st = null, note = '';
       var fig = (a.notes || []).filter(function (n) { return n.sc.indexOf(k.sc) >= 0; }).map(function (n) { return n.text; });
       var how = (WCAG_HOW[k.how] || '') + (fig.length ? ', with the Figma annotation' + (fig.length > 1 ? 's ' : ' ') + fig.join(', ') : '');
-      var person = k.person ? 'A person checks that ' + k.person.replace(/^\w/, function (x) { return x.toLowerCase(); }) : '';
+      var texts = /^(1\.3\.3|1\.4\.5|3\.1\.2|1\.4\.12|2\.4\.6)$/.test(k.sc) && (c.__textParts || []).length ? ', its ' + c.__textParts.join(', ') : '';
+      var person = k.person ? 'On ' + c.name + texts + ', a person checks that ' + k.person.replace(/^\w/, function (x) { return x.toLowerCase(); }) : '';
       if (k.extra) st = 'done';
       else if (k.how === 'page') st = null;   // the page that uses it answers for it
       else if (k.how === 'media' && !(live && live.ran.media)) st = null;   // it plays no video or sound
@@ -1634,9 +1718,9 @@ a.pg-usage-name { color: var(--sg-text); }
       else if (k.how === 'audit') {
         var did = audited && audited.ran.indexOf(WCAG_AUDIT[k.sc]) >= 0;
         st = did ? 'done' : 'check';
-        note = did ? 'Nothing found by the last audit.' : !audited ? 'Run the audit, it tries this in a browser.' : WCAG_AUDIT[k.sc] === 'reflow' ? 'Set a11y.reflow to true in ds-config.json, and the audit tries it 320 pixels wide.' : 'The last audit did not get to it. Run it again.';
+        note = did ? 'Nothing found by the last audit.' : !audited ? 'Run the audit, it tries this on ' + c.name + ' in a browser.' : WCAG_AUDIT[k.sc] === 'reflow' ? 'For every component, ' + c.name + ' too, set a11y.reflow to true in ds-config.json, and the audit tries each 320 pixels wide.' : 'The last audit did not get to ' + c.name + '. Run it again.';
       } else if (k.ran && live && !k.ran.some(function (r) { return live.ran[r]; }) && !its.length) st = null;   // nothing in it that this asks about
-      else if (!tried && !(ch && !ch.notRead)) { st = 'check'; note = 'Tried when its Accessibility area is open on its own page.'; }
+      else if (!tried && !(ch && !ch.notRead)) { st = 'check'; note = 'Tried on ' + c.name + ' when its Accessibility area is open.'; }
       else {
         st = k.person ? 'check' : 'done';
         var used = /^(1\.4\.13|2\.5\.2|3\.2\.1|3\.2\.2)$/.test(k.sc) && live && live.usedN != null, n = used ? live.usedN : live && live.tried;
@@ -1650,17 +1734,25 @@ a.pg-usage-name { color: var(--sg-text); }
       else if (its.some(function (it) { return it.st === 'check'; }) && st) st = 'check';
       else if (!st && its.some(function (it) { return it.st === 'done'; })) st = 'done';
       if (!st) return null;
-      return { k: k, st: st, its: its, note: note, how: how };
+      return { k: k, st: st, its: its, note: note, how: how, fig: fig };
     }).filter(Boolean);
     var order = { todo: 0, check: 1, done: 2 }, num = function (sc) { return sc.split('.').map(function (x) { return ('000' + x).slice(-3); }).join('.'); };
     // To fix first, then to check, then done; what goes beyond WCAG 2.1 A and AA last, apart.
     rows.sort(function (p, q) { return (!!p.k.extra - !!q.k.extra) || order[p.st] - order[q.st] || (num(p.k.sc) < num(q.k.sc) ? -1 : 1); });
     return rows.map(function (r) {
       var x = A11Y[r.st];
-      var found = r.its.length ? r.its.map(function (it) { var y = A11Y[it.st] || A11Y.done; return '<div class="pg-a11y-item"><span class="pg-par--' + y[2] + '"><span class="pg-par-sign" aria-hidden="true">' + y[0] + '</span></span> ' + it.html + (it.from ? '<span class="pg-a11y-from">' + esc(it.from) + '</span>' : '') + '</div>'; }).join('') : '';
+      var found = r.its.length ? r.its.map(function (it) { var y = A11Y[it.st] || A11Y.done; return '<div class="pg-a11y-item"><span class="pg-par--' + y[2] + '"><span class="pg-par-sign" aria-hidden="true">' + y[0] + '</span></span> ' + it.html + '</div>'; }).join('') : '';
       if (r.note && !(r.st === 'todo')) found += '<div class="pg-a11y-item pg-a11y-quiet">' + esc(r.note) + '</div>';
-      return '<tr data-status="' + r.st + '"' + (r.k.extra ? ' data-extra' : '') + '><td class="pg-par-type">' + esc(r.k.sc + ' ' + r.k.name + (r.k.level ? ' (' + r.k.level + ')' : '')) + '</td>' +
-        '<td>' + esc(r.k.says) + (r.how ? '<span class="pg-a11y-from">' + esc(r.how) + '</span>' : '') + '</td><td>' + found + '</td>' +
+      // Where it is read from: each finding's own source, else how the criterion is known, with the Figma annotation
+      // that states it.
+      var src = [];
+      r.its.forEach(function (it) { if (it.from && src.indexOf(it.from) < 0) src.push(it.from); });
+      if (!src.length) src.push(WCAG_SRC[r.k.how] || r.how || '');
+      r.fig.forEach(function (t) { if (!src.some(function (x) { return x.indexOf(t) >= 0; })) src.push('Figma annotation ' + t); });
+      var name = r.k.sc + ' ' + r.k.name + (r.k.level ? ' (' + r.k.level + ')' : '');
+      WCAG_TIP[r.k.sc] = { name: 'WCAG ' + name, says: r.k.says, how: r.how };
+      return '<tr data-status="' + r.st + '"' + (r.k.extra ? ' data-extra' : '') + '><td class="pg-par-type">' + (ALL ? esc(name) : '<button type="button" class="sg-token-link pg-wcag-tip" data-wcag="' + esc(r.k.sc) + '" aria-expanded="false" aria-haspopup="dialog">' + esc(name) + '</button>') + '</td>' +
+        '<td>' + found + '</td><td class="pg-a11y-src">' + src.filter(Boolean).map(function (x) { return '<span class="pg-a11y-from">' + esc(x) + '</span>'; }).join('') + '</td>' +
         '<td><span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span></td></tr>';
     }).join('');
   }
@@ -1736,15 +1828,17 @@ a.pg-usage-name { color: var(--sg-text); }
         var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? facts.a11y : null, warn = !!(f && f.todo);
         return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
       })) + '</div></div>' +
-      // Playground: the component drawn, its controls and its code.
+      // Playground: the component drawn, its controls, the tokens behind what is drawn and its code.
       '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview-col"><div class="pg-stage-bar pg-stage-bar--top"><div class="pg-stage-mode"></div><div class="pg-stage-tools"></div></div><div class="pg-preview"></div><div class="pg-frame" hidden></div><div class="pg-anatomy" hidden></div><div class="pg-stage-bar pg-stage-bar--bottom"><p class="pg-anat-line" hidden></p><div class="pg-stage-mode"></div></div></div><div class="pg-panel"><div class="pg-actions"></div>' +
         (ALL ? '' : '<div class="pg-ctl pg-width"><div class="pg-ctl-label">Width</div>' + segHTML(WIDTHS.map(function (w) { return { v: w[0], label: w[1] }; })) + '</div>') +
         '<div class="pg-controls"></div></div></div>' +
         (ALL || !(c.figmaShots || []).length ? '' : '<div class="pg-inspect pg-compare" hidden><div class="pg-inspect-head">Figma beside the code</div><div class="pg-compare-bar">' + segHTML([{ v: 'side', label: 'Side by side' }, { v: 'over', label: 'Over' }]) +
           '<label class="pg-ctl-label pg-compare-amount">How much of Figma shows <input type="range" min="0" max="100" value="50"></label></div><div class="pg-compare-body"></div></div>') +
-        // Its code. Its tokens are listed in Parity, and Inspect gives the value of each part clicked.
-        '<div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div>' + '</div>' +
+        // The tokens behind what is drawn now, following every change made here, its code on their right. Every token the
+        // component has is in Parity.
+        '<div class="pg-code-row"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
+        '<div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div></div>' + '</div>' +
       '</div>' +
       // Variants: every option of each variant prop and both sides of each on/off prop, one per row, the other props as the Playground sets them.
       (ALL || !variantRows(c).length ? '' : '<div class="pg-area" data-area="variants"><div class="pg-footer"><div class="pg-variants"></div></div></div>') +
@@ -1827,6 +1921,16 @@ a.pg-usage-name { color: var(--sg-text); }
       segItems(parFilter).forEach(function (b) { b.addEventListener('click', function () { parShow(b.dataset.v); }); });
       parShow('all');
     }
+    var tTokens = sec.querySelector('.pg-tokens');
+    // The code as tall as what it holds, never taller than the tokens beside it: past their height it scrolls inside.
+    // On its own row, its own height.
+    var codeBox = sec.querySelector('.pg-code'), tokBox = tTokens && tTokens.closest('.pg-inspect');
+    function codeHeight() {
+      if (!codeBox || !tokBox) return;
+      codeBox.style.maxHeight = '';
+      if (tokBox.offsetHeight && Math.abs(codeBox.offsetTop - tokBox.offsetTop) < 2) codeBox.style.maxHeight = tokBox.offsetHeight + 'px';
+    }
+    if (window.ResizeObserver && tokBox) new ResizeObserver(codeHeight).observe(tokBox);
     // The code for what the preview shows now: the component as a product writes it (its tag and the props set here,
     // each value as the code spells it; a prop the code requires and the playground does not set is written with …),
     // else the HTML the preview draws. Copied by the system's own button.
@@ -1853,7 +1957,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // The area chosen in view in the scrolling bar, the page itself left where it is.
       var strip = areaBar.querySelector('.pg-areas-scroll'), on = segItems(areaBar).find(function (b) { return b.dataset.v === v; });
       if (strip && on && strip.scrollWidth > strip.clientWidth) { var sr = strip.getBoundingClientRect(), br = on.getBoundingClientRect(); if (br.left < sr.left || br.right > sr.right) strip.scrollLeft += br.left < sr.left ? br.left - sr.left - 8 : br.right - sr.right + 8; }
-      if (v === 'play') { nudge(); if (inspecting) requestAnimationFrame(drawAnatomy); }
+      if (v === 'play') { nudge(); codeHeight(); if (inspecting) requestAnimationFrame(drawAnatomy); }
       if (v === 'variants') requestAnimationFrame(drawVariants);
       if (v !== 'a11y' && wcagStop) wcagStop();
       if (v === 'a11y') checkLive();
@@ -2048,7 +2152,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // corners, shadow, text style and colour (what it has of them).
     function pickedValues(el) {
       if (el.tagName.toLowerCase() === 'svg') { var r = el.getBoundingClientRect(), k = parseFloat((anatBox.querySelector('.pg-anat-wrap') || {}).style ? (anatBox.querySelector('.pg-anat-wrap').style.transform.match(/scale\(([\d.]+)\)/) || [0, 1])[1] : 1) || 1; return ['size ' + Math.round(r.width / k) + '×' + Math.round(r.height / k) + 'px', 'colour ' + tok(el, getComputedStyle(el).color, 'color', c.name)]; }
-      return lookRows(el).filter(function (x) { return x[1] !== '-' && x[1] !== 'none' && x[1] !== 'transparent' && x[1] !== '0'; }).map(function (x) { return x[0] + ' ' + x[1]; });
+      return lookRows(el, false).filter(function (x) { return x[1] !== '-' && x[1] !== 'none' && x[1] !== 'transparent' && x[1] !== '0'; }).map(function (x) { return x[0] + ' ' + x[1]; });
     }
     // A click picks a part; one inside the part picked goes a level down; the part picked again goes a level up.
     function pickAnatomy(key) {
@@ -2116,9 +2220,23 @@ a.pg-usage-name { color: var(--sg-text); }
     // status above it and when the last audit ran.
     var a11yEl = sec.querySelector('.pg-a11y-rows'), a11ySumEl = sec.querySelector('.pg-a11y-sum'), a11yNote = sec.querySelector('.pg-a11y-note');
     var staticItems = c.a11y ? a11yStaticItems(c) : [], liveItems = [], liveNow = null;
+    // The parts of what is drawn that hold words (its label, its description), by their own class, for the rows a person
+    // checks on its words.
+    function textParts() {
+      var root = cur || preview, out = [];
+      if (!root) return out;
+      root.querySelectorAll('*').forEach(function (k) {
+        if (k.closest('svg') || !Array.prototype.some.call(k.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); })) return;
+        var cl = (typeof k.className === 'string' && k.className.split(/\s+/).filter(function (x) { return x && !/^(sg-|pg-)/.test(x); })[0]) || '';
+        var nm = cl ? (cl.replace(new RegExp('^' + (c.cls || c.name).replace(/^[#.]/, '') + '[-_]*', 'i'), '') || cl).replace(/^\w/, function (x) { return x.toUpperCase(); }) + ' part' : 'text';
+        if (out.indexOf(nm) < 0) out.push(nm);
+      });
+      return out.slice(0, 4);
+    }
     function a11yRender(live) {
       if (!a11yEl) return;
       if (live !== undefined) liveNow = live;
+      c.__textParts = textParts();
       a11yEl.innerHTML = a11yRows(c, staticItems.concat(liveItems), liveNow);
       var n = {};
       Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
@@ -2390,19 +2508,23 @@ a.pg-usage-name { color: var(--sg-text); }
         });
       });
     }
+    // The tokens table beside the code, read from the component as it is drawn now.
     // Every change in the Playground passes here (a control, a text typed, the component used in the preview), so the
     // anatomy is drawn again from it, once a frame.
     var anatQueued = false;
     function inspect(e) {
       if (inspecting && !anatQueued) { anatQueued = true; requestAnimationFrame(function () { anatQueued = false; drawAnatomy(); }); }
-      writeLink(); checkLive();
+      var el = (c.cls && (e.classList.contains(clsName(c)) ? e : e.querySelector('.' + clsName(c)))) || e;
+      tTokens.innerHTML = rowsHTML(lookRows(el, true).concat(partRows(el, c.name)));
+      writeLink(); checkLive(); codeHeight();
       showCode(e);
       nudge();
       if (WIDTH !== 'fit') renderFrame();
       if (compareOn) requestAnimationFrame(drawCompare);
     }
-    // What a part clicked in Inspect is drawn with, by the tokens behind it: its spacing, fill, line, corners, shadow, text.
-    function lookRows(el) {
+    // What an element is drawn with, by the tokens behind it: its spacing, fill, line, corners, shadow, text. The
+    // component's own rows (whole) add the colours its states set elsewhere; a part clicked in Inspect has its own.
+    function lookRows(el, whole) {
       var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px', texted = drawsText(el);
       var shadow = cs.boxShadow && cs.boxShadow !== 'none' ? (c.allTokens || []).filter(function (t) { return t.props.some(function (p) { return /shadow/.test(p); }); }) : [];
       return [].concat(
@@ -2413,6 +2535,7 @@ a.pg-usage-name { color: var(--sg-text); }
         radiusRows(el, cs),
         cs.boxShadow && cs.boxShadow !== 'none' ? [['shadow', (shadow.length === 1 ? (shadow[0].figma || shadow[0].var) + '  ·  ' : '') + cs.boxShadow]] : [],
         texted ? [['color', tok(el, cs.color, 'color', c.name)]] : [],
+        whole ? extraColorRows(el, preview, c.name) : [],
         texted ? [['font', fontTok(el, cs)]] : [],
         cs.opacity !== '1' ? [['opacity', cs.opacity]] : []
       );
