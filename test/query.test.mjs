@@ -69,3 +69,19 @@ test('no catalog yet: --query runs the audit once to write it, then answers (nev
   const again = spawnSync(process.execPath, [join(here, '..', 'query.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8' });
   assert.doesNotMatch(again.stdout, /No catalog yet/);
 });
+
+test('--check-ui on a page checks it as an edit (what changed since the last commit), never fails it as JSON', async () => {
+  const { fixtureProject } = await import('./helpers.mjs');
+  const { readFileSync, writeFileSync } = await import('node:fs');
+  const dir = fixtureProject(join(import.meta.dirname, 'fixtures', 'demo-ds'), 'check-ui-page-');   // committed as it is
+  const run = () => spawnSync(process.execPath, [join(import.meta.dirname, '..', 'audit.mjs'), '--check-ui', 'apps/gallery/ui.html'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  let r = run();
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, /✅ apps\/gallery\/ui\.html: what changed since the last commit uses only the system/);
+  const page = join(dir, 'apps', 'gallery', 'ui.html');
+  writeFileSync(page, readFileSync(page, 'utf8').replace('</body>', '<span style="color:#2e7d32">Saved</span></body>'));
+  r = run();
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stdout, /#2e7d32 is not a design-system colour/);
+  assert.doesNotMatch(r.stdout, /not valid JSON/);
+});
