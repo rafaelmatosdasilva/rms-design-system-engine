@@ -51,5 +51,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-06-style-guide-inspect-bars-alerts` | The 21 guide tasks on Haiku (engine ff07bde) | "Style guide: Inspect in the Playground, the stage's bars, alert icons, a sticky Parity head" |
 | `2026-10-06-inspect-a11y-component-sg` | The 21 guide tasks on Haiku (engine 066e053) | "Style guide: Inspect follows the modes and reaches nested parts; Accessibility as one status table; --component with --styleguide" |
 | `2026-10-06-width-inspect-slots` | The 21 guide tasks on Haiku (engine ef4872f) | "Style guide: a Width while inspecting draws the anatomy at that width; slots said under the name" |
+| `2026-10-06-a11y-every-variant` | The 21 guide tasks on Haiku (engine 2734a61) | "Style guide: Accessibility covers every variant; a click outside lets go in Inspect" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
