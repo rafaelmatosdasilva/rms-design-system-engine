@@ -673,7 +673,8 @@ The rules are `--check-ui`'s, plus:
   another carries `"opens": "<id>"` and the part it opens has that `"id"`: it is drawn closed and opens on a click, as
   the system's overlay when its CSS has one (container, layers, open and closing classes, as the style guide plays it),
   else as a popover under the part; Escape, a click outside or a button inside closes it and the focus goes back. An
-  `opens` that names no part, the page or itself is an error. With Chrome, each one is tried: it must open with the
+  `opens` that names no part, the page or itself is an error. A part it opens drawn with the engine's layout pieces
+  (a Stack of buttons, not a Missing box or a stand-in) goes on the gaps list as a dialog or menu the system lacks. With Chrome, each one is tried: it must open with the
   focus inside, close with Escape and give the focus back, and each field must take typing; what does not is a ⚠️ line
   under 🖱.
 - **Every state.** A composition names its other states beside it, `"states": { "<name>": { "<id>": { …that part in

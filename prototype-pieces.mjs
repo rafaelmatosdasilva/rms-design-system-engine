@@ -123,6 +123,13 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     if (to == null) continue;
     if (typeof to !== 'string' || !ids.has(to)) findings.push({ rule: 2, level: 'error', id: node.id, message: `${node.component}.opens names ${JSON.stringify(to)}, and no part has that id: give the part it opens an "id" and name it here` });
     else if (to === rootId || to === node.id) findings.push({ rule: 2, level: 'error', id: node.id, message: `${node.component}.opens names ${to === rootId ? 'the page itself' : 'itself'}: it opens another part (a dialog, a menu), drawn closed until it is used` });
+    else {
+      // What it opens, drawn with the engine's layout pieces, is a dialog or menu the system does not have: said once.
+      const t = nodes.find((n) => n.id === to);
+      const label = Object.entries(node.props ?? {}).find(([k, v]) => /^(label|text|title)$/i.test(k) && typeof v === 'string')?.[1];
+      if (t && pieces[t.component] && t.component !== 'Missing' && !t.props?.standInFor && !gaps.some((g) => g.node === t.id))
+        gaps.push({ need: `a dialog or menu for what ${label ? `"${label}"` : node.component} opens`, kind: 'component', closest: null, used: `the engine's ${t.component}`, prototype: name, node: t.id });
+    }
   }
   for (const node of nodes) {
     const p = node.props ?? {};

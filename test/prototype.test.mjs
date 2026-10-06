@@ -297,3 +297,20 @@ test('a part opens another part of the composition by its id; one that names no 
     'button.opens names the page itself: it opens another part (a dialog, a menu), drawn closed until it is used',
   ]);
 });
+
+test('what a button opens, drawn with the engine\'s layout pieces, is a dialog or menu on the gaps list; a Missing box or stand-in says it already', () => {
+  const ui = { component: 'Page', props: { padding: 'padding/m' }, children: [
+    { component: 'button', props: { Label: 'Delete project', opens: 'confirm' } },
+    { id: 'confirm', component: 'Stack', props: { gap: 'gap/s' }, children: [{ component: 'button', props: { Label: 'Delete' } }, { component: 'button', props: { Label: 'Cancel' } }] },
+  ] };
+  const r = checkPrototype(ui, { catalog, view, scales, name: 'project' });
+  assert.equal(r.ok, true, JSON.stringify(r.findings));
+  const g = r.gaps.find((x) => x.node === 'confirm');
+  assert.equal(g?.need, 'a dialog or menu for what "Delete project" opens');
+  assert.equal(g?.used, "the engine's Stack");
+  const said = { component: 'Page', children: [
+    { component: 'button', props: { Label: 'Delete project', opens: 'confirm' } },
+    { id: 'confirm', component: 'Missing', props: { need: 'a confirmation dialog' } },
+  ] };
+  assert.ok(!checkPrototype(said, { catalog, view, scales, name: 'project' }).gaps.some((x) => /dialog or menu/.test(x.need)));
+});
