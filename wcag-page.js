@@ -323,7 +323,8 @@
           on();
           while (!found && Date.now() < until) {
             await sleep(50);
-            var fresh = showing().filter(function (n) { return before.indexOf(n) < 0 && !el.contains(n) && !n.contains(el); });
+            // What a page draws for itself and hides from assistive technology (a guide's overlay) is not content shown.
+            var fresh = showing().filter(function (n) { return before.indexOf(n) < 0 && !el.contains(n) && !n.contains(el) && !n.closest('[aria-hidden="true"]'); });
             found = fresh.filter(function (n) { return !fresh.some(function (o) { return o !== n && o.contains(n); }); })[0] || null;
           }
           return found;
@@ -333,7 +334,8 @@
         if (pop) {
           ran.hovercontent = 1;
           fire(document.activeElement || document.body, 'keydown', { key: 'Escape', code: 'Escape' }); fire(document, 'keydown', { key: 'Escape', code: 'Escape' });
-          await sleep(120);
+          // Given time to fade out (a transition of a few tenths of a second) before it is said to stay.
+          for (var tEsc = 0; tEsc < 12 && pop.isConnected && vis(pop); tEsc++) await sleep(50);
           if (pop.isConnected && vis(pop)) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') does not close with Escape');
           await leave();
           pop = await appear();
