@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: tokens table back, card tables with a Source column and named parts; prototypes flip toggles; 320 pixels (continuous evaluation)
+
+What changed since the entry below (engine 7e78e46): The Playground shows the tokens behind what is drawn again; Accessibility is one card table with a Source column, what a criterion means opening from its name, each finding naming the component or part; prototypes flip toggles and show what a part controls; the style guide fits 320 pixels. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `7ac6d1fe06c3` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7554a8c | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.053 | $0.057 |
+| Input a run | 88k | 98k |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below, 1 rule violation. Failed: new-ui-saved #2: never changes code it was not asked to (screenshot.mjs). Records: `records/2026-10-06-prototypes-flip-toggles-and-show`.
+
 ## 2026-10: Style guide: no tokens tables in the Playground; unused Figma annotations listed in Figma (continuous evaluation)
 
 What changed since the entry below (engine 0d370b4): The Playground shows the component, its controls and its code, every token being in Parity; --figma-edits lists each Figma annotation no check reads, with the wording a check reads; a failing contrast is always flagged. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.

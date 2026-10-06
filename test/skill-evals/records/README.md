@@ -56,5 +56,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-06-style-guide-a-slot-is` | The 21 guide tasks on Haiku (engine 7447255) | "Style guide: a slot is an area named Slot; ids an instance points to are kept; square checkerboard" |
 | `2026-10-06-style-guide-one-accessibility-table` | The 21 guide tasks on Haiku (engine 0d370b4) | "Style guide: one Accessibility table by WCAG criterion; every slot marked; an address per area; full width" |
 | `2026-10-06-a-failing-contrast-is-never` | The 21 guide tasks on Haiku (engine 7e78e46) | "Style guide: no tokens tables in the Playground; unused Figma annotations listed in Figma" |
+| `2026-10-06-prototypes-flip-toggles-and-show` | The 21 guide tasks on Haiku (engine 7554a8c) | "Style guide: tokens table back, card tables with a Source column and named parts; prototypes flip toggles; 320 pixels" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
