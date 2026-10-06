@@ -470,7 +470,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const ex = Object.keys(authored[c.name]?.behaviourExceptions ?? {});
         if (ex.length) src.push({ st: 'done', from: 'contract.authored.json (behaviourExceptions)', what: ex.join(', '), used: ['what is not asked of it, each with its reason'] });
         if (st) src.push({ st: 'done', from: 'Its code', what: `The scripts, the markup and the CSS of the project (${st.files.scripts ?? 0} scripts).`, used: [`single-key shortcuts, short timers, gestures and device motion${(statics[c.name] ?? []).length ? `: ${(statics[c.name] ?? []).length} found on it` : ', none found on it'}`] });
-        src.push({ st: 'done', from: 'This page, in the browser', what: 'The component as drawn here, in every variant.', used: ['the checks marked Tried in the browser on every variant'] });
+        src.push({ st: 'done', from: 'The style guide, in the browser', what: 'The component as drawn here, in every variant.', used: ['the checks marked Tried in the browser on every variant'] });
         src.push(result ? { st: c.a11y.checked?.notRead ? 'none' : 'done', from: `The last audit, in a browser (${(result.target ?? []).join(', ') || 'its page'})`, what: result.checkedAt ? `Run ${result.checkedAt.slice(0, 16).replace('T', ' ')}.` : 'Its last run.', used: c.a11y.checked?.notRead ? ['nothing: it was not drawn on the page the audit opened'] : ['real key presses, zoom, text spacing, reflow, a keyboard trap, and what Figma\'s annotations state'] }
           : { st: 'none', from: 'The audit, in a browser', what: 'Not run yet.', used: [] });
         c.a11y.sources = src;

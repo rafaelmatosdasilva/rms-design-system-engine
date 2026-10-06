@@ -246,9 +246,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   modes are switched inside the playground, each named as Figma names its collection (`figma.colorCollection`,
   Styling; a sizing collection by its own name, Sizing, the name kept for screen readers and not shown): the sizing
   mode at its top left, the colour mode and any other at its bottom right, never among the component's props. Under it,
-  its specs (see Specs) follow the controls as they change. Below them, its code. The Playground has no tokens table:
-  every token it is drawn with is in Parity, each variable's name opening its value per mode and what uses it, and
-  Inspect gives the value of the part clicked. Where two tokens share a value, Inspect names the one the component's
+  its specs (see Specs) follow the controls as they change. Below them, the tokens behind what is drawn now (each
+  visible part, read again on every change made there) with its code on their right, the code as tall as what it holds
+  and never taller than the tokens. There is no table of every token it has: that is Parity, where each variable's name
+  opens its value per mode and what uses it. Where two tokens share a value, the tables name the one the component's
   rules use, then one that names the part. Above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
@@ -264,8 +265,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares): its type,
   Figma's name and value, the code's, a status as a sign and the system's colour (the same, differs, only in Figma, only
   in code) and when it last held, with a filter by type above it, its head kept in view under the areas as the rows
-  scroll by (on a phone the table scrolls sideways instead), and what differs, with who acts, below it. The code is as tall as
-  what it holds, up to a fixed height; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
+  scroll by (on a phone the table scrolls sideways instead), and what differs below it, a row each naming the component or part, who acts and what to do; both in the Playground's card tables. The code is as tall as
+  what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
   (`showFirst`: Show Text and Text Content, or both on the same part). **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
   classes its markup holds, or the tags and imports of its file), each the overview's card with its own preview.
 - **Playground links**: a control and the preview follow each other (a radio picked in the preview sets State); a
@@ -387,11 +388,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Accessibility**, one table by WCAG criterion (`a11yRows`): WCAG (the criterion and its level), What it means (in
-  plain words, with how it is known and the Figma annotations that feed it), What was found (each finding or duty on
-  its own line with its sign and where it comes from, a Figma annotation, `contract.authored.json`, its code, this
-  page in the browser, the last audit or the audit's code capture) and Status (✕ To fix, ! To check, ✓ Done, a sign
-  and the system's colour). Only what applies to the component is listed: a criterion of the page that uses it (a
+- **Accessibility**, one table by WCAG criterion (`a11yRows`), in the same card as the Playground's tables (and so is
+  Parity's): WCAG (the criterion and its level; a click, a key or the pointer resting on it opens what it means in plain
+  words and how it is checked, the token panel's own pop-up, Escape closing it), What was found (each finding or duty on
+  its own line with its sign, naming the component, its variant or its part: "On badge, its Label part, a person checks
+  that…", `onWhat`), Source (where each is read from: a Figma annotation, `contract.authored.json`, its code, the style
+  guide in the browser, the last audit or the audit's code capture, a person) and Status (✕ To fix, ! To check, ✓ Done,
+  a sign and the system's colour). Only what applies to the component is listed: a criterion of the page that uses it (a
   title, a skip link, orientation, consistent navigation), video and sound it does not play, what it has nothing for
   (no link for 2.4.4), and what asks of controls or fields on a component with none in any variant (keyboard,
   focus, labels, errors) are left out. To fix first, then to check, then done; a WCAG 2.2 or AAA criterion a check
@@ -411,15 +414,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   its check ran and found nothing (the page's run, `ran` in the last audit's `a11y.json` for zoom, spacing, reflow
   and a keyboard trap, the code read for the rest) and to check when only a person can judge it, with what to look
   at.
-- **Where it is read from** (`a11yView().sources`, built in `styleguide-gen.mjs`): a table of every source of the
-  component's accessibility, what each holds and what uses it, each Used by a check, Read by the agents only, or
-  Nothing there. Each Figma annotation on it and on its layers (`annotationUses` in `a11y-check.mjs`): the role it
-  states, a spoken name or alt text, a heading level, a part's role, a behaviour (Escape closes, the arrow keys move,
-  Enter and Space activate), each with the check that reads it; one no check reads (a sizing note, a usage note) says
-  so, and how to write it so one does: its own wording when the engine can tell what it means (`annotationWording`),
-  which `--figma-edits` also lists in Figma. The team's guidelines (`guidelines.sources`, the Notion and GitLab pages fetched
-  into files): the section named after the component, with its lines about accessibility, read by the agents as design
-  intent and by no check. The contract, its code, this page and the last audit (the page it opened and when).
+- **What no check reads** (`a11yView().sources`, built in `styleguide-gen.mjs`), a card table under it shown only when
+  there is something: each Figma annotation on it and on its layers that no check reads (`annotationUses` in
+  `a11y-check.mjs` gives it no use: a sizing note, a usage note), with how to write it so one does (its own wording when
+  the engine can tell what it means, `annotationWording`, which `--figma-edits` also lists in Figma), and the team's
+  guidelines (`guidelines.sources`, the Notion and GitLab pages fetched into files), the section named after the
+  component, read by the agents as design intent and by no check. What a check reads is in the Source column.
 - **In use**: the approved pictures of `frames[]` (Gate [2] (Figma frame unchanged)'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,
