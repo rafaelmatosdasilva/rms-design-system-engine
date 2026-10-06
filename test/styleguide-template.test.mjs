@@ -243,25 +243,29 @@ test('in the browser: no script error, a control changes the real component, the
     // Its API read from Chip.jsx, and its accessibility: the role's obligations with their WCAG criterion, the text
     // contrast measured as drawn, and no browser check yet.
     assert.match(await run(`document.querySelector('#c-chip [data-area="docs"] .pg-footer').textContent`), /Props.*Label.*default Filter.*Read from src\/components\/Chip\.jsx/s);
+    // Every variant tried in the browser when the Accessibility area shows, whatever the Playground has set, as Parity
+    // lists everything: the chip's Size, Icon and pressed sides, each check said once with the variants it holds in.
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const a11y = await run(`[...document.querySelectorAll('#c-chip .pg-doc')].find((d) => /Accessibility/.test(d.querySelector('h3').textContent)).textContent`);
     assert.match(a11y, /togglebutton: a <button type="button"> with aria-pressed/);
     assert.match(a11y, /WCAG 2\.1\.1 Keyboard \(A\)/);
-    assert.match(a11y, /Text contrast\d+\.\d:1 on "Filter", needs 4\.5:1.*Done/);
+    assert.match(a11y, /Text contrast(At least )?\d+\.\d:1 .*in (all )?\d+ (of \d+ )?variants and colour modes/);
     assert.match(a11y, /Browser checkNot run yet.*Not checked yet/s);
     // One table like Parity's: what, what it means, a status with its sign, the WCAG criterion; a count above it.
     assert.match(a11y, /What.*What it means.*Status.*WCAG/);
     assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /\d+ done.*\d+ not checked yet/);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
-    await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
-    assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
-    assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Text contrast.*(Done|To fix)/, 'measured again in the other mode');
-    // On this variant: tried on the live component when the Accessibility area shows it, and again for another variant.
-    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const live = await run(`document.querySelector('#c-chip .pg-a11y-live').textContent`);
-    assert.match(live, /Tab reaches it once: "Filter"/);
+    assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
     assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
+    // Another page mode: tried again in it.
+    await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
+    assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Text contrast.*(Done|To fix)/, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
     assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
@@ -313,6 +317,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.ok(nested.length && nested.every((k) => /^part 0 chip > \d+ /.test(k)), 'the parts inside it: ' + nested);
     await run(`document.querySelector('#c-chip .pg-anat-marks .is-nested').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /^chip › /, 'the path to what is picked');
+    // A click on the stage outside the component lets go of what is picked.
+    await run(`document.querySelector('#c-chip .pg-anatomy').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+    assert.equal(await run(`document.querySelectorAll('#c-chip .pg-anat-marks .is-picked').length + '|' + document.querySelector('#c-chip .pg-anat-marks').classList.contains('has-pick')`), '0|false');
     // A mode switched while inspecting reaches the drawing: the inspector carries the Playground's modes.
     const tplSrc = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
     assert.match(tplSrc, /SGModes\.controls\(preview, function \(\) \{ refresh\(\); if \(inspecting\) requestAnimationFrame\(drawAnatomy\); \}/);
