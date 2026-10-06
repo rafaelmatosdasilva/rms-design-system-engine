@@ -742,8 +742,12 @@ The rules are `--check-ui`'s, plus:
   request that has a part open another (a button that opens a confirmation, a menu) owes an `opens`: a state alone is a
   ⚠️ line. Each state is held to the request and the documentation as the page is: a tag a "saved" state adds where
   the guidelines rule a tag out for a message is an error. With Chrome, each one is tried: it must open with the
-  focus inside, close with Escape and give the focus back, and each field must take typing; what does not is a ⚠️ line
-  under 🖱.
+  focus inside, close with Escape and give the focus back, each field must take typing, each toggle (a switch, a toggle
+  button, a checkbox the system draws) must turn on and off when clicked, and each part that shows another
+  (`aria-expanded` with `aria-controls`) must show and hide it; what does not is a ⚠️ line under 🖱. The page does what
+  a product would where the system's own scripts do not: a click moves the selection in a group, flips a toggle (its
+  `aria-pressed` or `aria-checked` and the class the system's CSS turns on for it), and shows or hides what a part
+  controls; a component the system defines by id (a tooltip, `#tt`) is one element in the page, for its script.
 - **Every state.** A composition names its other states beside it, `"states": { "<name>": { "<id>": { …that part in
   this state… } } }` (in the composition, or beside `"prototype"` in the file), each naming by `id` only the parts that
   differ; `null` leaves a part out, and a part with no `component` keeps its own with the `props` given over its own.
@@ -1058,8 +1062,8 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   - anything that looks disabled is `disabled` or `aria-disabled`
   A state is read from the instance's classes or `data-state` (error or invalid, selected, active or
   current, disabled). Nothing is checked for a component without a declared role.
-- **Reflow at 320px (1.4.10)** — opt in with `a11y.reflow: true` for real screens (a component catalog is
-  not meant to reflow).
+- **Reflow at 320px (1.4.10)** — opt in with `a11y.reflow: true`. The engine's style guide fits 320 pixels (its
+  Parity filter and a control with many options scroll sideways), so a system checked on its style guide can turn it on.
 - **WCAG 2.1, the rest a component can be checked for** (`wcag-page.js`, run on the first three instances of each
   component, the first one also used) — an image or `role="img"` with no words (1.1.1); a video with no captions
   track, sound that plays by itself (1.2.2, 1.4.2); radio buttons with no named group, a data table with no header

@@ -371,7 +371,9 @@ html, body { margin: 0; }
     if (ev.target.closest('a[href^="#"], a[href=""]')) ev.preventDefault();   // a link in a prototype stays on the page
     for (var n = ev.target; n && n !== box; n = n.parentElement) {
       var p = n.parentElement; if (!p || !box.contains(p)) break;
-      var sibs = Array.prototype.filter.call(p.children, function (k) { return k.tagName === n.tagName; });
+      // Items of one group: the same element and, when drawn from the system, the same component (a chip beside a button
+      // is not a group).
+      var sibs = Array.prototype.filter.call(p.children, function (k) { return k.tagName === n.tagName && k.getAttribute('data-pt-component') === n.getAttribute('data-pt-component'); });
       if (sibs.length < 2) continue;
       var marked = sibs.find(function (k) { return Array.prototype.some.call(k.classList, function (x) { return MARK.test(x); }) || /true/.test(k.getAttribute('aria-selected') || k.getAttribute('aria-pressed') || k.getAttribute('aria-checked') || ''); });
       if (!marked) continue;
@@ -380,7 +382,34 @@ html, body { margin: 0; }
       sibs.forEach(function (k) { cls.forEach(function (x) { k.classList.toggle(x, k === n); }); ['aria-selected', 'aria-pressed', 'aria-checked'].forEach(function (a) { if (marked.hasAttribute(a)) k.setAttribute(a, k === n ? 'true' : 'false'); }); });
       return;
     }
+    // One toggle on its own (a switch, a toggle button, a checkbox the system draws): a click flips it, its state for a
+    // screen reader and the class the system's CSS turns on for it, unless the system's own script already did.
+    var t = ev.target.closest('[aria-pressed], [role="switch"], [role="checkbox"]');
+    if (t && box.contains(t) && !t.matches('input') && !t.hasAttribute('data-pt-opens') && !t.disabled && t.getAttribute('aria-disabled') !== 'true') {
+      var attr = t.hasAttribute('aria-pressed') ? 'aria-pressed' : 'aria-checked', was = t.getAttribute(attr);
+      setTimeout(function () {
+        if (t.getAttribute(attr) !== was) return;
+        var on = was !== 'true'; t.setAttribute(attr, String(on));
+        var comp = t.closest('[data-pt-component]'), c = comp && COMP[comp.getAttribute('data-pt-component')];
+        var mark = ((c && c.mods) || []).filter(function (x) { return MARK.test(x); })[0];
+        if (mark) comp.classList.toggle(mark, on);
+      }, 0);
+      return;
+    }
+    // A part that shows and hides another (aria-expanded and aria-controls): a click does it, unless the system's script did.
+    var d = ev.target.closest('[aria-expanded][aria-controls]');
+    if (d && box.contains(d) && !d.hasAttribute('data-pt-opens')) {
+      var open = d.getAttribute('aria-expanded');
+      setTimeout(function () {
+        if (d.getAttribute('aria-expanded') !== open) return;
+        var on = open !== 'true'; d.setAttribute('aria-expanded', String(on));
+        String(d.getAttribute('aria-controls')).split(/\s+/).forEach(function (id) { var x = id && document.getElementById(id); if (x) x.hidden = !on; });
+      }, 0);
+    }
   });
+  // A component the system defines by its id (a tooltip its script fills, #tt) is one element in the page, as in a
+  // product, so the system's own script finds it.
+  Object.keys(COMP).forEach(function (n) { var c = COMP[n]; if (/^#[\w-]+$/.test(c.cls || '') && !document.getElementById(c.cls.slice(1))) { var one = document.createElement('div'); one.id = c.cls.slice(1); document.body.appendChild(one); } });
   // The page in one of its states (empty, error, loading…): the parts that differ, drawn as a whole page again.
   var STATES = [{ name: 'default', tree: D.tree }].concat(D.states || []), STATE = 'default';
   function show(name) {

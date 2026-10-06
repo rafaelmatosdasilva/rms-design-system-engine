@@ -213,8 +213,11 @@ export const RENDER_EXPRESSION = `(() => {
 })()`;
 
 // How the page works, tried in the browser: each part that opens another (a dialog, a menu) is clicked, the part must
-// show with the focus inside it, Escape must close it and the focus go back; each field must take what is typed.
-// → [{ kind: 'opens', id, by, opened, focusInside, closed, focusBack } | { kind: 'field', path, where, takes }]
+// show with the focus inside it, Escape must close it and the focus go back; each field must take what is typed; each
+// toggle (a switch, a toggle button) must flip when clicked and flip back; each part that shows another (aria-expanded
+// with aria-controls) must show it and hide it again.
+// → [{ kind: 'opens', id, by, opened, focusInside, closed, focusBack } | { kind: 'field', path, where, takes }
+//    | { kind: 'toggle', by, flips } | { kind: 'shows', by, shows }]
 export const INTERACT_EXPRESSION = `(async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const out = [];
@@ -242,6 +245,22 @@ export const INTERACT_EXPRESSION = `(async () => {
     for (let i = 0; i < 40 && !closed; i++) { await wait(50); closed = !document.querySelector('[data-pt-layer="' + id + '"]'); }
     out.push({ kind: 'opens', id, by, opened, focusInside, closed, focusBack: closed && document.activeElement === t });
   }
+  const name = (t) => (t.getAttribute('aria-label') || t.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 60) || t.getAttribute('data-pt-path') || t.closest('[data-pt-path]')?.getAttribute('data-pt-path');
+  for (const t of [...document.querySelectorAll('#pt-canvas [aria-pressed], #pt-canvas [role="switch"], #pt-canvas [role="checkbox"]')].filter((t) => !t.matches('input') && !t.hasAttribute('data-pt-opens') && !t.disabled && t.getAttribute('aria-disabled') !== 'true' && shown(t)).slice(0, 8)) {
+    const a = t.hasAttribute('aria-pressed') ? 'aria-pressed' : 'aria-checked', was = t.getAttribute(a);
+    t.click(); await wait(60);
+    const flipped = t.getAttribute(a) !== was;
+    t.click(); await wait(60);
+    out.push({ kind: 'toggle', by: name(t), flips: flipped && t.getAttribute(a) === was });
+  }
+  for (const d of [...document.querySelectorAll('#pt-canvas [aria-expanded][aria-controls]')].filter((d) => !d.hasAttribute('data-pt-opens') && shown(d)).slice(0, 8)) {
+    const ids = String(d.getAttribute('aria-controls')).split(/\\s+/).filter(Boolean), was = d.getAttribute('aria-expanded') === 'true';
+    const vis = () => ids.some((id) => shown(document.getElementById(id)));
+    d.click(); await wait(80);
+    const one = vis() !== was;
+    d.click(); await wait(80);
+    out.push({ kind: 'shows', by: name(d), shows: one && vis() === was });
+  }
   return out;
 })()`;
 
@@ -258,6 +277,8 @@ export function interactionLines(list = []) {
         else if (!i.focusBack) out.push(`⚠️  closing ${i.id} does not give the focus back to "${i.by}"`);
       }
     } else if (i.kind === 'field' && !i.takes) out.push(`⚠️  the field at ${i.path}${i.where ? ` in ${i.where}` : ''} takes no typing`);
+    else if (i.kind === 'toggle' && !i.flips) out.push(`⚠️  "${i.by}" does not turn on and off when clicked`);
+    else if (i.kind === 'shows' && !i.shows) out.push(`⚠️  "${i.by}" does not show and hide what it controls`);
   }
   return out;
 }
