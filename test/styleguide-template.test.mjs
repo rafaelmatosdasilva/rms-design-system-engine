@@ -288,6 +288,19 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-anat-marks .is-picked').length`), 1);
     await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^part 1/.test(x.dataset.hit)).dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /color.*--chip-text/, 'the label: its colour');
+    // Picked: it stands out, the other boxes faded around it.
+    assert.equal(await run(`(() => { const ms = document.querySelector('#c-chip .pg-anat-marks'), other = [...ms.querySelectorAll('[data-hit]')].find((x) => !x.classList.contains('is-picked')); return ms.classList.contains('has-pick') + '|' + getComputedStyle(other).opacity; })()`), 'true|0.3');
+    // Nested: the component itself picked, what sits inside it is drawn as parts too, one level down, and a click on
+    // one names the path to it.
+    await run(`document.querySelector('#c-chip .pg-anat-marks [data-hit^="part 0 "]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+    const nested = await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks .is-nested')].map((x) => x.dataset.hit)`);
+    assert.ok(nested.length && nested.every((k) => /^part 0 chip > \d+ /.test(k)), 'the parts inside it: ' + nested);
+    await run(`document.querySelector('#c-chip .pg-anat-marks .is-nested').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /^chip › /, 'the path to what is picked');
+    // A mode switched while inspecting reaches the drawing: the inspector carries the Playground's modes.
+    const tplSrc = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+    assert.match(tplSrc, /SGModes\.controls\(preview, function \(\) \{ refresh\(\); if \(inspecting\) requestAnimationFrame\(drawAnatomy\); \}/);
+    assert.match(tplSrc, /else if \(preview\.hasAttribute\(a\.attr\)\) anatBox\.setAttribute\(a\.attr, preview\.getAttribute\(a\.attr\)\)/);
     assert.ok(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-own')`), 'Its tokens, in the Playground');
     // A control changed in the Playground redraws the specs under it.
     const before = await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`);
@@ -302,6 +315,7 @@ test('in the browser: no script error, a control changes the real component, the
     // Done inspecting: the live component back in its place.
     await run(`document.querySelector('#c-chip .pg-stage-tools button').click()`);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview').hidden + '|' + document.querySelector('#c-chip .pg-anatomy').hidden + '|' + document.querySelector('#c-chip .pg-stage-tools button').textContent`), 'false|true|Inspect');
+    assert.equal(await run(`getComputedStyle(document.querySelector('#c-chip .pg-anatomy')).display + '|' + document.querySelector('#c-chip .pg-anatomy').childElementCount`), 'none|0', 'nothing of the anatomy left beside the Playground');
     // Variants: every option of each variant prop and both sides of each on/off prop, one per row, drawn by the Playground and copied still; the Playground
     // keeps what was set, and Try it sets the option there.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'variants').click()`);

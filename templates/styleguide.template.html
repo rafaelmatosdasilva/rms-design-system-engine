@@ -295,6 +295,11 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-anat-marks .pg-anat-space { z-index: 2; }
 .pg-anat-marks .pg-anat-num, .pg-anat-marks .pg-anat-lead { z-index: 3; pointer-events: none; }
 .pg-anat-marks [data-hit]:hover, .pg-anat-marks [data-hit].is-picked { outline: 2px solid var(--sg-accent); outline-offset: -1px; }
+/* Something picked: it stands out, the rest of the component dimmed around it and the other boxes faded. */
+.pg-anat-marks.has-pick [data-hit]:not(.is-picked):not(.is-inside) { opacity: 0.3; }
+.pg-anat-marks [data-hit].is-picked { z-index: 4; outline-width: 2px; box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--sg-bg) 60%, transparent); }
+/* What sits inside the part picked, one level down: drawn over it, so a click picks it (as a double click does in Figma). */
+.pg-anat-marks .pg-anat-part.is-nested { z-index: 5; }
 .pg-anat-space { position: absolute; outline: 1px dotted var(--sg-muted); outline-offset: -1px; }   /* a padding or a gap: outlined, never coloured, so no colour is mistaken for a token's */
 .pg-anat-part { position: absolute; outline: 1px dashed var(--sg-text); }
 .pg-compare-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-l); padding: var(--sg-space-m); }
@@ -325,6 +330,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-preview-col > .pg-preview, .pg-preview-col > .pg-frame, .pg-preview-col > .pg-anatomy { border-left: var(--sg-line); border-right: var(--sg-line); }
 .pg-anat-line { margin: 0; font-size: var(--sg-s); color: var(--sg-text); min-width: 0; }
 .pg-preview-col > .pg-anatomy { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 140px; padding: var(--sg-space-xl); background-color: var(--sg-stage, var(--sg-bg)); }
+.pg-preview-col > .pg-anatomy[hidden] { display: none; }   /* Done inspecting: the anatomy is gone, the Playground fills the stage */
 .pg-preview-col > .pg-anatomy .pg-anat-num, .pg-preview-col > .pg-anatomy .pg-anat-lead { display: none; }   /* the inspector names what is clicked, not a numbered list */
 .pg-stage-mode .sg-mode-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pg-preview-col > .pg-preview { flex: 1; }
@@ -1817,6 +1823,11 @@ a.pg-usage-name { color: var(--sg-text); }
     function drawAnatomy() {
       if (!anatBox || !cur || !preview.firstElementChild || anatBox.offsetParent === null) return;
       anatBox.innerHTML = '';
+      // In the modes the Playground is set to (colour, sizing): the copy is drawn with the same tokens.
+      AXES.forEach(function (a) {
+        if (a.classes) a.values.forEach(function (v) { if (v.value) anatBox.classList.toggle(v.value, preview.classList.contains(v.value)); });
+        else if (preview.hasAttribute(a.attr)) anatBox.setAttribute(a.attr, preview.getAttribute(a.attr)); else anatBox.removeAttribute(a.attr);
+      });
       // A component shown in an overlay (a modal over the window) is drawn as itself: its own element, without the layer.
       var src = preview.firstElementChild;
       if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + clsName(c)); if (own) src = own; }
@@ -1840,13 +1851,32 @@ a.pg-usage-name { color: var(--sg-text); }
       var m = marker(marks, k), b0 = box(root);
       m.mark('pg-anat-root', [b0.x, b0.y, b0.w, b0.h], { key: 'part 0 ' + c.name, name: c.name, el: root });   // under the rest: a click on the component itself
       var r = annotate(root, box, m.mark, m.num);
+      // Nested parts: along the path picked, the elements inside each picked part are drawn as parts too, so whatever
+      // sits in a group (an icon in a button in a footer) can be reached, one level per click.
+      var hitOf = function (key) { return marks.querySelector('[data-hit="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]'); };
+      var seenEl = function (n) { var nr = n.getBoundingClientRect(), ncs = getComputedStyle(n); return nr.width > 1 && nr.height > 1 && ncs.visibility !== 'hidden' && ncs.opacity !== '0'; };
+      var nameEl = function (n) { var cl = (n.getAttribute('class') || '').split(/\s+/).filter(Boolean)[0]; return n.tagName.toLowerCase() === 'svg' ? 'icon' : cl || (n.children.length ? 'group' : n.textContent.trim() ? 'text' : n.tagName.toLowerCase()); };
+      var chain = anatPath; anatPath = [];
+      for (var ci = 0; ci < chain.length; ci++) {
+        var ph = hitOf(chain[ci]), pel = ph && ph._info && ph._info.el;
+        if (!ph) break;
+        anatPath.push(chain[ci]);
+        if (!pel || pel.tagName.toLowerCase() === 'svg') continue;
+        var last = ci === chain.length - 1;
+        Array.prototype.filter.call(pel.children, seenEl).forEach(function (n, j) {
+          var bb = box(n), nm = nameEl(n);
+          m.mark('pg-anat-part is-nested' + (last ? ' is-inside' : ''), [bb.x, bb.y, bb.w, bb.h], { key: chain[ci] + ' > ' + (j + 1) + ' ' + nm, name: nm, el: n });
+        });
+      }
+      anatPicked = anatPath[anatPath.length - 1] || null;
       wrap.style.transform = 'scale(' + k + ')';
       // What is picked: the tokens it is drawn with; nothing picked, how to pick.
-      var hit = anatPicked && marks.querySelector('[data-hit="' + (window.CSS && CSS.escape ? CSS.escape(anatPicked) : anatPicked) + '"]'), info = hit && hit._info;
+      var hit = anatPicked && hitOf(anatPicked), info = hit && hit._info;
       if (hit) hit.classList.add('is-picked'); else anatPicked = null;
+      marks.classList.toggle('has-pick', !!hit);
       // One line: what is picked and its values; nothing picked, how to pick.
       if (anatLine) anatLine.innerHTML = !info ? 'Click a part, a padding or a gap to see what it is and its value.'
-        : info.el ? '<b>' + esc(info.name) + '</b>  ·  ' + esc(pickedValues(info.el).join('  ·  ') || 'nothing of its own')
+        : info.el ? '<b>' + esc(anatPath.map(function (key) { var h = hitOf(key); return h && h._info ? h._info.name : ''; }).filter(Boolean).join(' › ') || info.name) + '</b>  ·  ' + esc(pickedValues(info.el).join('  ·  ') || 'nothing of its own')
         : '<b>' + esc(info.what) + '</b>  ·  ' + esc(info.value);
     }
     // Variants: each option drawn by the Playground itself (its own refresh), copied still and inert into its row, then
@@ -1883,14 +1913,23 @@ a.pg-usage-name { color: var(--sg-text); }
       Object.keys(syncs).forEach(function (k) { syncs[k](); });
       showArea('play'); refresh();
     });
-    var anatPicked = null, anatLine = sec.querySelector('.pg-anat-line');
+    var anatPicked = null, anatPath = [], anatLine = sec.querySelector('.pg-anat-line');
     // What a picked part is drawn with, by its tokens: an icon's size and colour; else its padding, gap, fill, line,
     // corners, shadow, text style and colour (what it has of them).
     function pickedValues(el) {
       if (el.tagName.toLowerCase() === 'svg') { var r = el.getBoundingClientRect(), k = parseFloat((anatBox.querySelector('.pg-anat-wrap') || {}).style ? (anatBox.querySelector('.pg-anat-wrap').style.transform.match(/scale\(([\d.]+)\)/) || [0, 1])[1] : 1) || 1; return ['size ' + Math.round(r.width / k) + '×' + Math.round(r.height / k) + 'px', 'colour ' + tok(el, getComputedStyle(el).color, 'color', c.name)]; }
       return lookRows(el, false).filter(function (x) { return x[1] !== '-' && x[1] !== 'none' && x[1] !== 'transparent' && x[1] !== '0'; }).map(function (x) { return x[0] + ' ' + x[1]; });
     }
-    function pickAnatomy(key) { anatPicked = anatPicked === key ? null : key; drawAnatomy(); }
+    // A click picks a part; one inside the part picked goes a level down; the part picked again goes a level up.
+    function pickAnatomy(key) {
+      var at = anatPath.indexOf(key);
+      if (at >= 0) anatPath = anatPath.slice(0, at);   // picked again: back to the part around it
+      else {
+        var parent = key.lastIndexOf(' > ') > 0 ? key.slice(0, key.lastIndexOf(' > ')) : null, pi = parent ? anatPath.indexOf(parent) : -1;
+        anatPath = pi >= 0 ? anatPath.slice(0, pi + 1).concat(key) : [key];
+      }
+      drawAnatomy();
+    }
     if (anatBox) anatBox.addEventListener('click', function (e) { var h = e.target.closest && e.target.closest('.pg-anat-marks [data-hit]'); if (!h) return; e.preventDefault(); pickAnatomy(h.getAttribute('data-hit')); });
     // Figma beside the code: the Figma image of the variant set (its variant props equal to the Playground's), beside a
     // still copy of the component as drawn, or over it, as much of it as the slider says. A variant Figma has no image
@@ -1987,7 +2026,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var slots = stageCol.querySelectorAll('.pg-stage-mode');
       [function (a) { return a.scoped && a.attr === 'data-size'; }, function (a) { return a.scoped && a.attr !== 'data-size'; }].forEach(function (which, i) {
         if (!AXES.some(which)) return;
-        var row = SGModes.controls(preview, function () { refresh(); }, which);
+        var row = SGModes.controls(preview, function () { refresh(); if (inspecting) requestAnimationFrame(drawAnatomy); }, which);
         slots[i].appendChild(row); SGModes.register(row);
       });
     }
@@ -2204,7 +2243,7 @@ a.pg-usage-name { color: var(--sg-text); }
         if (inspecting && WIDTH !== 'fit') showWidth('fit');   // it inspects the live component, at its own width
         drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
         preview.hidden = inspecting; anatBox.hidden = !inspecting; if (anatLine) anatLine.hidden = !inspecting;
-        if (!inspecting) anatPicked = null;
+        if (!inspecting) { anatPicked = null; anatPath = []; anatBox.innerHTML = ''; }
         bottomBar();
         if (inspecting) requestAnimationFrame(drawAnatomy); else nudge();
       });
