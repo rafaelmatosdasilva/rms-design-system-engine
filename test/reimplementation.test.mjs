@@ -155,6 +155,17 @@ test('[reimplementation] a screen component can be excused, and screenComponents
   assert.match(soft.out, /⚠️ .*uses buttonStepper/);
 });
 
+test('[reimplementation] a component the DS has not built yet is said as not checked, not a product gap', () => {
+  const { code, out } = runGate(GATE, {
+    'ds-config.json': { ...SCREEN_DS, knownUnimplementedComponents: ['buttonStepper'] },
+    'figma-screen-components.snapshot.json': screenSnap({ buttonStepper: 1 }),
+    'app/ui.src.html': '<div class="stepper"></div>\n',
+  });
+  assert.equal(code, 0, out);
+  assert.match(out, /⏭ \[reimplementation\] app: "Main" uses buttonStepper, which the DS has not built yet/);
+  assert.doesNotMatch(out, /the code never uses/);
+});
+
 test('[reimplementation] screens configured but not captured: said on a ⏭ line', () => {
   const { out } = runGate(GATE, {
     'ds-config.json': { ...SCREEN_DS, frames: [{ name: 'Main', nodeId: '1-2', plugin: 'app' }] },
