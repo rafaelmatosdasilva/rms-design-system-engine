@@ -676,7 +676,13 @@ test('a Figma slot the code holds in a part of its own is paired with that part,
 });
 
 test('import line and nesting: as a product writes the import, and the system\'s components it is built with', async () => {
-  const { importOf, nestedComponents, stylesheetImport } = await import('../styleguide-data.mjs');
+  const { importOf, nestedComponents, stylesheetImport, scriptUses } = await import('../styleguide-data.mjs');
+  // Its own functions in the system's script: named after it and naming its class, never one that only uses it inside
+  // something else; exported when the script is a module.
+  const script = "function showToast(msg) { const t = document.createElement('div'); t.className = 'toast'; }\nfunction showProgress() { el.classList.add('toast'); }\nfunction esc(s) { return s; }\nexport function createChip() { return '<span class=\"chip\"></span>'; }";
+  assert.deepEqual(scriptUses({ text: script, cls: 'toast', name: 'toast' }), [{ name: 'showToast', args: 'msg', exported: false }]);
+  assert.deepEqual(scriptUses({ text: script, cls: '.chip', name: 'chip' }), [{ name: 'createChip', args: '', exported: true }]);
+  assert.deepEqual(scriptUses({ text: script, cls: 'badge', name: 'badge' }), []);
   // A system of CSS classes: a product imports its stylesheet, by the name the package's exports give it.
   assert.deepEqual(stylesheetImport({ file: 'packages/ui/src/theme.css', pkg: { name: '@acme/ds', dir: '.', exports: { './theme.css': './packages/ui/src/theme.css' } } }), { line: "@import '@acme/ds/theme.css';", from: '@acme/ds/theme.css', css: true });
   assert.equal(stylesheetImport({ file: 'src/theme.css', pkg: { name: '@acme/ds', dir: '.' } }).line, "@import '@acme/ds/src/theme.css';");

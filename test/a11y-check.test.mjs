@@ -175,7 +175,7 @@ const CHROME = findChrome({ playwright: true });
 test('[modes] after a mode switch the colours are read settled, never halfway through a transition', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'settle-test-'));
   const page = join(dir, 'p.html');
-  writeFileSync(page, '<!doctype html><style>b{color:#111;background:#fff;transition:color 5s}:root[data-c=dark] b{color:#eee;background:#111}</style><b id="x">Cancel</b>');
+  writeFileSync(page, '<!doctype html><style>b{color:#111;background:#fff;transition:color 5s 60s}:root[data-c=dark] b{color:#eee;background:#111}</style><b id="x">Cancel</b>');
   const browser = await launchChrome(CHROME, { tmpPrefix: 'settle-test-' });
   try {
     const { send, close } = await connectCDP(browser.wsUrl);
@@ -183,7 +183,7 @@ test('[modes] after a mode switch the colours are read settled, never halfway th
     assert.equal(await waitForTrue(send, sessionId, FILE_PAGE_LOADED), true);
     const read = async () => (await send('Runtime.evaluate', { expression: 'getComputedStyle(document.getElementById("x")).color', returnByValue: true }, sessionId)).result.value;
     await send('Runtime.evaluate', { expression: 'document.documentElement.setAttribute("data-c", "dark")' }, sessionId);
-    assert.equal(await read(), 'rgb(17, 17, 17)', 'mid-transition: the old text colour on the new dark background');
+    assert.equal(await read(), 'rgb(17, 17, 17)', 'waiting on its transition: the old text colour on the new dark background');
     await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId);
     assert.equal(await read(), 'rgb(238, 238, 238)');
     close();

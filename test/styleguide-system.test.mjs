@@ -213,7 +213,7 @@ test('each difference in plain English for the style guide: a contract field, a 
 });
 
 test('what to do about each difference, and who does it', () => {
-  assert.deepEqual(plainAction('chip height (Size=L): Figma 32, rendered 36px  (.chip · theme.css:60)  → set 32px'), { who: 'code', todo: 'In the code, set the chip height to 32px. Tell me to do it.' });
+  assert.deepEqual(plainAction('chip height (Size=L): Figma 32, rendered 36px  (.chip · theme.css:60)  → set 32px'), { who: 'code', todo: 'In the code, set the chip height to 32px. Tell Claude to do it.' });
   assert.deepEqual(plainAction('node font size: Figma m (11px), rendered 13px via --l-size  (.x · a.html:75)  → in Figma, set it to the token behind --l-size  [code moved, Figma is behind]'), { who: 'figma', todo: 'In Figma, set the node font size to the token behind --l-size.' });
   assert.equal(plainAction('modal.fontSizeVar: contract=null  Figma="l"').who, 'code');
   assert.equal(plainAction('· overlay/color').who, 'figma');

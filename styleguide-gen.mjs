@@ -572,7 +572,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
     // product brings it in (its import line and its file) and the system's components it is built with.
     try {
-      const { parityView, parityRows, importOf, stylesheetImport, nestedComponents } = await import('./styleguide-data.mjs');
+      const { parityView, parityRows, importOf, stylesheetImport, scriptUses, nestedComponents } = await import('./styleguide-data.mjs');
       const checkedAt = new Date().toISOString();   // the token check ran just now, for this page
       const { loadAgreed } = await import('./agreed.mjs');
       const agreedRec = loadAgreed(ROOT);
@@ -586,16 +586,24 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         }
         return null;
       };
-      // The system's stylesheet as a product imports it: by its package (the project's own counts), once for every component.
-      let sheetLine;
-      const sheetImport = () => {
-        if (sheetLine !== undefined) return sheetLine;
-        const file = themeFiles[0];
-        let pkg = file ? pkgOf(file) : null;
-        if (pkg) pkg = { ...pkg, exports: readJson(join(pkg.dir, 'package.json'))?.exports ?? null };
-        else { const j = readJson(join(ROOT, 'package.json')); if (j?.name) pkg = { name: j.name, dir: '.', exports: j.exports ?? null }; }
-        sheetLine = file && existsSync(resolve(ROOT, file)) ? stylesheetImport({ file, pkg }) : null;
-        return sheetLine;
+      // A component of CSS classes as a product brings it in, read from the code: the stylesheet that holds its rule, by
+      // the name its package's exports give it (the project's own package counts), and the functions of the system's own
+      // script that build or drive it (systemScripts), each by the name the script gives it.
+      const pkgFor = (file) => {
+        const p = pkgOf(file);
+        if (p) return { ...p, exports: readJson(join(p.dir, 'package.json'))?.exports ?? null };
+        const j = readJson('package.json');
+        return j?.name ? { name: j.name, dir: '.', exports: j.exports ?? null } : null;
+      };
+      const ownSheets = [...new Set([...themeFiles, ...(ctx?.componentSheets ?? [])])].filter((f) => !String(f).startsWith('..') && existsSync(resolve(ROOT, f))).map((f) => [f, readText(f)]).filter(([, t]) => t);
+      const scripts = (Array.isArray(cfg.systemScripts) ? cfg.systemScripts : []).map((f) => [f, readText(f)]).filter(([, t]) => t);
+      const { ruleLines: rulesOf } = await import('./styleguide-data.mjs');
+      const cssImport = (c) => {
+        const file = (c.cls && ownSheets.find(([, t]) => rulesOf(t, c.cls).length)?.[0]) || themeFiles.find((f) => existsSync(resolve(ROOT, f)));
+        const imp = file ? stylesheetImport({ file, pkg: pkgFor(file) }) : null;
+        if (!imp) return null;
+        const uses = scripts.flatMap(([f, t]) => { const fns = scriptUses({ text: t, cls: c.cls, name: c.name }); if (!fns.length) return []; const from = stylesheetImport({ file: f, pkg: pkgFor(f) }).from; return [fns.every((x) => x.exported) ? { line: `import { ${fns.map((x) => x.name).join(', ')} } from '${from}';`, from, module: true } : { line: fns.map((x) => `${x.name}(${x.args})`).join('; '), from, module: false }]; });
+        return uses.length ? { ...imp, uses } : imp;
       };
       for (const c of view.components) {
         c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
@@ -609,7 +617,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           if (text && text.length <= 200000) c.source = { file: c.api.file, text };
         }
         // A component that is CSS classes: a product brings it in with the system's stylesheet.
-        if (!c.import && (!c.api?.tag || c.api.syntax === 'html')) { const sheet = sheetImport(); if (sheet) c.import = sheet; }
+        if (!c.import && (!c.api?.tag || c.api.syntax === 'html')) { const own = cssImport(c); if (own) c.import = own; }
       }
     } catch { /* the page shows what it has */ }
     // Its links (Figma, its code, the team's documentation) and its changelog: the commits that changed it, each with
