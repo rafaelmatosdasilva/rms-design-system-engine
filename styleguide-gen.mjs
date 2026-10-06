@@ -546,7 +546,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       };
       for (const c of view.components) {
         c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
-        c.parity.rows = parityRows({ name: c.name, propsSnap, controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], codeProps: c.api?.props ?? {}, allTokens: c.allTokens ?? [], check, agreed: agreedRec, propsAt: propsSnap._updated ?? null, checkedAt });
+        c.parity.rows = parityRows({ name: c.name, propsSnap, controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], codeProps: c.api?.props ?? {}, allTokens: c.allTokens ?? [], check, agreed: agreedRec, propsAt: propsSnap._updated ?? null, checkedAt, slotParts: (c.anatomy ?? []).filter((x) => x.slot) });
         const text = c.api?.file ? readText(c.api.file) : '';
         const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names });
         if (uses.length) c.uses = uses;

@@ -1296,7 +1296,7 @@ export function splitFindings(list = []) {
 // → [{ type: 'Prop'|'Variable'|'Value', figma: { name, value } | null, code: { name, value } | null,
 //      status: 'match'|'differs'|'figma'|'code', at }], props first, then variables, then values. status figma: only in
 // Figma; code: only in code. at: a value's time is since both sides agreed, or when it last moved.
-export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], codeProps = {}, allTokens = [], check = null, agreed = {}, propsAt = null, checkedAt = null } = {}) {
+export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], codeProps = {}, allTokens = [], check = null, agreed = {}, propsAt = null, checkedAt = null, slotParts = [] } = {}) {
   const lc = (x) => String(x ?? '').toLowerCase().replace(/[\s_-]+/g, '');
   const rows = [];
   // The code's props as the API reader gives them (a list, each with its name) or keyed by name.
@@ -1320,8 +1320,12 @@ export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], 
     const ctl = controls.find((k) => lc(k.label) === lc(label));
     const own = ctl ? null : Object.keys(codeProps).find((n) => lc(n) === lc(label));
     const codeName = ctl ? (ctl.prop ?? ctl.label) : own;
+    // A Figma slot the code holds in a part of its own (the contract names it: .modal-slot): paired with that part.
+    const slotFigma = Object.values(fprops).filter((x) => x.type === 'SLOT').length;
+    const part = d.type === 'SLOT' && !codeName ? slotParts.find((x) => lc(x.name) === lc(label)) ?? (slotFigma === 1 && slotParts.length === 1 ? slotParts[0] : null) : null;
+    if (part?.selector) { rows.push({ type: 'Prop', figma: { name: label, value: say(d) }, code: { name: part.selector, value: 'its slot' }, status: 'match', at: propsAt, slot: true }); continue; }
     const inside = !codeName && !notBuilt.has(lc(label)) && (html ? d.type === 'SLOT' || d.type === 'INSTANCE_SWAP' : d.type === 'SLOT' && 'children' in codeProps);
-    if (inside) { rows.push({ type: 'Prop', figma: { name: label, value: say(d) }, code: html ? { name: 'its content', value: 'what the markup puts inside' } : { name: 'children', value: 'what it wraps' }, status: 'match', at: propsAt }); continue; }
+    if (inside) { rows.push({ type: 'Prop', figma: { name: label, value: say(d) }, code: html ? { name: 'its content', value: 'what the markup puts inside' } : { name: 'children', value: 'what it wraps' }, status: 'match', at: propsAt, slot: d.type === 'SLOT' }); continue; }
     if (codeName && !notBuilt.has(lc(label))) {
       paired.add(lc(codeName));
       const def = codeProps[codeName]?.default;
