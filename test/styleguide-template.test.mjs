@@ -397,6 +397,14 @@ test('in the browser: no script error, a control changes the real component, the
     assert.ok(await run(`(() => { const p = document.querySelector('#c-chip .pg-preview').getBoundingClientRect(), t = document.querySelector('#c-chip .pg-stage-bar--top').getBoundingClientRect(); return t.bottom <= p.top + 1; })()`), 'the bar sits above the stage, never over the component');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'log').click()`);
     assert.equal(await run(`(() => { const s = document.querySelector('#c-chip .pg-areas-scroll'), b = s.querySelector('[data-v="log"]').getBoundingClientRect(), r = s.getBoundingClientRect(); return s.scrollLeft > 0 && b.right <= r.right + 1; })()`), true, 'Changelog scrolled into view');
+    // On a phone a table of several columns is a block per row: no head row over the text, each value under the name of its
+    // column, no cell narrower than the card, nothing wider than the screen.
+    for (const area of ['parity', 'a11y']) {
+      await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === '${area}').click()`);
+      await new Promise((r) => setTimeout(r, 150));
+      assert.equal(await run(`(() => { const t = document.querySelector('#c-chip [data-area="${area}"] .pg-par-table'), rows = [...t.querySelectorAll('tbody tr')], card = t.closest('.pg-par-card').getBoundingClientRect();
+        return getComputedStyle(t.querySelector('thead')).position === 'absolute' && rows.length > 0 && rows.every((r) => getComputedStyle(r).display === 'block' && [...r.cells].every((td, i) => i === 0 || !td.textContent.trim() || td.getAttribute('data-label')) && [...r.cells].every((td) => td.getBoundingClientRect().width >= card.width - 64 || !td.textContent.trim())) && document.documentElement.scrollWidth <= innerWidth; })()`), true, area + ' reads as blocks on a phone');
+    }
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
     // How to use it: the same four sections on every page, a missing one said; the overview counts them.
