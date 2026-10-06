@@ -181,15 +181,8 @@ test('in the browser: no script error, a control changes the real component, the
     // No Inspect over the live component and no button for its specs: they are their own area, beside the Playground.
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].map((b) => b.textContent).filter((x) => /Inspect|specs/i.test(x)).join()`), '');
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-preview [data-hit]').length`), 0);
-    // Full width: the component across the whole card, its controls below; again puts it back.
-    const wideBtn = `[...document.querySelectorAll('#c-chip .pg-actions button')].find((b) => b.textContent === 'Full width')`;
-    const w0 = await run(`document.querySelector('#c-chip .pg-preview').getBoundingClientRect().width`);
-    await run(`${wideBtn}.click()`);
-    assert.equal(await run(`${wideBtn}.getAttribute('aria-pressed')`), 'true');
-    assert.ok(await run(`document.querySelector('#c-chip .pg-preview').getBoundingClientRect().width`) > w0 + 100, 'wider');
-    assert.ok(await run(`document.querySelector('#c-chip .pg-panel').getBoundingClientRect().top >= document.querySelector('#c-chip .pg-preview').getBoundingClientRect().bottom - 1`), 'the controls below it');
-    await run(`${wideBtn}.click()`);
-    assert.equal(await run(`Math.round(document.querySelector('#c-chip .pg-preview').getBoundingClientRect().width)`), Math.round(w0));
+    // No Full width button: the preview card keeps its layout.
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].some((b) => b.textContent === 'Full width')`), false);
     // Width: a chosen width draws it in a frame of that width with the page's own stylesheets; Fit brings the live
     // preview back.
     await run(`document.querySelector('#c-chip .pg-width [data-v="phone"]').click()`);
@@ -301,6 +294,10 @@ test('in the browser: no script error, a control changes the real component, the
     for (let i = 0; i < 60 && (await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`)) === before; i++) await new Promise((r) => setTimeout(r, 50));
     assert.notEqual(await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`), before, 'the specs follow the control');
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
+    // A text typed in the Playground is in the specs too.
+    await run(`(() => { const f = [...document.querySelectorAll('#c-chip .pg-ctl')].find((c) => c.querySelector('.pg-ctl-label').textContent.startsWith('Label')).querySelector('input'); f.value = 'Typed words'; f.dispatchEvent(new Event('input')); })()`);
+    for (let i = 0; i < 60 && !/Typed words/.test(await run(`document.querySelector('#c-chip .pg-anatomy').textContent`)); i++) await new Promise((r) => setTimeout(r, 50));
+    assert.match(await run(`document.querySelector('#c-chip .pg-anatomy').textContent`), /Typed words/, 'the specs follow a text typed');
     // Variants: every option of each variant prop and both sides of each on/off prop, one per row, drawn by the Playground and copied still; the Playground
     // keeps what was set, and Try it sets the option there.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'variants').click()`);

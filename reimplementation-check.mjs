@@ -258,6 +258,10 @@ if (!screenSnap?.screens) {
   };
   const gaps = [];
   const unread = new Set();
+  // A component the DS has not built yet (knownUnimplementedComponents) has no code a product could use:
+  // it is said once per screen as not checked, not counted as a product's gap.
+  const unbuilt = new Set(cfg.knownUnimplementedComponents ?? []);
+  const notBuilt = new Map();
   for (const scr of Object.values(screenSnap.screens)) {
     if (!scr?.plugin) continue;
     const files = filesOf(scr.plugin);
@@ -271,12 +275,14 @@ if (!screenSnap?.screens) {
       if (!token || /[\s>+~[\]:]/.test(token)) continue;   // no single class to look for
       if (used.has(token)) continue;
       if (KNOWN.has(`${scr.plugin}/${comp}`)) continue;
+      if (unbuilt.has(comp)) { const k = `${scr.plugin}|${comp}`; if (!notBuilt.has(k)) notBuilt.set(k, { plugin: scr.plugin, screen: scr.name ?? '', comp }); continue; }
       gaps.push({ plugin: scr.plugin, screen: scr.name ?? '', comp, sel });
     }
   }
   const seenGap = new Set();
   const uniqueGaps = gaps.filter((g) => { const k = `${g.plugin}|${g.comp}`; if (seenGap.has(k)) return false; seenGap.add(k); return true; });
   for (const p of unread) lines.push(`⏭ [reimplementation] ${p}: no code file found for its Figma screens (pluginDirs)`);
+  for (const n of notBuilt.values()) lines.push(`⏭ [reimplementation] ${n.plugin}: "${n.screen}" uses ${n.comp}, which the DS has not built yet (knownUnimplementedComponents), so its code cannot use it; checked once the DS builds it`);
   if (!uniqueGaps.length) {
     lines.push(`✅ [reimplementation] every DS component the product screens use in Figma is used by their code (${Object.keys(screenSnap.screens).length} screen${Object.keys(screenSnap.screens).length === 1 ? '' : 's'})`);
   } else {
