@@ -65,6 +65,7 @@ rms-design-system-engine --no-docs                       # skip the design-inten
 rms-design-system-engine --refresh-figma                 # read Figma the best way there is: design.json, figma-cli, else says how
 rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
+rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then the style guide, its address printed
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
@@ -289,11 +290,15 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   inspecting, what is picked at its left. They keep the stage (the checkerboard) apart from what changes it.
 - **Inspect**, in the top bar (none on the measuring page): the Playground turns into its anatomy, in the live
   component's place, so a prop is changed and inspected in one place: an inert copy of the component as the controls set
-  it, redrawn as they change (a text typed too), drawn larger, each part and each padding and gap outlined, a slot in
+  it, redrawn as they change (a text typed too), at the size the Playground draws it (smaller only to fit), each part and each padding and gap outlined, a slot in
   the accent, never filled with a colour (`annotate`). A click on the component, a part, or a padding or gap band (each
   space over the parts, each part over the component) says in one line what it is and its value (a part's padding,
   gap, fill, line, corners, shadow, text style and colour; an icon's size and colour; a space's token and value),
-  outlined in the accent; a second click puts it down. Done inspecting brings the live component back. A component
+  outlined in the accent, the rest of the component dimmed around it and the other boxes faded; a second click goes
+  back up a level. What sits inside the part picked is drawn as parts too, one level per click, as a double click in
+  Figma reaches a layer in a group, and the line names the path (`Actions › buttonSecondary › text`). The modes
+  switched while inspecting (Light, Dark, Desktop, Phone) redraw it in that mode, what is picked kept. Done inspecting
+  brings the live component back and leaves nothing of the anatomy beside it. A component
   shown in an overlay is drawn as its own element.
 - **Width**, in the Playground (none on the measuring page): Fit (the live preview), Phone (375px), Tablet (768px) or
   Desktop (1280px), a frame of that width written with the page's own stylesheets, its icon sheet, the component as
@@ -370,7 +375,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Accessibility**: its role (the Figma annotation, else `contract.authored.json` semantics) and what it asks for
+- **Accessibility**, one table like Parity's (`a11yRow`): What, What it means (in plain words), Status (✓ Done, ✕ To fix,
+  ! Not checked yet, – Not needed, a sign and the system's colour) and WCAG, with a count of each above it, kept as
+  the live rows change; what to fix first, then the variant shown and its text contrast, then what the role asks for
+  (done once the last browser check ran with nothing found under its criterion). Its rows: its role (the Figma annotation, else `contract.authored.json` semantics) and what it asks for
   (`role-markup.mjs`, `behaviour-contract.mjs`: element, name, keys, part roles), each with its WCAG 2.2 criterion;
   the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); **To fix**, what the audit found
   on it that is about accessibility rather than Figma (a text's contrast in one variant and mode, `splitFindings`),

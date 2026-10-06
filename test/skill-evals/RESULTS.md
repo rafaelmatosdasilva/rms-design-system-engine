@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: Inspect follows the modes and reaches nested parts; Accessibility as one status table; --component with --styleguide (continuous evaluation)
+
+What changed since the entry below (engine ff07bde): The guide set's usage reference describes the inspector at the Playground's size, its pick that dims the rest, nested parts one level per click, the modes followed while inspecting, Done leaving nothing behind, Accessibility as one table of statuses, and --component with --styleguide auditing a component before building the page. The guide changed in `reference/usage.md`.
+
+Guide set measured: `5a17a7519df8` · Project measured: `13d811a9d668`
+
+| Haiku, engine 066e053 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.057 |
+| Input a run | 86k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 86k. Records: `records/2026-10-06-inspect-a11y-component-sg`.
+
 ## 2026-10: Style guide: Inspect in the Playground, the stage's bars, alert icons, a sticky Parity head (continuous evaluation)
 
 What changed since the entry below (engine c595e4e): The guide set's usage reference describes the Playground's Inspect toggle and its bars, the plainer header, the alert icons on Parity and Accessibility, and the sticky Parity head. The guide changed in `reference/usage.md`.

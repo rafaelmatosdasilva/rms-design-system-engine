@@ -128,6 +128,17 @@ test('tokens are shown only when equal to Figma in every mode, grouped like the 
   assert.equal(t.differences, 1);
 });
 
+test('--component with --styleguide: that component audited first, then the page, its address printed', { timeout: 600000 }, () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sgc-');
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const out = r.stdout + r.stderr;
+  assert.match(out, /Auditing button, then building the style guide\./);
+  assert.match(out, /scope|button/i, 'the scoped audit ran');
+  assert.ok(existsSync(join(dir, '.design-system-engine-out', 'census.json')), 'the audit wrote its results');
+  assert.match(out, /button: \.design-system-engine-out\/styleguide\/index\.html#c-button/);
+});
+
 test('the demo design system: its real markup from its page, and props named differently stay out', { timeout: 300000 }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sg-');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
@@ -235,11 +246,15 @@ test('in the browser: no script error, a control changes the real component, the
     const a11y = await run(`[...document.querySelectorAll('#c-chip .pg-doc')].find((d) => /Accessibility/.test(d.querySelector('h3').textContent)).textContent`);
     assert.match(a11y, /togglebutton: a <button type="button"> with aria-pressed/);
     assert.match(a11y, /WCAG 2\.1\.1 Keyboard \(A\)/);
-    assert.match(a11y, /Passes: \d+\.\d:1 on "Filter", needs 4\.5:1/);
-    assert.match(a11y, /Last audit.*Not run yet/s);
+    assert.match(a11y, /Text contrast\d+\.\d:1 on "Filter", needs 4\.5:1.*Done/);
+    assert.match(a11y, /Browser checkNot run yet.*Not checked yet/s);
+    // One table like Parity's: what, what it means, a status with its sign, the WCAG criterion; a count above it.
+    assert.match(a11y, /What.*What it means.*Status.*WCAG/);
+    assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /\d+ done.*\d+ not checked yet/);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
     await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
-    assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Passes|Fails/, 'measured again in the other mode');
+    assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Text contrast.*(Done|To fix)/, 'measured again in the other mode');
     // On this variant: tried on the live component when the Accessibility area shows it, and again for another variant.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const live = await run(`document.querySelector('#c-chip .pg-a11y-live').textContent`);
@@ -269,11 +284,12 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'Prop').click()`);
     assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].filter((r) => !r.hidden).map((r) => r.dataset.type))]`), ['Prop']);
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'all').click()`);
-    // Inspect: the Playground turns into its anatomy (an inert copy drawn larger, as the controls set it, each part, padding
+    // Inspect: the Playground turns into its anatomy (an inert copy at the Playground's size, as the controls set it, each part, padding
     // and gap outlined, never filled with a colour); a click on one says in one line what it is and its value; again
     // puts the live component back.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy').hidden`), true, 'off until asked for');
+    const liveH = await run(`document.querySelector('#c-chip .pg-preview .chip').getBoundingClientRect().height`);
     await run(`document.querySelector('#c-chip .pg-stage-tools button').click()`);
     // Drawn on the next frame: waited for, as a busy machine can take longer than a fixed pause.
     for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-anat-space').length`)); i++) await new Promise((r) => setTimeout(r, 50));
@@ -281,13 +297,26 @@ test('in the browser: no script error, a control changes the real component, the
     assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-space').length`) >= 2);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks > *')].every((m) => { const b = getComputedStyle(m).backgroundColor; return m.classList.contains('pg-anat-num') || b === 'rgba(0, 0, 0, 0)'; })`), true, 'no colour fills on the drawing');
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
-    assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
+    assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`), liveH, 'drawn at the size the Playground draws it');
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /Click a part, a padding or a gap/);
     await run(`(() => { const m = [...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^chip padding/.test(x.dataset.hit)); m.scrollIntoView({ block: 'center' }); const r = m.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).click(); })()`);
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /^chip padding \w+ {2}· {2}--padding-[a-z]+/, 'one line: what it is and its value');
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-anat-marks .is-picked').length`), 1);
     await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^part 1/.test(x.dataset.hit)).dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /color.*--chip-text/, 'the label: its colour');
+    // Picked: it stands out, the other boxes faded around it.
+    assert.equal(await run(`(() => { const ms = document.querySelector('#c-chip .pg-anat-marks'), other = [...ms.querySelectorAll('[data-hit]')].find((x) => !x.classList.contains('is-picked')); return ms.classList.contains('has-pick') + '|' + getComputedStyle(other).opacity; })()`), 'true|0.3');
+    // Nested: the component itself picked, what sits inside it is drawn as parts too, one level down, and a click on
+    // one names the path to it.
+    await run(`document.querySelector('#c-chip .pg-anat-marks [data-hit^="part 0 "]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+    const nested = await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks .is-nested')].map((x) => x.dataset.hit)`);
+    assert.ok(nested.length && nested.every((k) => /^part 0 chip > \d+ /.test(k)), 'the parts inside it: ' + nested);
+    await run(`document.querySelector('#c-chip .pg-anat-marks .is-nested').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /^chip › /, 'the path to what is picked');
+    // A mode switched while inspecting reaches the drawing: the inspector carries the Playground's modes.
+    const tplSrc = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+    assert.match(tplSrc, /SGModes\.controls\(preview, function \(\) \{ refresh\(\); if \(inspecting\) requestAnimationFrame\(drawAnatomy\); \}/);
+    assert.match(tplSrc, /else if \(preview\.hasAttribute\(a\.attr\)\) anatBox\.setAttribute\(a\.attr, preview\.getAttribute\(a\.attr\)\)/);
     assert.ok(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-own')`), 'Its tokens, in the Playground');
     // A control changed in the Playground redraws the specs under it.
     const before = await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`);
@@ -302,6 +331,7 @@ test('in the browser: no script error, a control changes the real component, the
     // Done inspecting: the live component back in its place.
     await run(`document.querySelector('#c-chip .pg-stage-tools button').click()`);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview').hidden + '|' + document.querySelector('#c-chip .pg-anatomy').hidden + '|' + document.querySelector('#c-chip .pg-stage-tools button').textContent`), 'false|true|Inspect');
+    assert.equal(await run(`getComputedStyle(document.querySelector('#c-chip .pg-anatomy')).display + '|' + document.querySelector('#c-chip .pg-anatomy').childElementCount`), 'none|0', 'nothing of the anatomy left beside the Playground');
     // Variants: every option of each variant prop and both sides of each on/off prop, one per row, drawn by the Playground and copied still; the Playground
     // keeps what was set, and Try it sets the option there.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'variants').click()`);
@@ -552,7 +582,7 @@ test('an accessibility finding goes to Accessibility, a difference from Figma to
   assert.deepEqual(parity.map((x) => x.check), ['Structure', 'Token layering']);
   assert.deepEqual(a11y.map((x) => x.check), ['State contrast']);
   const html = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
-  assert.match(html, /<dt>To fix<\/dt>/, 'the Accessibility area lists what to fix');
+  assert.match(html, /a11yRow\('todo', contrast \? 'Text contrast' : 'To fix'/, 'the Accessibility area lists what to fix');
   assert.match(html, /a\[0\] === 'a11y' \? facts\.a11y/, 'the Accessibility tab carries the alert icon');
   assert.match(html, /if \(o\.icon\) text = '<svg class="sg-seg-icon"[^\n]*' \+ text;/, 'the icon before the label');
   assert.match(html, /n \+= \(c\.a11yFindings \|\| \[\]\)\.length/, 'counting what the audit found with what the browser check found');
