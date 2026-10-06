@@ -242,7 +242,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par--none { color: var(--sg-muted); }
 .pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text-2); }
 /* Wide enough, the table never scrolls on its own (a box that scrolls would hold its head back); on a phone it does. */
-@media (max-width: 720px) { .pg-par-scroll { overflow-x: auto; } }
+@media (max-width: 720px) { .pg-par-scroll { overflow-x: auto; } .pg-par-filter { max-width: 100%; overflow-x: auto; padding: 2px; } }   /* the filter scrolls sideways too, as the areas do */
 /* Where it is used: each product's own page pictured, the component marked on it. */
 .pg-usedin { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 .pg-shot { position: relative; overflow: hidden; border-radius: var(--sg-radius); border: var(--sg-line); background: var(--sg-bg-2); }
@@ -414,7 +414,8 @@ a.pg-usage-name { color: var(--sg-text); }
   .pg-preview { overflow-x: auto; }   /* centred like everywhere; a component wider than a phone scrolls from its start (safe center) */
   /* On a phone the stage gives the component room of its own below the mode switches, never squeezed under them. */
   .pg-preview, .pg-frame { min-height: 220px; }
-  .pg-preview-card { grid-template-columns: 1fr; } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); }
+  .pg-preview-card { grid-template-columns: minmax(0, 1fr); } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); min-width: 0; }
+  .pg-ctl { min-width: 0; } .pg-ctl > :not(.pg-ctl-label) { max-width: 100%; overflow-x: auto; }   /* a control with many options scrolls sideways on a narrow screen */
   .pg-updated > div { grid-template-columns: 1fr; gap: 0; }   /* the documentation in one column: each name above its text */
   .pg-inspect-grid.pg-grid-2, .pg-examples { grid-template-columns: 1fr; }   /* Parity and Do and Don't in one column on a phone */
 }
@@ -2267,6 +2268,9 @@ a.pg-usage-name { color: var(--sg-text); }
     }
     function checkLive() {
       if (ALL || !a11yEl || !cur || areaNow !== 'a11y') return;
+      // Tried once the page has started: the system's scripts, which run after this one, add their own elements, and one
+      // added during a hover would be taken for what the hover shows.
+      if (document.readyState !== 'complete') { if (!checkLive.waiting) { checkLive.waiting = true; window.addEventListener('load', function () { setTimeout(function () { checkLive.waiting = false; checkLive(); }, 50); }); } return; }
       // A mode or a setting changed while what it does was being tried: that try ends, and every variant is tried again.
       var sig0 = Array.prototype.map.call(document.documentElement.attributes, function (x) { return x.name + x.value; }).join();
       if (wcagStop && sig0 !== liveSig) wcagStop();
