@@ -95,6 +95,7 @@ Install the rms-design-system-engine skill for me by running curl -fsSL https://
 ```
 /rms-design-system-engine check everything
 /rms-design-system-engine build the style guide
+/rms-design-system-engine check the modal and show it in the style guide
 /rms-design-system-engine prototype a settings page with our components
 /rms-design-system-engine check the accessibility of the button
 ```
