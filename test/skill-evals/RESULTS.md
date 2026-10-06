@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: WCAG 2.1 A and AA for every component; where accessibility is read from; slots drawn in the Playground (continuous evaluation)
+
+What changed since the entry below (engine 2734a61): The audit and the style guide check every WCAG 2.1 criterion at A and AA a component can be checked for (wcag-page.js, a11y-static.mjs, wcag21.mjs); the style guide adds a WCAG 2.1 table, a From column and a Where it is read from table, and draws slots as dashed boxes. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `c1ee43c016f1` · Project measured: `13d811a9d668`
+
+| Haiku, engine e84f729 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 77/77 | 69/70 |
+| Mean cost a run | $0.056 | $0.055 |
+| Input a run | 98k | 95k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below. Failed: forbidden-green #2: says why not. Records: `records/2026-10-06-wcag-2-1-a-and`.
+
 ## 2026-10: Style guide: Accessibility covers every variant; a click outside lets go in Inspect (continuous evaluation)
 
 What changed since the entry below (engine ef4872f): The guide set's usage reference describes Accessibility over every variant and colour mode, as Parity lists everything, and a click outside the component letting go in Inspect; fix-chip-height measured at 10 runs after a miss in the entry below. The guide changed in `reference/usage.md`.
