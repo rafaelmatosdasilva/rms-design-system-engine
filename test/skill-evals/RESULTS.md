@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: Inspect in the Playground, the stage's bars, alert icons, a sticky Parity head (continuous evaluation)
+
+What changed since the entry below (engine c595e4e): The guide set's usage reference describes the Playground's Inspect toggle and its bars, the plainer header, the alert icons on Parity and Accessibility, and the sticky Parity head. The guide changed in `reference/usage.md`.
+
+Guide set measured: `a2efcc32d7f9` · Project measured: `13d811a9d668`
+
+| Haiku, engine ff07bde | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.053 |
+| Input a run | 105k | 86k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 105k. Records: `records/2026-10-06-style-guide-inspect-bars-alerts`.
+
 ## 2026-10: Accessibility findings go to Accessibility, not Parity (continuous evaluation)
 
 What changed since the entry below (engine 7229c44): The style guide shows the audit's contrast findings under a component's Accessibility area instead of its Parity. The guide changed in `reference/usage.md`.

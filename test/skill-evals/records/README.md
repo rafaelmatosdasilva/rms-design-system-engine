@@ -48,5 +48,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-06-anatomy-follows-playground` | The 21 guide tasks on Haiku (engine e46b7bc) | "The anatomy follows every Playground change; no Full width" |
 | `2026-10-06-parity-one-table` | The 21 guide tasks on Haiku (engine 7229c44) | "Parity as one table of every prop, variable and value" |
 | `2026-10-06-a11y-findings-to-accessibility` | The 21 guide tasks on Haiku (engine c595e4e) | "Accessibility findings go to Accessibility, not Parity" |
+| `2026-10-06-style-guide-inspect-bars-alerts` | The 21 guide tasks on Haiku (engine ff07bde) | "Style guide: Inspect in the Playground, the stage's bars, alert icons, a sticky Parity head" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
