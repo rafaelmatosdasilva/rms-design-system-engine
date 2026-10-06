@@ -18,7 +18,11 @@
 //   • a page with no lang, a viewport that blocks zoom (user-scalable=no, maximum-scale=1);
 //   • a page with no main heading, or several (I79): a document with text in its body has one h1 (an app shell
 //     its scripts fill has no text, and a template whose content comes from elsewhere is not read);
-//   • animations with no prefers-reduced-motion alternative anywhere in the project.
+//   • animations with no prefers-reduced-motion alternative anywhere in the project;
+//   • in the scripts (WCAG 2.1): a shortcut on a single letter or number, listened for on the whole page, with no
+//     modifier key (2.1.4); something hidden, closed or removed on a timer of 1 to 20 seconds that nothing pauses on
+//     hover or focus (2.2.1); a gesture with two fingers or more (2.5.1); an action on shaking or tilting the device
+//     (2.5.4).
 // An element whose attributes are spread ({...props}, v-bind="$attrs") can receive them from outside: it is
 // never reported. A finding that does not say its fix in `desc` carries it in `fix`, for the check of each edit
 // (edit-check.mjs, idea I74), which hands the fix back to the agent that wrote the line.
@@ -221,6 +225,71 @@ export function styleOnly(text) {
   return out + t.slice(last).replace(/[^\n]/g, ' ');
 }
 
+// A component file with only its <script> blocks left (a .vue or .svelte file), line numbers kept.
+export function scriptOnly(text) {
+  const t = String(text ?? '');
+  let out = '', last = 0;
+  for (const m of t.matchAll(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi)) {
+    const start = m.index + m[1].length;
+    out += t.slice(last, start).replace(/[^\n]/g, ' ') + m[2];
+    last = start + m[2].length;
+  }
+  return out + t.slice(last).replace(/[^\n]/g, ' ');
+}
+
+// Scripts (WCAG 2.1): what a component does that a page cannot show without being used a certain way. → [{ line, kind,
+// desc, fix, near }], `near` the code around it, so a finding in a shared script can be told apart by the component
+// it handles.
+export function scriptFindings(text) {
+  const out = [];
+  const src = String(text ?? '').replace(/\/\*[\s\S]*?\*\/|(^|[^:\\])\/\/[^\n]*/g, (c) => c.replace(/[^\n]/g, ' '));
+  const near = (i) => src.slice(Math.max(0, i - 400), i + 400);
+  // 2.1.4 Character key shortcuts: a single letter, number or sign as a shortcut, listened for on the whole page (one on
+  // a focused component is allowed), with no Ctrl, Alt or Cmd asked for around it.
+  if (/\b(?:document|window|globalThis|body)\s*\.\s*addEventListener\s*\(\s*['"]key(?:down|up|press)['"]|\b(?:document|window)\s*\.\s*onkey(?:down|up|press)\s*=/.test(src)) {
+    const seen = new Set();
+    for (const m of src.matchAll(/\.\s*key\s*===?\s*['"]([^'"\s])['"]|['"]([^'"\s])['"]\s*===?\s*\w+\s*\.\s*key\b|\.\s*code\s*===?\s*['"](Key[A-Z]|Digit\d)['"]|\bcase\s+['"]([a-zA-Z0-9?/])['"]\s*:/g)) {
+      const key = m[1] ?? m[2] ?? m[3] ?? m[4];
+      // A comparison is read with its own condition (the line it sits on); a switch case with what comes before it.
+      const ls = src.lastIndexOf('\n', m.index) + 1, le = src.indexOf('\n', m.index);
+      const line = src.slice(ls, le < 0 ? src.length : le);
+      const at = m.index - ls, cond = line.slice(Math.max(0, line.lastIndexOf('if', at), line.lastIndexOf(';', at), line.lastIndexOf('{', at)), line.slice(at).search(/\)\s*(?:\{|return\b|[\w.]+\s*\()|;|\}|$/) + at);
+      const around = m[4] ? src.slice(Math.max(0, m.index - 300), m.index) : cond;
+      if (/\b(?:ctrlKey|metaKey|altKey)\b|getModifierState/.test(around) || seen.has(key)) continue;
+      seen.add(key);
+      out.push({ line: lineAt(src, m.index), kind: 'shortcut', desc: `the key "${key}" alone is a shortcut on the whole page: it fires by mistake for people using voice control or typing with one finger`, fix: 'ask for Ctrl, Alt or Cmd with it, or listen only while the component has the focus, or let the person turn it off', near: near(m.index) });
+    }
+  }
+  // 2.2.1 Timing adjustable: something hidden, closed or removed by itself after 1 to 20 seconds. Shorter is the end of
+  // an animation the person started; a timer the component stops while it has the pointer or the focus is adjustable.
+  for (const m of src.matchAll(/\bsetTimeout\s*\(/g)) {
+    let depth = 1, i = m.index + m[0].length, comma = -1;
+    while (i < src.length && depth) { const ch = src[i]; if (ch === '(' || ch === '[' || ch === '{') depth++; else if (ch === ')' || ch === ']' || ch === '}') depth--; else if (ch === ',' && depth === 1) comma = i; i++; }
+    if (comma < 0) continue;
+    const fn = src.slice(m.index + m[0].length, comma), delay = src.slice(comma + 1, i - 1);
+    const nums = [...delay.matchAll(/\b(\d[\d_]*)\b/g)].map((x) => Number(x[1].replace(/_/g, '')));
+    if (!nums.length || !/^[\s\d_?:()\w.!&|=<>]*$/.test(delay)) continue;
+    const n = Math.min(...nums);
+    if (n < 1000 || n >= 20000) continue;
+    if (!/\.\s*remove\s*\(|\b(?:hide|close|dismiss)\w*|\.hidden\s*=\s*true|display\s*=\s*['"]none|classList\s*\.\s*(?:remove\s*\(\s*['"](?:is-)?(?:open|visible|show|shown|active)|add\s*\(\s*['"](?:is-)?(?:hidden|closing|leaving))/i.test(fn)) continue;
+    // Its timer stopped while the pointer or the focus is on it: clearTimeout(<that timer>) in a hover or focus listener.
+    const v = src.slice(Math.max(0, m.index - 60), m.index).match(/(\w+)\s*=\s*$/)?.[1];
+    if (v && new RegExp(`(?:mouseenter|pointerenter|mouseover|focusin|['"]focus['"])[\\s\\S]{0,400}?clearTimeout\\s*\\(\\s*${v}\\b`).test(src)) continue;
+    out.push({ line: lineAt(src, m.index), kind: 'timing', desc: `something closes by itself after ${n / 1000} second${n === 1000 ? '' : 's'}: people who read slowly, or use a screen reader, need longer`, fix: 'keep it until the person closes it, or stop the timer while it has the pointer or the focus, or give at least 20 seconds', near: near(m.index) });
+  }
+  // 2.5.1 Pointer gestures: two fingers or more (a pinch, a two-finger swipe).
+  for (const m of src.matchAll(/\btouches\s*\.\s*length\s*(?:>=?\s*[12]|===?\s*[2-9])|['"]gesture(?:start|change|end)['"]|\bongesture(?:start|change)\b/g)) {
+    out.push({ line: lineAt(src, m.index), kind: 'gesture', desc: 'an action with two fingers or more: people who can use only one finger, or a mouse, cannot do it', fix: 'offer the same action with one tap (buttons for zoom, arrows for a swipe)', near: near(m.index) });
+    break;
+  }
+  // 2.5.4 Motion actuation: shaking or tilting the device does something.
+  for (const m of src.matchAll(/['"]device(?:motion|orientation)['"]|\bondevice(?:motion|orientation)\b|\bnew\s+(?:Accelerometer|Gyroscope|LinearAccelerationSensor)\s*\(/g)) {
+    out.push({ line: lineAt(src, m.index), kind: 'motionact', desc: 'an action on shaking or tilting the device: people with a mounted device or a tremor cannot do it, or do it by mistake', fix: 'offer a button for the same action, and let the motion be turned off', near: near(m.index) });
+    break;
+  }
+  return out;
+}
+
 function walk(ROOT, exts, limit = 4000) {
   const files = [];
   const go = (dir, depth) => {
@@ -257,6 +326,11 @@ export function staticA11y(ROOT) {
   for (const [f, text] of styleText) for (const x of cssFindings(text, all)) findings.push({ file: relative(ROOT, f), ...x });
   // Animations with no reduced-motion alternative anywhere: reported once, at the first animation.
   const scripts = walk(ROOT, new Set(['.js', '.mjs', '.ts']));
+  // What the scripts do (WCAG 2.1): shortcuts, timers, gestures, device motion.
+  for (const f of [...scripts, ...walk(ROOT, new Set(['.jsx', '.tsx', '.vue', '.svelte']))]) {
+    const text = read(f);
+    for (const x of scriptFindings(['.vue', '.svelte'].includes(extname(f)) ? scriptOnly(text) : text)) findings.push({ file: relative(ROOT, f), ...x });
+  }
   const reduced = /prefers-reduced-motion/.test(all) || markup.some((f) => /prefers-reduced-motion/.test(read(f))) || scripts.some((f) => /prefers-reduced-motion/.test(read(f)));
   if (!reduced) {
     for (const [f, text] of styleText) {
@@ -265,5 +339,5 @@ export function staticA11y(ROOT) {
       if (a) { findings.push({ file: relative(ROOT, f), line: lineAt(css, a.index + (a[0].match(/^\s*[;{]?\s*/)?.[0].length ?? 0)), kind: 'motion', desc: 'an animation, and no prefers-reduced-motion alternative anywhere in the project: people who get sick from motion cannot turn it off' }); break; }
     }
   }
-  return { findings, files: { markup: markup.length, styles: styles.length } };
+  return { findings, files: { markup: markup.length, styles: styles.length, scripts: scripts.length } };
 }

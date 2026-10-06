@@ -78,7 +78,8 @@ import { loadModes } from './mode-resolver.mjs';
 import { modeSwitch } from './code-capture.mjs';
 import { codeSnapshotPath, OUT_DIR } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
-import { partRoleOf, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
+import { WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from './wcag21.mjs';
+import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
 
 // ── Pure, unit-testable core (exported; importing this module runs NOTHING) ─────
 // Parse a computed-style color. Returns {r,g,b,a} or null when it is not an rgb()/rgba()
@@ -329,6 +330,8 @@ export const A11Y_GUIDE = {
     why: 'A screen reader announces the element by its role. The contract says what each component is; this one renders as something different.',
     fix: 'Use the element or role the contract names (contract.authored.json → semantics), or correct the contract.',
   },
+  // WCAG 2.1 A and AA, the rest of what a component can be checked for (wcag-page.js, wcag21.mjs).
+  ...WCAG21_GUIDE,
 };
 const A11Y_ROLE_WORD = { button: 'A button', link: 'A link', textbox: 'An input field', searchbox: 'A search field', checkbox: 'A checkbox', radio: 'A radio button', switch: 'A switch', combobox: 'A dropdown', tab: 'A tab', slider: 'A slider' };
 // One readable line locating a single finding.
@@ -363,6 +366,7 @@ export function groupSame(list) {
 // numbers + the fix. Same facts as the plain lines, but parseable.
 export function a11yFindingRecord(kind, f) {
   const rec = { issue: kind, selector: f.desc ?? null, fix: A11Y_GUIDE[kind]?.fix ?? null };
+  if (WCAG21_KIND[kind]) rec.wcag = WCAG21_KIND[kind];
   if (kind === 'contrast' || kind === 'hovercontrast') { rec.theme = f.theme ?? null; rec.text = f.text ?? null; rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
   if (kind === 'focuscontrast') { rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
   if (kind === 'iconcontrast') { rec.theme = f.theme ?? null; rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
@@ -675,6 +679,29 @@ export function annotationFacts(annotations = []) {
 }
 // From the component-props snapshot: { component: { facts, layers: [{ layer, facts }] } }. Facts on
 // the component node, and on its inner layers (layerAnnotations) when the capture recorded them.
+// What each Figma annotation on a component feeds, so a designer can tell a note is used: the role it states (what that
+// role owes, tried in the browser), a spoken name or alt text and a heading level (checked against what it renders), a
+// part's role on a layer, a behaviour (Escape closes, arrow keys move, Enter and Space activate). Every note also reaches
+// the agents as design intent. entry: the component's snapshot entry ({ annotations, layerAnnotations }).
+// → [{ text, layer?, uses: [what it feeds], sc: [criteria] }]
+export function annotationUses(entry = {}) {
+  const out = [];
+  const one = (a, layer) => {
+    const text = String(a?.label ?? a?.labelMarkdown ?? '').trim();
+    if (!text) return;
+    const f = annotationFacts([a]), uses = [], sc = [];
+    if (f.part && layer) { uses.push(`the role of its "${layer}" part (${f.part}), checked in the browser`); sc.push('1.3.1'); }
+    else if (f.part) { uses.push(`a part's role (${f.part}), checked once it sits on the layer of that part`); }
+    if (f.role && /\brole\s*[:=]/i.test(text)) { uses.push(`its role (${f.role}${f.pressed ? ', a toggle' : ''}): what that role owes is tried in the browser`); sc.push('4.1.2', '2.1.1'); }
+    if (f.name) { uses.push(`its spoken name ("${f.name}"), checked against what it renders`); sc.push('4.1.2', '1.1.1'); }
+    if (f.level) { uses.push(`its heading level (${f.level}), checked against what it renders`); sc.push('1.3.1'); }
+    for (const b of annotatedBehaviours([a])) { uses.push(`a behaviour (${b.says}), tried in the browser`); sc.push('2.1.1'); }
+    out.push({ text, ...(layer ? { layer } : {}), uses, sc: [...new Set(sc)] });
+  };
+  for (const a of entry.annotations ?? []) one(a, null);
+  for (const l of entry.layerAnnotations ?? []) for (const a of l.annotations ?? []) one(a, l.layer);
+  return out;
+}
 export function annotationFactsFor(ROOT, cfg = {}) {
   let snap = {};
   try { snap = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { return {}; }
@@ -1166,6 +1193,7 @@ async function main() {
   }
 
   const unrendered = [], unread = [], unfinished = [];
+  const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
   for (const target of targets) {
     const label = target.label;
@@ -1305,6 +1333,37 @@ async function main() {
     await step(async () => {
       for (const x of (await evalv(deepSweepExpression(roots, 'targets'))) ?? []) findings.push({ kind: 'target', plugin: label, ...x });
     });
+    // WCAG 2.1 A and AA, what is left once the checks above have run (wcag-page.js): text alternatives, groups and
+    // tables, reading order, input purpose, control edges, moving and flashing content, link words, empty headings,
+    // label in name, valid ARIA, status messages; then what it does when used (hover content, focus, input, press).
+    // The first few of each component on the page; findings say the component they sit in.
+    await step(async () => {
+      await evalv(WCAG_PAGE_SOURCE + '; true');
+      const sels = roots ?? [null];
+      for (const sel of sels) {
+        const res = await evalv(`(async () => {
+          const sel = ${JSON.stringify(sel)};
+          const all = sel ? [...document.querySelectorAll(sel)] : [document.body];
+          const seen = [], out = [];
+          for (const el of all) {
+            if (seen.length >= 3) break;
+            if (seen.some((s) => s.contains(el)) || !el.getClientRects().length) continue;
+            seen.push(el);
+            out.push(...window.__wcag21.check(el, { name: sel || '' }).findings);
+            if (seen.length === 1) out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings);
+          }
+          return out;
+        })()`);
+        const once = new Set();
+        for (const f of res ?? []) {
+          const desc = sel ? `${f.desc} in ${sel}` : f.desc;
+          if (once.has(f.kind + desc)) continue;
+          once.add(f.kind + desc);
+          findings.push({ kind: f.kind, plugin: label, desc });
+        }
+      }
+      ranChecks.add('wcag21');
+    });
     await step(async () => {
       // Positive tabindex, then a real walk: Tab through the page and watch where the focus goes.
       const positive = await evalv(`[...document.querySelectorAll('[tabindex]')].filter(e => +e.getAttribute('tabindex') > 0).map(e => (e.tagName.toLowerCase() + (e.id ? '#' + e.id : '')).slice(0, 60))`);
@@ -1324,6 +1383,7 @@ async function main() {
       for (let i = 2; i < seq.length; i++) {
         if (seq[i] && seq[i] === seq[i - 1] && seq[i] === seq[i - 2] && distinct.size > 1) { findings.push({ kind: 'tabtrap', plugin: label, desc: seq[i].split('|').slice(1).join('|') }); break; }
       }
+      ranChecks.add('tabtrap');
     });
     await step(async () => {
       const open = (await evalv(deepSweepExpression(null, 'dialogs'))) ?? [];
@@ -1350,11 +1410,13 @@ async function main() {
       await evalv(`(() => { const s = document.createElement('style'); s.id = '__designSystemEngine_spacing'; s.textContent = '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }'; document.head.appendChild(s); })()`);
       for (const d of (await evalv(deepSweepExpression(roots, 'clipped'))) ?? []) if (!before.has(d)) findings.push({ kind: 'spacing', plugin: label, desc: d });
       await evalv(`document.getElementById('__designSystemEngine_spacing')?.remove()`);
+      ranChecks.add('spacing');
     });
     if (cfg.a11y?.reflow === true) await step(async () => {
       await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 1, mobile: false }, sessionId);
       const r3 = await evalv(deepSweepExpression(null, 'reflow'));
       if (r3 && r3.scrollWidth > r3.width + 1) findings.push({ kind: 'reflow', plugin: label, desc: `${label}: ${r3.scrollWidth}px wide at 320px` });
+      ranChecks.add('reflow');
       await send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
     });
     await step(async () => {
@@ -1364,6 +1426,7 @@ async function main() {
       await send('Emulation.setDeviceMetricsOverride', { width: 640, height: 450, deviceScaleFactor: 2, mobile: false }, sessionId);
       for (const d of (await evalv(deepSweepExpression(roots, 'clipped'))) ?? []) if (!before.has(d)) findings.push({ kind: 'zoom', plugin: label, desc: d });
       await send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+      ranChecks.add('zoom');
     });
     await step(async () => {
       // Rendered role against the contract's authored semantics (contract.authored.json).
@@ -1574,7 +1637,7 @@ async function main() {
   const keyboard = findings.filter((f) => f.kind === 'keyboard');
   const themes   = [...new Set(modes.map((m) => m.name))];
 
-  const more = ['tooltipname', 'target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'behaviour', 'statefollows'].map((k) => [k, findings.filter((f) => f.kind === k)]);
+  const more = ['tooltipname', 'target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'behaviour', 'statefollows', ...Object.keys(WCAG21_GUIDE)].map((k) => [k, findings.filter((f) => f.kind === k)]);
   const buckets = [['contrast', contrast], ['hovercontrast', hoverCon], ['iconcontrast', iconCon], ['name', names], ['focus', focus], ['focuscontrast', focusCon], ['ariastate', state], ['keyboard', keyboard], ...more].filter(([, l]) => l.length);
   const total = buckets.reduce((n, [, l]) => n + l.length, 0);
   const inThemes = themes.length > 1 ? ` (checked in ${themes.length} themes)` : '';
@@ -1617,6 +1680,9 @@ async function main() {
     usedStyleguide: !!sg,
     themes, strict: STRICT, total, cannotMeasure: cannot.length,
     checkedAt: new Date().toISOString(),
+    // The page-wide checks that finished: a criterion they stand for (a keyboard trap, text spacing, reflow, zoom) is
+    // met only where its check ran.
+    ran: [...ranChecks],
     issues: buckets.flatMap(([kind, list]) => list.map((f) => { const r = a11yFindingRecord(kind, f); const n = ownerName(f.desc); if (n) r.component = n; const u = figmaOf(f.desc); if (u) r.figma = u; return r; })),
     // What could not be read, rendered or finished: never a clean result, so an agent or CI can tell.
     ...(unread.length || unrendered.length || unfinished.length ? { notRead: [...unread, ...unrendered.map((u) => `${u} (not rendered)`), ...unfinished] } : {}),

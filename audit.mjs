@@ -4012,7 +4012,8 @@ function reportFull(label, items, shown) {
       if (findings.length) {
         const count = (k) => findings.filter((f) => f.kind === k).length;
         const parts = [['name', 'with no accessible name'], ['focus', 'focus outline removed and not put back'], ['keyboard', 'keyboard'], ['aria', 'aria'],
-          ['language', 'page with no language'], ['heading', 'page with no main heading or several'], ['zoom', 'zoom blocked'], ['motion', 'animation with no reduced-motion alternative']].filter(([k]) => count(k)).map(([k, w]) => `${count(k)} ${w}`);
+          ['language', 'page with no language'], ['heading', 'page with no main heading or several'], ['zoom', 'zoom blocked'], ['motion', 'animation with no reduced-motion alternative'],
+          ['shortcut', 'single-key shortcut'], ['timing', 'closes on a short timer'], ['gesture', 'needs two fingers'], ['motionact', 'works by moving the device']].filter(([k]) => count(k)).map(([k, w]) => `${count(k)} ${w}`);
         console.log(C.yellow(`\n♿ Accessibility from the code (no browser needed): ${findings.length} finding${findings.length === 1 ? '' : 's'} in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'} (${parts.join(' · ')}). Advisory.`));
         const all = process.argv.includes('--a11y');
         for (const f of findings.slice(0, all ? findings.length : 15)) console.log(C.yellow(`     ${f.file}:${f.line}  ${f.desc}`));
