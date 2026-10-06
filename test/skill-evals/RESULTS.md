@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Guides: every gate by the number the report prints (continuous evaluation)
+
+What changed since the entry below (engine b454dee): every gate reference in the guide (about 160, from older numberings such as Gate [10g], [3f], [11] for the states gate) is now the report's number with its name, and the full-audit table follows the report's order. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/gates.md`, `reference/maintainers.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `2e192c56b1b9` · Project measured: `13d811a9d668`
+
+| Haiku, engine 25c754b | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.054 |
+| Input a run | 96k | 93k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 96k. Records: `records/2026-10-06-guides-every-gate-named-by`.
+
 ## 2026-10: Style guide: specs, every variant, a token panel, names held to one style (continuous evaluation)
 
 What changed since the entry below (engine e67aeb3): reference/usage.md, reference/config.md and the Figma edits recipe: the style guide's Specs area, every variant at once, a token panel in place, Full width, Simplify, issue links, common mistakes from the products; property and option names held to the style most of the system writes, listed in the differences and renamed in Figma after a yes; icon contrast and title-only names in the accessibility check; a docs surface that is not there is not a pass; an experimental component may be used and one a part never holds goes beside it; each state held to the request and the documentation; a request that opens a part owes an opens; --check-ui on a page checks it as an edit. The guide changed in `cookbook/figma-edits.md`, `reference/config.md`, `reference/usage.md`.
