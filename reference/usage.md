@@ -293,7 +293,11 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the accent, never filled with a colour (`annotate`). A click on the component, a part, or a padding or gap band (each
   space over the parts, each part over the component) says in one line what it is and its value (a part's padding,
   gap, fill, line, corners, shadow, text style and colour; an icon's size and colour; a space's token and value),
-  outlined in the accent; a second click puts it down. Done inspecting brings the live component back. A component
+  outlined in the accent, the rest of the component dimmed around it and the other boxes faded; a second click goes
+  back up a level. What sits inside the part picked is drawn as parts too, one level per click, as a double click in
+  Figma reaches a layer in a group, and the line names the path (`Actions › buttonSecondary › text`). The modes
+  switched while inspecting (Light, Dark, Desktop, Phone) redraw it in that mode, what is picked kept. Done inspecting
+  brings the live component back and leaves nothing of the anatomy beside it. A component
   shown in an overlay is drawn as its own element.
 - **Width**, in the Playground (none on the measuring page): Fit (the live preview), Phone (375px), Tablet (768px) or
   Desktop (1280px), a frame of that width written with the page's own stylesheets, its icon sheet, the component as
