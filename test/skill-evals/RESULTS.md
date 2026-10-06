@@ -1,5 +1,80 @@
 # Skill evaluation results
 
+## 2026-10: Prototypes: flows that hold, lists owe an empty state, what the system cannot give said once (continuous evaluation)
+
+What changed since the entry below (engine ce48769): the prototype recipe and reference/usage.md: --flow stops with ❌ until its pages decide alike, every page voting; a list owes an empty state; a state's part changes props; false read as False; a heading at the largest text style and a missing confirmation message are said once as gaps; a part opened from layout pieces is a dialog the system lacks; NEXT names the measured differences; a Missing box carries what the guidelines say the system lacks; the router row for the visual comparison names where the Figma image comes from. The guide changed in `cookbook/prototype.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `d3c2da2c5184` · Project measured: `13d811a9d668`
+
+| Haiku, engine e67aeb3 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.054 |
+| Input a run | 100k | 95k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 95k a run against 100k. Records: `records/2026-10-06-a-missing-box-carries-what`.
+
+The guide runs: 4 on Claude Code 2.1.289, then a usage limit paused the run and the other 66 ran on 2.1.290.
+
+### Prototypes, Claude alone against Claude with the skill
+
+Eleven requests on Tidepool, each asked in the same words on both sides: the six of the entry on prototyping below,
+and five new ones: a list (owes its empty state), a sign-in form (owes the form sent with a mistake), the team's
+sign-up flow (Account, Plan, Payment, Welcome, its pages deciding alike), a page at phone width, and a page whose
+Delete button opens a confirmation. The scorer does not use the engine. Claude alone has the Figma MCP output and the
+repository, the guidelines included; its rows do not depend on the engine (Opus measured with 020b677, Haiku with
+ce48769, both scored with the scorers below).
+
+| Prototypes that pass | Claude alone | With the skill (engine e67aeb3) |
+|---|---|---|
+| Opus, 11 tasks × 3 runs | 17/33 · $7.09 · 7.0 turns a run | 33/33 · $9.36 · 6.6 turns a run |
+| Haiku, 11 tasks × 3 runs | 3/33 · $3.30 · 20.7 turns a run | 32/33 · $3.65 · 10.8 turns a run |
+
+| Task | Opus alone | Opus with the skill | Haiku alone | Haiku with the skill |
+|---|---|---|---|---|
+| Settings page (no switch in the system) | 0/3 | 3/3 | 0/3 | 3/3 |
+| Search page | 3/3 | 3/3 | 0/3 | 3/3 |
+| Empty state | 2/3 | 3/3 | 0/3 | 3/3 |
+| Profile, like the designed Settings screen | 3/3 | 3/3 | 3/3 | 3/3 |
+| Dialog, one button by the guidelines | 2/3 | 3/3 | 0/3 | 3/3 |
+| Guidelines from GitLab and Notion links | 3/3 | 3/3 | 0/3 | 3/3 |
+| A list, with its empty state | 0/3 | 3/3 | 0/3 | 3/3 |
+| A sign-in form, with its error state | 0/3 | 3/3 | 0/3 | 3/3 |
+| The team's sign-up flow | 0/3 | 3/3 | 0/3 | 2/3 |
+| A page at phone width | 2/3 | 3/3 | 0/3 | 3/3 |
+| A Delete button that opens a confirmation | 2/3 | 3/3 | 0/3 | 3/3 |
+
+**Reading.** Without the skill most failures were inventions: a component, a look, a colour or a size the system does
+not have (Opus in 10 of 33 runs, Haiku in 29), and neither model showed a list empty or a form sent with a mistake.
+With the skill nothing was invented on either model. Haiku with the skill was measured on three engines, each with the
+misses of the one before turned into checks: b1a0758 (32/33: a confirmation built from layout pieces whose reply never
+said the system has no dialog), 36df45b (32/33: a Cancel shown as a Missing box whose reply never said link, though the
+guidelines say the other action is a link the system lacks) and e67aeb3 (32/33: a sign-up flow run that went round on
+"where the actions sit" and ran out of turns before it replied; each such line now says how to match it, in the next
+change). Opus with the skill passed 33/33 on all three. Every miss of the guide runs on the first two engines became a
+check too: the NEXT line names the measured differences, the router row for the visual comparison names where the Figma
+image comes from.
+
+Scorer fixes, applied to every row of both sides: a gap named under a heading of gaps, missing or would need counts as
+said; a phone-width check reads the JSON parent of the chips; for the guide set, markdown around a word ("actually
+*current*") no longer hides it. Every row above is scored with them.
+
+## 2026-10: Prototypes: flows, a design review, and pages held to each other (continuous evaluation)
+
+What changed since the entry below (engine ca59a27): reference/usage.md and the prototype recipe: click-through flows held to the team's flows, a design review scored in Chrome, and pages compared on text styles and action words, the first page made setting what none share yet. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `ab809a3f4f96` · Project measured: `13d811a9d668`
+
+| Haiku, engine ce48769 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.055 |
+| Input a run | 105k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 105k. Records: `records/2026-10-05-prototypes-click-through-flows-a`.
+
 ## 2026-10: Prototypes: usage, Do and Don't, interactive, gaps to Figma, every state and screen size (continuous evaluation)
 
 What changed since the entry below (engine cf070d8): reference/usage.md and the prototype and figma-edits recipes: a component's usage and Do and Don't in the prototype catalog and checks; prototypes that work (opens, selections, fields); the prototypes' gaps written to Figma as a to do list after a yes; every state, every screen width and longer words checked in Chrome. The guide changed in `cookbook/figma-edits.md`, `cookbook/prototype.md`, `reference/usage.md`, `rms-design-system-engine.md`.

@@ -89,9 +89,9 @@ function withoutNotes(ui) {
     // Notes the check reads and the drawing uses, never options: standInFor, purpose, content (the words a designed
     // instance shows), box (its size on the screen) and, on a component the code has not built, the surface the screen
     // gives it, figmaState (the state a designed screen shows it in) and opens (the id of the part a click opens).
-    const { standInFor, purpose, content, box, textless, figmaState, opens, ...rest } = o;
+    const { standInFor, purpose, content, box, textless, figmaState, opens, goesTo, ...rest } = o;
     for (const k of ['width', 'height']) if (typeof rest[k] === 'number') rest[k] = String(rest[k]);
-    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, ...p } = rest.props; if (!PIECES.includes(rest.component)) delete p.surface; rest.props = p; for (const k of ['width', 'height', 'count', 'minWidth']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
+    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, goesTo: g2, ...p } = rest.props; if (!PIECES.includes(rest.component)) delete p.surface; rest.props = p; for (const k of ['width', 'height', 'count', 'minWidth']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
     if (typeof rest.count === 'number') rest.count = String(rest.count);
     return rest;
   };
@@ -123,11 +123,19 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     if (to == null) continue;
     if (typeof to !== 'string' || !ids.has(to)) findings.push({ rule: 2, level: 'error', id: node.id, message: `${node.component}.opens names ${JSON.stringify(to)}, and no part has that id: give the part it opens an "id" and name it here` });
     else if (to === rootId || to === node.id) findings.push({ rule: 2, level: 'error', id: node.id, message: `${node.component}.opens names ${to === rootId ? 'the page itself' : 'itself'}: it opens another part (a dialog, a menu), drawn closed until it is used` });
+    else {
+      // What it opens, drawn with the engine's layout pieces, is a dialog or menu the system does not have: said once.
+      const t = nodes.find((n) => n.id === to);
+      const label = Object.entries(node.props ?? {}).find(([k, v]) => /^(label|text|title)$/i.test(k) && typeof v === 'string')?.[1];
+      if (t && pieces[t.component] && t.component !== 'Missing' && !t.props?.standInFor && !gaps.some((g) => g.node === t.id))
+        gaps.push({ need: `a dialog or menu for what ${label ? `"${label}"` : node.component} opens`, kind: 'component', closest: null, used: `the engine's ${t.component}`, prototype: name, node: t.id });
+    }
   }
   for (const node of nodes) {
     const p = node.props ?? {};
     if (node.component === 'Missing' && pieces.Missing) {
-      gaps.push({ need: String(p.need ?? 'unnamed need'), kind: p.kind ?? 'component', closest: p.closest ?? null, used: null, prototype: name, node: node.id });
+      const said = lackSaid(context, String(p.need ?? ''), p.closest);
+      gaps.push({ need: String(p.need ?? 'unnamed need'), kind: p.kind ?? 'component', closest: p.closest ?? null, used: null, prototype: name, node: node.id, ...(said ? { note: `the guidelines: "${said}"` } : {}) });
       if (!p.need) findings.push({ rule: 2, level: 'error', id: node.id, message: 'a Missing box must say the need it stands for (need)' });
       continue;
     }
@@ -156,7 +164,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const agreed = new Set((v.controls ?? []).flatMap((c) => [c.label, c.prop]));
     const optDefs = catalog.components[node.component]?.props ?? {};
     for (const k of Object.keys(p)) {
-      if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState', 'opens'].includes(k) || agreed.has(k)) continue;
+      if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState', 'opens', 'goesTo'].includes(k) || agreed.has(k)) continue;
       // A value of a choice turns on the class the system's CSS adds for it (.node.node-selected); a default value
       // needs none. One the CSS has no class for is drawn without it, and said.
       if (optDefs[k]?.type === 'enum') {
@@ -199,6 +207,22 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
   for (const [piece, ids] of Object.entries(used)) gaps.push({ need: `a ${piece} layout component`, kind: 'layout', closest: null, used: `the engine's ${piece}`, prototype: name, node: ids.join(', '), count: ids.length });
   const errors = findings.filter((f) => f.level === 'error').length;
   return { ok: errors === 0, findings, counts: { components: r.counts.components, errors, warnings: findings.length - errors }, gaps, drawable, pieces: Object.keys(pieces) };
+}
+
+// What the guidelines say the system lacks, for a Missing box ("Any other action is a link. Tidepool has no link component
+// yet."): the sentence and the one before it, from the closest component's guidelines, else from a component's whose
+// sentence before shares a word with the need. Null when the need already names it.
+export function lackSaid(context, need, closest) {
+  const words = (t) => String(t ?? '').toLowerCase().match(/[a-z]{4,}/g) ?? [];
+  const needWords = new Set(words(need));
+  const said = [];
+  for (const [name, k] of Object.entries(context?.components ?? {})) {
+    const sentences = String(k.guidelines ?? '').split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+    sentences.forEach((x, i) => { const m = /\bno ([a-z]+(?: [a-z]+)?) (?:component|yet)\b/i.exec(x); if (m) said.push({ name, lacks: m[1].toLowerCase().replace(/ component$/, ''), text: [sentences[i - 1], x].filter(Boolean).join(' '), before: sentences[i - 1] ?? '' }); });
+  }
+  const hit = said.find((x) => x.name === closest) ?? said.find((x) => words(x.before).some((w) => needWords.has(w)));
+  if (!hit || words(hit.lacks).every((w) => needWords.has(w))) return null;
+  return hit.text;
 }
 
 // The class the system's CSS adds to a component's class for a value (the same reading the page does), or null.
@@ -244,6 +268,18 @@ export function mergeGaps(byPrototype = {}) {
     }
   }
   return [...merged.values()].sort((a, b) => b.prototypes.length - a.prototypes.length || (a.kind === 'layout') - (b.kind === 'layout'));
+}
+
+// The engine's layout pieces a system lacks (Row, Stack, Page) are one need for the design team: one line.
+export function groupLayout(gaps = []) {
+  const layout = gaps.filter((g) => g.kind === 'layout' && /^an? (\w+) layout component$/i.test(String(g.need)));
+  if (layout.length < 2) return gaps;
+  const names = layout.map((g) => /^an? (\w+) layout component$/i.exec(g.need)[1]);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+  const prototypes = [...new Set(layout.flatMap((g) => g.prototypes ?? []))];
+  const one = { kind: 'layout', need: `${list} layout components`, used: "the engine's own", closest: null, note: null, ...(prototypes.length ? { prototypes } : {}) };
+  const at = gaps.indexOf(layout[0]);
+  return [...gaps.slice(0, at).filter((g) => !layout.includes(g)), one, ...gaps.slice(at).filter((g) => !layout.includes(g))];
 }
 
 // One line per gap, for the summary and the reply.

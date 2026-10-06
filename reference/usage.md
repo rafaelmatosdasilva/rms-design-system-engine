@@ -647,8 +647,10 @@ take; the format; and the prototypes already in `prototypes/`.
   page", is a limit: a prototype with more is not drawn, and the error quotes the sentence and its section.
 - **What the request asks for.** A component the request names (every word of its name is in it: "an empty state"
   → emptyState) that the prototype does not use is a warning the reply owes: add it, or say why. A kind of component
-  the request names that the system has none of (a switch, a toast, a dialog, a progress bar), shown neither as a Missing
-  box nor with `standInFor`, is a warning the reply owes too: the system has no such component, say so. A component the
+  the request names that the system has none of (a switch, a toast, a dialog, a progress bar, or a message confirming
+  something saved, sent or done when the system has no toast, banner, alert or notification), shown neither as a
+  Missing box nor with `standInFor` (nor by a part whose `purpose` names it), is a warning the reply owes too: the
+  system has no such component, say so. The same line for several parts is said once, with how many. A component the
   documentation rules out for the request's words ("a message confirming…" and a tag that is never a message that comes
   and goes), used anyway, is an error, unless the node says what else it is for in `"purpose"` (a note, like
   `standInFor`, that the check reads and the drawing ignores).
@@ -672,7 +674,8 @@ The rules are `--check-ui`'s, plus:
 - **The engine's pieces** (Page, Stack, Row, Columns, Text) exist only where the system has no component of that name.
   They carry no colour, border or font of their own: `gap` and `padding` take a spacing token, `Text.style` a text
   style, `Page.width` the screen's width in px; `grow` takes the room a parent leaves. The page takes the system's own
-  page surface, text colour and font family. Each piece used is a layout gap.
+  page surface, text colour and font family. Each piece used is a layout gap, the pieces of one prototype said in one
+  line ("Row, Stack and Page layout components").
 - **A need nothing fits** is `{ "component": "Missing", "props": { "need": "…", "kind": "…", "closest": "…" } }`, drawn
   as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`.
 - **An option Figma and the code do not share by name** is drawn on the part its name points to: a text option
@@ -688,15 +691,20 @@ The rules are `--check-ui`'s, plus:
   another carries `"opens": "<id>"` and the part it opens has that `"id"`: it is drawn closed and opens on a click, as
   the system's overlay when its CSS has one (container, layers, open and closing classes, as the style guide plays it),
   else as a popover under the part; Escape, a click outside or a button inside closes it and the focus goes back. An
-  `opens` that names no part, the page or itself is an error. With Chrome, each one is tried: it must open with the
+  `opens` that names no part, the page or itself is an error. A part it opens drawn with the engine's layout pieces
+  (a Stack of buttons, not a Missing box or a stand-in) goes on the gaps list as a dialog or menu the system lacks. With Chrome, each one is tried: it must open with the
   focus inside, close with Escape and give the focus back, and each field must take typing; what does not is a ⚠️ line
   under 🖱.
 - **Every state.** A composition names its other states beside it, `"states": { "<name>": { "<id>": { …that part in
   this state… } } }` (in the composition, or beside `"prototype"` in the file), each naming by `id` only the parts that
-  differ; `null` leaves a part out. Each state is checked as a whole page (a state that names no part is an error), its
-  gaps join the prototype's, and the page has a switch for it (`#state=<name>` opens one). The page owes an empty state
-  when it shows a list (a part holding two or more of the same system component, or a component named or made for a
-  list, table, grid or feed), an error state when it takes input (a field and a button), and each state the request
+  differ; `null` leaves a part out, and a part with no `component` keeps its own with the `props` given over its own.
+  Each state is checked as a whole page (a state that names no part is an error), its gaps join the prototype's, and
+  the page has a switch for it (`#state=<name>` opens one). A value written as a person would (`false` for an option of
+  False and True, an option in another case) is read as the system writes it. The page owes an empty state when it
+  shows a list (two or more of the same system component that is not a control, two or more arrangements alike, a
+  row each with a name and a tag, a component named or made for a list, table, grid or feed, or a request that says
+  list; fields, buttons and chips side by side are a form or a set of choices), an error state when it takes input (a
+  field and a button), and each state the request
   names ("with a loading state") or the team's guidelines ask of the page or of a component it uses ("every list shows
   an empty state"). A state is found by its kind, whatever its name ("No results" is an empty state). One not given is
   a ⚠️ line the reply owes.
@@ -709,6 +717,25 @@ The rules are `--check-ui`'s, plus:
   as written are owed in the reply. A picture is saved for each width (`<name>@<width>.png`) and each state
   (`<name>.<state>.png`). Row `wrap` and Columns `minWidth` (the narrowest a column may be, in px) let a layout fit a
   narrow screen.
+- **Flows.** A part that leads to another page carries `"goesTo": "<prototype name>"` (`"<name>#<state>"` for one of
+  its states); a click on the drawn page opens it, and a link to a page not drawn yet is a ⚠️ line the reply owes.
+  `rms-design-system-engine --prototype --flow` reads every prototype in `prototypes/` and lists each link, where the
+  flow starts and where it ends, and the team's flows: steps joined by arrows ("Sign-up: Account → Plan → Welcome") in
+  the guidelines or the design intent's flows layer, or a numbered or bulleted list under a heading that says flow,
+  journey or funnel. Each step is matched to the prototype whose name or main heading shares its words; a step with no
+  prototype, and two steps in a row whose pages do not link, are ❌ lines. A link whose words go back (Back, Previous)
+  is a way back, not a step. The pages of a flow are held to each other as the product's pages are, every page of it
+  voting and the flow's own order breaking a tie, and when one page after the first has a way back, every one must.
+  A flow with a ❌ line exits 1 and is not done: each one is fixed in the page it names and the flow run again until
+  it says ✅ the flow holds.
+- **Design review.** With Chrome, the drawn page is reviewed as a designer would before anyone sees it, and scored out
+  of 10 under 🎨: the parts of a column start on one line (a component's own margin that pushes one in is named), one
+  arrangement keeps one spacing and the page a few, one part styled as the primary action is in view (the system's
+  primary component, or a class or option that says primary), the main heading is the largest text and each heading
+  smaller than the one above it and larger or heavier than its text, and a line of text runs under about 90
+  characters. Each ⚠️ line says what to change; the reply owes the ones it keeps. A heading already in the system's
+  largest text style, the same as its body text, cannot be made larger: an ℹ️ line and a gap the reply names (no
+  heading style), never taken off the score.
 - **A retired component** (status deprecated) is an error that names its replacement.
 - **What the documentation says.** After drawing, each system component the prototype uses is listed beside what it
   uses it for (its labels and stand-ins) and what the documentation says it is for, so a use it is not for stands out:
@@ -716,9 +743,14 @@ The rules are `--check-ui`'s, plus:
 - **The product's other pages.** A prototype is compared with the other prototypes in `prototypes/`: page padding, the
   space between sections, the screen width, the page heading's text style, where the actions sit and how they line up,
   the frame (the containers at the top of the layout, a component holding other parts or named as a bar, panel, header,
-  window or nav, like an action bar and a side panel), and the answer given to each need the system lacks (a chip as a stand-in on one page and a Missing box on another is
-  a difference). A decision counts when two pages share it, or one screen a designer made in Figma (in the screen
-  capture, or a starting point from `--from-screens`), and no other value weighs as much; `prototypes/conventions.json` (`{ "page": { "padding":
+  window or nav, like an action bar and a side panel), the text styles of body text and section headings, what each
+  kind of action is called and the component it is (save, cancel, go on, go back, delete, create: "Save" on every page,
+  never "Submit" on one; a button for it everywhere, never a chip on one page), and the answer given to each need the
+  system lacks (a chip as a stand-in on one page and a Missing box on another is a difference). A decision counts when
+  two pages share it (the page being drawn votes too), or one screen a designer made in Figma (in the screen capture,
+  or a starting point from `--from-screens`), and no other value weighs as much; where nothing is shared yet (one page, or pages that disagree
+  evenly), the first page made sets it, for the pages made after it only, so a product with no patterns or templates
+  still gets pages that match. `prototypes/conventions.json` (`{ "page": { "padding":
   … }, "heading": { "style": … }, "actions": { "at": "end", "justify": "end" }, "needs": { "<need>": "<answer>" } }`),
   written by the team, wins. Each difference is listed with the pages it differs from, and the Stop hook holds the
   reply to it like a gap. `rms-design-system-engine --prototype --consistency` compares every page with the others.

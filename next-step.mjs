@@ -27,7 +27,9 @@ export function measuredLines(gates) {
 // state: { failing: [gate], scope: [names], handback: { code, figma }, burndownNext, baselineWritten: { count, file },
 //         toBuild: { tokens, file, theme, components } (build mode), cmd }
 // a11y: how many accessibility findings the browser check listed for this run (null when it did not run).
-export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, toBuild = null, build = false, a11y = null, cmd = 'rms-design-system-engine' } = {}) {
+// measured: how many differences the browser measured (they are advisory, so the summary lists them under their own
+// heading and the NEXT line names them, or a relay that keeps only the failing gates leaves them out).
+export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, toBuild = null, build = false, a11y = null, measured = 0, cmd = 'rms-design-system-engine' } = {}) {
   const rerun = scope.length ? `${cmd} --component ${scope.join(',')}` : cmd;
   if (baselineWritten) return `NEXT: tell the user ${baselineWritten.file} now holds the accepted debt; commit it only when they ask.`;
   // Build mode, one component checked: it is being built from Figma, so a failure is part of building it, not a
@@ -41,7 +43,7 @@ export function nextStep({ failing = [], scope = [], handback = {}, burndownNext
   if (a11y && build && scope.length) return `NEXT: you are building ${scope.join(', ')}: it matches Figma; now fix each line under the accessibility check (its role, its parts, what it does, its names), then run ${rerun} again. A line that says to send it back to Figma goes to the person instead: tell them, do not change the design.`;
   if (failing.length) {
     const g = failing[0];
-    return `NEXT: tell the user what fails under "${gateName(g.label)}"${failing.length > 1 ? ` (and ${failing.length - 1} more failing gate${failing.length > 2 ? 's' : ''})` : ''} and the fix it names. Change the code only when they ask for that fix, then run ${rerun}. To accept a known difference instead: ${cmd} --baseline --findings (only when they ask).`;
+    return `NEXT: tell the user what fails under "${gateName(g.label)}"${failing.length > 1 ? ` (and ${failing.length - 1} more failing gate${failing.length > 2 ? 's' : ''})` : ''} and the fix it names${measured ? `, and the ${measured} difference${measured > 1 ? 's' : ''} under "Measured differences"` : ''}. Change the code only when they ask for that fix, then run ${rerun}. To accept a known difference instead: ${cmd} --baseline --findings (only when they ask).`;
   }
   if (handback.code) return `NEXT: show the user ${handback.code}; apply it only when they ask (git apply ${handback.code}), then run ${rerun}.`;
   if (handback.figma) return `NEXT: show the user ${handback.figma}, the changes to make in Figma. Nothing is changed in Figma by the skill.`;
