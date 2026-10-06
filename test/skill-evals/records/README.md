@@ -42,5 +42,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-05-prototypes-click-through-flows-a` | The 21 guide tasks on Haiku (engine ce48769) | "Prototypes: flows, a design review, and pages held to each other" |
 | `2026-10-06-a-missing-box-carries-what` | The 21 guide tasks on Haiku (engine e67aeb3) | "Prototypes: flows that hold, lists owe an empty state, what the system cannot give said once" |
 | `2026-10-06-check-ui-on-a-page` | The 21 guide tasks on Haiku (engine b454dee) | "Style guide: specs, every variant, a token panel, names held to one style" |
+| `2026-10-06-guides-every-gate-named-by` | The 21 guide tasks on Haiku (engine 25c754b) | "Guides: every gate by the number the report prints" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
