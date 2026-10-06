@@ -1451,6 +1451,23 @@ export function stylesheetImport({ file, pkg = null } = {}) {
   return { line: `@import '${from}';`, from, css: true };
 }
 
+// The functions of the system's own script that build or drive a component: those whose body names its class as a
+// class (a '.toast' or 'toast' string, classList, className, class="…") and whose own name shares a word with the
+// component's (showToast for toast, createSegmentedControl for segmentedControl), never one that only uses it inside
+// something else. text: the script · cls: the component's class · name: the component's name.
+// → [{ name, args, exported }] in the order the script has them. exported: the script is a module that exports it.
+export function scriptUses({ text = '', cls = '', name = '' } = {}) {
+  const words = (w) => String(w).replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z]+/).filter((x) => x.length >= 4);
+  const own = words(name || cls);
+  const c = String(cls).replace(/^[.#]/, '');
+  if (!c || /^#/.test(cls)) return [];
+  const e = c.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+  const names = new RegExp(`(['"\`])\\.?${e}\\1|classList\\.\\w+\\(\\s*['"\`]${e}['"\`]|class(?:Name)?\\s*=\\s*['"\`][^'"\`]*\\b${e}\\b|['"\`][^'"\`\\n]*\\.${e}(?![\\w-])[^'"\`\\n]*['"\`]`);
+  const t = String(text), fns = [...t.matchAll(/^(export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)\s*\{/gm)];
+  return fns.map((m, i) => ({ name: m[2], args: m[3].replace(/\s+/g, ' ').trim(), exported: !!m[1] || new RegExp(`export\\s*\\{[^}]*\\b${m[2]}\\b`).test(t), body: t.slice(m.index, i + 1 < fns.length ? fns[i + 1].index : t.length) }))
+    .filter((f) => words(f.name).some((w) => own.includes(w)) && names.test(f.body.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))).map(({ name: n, args, exported }) => ({ name: n, args, exported }));
+}
+
 // The system's components a component is built with: those whose class its markup holds (HTML), or that its own file
 // uses (a tag, an import). Itself and its own parts never count. names: [{ name, cls }].
 export function nestedComponents({ name, cls = null, markup = '', text = '', names = [] } = {}) {
