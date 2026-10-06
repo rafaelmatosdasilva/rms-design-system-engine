@@ -927,6 +927,36 @@ Merge the returned `effects` into `figma-vars.snapshot.json` alongside `color`/`
 ---
 
 
+## Phase 1 - Step 1e: Capture the components each product screen uses → `figma-screen-components.snapshot.json`
+
+Gate [10] (No hand-built DS components) compares each product screen in Figma with its product's code: a DS component a screen uses that the code never uses was built by hand or left out (a stepper drawn as `buttonStepper` in Figma, hand-built in code). Run this over every entry of `ds-config.json → frames[]` and `screens[]`, and save the result where `paths.snapshotScreenComponents` points (default `figma-screen-components.snapshot.json`), with `_updated` stamped. With FIGMA_TOKEN the audit captures it itself.
+
+```js
+const SCREENS = [ /* ds-config.json → frames[] and screens[]: { name, nodeId, plugin } */ ];
+const cache = new Map();
+async function compName(inst) {
+  const mc = await inst.getMainComponentAsync(); if (!mc) return null;
+  if (!cache.has(mc.id)) cache.set(mc.id, mc.parent?.type === 'COMPONENT_SET' ? mc.parent.name : mc.name);
+  return cache.get(mc.id);
+}
+const screens = {};
+for (const s of SCREENS) {
+  const root = await figma.getNodeByIdAsync(s.nodeId.replace('-', ':')); if (!root) continue;
+  const components = {};
+  async function rec(n) {
+    if (n.visible === false && !(n.boundVariables && n.boundVariables.visible)) return;   // a dead layer is not used
+    if (n.type === 'INSTANCE') { const c = await compName(n); if (c) components[c] = (components[c] ?? 0) + 1; }
+    if ('children' in n) for (const c of n.children) await rec(c);
+  }
+  await rec(root);
+  screens[s.nodeId.replace('-', ':')] = { name: s.name, plugin: s.plugin, components };
+}
+return { _updated: new Date().toISOString(), screens };
+```
+
+---
+
+
 ## Phase 1 - Step 2: Read the snapshots
 
 Read both snapshot files. Parse them. If either is missing, treat all live values as new and skip to Step 4.

@@ -818,6 +818,44 @@ async function refreshTemplateComposition(fileKey, templates, token, outPath) {
   }
 }
 
+// ── The DS components each product screen uses (Gate [10], Figma -> code) ─────────────
+// Walks every frame and screen in ds-config.json and counts each visible instance by its main
+// component (the component set's name when it is a variant). reimplementation-check.mjs then requires
+// the product's code to use each DS component its screens use, so a hand-built one is found.
+async function refreshScreenComponents(fileKey, screens, token, outPath) {
+  const list = (screens ?? []).filter((s) => s?.nodeId);
+  if (!list.length) return false;
+  try {
+    const out = {};
+    for (const scr of list) {
+      const nd = await fetchNodeDoc(fileKey, scr.nodeId, token);
+      if (!nd.ok) { console.log(C.yellow(`  ⚠️  /nodes ${scr.nodeId} → ${nd.status}`)); continue; }
+      const entry = Object.values(nd.nodes ?? {})[0] ?? {};
+      const comps = entry.components ?? {}, sets = entry.componentSets ?? {};
+      const nameOf = (id) => { const c = comps[id]; if (!c) return null; return (c.componentSetId && sets[c.componentSetId]?.name) || c.name; };
+      const components = {};
+      (function rec(n) {
+        if (!n) return;
+        if (n.visible === false && !(n.boundVariables && n.boundVariables.visible)) return;
+        if (n.type === 'INSTANCE') { const name = nameOf(n.componentId) ?? n.name; if (name) components[name] = (components[name] ?? 0) + 1; }
+        for (const c of n.children ?? []) rec(c);
+      })(entry.document);
+      const id = String(scr.nodeId).replace('-', ':');
+      out[id] = { name: scr.name || id, plugin: scr.plugin, components };
+    }
+    writeFileSync(outPath, JSON.stringify({
+      _updated: new Date().toISOString(),
+      _note: 'The components each product screen uses in Figma (frames and screens in ds-config.json), with how many times. Read from Figma; do not edit by hand.',
+      screens: out,
+    }, null, 2) + '\n');
+    console.log(C.dim(`  ✅ Screen components: ${Object.keys(out).length} screen(s)`));
+    return true;
+  } catch (e) {
+    console.log(C.yellow(`  ⚠️  Screen components refresh failed: ${e.message}`));
+    return false;
+  }
+}
+
 // ── Per-reference-screen element inventory (the Markup gate) ──────────────────────────
 // Walks each reference SCREEN (cfg.screens, falling back to cfg.frames) and records every
 // interactive DS control instance as { component, label } - the visible label being the control's
@@ -1397,6 +1435,7 @@ async function bootstrapConfig() {
   const SNAP_COMP_PROPS  = cfg.paths?.compPropsSnapshot  ??
     SNAP_VARS.replace(/[^/\\]+$/, 'figma-component-props.snapshot.json');
   const SNAP_FRAME_GEOM  = cfg.paths?.snapshotFrameGeometry ?? null;
+  const SNAP_SCREEN_COMPONENTS = cfg.paths?.snapshotScreenComponents ?? 'figma-screen-components.snapshot.json';
   const PLUGIN_CSS  = cfg.paths?.pluginCSS          ?? [];
   const PLUGINS     = cfg.paths?.plugins            ?? [];
   const KNOWN_UNUSED     = new Set(cfg.knownUnusedVars         ?? []);
@@ -1886,6 +1925,13 @@ function reportFull(label, items, shown) {
       } else {
         lines.push(`${SNAP_FRAME_GEOM} ✓ (updated today)`);
       }
+    }
+
+    // The components each product screen uses (Gate [10]): tracked when captured.
+    if (existsSync(join(ROOT, SNAP_SCREEN_COMPONENTS))) {
+      const sc = snapshotAge(SNAP_SCREEN_COMPONENTS);
+      if (sc !== null && sc > 24) { lines.push(C.yellow(`⚠️  ${SNAP_SCREEN_COMPONENTS} is ${ageWords(sc)} old - the screens may use components it does not list`)); warn = true; }
+      else if (sc !== null) lines.push(`${SNAP_SCREEN_COMPONENTS} ✓ (updated today)`);
     }
 
     // ── Opt-in escalations (default off → byte-identical for projects that don't set them) ──
@@ -2647,7 +2693,7 @@ function reportFull(label, items, shown) {
     await fetchFigmaFileVersion(figmaFileKey, figmaToken);
     const iconFile = (cfg.iconLibraryFileKey || cfg.icons?.libraryFileKey)
       ? (cfg.paths?.snapshotIcons && resolve(ROOT, cfg.paths.snapshotIcons) === join(ROOT, 'figma-icons.snapshot.json') ? 'figma-icon-inventory.snapshot.json' : 'figma-icons.snapshot.json') : null;
-    const refreshFiles = [SNAP_COMP_PROPS, 'component-values.snapshot.json', iconFile, SNAP_FRAME_GEOM, 'figma-screens.snapshot.json', 'figma-templates.snapshot.json'].filter(Boolean);
+    const refreshFiles = [SNAP_COMP_PROPS, 'component-values.snapshot.json', iconFile, SNAP_FRAME_GEOM, 'figma-screens.snapshot.json', SNAP_SCREEN_COMPONENTS, 'figma-templates.snapshot.json'].filter(Boolean);
     const stampPath = join(ROOT, OUT_DIR, 'figma-refresh.json');
     let engineHash = ''; try { engineHash = createHash('sha1').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex'); } catch { /* keyed on the config alone */ }
     const refreshKey = createHash('sha1').update(JSON.stringify([figmaFileKey, cfg.figma?.componentsPage ?? cfg.componentsPage, cfg.iconLibraryFileKey, cfg.icons, cfg.frames, cfg.screens, cfg.templates, cfg.paths, engineHash])).digest('hex');
@@ -2669,6 +2715,7 @@ function reportFull(label, items, shown) {
       () => SNAP_FRAME_GEOM ? refreshFrameGeometry(figmaFileKey, cfg.frames ?? [], figmaToken, join(ROOT, SNAP_FRAME_GEOM)) : Promise.resolve(),
       () => refreshScreenElements(figmaFileKey, cfg.screens ?? cfg.frames ?? [], figmaToken, join(ROOT, 'figma-screens.snapshot.json')),
       () => refreshTemplateComposition(figmaFileKey, cfg.templates ?? [], figmaToken, join(ROOT, 'figma-templates.snapshot.json')),
+      () => refreshScreenComponents(figmaFileKey, [...(cfg.frames ?? []), ...(cfg.screens ?? [])], figmaToken, join(ROOT, SNAP_SCREEN_COMPONENTS)),
     ], FIGMA_REFRESH_CONCURRENCY);
     const st = figmaFetch.stats;
     console.log(st.limit ? C.yellow(`⏸  ${budgetLine(st)}`) : `ℹ️  ${budgetLine(st)}`);
@@ -3456,11 +3503,12 @@ function reportFull(label, items, shown) {
         const tokens = Object.keys(vsnap.color[mode] || {});
         if (tokens.length < 8) continue;                              // too few to infer a norm
         const aliases = vsnap.aliases?.[mode] || {};
+        const deliberate = new Set(cfg.knownRawTokens ?? []);        // a literal the team keeps on purpose
         const raw = tokens.filter((t) => !(t in aliases));            // references nothing → raw literal
         const aliasRate = (tokens.length - raw.length) / tokens.length;
         if (aliasRate >= 0.8 && raw.length && raw.length < tokens.length) {
           bestRate = Math.max(bestRate, aliasRate);
-          for (const t of raw) outlierSet.add(t);
+          for (const t of raw) if (!deliberate.has(t)) outlierSet.add(t);
         }
       }
       if (outlierSet.size) {

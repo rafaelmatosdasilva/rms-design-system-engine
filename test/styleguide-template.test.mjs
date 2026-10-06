@@ -202,7 +202,7 @@ test('in the browser: no script error, a control changes the real component, the
     // A link to the variant: the props set away from their defaults in the address, kept as they change, and a link
     // opened sets them, the controls following.
     assert.equal(await run(`location.hash`), '#c-chip?Size=L');
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].some((b) => b.textContent === 'Copy link')`), true);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].some((b) => b.textContent === 'Copy link')`), false, 'no Copy link button: the address bar holds the link');
     await run(`location.hash = '#overview'`); await new Promise((r) => setTimeout(r, 200));
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'M').click()`);
     assert.equal(await run(`location.hash`), '#overview', 'a view not shown leaves the address alone');
@@ -263,16 +263,16 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(own, /border-radius/);
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Specs,Variants,Documentation,Accessibility,Parity,Used in,Changelog');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Variants,Documentation,Accessibility,Parity,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
     assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity with Figma.*agree/s);
-    // Specs, its own area: a copy drawn larger as the Playground set it, each part numbered, its padding outlined and
+    // Specs, in the Playground under the component: a copy drawn larger as the controls set it, each part numbered, its padding outlined and
     // numbered after the parts and named by its token in the list (numbers, never colours), how it lines its items up;
     // never a second live component. A click on a part, a padding or a gap (or its name in the list) shows the tokens
     // it is drawn with; again puts it down.
-    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'specs').click()`);
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // Drawn on the next frame: waited for, as a busy machine can take longer than a fixed pause.
     for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-anat-num').length`)); i++) await new Promise((r) => setTimeout(r, 50));
     assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-num').length`) >= 1);
@@ -287,20 +287,26 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
     assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-pick').textContent`), /Picked.*Click a part, a padding or a gap/s);
-    await run(`(() => { const m = [...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^chip padding/.test(x.dataset.hit)); const r = m.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).click(); })()`);
+    await run(`(() => { const m = [...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^chip padding/.test(x.dataset.hit)); m.scrollIntoView({ block: 'center' }); const r = m.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).click(); })()`);
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-pick').textContent`), /Picked.*chip padding \w+.*--padding-[a-z]+/s);
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-anat-marks .is-picked').length`), 1);
     await run(`document.querySelector('#c-chip .pg-anat-legend [data-pick^="part 1"]').click()`);
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-pick').textContent`), /Picked.*color.*--chip-text.*font/s, 'the label: its colour and text style');
     await run(`document.querySelector('#c-chip .pg-anat-legend [data-pick^="part 1"]').click()`);
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-pick').textContent`), /Click a part/);
-    assert.ok(await run(`!!document.querySelector('#c-chip [data-area="specs"] .pg-own')`), 'Its tokens, in Specs');
-    // Variants: every option of each variant prop, one per row, drawn by the Playground and copied still; the Playground
+    assert.ok(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-own')`), 'Its tokens, in the Playground');
+    // A control changed in the Playground redraws the specs under it.
+    const before = await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`);
+    await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'M').click()`);
+    for (let i = 0; i < 60 && (await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`)) === before; i++) await new Promise((r) => setTimeout(r, 50));
+    assert.notEqual(await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`), before, 'the specs follow the control');
+    await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
+    // Variants: every option of each variant prop and both sides of each on/off prop, one per row, drawn by the Playground and copied still; the Playground
     // keeps what was set, and Try it sets the option there.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'variants').click()`);
     for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-variant-row').length`)); i++) await new Promise((r) => setTimeout(r, 50));
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-variant-group')].map((g) => g.querySelector('h3').textContent + ':' + [...g.querySelectorAll('.pg-variant-row > .pg-ctl-label')].map((l) => l.textContent).join('|')).join()`), 'Size:M|L (in the Playground)');
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-variant-row')].map((r) => r.querySelector('.pg-variant-stage .chip').classList.contains('chip--l')).join()`), 'false,true');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-variant-group')].map((g) => g.querySelector('h3').textContent + ':' + [...g.querySelectorAll('.pg-variant-row > .pg-ctl-label')].map((l) => l.textContent).join('|')).join()`), 'Size:M|L (in the Playground),Icon:false (in the Playground)|true', 'an on/off prop shows both sides too');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-variant-group')[0].querySelectorAll('.pg-variant-row')].map((r) => r.querySelector('.pg-variant-stage .chip').classList.contains('chip--l')).join()`), 'false,true');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-variant-row')].map((r) => r.getBoundingClientRect().left).every((x, i, a) => Math.abs(x - a[0]) < 1)`), true, 'one per row, never a grid');
     assert.equal(await run(`document.querySelector('#c-chip .pg-variant-stage .chip').closest('[inert]') !== null`), true);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the Playground as it was');
@@ -312,7 +318,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
     // Each section of rows in the Playground's tables: its title the head (Usage, Accessibility).
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /Usage/);
-    assert.equal(await run(`document.querySelector('#c-chip [data-area="specs"] .pg-doc-card > .pg-inspect-head > h3').textContent`), 'Anatomy');
+    assert.equal(await run(`document.querySelector('#c-chip [data-area="play"] .pg-doc-card > .pg-inspect-head > h3').textContent`), 'Anatomy');
     // Its header says at a glance how it stands: its version, Figma, accessibility and where it is used.
     assert.match(await run(`document.querySelector('#c-chip .pg-facts').textContent`), /Figma\s*Agrees.*Accessibility\s*Not checked in a browser yet.*Used in\s*(\d+ products?|No product yet)/s);
     assert.match(await run(`document.querySelector('#overview .sg-card[href="#c-chip"] .sg-card-facts').textContent`), /^Figma agrees.*Accessibility not checked$/s);
@@ -702,10 +708,10 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
   assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
   assert.doesNotMatch(tpl, /'Status: ' \+ kinds|Usage written: |Open the To do list/, 'the overview counts nothing of its own');
-  assert.match(tpl, /\.pg-stage-mode:last-child \{ align-self: flex-end; \}/, 'a sizing switch sits at the bottom right');
+  assert.match(tpl, /\.pg-stage-mode:last-child \{ align-self: flex-end; \}/, 'the colour mode sits at the bottom right');
   assert.match(tpl, /\.pg-stage-mode \.sg-mode-label \{ position: absolute; width: 1px/, 'no visible label on the switches inside the playground');
   assert.match(tpl, /\.sg-demo\.sg-colors \{ display: grid; grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/, 'six colours a row');
-  assert.match(tpl, /a\.scoped && a\.attr !== 'data-size'; \}, function \(a\) \{ return a\.scoped && a\.attr === 'data-size'/, 'the colour mode top left, a sizing one bottom right, inside the playground');
+  assert.match(tpl, /a\.scoped && a\.attr === 'data-size'; \}, function \(a\) \{ return a\.scoped && a\.attr !== 'data-size'/, 'the sizing mode top left, the colour mode bottom right, inside the playground');
   assert.match(tpl, /\.sg-thumb-live \{[^}]*align-self: center/, 'a card preview is centred whatever its own rule says');
 });
 
@@ -763,4 +769,40 @@ test('Do and Don\'t: pictures in the references, each named for its caption, do\
     const r = await figmaVariantImages(dir, { visualRefs: 'refs' }, 'button', { token: null });
     assert.deepEqual(r.images.map((i) => [i.variant, i.scale]), [['State=Hover', 1]]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('in the browser: with a width chosen, a link to another component opens it', { timeout: 300000 }, async (t) => {
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const chromePath = findChrome({ playwright: true });
+  if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-nav-');
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p))); }
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
+  const c = await launchChrome(chromePath);
+  try {
+    const { send, on, close } = await connectCDP(c.wsUrl);
+    const errors = []; on('Runtime.exceptionThrown', (p) => errors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
+    const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}#c-chip`);
+    await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
+    const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
+    await new Promise((r) => setTimeout(r, 300));
+    await run(`document.querySelector('#c-chip .pg-width [data-v="desktop"]').click()`);
+    await run(`document.querySelector('.sg-nav a[href="#c-button"]').click()`);
+    await new Promise((r) => setTimeout(r, 500));
+    assert.equal(await run(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`), 'c-button', errors.join('\n'));
+    assert.match(await run(`location.hash`), /^#c-button(\?width=desktop)?$/, 'no test text leaks into the address');
+    assert.equal(await run(`!!document.querySelector('#c-button .pg-frame iframe') && document.querySelector('#c-button .pg-frame iframe').contentDocument.querySelector('.pg-frame-stage') !== null`), true, 'drawn at the width chosen');
+    assert.deepEqual(errors, []);
+    close();
+  } finally { c.kill(); }
+});
+
+test('a foundation\'s size switch: only its samples take the size, no label, room below it', () => {
+  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  assert.match(tpl, /var sized = function \(el\) \{ axes\.forEach/);
+  assert.match(tpl, /SGModes\.controls\(holder, function \(\) \{ draw\(sized\); \}/, 'the switch acts on a holder, never on the section');
+  assert.match(tpl, /\.sg-size-switch \{ margin-bottom: var\(--sg-space-xxl\); \}/);
+  assert.match(tpl, /\.sg-size-switch \.sg-mode-label \{ position: absolute; width: 1px/);
+  assert.doesNotMatch(tpl, /sec\.classList\.add\('sg-scope'\)/);
 });

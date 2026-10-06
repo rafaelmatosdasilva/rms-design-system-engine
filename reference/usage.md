@@ -232,7 +232,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   token for is left to the browser's own and listed, never given a value of the engine's.
 - **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; a size that
-  changes with a mode shows the value of the mode its section's size switch picks; icons from the icon sheet. The
+  changes with a mode shows the value of the mode its section's size switch picks (the switch, with no visible label
+  and room below it, changes only the samples and their values, never the page around them); icons from the icon sheet. The
   colours sit six a row, each as wide as the room, so its Figma name and variable read whole (three on a phone).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15] (Component props match Figma)
@@ -242,8 +243,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   contract's `propertyMap` (found by its options when the contract spells the prop another way), `htmlRealizations`,
   a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. The system's
   modes are switched inside the playground, each named as Figma names its collection (`figma.colorCollection`,
-  Styling; a sizing collection by its own name, Sizing, the name kept for screen readers and not shown): the colour
-  mode at its top left, the other at its bottom right, never among the component's props. Below it, the tokens behind what is drawn with its code on their right, and under
+  Styling; a sizing collection by its own name, Sizing, the name kept for screen readers and not shown): the sizing
+  mode at its top left, the colour mode and any other at its bottom right, never among the component's props. Under it,
+  its specs (see Specs) follow the controls as they change. Below them, the tokens behind what is drawn with its code on their right, and under
   them **Its tokens**, every token it is drawn with (`allComponentTokens`: each `var()` in a rule for its class or one
   of its parts, `.badge-label`, `.badge__icon`, in any state, shown in this variant or not, never another component's
   class), by Figma's name, with the properties it sets, its value in the mode shown and a colour's swatch, ordered
@@ -252,13 +254,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the part. Above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
-- **A component's page in areas**: Playground, Specs, Variants, Documentation, Accessibility, Parity and Used in, one at a time on
+- **A component's page in areas**: Playground (with its specs), Variants, Documentation, Accessibility, Parity and Used in, one at a time on
   the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
   `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
   page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
   top too); Parity carries the system's alert icon (an icon named warning or alert) while something differs, its count
-  said to a screen reader. Each section of rows (Anatomy in Specs, Usage, Documentation, Accessibility) is one of the
+  said to a screen reader. Each section of rows (Anatomy in the Playground, Usage, Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is two columns of tables
   (what differs, what is not built or compared, the values that agree, its props, its tokens). The code is as tall as
   what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
@@ -278,8 +280,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **The page's own reading**: every button says what it does in words (Menu and Close menu, on a phone; on a wide
   screen the menu is always there), and the style guide check fails when the page's text roles fall below 4.5:1 on its
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
-- **Specs**, an area of its own (none on the measuring page): an inert copy of
-  the component as the Playground set it, drawn larger, each part numbered in reading order (the contract's named
+- **Specs**, in the Playground under the component (none on the measuring page), so a prop is changed and inspected in
+  one place: an inert copy of the component as the controls set it, redrawn as they change, drawn larger, each part numbered in reading order (the contract's named
   parts, `c.anatomy`, a Figma auto name such as Frame 106 replaced by the part's class, then what sits directly inside
   it), a slot outlined, each padding and gap outlined and numbered after the parts and named by its token in the list
   (numbers, never colours, so nothing reads as a token's colour), each part's colours, icon size and text style by
@@ -288,13 +290,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the list, and Picked shows what that one is drawn with (a part's padding, gap, fill, line, corners, shadow, text
   style and colour; a space's token and value), outlined in the accent; a second click puts it down. A number that
   would cover another moves to the nearest free place around it, with a line back (`marker`). A component shown in an
-  overlay is drawn as its own element. Nothing is drawn over the live component in the Playground.
+  overlay is drawn as its own element. Nothing is drawn over the live component.
 - **Full width**, in the Playground (none on the measuring page): the component across the whole card, its controls
   below it; again puts it back.
-- **Simplify** (`simplifyView`), a page of its own when it has something to say: components that are one component
-  in several copies (names that differ in their last word, with half their props or more the same: one component with
-  a Type option), a variant prop with one option, or with one option built, and, when the products' code was read and
-  something uses the system, a component no product uses. Each says what to do.
 - **Width**, in the Playground (none on the measuring page): Fit (the live preview), Phone (375px), Tablet (768px) or
   Desktop (1280px), a frame of that width written with the page's own stylesheets, its icon sheet, the component as
   drawn now and the system's own scripts (`systemScripts`), so its media queries apply and it works there (a click
@@ -326,7 +324,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   The full list stays at `#uses?t=--name`. Search also finds each component's props and their options.
 - **A link to each variant**: the address carries the props set away from their defaults and the width
   (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
-  the controls follow (a value the component does not have is left at its default). Copy link copies it.
+  the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
+  button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
 - **Parity** (`parityView`): the facts of the agreed record equal on both sides (one an open difference names is left
   out), its props and tokens, its differences, Figma props not built, and what the audit's census could not compare.
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
@@ -341,8 +340,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (agrees, or how many differences and props not built), Accessibility (no problem found, how many, or not checked in
   a browser yet) and Used in (how many products); a fact that needs work is marked with ! and in bold, never by colour
   alone. Its overview card carries the Figma and accessibility facts in one line.
-- **Variants**, an area of its own when a variant prop has two options built: each option of each variant prop, one
-  per row with its name, drawn by the Playground itself (the other props as it sets them) and copied still and inert,
+- **Variants**, an area of its own when a variant prop has two options built or an on/off prop is built: each option of
+  each variant prop and both sides of each on/off prop (false, true), one per row with its name, drawn by the Playground itself (the other props as it sets them) and copied still and inert,
   the Playground left as it was; Try it sets that option there. An option Figma has and the code does not build says
   so.
 - **Status and coverage** (`statusView`, `coverageOf`): under its name and on its overview card, stable, beta or
@@ -356,7 +355,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
   `docs/preview.png`, `docs/screenshot.png`, `preview.png` … beside its page), else its page pictured in Chrome as it
   opens with the component's places marked (`product-shots.mjs`, window size from its `showUI` call), and how many
-  times its class appears in the product's source page. `styleguide.productShots: false` turns the pictures off.
+  times its class appears in the product's source page. A use is the class put on an element (`class-use.mjs`: a class
+  attribute, `className`, `classList`), never a word in a comment or a CSS rule. A product whose screens use it in Figma
+  (`figma-screen-components.snapshot.json`) while its code never does is listed too, said to build it by hand there.
+  `styleguide.productShots: false` turns the pictures off.
 - **Code**: the code for what the playground shows, with the system's button to copy it. With a framework file
   (`component-api.mjs` `callName`): the component's tag with the props set, in its syntax (jsx, vue, svelte, a custom
   element), each value as the code spells it, a default left out, every prop the code requires written (`={…}`).
