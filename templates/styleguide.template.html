@@ -242,8 +242,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-shot img { display: block; width: 100%; height: auto; }
 .pg-mark { position: absolute; border: 2px solid var(--sg-accent); border-radius: var(--sg-radius-s); pointer-events: none; }
 /* The code a product writes for what the playground shows, with the system's button to copy it. */
-.pg-code-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-m); align-items: start; }
-.pg-code { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; min-width: 0; display: flex; flex-direction: column; box-shadow: var(--sg-shadow); }
+.pg-code { max-height: 28em; border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; min-width: 0; display: flex; flex-direction: column; box-shadow: var(--sg-shadow); }
 .pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-code pre { flex: 1; min-height: 0; margin: 0; padding: var(--sg-space-m); overflow: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
@@ -389,7 +388,6 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-example-stage { display: flex; align-items: center; justify-content: center; padding: var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-stage, var(--sg-bg)); overflow: auto; }
 .pg-example-stage > img { max-width: 100%; height: auto; }
 .pg-example > .pg-example-caption { margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }
-.pg-own-swatch { display: inline-block; width: var(--sg-space-m); height: var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius-s); vertical-align: middle; margin-right: var(--sg-space-xs); }
 .sg-topbar, .sg-nav-close, .sg-scrim { display: none; }
 .sg-sidebar-header { position: relative; }
 @media (max-width: 720px) {
@@ -940,51 +938,12 @@ a.pg-usage-name { color: var(--sg-text); }
       return b.width > 2 && b.height > 2 && cs.visibility !== 'hidden' && +cs.opacity > 0;
     });
   }
-  function partRows(root, compName) {
-    var rows = [], seen = {};
-    root.querySelectorAll('*').forEach(function (k) {
-      if (rows.length >= 10 || k.closest('svg') !== k && k.closest('svg')) return;
-      var b = k.getBoundingClientRect(); if (b.width <= 2 || b.height <= 2) return;
-      var kcs = getComputedStyle(k); if (kcs.visibility === 'hidden' || +kcs.opacity === 0) return;   // a part no one sees (a native input under its drawn box) is not listed
-      var name = (k.getAttribute('class') || '').split(/\s+/).filter(Boolean)[0] || k.tagName.toLowerCase();
-      var v;
-      if (k.tagName.toLowerCase() === 'svg') {
-        var col = [kcs.color, kcs.stroke, kcs.fill].filter(function (x) { return x && x !== 'none' && x !== 'rgba(0, 0, 0, 0)'; })[0];
-        v = Math.round(b.width) + '×' + Math.round(b.height) + 'px' + (col ? '  ·  ' + tok(k, col, 'color', compName) : '');
-        name = name === 'svg' ? 'icon' : name;
-      } else if (Array.prototype.some.call(k.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); }) || /^(INPUT|TEXTAREA)$/.test(k.tagName)) {
-        v = fontTok(k, kcs) + '  ·  ' + tok(k, kcs.color, 'color', compName);
-      } else return;
-      var key = name + v; if (seen[key]) return; seen[key] = 1;
-      rows.push([name, v]);
-    });
-    return rows;
-  }
-  function extraColorRows(el, preview, compName) {
-    var rows = [], seen = {};
-    function mark(node, v) { var t = tokenName(node, v, 'color', compName); if (t) seen[t] = 1; }
-    var rcs = getComputedStyle(el); mark(el, rcs.color); mark(el, rcs.backgroundColor); mark(el, rcs.borderTopColor);
-    var iconN = 0;
-    preview.querySelectorAll('svg').forEach(function (svg) {
-      var scs = getComputedStyle(svg);
-      var cands = [scs.color, scs.stroke, scs.fill].filter(function (v) { return v && v !== 'none' && v !== 'rgb(0, 0, 0)' && v !== 'rgba(0, 0, 0, 0)'; });
-      for (var i = 0; i < cands.length; i++) { var t = tokenName(svg, cands[i], 'color', compName); if (t && !seen[t]) { seen[t] = 1; iconN++; rows.push([iconN > 1 ? 'icon ' + iconN : 'icon', tok(svg, cands[i], 'color', compName)]); break; } }
-    });
-    preview.querySelectorAll('*').forEach(function (node) {
-      if (node === el || node.tagName.toLowerCase() === 'svg' || node.closest('svg')) return;
-      var ownText = false; for (var i = 0; i < node.childNodes.length; i++) if (node.childNodes[i].nodeType === 3 && node.childNodes[i].textContent.trim()) ownText = true;
-      if (!ownText) return;
-      var col = getComputedStyle(node).color, t = tokenName(node, col, 'color', compName);
-      if (t && !seen[t]) { seen[t] = 1; var cl = (typeof node.className === 'string' && node.className) ? node.className.split(' ')[0].replace(/^[a-zA-Z]+-/, '') : node.tagName.toLowerCase(); rows.push([(cl || 'text') + ' color', tok(node, col, 'color', compName)]); }
-    });
-    return rows;
-  }
 
   /* ── Component playground ─────────────────────────────────────────────────────────────────────────────────
      Each component is drawn from the project's own markup (the contract's probe, or the first instance in its own
      pages), else the element its Figma role asks for. Its controls are the props Figma and the code agree on; an
      option applies what the contract's propertyMap says it adds (a class, an attribute), a boolean shows or hides
-     the part it names. Below: the tokens behind the rendered result and its computed box. */
+     the part it names. Below: its code. */
   // The class a preview draws a component with: its own, or, for one the system defines by id (#tt, kept once in
   // the page for the system's scripts), a class standing for that id whose rules are the id's (idAliasRules).
   function clsName(c) { return /^#/.test(c.cls || '') ? 'sg-id-' + c.cls.slice(1) : c.cls; }
@@ -1412,7 +1371,7 @@ a.pg-usage-name { color: var(--sg-text); }
     rows.forEach(function (r) { n[r.status] = (n[r.status] || 0) + 1; });
     var types = ['Prop', 'Variable', 'Value'].filter(function (t) { return rows.some(function (r) { return r.type === t; }); });
     var plural = { Prop: 'Props', Variable: 'Variables', Value: 'Values' };
-    var side = function (x) { return x ? '<td><code>' + esc(x.name) + '</code>' + (x.value ? '<span class="pg-par-val">' + esc(x.value) + '</span>' : '') + '</td>' : '<td class="pg-par-none">Not there</td>'; };
+    var side = function (x) { return x ? '<td><code>' + (/^--[\w-]+$/.test(x.name) ? usesLink(x.name) : esc(x.name)) + '</code>' + (x.value ? '<span class="pg-par-val">' + esc(x.value) + '</span>' : '') + '</td>' : '<td class="pg-par-none">Not there</td>'; };
     var body = rows.map(function (r) {
       var st = PAR[r.status] || ['?', r.status];
       return '<tr data-type="' + esc(r.type) + '" data-status="' + esc(r.status) + '"><td class="pg-par-type">' + esc(r.type) + '</td>' + side(r.figma) + side(r.code) +
@@ -1619,7 +1578,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (!a.sources || !a.sources.length) return '';
     var rows = a.sources.map(function (x) {
       var k = SRC[x.st] || SRC.none;
-      var used = x.used && x.used.length ? x.used.join('; ') + '.' : x.st === 'agents' ? (/annotation/.test(x.from) ? 'No accessibility check reads it. The agents read it as design intent, and Documentation shows it. Written as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer, a check reads it.' : 'No accessibility check reads it. The agents read it as design intent.') : '';
+      var used = x.used && x.used.length ? x.used.join('; ') + '.' : x.st === 'agents' ? (x.wording ? 'No accessibility check reads it as written. Written as ' + x.wording + ', a check reads it; --figma-edits lists it in Figma.' : /annotation/.test(x.from) ? 'No accessibility check reads it. The agents read it as design intent, and Documentation shows it. Written as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer, a check reads it.' : 'No accessibility check reads it. The agents read it as design intent.') : '';
       used = used.replace(/^\w/, function (ch) { return ch.toUpperCase(); });
       return '<tr data-status="' + (x.st === 'done' ? 'done' : x.st === 'agents' ? 'check' : 'none') + '"><td class="pg-par-type">' + esc(x.from) + '</td><td>' + esc(x.what) + '</td>' +
         '<td><span class="pg-par-status pg-par--' + k[2] + '"><span class="pg-par-sign" aria-hidden="true">' + k[0] + '</span>' + esc(k[1]) + '</span></td><td>' + esc(used) + '</td></tr>';
@@ -1777,18 +1736,15 @@ a.pg-usage-name { color: var(--sg-text); }
         var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? facts.a11y : null, warn = !!(f && f.todo);
         return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
       })) + '</div></div>' +
-      // Playground: the component drawn, its controls, its code and the tokens behind it.
+      // Playground: the component drawn, its controls and its code.
       '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview-col"><div class="pg-stage-bar pg-stage-bar--top"><div class="pg-stage-mode"></div><div class="pg-stage-tools"></div></div><div class="pg-preview"></div><div class="pg-frame" hidden></div><div class="pg-anatomy" hidden></div><div class="pg-stage-bar pg-stage-bar--bottom"><p class="pg-anat-line" hidden></p><div class="pg-stage-mode"></div></div></div><div class="pg-panel"><div class="pg-actions"></div>' +
         (ALL ? '' : '<div class="pg-ctl pg-width"><div class="pg-ctl-label">Width</div>' + segHTML(WIDTHS.map(function (w) { return { v: w[0], label: w[1] }; })) + '</div>') +
         '<div class="pg-controls"></div></div></div>' +
         (ALL || !(c.figmaShots || []).length ? '' : '<div class="pg-inspect pg-compare" hidden><div class="pg-inspect-head">Figma beside the code</div><div class="pg-compare-bar">' + segHTML([{ v: 'side', label: 'Side by side' }, { v: 'over', label: 'Over' }]) +
           '<label class="pg-ctl-label pg-compare-amount">How much of Figma shows <input type="range" min="0" max="100" value="50"></label></div><div class="pg-compare-body"></div></div>') +
-        // The tokens behind what is drawn, its code on their right; every token it uses below them all.
-        '<div class="pg-code-row"><div class="pg-inspect"><div class="pg-inspect-head">Tokens</div><table class="pg-tokens"></table></div>' +
-        '<div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div></div>' +
-        // Every token it uses, below them all.
-        (ALL ? '' : '<div class="pg-footer">' + (((c.allTokens || []).length || (c.ownTokens && (c.ownTokens.colors.length || c.ownTokens.sizes.length)) ? '<div class="pg-inspect"><div class="pg-inspect-head">Its tokens</div><table class="pg-own"></table></div>' : '')) + '</div>') + '</div>' +
+        // Its code. Its tokens are listed in Parity, and Inspect gives the value of each part clicked.
+        '<div class="pg-code"><div class="pg-code-head"><span class="pg-code-title">' + (c.api && c.api.tag ? 'Code' : 'HTML') + '</span>' + sysButton('button', 'Copy code', ' data-copy') + '<span class="sg-hidden-text" role="status"></span></div><pre><code></code></pre></div>' + '</div>' +
       '</div>' +
       // Variants: every option of each variant prop and both sides of each on/off prop, one per row, the other props as the Playground sets them.
       (ALL || !variantRows(c).length ? '' : '<div class="pg-area" data-area="variants"><div class="pg-footer"><div class="pg-variants"></div></div></div>') +
@@ -1871,16 +1827,6 @@ a.pg-usage-name { color: var(--sg-text); }
       segItems(parFilter).forEach(function (b) { b.addEventListener('click', function () { parShow(b.dataset.v); }); });
       parShow('all');
     }
-    var tTokens = sec.querySelector('.pg-tokens'), tOwn = sec.querySelector('.pg-own');
-    // The code as tall as what it holds, never taller than the tokens beside it: past their height it scrolls inside.
-    // On its own row, its own height.
-    var codeBox = sec.querySelector('.pg-code'), tokBox = tTokens && tTokens.closest('.pg-inspect');
-    function codeHeight() {
-      if (!codeBox || !tokBox) return;
-      codeBox.style.maxHeight = '';
-      if (tokBox.offsetHeight && Math.abs(codeBox.offsetTop - tokBox.offsetTop) < 2) codeBox.style.maxHeight = tokBox.offsetHeight + 'px';
-    }
-    if (window.ResizeObserver && tokBox) new ResizeObserver(codeHeight).observe(tokBox);
     // The code for what the preview shows now: the component as a product writes it (its tag and the props set here,
     // each value as the code spells it; a prop the code requires and the playground does not set is written with …),
     // else the HTML the preview draws. Copied by the system's own button.
@@ -1907,7 +1853,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // The area chosen in view in the scrolling bar, the page itself left where it is.
       var strip = areaBar.querySelector('.pg-areas-scroll'), on = segItems(areaBar).find(function (b) { return b.dataset.v === v; });
       if (strip && on && strip.scrollWidth > strip.clientWidth) { var sr = strip.getBoundingClientRect(), br = on.getBoundingClientRect(); if (br.left < sr.left || br.right > sr.right) strip.scrollLeft += br.left < sr.left ? br.left - sr.left - 8 : br.right - sr.right + 8; }
-      if (v === 'play') { nudge(); codeHeight(); if (inspecting) requestAnimationFrame(drawAnatomy); }
+      if (v === 'play') { nudge(); if (inspecting) requestAnimationFrame(drawAnatomy); }
       if (v === 'variants') requestAnimationFrame(drawVariants);
       if (v !== 'a11y' && wcagStop) wcagStop();
       if (v === 'a11y') checkLive();
@@ -2102,7 +2048,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // corners, shadow, text style and colour (what it has of them).
     function pickedValues(el) {
       if (el.tagName.toLowerCase() === 'svg') { var r = el.getBoundingClientRect(), k = parseFloat((anatBox.querySelector('.pg-anat-wrap') || {}).style ? (anatBox.querySelector('.pg-anat-wrap').style.transform.match(/scale\(([\d.]+)\)/) || [0, 1])[1] : 1) || 1; return ['size ' + Math.round(r.width / k) + '×' + Math.round(r.height / k) + 'px', 'colour ' + tok(el, getComputedStyle(el).color, 'color', c.name)]; }
-      return lookRows(el, false).filter(function (x) { return x[1] !== '-' && x[1] !== 'none' && x[1] !== 'transparent' && x[1] !== '0'; }).map(function (x) { return x[0] + ' ' + x[1]; });
+      return lookRows(el).filter(function (x) { return x[1] !== '-' && x[1] !== 'none' && x[1] !== 'transparent' && x[1] !== '0'; }).map(function (x) { return x[0] + ' ' + x[1]; });
     }
     // A click picks a part; one inside the part picked goes a level down; the part picked again goes a level up.
     function pickAnatomy(key) {
@@ -2330,22 +2276,6 @@ a.pg-usage-name { color: var(--sg-text); }
         }, function () { /* this variant could not be tried */ }).then(function () { if (!stopped) next(i + 1); });
       })(0);
     }
-    // Every token this component is drawn with (its parts and states too, shown in this variant or not): its Figma name,
-    // its variable with the value in the mode it is shown in, a colour's swatch, and what it sets. Without that list, the
-    // tokens named after it.
-    function ownRows() {
-      if (!tOwn) return;
-      if ((c.allTokens || []).length) {
-        tOwn.innerHTML = c.allTokens.map(function (t) {
-          var v = live(cur || preview, t.var), colour = v && window.CSS && CSS.supports('color', v) && !/^(inherit|initial|unset|currentcolor)$/i.test(v);
-          return '<tr><td>' + esc(t.figma || t.var) + (t.props.length ? '<span class="pg-look">' + esc(t.props.join(', ')) + '</span>' : '') + '</td><td>' + (colour ? '<span class="pg-own-swatch" style="background:var(' + esc(t.var) + ')"></span>' : '') + usesLink(t.var) + (v ? '  ·  ' + esc(v) : '') + '</td></tr>';
-        }).join('');
-        return;
-      }
-      var o = c.ownTokens;
-      tOwn.innerHTML = o.colors.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td><span class="pg-own-swatch" style="background:var(' + esc(t.var) + ')"></span>' + usesLink(t.var) + '  ·  ' + esc(live(preview, t.var)) + '</td></tr>'; }).join('') +
-        o.sizes.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + usesLink(t.var) + '  ·  ' + esc(live(preview, t.var) || t.value) + '</td></tr>'; }).join('');
-    }
     // Per-component mode controls, inside the playground: only the axes that nest, so this preview can differ from the
     // page. The sizing mode (Desktop, Phone) at its top left, the colour mode and any other collection at its bottom right; they are the
     // system's modes, not the component's props. The stage keeps room for them above and below the component.
@@ -2460,23 +2390,19 @@ a.pg-usage-name { color: var(--sg-text); }
         });
       });
     }
-    // The tables beside the preview, read from the component as it is drawn now.
     // Every change in the Playground passes here (a control, a text typed, the component used in the preview), so the
     // anatomy is drawn again from it, once a frame.
     var anatQueued = false;
     function inspect(e) {
       if (inspecting && !anatQueued) { anatQueued = true; requestAnimationFrame(function () { anatQueued = false; drawAnatomy(); }); }
-      var el = (c.cls && (e.classList.contains(clsName(c)) ? e : e.querySelector('.' + clsName(c)))) || e;
-      tTokens.innerHTML = rowsHTML(lookRows(el, true).concat(partRows(el, c.name)));
-      ownRows(); writeLink(); checkLive(); codeHeight();
+      writeLink(); checkLive();
       showCode(e);
       nudge();
       if (WIDTH !== 'fit') renderFrame();
       if (compareOn) requestAnimationFrame(drawCompare);
     }
-    // What an element is drawn with, by the tokens behind it: its spacing, fill, line, corners, shadow, text. The
-    // component's own rows (whole) add the colours its states set elsewhere; a part picked on Specs has its own.
-    function lookRows(el, whole) {
+    // What a part clicked in Inspect is drawn with, by the tokens behind it: its spacing, fill, line, corners, shadow, text.
+    function lookRows(el) {
       var cs = getComputedStyle(el), bw = cs.borderTopWidth, hasGap = cs.gap && cs.gap !== 'normal' && cs.gap !== '0px', texted = drawsText(el);
       var shadow = cs.boxShadow && cs.boxShadow !== 'none' ? (c.allTokens || []).filter(function (t) { return t.props.some(function (p) { return /shadow/.test(p); }); }) : [];
       return [].concat(
@@ -2487,7 +2413,6 @@ a.pg-usage-name { color: var(--sg-text); }
         radiusRows(el, cs),
         cs.boxShadow && cs.boxShadow !== 'none' ? [['shadow', (shadow.length === 1 ? (shadow[0].figma || shadow[0].var) + '  ·  ' : '') + cs.boxShadow]] : [],
         texted ? [['color', tok(el, cs.color, 'color', c.name)]] : [],
-        whole ? extraColorRows(el, preview, c.name) : [],
         texted ? [['font', fontTok(el, cs)]] : [],
         cs.opacity !== '1' ? [['opacity', cs.opacity]] : []
       );

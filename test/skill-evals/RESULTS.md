@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: no tokens tables in the Playground; unused Figma annotations listed in Figma (continuous evaluation)
+
+What changed since the entry below (engine 0d370b4): The Playground shows the component, its controls and its code, every token being in Parity; --figma-edits lists each Figma annotation no check reads, with the wording a check reads; a failing contrast is always flagged. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `900ea1cae604` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7e78e46 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.053 |
+| Input a run | 93k | 88k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 88k a run against 93k. Records: `records/2026-10-06-a-failing-contrast-is-never`.
+
 ## 2026-10: Style guide: one Accessibility table by WCAG criterion; every slot marked; an address per area; full width (continuous evaluation)
 
 What changed since the entry below (engine 7447255): The Accessibility area is one table by WCAG 2.1 criterion with only what applies; every Figma slot is marked in the Playground; each area of a component has its own address; the page takes the full width. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.

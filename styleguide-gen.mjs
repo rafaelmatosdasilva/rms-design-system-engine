@@ -427,6 +427,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { a11yView } = await import('./styleguide-data.mjs');
       const { contractSemantics, A11Y_GUIDE, annotationUses } = await import('./a11y-check.mjs');
       const { partRolesOf } = await import('./behaviour-contract.mjs');
+      const { annotationWording } = await import('./figma-edits.mjs');
       const authoredRoles = contractSemantics(ROOT, cfg);
       const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
       const result = readJson(join(OUT_DIR, 'a11y.json'));
@@ -455,7 +456,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const c of view.components) {
         if (!c.a11y) continue;
         const src = [];
-        for (const n of c.a11y.notes ?? []) src.push({ st: n.uses.length ? 'done' : 'agents', from: n.layer ? `Figma annotation on its "${n.layer}" layer` : 'Figma annotation', what: n.text, used: n.uses });
+        for (const n of c.a11y.notes ?? []) {
+          const wording = n.uses.length ? null : annotationWording(n.text, n.layer ?? null);
+          src.push({ st: n.uses.length ? 'done' : 'agents', from: n.layer ? `Figma annotation on its "${n.layer}" layer` : 'Figma annotation', what: n.text, used: n.uses, ...(wording ? { wording } : {}) });
+        }
         if (!(c.a11y.notes ?? []).length) src.push({ st: 'none', from: 'Figma annotations', what: 'None on it.', used: [] });
         const gl = intentNow.components?.[c.name]?.guidelines;
         if (glFiles.length) {

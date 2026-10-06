@@ -246,13 +246,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   modes are switched inside the playground, each named as Figma names its collection (`figma.colorCollection`,
   Styling; a sizing collection by its own name, Sizing, the name kept for screen readers and not shown): the sizing
   mode at its top left, the colour mode and any other at its bottom right, never among the component's props. Under it,
-  its specs (see Specs) follow the controls as they change. Below them, the tokens behind what is drawn with its code on their right, and under
-  them **Its tokens**, every token it is drawn with (`allComponentTokens`: each `var()` in a rule for its class or one
-  of its parts, `.badge-label`, `.badge__icon`, in any state, shown in this variant or not, never another component's
-  class), by Figma's name, with the properties it sets, its value in the mode shown and a colour's swatch, ordered
-  colour, type, spacing, radius, border, shadow; a token named after it that its rules reach only through another stays
-  listed. Where two tokens share a value, the tables name the one the component's rules use, then one that names
-  the part. Above it, its documentation, the products it is **used in** (each by
+  its specs (see Specs) follow the controls as they change. Below them, its code. The Playground has no tokens table:
+  every token it is drawn with is in Parity, each variable's name opening its value per mode and what uses it, and
+  Inspect gives the value of the part clicked. Where two tokens share a value, Inspect names the one the component's
+  rules use, then one that names the part. Above it, its documentation, the products it is **used in** (each by
   its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
   differences list the last full audit wrote.
 - **A component's page in areas**: Playground (with its specs), Variants, Documentation, Accessibility, Parity and Used in, one at a time on
@@ -268,9 +265,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Figma's name and value, the code's, a status as a sign and the system's colour (the same, differs, only in Figma, only
   in code) and when it last held, with a filter by type above it, its head kept in view under the areas as the rows
   scroll by (on a phone the table scrolls sideways instead), and what differs, with who acts, below it. The code is as tall as
-  what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
-  (`showFirst`: Show Text and Text Content, or both on the same part); the tokens table leaves out the text style and
-  colour while no text is shown, and a part no one sees (a native input at no opacity). **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
+  what it holds, up to a fixed height; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
+  (`showFirst`: Show Text and Text Content, or both on the same part). **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
   classes its markup holds, or the tags and imports of its file), each the overview's card with its own preview.
 - **Playground links**: a control and the preview follow each other (a radio picked in the preview sets State); a
   label edit writes only its words into its part. An option the contract maps to another element's selector (a
@@ -420,7 +416,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Nothing there. Each Figma annotation on it and on its layers (`annotationUses` in `a11y-check.mjs`): the role it
   states, a spoken name or alt text, a heading level, a part's role, a behaviour (Escape closes, the arrow keys move,
   Enter and Space activate), each with the check that reads it; one no check reads (a sizing note, a usage note) says
-  so, and how to write it so one does. The team's guidelines (`guidelines.sources`, the Notion and GitLab pages fetched
+  so, and how to write it so one does: its own wording when the engine can tell what it means (`annotationWording`),
+  which `--figma-edits` also lists in Figma. The team's guidelines (`guidelines.sources`, the Notion and GitLab pages fetched
   into files): the section named after the component, with its lines about accessibility, read by the agents as design
   intent and by no check. The contract, its code, this page and the last audit (the page it opened and when).
 - **In use**: the approved pictures of `frames[]` (Gate [2] (Figma frame unchanged)'s references in `visualRefs`), six at most.
@@ -860,7 +857,12 @@ variant's name (`state=default` → `state=Default`), then a property (`editComp
 Icon"); one already renamed is skipped. Every need the prototypes found the system lacks (`prototypes/gaps.json`, merged) becomes
 the design team's to do list: a page "Design system to do" with a frame "Gaps from prototypes", one card per need (what
 kind, what the prototypes use meanwhile or the closest component, and which prototypes need it), the most needed first,
-written afresh each time; nothing else in the file is touched. With gaps and no Figma snapshot, only the list is written.
+written afresh each time; nothing else in the file is touched. Each Figma annotation no check reads (`annotationUses`
+gives it no use) goes on the same page, in a frame "Annotations no check reads": its component and layer, its words, and
+the wording a check reads when the engine can tell what it means (`annotationWording`: "This is a button" → `Role:
+button`, "Esc" → `Escape closes it`, "H2" → `Heading level 2`, a quoted name → `aria-label: …`, a layer named Error →
+`Role: errormessage`); one it cannot tell stays a note for people. The annotations themselves are never changed. With
+gaps and no Figma snapshot, only the gaps list is written.
 
 It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its Figma node, what it adds and why) and
 `figma-apply.js`, a Figma plugin script that makes exactly those edits, leaves a component that already states a role
