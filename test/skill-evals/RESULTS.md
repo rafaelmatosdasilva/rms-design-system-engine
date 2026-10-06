@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: a slot is an area named Slot; ids an instance points to are kept; square checkerboard (continuous evaluation)
+
+What changed since the entry below (engine e84f729): The Playground marks a slot as the area it takes, named Slot inside; an instance copied from a page keeps the ids it points to, made unique; a control given visible words loses an aria-label that leaves them out; the checkerboard is square; the WCAG hover check waits for a fade. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `ae6ed2fb3cdd` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7447255 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 69/70 |
+| Mean cost a run | $0.055 | $0.053 |
+| Input a run | 95k | 86k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed. Failed: forbidden-green #1: says why not. Records: `records/2026-10-06-style-guide-a-slot-is`.
+
 ## 2026-10: WCAG 2.1 A and AA for every component; where accessibility is read from; slots drawn in the Playground (continuous evaluation)
 
 What changed since the entry below (engine 2734a61): The audit and the style guide check every WCAG 2.1 criterion at A and AA a component can be checked for (wcag-page.js, a11y-static.mjs, wcag21.mjs); the style guide adds a WCAG 2.1 table, a From column and a Where it is read from table, and draws slots as dashed boxes. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
