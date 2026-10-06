@@ -21,6 +21,7 @@
 //
 // Exit 0 on success. Never throws into the audit — callers wrap it.
 
+import { usedClasses } from './class-use.mjs';
 import { appDir } from './code-roots.mjs';
 import { codeSizeCSS, modeRootCSS } from './styleguide-data.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
@@ -227,6 +228,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
 
   // ── USAGE — which plugins use each component ────────────────────────────────────
   function usageMap(intent) {
+    // The components each product screen uses in Figma (Gate [10] reads the same file).
+    let screenComponents = {};
+    try { screenComponents = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotScreenComponents ?? 'figma-screen-components.snapshot.json'), 'utf8')); } catch { /* not captured */ }
     // Usage label per app: ds-config.json → styleguide.plugins [{ key, match }] (a short label and a
     // path fragment), else each configured app (paths.plugins) with a short label made from its name.
     // Each product: { key, match, name?, href? } (styleguide.plugins); its full name, else the app's name in words.
@@ -236,10 +240,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const usage = {};
     for (const name of Object.keys(intent.components || {})) {
       const cls = intent.components[name].class || ('.' + name);
-      const bare = cls.replace(/^\./, '');
+      const bare = (String(cls).match(/[.#]?([A-Za-z][\w-]*)/) ?? [])[1] ?? name;   // its first class (or id): what an element carries
       const found = new Set();
-      for (const s of sources) if (s.txt.includes(cls) || s.txt.includes('"' + bare) || s.txt.includes(bare + ' ')) found.add(s.m.key);
-      usage[name] = [...found].map((key) => { const g = PLUGS.find((x) => x.key === key); return { key, name: g?.name ?? key, ...(typeof g?.href === 'string' && /^https?:\/\//.test(g.href) ? { href: g.href } : {}) }; });
+      for (const s of sources) if ((s.used ??= usedClasses(s.txt)).has(bare)) found.add(s.m.key);   // put on an element, never a word in a comment
+      // A product whose screen uses it in Figma while its code never does: listed too, said so (built by hand there).
+      const inFigma = new Set();
+      for (const scr of Object.values(screenComponents.screens ?? {})) {
+        if (!(scr?.components ?? {})[name]) continue;
+        const g = PLUGS.find((x) => x.match && String(scr.plugin ?? '').includes(x.match)) ?? PLUGS.find((x) => x.key === scr.plugin);
+        if (g && !found.has(g.key)) inFigma.add(g.key);
+      }
+      usage[name] = [...found, ...inFigma].map((key) => { const g = PLUGS.find((x) => x.key === key); return { key, name: g?.name ?? key, ...(typeof g?.href === 'string' && /^https?:\/\//.test(g.href) ? { href: g.href } : {}), ...(inFigma.has(key) ? { figmaOnly: true } : {}) }; });
     }
     return usage;
   }
@@ -649,13 +660,6 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         }
       } catch { /* no pictures: the cards show the names */ }
     }
-    // Where the system could be simpler: one component in several copies, props with nothing to choose, unused ones.
-    try {
-      const { simplifyView } = await import('./styleguide-data.mjs');
-      const usedBy = new Map();
-      for (const c of view.components) for (const u of c.uses ?? []) { const n = typeof u === 'string' ? u : u?.name; if (n) usedBy.set(n, [...(usedBy.get(n) ?? []), c.name]); }
-      view.simplify = simplifyView(view.components.map((c) => ({ ...c, usedBy: usedBy.get(c.name) ?? [] })), { products: view.components.some((c) => (c.usage ?? []).length) });
-    } catch { /* nothing to say */ }
     lastView = view;
     agreedSummary = { components: view.components.length, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');

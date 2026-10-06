@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Hand-built components found, skipped checks said, style guide component page (continuous evaluation)
+
+What changed since the entry below (engine 25c754b): Gate 10 reads the product screens from Figma; the summary lists what was not checked; the refresh recipe captures the screen components; the style guide moves Specs into the Playground. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `e327581706ac` · Project measured: `13d811a9d668`
+
+| Haiku, engine f78312e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.055 |
+| Input a run | 93k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 93k. Records: `records/2026-10-06-hand-built-components-are-found`.
+
 ## 2026-10: Guides: every gate by the number the report prints (continuous evaluation)
 
 What changed since the entry below (engine b454dee): every gate reference in the guide (about 160, from older numberings such as Gate [10g], [3f], [11] for the states gate) is now the report's number with its name, and the full-audit table follows the report's order. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/gates.md`, `reference/maintainers.md`, `reference/usage.md`, `rms-design-system-engine.md`.

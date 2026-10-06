@@ -39,8 +39,8 @@
 ✅  [9] No invented text casing  (no text-transform the DS/Figma does not define)
        ✅ no text-transform the DS doesn't define
 
-✅  [10] No hand-built DS components  (screens use the DS component, not a local look-alike)
-       ⏭ no reimplementationSurfaces configured — skipped
+⏭   [10] No hand-built DS components  (screens use the DS component, not a local look-alike)
+       ⏭ not verified - [reimplementation] no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
 
 ✅  [11] Clean CSS  (no unused variables · no values that contradict Figma · safe containment)
        ✅ 0 unused vars  (scanned 4 files; 0 known-unused exempted)
@@ -140,7 +140,8 @@
   ✅  [7]   No invented CSS variables                           Pass
   ✅  [8]   Docs tell the truth                                 Pass
   ✅  [9]   No invented text casing                             Pass
-  ✅  [10]  No hand-built DS components                         Pass
+  ⏭  [10]  No hand-built DS components                         Not run
+         Not verified: [reimplementation] no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
   ✅  [11]  Clean CSS                                           Pass
   ✅  [12]  Nested components keep their own styles             Pass
   ✅  [13]  Structure matches (height, spacing, corners)        Pass
@@ -187,7 +188,7 @@
      src/pages/Settings.tsx:8  bg-[#1f7a3a]/10  the theme has this value: write bg-status-success/10
 
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
-  ● Gate health      22/25 gates pass
+  ● Gate health      21/25 gates pass
   ● Coverage         0/3 components modelled (0%)  ·  exemption debt 0
   ● Documentation    3/3 contracts have a description (100%)
   ● AI guidance      0/3 carry whenNotToUse/useInstead (0%)
@@ -215,6 +216,15 @@
 
 - **Component props match Figma** fails:
   - badge/Tone: the code names it "tone" (letter case T → t)  (src/components/Badge.tsx)
+
+**Not checked in this run**: 20
+- Data is up to date: No plugins configured in ds-config.json
+- Figma frame unchanged: No frames configured in ds-config.json - visual regression skipped
+- Tokens used in screens exist in CSS: no frames[] configured in ds-config.json
+- Exception lists are valid: no design-system-engine-map.mjs - no exception list to check
+- Docs tell the truth: no documentation surfaces configured
+- No hand-built DS components: no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
+- and 14 more
 
 Burndown, open findings per component: badge 4 · 5 not tied to a component
 Fix first: badge. Run with --component badge, fix, run again.
