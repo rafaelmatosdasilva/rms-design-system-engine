@@ -23,7 +23,7 @@
   color-scheme: light dark;
   --sg-bg: Canvas; --sg-bg-2: Canvas; --sg-surface: Canvas; --sg-stage: var(--sg-bg);
   --sg-text: CanvasText; --sg-text-2: CanvasText; --sg-muted: GrayText; --sg-border: GrayText; --sg-accent: AccentColor;
-  --sg-warning: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-border);
+  --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-border);
   --sg-xs: smaller; --sg-s: small; --sg-s-weight: normal; --sg-m: medium; --sg-m-weight: normal; --sg-l: large; --sg-l-weight: bold;
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: bold; --sg-lh: normal;
   --sg-space-xxs: 0.125rem; --sg-space-xs: 0.25rem; --sg-space-s: 0.5rem; --sg-space-m: 0.75rem; --sg-space-l: 1rem; --sg-space-xl: 1.5rem; --sg-space-xxl: 2rem;
@@ -204,6 +204,25 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-import code { font-family: inherit; color: var(--sg-text); }
 .pg-parity-sum { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
 .pg-parity td:last-child { word-break: normal; overflow-wrap: anywhere; }
+/* Parity, one table: every prop, variable and value, Figma beside code, a status marked by a sign and its colour. */
+.pg-par-filter { margin: 0 0 var(--sg-space-m); }
+.pg-par-table { width: 100%; border-collapse: collapse; font-size: var(--sg-m); }
+.pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; }
+.pg-par-table td { padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: top; color: var(--sg-text); overflow-wrap: anywhere; }
+.pg-par-table td > code { display: block; }
+.pg-par-table .pg-par-val { display: block; color: var(--sg-muted); font-size: var(--sg-s); }
+.pg-par-table .pg-par-none { color: var(--sg-muted); }
+.pg-par-table .pg-par-type, .pg-par-table .pg-par-at { white-space: nowrap; color: var(--sg-text-2); }
+.pg-par-status { display: inline-flex; align-items: center; gap: var(--sg-space-xs); white-space: nowrap; font-weight: var(--sg-heading-weight); }
+.pg-par-sign { display: inline-flex; align-items: center; justify-content: center; width: 1.25em; height: 1.25em; border-radius: var(--sg-radius-pill); color: var(--sg-bg); font-size: var(--sg-s); }
+.pg-par--match .pg-par-sign { background: var(--sg-positive); }
+.pg-par--match { color: var(--sg-positive); }
+.pg-par--differs .pg-par-sign { background: var(--sg-negative); }
+.pg-par--differs { color: var(--sg-negative); }
+.pg-par--figma .pg-par-sign, .pg-par--code .pg-par-sign { background: var(--sg-warning); }
+.pg-par--figma, .pg-par--code { color: var(--sg-warning); }
+.pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text-2); }
+.pg-par-scroll { overflow-x: auto; }
 /* Where it is used: each product's own page pictured, the component marked on it. */
 .pg-usedin { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 .pg-shot { position: relative; overflow: hidden; border-radius: var(--sg-radius); border: var(--sg-line); background: var(--sg-bg-2); }
@@ -1320,20 +1339,31 @@ a.pg-usage-name { color: var(--sg-text); }
   function differencesHTML(c) {
     return ((c.differences || []).length ? '<div class="pg-note pg-diff"><b>Differs from Figma</b><ul class="pg-diff-list">' + c.differences.map(function (x) { return '<li>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</li>'; }).join('') + '</ul></div>' : '');
   }
+  // One table of everything the component has (each prop, variable and value, whatever the Playground shows): its type,
+  // Figma's name and value, the code's, a status as a sign and its colour (in both and the same, differs, only in Figma,
+  // only in code) and when it last held. A filter by type above it; what differs, with who acts, below it.
+  var PAR = { match: ['✓', 'Same'], differs: ['✕', 'Differs'], figma: ['!', 'Only in Figma'], code: ['!', 'Only in code'] };
   function parityHTML(c) {
     var p = c.parity; if (!p) return differencesHTML(c);
-    var n = p.counts, parts = [n.agree + ' agree', n.differ + ' differ'];
-    if (n.notBuilt) parts.push(n.notBuilt + ' not built yet'); if (n.notCompared) parts.push(n.notCompared + ' not compared');
-    var box = function (head, rows, cls) { return rows ? '<div class="pg-inspect pg-parity' + (cls ? ' ' + cls : '') + '"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>' : ''; };
-    var diffs = (c.differences || []).map(function (x) { return '<tr><td>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + '</td><td>' + (x.todo ? '<b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) : '') + '</td></tr>'; }).join('');
-    var open = (p.notBuilt.length ? '<tr><td>Not built yet</td><td>Figma has ' + esc(p.notBuilt.join(', ')) + '; the code does not build ' + (p.notBuilt.length === 1 ? 'it' : 'them') + ' yet.</td></tr>' : '') +
-      (p.notCompared ? p.notCompared.reasons.map(function (r) { return '<tr><td>Not compared</td><td>' + esc(r[1] + ' · ' + r[0]) + '</td></tr>'; }).join('') : '');
-    var facts = p.agreed.map(function (f) { return '<tr><td>' + esc(f.what) + '</td><td>' + esc(f.value) + (f.since ? '  ·  since ' + esc(when(f.since)) : '') + (f.commit ? ' (' + esc(f.commit) + ')' : '') + '</td></tr>'; }).join('');
-    var props = p.props.map(function (k) { return '<tr><td>' + esc(k.figma) + '</td><td>' + esc(k.code) + '</td></tr>'; }).join('');
-    var toks = p.tokens.map(function (t) { return '<tr><td>' + esc(t.figma) + '</td><td>' + esc(t.var) + '</td></tr>'; }).join('');
-    return '<div class="pg-doc"><h3>Parity with Figma</h3><p class="pg-parity-sum">' + esc(parts.join('  ·  ')) + '</p>' +
-      (diffs ? '' : '<p class="pg-parity-sum">Nothing differs from Figma in what the last audit compared.</p>') +
-      '<div class="pg-inspect-grid pg-grid-2">' + box('Differs from Figma', diffs) + box('Not built or not compared', open) + box('Values that agree', facts) + box('Props (Figma · code)', props) + box('Tokens (Figma · code)', toks) + '</div></div>';
+    var rows = p.rows || [];
+    if (!rows.length) return '<div class="pg-doc"><h3>Parity with Figma</h3><p class="pg-parity-sum">Nothing of it was read from Figma or the code yet.</p>' + differencesHTML(c) + '</div>';
+    var n = { match: 0, differs: 0, figma: 0, code: 0 };
+    rows.forEach(function (r) { n[r.status] = (n[r.status] || 0) + 1; });
+    var types = ['Prop', 'Variable', 'Value'].filter(function (t) { return rows.some(function (r) { return r.type === t; }); });
+    var plural = { Prop: 'Props', Variable: 'Variables', Value: 'Values' };
+    var side = function (x) { return x ? '<td><code>' + esc(x.name) + '</code>' + (x.value ? '<span class="pg-par-val">' + esc(x.value) + '</span>' : '') + '</td>' : '<td class="pg-par-none">Not there</td>'; };
+    var body = rows.map(function (r) {
+      var st = PAR[r.status] || ['?', r.status];
+      return '<tr data-type="' + esc(r.type) + '" data-status="' + esc(r.status) + '"><td class="pg-par-type">' + esc(r.type) + '</td>' + side(r.figma) + side(r.code) +
+        '<td><span class="pg-par-status pg-par--' + esc(r.status) + '"><span class="pg-par-sign" aria-hidden="true">' + st[0] + '</span>' + esc(st[1]) + '</span></td>' +
+        '<td class="pg-par-at">' + (r.at ? esc(when(r.at)) : '') + '</td></tr>';
+    }).join('');
+    var sum = [['match', n.match + ' the same'], ['differs', n.differs + ' differ'], ['figma', n.figma + ' only in Figma'], ['code', n.code + ' only in code']]
+      .map(function (x) { return '<span class="pg-par-status pg-par--' + x[0] + '"><span class="pg-par-sign" aria-hidden="true">' + PAR[x[0]][0] + '</span>' + esc(x[1]) + '</span>'; }).join('');
+    var filter = types.length > 1 ? '<div class="pg-par-filter">' + segHTML([{ label: 'All (' + rows.length + ')', v: 'all' }].concat(types.map(function (t) { return { label: plural[t] + ' (' + rows.filter(function (r) { return r.type === t; }).length + ')', v: t }; }))) + '</div>' : '';
+    return '<div class="pg-doc pg-par"><h3>Parity with Figma</h3><div class="pg-par-sum">' + sum + '</div>' + filter +
+      '<div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Type</th><th>Figma</th><th>Code</th><th>Status</th><th>Updated</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      differencesHTML(c) + '</div>';
   }
   // ── How a product brings it in: its import line (copied), its file (downloaded), and what it is built with ────────
   function importHTML(c) {
@@ -1634,6 +1664,16 @@ a.pg-usage-name { color: var(--sg-text); }
       while (d.firstChild) (d.firstChild === h ? head : card).appendChild(d.firstChild);
       d.appendChild(card);
     });
+    // Parity's filter: every row, or one type (props, variables, values).
+    var parFilter = sec.querySelector('.pg-par-filter');
+    if (parFilter) {
+      var parShow = function (v) {
+        segItems(parFilter).forEach(function (b) { segSelect(b, b.dataset.v === v); });
+        Array.prototype.forEach.call(sec.querySelectorAll('.pg-par-table tbody tr'), function (tr) { tr.hidden = v !== 'all' && tr.dataset.type !== v; });
+      };
+      segItems(parFilter).forEach(function (b) { b.addEventListener('click', function () { parShow(b.dataset.v); }); });
+      parShow('all');
+    }
     var tTokens = sec.querySelector('.pg-tokens'), tOwn = sec.querySelector('.pg-own');
     // The code as tall as what it holds, never taller than the tokens beside it: past their height it scrolls inside.
     // On its own row, its own height.
