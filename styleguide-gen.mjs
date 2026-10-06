@@ -572,7 +572,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
     // product brings it in (its import line and its file) and the system's components it is built with.
     try {
-      const { parityView, parityRows, importOf, nestedComponents } = await import('./styleguide-data.mjs');
+      const { parityView, parityRows, importOf, stylesheetImport, nestedComponents } = await import('./styleguide-data.mjs');
       const checkedAt = new Date().toISOString();   // the token check ran just now, for this page
       const { loadAgreed } = await import('./agreed.mjs');
       const agreedRec = loadAgreed(ROOT);
@@ -586,6 +586,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         }
         return null;
       };
+      // The system's stylesheet as a product imports it: by its package (the project's own counts), once for every component.
+      let sheetLine;
+      const sheetImport = () => {
+        if (sheetLine !== undefined) return sheetLine;
+        const file = themeFiles[0];
+        let pkg = file ? pkgOf(file) : null;
+        if (pkg) pkg = { ...pkg, exports: readJson(join(pkg.dir, 'package.json'))?.exports ?? null };
+        else { const j = readJson(join(ROOT, 'package.json')); if (j?.name) pkg = { name: j.name, dir: '.', exports: j.exports ?? null }; }
+        sheetLine = file && existsSync(resolve(ROOT, file)) ? stylesheetImport({ file, pkg }) : null;
+        return sheetLine;
+      };
       for (const c of view.components) {
         c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
         c.parity.rows = parityRows({ name: c.name, propsSnap, controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], codeProps: c.api?.props ?? {}, allTokens: c.allTokens ?? [], check, agreed: agreedRec, propsAt: propsSnap._updated ?? null, checkedAt, slotParts: (c.anatomy ?? []).filter((x) => x.slot) });
@@ -597,6 +608,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           if (imp) c.import = imp;
           if (text && text.length <= 200000) c.source = { file: c.api.file, text };
         }
+        // A component that is CSS classes: a product brings it in with the system's stylesheet.
+        if (!c.import && (!c.api?.tag || c.api.syntax === 'html')) { const sheet = sheetImport(); if (sheet) c.import = sheet; }
       }
     } catch { /* the page shows what it has */ }
     // Its links (Figma, its code, the team's documentation) and its changelog: the commits that changed it, each with

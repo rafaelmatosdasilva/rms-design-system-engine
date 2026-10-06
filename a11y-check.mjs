@@ -84,6 +84,10 @@ import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, m
 // ── Pure, unit-testable core (exported; importing this module runs NOTHING) ─────
 // Parse a computed-style color. Returns {r,g,b,a} or null when it is not an rgb()/rgba()
 // (e.g. a gradient keyword or color(display-p3 …)) — callers treat null as "cannot compute".
+// After a mode switch, every CSS transition it started jumps to its end: a colour is read as it settles, never halfway
+// (a button whose text colour transitions and whose background does not reads 1:1 for a moment).
+export const SETTLE_TRANSITIONS = `document.getAnimations().forEach((a) => { if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) { try { a.finish(); } catch (e) {} } })`;
+
 export function parseColor(s) {
   if (typeof s !== 'string') return null;
   if (s === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
@@ -1280,6 +1284,7 @@ async function main() {
     for (const mode of modes) {
       await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
       if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
+      await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId).catch(() => {});
       const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, true, STATE_MAP), returnByValue: true }, sessionId).catch((e) => ({ error: e.message }));
       if (!r.result?.value) { const why = r.error ?? r.exceptionDetails?.exception?.description?.split('\n')[0]; unread.push(`${label} (${mode.name}${why ? `: ${why}` : ''})`); if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); first = false; continue; }
       const { textEls = [], iconEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [] } = r.result.value;
@@ -1315,6 +1320,7 @@ async function main() {
         const q = await send('DOM.querySelectorAll', { nodeId: doc.root.nodeId, selector: 'a[href],button,[role=button],[role=link],input:not([type=hidden]),select,textarea,[tabindex]' }, sessionId);
         const ids = (q.nodeIds || []).slice(0, 400);
         for (const id of ids) { try { await send('CSS.forcePseudoState', { nodeId: id, forcedPseudoClasses: ['hover'] }, sessionId); } catch {} }
+        await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId).catch(() => {});
         const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, false, STATE_MAP), returnByValue: true }, sessionId);
         const hoverText = (r.result?.value || {}).textEls || [];
         const restKey = new Set(findings.filter((f) => f.kind === 'contrast' && f.theme === modes[0].name).map((f) => f.desc + '|' + f.text));
