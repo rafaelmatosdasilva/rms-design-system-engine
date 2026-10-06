@@ -282,17 +282,17 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **The page's own reading**: every button says what it does in words (Menu and Close menu, on a phone; on a wide
   screen the menu is always there), and the style guide check fails when the page's text roles fall below 4.5:1 on its
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
-- **Specs**, in the Playground under the component (none on the measuring page), so a prop is changed and inspected in
-  one place: an inert copy of the component as the controls set it, redrawn as they change, drawn larger, each part numbered in reading order (the contract's named
-  parts, `c.anatomy`, a Figma auto name such as Frame 106 replaced by the part's class, then what sits directly inside
-  it), a slot outlined, each padding and gap outlined and numbered after the parts and named by its token in the list
-  (numbers, never colours, so nothing reads as a token's colour), each part's colours, icon size and text style by
-  their tokens, and how it lines up its items (`annotate`); then Its tokens. It is picked by a click: on the component
-  itself, a part, or a padding or gap band (each space over the parts, each part over the component), or on a name in
-  the list, and Picked shows what that one is drawn with (a part's padding, gap, fill, line, corners, shadow, text
-  style and colour; a space's token and value), outlined in the accent; a second click puts it down. A number that
-  would cover another moves to the nearest free place around it, with a line back (`marker`). A component shown in an
-  overlay is drawn as its own element. Nothing is drawn over the live component.
+- **The stage's bars**: above the component, a bar in the tables' head colour with the sizing mode (Desktop, Phone) at
+  its left and Inspect at its right; below it, a bar with the colour mode (Light, Dark) at its right and, while
+  inspecting, what is picked at its left. They keep the stage (the checkerboard) apart from what changes it.
+- **Inspect**, in the top bar (none on the measuring page): the Playground turns into its anatomy, in the live
+  component's place, so a prop is changed and inspected in one place: an inert copy of the component as the controls set
+  it, redrawn as they change (a text typed too), drawn larger, each part and each padding and gap outlined, a slot in
+  the accent, never filled with a colour (`annotate`). A click on the component, a part, or a padding or gap band (each
+  space over the parts, each part over the component) says in one line what it is and its value (a part's padding,
+  gap, fill, line, corners, shadow, text style and colour; an icon's size and colour; a space's token and value),
+  outlined in the accent; a second click puts it down. Done inspecting brings the live component back. A component
+  shown in an overlay is drawn as its own element.
 - **Width**, in the Playground (none on the measuring page): Fit (the live preview), Phone (375px), Tablet (768px) or
   Desktop (1280px), a frame of that width written with the page's own stylesheets, its icon sheet, the component as
   drawn now and the system's own scripts (`systemScripts`), so its media queries apply and it works there (a click
@@ -334,14 +334,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
   `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`),
-  `contract.authored.json` → `components.<name>.links`, and Report an issue (`issueLink`): `styleguide.issues`, the
-  tracker's new-issue address with `{name}` and `{title}` (`"https://redmine/…/issues/new?issue[subject]={title}"`),
-  else the repository's own on GitHub or GitLab. The overview adds Send feedback (`styleguide.feedback`, else the
-  same tracker with a Style guide title).
-- **At a glance** (`factsOf`), under its name: Version (the release its last change shipped in), Last changed, Figma
-  (agrees, or how many differences and props not built), Accessibility (no problem found, how many, or not checked in
-  a browser yet) and Used in (how many products); a fact that needs work is marked with ! and in bold, never by colour
-  alone. Its overview card carries the Figma and accessibility facts in one line.
+  `contract.authored.json` → `components.<name>.links`, as buttons at the top right of its header. The overview adds Send
+  feedback (`styleguide.feedback`, else `styleguide.issues`, the tracker's new-issue address with `{name}` and `{title}`,
+  else the repository's own on GitHub or GitLab, with a Style guide title, `issueLink`).
+- **At a glance** (`factsOf`), under its name: Version (the release its last change shipped in) and Last changed, its
+  date and time. How it stands with Figma and with accessibility is on those areas (their alert icons) and on its
+  overview card, in one line, a fact that needs work marked with ! and in bold, never by colour alone.
 - **Variants**, an area of its own when a variant prop has two options built or an on/off prop is built: each option of
   each variant prop and both sides of each on/off prop (false, true), one per row with its name, drawn by the Playground itself (the other props as it sets them) and copied still and inert,
   the Playground left as it was; Try it sets that option there. An option Figma has and the code does not build says

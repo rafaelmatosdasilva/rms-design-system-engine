@@ -178,8 +178,9 @@ test('in the browser: no script error, a control changes the real component, the
     // system's own button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-code code').textContent`), '<Chip Size="L" />');
     assert.equal(await run(`document.querySelector('#c-chip .pg-code [data-copy]').tagName`), 'BUTTON');
-    // No Inspect over the live component and no button for its specs: they are their own area, beside the Playground.
+    // Inspect sits in the bar above the stage, not with the props.
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].map((b) => b.textContent).filter((x) => /Inspect|specs/i.test(x)).join()`), '');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-stage-bar--top .pg-stage-tools button')].map((b) => b.textContent).join()`), 'Inspect');
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-preview [data-hit]').length`), 0);
     // No Full width button: the preview card keeps its layout.
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].some((b) => b.textContent === 'Full width')`), false);
@@ -268,43 +269,39 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'Prop').click()`);
     assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].filter((r) => !r.hidden).map((r) => r.dataset.type))]`), ['Prop']);
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'all').click()`);
-    // Specs, in the Playground under the component: a copy drawn larger as the controls set it, each part numbered, its padding outlined and
-    // numbered after the parts and named by its token in the list (numbers, never colours), how it lines its items up;
-    // never a second live component. A click on a part, a padding or a gap (or its name in the list) shows the tokens
-    // it is drawn with; again puts it down.
+    // Inspect: the Playground turns into its anatomy (an inert copy drawn larger, as the controls set it, each part, padding
+    // and gap outlined, never filled with a colour); a click on one says in one line what it is and its value; again
+    // puts the live component back.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
+    assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy').hidden`), true, 'off until asked for');
+    await run(`document.querySelector('#c-chip .pg-stage-tools button').click()`);
     // Drawn on the next frame: waited for, as a busy machine can take longer than a fixed pause.
-    for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-anat-num').length`)); i++) await new Promise((r) => setTimeout(r, 50));
-    assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-num').length`) >= 1);
+    for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-anat-space').length`)); i++) await new Promise((r) => setTimeout(r, 50));
+    assert.equal(await run(`document.querySelector('#c-chip .pg-stage-tools button').getAttribute('aria-pressed') + '|' + document.querySelector('#c-chip .pg-preview').hidden`), 'true|true', 'the inspector in the live component\'s place');
     assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-space').length`) >= 2);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks > *')].every((m) => { const b = getComputedStyle(m).backgroundColor; return m.classList.contains('pg-anat-num') || b === 'rgba(0, 0, 0, 0)'; })`), true, 'no colour fills on the drawing');
-    const legend = await run(`document.querySelector('#c-chip .pg-anat-legend').textContent`);
-    assert.match(legend, /Parts.*Spacing.*chip padding.*--padding-[a-z]+.*Alignment.*row/s);
-    assert.match(legend, /--chip-[a-z-]+/, 'the colour tokens of what it draws');
-    const nums = await run(`[...document.querySelectorAll('#c-chip .pg-anat-num')].map((n) => n.textContent).join()`);
-    assert.equal(nums, await run(`[...document.querySelectorAll('#c-chip .pg-anat-legend b')].map((b) => b.textContent).join()`), 'every number in the drawing is one in the list, in the same order');
-    assert.equal(await run(`(() => { const r = [...document.querySelectorAll('#c-chip .pg-anat-num')].map((n) => n.getBoundingClientRect()); return r.some((a, i) => r.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1)); })()`), false, 'no number covers another');
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
     assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
-    assert.match(await run(`document.querySelector('#c-chip .pg-anat-pick').textContent`), /Picked.*Click a part, a padding or a gap/s);
+    assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /Click a part, a padding or a gap/);
     await run(`(() => { const m = [...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^chip padding/.test(x.dataset.hit)); m.scrollIntoView({ block: 'center' }); const r = m.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).click(); })()`);
-    assert.match(await run(`document.querySelector('#c-chip .pg-anat-pick').textContent`), /Picked.*chip padding \w+.*--padding-[a-z]+/s);
+    assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /^chip padding \w+ {2}· {2}--padding-[a-z]+/, 'one line: what it is and its value');
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-anat-marks .is-picked').length`), 1);
-    await run(`document.querySelector('#c-chip .pg-anat-legend [data-pick^="part 1"]').click()`);
-    assert.match(await run(`document.querySelector('#c-chip .pg-anat-pick').textContent`), /Picked.*color.*--chip-text.*font/s, 'the label: its colour and text style');
-    await run(`document.querySelector('#c-chip .pg-anat-legend [data-pick^="part 1"]').click()`);
-    assert.match(await run(`document.querySelector('#c-chip .pg-anat-pick').textContent`), /Click a part/);
+    await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^part 1/.test(x.dataset.hit)).dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+    assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /color.*--chip-text/, 'the label: its colour');
     assert.ok(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-own')`), 'Its tokens, in the Playground');
     // A control changed in the Playground redraws the specs under it.
     const before = await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`);
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'M').click()`);
     for (let i = 0; i < 60 && (await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`)) === before; i++) await new Promise((r) => setTimeout(r, 50));
-    assert.notEqual(await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`), before, 'the specs follow the control');
+    assert.notEqual(await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`), before, 'the inspector follows the control');
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
     // A text typed in the Playground is in the specs too.
     await run(`(() => { const f = [...document.querySelectorAll('#c-chip .pg-ctl')].find((c) => c.querySelector('.pg-ctl-label').textContent.startsWith('Label')).querySelector('input'); f.value = 'Typed words'; f.dispatchEvent(new Event('input')); })()`);
     for (let i = 0; i < 60 && !/Typed words/.test(await run(`document.querySelector('#c-chip .pg-anatomy').textContent`)); i++) await new Promise((r) => setTimeout(r, 50));
-    assert.match(await run(`document.querySelector('#c-chip .pg-anatomy').textContent`), /Typed words/, 'the specs follow a text typed');
+    assert.match(await run(`document.querySelector('#c-chip .pg-anatomy').textContent`), /Typed words/, 'the inspector follows a text typed');
+    // Done inspecting: the live component back in its place.
+    await run(`document.querySelector('#c-chip .pg-stage-tools button').click()`);
+    assert.equal(await run(`document.querySelector('#c-chip .pg-preview').hidden + '|' + document.querySelector('#c-chip .pg-anatomy').hidden + '|' + document.querySelector('#c-chip .pg-stage-tools button').textContent`), 'false|true|Inspect');
     // Variants: every option of each variant prop and both sides of each on/off prop, one per row, drawn by the Playground and copied still; the Playground
     // keeps what was set, and Try it sets the option there.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'variants').click()`);
@@ -322,9 +319,10 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
     // Each section of rows in the Playground's tables: its title the head (Usage, Accessibility).
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /Usage/);
-    assert.equal(await run(`document.querySelector('#c-chip [data-area="play"] .pg-doc-card > .pg-inspect-head > h3').textContent`), 'Anatomy');
-    // Its header says at a glance how it stands: its version, Figma, accessibility and where it is used.
-    assert.match(await run(`document.querySelector('#c-chip .pg-facts').textContent`), /Figma\s*Agrees.*Accessibility\s*Not checked in a browser yet.*Used in\s*(\d+ products?|No product yet)/s);
+    assert.equal(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-anatomy-doc')`), false, 'no Anatomy card under the Playground');
+    // Its header: only its version and when it last changed (with the time), its links at the top right, no issue link.
+    assert.doesNotMatch(await run(`(document.querySelector('#c-chip .pg-facts') || {}).textContent || ''`), /Figma|Accessibility|Used in/);
+    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-header').textContent`), /Report an issue/);
     assert.match(await run(`document.querySelector('#overview .sg-card[href="#c-chip"] .sg-card-facts').textContent`), /^Figma agrees.*Accessibility not checked$/s);
     // The name stays beside the areas; nothing differs, so Parity carries no alert and the page no line about it.
     assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + !!document.querySelector('#c-chip .pg-areas [data-v="parity"] .sg-seg-icon') + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|false|false');
@@ -333,7 +331,7 @@ test('in the browser: no script error, a control changes the real component, the
     await new Promise((r) => setTimeout(r, 100));
     assert.equal(await run(`(() => { const s = document.querySelector('#c-chip .pg-areas-scroll'), items = [...s.querySelectorAll('[data-v]')]; return s.scrollWidth > s.clientWidth && new Set(items.map((b) => Math.round(b.getBoundingClientRect().top))).size === 1 && document.documentElement.scrollWidth <= innerWidth; })()`), true, 'one row that scrolls, the page itself no wider than the screen');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
-    assert.ok(await run(`(() => { const p = document.querySelector('#c-chip .pg-preview').getBoundingClientRect(), [a, b] = document.querySelectorAll('#c-chip .pg-stage-mode'); const top = a && a.children.length ? a.getBoundingClientRect().bottom : p.top, bottom = b && b.children.length ? b.getBoundingClientRect().top : p.bottom; return Math.round(bottom - top); })()`) >= 200, 'on a phone the component has room of its own between the mode switches');
+    assert.ok(await run(`(() => { const p = document.querySelector('#c-chip .pg-preview').getBoundingClientRect(), t = document.querySelector('#c-chip .pg-stage-bar--top').getBoundingClientRect(); return t.bottom <= p.top + 1; })()`), 'the bar sits above the stage, never over the component');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'log').click()`);
     assert.equal(await run(`(() => { const s = document.querySelector('#c-chip .pg-areas-scroll'), b = s.querySelector('[data-v="log"]').getBoundingClientRect(), r = s.getBoundingClientRect(); return s.scrollLeft > 0 && b.right <= r.right + 1; })()`), true, 'Changelog scrolled into view');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
@@ -722,7 +720,7 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.deepEqual(logs.badge.map((r) => [r.subject, r.release, r.pr]), [['Badge colour', null, '4'], ['Badge and chip', 'v1.0.0', null]]);
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /\['log', 'Changelog'\]/);
-  assert.match(tpl, /importHTML\(c\) \+ linksHTML\(c\.links\)/);
+  assert.match(tpl, /'<div class="pg-head"><h2>' \+ esc\(c\.name\) \+ '<\/h2>' \+ headLinksHTML\(c\.links\)/, 'its links at the top right, beside its name');
   assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
   // What's new: every component's changes by release, one row per commit with the components it touched.
   assert.match(tpl, /navLink\('whats-new', 'what\\'s new'\)/);
@@ -752,7 +750,8 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
   assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
   assert.doesNotMatch(tpl, /'Status: ' \+ kinds|Usage written: |Open the To do list/, 'the overview counts nothing of its own');
-  assert.match(tpl, /\.pg-stage-mode:last-child \{ align-self: flex-end; \}/, 'the colour mode sits at the bottom right');
+  assert.match(tpl, /<div class="pg-stage-bar pg-stage-bar--top"><div class="pg-stage-mode"><\/div>/, 'the sizing mode in the bar above the stage');
+  assert.match(tpl, /<div class="pg-stage-bar pg-stage-bar--bottom"><p class="pg-anat-line" hidden><\/p><div class="pg-stage-mode"><\/div>/, 'the colour mode in the bar below it, at the right');
   assert.match(tpl, /\.pg-stage-mode \.sg-mode-label \{ position: absolute; width: 1px/, 'no visible label on the switches inside the playground');
   assert.match(tpl, /\.sg-demo\.sg-colors \{ display: grid; grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/, 'six colours a row');
   assert.match(tpl, /a\.scoped && a\.attr === 'data-size'; \}, function \(a\) \{ return a\.scoped && a\.attr !== 'data-size'/, 'the sizing mode top left, the colour mode bottom right, inside the playground');
