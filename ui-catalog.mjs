@@ -164,10 +164,12 @@ export function checkUi(ui, catalog) {
     } else {
       // A component on its way out names what replaces it; one still being settled (experimental, beta) is the system's
       // own and may be used: the line says so, or an agent reads it as forbidden and leaves the need unmet.
-      if (def.status) add(1, 'warning', node.id, `${node.component} is ${def.status}${def.useInstead?.length ? `: use ${def.useInstead.join(' or ')}` : /^(experimental|beta|in progress|draft|new)$/i.test(def.status) ? ': it is in the system and may still change; keep it, and say so in the reply' : ''}`);
+      if (def.status) add(1, 'warning', node.id, `${node.component} is ${def.status}${def.useInstead?.length ? `: use ${def.useInstead.join(' or ')}` : /^(experimental|beta|in progress|draft|new)$/i.test(def.status) ? ': it is in the system and may still change; use it for what it is for, and say so in the reply' : ''}`);
       const props = { ...Object.fromEntries(Object.entries(node).filter(([k]) => !RESERVED.has(k))), ...(node.props ?? {}) };
       for (const [k, v] of Object.entries(props)) {
         const p = def.props?.[k] ?? Object.entries(def.props ?? {}).find(([, e]) => e.codeName === k)?.[1];
+        // A part's own keys (its id, its children) written inside its props: say where they go.
+        if (!p && ['id', 'children', 'component'].includes(k)) { add(2, 'error', node.id, `${node.component} has no prop "${k}": "${k}" goes beside "component", not inside "props"`); continue; }
         if (!p) { add(2, 'error', node.id, `${node.component} has no prop "${k}"`); continue; }
         const allowed = k === p.codeName && p.codeValues ? p.codeValues : p.values;   // code props take the code's own names
         if (p.type === 'enum' && allowed && !allowed.includes(v)) {

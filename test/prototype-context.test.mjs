@@ -383,3 +383,16 @@ test('a difference between pages says how to match it in the composition', async
   assert.equal(howToMatch({ what: 'page alignment', here: 'center', product: 'stretch' }), 'give the Page align "stretch"');
   assert.equal(howToMatch({ what: "the page's frame", here: 'no header', product: 'header' }), null);
 });
+
+test('a request that has a part open another owes an "opens"; a state alone is not it', async () => {
+  const { requestFindings } = await import('../prototype-context.mjs');
+  const ctx = { components: { button: { purpose: 'The main action on a screen.' } }, rules: [] };
+  const req = 'a project page with a Delete project button that opens a confirmation';
+  const without = requestFindings(ctx, req, [{ id: 'b', component: 'button', props: { Label: 'Delete project' } }]);
+  assert.ok(without.some((f) => f.said === 'opens'), JSON.stringify(without));
+  const withOpens = requestFindings(ctx, req, [{ id: 'b', component: 'button', props: { Label: 'Delete project', opens: 'c' } }, { id: 'c', component: 'Stack', props: {} }]);
+  assert.ok(!withOpens.some((f) => f.said === 'opens'));
+  assert.ok(!requestFindings(ctx, 'a settings page with a Save button', []).some((f) => f.said === 'opens'));
+  assert.ok(!requestFindings(ctx, 'a page that opens with a heading', []).some((f) => f.said === 'opens'));
+  assert.ok(requestFindings(ctx, 'a row whose More button opens a small menu', []).some((f) => f.said === 'opens'));
+});

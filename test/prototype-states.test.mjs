@@ -96,6 +96,16 @@ test('--prototype draws each state, owes the states the page lacks, and tries ev
   r = run('--prototype', 'prototypes/wrong.json', '--no-browser');
   assert.equal(r.status, 1);
   assert.match(r.stdout, /state "empty" names "nowhere", and no part has that id/);
+
+  // A part a state adds is held to the documentation too: a tag the guidelines rule out for a message, shown only once saved.
+  writeFileSync(join(dir, 'guidelines.md'), '## tag\nA status that does not change. Never a message that comes and goes, like a confirmation.\n');
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, guidelines: { sources: ['guidelines.md'] } }, null, 2));
+  writeFileSync(join(dir, 'prototypes', 'saved.json'), JSON.stringify({ component: 'Page', children: [{ component: 'field', props: {} }, { component: 'button', props: { Label: 'Save' } }, { id: 'note', component: 'Text', props: { text: '' } }],
+    states: { saved: { note: { component: 'tag', props: { Tone: 'Positive', Label: 'Changes saved' } } } } }));
+  r = run('--prototype', 'prototypes/saved.json', '--no-browser', '--for', 'a page with a Save button and a message confirming the changes were saved');
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stdout, /state "saved": tag is ruled out for "message/);
 });
 
 test('a value as the person writes it is read as the system writes it; a state that names no component changes the part', async () => {

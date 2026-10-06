@@ -116,6 +116,12 @@ test('an experimental component may be used: its line says keep it; one inside a
   const catalog = { components: { chip: { props: { Label: { type: 'text' } }, children: ['button'] }, tag: { props: { Label: { type: 'text' } }, status: 'experimental' }, button: { props: { Label: { type: 'text' } } } } };
   const r = checkUi({ component: 'chip', props: { Label: 'Today' }, children: [{ component: 'tag', props: { Label: 'New' } }] }, catalog);
   const msgs = r.findings.map((f) => f.message);
-  assert.ok(msgs.includes('tag is experimental: it is in the system and may still change; keep it, and say so in the reply'), msgs.join('\n'));
+  assert.ok(msgs.includes('tag is experimental: it is in the system and may still change; use it for what it is for, and say so in the reply'), msgs.join('\n'));
   assert.ok(msgs.some((m) => /never puts tag inside chip: put it beside chip, not inside it/.test(m)), msgs.join('\n'));
+});
+
+test('an id written inside props says where it goes', async () => {
+  const { checkUi } = await import('../ui-catalog.mjs');
+  const r = checkUi({ component: 'chip', props: { id: 'x', Label: 'A' } }, { components: { chip: { props: { Label: { type: 'text' } } } } });
+  assert.ok(r.findings.some((f) => f.message === 'chip has no prop "id": "id" goes beside "component", not inside "props"'), JSON.stringify(r.findings));
 });
