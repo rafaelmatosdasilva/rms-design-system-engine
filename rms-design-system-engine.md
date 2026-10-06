@@ -248,13 +248,13 @@ A Figma value is read in **every mode** of its collection, never from the one a 
 5. **A hardcoded value is a divergence only when it contradicts Figma - scoped per component.** This is a *parity* skill, not a style linter - it does not push `var()` over literals for its own sake. A raw literal in a CSS rule is flagged only when the component that rule belongs to has **no matching value** for it in Figma; when Figma uses that same value on that component, the literal has 100% parity and passes, token-backed or not. Scoping is per component via `component-values.snapshot.json` - a full raw-value sweep of **every node** of each component (all variants, all descendants, hidden included). A file's literals are checked against the component whose base selector the file contains (so `Primary.vue`, carrying `.buttonPrimary`, is scoped to `ButtonPrimary`'s swept values). So `.icon { width: 24px }` passes only because *ButtonPrimary's own icon node* is 24px in Figma - a 24px that belongs to some **other** component no longer excuses it. Matches are reported as info (`ℹ️ … parity OK, not failed [Component]`) so they stay visible and auditable. **Fallback:** when `component-values.snapshot.json` is absent, or a file maps to no component, the gate falls back to the global value set (resolved token colours across every mode + all sizing/typography numerics + captured structural geometry) - coarser, but non-breaking. `100vw` (a scrollbar-clipping rendering bug) is never suppressed. A length in an `outline` of a `:focus` rule (a focus ring) that Figma has no value for is listed apart, never failed: Figma draws no outline to compare it with; a colour in that ring is still checked. Document deliberate literals Figma has no counterpart for - layout math like `50%`, positioning zeros - in `ds-config.json → knownHardcodedExceptions`.
 6. **New Figma component tokens detected during any audit step must be implemented in code before the audit closes.**
 7. **Requirement follows use, with a middle ground for elements that can be switched on later. Three states, not two:**
-   - **Visible token** (bound on a visible node in some variant) → a hard requirement. Missing CSS var ⇒ `❌ UNCOVERED`, Gate [10] fails. It is "meant to be used" now.
+   - **Visible token** (bound on a visible node in some variant) → a hard requirement. Missing CSS var ⇒ `❌ UNCOVERED`, Gate [14] (All states are built) fails. It is "meant to be used" now.
    - **Hidden + visibility boolean** (`boundVariables.visible`, itself or via a hidden ancestor) → the element is off *here* but can be **toggled on in a future project or state**, so the code must **permit** that: if its CSS var exists the code already supports activation (`✅`); if the var is missing the element could not render when switched on ⇒ `⚠️ UNCOVERED-TOGGLEABLE`, an **advisory that is surfaced but does not fail** the gate (it is legitimately off in this project). So it is *checked*, not silently ignored.
    - **Hidden, no boolean** (statically off, dead) → `⏭ HIDDEN-STATIC`, never a requirement, ignored.
 
    The capture records this via `_hiddenOnly`/`_hiddenToggleable` in `component-state-tokens.json`. (This replaces the earlier "hidden + boolean → always implement" stance: a DS element switched off downstream must not *fail* a consumer that has it off - but because it can be turned on later, its missing wiring is still raised as an advisory so someone can decide.)
-9. **CSS alias chains must mirror Figma exactly.** When Figma aliases a component token directly to a primitive (e.g. `primitives/Neutral 700`), the CSS var must chain through the matching primitive var (e.g. `var(--neutral-700)`). Routing through a semantic intermediate (`var(--border)`, `var(--bg)`, `var(--text-muted)`) is never acceptable as a substitute - even when the resolved hex is identical. A `🔗 ALIAS FAIL` from Gate [2] is always fixed in CSS; there is no exemption map.
-8. **Every DS sub-component nested inside another DS component must retain its own CSS styles.** A parent component's rule that combines a component class with a bare element tag (`.card svg { color: X }`) directly targets that element - direct targeting beats inheritance. When adding any CSS rule of the form `.<componentClass> <elementTag> { <visual-property> }`, either (a) prove it's a leaf component, or (b) add explicit `.<subComponent> <elementTag> { }` overrides later in the cascade. Add every such rule to the `ALLOWED` map in `subcomponent-isolation-check.mjs`. Gate [9] enforces this mechanically.
+9. **CSS alias chains must mirror Figma exactly.** When Figma aliases a component token directly to a primitive (e.g. `primitives/Neutral 700`), the CSS var must chain through the matching primitive var (e.g. `var(--neutral-700)`). Routing through a semantic intermediate (`var(--border)`, `var(--bg)`, `var(--text-muted)`) is never acceptable as a substitute - even when the resolved hex is identical. A `🔗 ALIAS FAIL` from Gate [3] (Token values) is always fixed in CSS; there is no exemption map.
+8. **Every DS sub-component nested inside another DS component must retain its own CSS styles.** A parent component's rule that combines a component class with a bare element tag (`.card svg { color: X }`) directly targets that element - direct targeting beats inheritance. When adding any CSS rule of the form `.<componentClass> <elementTag> { <visual-property> }`, either (a) prove it's a leaf component, or (b) add explicit `.<subComponent> <elementTag> { }` overrides later in the cascade. Add every such rule to the `ALLOWED` map in `subcomponent-isolation-check.mjs`. Gate [12] (Nested components keep their own styles) enforces this mechanically.
 
 ---
 
@@ -268,8 +268,8 @@ A Figma value is read in **every mode** of its collection, never from the one a 
 - Naming violations are flagged regardless of whether the value is correct.
 - When renaming: update declarations, all usages, then rebuild. Update `EXPLICIT` in both `parity-check.mjs` and `bound-check.mjs` if the old name had an explicit entry.
 - When adding a token group: add CSS var + rule consumer + update `design-system-engine-map.mjs` + rebuild.
-- When removing a token from DS: remove CSS var if unused (Gate [5] catches it), replace in rules if used, remove from `design-system-engine-map.mjs`, remove from `EXPLICIT`/`COVERED` if present.
-- When removing an entire component from DS: Phase 1 shows many REMOVED tokens for that component. Remove all its CSS vars (Gate [5] flags any that remain). Remove all its CSS rules. Remove from `design-system-engine-map.mjs`, `EXPLICIT`, `COVERED`, and `figma-structure.snapshot.json`. Re-run bound walk to purge it from `bound-tokens.json`. Rebuild.
+- When removing a token from DS: remove CSS var if unused (Gate [11] (Clean CSS) catches it), replace in rules if used, remove from `design-system-engine-map.mjs`, remove from `EXPLICIT`/`COVERED` if present.
+- When removing an entire component from DS: Phase 1 shows many REMOVED tokens for that component. Remove all its CSS vars (Gate [11] (Clean CSS) flags any that remain). Remove all its CSS rules. Remove from `design-system-engine-map.mjs`, `EXPLICIT`, `COVERED`, and `figma-structure.snapshot.json`. Re-run bound walk to purge it from `bound-tokens.json`. Rebuild.
 
 ---
 
@@ -280,21 +280,21 @@ After every run, report this table so the practitioner knows exactly what the au
 
 | Area | Method | Confidence |
 |---|---|---|
-| Token values match Figma | Automated (Gate [2] - resolver against live snapshot) | High |
-| All Figma tokens have a CSS var | Automated (Gate [4] - bound-check against frame walk, auto-refreshed) | High if frames configured; **not run** if `frames: []` |
-| All state tokens wired | Automated (Gate [10] - state walk, auto-refreshed) | High |
-| No unused CSS vars | Automated (Gate [5]) | High |
-| No hardcoded values in rules | Automated (Gate [6]) | High |
-| Structural parity (height, padding, gap) | Automated (Gate [3]) | High |
-| Figma annotation acknowledgment + CSS verification | Automated (Gate [10g]) | High |
-| Surface container --area-bg declarations | Automated (Gate [10h]) | High if SURFACE_CONTAINERS populated |
-| Button modifier-class base compliance | Automated (Gate [10i]) | High if BUTTON_CLASS_RULES populated |
-| Nested components keep their styles | Automated (Gate [9]) | High |
-| Build freshness | Automated (Gate [7]) | High |
+| Token values match Figma | Automated (Gate [3] (Token values) - resolver against live snapshot) | High |
+| All Figma tokens have a CSS var | Automated (Gate [4] (Tokens used in screens exist in CSS) - bound-check against frame walk, auto-refreshed) | High if frames configured; **not run** if `frames: []` |
+| All state tokens wired | Automated (Gate [14] (All states are built) - state walk, auto-refreshed) | High |
+| No unused CSS vars | Automated (Gate [11] (Clean CSS)) | High |
+| No hardcoded values in rules | Automated (Gate [11] (Clean CSS)) | High |
+| Structural parity (height, padding, gap) | Automated (Gate [13] (Structure)) | High |
+| Figma annotation acknowledgment + CSS verification | Automated (Gate [13] (Structure)) | High |
+| Surface container --area-bg declarations | Automated (Gate [13] (Structure)) | High if SURFACE_CONTAINERS populated |
+| Button modifier-class base compliance | Automated (Gate [13] (Structure)) | High if BUTTON_CLASS_RULES populated |
+| Nested components keep their styles | Automated (Gate [12] (Nested components keep their own styles)) | High |
+| Build freshness | Automated (Gate [1] (Data is up to date)) | High |
 | Removed tokens reconciled | Manual (Phase 1 diff) | Medium - verify any "used in a rule" replacements visually |
-| Component states fully wired | Automated (Gate [10]) | High |
-| SVG symbols + path freshness | Automated (Gate [14] - icon contract: symbol docs + path data + live Figma check) | High if all symbols documented and FIGMA_TOKEN set |
-| Looks the same as Figma | Automated (Gate [9], requires FIGMA_TOKEN) or Manual (Step 7 screenshots) | **Not run** if neither is configured |
+| Component states fully wired | Automated (Gate [14] (All states are built)) | High |
+| SVG symbols + path freshness | Automated (Gate [20] (Icons) - icon contract: symbol docs + path data + live Figma check) | High if all symbols documented and FIGMA_TOKEN set |
+| Looks the same as Figma | Automated (Gate [2] (Figma frame unchanged), requires FIGMA_TOKEN) or Manual (Step 7 screenshots) | **Not run** if neither is configured |
 | CI enforcement | GitHub Actions (`.github/workflows/design-system-engine.yml`) | High if configured |
 
 Flag any row marked **not run** or **skipped** explicitly in the summary - do not imply full coverage.

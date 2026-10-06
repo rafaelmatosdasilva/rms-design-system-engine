@@ -26,17 +26,17 @@ fine and expected. When the answer is yes, the same session must:
 
 **Worked example (2026-07-23).** A project's `figma-component-props.snapshot.json`
 held only its `_updated` stamp because an earlier capture had returned nothing.
-Gate [1] validated age and existence, so it reported "✓ updated today" while Gate
-[10g] silently checked zero annotations - a real DS annotation went unverified for
+Gate [1] (Data is up to date) validated age and existence, so it reported "✓ updated today" while Gate
+[13] (Structure) silently checked zero annotations - a real DS annotation went unverified for
 weeks and the audit stayed green throughout.
 
 The project-level fix was to re-run the capture. The engine-level fix was the one
-that mattered: Gate [1] now counts non-metadata entries in every snapshot and fails
+that mattered: Gate [1] (Data is up to date) now counts non-metadata entries in every snapshot and fails
 a file that is fresh but empty, naming the gate left checking nothing. A stale
 snapshot is bad; an empty one is worse, because stale data still gets checked.
 
 **Worked example (2026-07-24).** Two new sprites were added to a plugin's shared icon
-sheet. Gate [14] flagged both as undocumented - correct, but it missed the more
+sheet. Gate [20] (Icons) flagged both as undocumented - correct, but it missed the more
 interesting half: the contract already held an entry for one of them under a stale key
 (`icon-zoom`) whose own description said `Icon/Fit`. The id and the DS component had
 been out of sync for as long as the entry existed, and no gate looked at the
@@ -93,7 +93,7 @@ colour *in its parent context* (`selector: '.menuList .infoButton svg'`, with a
 `probe` that nests them), one per mode. It uses the real cascade, so it is exact and
 silent until it actually regresses - verified by reverting the CSS fix and watching
 only those two assertions fail. The lesson: when the risk is a cascade/nesting
-outcome, the guard belongs in Gate [16] (rendered), not in a static selector scan.
+outcome, the guard belongs in Gate [24] (Renders correctly in a browser) (rendered), not in a static selector scan.
 The isolation-fix override rules themselves are then documented in `ALLOWED_BROAD_RULES`
 as `ISOLATION FIX`.
 

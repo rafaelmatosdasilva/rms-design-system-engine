@@ -5,19 +5,19 @@ Part of the rms-design-system-engine reference (`rms-design-system-engine --refe
 ---
 
 
-## Gate [10g] - Figma annotation parity
+## Gate [13] (Structure) - Figma annotation parity
 
-Every Figma annotation attached to a component node is a design specification. The audit fetches `doc.annotations[]` for every component via the REST API and stores them in `figma-component-props.snapshot.json`. Gate [10g] then enforces that each annotation is acknowledged in the contract and, where applicable, verified in CSS.
+Every Figma annotation attached to a component node is a design specification. The audit fetches `doc.annotations[]` for every component via the REST API and stores them in `figma-component-props.snapshot.json`. Gate [13] (Structure) then enforces that each annotation is acknowledged in the contract and, where applicable, verified in CSS.
 
 ### How it works
 
 1. **`audit.mjs` refresh** - `refreshComponentProps()` fetches `doc.annotations[]` alongside `componentPropertyDefinitions` for every component node. Nodes with either properties **or** annotations are included in the snapshot. (`/nodes` works on any plan with a token.)
-2. **Gate [10g] check** - for every component in the snapshot that has annotations, `structure-check.mjs` looks up `CONTRACT[key].annotations` and verifies each annotation label is present. Missing label → `FAIL`. If a CSS selector is provided, it must exist in the CSS - not found → `FAIL`. An accessibility note the accessibility check verifies (a role, name, heading level or alt text, see *Writing accessibility notes in Figma* in `rms-design-system-engine --reference usage`) passes without an entry.
+2. **Gate [13] (Structure) check** - for every component in the snapshot that has annotations, `structure-check.mjs` looks up `CONTRACT[key].annotations` and verifies each annotation label is present. Missing label → `FAIL`. If a CSS selector is provided, it must exist in the CSS - not found → `FAIL`. An accessibility note the accessibility check verifies (a role, name, heading level or alt text, see *Writing accessibility notes in Figma* in `rms-design-system-engine --reference usage`) passes without an entry.
 3. **`anyFail`** - annotation failures count the same as property failures; the gate exits non-zero.
 
 ### Plugin API capture (no token, any plan)
 
-No token? Generate the same file inside Figma via `use_figma` / the plugin console, then save it as `figma-component-props.snapshot.json` at project root and commit it. `componentPropertyDefinitions` is readable on a COMPONENT_SET (or a standalone COMPONENT), so this needs no token or special plan access - it feeds Gate [12] (component prop parity) and Gate [10g] at full strength:
+No token? Generate the same file inside Figma via `use_figma` / the plugin console, then save it as `figma-component-props.snapshot.json` at project root and commit it. `componentPropertyDefinitions` is readable on a COMPONENT_SET (or a standalone COMPONENT), so this needs no token or special plan access - it feeds Gate [15] (component prop parity) and Gate [13] (Structure) at full strength:
 
 ```js
 const result = {};
@@ -39,7 +39,7 @@ return JSON.stringify({ _updated: new Date().toISOString(), ...result }, null, 2
 
 ### `component-composition.snapshot.json` - Plugin API capture (no token, any plan)
 
-Feeds Gate [11c] (Sub-components match Figma). For each component, records the set of OTHER DS components it instantiates. Run in Figma (via `use_figma` / the Plugin console), save as `component-composition.snapshot.json` at project root, and commit it:
+Feeds Gate [16] (Sub-components match Figma). For each component, records the set of OTHER DS components it instantiates. Run in Figma (via `use_figma` / the Plugin console), save as `component-composition.snapshot.json` at project root, and commit it:
 
 ```js
 const compSetName = (inst) => {
@@ -62,11 +62,11 @@ return JSON.stringify({ _updated: new Date().toISOString(), ...result }, null, 2
 
 ### `figma-templates.snapshot.json` - auto-captured in Phase 1 (REST `/nodes`, any plan)
 
-Feeds Gate [11d] (Templates compose the right components). For each frame listed in `ds-config.json → templates[]`, records the ordered top-level DS component instances it composes - `{ templates: { "Consult": { name, nodeId, components: ["Filters", "SidePanel"] } } }`. Captured automatically by `refreshTemplateComposition` in `audit.mjs` whenever `FIGMA_TOKEN` + `templates[]` are set (walks each frame, records INSTANCE/COMPONENT names in document order, does **not** descend into an instance's internals). Auto-generated - do not edit by hand; the gate is inert (PASS) until it exists.
+Feeds Gate [17] (Templates compose the right components). For each frame listed in `ds-config.json → templates[]`, records the ordered top-level DS component instances it composes - `{ templates: { "Consult": { name, nodeId, components: ["Filters", "SidePanel"] } } }`. Captured automatically by `refreshTemplateComposition` in `audit.mjs` whenever `FIGMA_TOKEN` + `templates[]` are set (walks each frame, records INSTANCE/COMPONENT names in document order, does **not** descend into an instance's internals). Auto-generated - do not edit by hand; the gate is inert (PASS) until it exists.
 
 ### `figma-icons.snapshot.json` - Plugin API capture (no token, any plan)
 
-Feeds Gate [14]'s inventory part. The DS icon set often lives in a **separate library file** with its own structure, so run this **inside that icon library file** (via `use_figma` / the Plugin console), save as `figma-icons.snapshot.json` at project root, and commit it. Adjust the page filter and the name derivation to that file's convention:
+Feeds Gate [20] (Icons)'s inventory part. The DS icon set often lives in a **separate library file** with its own structure, so run this **inside that icon library file** (via `use_figma` / the Plugin console), save as `figma-icons.snapshot.json` at project root, and commit it. Adjust the page filter and the name derivation to that file's convention:
 
 ```js
 const ICON_PAGE = null;          // e.g. 'Icons' to limit to one page, or null for all
@@ -138,11 +138,11 @@ Annotations describe design intent, not CSS mechanics. Read them for what they r
 ---
 
 
-## Gate [3] - childFramePadding HTML structure check
+## Gate [13] - childFramePadding HTML structure check
 
 When `structure-contract.mjs` has a component entry with `childFramePadding[]`, the CSS padding rule targets a child element (e.g. `.buttonTertiary span`). If the HTML renders bare text without that child element, the padding is silently missing - the CSS rule matches nothing.
 
-**Run this check after every Gate [3] pass** (or any time you add a `childFramePadding` entry to the contract):
+**Run this check after every Gate [13] (Structure) pass** (or any time you add a `childFramePadding` entry to the contract):
 
 For each component that has `childFramePadding` entries:
 1. Extract the `cssSelector` for each entry (e.g. `.buttonTertiary span` → child tag = `span`, parent class = `buttonTertiary`)
@@ -161,7 +161,7 @@ Then for each matched line, check whether text content is wrapped: `>Cancel<` is
 ---
 
 
-## Gate [10h] - Surface container token enforcement
+## Gate [13] (Structure) - Surface container token enforcement
 
 Verifies that every surface container in `SURFACE_CONTAINERS` declares `--area-bg: var(--bgVar)` in its CSS rule. This ensures components using `var(--area-bg, fallback)` automatically inherit the correct surface color without per-instance wiring.
 
@@ -174,18 +174,18 @@ export const SURFACE_CONTAINERS = [
 ];
 ```
 
-`structure-check.mjs` Gate [10h] verifies that each listed selector has `--area-bg: var(--bgVar[...])` in its CSS block. Fails if missing or uses the wrong var.
+`structure-check.mjs` Gate [13] (Structure) verifies that each listed selector has `--area-bg: var(--bgVar[...])` in its CSS block. Fails if missing or uses the wrong var.
 
 **When to add an entry:** any time you add a new surface container (a wrapper that gives components a distinct background context).
 
 ---
 
 
-## Gate [10i] - Button class-base rules
+## Gate [13] (Structure) - Button class-base rules
 
 Catches icon-only buttons (and other modifier-class buttons) using the wrong DS base class. The classic failure: a ghost icon button that should be `.buttonGhost` is coded as `.buttonTertiary.buttonCompact`, giving it a visible border on hover.
 
-**How it works:** Gate [10i] scans every plugin HTML source file for `<button>` elements whose class list includes a _modifier class_ defined in `BUTTON_CLASS_RULES`. For each match, it checks that at least one of the `allowedBases` classes is also present. If not, it fails with the file path and full class string.
+**How it works:** Gate [13] (Structure) scans every plugin HTML source file for `<button>` elements whose class list includes a _modifier class_ defined in `BUTTON_CLASS_RULES`. For each match, it checks that at least one of the `allowedBases` classes is also present. If not, it fails with the file path and full class string.
 
 ```js
 // structure-contract.mjs
@@ -201,9 +201,9 @@ export const BUTTON_CLASS_RULES = [
 ---
 
 
-## Gate [10g] - Inverse annotation check (WARN)
+## Gate [13] (Structure) - Inverse annotation check (WARN)
 
-In addition to the Figma→Contract direction (annotation must be acknowledged), Gate [10g] also warns in the **Contract→Figma** direction: if a `propertyMap` entry maps a CSS selector but no Figma annotation covers that property name, a `⚠️ WARN` is emitted.
+In addition to the Figma→Contract direction (annotation must be acknowledged), Gate [13] (Structure) also warns in the **Contract→Figma** direction: if a `propertyMap` entry maps a CSS selector but no Figma annotation covers that property name, a `⚠️ WARN` is emitted.
 
 This is a warning, not a failure - it does not block the audit. Its purpose: surface documentation gaps and create pressure to add Figma annotations for behavioral CSS you've already implemented.
 
@@ -212,7 +212,7 @@ This is a warning, not a failure - it does not block the audit. Its purpose: sur
 ---
 
 
-## Gate [14] - Icons match Figma (SVG symbol audit)
+## Gate [20] - Icons match Figma (SVG symbol audit)
 
 Every `<symbol>` element in any plugin HTML file must be declared in `ICON_SYMBOLS` in `structure-contract.mjs`. Undocumented symbols fail the gate.
 
