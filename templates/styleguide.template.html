@@ -269,8 +269,7 @@ a.pg-usage-name { color: var(--sg-text); }
   background-color: var(--sg-stage, var(--sg-bg));
   --sg-checker: color-mix(in srgb, var(--sg-text) 7%, transparent);
   background-image: linear-gradient(45deg, var(--sg-checker) 25%, transparent 25%, transparent 75%, var(--sg-checker) 75%), linear-gradient(45deg, var(--sg-checker) 25%, transparent 25%, transparent 75%, var(--sg-checker) 75%);
-  background-size: 16px 16px; background-position: 0 0, 8px 8px;
-  border-radius: var(--sg-radius); }
+  background-size: 16px 16px; background-position: 0 0, 8px 8px; }   /* square: the stage's bars round its corners */
 .pg-actions { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); }
 .pg-actions:empty { display: none; }
 .pg-panel { display: flex; flex-direction: column; gap: var(--sg-space-l); padding-left: var(--sg-space-l); }
@@ -325,11 +324,11 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Width: the component in a frame of that width, scaled to fit when wider than the room. */
 .pg-preview[hidden], .pg-frame[hidden] { display: none; }
 .pg-preview-col { min-width: 0; display: flex; flex-direction: column; position: relative; }
-/* A slot in the component, drawn where it sits as Figma draws one: a dashed box named Slot, over the component and out
-   of its markup, so its size, its code and its checks stay the component's own. */
-.pg-slot-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2147483000; }   /* above a component that sets its own z-index (a modal card); the preview isolates it */
-.pg-slot-box { position: absolute; box-sizing: border-box; border: 1px dashed var(--sg-text-2); background: color-mix(in srgb, var(--sg-text-2) 6%, transparent); }
-.pg-slot-box::after { content: attr(data-slot); position: absolute; left: -1px; bottom: 100%; padding: var(--sg-space-xxs) var(--sg-space-xs); font-size: var(--sg-xs); color: var(--sg-text-2); background: var(--sg-bg); border: 1px dashed var(--sg-text-2); }
+/* A slot in the component: the area it takes, dashed and named Slot inside, in place of the placeholder its markup
+   holds (kept, unseen, so the component keeps its size). Only the Playground marks it; the code shown never has it. */
+.pg-slot-area { position: relative; min-height: 40px; min-width: 96px; box-sizing: border-box; outline: 1px dashed var(--sg-text-2); outline-offset: -1px; background: color-mix(in srgb, var(--sg-text-2) 6%, transparent); }
+.pg-slot-area > * { visibility: hidden; }
+.pg-slot-area::after { content: attr(data-slot); position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--sg-s); color: var(--sg-text-2); }
 /* The system's modes inside the playground: the colour mode top left, a sizing collection top right, over the stage. */
 .pg-stage-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sg-space-s); padding: var(--sg-space-s) var(--sg-space-m); background: var(--sg-bg-2); border: var(--sg-line); }
 .pg-stage-bar--top { border-bottom: none; border-radius: var(--sg-radius-l) var(--sg-radius-l) 0 0; }
@@ -962,7 +961,7 @@ a.pg-usage-name { color: var(--sg-text); }
       for (var i = 0; i < cands.length; i++) { var t = tokenName(svg, cands[i], 'color', compName); if (t && !seen[t]) { seen[t] = 1; iconN++; rows.push([iconN > 1 ? 'icon ' + iconN : 'icon', tok(svg, cands[i], 'color', compName)]); break; } }
     });
     preview.querySelectorAll('*').forEach(function (node) {
-      if (node === el || node.tagName.toLowerCase() === 'svg' || node.closest('svg') || node.closest('.pg-slot-layer')) return;
+      if (node === el || node.tagName.toLowerCase() === 'svg' || node.closest('svg')) return;
       var ownText = false; for (var i = 0; i < node.childNodes.length; i++) if (node.childNodes[i].nodeType === 3 && node.childNodes[i].textContent.trim()) ownText = true;
       if (!ownText) return;
       var col = getComputedStyle(node).color, t = tokenName(node, col, 'color', compName);
@@ -979,12 +978,23 @@ a.pg-usage-name { color: var(--sg-text); }
   // The class a preview draws a component with: its own, or, for one the system defines by id (#tt, kept once in
   // the page for the system's scripts), a class standing for that id whose rules are the id's (idAliasRules).
   function clsName(c) { return /^#/.test(c.cls || '') ? 'sg-id-' + c.cls.slice(1) : c.cls; }
+  // The ids an instance keeps (the label its group is named by) made unique each time it is drawn, with what points to
+  // them inside it, so two copies on the page never share one.
+  var ID_N = 0, ID_REFS = ['aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-owns', 'aria-errormessage', 'aria-activedescendant', 'aria-details', 'aria-flowto', 'for', 'headers', 'list'];
+  function uniqueIds(root) {
+    var map = {}, n = ++ID_N;
+    [root].concat(Array.prototype.slice.call(root.querySelectorAll('[id]'))).forEach(function (el) { if (el.id) { map[el.id] = el.id + '-sg' + n; el.id = map[el.id]; } });
+    if (!Object.keys(map).length) return;
+    [root].concat(Array.prototype.slice.call(root.querySelectorAll('*'))).forEach(function (el) {
+      ID_REFS.forEach(function (a) { var v = el.getAttribute(a); if (v) el.setAttribute(a, v.split(/\s+/).map(function (x) { return map[x] || x; }).join(' ')); });
+    });
+  }
   function baseElement(c) {
     if (c.markup) {
       var t = document.createElement('template'); t.innerHTML = c.markup.trim(); var first = t.content.firstElementChild;
       // The instance as the component is at rest: a state, a hidden flag or a layout the product gave this one copy is
       // dropped, so the props decide (a Disabled option puts disabled back).
-      if (first) { ['disabled', 'aria-disabled', 'hidden', 'style'].forEach(function (a) { first.removeAttribute(a); }); return first; }
+      if (first) { ['disabled', 'aria-disabled', 'hidden', 'style'].forEach(function (a) { first.removeAttribute(a); }); uniqueIds(first); return first; }
     }
     var e;
     switch (c.role) {
@@ -1764,7 +1774,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var attrs = function (el, only) { return Array.prototype.filter.call(el.attributes, function (a) { return !only || only.test(a.name); }).map(function (a) { return ' ' + a.name + '="' + esc(a.value) + '"'; }).join(''); };
       var sheet = document.querySelector('body > svg');
       var html = '<!doctype html><html' + attrs(document.documentElement) + '><head><meta charset="utf-8">' + head + '</head><body style="margin:0">' + (sheet ? sheet.outerHTML : '') +
-        '<div class="pg-frame-stage"' + attrs(preview, /^data-/) + '>' + Array.prototype.filter.call(preview.children, function (n) { return !n.classList.contains('pg-slot-layer'); }).map(function (n) { return n.outerHTML; }).join('') + '</div>' +
+        '<div class="pg-frame-stage"' + attrs(preview, /^data-/) + '>' + Array.prototype.map.call(preview.children, function (n) { return n.outerHTML; }).join('') + '</div>' +
         // The system's own scripts run in the frame too, so it works there as in a product (a selection moves, an overlay opens).
         Array.prototype.map.call(document.querySelectorAll('script[data-system-script]'), function (n) { return n.outerHTML; }).join('') + '</body></html>';
       frame.innerHTML = '<div class="pg-frame-device"><div class="pg-frame-label">' + esc(w[1] + ' · ' + w[2] + 'px wide') + '</div><div class="pg-frame-box"><iframe title="' + esc(c.name + ' at ' + w[2] + ' pixels wide') + '"></iframe></div></div>';
@@ -1964,7 +1974,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var pw = src.getBoundingClientRect().width || (src === preview.firstElementChild ? drawnWidth : 0);
       if (!wv && pw) { copy.style.width = pw + 'px'; copy.style.boxSizing = 'border-box'; }
       copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
-      [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[id]'))).forEach(function (k) { k.removeAttribute('id'); });
+      uniqueIds(copy);
       var stage = document.createElement('div'); stage.className = 'pg-anat-stage';
       var wrap = document.createElement('div'); wrap.className = 'pg-anat-wrap'; wrap.appendChild(copy);
       var marks = document.createElement('div'); marks.className = 'pg-anat-marks'; marks.setAttribute('aria-hidden', 'true');
@@ -2025,7 +2035,7 @@ a.pg-usage-name { color: var(--sg-text); }
             var val = 'value' in o ? o.value : o.label;
             state[p.label] = val; refresh();
             var src = preview.firstElementChild, copy = src ? src.cloneNode(true) : null;
-            if (copy) { copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true'); [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[id]'))).forEach(function (k) { k.removeAttribute('id'); }); }
+            if (copy) { copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true'); uniqueIds(copy); }
             var modes = Array.prototype.filter.call(preview.attributes, function (a) { return /^data-/.test(a.name); }).map(function (a) { return ' ' + a.name + '="' + esc(a.value) + '"'; }).join('');
             html += '<div class="pg-variant-row"><div class="pg-ctl-label">' + esc(o.label) + (val === keep[p.label] ? ' (in the Playground)' : '') + '</div><div class="pg-variant-stage"' + modes + '>' + (copy ? copy.outerHTML : '') + '</div>' +
               sysButton('button', 'Try it', ' data-try="' + esc(p.label) + '" data-v="' + esc(o.label) + '"') + '</div>';
@@ -2091,7 +2101,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var copy = src.cloneNode(true), w = src.getBoundingClientRect().width;
       if (w) { copy.style.width = w + 'px'; copy.style.boxSizing = 'border-box'; }
       copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
-      [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[id]'))).forEach(function (k) { k.removeAttribute('id'); });
+      uniqueIds(copy);
       var img = '<img class="pg-compare-img" alt="' + esc(c.name + ' in Figma') + '" src="' + esc(sh.src) + '" width="' + Math.round(sh.w) + '" height="' + Math.round(sh.h) + '">';
       // A small one drawn larger, both by the same amount, so a pixel of difference can be seen.
       var k = Math.max(1, Math.min(4, Math.floor(120 / Math.max(1, sh.h, src.getBoundingClientRect().height))));
@@ -2366,39 +2376,28 @@ a.pg-usage-name { color: var(--sg-text); }
           written.push(leaf); leaves[p.label] = leaf;
         }
       });
+      // A control the instance named by aria-label (an icon-only button in a product) that the props now give visible
+      // words: its words name it, as voice control expects (WCAG 2.5.3), so the old name goes.
+      [e].concat(Array.prototype.slice.call(e.querySelectorAll('[aria-label]'))).forEach(function (k) {
+        var given = k.getAttribute('aria-label'), shown = (k.textContent || '').replace(/\s+/g, ' ').trim();
+        if (given && shown && /^(BUTTON|A)$/.test(k.tagName) && given.toLowerCase().indexOf(shown.toLowerCase()) < 0) k.removeAttribute('aria-label');
+      });
       inspect(e);
       drawSlots();
       drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
       if (AREA === 'variants' && !drawingVariants) requestAnimationFrame(drawVariants);
     }
-    // Each slot of the component (a Figma SLOT paired with the part of the code it is), drawn where it sits: a dashed
-    // box named Slot (and its name when it has its own), laid over the preview, never in the component's markup. An
-    // empty slot gets room to be seen. A slot only Figma has is said under the name.
+    // Each slot of the component (a Figma SLOT paired with the part of the code it is) marked where it sits: the area
+    // it takes, named Slot inside it (and its own name when it has one), in place of the placeholder its markup holds.
+    // A slot only Figma has is said under the name.
     var SLOTS = ((c.parity && c.parity.rows) || []).filter(function (r) { return r.type === 'Prop' && r.figma && /^slot$/.test(r.figma.value) && r.code && /^[.#]/.test(r.code.name); });
     function drawSlots() {
-      var old = preview.querySelector(':scope > .pg-slot-layer'); if (old) old.remove();
       if (!SLOTS || !SLOTS.length || !cur) return;
-      if (slotObs && slotObs.seen !== cur) { slotObs.observe(cur); slotObs.seen = cur; }
-      var layer = document.createElement('div'); layer.className = 'pg-slot-layer'; layer.setAttribute('aria-hidden', 'true');
-      var box = preview.getBoundingClientRect();
       SLOTS.forEach(function (r) {
         var els = []; try { els = (cur.matches(r.code.name) ? [cur] : []).concat(Array.prototype.slice.call(cur.querySelectorAll(r.code.name))); } catch (e) { return; }
-        els.forEach(function (el) {
-          var b = el.getBoundingClientRect(); if (!b.width && !b.height && !el.getClientRects().length) return;
-          var d = document.createElement('div'); d.className = 'pg-slot-box';
-          d.setAttribute('data-slot', /^slot$/i.test(r.figma.name) ? 'Slot' : 'Slot ' + r.figma.name);
-          var h = b.height < 8 ? 32 : b.height, w = b.width < 8 ? 96 : b.width;   // an empty slot gets room to be seen
-          d.style.left = (b.left - box.left + preview.scrollLeft - (w - b.width) / 2) + 'px'; d.style.top = (b.top - box.top + preview.scrollTop - (h - b.height) / 2) + 'px';
-          d.style.width = w + 'px'; d.style.height = h + 'px';
-          layer.appendChild(d);
-        });
+        els.forEach(function (el) { el.classList.add('pg-slot-area'); el.setAttribute('data-slot', /^slot$/i.test(r.figma.name) ? 'Slot' : 'Slot ' + r.figma.name); });
       });
-      if (layer.children.length) preview.appendChild(layer);
     }
-    // Drawn again whenever the preview or the component moves or changes size (the stage settles, a width, a font).
-    var slotObs = SLOTS.length && window.ResizeObserver ? new ResizeObserver(function () { requestAnimationFrame(drawSlots); }) : null;
-    if (slotObs) slotObs.observe(preview);
-    if (SLOTS.length) window.addEventListener('resize', function () { requestAnimationFrame(drawSlots); });
     // The tables beside the preview, read from the component as it is drawn now.
     // Every change in the Playground passes here (a control, a text typed, the component used in the preview), so the
     // anatomy is drawn again from it, once a frame.

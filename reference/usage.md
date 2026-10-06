@@ -287,7 +287,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
 - **The stage's bars**: above the component, a bar in the tables' head colour with the sizing mode (Desktop, Phone) at
   its left and Inspect at its right; below it, a bar with the colour mode (Light, Dark) at its right and, while
-  inspecting, what is picked at its left. They keep the stage (the checkerboard) apart from what changes it.
+  inspecting, what is picked at its left. They keep the stage (the checkerboard) apart from what changes it; the
+  checkerboard itself is square, the bars round the stage's corners.
+- **An instance from a page keeps what names it**: an id the instance itself points to (the label a radio group is named
+  by, through `aria-labelledby` or `for`) stays with the copy (`keepReferencedIds`), and each drawing makes it unique
+  (`uniqueIds`), so no two copies share an id and none points at a missing one. A control a product named by
+  `aria-label` (an icon-only button) that the props now give visible words loses that name, so its words name it
+  (2.5.3).
 - **Inspect**, in the top bar (none on the measuring page): the Playground turns into its anatomy, in the live
   component's place, so a prop is changed and inspected in one place: an inert copy of the component as the controls set
   it, redrawn as they change (a text typed too), at the size the Playground draws it (smaller only to fit), each part and each padding and gap outlined, a slot in
@@ -335,9 +341,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
   button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
 - **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma; a Figma
-  slot the contract gives a part of its own is paired with that part (`.modal-slot`), and drawn in the Playground where
-  that part sits as Figma draws a slot, a dashed box named Slot (`drawSlots`, laid over the preview and out of the
-  component's markup, so its size, its code and its checks stay the component's; an empty slot gets room to be seen);
+  slot the contract gives a part of its own is paired with that part (`.modal-slot`), and marked in the Playground as the
+  area it takes, dashed and named Slot inside, in place of the placeholder its markup holds (`drawSlots`, the
+  `.pg-slot-area` class: the placeholder kept unseen so the component keeps its size, at least 40 by 96 pixels so an
+  empty one is seen; the HTML shown drops the mark);
   a slot only Figma has is said under the component's name (`slotsHTML`); in an
   HTML and CSS system a slot or component swap is the markup's content, with code props a slot is `children`) and
   per code prop Figma lacks; per CSS variable its rules use (the token check's values in each mode, the same or differs;
