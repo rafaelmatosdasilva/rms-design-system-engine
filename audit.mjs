@@ -3606,10 +3606,9 @@ function reportFull(label, items, shown) {
       const cap = await readFreshSnapshot(ROOT, cfg);
       if (cap) {
         const { stateContrastFindings } = await import('./contrast-check.mjs');
-        const { findings, checked, kept } = stateContrastFindings(cap, cfg);
-        const keptSay = kept ? `; ${kept} kept on purpose (knownLowContrast)` : '';
+        const { findings, checked } = stateContrastFindings(cap, cfg);
         if (findings.length) {
-          console.log(C.yellow(`\n⚠️  State contrast: ${findings.length} component state(s) below WCAG AA, as rendered (${checked} checked; disabled states exempt${keptSay}).`));
+          console.log(C.yellow(`\n⚠️  State contrast: ${findings.length} component state(s) below WCAG AA, as rendered (${checked} checked; disabled states exempt).`));
           const { colorHex } = await import('./css-values.mjs');
           const hex = (v, name) => `${colorHex(v) ?? v}${name ? ` (${name})` : ''}`;
           const { codeReason, reasonLine } = await import('./change-reason.mjs');
@@ -3622,7 +3621,7 @@ function reportFull(label, items, shown) {
           const { figmaLinker } = await import('./figma-link.mjs');
           const linkFor = figmaLinker(ROOT, cfg);
           for (const comp of [...new Set(findings.slice(0, 20).map((f) => f.component))]) { const u = linkFor(comp); if (u) console.log(`     🔗 ${comp} in Figma: ${u}`); }
-        } else if (checked) console.log(`\nℹ️  State contrast: every rendered component state meets WCAG AA${kept ? ' but the ones kept on purpose' : ''} (${checked} checked; disabled states exempt${keptSay}).`);
+        } else if (checked) console.log(`\nℹ️  State contrast: every rendered component state meets WCAG AA (${checked} checked; disabled states exempt).`);
       }
     } catch { /* advisory: never fails */ }
   }
