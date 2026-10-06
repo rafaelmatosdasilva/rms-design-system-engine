@@ -612,7 +612,9 @@ repairs the UI and never adds anything, so it can be run on every generation. It
 down once (only catalog components; only listed props and values; booleans are true or false; unique
 ids, one root, existing children, one parent each, no cycles; nothing inside a component it must never
 combine with), and every finding names the rule it breaks. A deprecated component, a node not attached
-to the tree, or a child the design system never nests there is a warning. Findings are also written to
+to the tree, or a child the design system never nests there is a warning; an experimental one is a warning that
+says it may be used for what it is for. Given a page or a component file instead (HTML, JSX, Vue, CSS), it runs the
+check every edit gets on what changed since the last commit, never failing the file as JSON. Findings are also written to
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
