@@ -323,6 +323,8 @@
           on();
           while (!found && Date.now() < until) {
             await sleep(50);
+            // The trigger drawn again (the page redrew itself on the hover or the focus): nothing popped up from it.
+            if (!el.isConnected) return null;
             // What a page draws for itself and hides from assistive technology (a guide's overlay) is not content shown.
             var fresh = showing().filter(function (n) { return before.indexOf(n) < 0 && !el.contains(n) && !n.contains(el) && !n.closest('[aria-hidden="true"]'); });
             found = fresh.filter(function (n) { return !fresh.some(function (o) { return o !== n && o.contains(n); }); })[0] || null;

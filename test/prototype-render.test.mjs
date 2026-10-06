@@ -118,7 +118,7 @@ test('--prototype measures the drawn page against the designed screen, saves its
   assert.doesNotMatch(r.stdout, /📏/);
 });
 
-test('a part that opens another opens it in the browser, with the focus inside; Escape closes it and gives the focus back; a field takes typing', { skip: CHROME ? false : 'no Chrome available', timeout: 600000 }, () => {
+test('a part that opens another opens it in the browser, with the focus inside; Escape closes it and gives the focus back; a field takes typing; a toggle turns on and off', { skip: CHROME ? false : 'no Chrome available', timeout: 600000 }, () => {
   const dir = fixtureProject(TIDEPOOL, 'tp-interact-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
@@ -127,12 +127,13 @@ test('a part that opens another opens it in the browser, with the focus inside; 
   const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: 300000 });
   mkdirSync(join(dir, 'prototypes'), { recursive: true });
   writeFileSync(join(dir, 'prototypes', 'filters.json'), JSON.stringify({ component: 'Page', props: { padding: 'padding/m' }, children: [
+    { component: 'chip', props: { Label: 'Email' } },
     { component: 'button', props: { Label: 'Rename', opens: 'rename' } },
     { id: 'rename', component: 'Stack', props: { padding: 'padding/m', gap: 'padding/s' }, children: [{ component: 'field', props: {} }, { component: 'button', props: { Label: 'Save' } }] },
   ] }));
   let r = run('--prototype', 'prototypes/filters.json');
   assert.equal(r.status, 0, r.stdout);
-  assert.match(r.stdout, /🖱  HOW IT WORKS {2}2 tried in the browser, all as in a product/, r.stdout);
+  assert.match(r.stdout, /🖱  HOW IT WORKS {2}3 tried in the browser, all as in a product/, r.stdout);
   const page = readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'filters.html'), 'utf8');
   assert.match(page, /"opens":"rename"/);
 
@@ -140,6 +141,11 @@ test('a part that opens another opens it in the browser, with the focus inside; 
   r = run('--prototype', 'prototypes/nowhere.json', '--no-browser');
   assert.equal(r.status, 1);
   assert.match(r.stdout, /button\.opens names "dialog", and no part has that id/);
+});
+
+test('a toggle that does not turn on and off, and a part that does not show what it controls, are named', () => {
+  assert.deepEqual(interactionLines([{ kind: 'toggle', by: 'Email', flips: false }, { kind: 'toggle', by: 'Push', flips: true }, { kind: 'shows', by: 'More', shows: false }]),
+    ['⚠️  "Email" does not turn on and off when clicked', '⚠️  "More" does not show and hide what it controls']);
 });
 
 test('what did not work in the browser is named: nothing opened, the focus left outside, no Escape, a field that takes no typing', () => {
