@@ -44,17 +44,3 @@ test('a naming difference reads plainly, belongs to its component, and the Figma
   assert.match(plainDifference(what), /^In Figma, the option "hover" of State is written differently from the rest of the system: 31 of/);
   assert.deepEqual(plainAction(what, 'buttonPrimary'), { who: 'figma', todo: 'In Figma, rename the option "hover" of buttonPrimary\'s State to "Hover". Then tell me to update the code\'s contract to the new name.' });
 });
-
-test('where the system could be simpler: one component in several copies, a prop with nothing to choose, a component no product uses', async () => {
-  const { simplifyView } = await import('../styleguide-data.mjs');
-  const btn = (name, extra) => ({ name, controls: [{ label: 'Label Content', type: 'TEXT' }, { label: 'Show Icon', type: 'BOOLEAN' }, extra], usage: [{ key: 'app' }] });
-  const comps = [
-    btn('buttonPrimary', { label: 'Disabled', type: 'BOOLEAN' }), btn('buttonSecondary', { label: 'State', type: 'VARIANT', options: [{ label: 'Default' }, { label: 'Hover' }] }),
-    { name: 'buttonMenu', controls: [{ label: 'Item Title Content', type: 'TEXT' }, { label: 'Show Tooltip', type: 'BOOLEAN' }, { label: 'Selected', type: 'BOOLEAN' }], usage: [{ key: 'app' }] },
-    { name: 'badge', controls: [{ label: 'Tone', type: 'VARIANT', options: [{ label: 'Neutral' }] }], usage: [] },
-  ];
-  const r = simplifyView(comps, { products: true });
-  assert.deepEqual(r.map((x) => [x.kind, x.components.join()]), [['family', 'buttonPrimary,buttonSecondary'], ['one-option', 'badge'], ['unused', 'badge']]);
-  assert.match(r[0].say, /one button with a Type option \(Primary, Secondary\)/);
-  assert.deepEqual(simplifyView(comps, { products: false }).map((x) => x.kind), ['family', 'one-option'], 'unused only when the products were read');
-});

@@ -38,8 +38,8 @@
 ✅  [9] No invented text casing  (no text-transform the DS/Figma does not define)
        ✅ no text-transform the DS doesn't define
 
-✅  [10] No hand-built DS components  (screens use the DS component, not a local look-alike)
-       ⏭ no reimplementationSurfaces configured — skipped
+⏭   [10] No hand-built DS components  (screens use the DS component, not a local look-alike)
+       ⏭ not verified - [reimplementation] no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
 
 ✅  [11] Clean CSS  (no unused variables · no values that contradict Figma · safe containment)
        ✅ 0 unused vars  (scanned 4 files; 0 known-unused exempted)
@@ -156,7 +156,8 @@
   ✅  [7]   No invented CSS variables                           Pass
   ✅  [8]   Docs tell the truth                                 Pass
   ✅  [9]   No invented text casing                             Pass
-  ✅  [10]  No hand-built DS components                         Pass
+  ⏭  [10]  No hand-built DS components                         Not run
+         Not verified: [reimplementation] no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
   ✅  [11]  Clean CSS                                           Pass
   ✅  [12]  Nested components keep their own styles             Pass
   ✅  [13]  Structure matches (height, spacing, corners)        Pass
@@ -199,7 +200,7 @@
    • button, chip have no focus state in Figma, so the code invents the focus ring and no one designs it: add a focus state (a visible ring, at least 3:1 against what is behind it)
 
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
-  ● Gate health      22/25 gates pass
+  ● Gate health      21/25 gates pass
   ● Coverage         3/3 components modelled (100%)  ·  exemption debt 0
   ● Documentation    4/4 contracts have a description (100%)
   ● AI guidance      0/4 carry whenNotToUse/useInstead (0%)
@@ -232,6 +233,15 @@
   - chip/Icon: the code names it "icon" (letter case I → i)  (src/components/Chip.jsx)
   - chip/Label: the code names it "label" (letter case L → l)  (src/components/Chip.jsx)
   - and 1 more
+
+**Not checked in this run**: 20
+- Data is up to date: Build freshness skipped on CI (mtime unreliable after fresh clone)
+- Figma frame unchanged: No frames configured in ds-config.json - visual regression skipped
+- Tokens used in screens exist in CSS: no frames[] configured in ds-config.json
+- Exception lists are valid: no design-system-engine-map.mjs - no exception list to check
+- Docs tell the truth: no documentation surfaces configured
+- No hand-built DS components: no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
+- and 14 more
 
 Burndown, open findings per component: chip 5 · button 2 · field 1 · 1 not tied to a component
 Fix first: chip. Run with --component chip, fix, run again.

@@ -24,10 +24,21 @@ const usesDs =
 // A bare native button with no local styling — a utility/reset, not a simulated component.
 const bareButton = `<button class="icon-only" aria-label="Close"></button>\n`;
 
-test('[reimplementation] no reimplementationSurfaces configured → no-op PASS', () => {
+test('[reimplementation] nothing to scan and no screens captured → not run (exit 2), never a pass', () => {
   const { code, out } = runGate(GATE, { 'ds-config.json': { ...DS } });
+  assert.equal(code, 2, out);
+  assert.match(out, /⏭ \[reimplementation\] no product code to scan/);
+  assert.doesNotMatch(out, /✅/);
+});
+
+test('[reimplementation] unset surfaces fall back to the products the config lists (pluginDirs)', () => {
+  const { code, out } = runGate(GATE, {
+    'ds-config.json': { ...DS, pluginDirs: { app: 'app' } },
+    'app/ui.src.html': handRolled,
+    'app/ui.html': usesDs,
+  });
   assert.equal(code, 0, out);
-  assert.match(out, /no reimplementationSurfaces configured/);
+  assert.match(out, /save-btn/, 'the source page is scanned, not the built one');
 });
 
 test('[reimplementation] a hand-styled <button> not using the DS class → advisory PASS', () => {
@@ -90,4 +101,64 @@ test('[reimplementation] an inline-styled look-alike button is flagged', () => {
   });
   assert.ok(!crashed(out), out);
   assert.match(out, /reimplementation/);
+});
+
+test('[reimplementation] a text input styled by its id, without the DS input class, is flagged', () => {
+  const { out } = runGate(GATE, {
+    'ds-config.json': { componentSelectors: { input: '.field' }, reimplementationSurfaces: ['ui.html'] },
+    'ui.html': `<input id="scale" type="text"><style>#scale { border: 1px solid #ccc; padding: 0 4px; }</style>\n`,
+  });
+  assert.match(out, /<input> "#scale"/);
+});
+
+test('[reimplementation] a DS input field, a checkbox and a part the theme styles inside a component are not flagged', () => {
+  const { code, out } = runGate(GATE, {
+    'ds-config.json': { componentSelectors: { input: '.field' }, paths: { themeCSS: 'theme.css' }, reimplementationSurfaces: ['ui.html'], reimplementationStrict: true },
+    'theme.css': '.field { border: 1px solid; } .inputField { padding: 0; } .field .field-icon { order: 3; }',
+    'ui.html': `<div class="field"><input class="inputField" type="text"><button class="field-icon clear">x</button></div><input type="checkbox" class="tick">`
+      + `<style>.clear { background: none; border: 0; } .tick { border: 1px solid; }</style>\n`,
+  });
+  assert.equal(code, 0, out);
+});
+
+// The Figma side: the DS components each product screen uses, read from Figma.
+const screenSnap = (components) => JSON.stringify({ screens: { '1:2': { name: 'Main', plugin: 'app', components } } });
+const SCREEN_DS = { componentSelectors: { buttonStepper: '.buttonStepper', buttonPrimary: '.buttonPrimary' }, pluginDirs: { app: 'app' } };
+
+test('[reimplementation] a component the Figma screen uses and the code never uses fails', () => {
+  const { code, out } = runGate(GATE, {
+    'ds-config.json': SCREEN_DS,
+    'figma-screen-components.snapshot.json': screenSnap({ buttonStepper: 1, buttonPrimary: 2, 'Icon-plus': 1 }),
+    'app/ui.src.html': `<!-- a buttonStepper drawn by hand --><div class="stepper"><button class="buttonPrimary">-</button></div>\n<style>.buttonStepper{}</style>\n`,
+  });
+  assert.equal(code, 1, out);
+  assert.match(out, /app: "Main" uses buttonStepper; the code never uses \.buttonStepper/);
+  assert.doesNotMatch(out, /uses buttonPrimary;/, 'a component the code uses is not listed');
+  assert.doesNotMatch(out, /Icon-plus/, 'only DS components count');
+});
+
+test('[reimplementation] a class added from script counts as a use', () => {
+  const { code, out } = runGate(GATE, {
+    'ds-config.json': SCREEN_DS,
+    'figma-screen-components.snapshot.json': screenSnap({ buttonStepper: 1 }),
+    'app/ui.src.html': `<div id="s"></div><script>document.getElementById('s').classList.add('buttonStepper');</script>\n`,
+  });
+  assert.equal(code, 0, out);
+  assert.match(out, /every DS component the product screens use in Figma is used by their code/);
+});
+
+test('[reimplementation] a screen component can be excused, and screenComponentsStrict false makes it advice', () => {
+  const files = { 'figma-screen-components.snapshot.json': screenSnap({ buttonStepper: 1 }), 'app/ui.src.html': '<div class="stepper"></div>\n' };
+  assert.equal(runGate(GATE, { ...files, 'ds-config.json': { ...SCREEN_DS, knownReimplementations: ['app/buttonStepper'] } }).code, 0);
+  const soft = runGate(GATE, { ...files, 'ds-config.json': { ...SCREEN_DS, screenComponentsStrict: false } });
+  assert.equal(soft.code, 0, soft.out);
+  assert.match(soft.out, /⚠️ .*uses buttonStepper/);
+});
+
+test('[reimplementation] screens configured but not captured: said on a ⏭ line', () => {
+  const { out } = runGate(GATE, {
+    'ds-config.json': { ...SCREEN_DS, frames: [{ name: 'Main', nodeId: '1-2', plugin: 'app' }] },
+    'app/ui.src.html': usesDs,
+  });
+  assert.match(out, /⏭ \[reimplementation\] the product screens are not captured from Figma/);
 });

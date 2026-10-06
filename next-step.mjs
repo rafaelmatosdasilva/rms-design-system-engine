@@ -19,6 +19,19 @@ const COUNT = /^❌\s+[A-Z][A-Z ?]*\s+\d+(\/\d+)?(\s|$)/;
 export function failLines(gate) {
   return (gate?.lines ?? []).map(clean).filter((t) => (t.startsWith('❌') && !ZERO_FAIL.test(t) && !COUNT.test(t)) || /^Fix:/.test(t));
 }
+// What a gate could not check in this run: a gate that did not run, or a ⏭ line inside one that did. A part
+// that could not run is never a pass, so the summary says it rather than leave a green gate to stand for it.
+export function notCheckedLines(gates) {
+  const why = (t) => clean(t).replace(/^⏭\s*/, '').replace(/^\[[^\]]+\]\s*/, '').replace(/^(skipped|SKIPPED)\b\s*[-:–—]?\s*/, '').replace(/\s*[-–—]\s*skipped\.?$/i, '').replace(/\.$/, '');
+  const out = [];
+  for (const g of gates ?? []) {
+    const skips = (g.lines ?? []).map(clean).filter((t) => t.startsWith('⏭'));
+    if (g.notRun) out.push(`${gateName(g.label)}: ${why(g.notRun)}`);
+    else if (skips.length) for (const t of skips) out.push(`${gateName(g.label)}: ${why(t)}`);
+    else if (g.planLimited) out.push(`${gateName(g.label)}: ${why(g.why ?? 'not run')}`);
+  }
+  return [...new Set(out)];
+}
 export function measuredLines(gates) {
   return (gates ?? []).flatMap((g) => (g.lines ?? []).map(clean))
     .filter((t) => /^⚠️\s+\S+ .*: Figma .*, rendered |while disabled \(/.test(t));
@@ -109,6 +122,12 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
     lines.push('', `**Measured differences** (rendered in the browser, advisory): ${measured.length}`);
     for (const t of measured.slice(0, 8)) lines.push(`- ${t.replace(/^⚠️\s*/, '')}`);
     if (measured.length > 8) lines.push(`- and ${measured.length - 8} more`);
+  }
+  const unchecked = verdict === 'baseline' ? [] : notCheckedLines(gates);
+  if (unchecked.length) {
+    lines.push('', `**Not checked in this run**: ${unchecked.length}`);
+    for (const t of unchecked.slice(0, 6)) lines.push(`- ${t}`);
+    if (unchecked.length > 6) lines.push(`- and ${unchecked.length - 6} more`);
   }
   if (burndown.length) {
     lines.push('', burndown[0].replace(/^📉\s*/, ''));

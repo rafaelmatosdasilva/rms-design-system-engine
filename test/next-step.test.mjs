@@ -1,7 +1,7 @@
 // I55: one next step and one plain summary per run, so an agent relays the engine's words.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextStep, buildSummary, failLines, measuredLines, dataStateLine } from '../next-step.mjs';
+import { nextStep, buildSummary, failLines, measuredLines, dataStateLine, notCheckedLines } from '../next-step.mjs';
 
 const gate = (label, pass, lines = [], extra = {}) => ({ label, pass, lines, ...extra });
 const tokens = gate('Token values  (color · sizing)', false, ['✅ PASS  25', '❌ FAIL  1', '❌ [sizing/-] radii/chip → --radii-chip', 'Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px']);
@@ -59,4 +59,18 @@ test('NEXT names the measured differences beside the failing gates, so a relay k
   assert.match(nextStep({ failing, measured: 2 }), /and the fix it names, and the 2 differences under "Measured differences"\./);
   assert.match(nextStep({ failing, measured: 1 }), /the 1 difference under "Measured differences"/);
   assert.doesNotMatch(nextStep({ failing }), /Measured differences/);
+});
+
+test('the summary lists what a gate could not check, even inside a gate that passed', () => {
+  const gates = [
+    { label: 'Markup  (ids)', pass: true, lines: ['✅ app: structure unchanged', '⏭  screen elements: no figma-screens.snapshot.json - skipped (capture it to enable)'] },
+    { label: 'Figma frame unchanged  (frame)', pass: true, planLimited: true, lines: ['⏭ skipped - FIGMA_TOKEN not set'] },
+    { label: 'Token values  (color)', pass: true, lines: ['✅ OK 12'] },
+  ];
+  const s = buildSummary({ verdict: 'passed', gates });
+  assert.match(s, /\*\*Not checked in this run\*\*: 2/);
+  assert.match(s, /- Markup: screen elements: no figma-screens\.snapshot\.json/);
+  assert.match(s, /- Figma frame unchanged: FIGMA_TOKEN not set/);
+  assert.doesNotMatch(s, /Token values:/);
+  assert.deepEqual(notCheckedLines([{ label: 'X  (y)', pass: true, lines: ['✅ fine'] }]), []);
 });
