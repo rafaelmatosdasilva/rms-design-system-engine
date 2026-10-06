@@ -335,8 +335,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
   button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
 - **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma; a Figma
-  slot the contract gives a part of its own is paired with that part (`.modal-slot`), said under the component's name
-  as well (`slotsHTML`); in an
+  slot the contract gives a part of its own is paired with that part (`.modal-slot`), and drawn in the Playground where
+  that part sits as Figma draws a slot, a dashed box named Slot (`drawSlots`, laid over the preview and out of the
+  component's markup, so its size, its code and its checks stay the component's; an empty slot gets room to be seen);
+  a slot only Figma has is said under the component's name (`slotsHTML`); in an
   HTML and CSS system a slot or component swap is the markup's content, with code props a slot is `children`) and
   per code prop Figma lacks; per CSS variable its rules use (the token check's values in each mode, the same or differs;
   no Figma variable, only in code) and per Figma variable named after it with no CSS variable; per value the agreed
@@ -395,7 +397,30 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   a control with an interactive role Tab does not reach, a name on each stop, a stop drawn as disabled (its class)
   that Tab still reaches, the focus change on it, a box holding it or what follows it (at least 3:1 against what is
   around it, 2.4.7 and 1.4.11), and each behaviour of `a11yView().behaviours` tried with the page's own events (a key
-  only a native element answers is said to be given by the browser).
+  only a native element answers is said to be given by the browser). The WCAG 2.1 checks of `wcag-page.js` (inlined
+  in the page) run on every variant too, and what the component does when used (hover, focus, input, press) on its
+  first six, one at a time, their findings joining the table; a code finding of `a11y-static.mjs` (a shortcut, a
+  timer, a gesture, device motion) sits at the top when its file is named after the component or the code around
+  it names the component's class (`wcagStatics`).
+- **From**: each row of the Accessibility table says where its information is read: the Figma annotation that states the
+  role (`Figma annotation Role: button`), a Figma annotation on a layer for a part's role, `contract.authored.json`
+  (semantics, behaviourExceptions), its code, this page in the browser, the last audit, or the audit's code capture.
+- **Where it is read from** (`a11yView().sources`, built in `styleguide-gen.mjs`): a table of every source of the
+  component's accessibility, what each holds and what uses it, each Used by a check, Read by the agents only, or
+  Nothing there. Each Figma annotation on it and on its layers (`annotationUses` in `a11y-check.mjs`): the role it
+  states, a spoken name or alt text, a heading level, a part's role, a behaviour (Escape closes, the arrow keys move,
+  Enter and Space activate), each with the check that reads it; one no check reads (a sizing note, a usage note) says
+  so, and how to write it so one does. The team's guidelines (`guidelines.sources`, the Notion and GitLab pages fetched
+  into files): the section named after the component, with its lines about accessibility, read by the agents as design
+  intent and by no check. The contract, its code, this page and the last audit (the page it opened and when).
+- **WCAG 2.1, level A and AA**: a second table below, every one of the 50 success criteria for the component
+  (`wcag21.mjs`), with what it asks in plain words, a status and how it is known. To fix when a check found something
+  under it (the page's, the audit's or the code's); for a person to check when only a person can judge it (an
+  instruction that relies on shape, an image of text, the words of a heading), with what to look at; Not needed for
+  what belongs to the page that uses the component (a page title, a skip link, orientation, consistent navigation),
+  for video and sound when the component plays none, and when the component has nothing it asks about (no link for
+  2.4.4); met when its check ran and found nothing (the page's own run, `ran` in the last audit's `a11y.json` for
+  zoom, spacing, reflow and a keyboard trap, the code read for the rest). A count of each sits above it.
 - **In use**: the approved pictures of `frames[]` (Gate [2] (Figma frame unchanged)'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,
@@ -1031,6 +1056,30 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   current, disabled). Nothing is checked for a component without a declared role.
 - **Reflow at 320px (1.4.10)** — opt in with `a11y.reflow: true` for real screens (a component catalog is
   not meant to reflow).
+- **WCAG 2.1, the rest a component can be checked for** (`wcag-page.js`, run on the first three instances of each
+  component, the first one also used) — an image or `role="img"` with no words (1.1.1); a video with no captions
+  track, sound that plays by itself (1.2.2, 1.4.2); radio buttons with no named group, a data table with no header
+  cells, a tab, an option or a list item outside the container its role needs (1.3.1); controls Tab reaches in
+  another order than they are shown (1.3.2, 2.4.3); a field that asks for a name, an email, a phone or an address
+  with no matching `autocomplete` (1.3.5); the edge of a field, a checkbox, a radio or a switch under 3:1 against what
+  is around it, a field's wrapper counted as its edge and a field with no edge drawn left alone (1.4.11); what
+  shows on hover or focus that Escape does not close, that goes when the pointer moves onto it, or that goes by
+  itself (1.4.13, a trigger with `data-tip` or `aria-describedby` given 1.6 seconds to show its tip); an
+  animation that runs more than 5 seconds with no pause, a loader excepted, or flashes more than three times a
+  second (2.2.2, 2.3.1); a link with no words or with "click here" (2.4.4); an empty heading, label or legend
+  (2.4.6); a control whose `aria-label` leaves out the words it shows (2.5.3); a control that acts on the press
+  rather than the release (2.5.2); taking the focus, or changing a value, that opens a page, sends a form, opens a
+  dialog or moves the focus (3.2.1, 3.2.2); an id used twice (4.1.1); a role or an `aria-*` attribute ARIA does not
+  have, a value it does not take, a reference to a missing id, `aria-hidden` over something Tab reaches (4.1.2); a
+  toast, a status line or a loader that no live region announces (4.1.3). Each finding carries its criterion in
+  `--json` (`wcag`), and `ran` lists the page-wide checks that finished (`wcag21`, `tabtrap`, `spacing`, `reflow`,
+  `zoom`), so a criterion is said to be met only where its check ran. A tooltip drawn by CSS `:hover` alone is
+  tried through the focus, as events from a page cannot hover.
+- **WCAG 2.1 in the code, no browser needed** (`a11y-static.mjs`, every script, `.vue` and `.svelte` scripts
+  included) — a single letter, number or sign as a shortcut on the whole page with no Ctrl, Alt or Cmd (2.1.4);
+  something hidden, closed or removed by itself after 1 to 20 seconds, unless its timer stops while it has the
+  pointer or the focus (2.2.1); a gesture with two fingers or more (2.5.1); an action on shaking or tilting the
+  device (2.5.4). Printed with the rest of the code's accessibility in the audit.
 - **State contrast, no browser needed** — from the code capture: each component's text against its own
   background in every mode and every state the capture produced (hover, selected, error…). Disabled states
   are exempt. A see-through background (a tint made with opacity or `color-mix()`) is blended over what

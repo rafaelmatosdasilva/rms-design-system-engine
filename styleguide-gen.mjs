@@ -425,16 +425,54 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // browser check (the audit's a11y.json) found on it. The page measures the text contrast itself, as it is drawn.
     try {
       const { a11yView } = await import('./styleguide-data.mjs');
-      const { contractSemantics, A11Y_GUIDE } = await import('./a11y-check.mjs');
+      const { contractSemantics, A11Y_GUIDE, annotationUses } = await import('./a11y-check.mjs');
       const { partRolesOf } = await import('./behaviour-contract.mjs');
       const authoredRoles = contractSemantics(ROOT, cfg);
       const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
       const result = readJson(join(OUT_DIR, 'a11y.json'));
       for (const c of view.components) {
         const entry = ctx?.propsSnap?.[c.name] ?? {};
-        c.a11y = a11yView({ name: c.name, cls: c.cls, role: c.role ?? authoredRoles[c.name] ?? null, annotations: entry.annotations ?? [], parts: partRolesOf(entry),
-          exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE });
+        c.a11y = a11yView({ name: c.name, cls: c.cls, role: c.role ?? authoredRoles[c.name] ?? null, roleFrom: c.role ? 'figma' : authoredRoles[c.name] ? 'contract' : null,
+          annotations: entry.annotations ?? [], parts: partRolesOf(entry), exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE, notes: annotationUses(entry) });
       }
+      // WCAG 2.1 at level A and AA: every criterion, how the engine covers it, in plain words, and what the checks
+      // found (the page runs the in-page checks itself on every variant, wcag-page.js). What the code does (shortcuts,
+      // timers, gestures, device motion) is read here, each finding given to the component its file or its code names.
+      const { WCAG21, WCAG21_GUIDE } = await import('./wcag21.mjs');
+      const { staticA11y } = await import('./a11y-static.mjs');
+      const { wcagStatics } = await import('./styleguide-data.mjs');
+      const st = cfg.a11yStatic === false ? null : staticA11y(ROOT);
+      const statics = st ? wcagStatics(st.findings, view.components) : {};
+      for (const c of view.components) if (c.a11y) { c.a11y.static = statics[c.name] ?? []; c.a11y.audited = result && !c.a11y.checked?.notRead ? { at: result.checkedAt ?? null, ran: result.ran ?? [] } : null; }
+      // Where its accessibility is read from, each source with what it holds and what uses it: each Figma annotation
+      // (annotationUses), the team's guidelines (a Notion or GitLab page fetched into a file, or a committed one: the
+      // agents read the section named after it as design intent, no check reads it), the authored contract, its code,
+      // the browser.
+      const intentNow = designIntent();
+      const glFiles = intentNow.guidelines?._sources ?? [];
+      const A11Y_WORDS = /\b(role|aria|keyboard|screen ?reader|focus|escape|tab key|contrast|label|alt text|announce|accessib|wcag)/i;
+      const glWhere = (f) => (/notion/i.test(f) ? `Notion, fetched into ${f}` : /gitlab/i.test(f) ? `GitLab, fetched into ${f}` : f);
+      for (const c of view.components) {
+        if (!c.a11y) continue;
+        const src = [];
+        for (const n of c.a11y.notes ?? []) src.push({ st: n.uses.length ? 'done' : 'agents', from: n.layer ? `Figma annotation on its "${n.layer}" layer` : 'Figma annotation', what: n.text, used: n.uses });
+        if (!(c.a11y.notes ?? []).length) src.push({ st: 'none', from: 'Figma annotations', what: 'None on it.', used: [] });
+        const gl = intentNow.components?.[c.name]?.guidelines;
+        if (glFiles.length) {
+          const lines = gl ? gl.split('\n').map((l) => l.trim()).filter((l) => l && A11Y_WORDS.test(l)) : [];
+          src.push({ st: !gl ? 'none' : 'agents', from: `Guidelines (${glFiles.map(glWhere).join('; ')})`, what: !gl ? 'No section named after it.' : lines.length ? lines.slice(0, 4).join(' ') : 'A section named after it, with nothing about accessibility.', used: [] });
+        }
+        if (authoredRoles[c.name]) src.push({ st: c.a11y.roleFrom === 'contract' ? 'done' : 'agents', from: 'contract.authored.json (semantics)', what: `Role ${authoredRoles[c.name]}.`, used: c.a11y.roleFrom === 'contract' ? ['its role: what that role owes is tried in the browser'] : ['nothing for now: Figma states its role, which comes first'] });
+        const ex = Object.keys(authored[c.name]?.behaviourExceptions ?? {});
+        if (ex.length) src.push({ st: 'done', from: 'contract.authored.json (behaviourExceptions)', what: ex.join(', '), used: ['what is not asked of it, each with its reason'] });
+        if (st) src.push({ st: 'done', from: 'Its code', what: `The scripts, the markup and the CSS of the project (${st.files.scripts ?? 0} scripts).`, used: [`single-key shortcuts, short timers, gestures and device motion${(statics[c.name] ?? []).length ? `: ${(statics[c.name] ?? []).length} found on it` : ', none found on it'}`] });
+        src.push({ st: 'done', from: 'This page, in the browser', what: 'The component as drawn here, in every variant.', used: ['the checks marked Tried in the browser on every variant'] });
+        src.push(result ? { st: c.a11y.checked?.notRead ? 'none' : 'done', from: `The last audit, in a browser (${(result.target ?? []).join(', ') || 'its page'})`, what: result.checkedAt ? `Run ${result.checkedAt.slice(0, 16).replace('T', ' ')}.` : 'Its last run.', used: c.a11y.checked?.notRead ? ['nothing: it was not drawn on the page the audit opened'] : ['real key presses, zoom, text spacing, reflow, a keyboard trap, and what Figma\'s annotations state'] }
+          : { st: 'none', from: 'The audit, in a browser', what: 'Not run yet.', used: [] });
+        c.a11y.sources = src;
+      }
+      const say = (g) => ({ one: g.title(1), many: g.title(7).replace(/^7 /, '{n} '), fix: g.fix });
+      view.wcag21 = { criteria: WCAG21, guide: Object.fromEntries(Object.entries(WCAG21_GUIDE).map(([k, g]) => [k, say(g)])), staticRan: !!st };
     } catch { /* the page shows what it can measure */ }
     // How to use it: the same four sections on every page, from what Figma, the code and the authored contract say.
     try {
@@ -713,6 +751,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     CHROME: () => chromeCSS(),
     ICON_SHEET: () => iconSheet(),
     SYSTEM_SCRIPTS: () => systemScripts(),
+    // The WCAG 2.1 checks the page runs on every variant (wcag-page.js).
+    WCAG_PAGE: async () => (await import('./wcag21.mjs')).WCAG_PAGE_SOURCE.replace(/<\/script/gi, '<\\/script'),
     USAGE: () => JSON.stringify(usageMap(intent)),
     DOCS_CODE: () => JSON.stringify(code),
     DOCS: () => JSON.stringify(docs),

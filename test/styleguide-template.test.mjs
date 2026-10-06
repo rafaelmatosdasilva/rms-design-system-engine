@@ -258,6 +258,8 @@ test('in the browser: no script error, a control changes the real component, the
     const live = await run(`document.querySelector('#c-chip .pg-a11y-live').textContent`);
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
+    // What it does when used is tried on a few variants after that, one at a time: then the Playground is drawn as set.
+    for (let i = 0; i < 120 && await run(`!!document.querySelector('#c-chip .pg-offstage')`); i++) await new Promise((r) => setTimeout(r, 250));
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
     assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
     // Another page mode: tried again in it.
@@ -286,7 +288,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity with Figma.*the same.*differ.*only in Figma.*only in code.*Type.*Figma.*Code.*Status.*Updated/s);
     // The filter shows one type at a time.
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'Prop').click()`);
-    assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].filter((r) => !r.hidden).map((r) => r.dataset.type))]`), ['Prop']);
+    // The filter acts on Parity's own table, never on the Accessibility tables beside it.
+    assert.deepEqual(await run(`[...new Set([...document.querySelector('#c-chip .pg-par-filter').closest('.pg-par').querySelectorAll('.pg-par-table tbody tr')].filter((r) => !r.hidden).map((r) => r.dataset.type))]`), ['Prop']);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].some((r) => r.hidden)`), false);
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'all').click()`);
     // Inspect: the Playground turns into its anatomy (an inert copy at the Playground's size, as the controls set it, each part, padding
     // and gap outlined, never filled with a colour); a click on one says in one line what it is and its value; again

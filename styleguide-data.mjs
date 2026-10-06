@@ -9,6 +9,7 @@
 // Pure: agreedView takes what the generator read and returns { components, notAgreed, modes }.
 import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
 import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs';
+import { WCAG21, WCAG21_KIND } from './wcag21.mjs';
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // A Figma prop name without its node suffix ("Label#3:4" → "Label").
@@ -1189,20 +1190,41 @@ export function apiView(api, file = api?.file) {
 }
 
 // ── Accessibility, per component: what it owes and what the last browser check found ─────────────────────────────────
-// Each check of a11y-check.mjs, by the WCAG 2.2 success criterion it stands for.
-export const A11Y_WCAG = {
+// Each check of a11y-check.mjs, by the WCAG success criterion it stands for (the WCAG 2.1 checks of wcag-page.js and
+// a11y-static.mjs added from wcag21.mjs).
+const A11Y_WCAG_OWN = {
   contrast: '1.4.3', hovercontrast: '1.4.3', focuscontrast: '1.4.11', iconcontrast: '1.4.11', name: '4.1.2', focus: '2.4.7', ariastate: '4.1.2', keyboard: '2.1.1',
   target: '2.5.8', tabtrap: '2.1.2', tabindex: '2.4.3', escape: '2.1.1', focusreturn: '2.4.3', heading: '1.3.1', motion: '2.3.3', forcedfocus: '2.4.7',
   spacing: '1.4.12', activate: '2.1.1', arrows: '2.1.1', zoom: '1.4.4', obscured: '2.4.11', focusthin: '2.4.13', rolecontract: '4.1.2', annotation: '4.1.2',
   reflow: '1.4.10', partrole: '1.3.1', behaviour: '2.1.1', statefollows: '4.1.2', semantics: '4.1.2',
 };
-// The criteria the page names, with their WCAG 2.2 title and level.
+export const A11Y_WCAG = { ...WCAG21_KIND, ...A11Y_WCAG_OWN };
+// The criteria the page names, with their WCAG title and level (every WCAG 2.1 criterion at A and AA, and the 2.2 ones
+// the checks stand for).
 export const WCAG_CRITERIA = {
+  ...Object.fromEntries(WCAG21.map((c) => [c.sc, [c.name, c.level]])),
   '1.3.1': ['Info and Relationships', 'A'], '1.4.3': ['Contrast (Minimum)', 'AA'], '1.4.4': ['Resize Text', 'AA'], '1.4.10': ['Reflow', 'AA'],
   '1.4.11': ['Non-text Contrast', 'AA'], '1.4.12': ['Text Spacing', 'AA'], '2.1.1': ['Keyboard', 'A'], '2.1.2': ['No Keyboard Trap', 'A'],
   '2.3.3': ['Animation from Interactions', 'AAA'], '2.4.3': ['Focus Order', 'A'], '2.4.7': ['Focus Visible', 'AA'], '2.4.11': ['Focus Not Obscured (Minimum)', 'AA'],
   '2.4.13': ['Focus Appearance', 'AAA'], '2.5.8': ['Target Size (Minimum)', 'AA'], '3.3.1': ['Error Identification', 'A'], '4.1.2': ['Name, Role, Value', 'A'],
 };
+// The static findings (a11y-static.mjs) that belong to a component: in a file named after it (or its class), or, in a
+// shared script, with its class or name in the code around the finding. → { name: [{ kind, file, line, desc, fix }] }
+export function wcagStatics(findings = [], components = []) {
+  const out = {};
+  const kinds = new Set(['shortcut', 'timing', 'gesture', 'motionact']);
+  const esc = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const words = components.map((c) => ({ name: c.name, file: new RegExp(`(?:^|[\\/._-])(?:${[c.name, c.cls].filter(Boolean).map(esc).join('|')})(?:[\\/._-]|$)`, 'i'),
+    code: c.cls ? new RegExp(`[.'"\\s]${esc(c.cls)}(?![\\w-])`) : null }));
+  for (const f of findings) {
+    if (!kinds.has(f.kind)) continue;
+    const base = String(f.file ?? '').replace(/\.[^./\\]+$/, '');
+    const own = words.filter((w) => w.file.test(base));
+    const hit = own.length ? own : words.filter((w) => w.code && w.code.test(f.near ?? ''));
+    for (const w of hit) (out[w.name] ??= []).push({ kind: f.kind, file: f.file, line: f.line, desc: f.desc, fix: f.fix ?? '' });
+  }
+  return out;
+}
 const wcagOfLine = (line) => (/error/i.test(line) ? '3.3.1' : '4.1.2');
 // "WCAG 2.1.1 Keyboard (A)": a criterion as the page names it.
 export const wcagLabel = (id) => (!id ? null : WCAG_CRITERIA[id] ? `WCAG ${id} ${WCAG_CRITERIA[id][0]} (${WCAG_CRITERIA[id][1]})` : `WCAG ${id}`);
@@ -1212,16 +1234,18 @@ export const wcagLabel = (id) => (!id ? null : WCAG_CRITERIA[id] ? `WCAG ${id} $
 // result: the last browser check (a11y.json), or null · guide: { kind: { title(n), fix } } (a11y-check.mjs A11Y_GUIDE).
 // → { role, element, expects: [{ says, wcag }], excused: [{ says, reason }], checked: null | { at, notRead?, issues: [{ kind,
 // title, fix, wcag, details: [where each one is] }] } }, one issue per kind of problem, each wcag as the page names it ("WCAG 4.1.2 Name, Role, Value (A)").
-export function a11yView({ name, cls = null, role = null, annotations = [], parts = [], exceptions = {}, result = null, guide = {} } = {}) {
+export function a11yView({ name, cls = null, role = null, roleFrom = null, annotations = [], parts = [], exceptions = {}, result = null, guide = {}, notes = [] } = {}) {
   const expects = [];
   const known = role && roleOf(role);
+  // Where each row comes from: the Figma annotation that states the role, else the authored contract.
+  const fromRole = roleFrom === 'figma' ? `Figma annotation Role: ${role}` : roleFrom === 'contract' ? 'contract.authored.json semantics' : 'its role';
   if (role) {
-    expects.push({ says: known ? `It is ${roleMarkup(role)}.` : `It carries role="${role}".`, wcag: '4.1.2' });
-    for (const line of roleSheetLines(role)) expects.push({ says: `It has ${line}.`, wcag: wcagOfLine(line) });
+    expects.push({ says: known ? `It is ${roleMarkup(role)}.` : `It carries role="${role}".`, wcag: '4.1.2', from: fromRole });
+    for (const line of roleSheetLines(role)) expects.push({ says: `It has ${line}.`, wcag: wcagOfLine(line), from: fromRole });
   }
   const b = behavioursFor(role, annotations.map((a) => (typeof a === 'string' ? { label: a } : a)), exceptions);
-  for (const r of b.rows) expects.push({ says: (r.sheet ?? r.says).replace(/^\w/, (ch) => ch.toUpperCase()) + '.', wcag: r.act?.keys ? '2.1.1' : '4.1.2' });
-  for (const line of partSheetLines(parts)) expects.push({ says: line.replace(/^\w/, (ch) => ch.toUpperCase()) + '.', wcag: '1.3.1' });
+  for (const r of b.rows) expects.push({ says: (r.sheet ?? r.says).replace(/^\w/, (ch) => ch.toUpperCase()) + '.', wcag: r.act?.keys ? '2.1.1' : '4.1.2', from: r.from === 'Figma annotation' ? 'Figma annotation' : fromRole });
+  parts.forEach((p, i) => { const line = partSheetLines([p])[0]; if (line) expects.push({ says: line.replace(/^\w/, (ch) => ch.toUpperCase()) + '.', wcag: '1.3.1', from: `Figma annotation on the "${p.layer}" layer` }); });
   const excused = b.excepted.map((x) => ({ says: x.id, reason: x.reason }));
   let checked = null;
   if (result) {
@@ -1255,7 +1279,7 @@ export function a11yView({ name, cls = null, role = null, annotations = [], part
   for (const x of checked?.issues ?? []) x.wcag = wcagLabel(x.wcag);
   // What the page tries on the live component: each behaviour its role and Figma's notes ask for.
   const behaviours = b.rows.map((r) => ({ id: r.id, says: r.says, act: r.act, expect: r.expect }));
-  return { role: role ?? null, ...(known ? { element: roleMarkup(role), key: roleKey(role) } : {}), expects, excused, checked, behaviours };
+  return { role: role ?? null, roleFrom, ...(known ? { element: roleMarkup(role), key: roleKey(role) } : {}), expects, excused, checked, behaviours, notes };
 }
 
 // ── Parity, per component: what agrees with Figma and what does not ────────────────────────────────────────────────
