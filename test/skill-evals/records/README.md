@@ -55,5 +55,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-06-wcag-2-1-a-and` | The 21 guide tasks on Haiku (engine e84f729) | "WCAG 2.1 A and AA for every component; where accessibility is read from; slots drawn in the Playground" |
 | `2026-10-06-style-guide-a-slot-is` | The 21 guide tasks on Haiku (engine 7447255) | "Style guide: a slot is an area named Slot; ids an instance points to are kept; square checkerboard" |
 | `2026-10-06-style-guide-one-accessibility-table` | The 21 guide tasks on Haiku (engine 0d370b4) | "Style guide: one Accessibility table by WCAG criterion; every slot marked; an address per area; full width" |
+| `2026-10-06-a-failing-contrast-is-never` | The 21 guide tasks on Haiku (engine 7e78e46) | "Style guide: no tokens tables in the Playground; unused Figma annotations listed in Figma" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
