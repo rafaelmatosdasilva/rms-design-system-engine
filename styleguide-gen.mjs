@@ -587,7 +587,6 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           { label: 'Code', url: w?.at ? fileUrl(repo, branch, w.at[0], w.at[1]) : null },
           ...(docsUrl ? [{ label: 'Documentation', url: String(docsUrl).replace(/\{name\}/g, encodeURIComponent(c.name)) }] : []),
           ...extra.map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })),
-          { label: 'Report an issue', url: issueLink({ template: issues, repo, name: c.name }) },
         ].filter((l) => l.url);
       }
       view.links = [
