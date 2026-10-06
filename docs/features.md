@@ -80,7 +80,7 @@ Measured on a small design system in Figma (tokens, four components and a screen
 
 A prototype here is made only of your design system's own components, with their own options. Nothing is invented and nothing in the system changes. When a screen needs something the system does not have, the prototype shows a labelled box and you get a list of what the system would need, for your design team to decide.
 
-Measured on six prototype requests, Claude alone made 13 of 18 right with Opus and 2 of 18 with Haiku; with the skill, 18 of 18 and 17 of 18 ([case study](../CASE-STUDY.md)).
+Measured on eleven prototype requests, Claude alone made 17 of 33 right with Opus and 3 of 33 with Haiku; with the skill, 33 of 33 and 32 of 33 ([case study](../CASE-STUDY.md)).
 
 | You want to | Type in Claude Code | Or in the terminal |
 |---|---|---|
