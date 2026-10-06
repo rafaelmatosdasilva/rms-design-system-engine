@@ -207,8 +207,9 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-parity td:last-child { word-break: normal; overflow-wrap: anywhere; }
 /* Parity, one table: every prop, variable and value, Figma beside code, a status marked by a sign and its colour. */
 .pg-par-filter { margin: 0 0 var(--sg-space-m); }
-.pg-par-table { width: 100%; border-collapse: collapse; font-size: var(--sg-m); }
-.pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; }
+.pg-par-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--sg-m); }
+/* Its head stays in view under the component's areas as the rows scroll by (the line under it moves with it). */
+.pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
 .pg-par-table td { padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: top; color: var(--sg-text); overflow-wrap: anywhere; }
 .pg-par-table td > code { display: block; }
 .pg-par-table .pg-par-val { display: block; color: var(--sg-muted); font-size: var(--sg-s); }
@@ -223,7 +224,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par--figma .pg-par-sign, .pg-par--code .pg-par-sign { background: var(--sg-warning); }
 .pg-par--figma, .pg-par--code { color: var(--sg-warning); }
 .pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text-2); }
-.pg-par-scroll { overflow-x: auto; }
+/* Wide enough, the table never scrolls on its own (a box that scrolls would hold its head back); on a phone it does. */
+@media (max-width: 720px) { .pg-par-scroll { overflow-x: auto; } }
 /* Where it is used: each product's own page pictured, the component marked on it. */
 .pg-usedin { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 .pg-shot { position: relative; overflow: hidden; border-radius: var(--sg-radius); border: var(--sg-line); background: var(--sg-bg-2); }
@@ -598,8 +600,12 @@ a.pg-usage-name { color: var(--sg-text); }
   // → { version, changed, parity: { say, todo }, a11y: { say, todo }, used }
   function factsOf(c) {
     var log = c.changelog || [], rel = log.find(function (r) { return r.release; });
-    var p = c.parity && c.parity.counts, differ = p ? p.differ : (c.differences || []).length, unbuilt = p ? p.notBuilt : (c.unbuilt || []).length;
-    var parity = differ || unbuilt ? { say: [differ ? (differ === 1 ? '1 difference' : differ + ' differences') : '', unbuilt ? unbuilt + ' not built' : ''].filter(Boolean).join(', '), todo: true }
+    // Parity counts what its table marks too (a row that differs, one only in Figma or only in code), what differs
+    // counted once whether the audit or the table says so.
+    var p = c.parity && c.parity.counts, rows = (c.parity && c.parity.rows) || [], st = { differs: 0, figma: 0, code: 0 };
+    rows.forEach(function (r) { if (r.status in st) st[r.status]++; });
+    var differ = Math.max(p ? p.differ : (c.differences || []).length, st.differs), unbuilt = p ? p.notBuilt : (c.unbuilt || []).length;
+    var parity = differ || unbuilt || st.figma || st.code ? { say: [differ ? (differ === 1 ? '1 difference' : differ + ' differences') : '', st.figma ? st.figma + ' only in Figma' : '', st.code ? st.code + ' only in code' : '', unbuilt ? unbuilt + ' not built' : ''].filter(Boolean).join(', '), todo: true }
       : { say: p && p.notCompared ? 'Agrees, ' + p.notCompared + ' not compared' : 'Agrees', todo: false };
     var ch = c.a11y && c.a11y.checked, n = ch && !ch.notRead ? ch.issues.reduce(function (s, i) { return s + ((i.details || []).length || 1); }, 0) : 0;
     n += (c.a11yFindings || []).length;   // what the audit found (a text's contrast) counts too
@@ -1563,6 +1569,7 @@ a.pg-usage-name { color: var(--sg-text); }
     function writeLink() { if (ALL || probing || hashParts().id !== sec.id) return; var h = linkFor(); if (h !== location.hash) history.replaceState(null, '', h); }
     var sec = document.createElement('section'); sec.id = 'c-' + c.name; sec.className = 'sg-section pg-card-section';
     if (!ALL && hashParts().id === sec.id) fromLink(hashParts().q);
+    var facts = factsOf(c);
     // Its documentation: Figma's description and annotations first, then the code's own note.
     var figDesc = c.description && c.description.replace(/@\w+/g, '').trim();
     var figNotes = (c.annotations || []).filter(function (a) { return a && a !== figDesc; });
@@ -1582,11 +1589,12 @@ a.pg-usage-name { color: var(--sg-text); }
         (ALL ? '' : factsHTML(c)) +
         importHTML(c) +
       '</div>' +
-      // What differs from Figma is marked on Parity itself: the system's alert icon, its count said to a screen reader.
+      // What is left to do is marked on its area, the system's alert icon before the label and what it is said to a
+      // screen reader: Parity while something differs from Figma or is not built, Accessibility while a problem stands
+      // (the last browser check's and the audit's), the same counts as its overview card.
       '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantProps(c).length)); }).map(function (a) {
-        var n = a[0] === 'parity' ? (c.differences || []).length : a[0] === 'a11y' ? (c.a11yFindings || []).length : 0;
-        var what = a[0] === 'a11y' ? (n === 1 ? 'one accessibility problem' : n + ' accessibility problems') : (n === 1 ? 'one thing differs from Figma' : n + ' things differ from Figma');
-        return { v: a[0], label: a[1], icon: n ? ALERT_ICON : null, say: n ? what : null };
+        var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? facts.a11y : null, warn = !!(f && f.todo);
+        return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
       })) + '</div></div>' +
       // Playground: the component drawn, its controls, its code and the tokens behind it.
       '<div class="pg-area" data-area="play">' +
@@ -1701,6 +1709,9 @@ a.pg-usage-name { color: var(--sg-text); }
     // One area at a time (every one at once on the measuring page, ?all); the one chosen stays chosen on the next
     // component. A link to the parity area from the line that says what differs.
     var areaBar = sec.querySelector('.pg-areas');
+    // What sticks under the areas (Parity's table head) knows how tall they are.
+    var areasHeight = function () { sec.style.setProperty('--pg-areas-h', areaBar.offsetHeight + 'px'); };
+    if (window.ResizeObserver) new ResizeObserver(areasHeight).observe(areaBar); else areasHeight();
     var nameEl = sec.querySelector('.pg-head > h2');
     if (!ALL && window.IntersectionObserver && nameEl) new IntersectionObserver(function (es) { areaBar.classList.toggle('is-stuck', !es[0].isIntersecting && es[0].boundingClientRect.top < 0); }).observe(nameEl);
     function showArea(v, kept) {

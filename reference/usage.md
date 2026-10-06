@@ -259,12 +259,14 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
   `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
   page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
-  top too); Parity carries the system's alert icon (an icon named warning or alert) while something differs, and
-  Accessibility while the audit found a problem on it, each count said to a screen reader. Each section of rows (Anatomy in the Playground, Usage, Documentation, Accessibility) is one of the
+  top too); Parity carries the system's alert icon (an icon named warning or alert) before its label while its table
+  marks something (a row that differs, one only in Figma or only in code, a prop not built), and Accessibility while a
+  problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Usage, Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares): its type,
   Figma's name and value, the code's, a status as a sign and the system's colour (the same, differs, only in Figma, only
-  in code) and when it last held, with a filter by type above it and what differs, with who acts, below it. The code is as tall as
+  in code) and when it last held, with a filter by type above it, its head kept in view under the areas as the rows
+  scroll by (on a phone the table scrolls sideways instead), and what differs, with who acts, below it. The code is as tall as
   what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
   (`showFirst`: Show Text and Text Content, or both on the same part); the tokens table leaves out the text style and
   colour while no text is shown, and a part no one sees (a native input at no opacity). **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
@@ -326,7 +328,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
   the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
   button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
-- **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma) and
+- **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma; in an
+  HTML and CSS system a slot or component swap is the markup's content, with code props a slot is `children`) and
   per code prop Figma lacks; per CSS variable its rules use (the token check's values in each mode, the same or differs;
   no Figma variable, only in code) and per Figma variable named after it with no CSS variable; per value the agreed
   record has seen (the same since both sides agreed, or differs since it last moved). Its open differences, with who acts.
