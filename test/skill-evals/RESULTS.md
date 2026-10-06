@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Accessibility findings go to Accessibility, not Parity (continuous evaluation)
+
+What changed since the entry below (engine 7229c44): The style guide shows the audit's contrast findings under a component's Accessibility area instead of its Parity. The guide changed in `reference/usage.md`.
+
+Guide set measured: `b0dcd0d43daf` · Project measured: `13d811a9d668`
+
+| Haiku, engine c595e4e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.057 |
+| Input a run | 96k | 105k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 105k a run against 96k. Records: `records/2026-10-06-a11y-findings-to-accessibility`.
+
 ## 2026-10: Parity as one table of every prop, variable and value (continuous evaluation)
 
 What changed since the entry below (engine e46b7bc): The style guide's Parity area is one table of everything the component has, Figma beside code, with a status and when it last held. The guide changed in `reference/usage.md`.
