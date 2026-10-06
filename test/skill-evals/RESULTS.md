@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Parity as one table of every prop, variable and value (continuous evaluation)
+
+What changed since the entry below (engine e46b7bc): The style guide's Parity area is one table of everything the component has, Figma beside code, with a status and when it last held. The guide changed in `reference/usage.md`.
+
+Guide set measured: `636d56b479b2` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7229c44 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.055 |
+| Input a run | 97k | 96k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 97k. One run (forbidden-green #2) was first scored as a miss: it left the setting alone and said the snapshots are current and not the problem, wording the scorer did not read. The scorer now reads it (a case in `test/skill-evals.test.mjs`), and every run was rescored twice: one verdict changed on the first pass, none on the second. Records: `records/2026-10-06-parity-one-table`.
+
 ## 2026-10: The anatomy follows every Playground change; no Full width (continuous evaluation)
 
 What changed since the entry below (engine a53a190): The style guide redraws the anatomy for a text typed in the Playground, and the Full width button is gone. The guide changed in `reference/usage.md`.

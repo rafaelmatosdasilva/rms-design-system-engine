@@ -1280,6 +1280,76 @@ export function parityView({ name, agreed = {}, census = null, differences = [],
     counts: { agree: facts.length + props.length + tokens.length, differ: differences.length, notBuilt: notBuilt.length, notCompared: notCompared?.count ?? 0 } };
 }
 
+// ── Parity, one table: every prop, variable and value of the component, Figma beside code ──────────────────────────
+// Everything the component has, whatever the Playground shows. propsSnap: the Figma props snapshot · controls: the props
+// both sides have ({ label, prop }) · unbuilt: Figma props the code does not build · codeProps: the code's own props
+// (component-api, { name: { default } }) · allTokens: every CSS variable its rules use ({ var, figma }) · check: the token
+// check's result (passVars, fail, skip) · agreed: the agreed record (facts, seen) · propsAt / checkedAt: when Figma's props
+// were read and when the tokens were checked.
+// → [{ type: 'Prop'|'Variable'|'Value', figma: { name, value } | null, code: { name, value } | null,
+//      status: 'match'|'differs'|'figma'|'code', at }], props first, then variables, then values. status figma: only in
+// Figma; code: only in code. at: a value's time is since both sides agreed, or when it last moved.
+export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], codeProps = {}, allTokens = [], check = null, agreed = {}, propsAt = null, checkedAt = null } = {}) {
+  const lc = (x) => String(x ?? '').toLowerCase().replace(/[\s_-]+/g, '');
+  const rows = [];
+  // Props: each Figma property, paired with the code prop that realizes it, then the code's own props Figma lacks.
+  const fprops = propsSnap[name]?.properties ?? {};
+  const say = (d) => {
+    if (d.type === 'VARIANT') return `${(d.variantOptions ?? []).join(', ')} · default ${d.defaultValue}`;
+    if (d.type === 'BOOLEAN') return `on or off · default ${d.defaultValue ? 'on' : 'off'}`;
+    if (d.type === 'TEXT') return `text · default ${JSON.stringify(String(d.defaultValue ?? ''))}`;
+    if (d.type === 'INSTANCE_SWAP') return 'a component swap';
+    return String(d.type ?? '').toLowerCase();
+  };
+  const paired = new Set();
+  const notBuilt = new Set(unbuilt.map((u) => lc(u.label ?? u)));
+  for (const [key, d] of Object.entries(fprops)) {
+    const label = key.split('#')[0];
+    const ctl = controls.find((k) => lc(k.label) === lc(label));
+    const own = ctl ? null : Object.keys(codeProps).find((n) => lc(n) === lc(label));
+    const codeName = ctl ? (ctl.prop ?? ctl.label) : own;
+    if (codeName && !notBuilt.has(lc(label))) {
+      paired.add(lc(codeName));
+      const def = codeProps[codeName]?.default;
+      rows.push({ type: 'Prop', figma: { name: label, value: say(d) }, code: { name: codeName, value: def === undefined ? '' : `default ${def}` }, status: 'match', at: propsAt });
+    } else rows.push({ type: 'Prop', figma: { name: label, value: say(d) }, code: null, status: 'figma', at: propsAt });
+  }
+  for (const [n, d] of Object.entries(codeProps)) {
+    if (paired.has(lc(n)) || /^(on[A-Z]|class(Name)?$|style$|children$|id$|ref$|key$)/.test(n)) continue;
+    rows.push({ type: 'Prop', figma: null, code: { name: n, value: d?.default === undefined ? '' : `default ${d.default}` }, status: 'code', at: propsAt });
+  }
+  // Variables: each CSS variable its rules use, with Figma's variable and the values in each mode, then the Figma
+  // variables named after it that have no CSS variable.
+  const modes = (list) => [...new Set(list.map((v) => (v.mode && v.mode !== '-' ? `${v.mode} ` : '') + (v.value ?? v.css ?? '')))].join(' · ');
+  const seenVar = new Set();
+  for (const t of allTokens) {
+    if (!t?.var || seenVar.has(t.var)) continue;
+    seenVar.add(t.var);
+    const pass = (check?.passVars ?? []).filter((v) => v.cssVar === t.var);
+    const fail = (check?.fail ?? []).filter((v) => v.cssVar === t.var);
+    if (!t.figma && !pass.length && !fail.length) { rows.push({ type: 'Variable', figma: null, code: { name: t.var, value: '' }, status: 'code', at: checkedAt }); continue; }
+    const figmaName = t.figma ?? String((pass[0] ?? fail[0]).token ?? '').replace(/\/color$/, '');
+    if (fail.length) rows.push({ type: 'Variable', figma: { name: figmaName, value: [...new Set(fail.map((v) => (v.mode && v.mode !== '-' ? `${v.mode} ` : '') + (v.figma ?? v.value ?? '')))].join(' · ') }, code: { name: t.var, value: [...new Set(fail.map((v) => (v.mode && v.mode !== '-' ? `${v.mode} ` : '') + (v.css ?? 'not declared')))].join(' · ') }, status: 'differs', at: checkedAt });
+    else rows.push({ type: 'Variable', figma: { name: figmaName, value: modes(pass) }, code: { name: t.var, value: modes(pass) }, status: pass.length ? 'match' : 'differs', at: checkedAt });
+  }
+  const prefix = lc(name);
+  const figmaOnly = new Map();
+  for (const sk of check?.skip ?? []) {
+    const tok = String(sk.token ?? '');
+    if (lc(tok.split('/')[0]) !== prefix || figmaOnly.has(tok)) continue;
+    figmaOnly.set(tok, { type: 'Variable', figma: { name: tok, value: '' }, code: null, status: 'figma', at: checkedAt, why: sk.reason ?? null });
+  }
+  rows.push(...figmaOnly.values());
+  // Values: every value the audit compares (height, padding, font size, a state's opacity), each with when it last held.
+  const pre = `${name} · `;
+  for (const [k, f] of Object.entries(agreed.seen ?? {}).filter(([k]) => k.startsWith(pre)).sort(([a], [b]) => a.localeCompare(b))) {
+    const moves = f.moves ?? [];
+    const at = f.same ? (agreed.facts?.[k]?.at ?? moves.at(-1)?.at ?? null) : (moves.at(-1)?.at ?? null);
+    rows.push({ type: 'Value', figma: { name: k.slice(pre.length), value: String(f.figma ?? '') }, code: { name: k.slice(pre.length), value: String(f.code ?? '') }, status: f.same ? 'match' : 'differs', at });
+  }
+  return rows;
+}
+
 // ── Where a person reports a problem: an issue about one component, or feedback on the page ────────────────────────
 // template: ds-config styleguide.issues, the tracker's new-issue address with {name} for the component and {title} for a
 // ready title ("https://redmine.example.com/projects/ds/issues/new?issue[subject]={title}"). Without one, the repository's
