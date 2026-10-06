@@ -162,7 +162,9 @@ export function checkUi(ui, catalog) {
       const guess = near(node.component, names);
       add(1, 'error', node.id, `"${node.component}" is not in the catalog${guess ? ` (did you mean ${guess}?)` : ''}`);
     } else {
-      if (def.status) add(1, 'warning', node.id, `${node.component} is ${def.status}${def.useInstead?.length ? `: use ${def.useInstead.join(' or ')}` : ''}`);
+      // A component on its way out names what replaces it; one still being settled (experimental, beta) is the system's
+      // own and may be used: the line says so, or an agent reads it as forbidden and leaves the need unmet.
+      if (def.status) add(1, 'warning', node.id, `${node.component} is ${def.status}${def.useInstead?.length ? `: use ${def.useInstead.join(' or ')}` : /^(experimental|beta|in progress|draft|new)$/i.test(def.status) ? ': it is in the system and may still change; keep it, and say so in the reply' : ''}`);
       const props = { ...Object.fromEntries(Object.entries(node).filter(([k]) => !RESERVED.has(k))), ...(node.props ?? {}) };
       for (const [k, v] of Object.entries(props)) {
         const p = def.props?.[k] ?? Object.entries(def.props ?? {}).find(([, e]) => e.codeName === k)?.[1];
@@ -183,7 +185,7 @@ export function checkUi(ui, catalog) {
       const child = byId.get(kidId);
       if (def && child && def.neverCombineWith?.includes(child.component)) add(5, 'error', node.id, `${node.component} must never contain ${child.component}`);
       if (def && child && comps[child.component] && def.children?.length && !def.children.includes(child.component))
-        add(5, 'warning', node.id, `the design system never puts ${child.component} inside ${node.component}`);
+        add(5, 'warning', node.id, `the design system never puts ${child.component} inside ${node.component}: put it beside ${node.component}, not inside it`);
     }
   }
   // Cycles: walking up from any node must end at the root.
