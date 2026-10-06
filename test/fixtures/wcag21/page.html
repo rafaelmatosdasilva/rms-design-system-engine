@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>WCAG 2.1 checks</title>
+<style>
+  body { font: 14px sans-serif; background: #fff; color: #111; }
+  .field { border: 1px solid #767676; padding: 4px; }
+  .faint { border: 1px solid #eeeeee; padding: 4px; background: #fff; }
+  .row { display: flex; gap: 8px; }
+  .reverse { display: flex; flex-direction: row-reverse; gap: 8px; }
+  @keyframes blink { 0% { opacity: 1 } 50% { opacity: 0.2 } }
+  .blinky { animation: blink 0.2s infinite; }
+  .marquee { animation: blink 3s infinite; }
+  .loader { animation: blink 1s infinite; }
+  .tip { position: absolute; background: #222; color: #fff; padding: 2px; }
+  .check-box { display: inline-block; width: 14px; height: 14px; border: 1px solid #f2f2f2; }
+  .check input { opacity: 0; position: absolute; }
+</style></head>
+<body>
+<h1>Fixture</h1>
+<!-- Each root passes or fails on purpose; the test names what each one owes. -->
+<div id="good">
+  <label for="e1">Email</label><input id="e1" class="field" type="email" autocomplete="email">
+  <fieldset><legend>Size</legend><label><input type="radio" name="s1"> S</label><label><input type="radio" name="s1"> L</label></fieldset>
+  <button aria-label="Save draft">Save draft</button>
+  <a href="#guide">Read the export guide</a>
+  <div class="toast" role="status">Saved</div>
+  <div class="loader" role="progressbar" aria-label="Loading"></div>
+  <table><tr><th scope="col">Name</th></tr><tr><td>A</td></tr><tr><td>B</td></tr></table>
+  <button class="tipper" data-tip="More">i</button>
+</div>
+<div id="bad">
+  <input class="faint" type="text" name="email" aria-label="Email">
+  <label><input type="radio" name="s2"> S</label><label><input type="radio" name="s2"> L</label>
+  <button aria-label="Submit form">Save</button>
+  <a href="#x">click here</a>
+  <div class="toast">Saved</div>
+  <div class="marquee">News</div>
+  <div class="blinky">!</div>
+  <table><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></table>
+  <div role="tab">Loose tab</div>
+  <h2></h2>
+  <span role="buton" aria-pressd="true" aria-expanded="yes" aria-describedby="nowhere">x</span>
+  <span id="twice">1</span><span id="twice">2</span>
+  <div aria-hidden="true"><button>Hidden yet focusable</button></div>
+  <img src="photo.png">
+  <div class="reverse"><button>First</button><button>Second</button></div>
+  <label class="check"><input type="checkbox"><span class="check-box"></span> Agree</label>
+  <button class="tipper2" data-tip="Help">?</button>
+  <button class="presser">Press</button>
+  <select class="jumper"><option>One</option><option>Two</option></select>
+</div>
+<script>
+  // A tooltip that ignores Escape and hides as the pointer leaves the trigger.
+  var tip = null;
+  document.querySelector('.tipper2').addEventListener('mouseenter', function (e) { tip = document.createElement('div'); tip.className = 'tip'; tip.textContent = 'Help'; document.body.appendChild(tip); });
+  document.querySelector('.tipper2').addEventListener('mouseleave', function () { if (tip) tip.remove(); tip = null; });
+  // A tooltip that behaves: Escape closes it, it stays while hovered, it leaves when the pointer leaves both.
+  var good = null, overTip = false;
+  var t1 = document.querySelector('.tipper');
+  t1.addEventListener('mouseenter', function () { if (good) return; good = document.createElement('div'); good.className = 'tip good-tip'; good.textContent = 'More'; good.addEventListener('mouseenter', function () { overTip = true; }); good.addEventListener('mouseleave', function () { overTip = false; }); document.body.appendChild(good); });
+  t1.addEventListener('mouseleave', function () { setTimeout(function () { if (good && !overTip) { good.remove(); good = null; } }, 50); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && good) { good.remove(); good = null; } });
+  // Acts on the press; a select that moves the focus when it changes.
+  document.querySelector('.presser').addEventListener('mousedown', function () { this.classList.add('pressed-done'); });
+  document.querySelector('.jumper').addEventListener('change', function () { document.querySelector('#bad a').focus(); });
+</script>
+</body></html>
