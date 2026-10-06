@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The anatomy follows every Playground change; no Full width (continuous evaluation)
+
+What changed since the entry below (engine a53a190): The style guide redraws the anatomy for a text typed in the Playground, and the Full width button is gone. The guide changed in `reference/usage.md`.
+
+Guide set measured: `f4d5cd72cfd2` · Project measured: `13d811a9d668`
+
+| Haiku, engine e46b7bc | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.055 |
+| Input a run | 99k | 97k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 99k. Records: `records/2026-10-06-anatomy-follows-playground`.
+
 ## 2026-10: A component the DS has not built yet is not a product's gap (continuous evaluation)
 
 What changed since the entry below (engine f78312e): Gate 10 says a product screen that uses a component in knownUnimplementedComponents on a not checked line instead of failing the product. The guide changed in `cookbook/full-audit.md`, `reference/config.md`.
