@@ -224,6 +224,9 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par--figma .pg-par-sign, .pg-par--code .pg-par-sign { background: var(--sg-warning); }
 .pg-par--figma, .pg-par--code { color: var(--sg-warning); }
 .pg-par--none .pg-par-sign { background: var(--sg-muted); }
+.pg-slots { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) var(--sg-space-m); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); }
+.pg-slot-code { color: var(--sg-text-2); }
+.pg-slot-code code { font-family: inherit; color: var(--sg-text); }
 .pg-par--none { color: var(--sg-muted); }
 .pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text-2); }
 /* Wide enough, the table never scrolls on its own (a box that scrolls would hold its head back); on a phone it does. */
@@ -620,6 +623,17 @@ a.pg-usage-name { color: var(--sg-text); }
     var a11y = n ? { say: n === 1 ? '1 problem' : n + ' problems', todo: true } : !ch || ch.notRead ? { say: 'Not checked in a browser yet', todo: false } : { say: 'No problem found', todo: false };
     var used = (c.usage || []).length;
     return { version: rel ? rel.release : log.length ? 'Not released yet' : null, changed: log.length ? String(log[0].date).slice(0, 10) : null, changedAt: log.length ? log[0].date : null, parity: parity, a11y: a11y, used: used };
+  }
+  // Its slots, under its name: each Figma slot beside what holds it in the code (its own part, .modal-slot, or the
+  // markup's content), signed as Parity signs them; a Figma slot the code does not hold, signed as only in Figma.
+  function slotsHTML(c) {
+    var rows = ((c.parity && c.parity.rows) || []).filter(function (r) { return r.type === 'Prop' && r.figma && /^slot$/.test(r.figma.value); });
+    if (!rows.length) return '';
+    return '<p class="pg-slots">' + rows.map(function (r) {
+      var st = PAR[r.status] || ['?', r.status];
+      return '<span class="pg-par-status pg-par--' + esc(r.status) + '"><span class="pg-par-sign" aria-hidden="true">' + st[0] + '</span>' + esc(/^slot$/i.test(r.figma.name) ? 'Slot' : 'Slot ' + r.figma.name) + '</span>' +
+        '<span class="pg-slot-code">' + (r.code ? (/^[.#]/.test(r.code.name) ? 'in the code <code>' + esc(r.code.name) + '</code>' : 'in the code, ' + esc(r.code.value)) : 'only in Figma') + '</span>';
+    }).join('') + '</p>';
   }
   function factsHTML(c) {
     var f = factsOf(c), item = function (k, v, todo) { return '<div><dt>' + esc(k) + '</dt><dd' + (todo ? ' class="sg-fact-todo"' : '') + '>' + esc(v) + '</dd></div>'; };
@@ -1609,6 +1623,7 @@ a.pg-usage-name { color: var(--sg-text); }
         (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
         (ALL ? '' : factsHTML(c)) +
+        slotsHTML(c) +
         importHTML(c) +
       '</div>' +
       // What is left to do is marked on its area, the system's alert icon before the label and what it is said to a
@@ -1649,6 +1664,8 @@ a.pg-usage-name { color: var(--sg-text); }
     // too: the system's scripts run in it and it can be used, by mouse or keyboard.
     function renderFrame() {
       if (!frame || probing) return;
+      // Inspecting: the anatomy stands in for both, drawn at the Width chosen.
+      if (inspecting) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = true; requestAnimationFrame(drawAnatomy); return; }
       if (WIDTH === 'fit' || ALL) { frame.hidden = true; frame.innerHTML = ''; preview.hidden = false; return; }
       var w = WIDTHS.find(function (x) { return x[0] === WIDTH; });
       preview.hidden = true; frame.hidden = false;
@@ -1849,8 +1866,11 @@ a.pg-usage-name { color: var(--sg-text); }
       if ((c.motion && c.motion.overlay) || getComputedStyle(src).position === 'fixed') { var own = c.cls && src.querySelector('.' + clsName(c)); if (own) src = own; }
       var copy = src.cloneNode(true);
       // At the width the Playground last drew it (it is hidden while this area shows), so the copy lays out the same.
+      // At the Width chosen (Phone, Tablet, Desktop): laid out as that width's frame lays it out, whole; at Fit, at the
+      // width the Playground last drew it (it is hidden while inspecting), so the copy lays out the same.
+      var wv = WIDTH !== 'fit' && WIDTHS.find(function (x) { return x[0] === WIDTH; });
       var pw = src.getBoundingClientRect().width || (src === preview.firstElementChild ? drawnWidth : 0);
-      if (pw) { copy.style.width = pw + 'px'; copy.style.boxSizing = 'border-box'; }
+      if (!wv && pw) { copy.style.width = pw + 'px'; copy.style.boxSizing = 'border-box'; }
       copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
       [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('[id]'))).forEach(function (k) { k.removeAttribute('id'); });
       var stage = document.createElement('div'); stage.className = 'pg-anat-stage';
@@ -1859,7 +1879,8 @@ a.pg-usage-name { color: var(--sg-text); }
       stage.appendChild(wrap); stage.appendChild(marks); anatBox.appendChild(stage);
       var root = c.only ? (copy.querySelector(c.only) || copy) : copy;
       if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { anatBox.textContent = 'This component sits over the page, so it is inspected in the browser rather than here.'; return; }
-      var whole = copy.getBoundingClientRect(), rr = root.getBoundingClientRect();
+      if (wv) { wrap.classList.add('pg-frame-stage'); wrap.style.width = wv[2] + 'px'; wrap.style.boxSizing = 'border-box'; }
+      var whole = (wv ? wrap : copy).getBoundingClientRect(), rr = root.getBoundingClientRect();
       // At the size the Playground draws it: inspecting never makes it bigger, and makes it smaller only to fit.
       var k = Math.min(1, (anatBox.clientWidth - 64) / Math.max(1, whole.width));
       stage.style.width = whole.width * k + 'px'; stage.style.height = whole.height * k + 'px';
@@ -2268,12 +2289,14 @@ a.pg-usage-name { color: var(--sg-text); }
         inspecting = !inspecting;
         inspectBtn.setAttribute('aria-pressed', inspecting ? 'true' : 'false');
         (inspectBtn.querySelector('span') || inspectBtn).textContent = inspecting ? 'Done inspecting' : 'Inspect';
-        if (inspecting && WIDTH !== 'fit') showWidth('fit');   // it inspects the live component, at its own width
         drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
-        preview.hidden = inspecting; anatBox.hidden = !inspecting; if (anatLine) anatLine.hidden = !inspecting;
+        // One of the two at a time, whatever the Width: the anatomy in the stage, or the Playground (live, or in its
+        // Width's frame).
+        anatBox.hidden = !inspecting; if (anatLine) anatLine.hidden = !inspecting;
         if (!inspecting) { anatPicked = null; anatPath = []; anatBox.innerHTML = ''; }
         bottomBar();
-        if (inspecting) requestAnimationFrame(drawAnatomy); else nudge();
+        renderFrame();
+        if (!inspecting) nudge();
       });
     }
     // Opened again by a link: its variant set, the controls following.
