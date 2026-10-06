@@ -142,7 +142,7 @@ if(SIZING_COLLECTION){const sc=collections.find(c=>c.name===SIZING_COLLECTION);i
 // modeVariants - DS-agnostic: for every collection in ds-config → figma.collections with ≥2 modes,
 // capture the vars that DIFFER across its modes, tagging EACH with its own kind (inferred from
 // resolvedType - a single collection may mix color/scalar/string/boolean). Colours of the colour
-// collection are skipped here (already in snap.color). Lets Gate [5] check non-colour, per-collection
+// collection are skipped here (already in snap.color). Lets Gate [5] (Every mode is covered) check non-colour, per-collection
 // mode axes (breakpoint sizing, per-locale strings) AND mixed-type collections (a Theme whose floats
 // and booleans also vary light↔dark).
 const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:[{name:'Phone',snapshotKey:'phone'},{name:'Tablet',snapshotKey:'tablet'}]}]
@@ -242,7 +242,7 @@ if(SIZING_COLLECTION){const sc=collections.find(c=>c.name===SIZING_COLLECTION);i
 // modeVariants - DS-agnostic: for every collection in ds-config → figma.collections with ≥2 modes,
 // capture the vars that DIFFER across its modes, tagging EACH with its own kind (inferred from
 // resolvedType - a single collection may mix color/scalar/string/boolean). Colours of the colour
-// collection are skipped here (already in snap.color). Lets Gate [5] check non-colour, per-collection
+// collection are skipped here (already in snap.color). Lets Gate [5] (Every mode is covered) check non-colour, per-collection
 // mode axes (breakpoint sizing, per-locale strings) AND mixed-type collections (a Theme whose floats
 // and booleans also vary light↔dark).
 const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:[{name:'Phone',snapshotKey:'phone'},{name:'Tablet',snapshotKey:'tablet'}]}]
@@ -334,7 +334,7 @@ return {motion:motionOut,effects:effectsOut};
 > The engine never refreshes these snapshots for you, so **you** run the Step 1c Plugin API walk
 > (works on any plan) alongside
 > the vars capture — refreshing one and not the other is the failure this rule exists to stop.
-> **Set `maxSnapshotAgeDays` in `ds-config.json`** so Gate [1] *hard-fails* on a stale snapshot
+> **Set `maxSnapshotAgeDays` in `ds-config.json`** so Gate [1] (Data is up to date) *hard-fails* on a stale snapshot
 > instead of passing green with an advisory — that turns "always refresh" from a discipline you can
 > forget into a gate you cannot.
 >
@@ -399,7 +399,7 @@ Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the 
 //                    Must walk recursively into children - many components put strokes on a
 //                    "Background" child rect rather than the component frame itself. Skip
 //                    what is inside an icon instance: a stroked icon's outline is not a border.
-//                    Controls Gate [3c] phantom border scan - when false, any CSS `border`
+//                    Controls Gate [13] (Structure) phantom border scan - when false, any CSS `border`
 //                    or `outline` on any selector matching this component is a phantom and fails.
 // childFramePadding = direct child FRAME nodes (not RECTANGLE/TEXT/INSTANCE) that have at
 //                    least one bound padding variable. These "wrapper frames" (e.g. LabelContainer)
@@ -409,14 +409,14 @@ Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the 
 // childFrameGaps   = direct child FRAME nodes with a bound itemSpacing variable:
 //                    [{ name, gapVar }]. Root-level gapVar cannot see these - a DS rebind on an
 //                    inner frame (e.g. toast "content" gap/s → gap/m) is invisible without them.
-//                    Gate [3] cross-checks every entry against CONTRACT[comp].children: an
+//                    Gate [13] (Structure) cross-checks every entry against CONTRACT[comp].children: an
 //                    uncontracted snapshot entry or a gapVar mismatch is a failure, and a
 //                    contracted gapVar whose frame no longer binds a gap in Figma is stale.
 //                    Omit if no child frames have bound gaps.
 ```
 
 **Deeper facts (recommended).** Also record these on each component's entry, from the same
-`State=Default` node. The measured comparison (Gate [10] `MEASURED`, `--capture-code --compare`) uses
+`State=Default` node. The measured comparison (Gate [13] (Structure) `MEASURED`, `--capture-code --compare`) uses
 each one when present:
 - sizing per axis, a fixed width, and min and max width
 - the gap, the stroke width on each side, and opacity
@@ -434,7 +434,7 @@ Snapshots without them keep working; the comparison simply skips what Figma did 
 
 **Each component against its Figma image.** With `codeReading.visual: true` the capture also saves each
 component as the page draws it (first mode, default state, scale 2) under `.design-system-engine-out/visual/code/`, and
-Gate [13] compares it with the Figma image of the component's default variant. The Figma image comes from
+Gate [13] (Structure) compares it with the Figma image of the component's default variant. The Figma image comes from
 `.design-system-engine-refs/components/<name>.png` when you saved one (exported from Figma at 2x), else from the Figma REST
 API with `FIGMA_TOKEN` (cached under `.design-system-engine-out/visual/figma/` until the file version changes). A component
 with neither is listed as not compared. Two percentages per component, worst first: the pixels that differ,
@@ -454,7 +454,7 @@ A state the user cannot reach is not listed: no hover when the disabled state ha
 press on a natively disabled control.
 Combinations such as selected with hover are compared whenever Figma has that variant (see below).
 
-With `variants` recorded, Gate [13] also lists each Figma variant value (an axis value such as
+With `variants` recorded, Gate [13] (Structure) also lists each Figma variant value (an axis value such as
 `Size=L`) that has no counterpart in code (`⚠️ VARIANTS`): not the default, not a state the code
 capture produced, and not one it found declared. When the variables snapshot has a breakpoint
 collection, the code capture measures each component at every breakpoint width (the smallest mode at
@@ -580,20 +580,20 @@ const restingStroke = (resting.strokes ?? []).filter(s => s.visible !== false).l
 `restingStroke` records the resting variant's **root** stroke, so a Phase-1 diff surfaces
 "resting state changed" when the DS adds/removes a resting border. To turn that visibility
 into an enforced lock, add `restingStroke: false` (+ `restingState`) to the component's
-CONTRACT entry when the resting state is borderless - **Gate [3l]** then requires the bare
+CONTRACT entry when the resting state is borderless - **Gate [13] (Structure)** then requires the bare
 component selector's border to be `transparent`/`none`, so a colored resting border can
 never regress in. It's opt-in per component (a `false` in the contract) because many DS
 components model their border on a child rect while the root variant has no stroke, so an
 auto-derived "must have a border" rule would false-positive.
 
-**Gate [3b] - border sides must match Figma, and are mandatory when a stroke exists.**
+**Gate [13] (Structure) - border sides must match Figma, and are mandatory when a stroke exists.**
 A component's `strokeSides` pins which CSS border sides may be drawn: `'all'` requires the
 `border:` shorthand; a single side (`'top'`/`'right'`/`'bottom'`/`'left'`) requires
 `border-<side>` and forbids the shorthand; `'none'` documents a component that draws no border
 of its own - its stroke flag comes from a *nested* sub-component or a consumer wrapper (e.g.
 `sectionHeader`'s nested `buttonSecondary`), so the CSS side assertion is skipped. Crucially,
 `strokeSides` is **mandatory whenever Figma draws any stroke** -
-`strokeOnDefault` OR `strokeOnAnyState`. A strokeful component that omits it **fails** Gate [3b]
+`strokeOnDefault` OR `strokeOnAnyState`. A strokeful component that omits it **fails** Gate [13] (Structure)
 rather than being silently skipped (the hole that let `.moreMenu` ship a 4-sided `border:`
 when its DS Background rect strokes bottom-only). To confirm the sides, read the DS component's
 per-side `strokeTopWeight`/`strokeBottomWeight`/… via the Plugin API - bound `strokeBottomWeight`
@@ -601,39 +601,39 @@ with the other sides at 0 means `border-bottom` only. Park a not-yet-verified st
 in `ds-config.json → knownUndeclaredStrokeSides` (tech-debt, not an exemption: declare the real
 sides and remove it as each is checked).
 
-**Gate [3m] - fixed-height components that can shrink (advisory).** A component whose snapshot `h`
+**Gate [13] (Structure) - fixed-height components that can shrink (advisory).** A component whose snapshot `h`
 is a fixed number renders that exact height in Figma, but in code it's often a flex-column
 child (a list row); a flex child with `height:Npx` and no `flex-shrink:0` compresses when
-the container runs short (the menuList/node/toast/moreMenu shrinking bug). Gate [3m]
+the container runs short (the menuList/node/toast/moreMenu shrinking bug). Gate [13] (Structure)
 warns when a fixed-height component whose base rule pins the height has no
 `flex-shrink:0`. It is a risk in how the component is placed, not a difference from Figma,
 so it never fails the gate. Exempt a genuinely-never-flex component via
 `ds-config.json → knownShrinkExceptions`.
 
-**Icon-size capture (Gate [16] `iconSizeOf`).** In Step 1c, also record each component's
+**Icon-size capture (Gate [24] (Renders correctly in a browser) `iconSizeOf`).** In Step 1c, also record each component's
 primary icon box as `iconSize` (the DS uses one icon size, typically 16px). A rendered
 assertion tagged `iconSizeOf: '<component>'` then sources its expected width/height from the
 snapshot - so an icon that's silently too small (the 12px search icon) fails, and the check
 auto-updates if the DS resizes.
 
-**Frame-geometry capture (Gate [16] `frameGeom`).** Component checks verify a component's
+**Frame-geometry capture (Gate [24] (Renders correctly in a browser) `frameGeom`).** Component checks verify a component's
 *own* box but miss *context* - spacing between elements, container padding. `figma-frame-geometry.snapshot.json`
 (`{ node: { h, pad:[t,r,b,l], gap } }`, keyed by node name, array + `_path` when a name repeats)
 is **auto-refreshed every run** via `refreshFrameGeometry` (REST `/nodes` - works on any plan,
-on any plan) and Gate [1] tracks its freshness. A rendered assertion tagged
+on any plan) and Gate [1] (Data is up to date) tracks its freshness. A rendered assertion tagged
 `frameGeom: { node, path? }` sources its expected padding/gap/height from that node, so
 container-spacing checks track the live frame - the class that missed the 7px `.view-toggle-row`
 bottom padding above the first divider.
 
-**`FRAME_GEOMETRY_MAP` - element-geometry auto-expand (Gate [16]).** Map a selector to a DS
+**`FRAME_GEOMETRY_MAP` - element-geometry auto-expand (Gate [24] (Renders correctly in a browser)).** Map a selector to a DS
 frame node once - `{ plugin, selector, node, path?, props? }` - and rendered-check expands it
 into one `frameGeom` assertion per `prop` (default: the four padding sides). Mapping a container
 once auto-checks all its box geometry against the live frame; no per-prop hand-authoring.
 
-**Text-style capture (Gate [16] `textStyle`).** A static CSS scan can't see that an element
+**Text-style capture (Gate [24] (Renders correctly in a browser) `textStyle`).** A static CSS scan can't see that an element
 *renders* the wrong type: a rule can set `font-size` from the right token yet inherit a heavier
 `font-weight` from a container (the checkbox label that inherited the `s` weight 700 while the DS
-uses style `m`, 600) - every token value is individually correct, so gates [3]/[8] stay green. An
+uses style `m`, 600) - every token value is individually correct, so gates [3]/[11] stay green. An
 assertion tagged `textStyle: '<name>'` sources the expected `font-size`/`font-weight`/`line-height`
 from that named DS text style in the **typography snapshot** (`figma-vars.snapshot.json → typography`,
 e.g. `m: { size, weight, lh }`) and expands into one computed-style assertion per facet (a tier with
@@ -643,21 +643,21 @@ checked. Opt-in per assertion, so it never false-positives on rules that correct
 thumb: every text element that maps to a DS named style should carry a `textStyle` assertion -
 matching size/weight/line-height by hand silently drifts and drops line-height.
 
-**Cross-plugin consistency (`CROSS_PLUGIN_CONSISTENCY`, Gate [16]).** A `theme.css` base
+**Cross-plugin consistency (`CROSS_PLUGIN_CONSISTENCY`, Gate [24] (Renders correctly in a browser)).** A `theme.css` base
 component must compute the same values in every plugin that uses it. Each entry -
 `{ label, selector, probe, props, plugins }` - renders the probe in every listed plugin and
 asserts they all agree on every prop, catching a plugin-local rule that silently overrides a
 shared component (e.g. dropping `flex-shrink` or changing a height on `.menuList`).
 
-**Multi-variant capture + Gate [3n]/[3o].** The snapshot records **every** variant's facts, not
+**Multi-variant capture + Gate [13] (Structure).** The snapshot records **every** variant's facts, not
 just the single `/default/i` one: `variantStroke` (per-variant root stroke) and `variantHeight`
-(per-variant height). **Gate [3n]** - a set with both a bordered and a borderless variant (the
-shape that hid node's new "Idle" state) must declare `restingStroke`, which activates Gate [3l]
-to lock the base border. **Gate [3o]** - a set whose variants have different heights (e.g. toast
+(per-variant height). **Gate [13] (Structure)** - a set with both a bordered and a borderless variant (the
+shape that hid node's new "Idle" state) must declare `restingStroke`, which activates Gate [13] (Structure)
+to lock the base border. **Gate [13] (Structure)** - a set whose variants have different heights (e.g. toast
 loading=48/success=32) must cover each non-base height in the contract's `states` map, so a new
 height-varying state can't render against the wrong height. Uniform components pass automatically.
 
-**Visual-regression advisory mode (Gate [2] de-noise).** The pixel screenshot compares the LIVE
+**Visual-regression advisory mode (Gate [2] (Figma frame unchanged) de-noise).** The pixel screenshot compares the LIVE
 DS frame to a stored PNG - so a change means the *designer edited the frame*, not that the code
 regressed (structural code↔DS geometry is the `frameGeom` checks' job). Set `ds-config.json →
 visualRegression.mode: "advisory"` and a changed frame **auto-updates the baseline** (the PNG diff
@@ -774,7 +774,7 @@ Write the result in this shape:
 
 1. **Identify the HTML equivalent** - determine which element in the rendered HTML corresponds to the Figma child frame (e.g. `LabelContainer` → `<span>` inside `.buttonTertiary`).
 2. **Verify or add a CSS rule** - grep for `.<component> <element> { padding`. If none exists, the padding layer is missing from the implementation - add it.
-3. **Document in `structure-contract.mjs`** so Gate [3] enforces it automatically:
+3. **Document in `structure-contract.mjs`** so Gate [13] (Structure) enforces it automatically:
    ```js
    buttonTertiary: {
      // ...other fields...
@@ -784,9 +784,9 @@ Write the result in this shape:
    }
    ```
 
-**`childFrameGaps` → contracted `children` entry required.** Same idea for inner-frame gaps: every snapshot `childFrameGaps` entry must have a matching `children: [{ name, cssSelector, gapVar }]` entry in `structure-contract.mjs`. Gate [3] fails on an uncontracted snapshot entry, a `gapVar` mismatch (contract stale vs Figma), or a contracted `gapVar` whose frame no longer binds a gap in Figma. Set `cssSelector: null` when the child frame is flattened in the HTML (its gap/padding is expressed on the root rule or geometrically) - the CSS lookup in Gate [3f] is skipped, but the snapshot cross-check still runs, so a DS rebind is always caught. Document the flattening in a comment next to the entry.
+**`childFrameGaps` → contracted `children` entry required.** Same idea for inner-frame gaps: every snapshot `childFrameGaps` entry must have a matching `children: [{ name, cssSelector, gapVar }]` entry in `structure-contract.mjs`. Gate [13] (Structure) fails on an uncontracted snapshot entry, a `gapVar` mismatch (contract stale vs Figma), or a contracted `gapVar` whose frame no longer binds a gap in Figma. Set `cssSelector: null` when the child frame is flattened in the HTML (its gap/padding is expressed on the root rule or geometrically) - the CSS lookup in Gate [13] (Structure) is skipped, but the snapshot cross-check still runs, so a DS rebind is always caught. Document the flattening in a comment next to the entry.
 
-> **A `cssSelector: null` slot that carries a PADDING token must declare `verifiedBy`, or Gate [3f] fails.** `cssSelector: null` skips the code lookup — which is correct for a gap (a slot's gap spaces whatever is slotted in *per-context*, so there is no one fixed value to assert) but **dangerous for a padding token**: a slot's own inset is a real value the code must reproduce, and skipping it silently is exactly how a slot's top/side padding drifts unseen. Real case: the DS `panel` was restructured into `HeadContent`/`MainContent` slots; `HeadContent` carried `top padding/l` (16), the base `.drawerHeader` shipped `padding/s` (8), and **every gate stayed green** because the slot was marked documentary. So the engine now **refuses** a null-selector slot with a `paddingVar.tb`/`paddingVar.lr` unless it names what checks that padding, via a **`verifiedBy`** string — a real selector, a `RENDERED_ASSERTIONS` reference (pin the exact per-side px there — a slot's padding is often asymmetric, e.g. top `padding/l` + bottom `padding/s`, which the single `{tb}` field can't express), or `'geometric …'` when a fixed height/`::before` inset absorbs it. No `verifiedBy` ⇒ **Gate [3f] FAIL** naming the slot and the unverified token. This is what turns "the DS defines a slot inset" from a silent skip into a tracked, reviewed exemption — the generic guard, not one hand-written assertion per slot.
+> **A `cssSelector: null` slot that carries a PADDING token must declare `verifiedBy`, or Gate [13] (Structure) fails.** `cssSelector: null` skips the code lookup — which is correct for a gap (a slot's gap spaces whatever is slotted in *per-context*, so there is no one fixed value to assert) but **dangerous for a padding token**: a slot's own inset is a real value the code must reproduce, and skipping it silently is exactly how a slot's top/side padding drifts unseen. Real case: the DS `panel` was restructured into `HeadContent`/`MainContent` slots; `HeadContent` carried `top padding/l` (16), the base `.drawerHeader` shipped `padding/s` (8), and **every gate stayed green** because the slot was marked documentary. So the engine now **refuses** a null-selector slot with a `paddingVar.tb`/`paddingVar.lr` unless it names what checks that padding, via a **`verifiedBy`** string — a real selector, a `RENDERED_ASSERTIONS` reference (pin the exact per-side px there — a slot's padding is often asymmetric, e.g. top `padding/l` + bottom `padding/s`, which the single `{tb}` field can't express), or `'geometric …'` when a fixed height/`::before` inset absorbs it. No `verifiedBy` ⇒ **Gate [13] (Structure) FAIL** naming the slot and the unverified token. This is what turns "the DS defines a slot inset" from a silent skip into a tracked, reviewed exemption — the generic guard, not one hand-written assertion per slot.
 
 **Unbound / flush inner gaps (`gapPx`).** A `gapVar` only exists when the DS binds the inner
 frame's spacing to a *token*. A frame whose children sit **flush** (auto-layout gap 0) or use a
@@ -797,7 +797,7 @@ from adding a stray gap there - the label-to-icon gap on the switch's Content fr
   `{ name, gapVar: null, gapPx: <number> }` (including `gapPx: 0`), so the value is visible and a
   Phase-1 diff surfaces a DS change to it.
 - **Contract** a `children` entry may pin the raw value with `gapPx` instead of `gapVar`:
-  `{ name: 'Content', cssSelector: '.switch-body', gapPx: 0 }`. Gate [3f] then asserts the CSS
+  `{ name: 'Content', cssSelector: '.switch-body', gapPx: 0 }`. Gate [13] (Structure) then asserts the CSS
   `gap` equals that literal (`0`/`0px`, or `<n>px`), and the snapshot cross-check flags a DS-side
   change to a contracted `gapPx`. To avoid flooding the contract, an **uncontracted** unbound gap
   is *not* a failure (unlike an uncontracted token gap) - it is only enforced once you opt in with
@@ -841,7 +841,7 @@ Plugin API) discipline, not gates, because a tokenless plan has no live Figma ac
   old padding that a DS redesign since removed — e.g. a compact divider that dropped its top padding),
   and no value gate sees it because the padding is on a bespoke per-plugin wrapper, not a base class.
   Capture the SLOT's gap and padding in Step 1c, and contract the code wrapper that realises the slot
-  so Gate [3]/[16] assert its padding — top and bottom included.
+  so Gate [13]/[24] (Structure / Renders correctly in a browser) assert its padding — top and bottom included.
 
 - **A slot's BACKGROUND FILL is a spec too — a header/sticky slot the DS fills must be OPAQUE in code,
   verified per mode.** When a `SLOT` (or the frame realising it) carries a solid `fills` paint — a
@@ -885,12 +885,12 @@ Plugin API) discipline, not gates, because a tokenless plan has no live Figma ac
   check whether *any* variant still has the old height. If one does, the geometry did not change — you
   measured the wrong variant (the classic `toast` success-vs-loading, or a `min-height` bar that grew
   to hug wrapped content). Only "no variant has the old height" is real drift.
-- **Capture icon path data via the Plugin API so freshness works tokenless.** Gate [16]'s live
+- **Capture icon path data via the Plugin API so freshness works tokenless.** Gate [24] (Renders correctly in a browser)'s live
   path/name freshness needs `FIGMA_TOKEN`; on a plan without one, capture each icon's vector path in
-  Phase 1 (Plugin API, any plan) into `figma-icons.snapshot.json`, so Gate [16] still compares the
+  Phase 1 (Plugin API, any plan) into `figma-icons.snapshot.json`, so Gate [24] (Renders correctly in a browser) still compares the
   snapshot against the code. Also diff the **live DS icon set** against the snapshot to surface added
   icons (a DS may carry more icons than the code uses — those are unused, not missing).
-- **A height change touches the contract AND the snapshot together.** Gate [3a] compares `contract.h`
+- **A height change touches the contract AND the snapshot together.** Gate [13] (Structure) compares `contract.h`
   to `snapshot.h`, so refreshing one without the other fails. For a component that hugs its content,
   prefer `sizing: 'hug'` (see the structure-contract section) over chasing the ±1px re-measure through
   both files.
@@ -900,7 +900,7 @@ Plugin API) discipline, not gates, because a tokenless plan has no live Figma ac
 
 ## Phase 1 - Step 1d: Capture effect styles → `effects` key in snapshot
 
-Run this after Step 1b. Effect styles (drop shadow, inner shadow, blur) are captured into a top-level `"effects"` key in `figma-vars.snapshot.json`. Once populated, Gate [19] (`effect-check.mjs`) compares each style against its CSS var. Both capture shapes on this page are accepted: this structured array, and the canonical string from Step 1b-motion-effects.
+Run this after Step 1b. Effect styles (drop shadow, inner shadow, blur) are captured into a top-level `"effects"` key in `figma-vars.snapshot.json`. Once populated, Gate [23] (Shadows) (`effect-check.mjs`) compares each style against its CSS var. Both capture shapes on this page are accepted: this structured array, and the canonical string from Step 1b-motion-effects.
 
 ```js
 // Effect styles capture - always safe (effect list is always small)
@@ -954,7 +954,7 @@ A rename shows as both added and removed. A pure addition shows only as added. T
 
 **Rename pattern** (REMOVED + NEW pair with same value) → A token rename adds a `/default/` or other state segment (e.g. `foo/background/color` → `foo/background/default/color`). Check whether the new name maps to the same CSS var via convention - if dropping `/default` produces the same var name, no CSS var change is needed, only a snapshot and comment update. **Also check if sibling state tokens were added alongside the rename** (e.g. `foo/background/hover/color`) - those are genuine new tokens requiring their own CSS vars and rule wiring.
 
-After any token rename, **re-run the bound walk** before Gate [4] - `bound-tokens.json` still has old names and may diverge from what Figma currently binds in the frames. Also update any matching entries in the `EXPLICIT` map in `parity-check.mjs` and the `EXPLICIT`/`COVERED` sets in `bound-check.mjs` - these two files maintain independent maps that can silently diverge after a rename.
+After any token rename, **re-run the bound walk** before Gate [4] (Tokens used in screens exist in CSS) - `bound-tokens.json` still has old names and may diverge from what Figma currently binds in the frames. Also update any matching entries in the `EXPLICIT` map in `parity-check.mjs` and the `EXPLICIT`/`COVERED` sets in `bound-check.mjs` - these two files maintain independent maps that can silently diverge after a rename.
 
 If diff is empty: print `✅ No DS changes since last snapshot (YYYY-MM-DD).`
 
@@ -975,7 +975,7 @@ For every changed or new token:
 
 ## Phase 1 - Step 5: Update snapshots
 
-Write fresh live data to both files, with `_modeOrder` (each collection's modes in Figma's own order, which the style guide lists them in) on the vars snapshot. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] the data is fresh.
+Write fresh live data to both files, with `_modeOrder` (each collection's modes in Figma's own order, which the style guide lists them in) on the vars snapshot. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] (Data is up to date) the data is fresh.
 
 > **Also stamp `_figmaVersion` on the vars snapshot.** Fetch it with
 > `GET /v1/files/{key}?depth=1` (the `version` field) and write it alongside `_updated`.
@@ -983,7 +983,7 @@ Write fresh live data to both files, with `_modeOrder` (each collection's modes 
 > since?" - and that is the question that matters. A snapshot taken an hour ago reads
 > "✓ updated today" while the designer has since added tokens, and every downstream gate
 > then verifies the code against a DS that no longer exists, passing green the whole way.
-> Gate [1] compares the two and fails when they diverge. The endpoint works on **every
+> Gate [1] (Data is up to date) compares the two and fails when they diverge. The endpoint works on **every
 > plan**, on every plan, so this is a reliable DS-drift signal on any plan. Stamp it only after confirming the capture
 > matches the file - stamping a version you did not actually capture asserts a freshness
 > that is not there. **Stamp BOTH the vars and the structure snapshot, and read the version
@@ -1006,7 +1006,7 @@ Write fresh live data to both files, with `_modeOrder` (each collection's modes 
   "aliases": { ... }
 }
 ```
-`parity-check.mjs` reads `snap.source` automatically and routes mismatches where CSS matches the upstream source (but not the primary snapshot) to `⏳ PENDING FIGMA SYNC` instead of `❌ FAIL`. Gate [2] only fails on genuine divergences.
+`parity-check.mjs` reads `snap.source` automatically and routes mismatches where CSS matches the upstream source (but not the primary snapshot) to `⏳ PENDING FIGMA SYNC` instead of `❌ FAIL`. Gate [3] (Token values) only fails on genuine divergences.
 
 > **⚠️ 32k output token limit:** Claude's response (including all tool call parameters) must stay under 32,000 output tokens. A snapshot for a large collection (>300 tokens) cannot be written in a single `Write` call - the JSON content alone exceeds the limit. **Always use the chunked write protocol below for large snapshots.**
 
@@ -1062,7 +1062,7 @@ node ~/.claude/skills/rms-design-system-engine/structure-check.mjs
 
 If either reports FAIL, reconcile CSS before Phase 2.
 
-**NEW SKIP = missing CSS var.** A NEW SKIP in Gate [2] means a token is in the snapshot but has no CSS var and no explicit exemption. Treat it exactly like a NEW token from Phase 1 - implement the CSS var before proceeding. Do not accept a passing Gate [2] that has non-zero NEW SKIPs for non-exempt tokens.
+**NEW SKIP = missing CSS var.** A NEW SKIP in Gate [3] (Token values) means a token is in the snapshot but has no CSS var and no explicit exemption. Treat it exactly like a NEW token from Phase 1 - implement the CSS var before proceeding. Do not accept a passing Gate [3] (Token values) that has non-zero NEW SKIPs for non-exempt tokens.
 
 **ALIAS FAIL = wrong primitive chain.** A `🔗 ALIAS FAIL` means hex matches but the CSS var routes through a different primitive than Figma. Either fix the CSS chain or add an entry to `KNOWN_INDIRECT_ALIAS` in `parity-check.mjs` if the semantic intermediate is intentional. Treat non-zero ALIAS FAILs the same as FAIL - do not close the audit.
 
