@@ -27,6 +27,7 @@
   --sg-xs: smaller; --sg-s: small; --sg-s-weight: normal; --sg-m: medium; --sg-m-weight: normal; --sg-l: large; --sg-l-weight: bold;
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: bold; --sg-lh: normal;
   --sg-space-xxs: 0.125rem; --sg-space-xs: 0.25rem; --sg-space-s: 0.5rem; --sg-space-m: 0.75rem; --sg-space-l: 1rem; --sg-space-xl: 1.5rem; --sg-space-xxl: 2rem;
+  --sg-row-h: calc(var(--sg-space-xxl) + var(--sg-space-m));   /* every table row at least this tall, from the system's spacing */
   --sg-radius-s: 0; --sg-radius: 0; --sg-radius-l: 0; --sg-radius-pill: 0;
   --sg-shadow: none; --sg-shadow-lift: none; --sg-icon: 1em;
   --sg-ease: 0s;
@@ -47,13 +48,14 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 
 /* ── Page layout ─────────────────────────────────────────────────────────── */
 .sg-layout { display: flex; min-height: 100vh; }
-.sg-sidebar { width: 200px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: var(--sg-line); background: var(--sg-bg-2); display: flex; flex-direction: column; scrollbar-gutter: stable; }
+.sg-sidebar { width: 240px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: var(--sg-line); background: var(--sg-bg-2); display: flex; flex-direction: column; scrollbar-gutter: stable; }
 .sg-sidebar-header { padding: var(--sg-space-l) var(--sg-space-l) var(--sg-space-m); border-bottom: var(--sg-line); }
 .sg-sidebar-header .sg-title { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); }
 .sg-sidebar-header > p { font-size: var(--sg-s); font-weight: var(--sg-m-weight); color: var(--sg-muted); margin-top: var(--sg-space-xxs); }
 .sg-nav { padding: var(--sg-space-s) 0; flex: 1; }
 .sg-nav a { display: flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-l); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-text-2); text-decoration: none; transition: background 0.1s, color 0.1s; line-height: var(--sg-lh); }
 .sg-nav a:hover { color: var(--sg-text); }
+.sg-nav a + a { margin-top: var(--sg-space-xs); }   /* room between the items of the list */
 .sg-nav a.active { color: var(--sg-text); box-shadow: inset 2px 0 0 var(--sg-text); }
 .sg-nav a span.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--sg-muted); flex-shrink: 0; }
 .sg-nav-label { font-size: var(--sg-xs); color: var(--sg-muted); padding: var(--sg-space-m) var(--sg-space-l) var(--sg-space-xs); }
@@ -73,6 +75,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-size-switch { margin-bottom: var(--sg-space-xxl); }   /* a foundation's size switch, well apart from what it changes */
 .sg-size-switch .sg-mode-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* named for a screen reader only */
 .pg-footer { display: flex; flex-direction: column; gap: var(--sg-space-m); margin-top: var(--sg-space-xl); }
+.pg-area-title { margin: var(--sg-space-xl) 0 var(--sg-space-l); }   /* each area's name, its content 16px below */
+.pg-area-title + .pg-footer { margin-top: 0; }
 .pg-updated { display: grid; gap: var(--sg-space-l); margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }   /* each section of the documentation clearly apart */
 .pg-updated > div { display: grid; grid-template-columns: 140px 1fr; gap: var(--sg-space-s); }
 .pg-updated dt { font-weight: var(--sg-heading-weight); color: var(--sg-text-2); }
@@ -121,7 +125,6 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-facts dd { margin: 0; color: var(--sg-text); }
 .sg-fact-todo { font-weight: var(--sg-heading-weight); }
 .sg-fact-todo::before { content: "! "; }
-.sg-card-facts { font-size: var(--sg-s); color: var(--sg-text-2); margin: 0; }
 .sg-overview-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }
 /* Each card's thumbnail: a few of the real tokens, or the component itself, drawn small on the system's own surface. */
 .sg-thumb { position: relative; height: 180px; overflow: hidden; contain: layout paint; display: flex; align-items: center; justify-content: center; gap: var(--sg-space-s); background: var(--sg-stage, var(--sg-bg)); border-radius: var(--sg-radius); pointer-events: none; }
@@ -138,7 +141,10 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-result > span:first-child { overflow-wrap: anywhere; }
 .sg-result-kind { font-size: var(--sg-xs); color: var(--sg-muted); }
 .sg-found { outline: var(--sg-line); outline-color: var(--sg-accent); outline-offset: var(--sg-space-xxs); }
-.sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xs); }
+/* A card: its picture on the stage above, its name below on the table heads' background, a line between them. */
+.sg-card.sg-card { padding: 0; gap: 0; overflow: hidden; }
+.sg-card > .sg-thumb { border-radius: 0; }
+.sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; padding: var(--sg-space-m) var(--sg-space-l); background: var(--sg-bg-2); border-top: var(--sg-line); }
 .sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-l); }
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
 .sg-screen img { display: block; width: 100%; height: auto; }
@@ -217,7 +223,9 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--sg-m); }
 /* Its head stays in view under the component's areas as the rows scroll by (the line under it moves with it). */
 .pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
-.pg-par-table td { padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: top; color: var(--sg-text); overflow-wrap: anywhere; }
+.pg-par-table td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; }
+/* Every table on the page: rows of one height at least, taller only for what they hold, their content centred in it. */
+.pg-par-table td, .pg-par-table th, .pg-inspect td { height: var(--sg-row-h); vertical-align: middle; }
 .pg-par-table td > code { display: block; }
 .pg-par-table .pg-par-val { display: block; color: var(--sg-muted); font-size: var(--sg-s); }
 .pg-par-table .pg-par-none { color: var(--sg-muted); }
@@ -249,9 +257,10 @@ a.pg-usage-name { color: var(--sg-text); }
      cut, a word broken only where it has to be. */
   .pg-par-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .pg-par-table, .pg-par-table tbody, .pg-par-table tr, .pg-par-table td { display: block; width: auto; }
-  .pg-par-table tr { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); }
+  .pg-par-table tr { padding: var(--sg-space-m); border-bottom: var(--sg-line); min-height: var(--sg-row-h); }
+  .pg-par-table td { height: auto; }
   .pg-par-card .pg-par-table tr:last-child { border-bottom: none; }
-  .pg-par-table td, .pg-par-table .pg-par-type, .pg-par-table .pg-par-at { border-bottom: none; padding: 2px 0; white-space: normal; overflow-wrap: break-word; min-width: 0; }
+  .pg-par-table td, .pg-par-table .pg-par-type, .pg-par-table .pg-par-at { border-bottom: none; padding: var(--sg-space-xs) 0; white-space: normal; overflow-wrap: break-word; min-width: 0; }
   .pg-par-table td:first-child { font-weight: var(--sg-heading-weight); color: var(--sg-text); padding-bottom: var(--sg-space-xs); }
   .pg-par-table td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
   .pg-par-table td:empty { display: none; }
@@ -279,17 +288,16 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-diff-list { margin: 0; padding-left: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-xs); }
 .pg-diff-list b { white-space: normal; }
 .pg-todo { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-text-2); }
-.sg-todo-group { margin-bottom: var(--sg-space-xl); }
-.sg-todo-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }
-.sg-todo-group > p { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
-.sg-todo-list { margin: 0; padding-left: var(--sg-space-xl); display: flex; flex-direction: column; gap: var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text); line-height: var(--sg-lh); }
-.sg-todo-list .pg-todo { font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.sg-todo { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one card table per component */
+.sg-todo .pg-todo { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.sg-todo-area, .sg-todo .pg-a11y-src { white-space: nowrap; }   /* Accessibility, Decide, In Figma: never broken mid-word */
 .pg-diff { border-color: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
 .pg-note:last-child { margin-bottom: var(--sg-space-m); }
 .pg-header { background: var(--sg-bg); padding: var(--sg-space-s) 0 var(--sg-space-m); margin-bottom: var(--sg-space-xs); }   /* scrolls away; the areas below it stay */
-.pg-stage { display: flex; flex-direction: column; gap: var(--sg-space-l); }
-.pg-preview-card { display: grid; grid-template-columns: 1fr minmax(240px, 340px); gap: var(--sg-space-l); align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: var(--sg-space-l); background: var(--sg-bg); box-shadow: var(--sg-shadow); }
-.pg-preview { min-width: 0; min-height: 140px; padding: var(--sg-space-xl); display: flex; align-items: safe center; align-content: safe center; justify-content: safe center; gap: var(--sg-space-m); flex-wrap: wrap; position: relative; isolation: isolate; }
+.pg-stage { display: flex; flex-direction: column; gap: var(--sg-space-l); container-type: inline-size; }
+/* The stage never narrower than a phone screen and its margins: with less room the controls go below it, never beside a squeezed stage. */
+.pg-preview-card { --sg-stage-min: 400px; display: grid; grid-template-columns: minmax(min(100%, var(--sg-stage-min)), 1fr) minmax(240px, 340px); gap: var(--sg-space-l); align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: var(--sg-space-l); background: var(--sg-bg); box-shadow: var(--sg-shadow); }
+.pg-preview { min-width: 0; min-height: 140px; overflow: auto; padding: var(--sg-space-xl); display: flex; align-items: safe center; align-content: safe center; justify-content: safe center; gap: var(--sg-space-m); flex-wrap: wrap; position: relative; isolation: isolate; }   /* a component wider than the stage scrolls inside it, never over the controls */
 /* A transparency checkerboard over the system's own page surface: a transparent component shows it, an opaque one covers it. */
 .pg-preview, .pg-frame, .pg-compare-stage {
   background-color: var(--sg-stage, var(--sg-bg));
@@ -314,6 +322,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-variant-row { display: grid; grid-template-columns: minmax(120px, 1fr) 3fr auto; gap: var(--sg-space-m); align-items: center; padding: var(--sg-space-m); border-bottom: var(--sg-line); }
 .pg-variant-row:last-child { border-bottom: none; }
 .pg-variant-stage { display: flex; align-items: center; min-width: 0; overflow: auto; }
+@container (max-width: 720px) { .pg-preview-card { grid-template-columns: minmax(0, 1fr); } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); min-width: 0; } }
 @media (max-width: 640px) { .pg-variant-row { grid-template-columns: 1fr auto; } .pg-variant-stage { grid-column: 1 / -1; grid-row: 2; } }
 .pg-anat-wrap { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; }
 .pg-anat-wrap, .pg-anat-wrap * { animation: none !important; transition: none !important; }   /* drawn at rest, never mid-entry */
@@ -355,11 +364,10 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-slot-area { position: relative; min-height: 40px; min-width: 96px; box-sizing: border-box; outline: 1px dashed var(--sg-text-2); outline-offset: -1px; background: color-mix(in srgb, var(--sg-text-2) 6%, transparent); }
 .pg-slot-area > * { visibility: hidden; }
 .pg-slot-area::after { content: attr(data-slot); position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--sg-s); color: var(--sg-text-2); }
-/* A slot whose content sits straight inside the component: that content kept in place, unseen, and the area it takes
-   drawn over it, inside the component's own frame. */
-.pg-slot-rel { position: relative; }
-.pg-slot-hidden { visibility: hidden; }
-.pg-slot-host::after { content: attr(data-slot); position: absolute; left: var(--pg-slot-x); top: var(--pg-slot-y); width: var(--pg-slot-w); height: var(--pg-slot-h); box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--sg-text-2); background: color-mix(in srgb, var(--sg-text-2) 6%, transparent); font-size: var(--sg-s); color: var(--sg-text-2); pointer-events: none; }
+/* A slot whose content sits straight inside the component: that content gives way to the slot area, which the
+   component grows around. */
+.pg-slot-gone { display: none; }
+.pg-still, .pg-still * { transition: none !important; }   /* while its colours are measured */
 /* The system's modes inside the playground: the colour mode top left, a sizing collection top right, over the stage. */
 .pg-stage-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sg-space-s); padding: var(--sg-space-s) var(--sg-space-m); background: var(--sg-bg-2); border: var(--sg-line); }
 .pg-stage-bar--top { border-bottom: none; border-radius: var(--sg-radius-l) var(--sg-radius-l) 0 0; }
@@ -369,7 +377,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-stage-tools { display: flex; gap: var(--sg-space-xs); margin-left: auto; }
 .pg-preview-col > .pg-preview, .pg-preview-col > .pg-frame, .pg-preview-col > .pg-anatomy { border-left: var(--sg-line); border-right: var(--sg-line); }
 .pg-anat-line { margin: 0; font-size: var(--sg-s); color: var(--sg-text); min-width: 0; }
-.pg-preview-col > .pg-anatomy { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 140px; padding: var(--sg-space-xl); background-color: var(--sg-stage, var(--sg-bg)); }
+.pg-preview-col > .pg-anatomy { display: flex; align-items: center; justify-content: safe center; flex: 1; overflow: auto; min-height: 140px; padding: var(--sg-space-xl); background-color: var(--sg-stage, var(--sg-bg)); }
 .pg-preview-col > .pg-anatomy[hidden] { display: none; }   /* Done inspecting: the anatomy is gone, the Playground fills the stage */
 .pg-preview-col > .pg-anatomy .pg-anat-num, .pg-preview-col > .pg-anatomy .pg-anat-lead { display: none; }   /* the inspector names what is clicked, not a numbered list */
 .pg-stage-mode .sg-mode-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -391,7 +399,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; box-shadow: var(--sg-shadow); }
 .pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-inspect table { width: 100%; border-collapse: collapse; }
-.pg-inspect td { font-size: var(--sg-m); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: top; }
+.pg-inspect td { font-size: var(--sg-m); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); }
 .pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
 .pg-inspect td:last-child { color: var(--sg-text); word-break: break-all; }
 .pg-inspect tr:last-child td { border-bottom: none; }
@@ -425,7 +433,6 @@ a.pg-usage-name { color: var(--sg-text); }
   body.sg-nav-open .sg-scrim { display: block; position: fixed; inset: 0; z-index: 30; }
   .sg-scrim:not([class*=" "]) { background: color-mix(in srgb, var(--sg-text) 40%, transparent); }
   .sg-main { padding: var(--sg-space-l); width: 100%; box-sizing: border-box; }
-  .pg-preview { overflow-x: auto; }   /* centred like everywhere; a component wider than a phone scrolls from its start (safe center) */
   /* On a phone the stage gives the component room of its own below the mode switches, never squeezed under them. */
   .pg-preview, .pg-frame { min-height: 220px; }
   .pg-preview-card { grid-template-columns: minmax(0, 1fr); } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); min-width: 0; }
@@ -463,6 +470,8 @@ a.pg-usage-name { color: var(--sg-text); }
   var COMPONENTS = DATA.components || [];
   var html = document.documentElement, main = document.getElementById('sg-main'), nav = document.getElementById('sg-nav');
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  // A component's place on the page: its name, any character an address reads (a slash, a space) as a dash.
+  function cid(n) { return 'c-' + String(n).replace(/[^\w-]+/g, '-'); }
   function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; a.innerHTML = '<span class="dot"></span>' + esc(label); (parent || nav).appendChild(a); }
   function section(id, badge, title, lead) {
     var s = document.createElement('section'); s.id = id; s.className = 'sg-section';
@@ -536,7 +545,7 @@ a.pg-usage-name { color: var(--sg-text); }
     tokenPop.innerHTML = '<p class="sg-token-pop-name"><code>' + esc(v) + '</code></p><dl class="pg-updated">' +
       (t.figma ? '<div><dt>In Figma</dt><dd><p>' + esc(t.figma) + '</p></dd></div>' : '') +
       '<div><dt>' + (t.values ? 'In each mode' : 'Its value') + '</dt><dd>' + values + '</dd></div>' +
-      '<div><dt>Used by</dt><dd>' + (comps.length ? comps.slice(0, 12).map(function (c) { return '<p><a class="sg-uses-link" href="#c-' + esc(c.n) + '">' + esc(c.n) + '</a>' + (c.through ? ', through ' + esc(c.through) : '') + '</p>'; }).join('') + (comps.length > 12 ? '<p><a class="sg-uses-link" href="#uses?t=' + encodeURIComponent(v) + '">and ' + (comps.length - 12) + ' more</a></p>' : '') : '<p>No component uses it yet.</p>') + '</dd></div></dl>' +
+      '<div><dt>Used by</dt><dd>' + (comps.length ? comps.slice(0, 12).map(function (c) { return '<p><a class="sg-uses-link" href="#' + esc(cid(c.n)) + '">' + esc(c.n) + '</a>' + (c.through ? ', through ' + esc(c.through) : '') + '</p>'; }).join('') + (comps.length > 12 ? '<p><a class="sg-uses-link" href="#uses?t=' + encodeURIComponent(v) + '">and ' + (comps.length - 12) + ' more</a></p>' : '') : '<p>No component uses it yet.</p>') + '</dd></div></dl>' +
       '<div class="sg-token-pop-actions">' + sysButton('button', 'Copy ' + v, ' data-copy-token') + '</div>';
     tokenPop.querySelector('[data-copy-token]').addEventListener('click', function (e) { copyText('var(' + v + ')', e.currentTarget); });
     Array.prototype.forEach.call(tokenPop.querySelectorAll('a'), function (a) { a.addEventListener('click', function () { closeToken(false); }); });
@@ -646,8 +655,9 @@ a.pg-usage-name { color: var(--sg-text); }
   function doWhat(t) { var r = String(t || '').replace(/^In (the code|Figma), /, ''); return r.charAt(0).toUpperCase() + r.slice(1); }   // the label already says where
   var TODO = [], TODO_NO = {};
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
-    (c.differences || []).concat(c.a11yFindings || []).forEach(function (x) { TODO.push({ who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
-    (c.unbuilt || []).forEach(function (u) { TODO.push({ who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell me to do it.' }); });
+    (c.differences || []).forEach(function (x) { TODO.push({ kind: 'parity', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
+    (c.a11yFindings || []).forEach(function (x) { TODO.push({ kind: 'a11y', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
+    (c.unbuilt || []).forEach(function (u) { TODO.push({ kind: 'parity', who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell me to do it.' }); });
   });
   // A control the page needs and the system lacks: drawn with a stand-in until the system has one.
   ((DATA.ui && DATA.ui.gaps) || []).forEach(function (g) { TODO.push({ who: 'both', comp: null, say: g.say, todo: g.todo }); });
@@ -708,8 +718,6 @@ a.pg-usage-name { color: var(--sg-text); }
     // accessibility is on its areas (their alert icons) and its overview card.
     return (f.version || f.changedAt) ? '<dl class="pg-facts">' + (f.version ? item('Version', f.version) : '') + (f.changedAt ? item('Last changed', when(f.changedAt)) : '') + '</dl>' : '';
   }
-  // On its card: only how it stands, in one line (Figma, then accessibility).
-  function cardFacts(c) { var f = factsOf(c); return '<p class="sg-card-facts"><span' + (f.parity.todo ? ' class="sg-fact-todo"' : '') + '>Figma ' + esc(f.parity.say.toLowerCase()) + '</span>  ·  <span' + (f.a11y.todo ? ' class="sg-fact-todo"' : '') + '>' + 'Accessibility ' + esc(f.a11y.todo || /^No problem/.test(f.a11y.say) ? f.a11y.say.toLowerCase() : 'not checked') + '</span></p>'; }
   var THUMBS = {};
   function card(grid, id, label, title, sub, thumb, status, facts) {
     var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ''); a.href = '#' + id; a.dataset.name = title.toLowerCase();
@@ -731,11 +739,11 @@ a.pg-usage-name { color: var(--sg-text); }
     var ps = (c.controls || []).map(function (p) { return p.label; });
     return ps.length ? ps.slice(0, 3).join(', ') + (ps.length > 3 ? ' and ' + (ps.length - 3) + ' more' : '') + '.' : c.role ? 'A ' + c.role + '.' : 'No props yet.';
   };
-  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { card(cGrid, 'c-' + c.name, 'Components', c.name, about(c), '', c.status, cardFacts(c)); });
+  COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) { card(cGrid, cid(c.name), 'Components', c.name, about(c), '', c.status); });   // its card: the thumbnail and the name only
   // A component's thumbnail is its own preview, drawn small and inert, once its section has drawn it. Never with ?all:
   // the engine measures that page, and a shrunken copy would be read as the component.
   function thumbOf(c, src) {
-    var at = THUMBS['c-' + c.name]; if (!at || !src || ALL) return;
+    var at = THUMBS[cid(c.name)]; if (!at || !src || ALL) return;
     at.innerHTML = ''; var k = src.cloneNode(true); k.classList.add('sg-thumb-live'); k.setAttribute('inert', ''); at.appendChild(k);
     fitThumb(at);
   }
@@ -745,19 +753,9 @@ a.pg-usage-name { color: var(--sg-text); }
     k.style.transform = ''; var bw = at.clientWidth - 24, bh = at.clientHeight - 24, r = k.getBoundingClientRect();
     var f = Math.min(1, bw / (r.width || 1), bh / (r.height || 1)); if (f < 1) k.style.transform = 'scale(' + f.toFixed(3) + ')';
   }
-  if (TODO.length) {
-    hr(); navLink('todo', 'to do (' + TODO.length + ')');
-    var td = section('todo', 'To do', 'What to do', 'Everything where Figma and the code differ, and everything Figma has that the code does not build yet. Each says who does it and exactly what to do. Tell me the numbers you want done, for example do 3 and 7.');
-    var groups = { figma: ['In Figma', 'For you, in the Figma file. Once it is done, ask me to read Figma again.'], code: ['In the code', 'Tell me to do them, one by one or all at once.'], both: ['Decide first', 'Figma and the code each have a case. Tell me which side is right and I will do the rest.'] };
-    ORDER.forEach(function (w) {
-      var items = TODO.filter(function (t) { return t.who === w; }); if (!items.length) return;
-      var g = document.createElement('div'); g.className = 'sg-todo-group';
-      g.innerHTML = '<h3>' + esc(groups[w][0]) + ' (' + items.length + ')</h3><p>' + esc(groups[w][1]) + '</p><ol class="sg-todo-list">' + items.map(function (t) {
-        return '<li value="' + t.no + '">' + (t.comp ? '<a href="#c-' + esc(t.comp) + '">' + esc(t.comp) + '</a>. ' : '') + esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span></li>';
-      }).join('') + '</ol>';
-      td.appendChild(g);
-    });
-  }
+  // The To do page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
+  hr(); navLink('todo', 'to do');
+  var td = section('todo', 'To do', 'What to do', 'Everything open in the system, parity and accessibility, by component: what differs from Figma, what Figma has that the code does not build, and what fails or is still to check for accessibility. Each says who does it and exactly what to do. Tell me the numbers you want done, for example do 3 and 7.');
   // What's new: every component's changes gathered by the release they shipped in, newest first, each a table of
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
@@ -777,7 +775,7 @@ a.pg-usage-name { color: var(--sg-text); }
       return '<div class="pg-inspect"><div class="pg-inspect-head">' + esc(g.k || 'Not released yet') + '  ·  ' + esc(g.at.slice(0, 10)) + '</div><table>' + commits.map(function (x) {
         var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short) + '</code>';
         var says = String(x.r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
-        return '<tr><td>' + x.comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#c-' + esc(n) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + esc(says) + ' ' + sha + '</td></tr>';
+        return '<tr><td>' + x.comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + esc(says) + ' ' + sha + '</td></tr>';
       }).join('') + '</table></div>';
     }).join('');
   }
@@ -1237,7 +1235,7 @@ a.pg-usage-name { color: var(--sg-text); }
   function htmlCode(e) {
     var copy = e.cloneNode(true);
     copy.style.removeProperty('margin'); copy.style.removeProperty('width');
-    ['--pg-slot-x', '--pg-slot-y', '--pg-slot-w', '--pg-slot-h'].forEach(function (k) { copy.style.removeProperty(k); });   // the Playground's slot mark
+    Array.prototype.forEach.call(copy.querySelectorAll('.pg-slot-fill'), function (n) { n.remove(); });   // the Playground's slot mark
     if (!copy.getAttribute('style')) copy.removeAttribute('style');
     var known = systemClasses();
     [copy].concat(Array.prototype.slice.call(copy.querySelectorAll('*'))).forEach(function (n) {
@@ -1463,7 +1461,7 @@ a.pg-usage-name { color: var(--sg-text); }
   function parityHTML(c) {
     var p = c.parity; if (!p) return differencesHTML(c);
     var rows = p.rows || [];
-    if (!rows.length) return '<div class="pg-doc"><h3>Parity</h3><p class="pg-parity-sum">Nothing of it was read from Figma or the code yet.</p>' + differencesHTML(c) + '</div>';
+    if (!rows.length) return '<div class="pg-doc"><p class="pg-parity-sum">Nothing of it was read from Figma or the code yet.</p>' + differencesHTML(c) + '</div>';
     var n = { match: 0, differs: 0, figma: 0, code: 0 };
     rows.forEach(function (r) { n[r.status] = (n[r.status] || 0) + 1; });
     var types = ['Prop', 'Variable', 'Value'].filter(function (t) { return rows.some(function (r) { return r.type === t; }); });
@@ -1478,7 +1476,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var sum = [['match', n.match + ' the same'], ['differs', n.differs + ' differ'], ['figma', n.figma + ' only in Figma'], ['code', n.code + ' only in code']]
       .map(function (x) { return '<span class="pg-par-status pg-par--' + x[0] + '"><span class="pg-par-sign" aria-hidden="true">' + PAR[x[0]][0] + '</span>' + esc(x[1]) + '</span>'; }).join('');
     var filter = types.length > 1 ? '<div class="pg-par-filter">' + segHTML([{ label: 'All (' + rows.length + ')', v: 'all' }].concat(types.map(function (t) { return { label: plural[t] + ' (' + rows.filter(function (r) { return r.type === t; }).length + ')', v: t }; }))) + '</div>' : '';
-    return '<div class="pg-doc pg-par"><h3>Parity</h3><div class="pg-par-sum">' + sum + '</div>' + filter +
+    return '<div class="pg-doc pg-par"><div class="pg-par-sum">' + sum + '</div>' + filter +
       '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Type</th><th>Figma</th><th>Code</th><th>Status</th><th>Updated</th></tr></thead><tbody>' + body + '</tbody></table></div></div>' +
       differencesHTML(c) + '</div>';
   }
@@ -1505,7 +1503,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // small, and its name), linked to its page ──────────────────────────────────────────────────────────────────────────
   function builtWithHTML(c) {
     return '<div class="sg-card-grid">' + (c.uses || []).map(function (n) {
-      return '<a class="sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : '') + '" href="#c-' + esc(n) + '"><div class="sg-thumb" aria-hidden="true" data-thumb="' + esc(n) + '"></div><h3>' + esc(n) + '</h3></a>';
+      return '<a class="sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : '') + '" href="#' + esc(cid(n)) + '"><div class="sg-thumb" aria-hidden="true" data-thumb="' + esc(n) + '"></div><h3>' + esc(n) + '</h3></a>';
     }).join('') + '</div>';
   }
   // ── Links: where else it lives (Figma, its code, the team's documentation), each opening in a new tab ────────────
@@ -1651,7 +1649,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // wrote that no check reads.
   function a11yHTML(c) {
     var a = c.a11y; if (!a) return '';
-    return '<div class="pg-doc pg-par pg-a11y"><h3>Accessibility</h3><div class="pg-par-sum pg-a11y-sum"></div><p class="pg-wcag-note pg-a11y-note"></p>' +
+    return '<div class="pg-doc pg-par pg-a11y"><div class="pg-par-sum pg-a11y-sum"></div><p class="pg-wcag-note pg-a11y-note"></p>' +
       '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>WCAG</th><th>What was found</th><th>Source</th><th>Status</th></tr></thead>' +
       '<tbody class="pg-a11y-rows"></tbody></table></div></div>' + unreadHTML(c) + '</div>';
   }
@@ -1677,17 +1675,17 @@ a.pg-usage-name { color: var(--sg-text); }
   function scOfLabel(label) { var m = /WCAG (\d+\.\d+\.\d+)/.exec(label || ''); return m ? m[1] : null; }
   function a11yStaticItems(c) {
     var a = c.a11y || {}, ch = a.checked, ran = ch && !ch.notRead, items = [];
-    var add = function (label, st, html, from) { var sc = scOfLabel(label); if (sc) items.push({ sc: sc, label: label, st: st, html: html, from: from }); };
+    var add = function (label, st, html, from, listed) { var sc = scOfLabel(label); if (sc) items.push({ sc: sc, label: label, st: st, html: html, from: from, listed: !!listed }); };
     (c.a11yFindings || []).forEach(function (x) {
       var contrast = /contrast/i.test((x.check || '') + ' ' + (x.what || ''));
-      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', (x.new ? '<b>New.</b> ' : '') + onWhat(c, x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : ''), 'The audit, from the code capture');
+      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', (x.new ? '<b>New.</b> ' : '') + onWhat(c, x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : ''), 'The audit, from the code capture', true);
     });
     if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '. ' + i.details.join('; ') + '. ' + i.fix), FROM_AUDIT + ', ' + when(ch.at)); });
     var stat = {};
     (a.static || []).forEach(function (f) { (stat[f.kind] = stat[f.kind] || []).push(f); });
     Object.keys(stat).forEach(function (k) { add(wcagLabelOf(wcagScOf(k)), 'todo', esc(wcagTitle(k, stat[k].length) + '. ' + stat[k].map(function (f) { return f.file + ':' + f.line + ', ' + f.desc; }).join('; ') + '. ' + wcagFix(k, stat[k][0].fix)), 'Its code'); });
     // Its role: what it is and what that role and Figma's notes ask of it (the first duty says what it is).
-    if (!a.role) add('WCAG 4.1.2 Name, Role, Value (A)', 'check', 'The role of ' + esc(c.name) + ' is not stated yet. In Figma, add an annotation to the ' + esc(c.name) + ' component' + (figmaOf(c) ? ' (<a href="' + esc(figmaOf(c)) + '" target="_blank" rel="noopener">open it in Figma</a>)' : '') + ' that says its role (Role: button), and its duties are listed here.', 'Figma, once annotated');
+    if (!a.role) add('WCAG 4.1.2 Name, Role, Value (A)', 'check', 'The role of ' + esc(c.name) + ' is not stated yet. In Figma, add an annotation to the ' + esc(c.name) + ' component' + (figmaOf(c) ? ' (<a href="' + esc(figmaOf(c)) + '" target="_blank" rel="noopener">open it in Figma</a>)' : '') + ' that says its role in the form Role: name (Role: dialog, Role: button, Role: list), and its duties are listed here.', 'Figma, once annotated');
     // A duty fails when the audit found its own kind of problem (the role's markup, a behaviour, a part, a name, the
     // keys), not when another finding shares its criterion.
     var DUTY = /^(rolecontract|behaviour|partrole|annotation|semantics|name|keyboard|activate|arrows|escape|focusreturn)$/;
@@ -1717,6 +1715,43 @@ a.pg-usage-name { color: var(--sg-text); }
   var WCAG_HOW = { auto: 'Tried in the browser on every variant', audit: 'Tried by the audit in a browser', static: 'Read in the code', person: 'A person checks', page: 'The page that uses it', media: 'Video and sound only' };
   var WCAG_SRC = { auto: 'The style guide, in the browser', audit: 'The last audit, in a browser', static: 'Its code', person: 'A person', page: 'The page that uses it', media: 'Video and sound only' };
   var WCAG_AUDIT = { '1.4.4': 'zoom', '1.4.10': 'reflow', '1.4.12': 'spacing', '2.1.2': 'tabtrap' };
+
+  // Every open item, by component: the numbered differences and builds (TODO), then what the audit and the code found
+  // for accessibility, and the parity rows on one side only. One card table per component; the system's own items first.
+  // A check the page runs in the browser shows in the component's Accessibility area once it is open.
+  function fillTodo() {
+    var by = {}, order = [], next = TODO.length;
+    var get = function (name) { var k = name || ''; if (!by[k]) { by[k] = { name: name, rows: [] }; order.push(by[k]); } return by[k]; };
+    TODO.forEach(function (t) { get(t.comp).rows.push({ no: t.no, kind: t.kind === 'a11y' ? 'Accessibility' : 'Parity', st: t.kind === 'a11y' || t.who !== 'both' ? 'todo' : 'check', who: WHO[t.who] || 'Decide', html: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>' }); });
+    COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
+      var rows = [];
+      // Who acts: Figma for what an annotation states, a decision for a colour pair (Figma's colours are deliberate),
+      // the code for the rest.
+      var whoOf = function (it) { return /Figma/.test(it.from || '') ? WHO.figma : /^1\.4\.(3|11)$/.test(it.sc) ? WHO.both : WHO.code; };
+      try { a11yStaticItems(c).forEach(function (it) { if (!it.listed && (it.st === 'todo' || it.st === 'check')) rows.push({ kind: 'Accessibility', st: it.st, who: whoOf(it), html: '<b>' + esc(wcagLabelOf(it.sc).replace(/^WCAG /, '')) + '.</b> ' + it.html }); }); } catch (e) { /* its accessibility is read on its own page */ }
+      ((c.parity && c.parity.rows) || []).forEach(function (r) {
+        if (r.status !== 'figma' && r.status !== 'code') return;
+        var n = (r.figma && r.figma.name) || (r.code && r.code.name) || '';
+        rows.push({ kind: 'Parity', st: 'check', who: 'Decide', html: esc(r.type + ' ' + n + (r.status === 'figma' ? ', only in Figma.' : ', only in the code.')) + '<span class="pg-todo">' + esc(r.status === 'figma' ? 'Build it in the code, or remove it from Figma.' : 'Add it to Figma, or remove it from the code.') + '</span>' });
+      });
+      if (rows.length) { var g = get(c.name); rows.forEach(function (r) { r.no = ++next; g.rows.push(r); }); }
+    });
+    order.sort(function (a, b) { return (a.name ? 1 : 0) - (b.name ? 1 : 0) || String(a.name).localeCompare(String(b.name)); });
+    var all = order.reduce(function (n, g) { return n + g.rows.length; }, 0), fix = order.reduce(function (n, g) { return n + g.rows.filter(function (r) { return r.st === 'todo'; }).length; }, 0);
+    var link = nav.querySelector('a[href="#todo"]');
+    if (!all) { td.insertAdjacentHTML('beforeend', '<p class="pg-par-sum">Nothing open: Figma and the code agree, and nothing fails for accessibility.</p>'); return; }
+    if (link) link.lastChild.textContent = 'to do (' + all + ')';
+    var sign = function (st) { var x = A11Y[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>'; };
+    var box = document.createElement('div'); box.className = 'sg-todo';
+    box.innerHTML = '<p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + order.map(function (g) {
+      g.rows.sort(function (p, q) { return (p.st === 'todo' ? 0 : 1) - (q.st === 'todo' ? 0 : 1) || p.no - q.no; });
+      return '<div class="pg-par-card sg-todo-card"><div class="pg-inspect-head">' + (g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system') + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>No.</th><th>Area</th><th>What to do</th><th>Who</th><th>Status</th></tr></thead><tbody>' +
+        g.rows.map(function (r) { return '<tr data-status="' + r.st + '"><td class="pg-par-type">' + r.no + '</td><td class="sg-todo-area">' + esc(r.kind) + '</td><td>' + r.html + '</td><td class="pg-a11y-src">' + esc(r.who) + '</td><td>' + sign(r.st) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
+    }).join('');
+    td.appendChild(box);
+    labelCells(td);
+  }
+  fillTodo();
   // The criteria with their status for the component, from its items and how each criterion is known. live: what this
   // page's run tried ({ ran: { check: 1 }, tried, usedN }), or null before it ran (and on the page of every component).
   function a11yRows(c, items, live) {
@@ -1742,17 +1777,20 @@ a.pg-usage-name { color: var(--sg-text); }
       else if (k.how === 'page') st = null;   // the page that uses it answers for it
       else if (k.how === 'media' && !(live && live.ran.media)) st = null;   // it plays no video or sound
       else if (k.how === 'person' || (k.how === 'media' && !k.kinds)) { st = 'check'; note = person; }
-      else if (k.how === 'static') { st = WCAG.staticRan ? 'done' : 'check'; note = WCAG.staticRan ? 'Nothing in its code.' : 'Read once the audit runs over the code.'; }
+      else if (k.how === 'static') { st = WCAG.staticRan ? 'done' : 'check'; note = WCAG.staticRan ? 'Passes, its code read. ' + k.says : 'Read once the audit runs over the code.'; }
       else if (k.how === 'audit') {
         var did = audited && audited.ran.indexOf(WCAG_AUDIT[k.sc]) >= 0;
         st = did ? 'done' : 'check';
-        note = did ? 'Nothing found by the last audit.' : !audited ? 'Run the audit, it tries this on ' + c.name + ' in a browser.' : WCAG_AUDIT[k.sc] === 'reflow' ? 'For every component, ' + c.name + ' too, set a11y.reflow to true in ds-config.json, and the audit tries each 320 pixels wide.' : 'The last audit did not get to ' + c.name + '. Run it again.';
+        note = did ? 'Passes, tried by the last audit in a browser. ' + k.says : !audited ? 'Run the audit, it tries this on ' + c.name + ' in a browser.' : WCAG_AUDIT[k.sc] === 'reflow' ? 'For every component, ' + c.name + ' too, set a11y.reflow to true in ds-config.json, and the audit tries each 320 pixels wide.' : 'The last audit did not get to ' + c.name + '. Run it again.';
       } else if (k.ran && live && !k.ran.some(function (r) { return live.ran[r]; }) && !its.length) st = null;   // nothing in it that this asks about
       else if (!tried && !(ch && !ch.notRead)) { st = 'check'; note = 'Tried on ' + c.name + ' when its Accessibility area is open.'; }
       else {
         st = k.person ? 'check' : 'done';
         var used = /^(1\.4\.13|2\.5\.2|3\.2\.1|3\.2\.2)$/.test(k.sc) && live && live.usedN != null, n = used ? live.usedN : live && live.tried;
-        note = (its.some(function (it) { return it.st === 'done'; }) ? '' : 'Nothing found' + (live ? ' in ' + (n === 1 ? 'the variant' : 'any of the ' + n + ' variants') + (used ? ' that can be used' : '') : '') + '. ') + person;
+        // Done says what passed and where it was tried, in the words of the criterion; one a person still checks says
+        // that no problem was found, then what the person looks at.
+        var where = live ? (n === 1 ? 'the variant tried' : 'all ' + n + ' variants' + (used ? ' that can be used' : '')) : 'the last audit in a browser';
+        note = its.some(function (it) { return it.st === 'done'; }) ? person : k.person ? 'No problem found in ' + where + '. ' + person : 'Passes in ' + where + '. ' + k.says;
       }
       // What asks of a control or a field, on a component with none in any variant: not asked of it (unless a finding says
       // otherwise).
@@ -1821,12 +1859,14 @@ a.pg-usage-name { color: var(--sg-text); }
     function linkFor() {
       var q = props.filter(function (p) { return state[p.label] !== byDefault(p); }).map(function (p) { return encodeURIComponent(p.label) + '=' + encodeURIComponent(String(state[p.label])); });
       if (WIDTH !== 'fit') q.push('width=' + WIDTH);
-      return '#' + sec.id + (areaNow && areaNow !== 'play' ? '/' + AREA_SLUG[areaNow] : '') + (q.length ? '?' + q.join('&') : '');
+      // The props set are the Playground's: only its address carries them; another area's address is the area alone.
+      var onPlay = !areaNow || areaNow === 'play';
+      return '#' + sec.id + (onPlay ? '' : '/' + AREA_SLUG[areaNow]) + (onPlay && q.length ? '?' + q.join('&') : '');
     }
     // Kept as the variant changes, without a new step in the browser's history; only while this view is the one shown.
     var probing = false;   // a test draw (where a text lands) is never written to the address or into a width frame
     function writeLink() { if (ALL || probing || hashParts().id !== sec.id) return; var h = linkFor(); if (h !== location.hash) history.replaceState(null, '', h); }
-    var sec = document.createElement('section'); sec.id = 'c-' + c.name; sec.className = 'sg-section pg-card-section';
+    var sec = document.createElement('section'); sec.id = cid(c.name); sec.className = 'sg-section pg-card-section';
     if (!ALL && hashParts().id === sec.id) fromLink(hashParts().q);
     var facts = factsOf(c);
     // Its documentation: Figma's description and annotations first, then the code's own note.
@@ -1852,7 +1892,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // What is left to do is marked on its area, the system's alert icon before the label and what it is said to a
       // screen reader: Parity while something differs from Figma or is not built, Accessibility while a problem stands
       // (the last browser check's and the audit's), the same counts as its overview card.
-      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantProps(c).length)); }).map(function (a) {
+      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)); }).map(function (a) {
         var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? facts.a11y : null, warn = !!(f && f.todo);
         return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
       })) + '</div></div>' +
@@ -1877,9 +1917,9 @@ a.pg-usage-name { color: var(--sg-text); }
         '</div></div>' +
       '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + a11yHTML(c) + '</div></div>' +
       '<div class="pg-area" data-area="parity"><div class="pg-footer">' + parityHTML(c) + '</div></div>' +
-      ((c.uses || []).length ? '<div class="pg-area" data-area="built"><div class="pg-footer"><div class="pg-doc"><h3>Built with</h3>' + builtWithHTML(c) + '</div></div></div>' : '') +
-      '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc"><h3>Used in</h3>' + usedInHTML(c) + '</div></div></div>' +
-      '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc"><h3>Changelog</h3>' + changelogHTML(c) + '</div></div></div>';
+      ((c.uses || []).length ? '<div class="pg-area" data-area="built"><div class="pg-footer"><div class="pg-doc">' + builtWithHTML(c) + '</div></div></div>' : '') +
+      '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc">' + usedInHTML(c) + '</div></div></div>' +
+      '<div class="pg-area" data-area="log"><div class="pg-footer"><div class="pg-doc">' + changelogHTML(c) + '</div></div></div>';
     var preview = sec.querySelector('.pg-preview'), controlsEl = sec.querySelector('.pg-controls'), frame = sec.querySelector('.pg-frame');
     // The component at a chosen width: a frame of that width holding the page's own stylesheets, the icon sheet and the
     // component as drawn now, so the system's media queries apply; scaled down to fit the room, never up. It is live
@@ -1938,6 +1978,12 @@ a.pg-usage-name { color: var(--sg-text); }
       var head = document.createElement('div'); head.className = 'pg-inspect-head'; card.appendChild(head);
       while (d.firstChild) (d.firstChild === h ? head : card).appendChild(d.firstChild);
       d.appendChild(card);
+    });
+    // Every area under its own title, the same on each: its name, as the area switch says it.
+    Array.prototype.forEach.call(sec.querySelectorAll('.pg-area'), function (a) {
+      var name = AREAS.filter(function (x) { return x[0] === a.getAttribute('data-area'); })[0];
+      if (!name) return;
+      var h = document.createElement('h3'); h.className = 'pg-area-title'; h.textContent = name[1]; a.insertBefore(h, a.firstChild);
     });
     labelCells(sec);
     // Parity's filter: every row, or one type (props, variables, values).
@@ -2106,8 +2152,8 @@ a.pg-usage-name { color: var(--sg-text); }
       if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { anatBox.textContent = 'This component sits over the page, so it is inspected in the browser rather than here.'; return; }
       if (wv) { wrap.classList.add('pg-frame-stage'); wrap.style.width = wv[2] + 'px'; wrap.style.boxSizing = 'border-box'; }
       var whole = (wv ? wrap : copy).getBoundingClientRect(), rr = root.getBoundingClientRect();
-      // At the size the Playground draws it: inspecting never makes it bigger, and makes it smaller only to fit.
-      var k = Math.min(1, (anatBox.clientWidth - 64) / Math.max(1, whole.width));
+      // At the size the Playground draws it, always: one wider than the area scrolls sideways, as the Playground does.
+      var k = 1;
       stage.style.width = whole.width * k + 'px'; stage.style.height = whole.height * k + 'px';
       // Measured from where the copy sits now (the stage moves once it is sized), before it is scaled.
       function box(el) { var r = el.getBoundingClientRect(), o = wrap.getBoundingClientRect(); return { x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height }; }
@@ -2159,7 +2205,10 @@ a.pg-usage-name { color: var(--sg-text); }
             state[p.label] = val; refresh();
             var src = preview.firstElementChild, copy = src ? src.cloneNode(true) : null;
             if (copy) { copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true'); uniqueIds(copy); }
-            var modes = Array.prototype.filter.call(preview.attributes, function (a) { return /^data-/.test(a.name); }).map(function (a) { return ' ' + a.name + '="' + esc(a.value) + '"'; }).join('');
+            // The Playground's other modes (its sizing) carry over; colour follows the page's mode, so each variant reads on
+            // the page's background whatever the Playground's own colour switch says.
+            var colourAttrs = AXES.filter(function (ax) { return ax.colour; }).map(function (ax) { return ax.attr; });
+            var modes = Array.prototype.filter.call(preview.attributes, function (a) { return /^data-/.test(a.name) && colourAttrs.indexOf(a.name) < 0; }).map(function (a) { return ' ' + a.name + '="' + esc(a.value) + '"'; }).join('');
             html += '<div class="pg-variant-row"><div class="pg-ctl-label">' + esc(o.label) + (val === keep[p.label] ? ' (in the Playground)' : '') + '</div><div class="pg-variant-stage"' + modes + '>' + (copy ? copy.outerHTML : '') + '</div>' +
               sysButton('button', 'Try it', ' data-try="' + esc(p.label) + '" data-v="' + esc(o.label) + '"') + '</div>';
           });
@@ -2313,7 +2362,8 @@ a.pg-usage-name { color: var(--sg-text); }
       var keptAttrs = colours.map(function (a) { return [a.attr, preview.getAttribute(a.attr)]; });
       var modeSets = [[]];
       colours.forEach(function (a) { var next = []; modeSets.forEach(function (ms) { a.values.forEach(function (v) { if (v.value) next.push(ms.concat([[a, v]])); }); }); if (next.length) modeSets = next; });
-      play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false;
+      // Colours read as they settle in each mode, never halfway through a component's own transition.
+      play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false; preview.classList.add('pg-still');
       var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {};
       try {
         plan.combos.forEach(function (cb) {
@@ -2356,7 +2406,7 @@ a.pg-usage-name { color: var(--sg-text); }
         });
       } finally {
         keptAttrs.forEach(function (k) { if (k[1] == null) preview.removeAttribute(k[0]); else preview.setAttribute(k[0], k[1]); });
-        play.classList.remove('pg-offstage'); play.hidden = wasPlay; preview.hidden = wasPreview;
+        play.classList.remove('pg-offstage'); play.hidden = wasPlay; preview.hidden = wasPreview; preview.classList.remove('pg-still');
         Object.keys(keep).forEach(function (k) { state[k] = keep[k]; });
         Object.keys(syncs).forEach(function (k) { syncs[k](); });
         refresh();
@@ -2510,34 +2560,30 @@ a.pg-usage-name { color: var(--sg-text); }
     // (.modal-slot) is that part; one whose content the markup puts straight inside the component (a card, a status bar,
     // a segmented control's segments) is the area that content takes, the parts of its other slots left as they are.
     var SLOTS = ((c.parity && c.parity.rows) || []).filter(function (r) { return r.type === 'Prop' && r.figma && /^slot$/.test(r.figma.value) && r.code; });
-    var slotObs = null;
     function slotName(r) { return /^slot$/i.test(r.figma.name) ? 'Slot' : 'Slot ' + r.figma.name; }
     function drawSlots() {
       if (!SLOTS || !SLOTS.length || !cur) return;
-      var partSel = SLOTS.filter(function (r) { return /^[.#]/.test(r.code.name); }).map(function (r) { return r.code.name; });
+      // The parts that are not the slot's content: the slots the code gives a part of their own, and the parts the
+      // controls show, hide or fill (a title, an icon).
+      var partSel = SLOTS.filter(function (r) { return /^[.#]/.test(r.code.name); }).map(function (r) { return r.code.name; })
+        .concat((c.controls || []).map(function (k) { return k.part; }).filter(function (sel) { return sel && /^[.#[]/.test(sel); }));
       SLOTS.forEach(function (r) {
         var own = /^[.#]/.test(r.code.name), els = [];
         try { els = own ? (cur.matches(r.code.name) ? [cur] : []).concat(Array.prototype.slice.call(cur.querySelectorAll(r.code.name))) : [cur]; } catch (e) { return; }
         els.forEach(function (el) {
           if (el !== cur) { el.classList.add('pg-slot-area'); el.setAttribute('data-slot', slotName(r)); return; }
-          // The component itself holds the slot's content: that content is hidden in place and the area it takes is
-          // drawn over it, inside the component's own box, so its frame, its padding and its other slots still show.
+          if (el.querySelector(':scope > .pg-slot-fill')) return;
+          // The component itself holds the slot's content: that content gives way to an area in its place, at least the
+          // size a slot needs to be read, so the component grows around it and its other parts still show.
           var kids = Array.prototype.filter.call(el.children, function (k) { return !partSel.some(function (sel) { try { return k.matches(sel) || k.querySelector(sel); } catch (e) { return false; } }); });
-          var box = el.getBoundingClientRect(), cs = getComputedStyle(el), area;
-          if (kids.length) {
-            kids.forEach(function (k) { k.classList.add('pg-slot-hidden'); });
-            var rs = kids.map(function (k) { return k.getBoundingClientRect(); }).filter(function (q) { return q.width || q.height; });
-            area = rs.length ? { l: Math.min.apply(null, rs.map(function (q) { return q.left; })), t: Math.min.apply(null, rs.map(function (q) { return q.top; })), r: Math.max.apply(null, rs.map(function (q) { return q.right; })), b: Math.max.apply(null, rs.map(function (q) { return q.bottom; })) } : null;
-          }
-          if (!area) area = { l: box.left + parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), t: box.top + parseFloat(cs.paddingTop) + parseFloat(cs.borderTopWidth), r: box.right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth), b: box.bottom - parseFloat(cs.paddingBottom) - parseFloat(cs.borderBottomWidth) };
-          // An empty slot gets room to be seen, never more than the component's own box.
-          var w = Math.min(Math.max(area.r - area.l, 96), box.width - (area.l - box.left)), h = Math.min(Math.max(area.b - area.t, 32), box.height - (area.t - box.top));
-          el.classList.add('pg-slot-host'); if (cs.position === 'static') el.classList.add('pg-slot-rel');
-          el.setAttribute('data-slot', slotName(r));
-          el.style.setProperty('--pg-slot-x', (area.l - box.left - parseFloat(cs.borderLeftWidth)) + 'px'); el.style.setProperty('--pg-slot-y', (area.t - box.top - parseFloat(cs.borderTopWidth)) + 'px');
-          el.style.setProperty('--pg-slot-w', w + 'px'); el.style.setProperty('--pg-slot-h', h + 'px');
-          if (!slotObs && window.ResizeObserver) { slotObs = new ResizeObserver(function () { requestAnimationFrame(function () { if (cur && cur.classList.contains('pg-slot-host')) { cur.classList.remove('pg-slot-host'); drawSlots(); } }); }); }
-          if (slotObs && slotObs.seen !== el) { slotObs.observe(el); slotObs.seen = el; }
+          var rs = kids.map(function (k) { return k.getBoundingClientRect(); }).filter(function (q) { return q.width || q.height; });
+          var w = rs.length ? Math.max.apply(null, rs.map(function (q) { return q.right; })) - Math.min.apply(null, rs.map(function (q) { return q.left; })) : 0;
+          var h = rs.length ? Math.max.apply(null, rs.map(function (q) { return q.bottom; })) - Math.min.apply(null, rs.map(function (q) { return q.top; })) : 0;
+          var fill = document.createElement('div');
+          fill.className = 'pg-slot-area pg-slot-fill'; fill.setAttribute('data-slot', slotName(r)); fill.setAttribute('aria-hidden', 'true');
+          fill.style.minWidth = Math.max(w, 96) + 'px'; fill.style.minHeight = Math.max(h, 40) + 'px';
+          el.insertBefore(fill, kids[0] || null);
+          kids.forEach(function (k) { k.classList.add('pg-slot-gone'); });
         });
       });
     }
@@ -2795,17 +2841,17 @@ a.pg-usage-name { color: var(--sg-text); }
   // own checks open the page). Its card's thumbnail is its markup at first, then its drawn preview.
   var ALL = /[?&]all\b/.test(location.search), BUILDERS = {};
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
-    BUILDERS['c-' + c.name] = function () {
+    BUILDERS[cid(c.name)] = function () {
       hr();
       var cardEl = buildCard(c); main.appendChild(cardEl); cardEl.hidden = false;
       cardEl._refresh();   // measure after it is in the page: a detached node computes to nothing
       thumbOf(c, cardEl.querySelector('.pg-preview').firstElementChild);
-      cardEl._area(AREA, true);   // drawn with the playground showing, then the area last chosen
+      cardEl._area('play', true);   // a component opens on its Playground
       refreshers.push(cardEl._refresh);
       return cardEl;
     };
-    navLink('c-' + c.name, c.name);
-    if (ALL) BUILDERS['c-' + c.name](); else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
+    navLink(cid(c.name), c.name);
+    if (ALL) BUILDERS[cid(c.name)](); else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
   });
   if (!COMPONENTS.length && !FLAT.length) { var empty = document.createElement('p'); empty.className = 'pg-empty'; empty.textContent = 'Nothing agreed yet.'; main.appendChild(empty); }
 
@@ -2852,9 +2898,9 @@ a.pg-usage-name { color: var(--sg-text); }
       var add = function (kind, label, href, find, more) { INDEX.push({ kind: kind, label: label, href: href, find: find || null, hay: [kind, label].concat(more || []).join(' ').toLowerCase() }); };
       Array.prototype.forEach.call(nav.querySelectorAll('a'), function (a) { var h = a.getAttribute('href'); if (!/^#c-/.test(h)) add('Section', a.textContent.trim(), h); });
       COMPONENTS.forEach(function (c) {
-        add('Component', c.name, '#c-' + c.name, null, [c.description, c.role, c.cls, c.note].concat(c.annotations || [], (c.controls || []).map(function (k) { return k.label + ' ' + (k.options || []).map(function (o) { return o.label; }).join(' '); }), (c.unbuilt || []).map(function (u) { return u.label; }), (c.slots || []).map(function (x) { return x.name; })));
-        ((c.ownTokens && c.ownTokens.colors) || []).concat((c.ownTokens && c.ownTokens.sizes) || []).forEach(function (t) { add('Token in ' + c.name, t.figma, '#c-' + c.name, t.figma, [t.var, t.value]); });
-        (c.controls || []).forEach(function (k) { add('Prop of ' + c.name, k.label, '#c-' + c.name, null, [k.prop].concat((k.options || []).map(function (o) { return o.label; }))); });
+        add('Component', c.name, '#' + cid(c.name), null, [c.description, c.role, c.cls, c.note].concat(c.annotations || [], (c.controls || []).map(function (k) { return k.label + ' ' + (k.options || []).map(function (o) { return o.label; }).join(' '); }), (c.unbuilt || []).map(function (u) { return u.label; }), (c.slots || []).map(function (x) { return x.name; })));
+        ((c.ownTokens && c.ownTokens.colors) || []).concat((c.ownTokens && c.ownTokens.sizes) || []).forEach(function (t) { add('Token in ' + c.name, t.figma, '#' + cid(c.name), t.figma, [t.var, t.value]); });
+        (c.controls || []).forEach(function (k) { add('Prop of ' + c.name, k.label, '#' + cid(c.name), null, [k.prop].concat((k.options || []).map(function (o) { return o.label; }))); });
       });
       FLAT.forEach(function (t) { add('Colour', t.figma, '#colors', t.figma, [t.var]); });
       [['spacing', 'Spacing'], ['radii', 'Radius']].forEach(function (k) { (TOKENS[k[0]] || []).forEach(function (t) { add(k[1], t.figma, '#' + k[0], t.figma, [t.var, t.value]); }); });
@@ -2929,7 +2975,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var body = document.createElement('div'); body.className = 'sg-uses pg-doc'; s.appendChild(body);
     s._link = function (q) {
       var v = (q && q.get('t')) || '', u = USES[v] || { direct: [], via: [] }, fig = named(v), val = v ? getComputedStyle(html).getPropertyValue(v).trim() : '';
-      var link = function (n) { return '<a class="sg-uses-link" href="#c-' + esc(n) + '">' + esc(n) + '</a>'; };
+      var link = function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; };
       var by = function (a, b) { return (a.name || a).localeCompare(b.name || b); }, n = u.direct.length + u.via.length;
       s.querySelector('h2').textContent = v || 'Token';
       body.innerHTML = '<p>' + esc(!n ? 'No component uses it.' : (n === 1 ? 'One component uses it' : n + ' components use it') + (u.via.length ? ', ' + (u.direct.length ? u.direct.length + ' in their own rules and ' : '') + u.via.length + ' through another token.' : '.')) + '</p><dl class="pg-updated">' +
@@ -2950,8 +2996,10 @@ a.pg-usage-name { color: var(--sg-text); }
     var at = hashParts(), id = at.id || 'overview', built = !!document.getElementById(id);
     if (!built && BUILDERS[id]) BUILDERS[id]();
     if (built && document.getElementById(id)._link) document.getElementById(id)._link(at.q);
-    // An area named in the address (#c-chip/accessibility) opens on it.
-    if (at.area && document.getElementById(id) && document.getElementById(id)._area) document.getElementById(id)._area(at.area, true);
+    // An area named in the address (#c-chip/accessibility) opens on it; moving to another component opens its Playground.
+    var sec0 = document.getElementById(id);
+    if (sec0 && sec0._area && (at.area || (id !== route.last && built))) sec0._area(at.area || 'play', true);
+    route.last = id;
     var target = document.getElementById(id) && document.getElementById(id).matches('main > section') ? document.getElementById(id) : document.getElementById('overview');
     if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
     links.forEach(function (a) { var on = a.getAttribute('href').slice(1) === target.id; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });

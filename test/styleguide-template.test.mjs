@@ -63,7 +63,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   assert.equal(tag.markup, '<span class="tag">New</span>');
   assert.deepEqual(data.components.find((c) => c.name === 'tag').controls.find((c) => c.label === 'Tone').options, [{ label: 'Neutral' }, { label: 'Positive', add: ['tag--positive'], attrs: {} }]);
   assert.deepEqual(data.tokens.radii.map((t) => t.var), ['--radii-button', '--radii-chip', '--radii-field']);
-  assert.deepEqual(data.modes, [{ label: 'Mode', values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme' }]);
+  assert.deepEqual(data.modes, [{ label: 'Mode', colour: true, values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme' }]);
   assert.match(html, /Living style guide/);
 });
 
@@ -82,7 +82,7 @@ test('what an option adds comes from the contract\'s selector: a class, an attri
 test('the mode axes: colour from the config, size from the sizing collection, each named as Figma names its collection, nesting only where the CSS nests', () => {
   const vars = { modeVariants: { sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { kind: 'scalar', values: { desktop: '12px', phone: '16px' } } } } } };
   assert.deepEqual(modeAxes({}, vars), [
-    { label: 'Mode', values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true, media: '(prefers-color-scheme: dark)', mediaValue: 'dark', restValue: 'light' },
+    { label: 'Mode', colour: true, values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-color', scoped: true, media: '(prefers-color-scheme: dark)', mediaValue: 'dark', restValue: 'light' },
     { label: 'sizing', attr: 'data-size', scoped: true, values: [{ label: 'Desktop', value: '' }, { label: 'Phone', value: 'phone', notInCode: true }] },
   ]);
   assert.deepEqual(modeAxes({ figma: { colorCollection: 'Styling' } }, { modeVariants: { Sizing: vars.modeVariants.sizing } }).map((a) => a.label), ['Styling', 'Sizing'], 'never Color or Size: the collections\' own names');
@@ -93,7 +93,7 @@ test('the mode axes: colour from the config, size from the sizing collection, ea
   assert.deepEqual(media.values[0], { label: 'Desktop', value: 'desktop' }, 'a breakpoint mode makes the base a choice of its own');
   assert.deepEqual(media.changes, { phone: [{ name: 'padding/m', from: '12px', to: '16px' }] }, 'the switch says what the mode changes, from the code');
   assert.equal(media.media, '(max-width: 480px)', 'the page starts in the mode its own device or window gets');
-  assert.deepEqual(modeAxes({ figma: { modes: [{ name: 'Day', cssSelector: 'root' }, { name: 'Night', cssSelector: 'class:night' }] } }), [{ label: 'Mode', values: [{ label: 'Day', value: '' }, { label: 'Night', value: 'night' }], classes: true }]);
+  assert.deepEqual(modeAxes({ figma: { modes: [{ name: 'Day', cssSelector: 'root' }, { name: 'Night', cssSelector: 'class:night' }] } }), [{ label: 'Mode', colour: true, values: [{ label: 'Day', value: '' }, { label: 'Night', value: 'night' }], classes: true }]);
 });
 
 test('a component\'s real markup is the first instance in the project\'s own pages, without ids or handlers', () => {
@@ -249,7 +249,7 @@ test('in the browser: no script error, a control changes the real component, the
     // Every variant tried in the browser when the Accessibility area shows, whatever the Playground has set, as Parity
     // lists everything: the chip's Size, Icon and pressed sides, each check said once with the variants it holds in.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
-    const a11y = await run(`[...document.querySelectorAll('#c-chip .pg-doc')].find((d) => /Accessibility/.test(d.querySelector('h3').textContent)).textContent`);
+    const a11y = await run(`document.querySelector('#c-chip .pg-a11y').textContent`);
     // One table by WCAG criterion, in the Playground's card: what was found, where it is read from, the status; a count
     // above it and when the audit last ran. Only what applies: no row is said not to be needed. No separate table of
     // sources.
@@ -382,8 +382,8 @@ test('in the browser: no script error, a control changes the real component, the
     // Its header: only its version and when it last changed (with the time), its links at the top right, no issue link.
     assert.doesNotMatch(await run(`(document.querySelector('#c-chip .pg-facts') || {}).textContent || ''`), /Figma|Accessibility|Used in/);
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-header').textContent`), /Report an issue/);
-    // What the Parity table marks counts: the chip's pressed prop is only in the code.
-    assert.match(await run(`document.querySelector('#overview .sg-card[href="#c-chip"] .sg-card-facts').textContent`), /^Figma 1 only in code.*Accessibility not checked$/s);
+    // Its card on the overview: the name only, no line on Figma or accessibility.
+    assert.equal(await run(`document.querySelector('#overview .sg-card[href="#c-chip"] > h3').textContent.trim() + '|' + document.querySelector('#overview .sg-card[href="#c-chip"]').children.length`), 'chip|2', 'its picture and its name');
     // The name stays beside the areas; Parity says what it marks to a screen reader (Tidepool has no alert icon to draw
     // before its label), and the page no line about it. Accessibility, with nothing found, says nothing.
     assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="parity"]').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="a11y"]').textContent + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|Parity, 1 only in code|Accessibility|false');
@@ -676,7 +676,11 @@ test('a Figma slot the code holds in a part of its own is paired with that part,
 });
 
 test('import line and nesting: as a product writes the import, and the system\'s components it is built with', async () => {
-  const { importOf, nestedComponents } = await import('../styleguide-data.mjs');
+  const { importOf, nestedComponents, stylesheetImport } = await import('../styleguide-data.mjs');
+  // A system of CSS classes: a product imports its stylesheet, by the name the package's exports give it.
+  assert.deepEqual(stylesheetImport({ file: 'packages/ui/src/theme.css', pkg: { name: '@acme/ds', dir: '.', exports: { './theme.css': './packages/ui/src/theme.css' } } }), { line: "@import '@acme/ds/theme.css';", from: '@acme/ds/theme.css', css: true });
+  assert.equal(stylesheetImport({ file: 'src/theme.css', pkg: { name: '@acme/ds', dir: '.' } }).line, "@import '@acme/ds/src/theme.css';");
+  assert.equal(stylesheetImport({ file: 'src/theme.css' }).line, "@import './src/theme.css';");
   assert.deepEqual(importOf({ tag: 'ModalGeneral', syntax: 'vue', file: 'src/components/library/modals/General.vue' }), { line: "import ModalGeneral from '@/components/library/modals/General.vue';", from: '@/components/library/modals/General.vue' });
   assert.equal(importOf({ tag: 'Chip', syntax: 'jsx', file: 'src/components/Chip.jsx', text: 'export function Chip() {}' }).line, "import { Chip } from '@/components/Chip';");
   assert.equal(importOf({ tag: 'Chip', syntax: 'jsx', file: 'packages/ui/src/Chip.tsx', text: 'export default function Chip() {}', pkg: { name: '@acme/ui', dir: 'packages/ui' } }).line, "import Chip from '@acme/ui/Chip';");
@@ -768,7 +772,7 @@ test('built with: its own area, each component the overview\'s card with its pre
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /\['built', 'Built with'\], \['used', 'Used in'\]/);
   const src = tpl.slice(tpl.indexOf('function builtWithHTML'), tpl.indexOf('function builtThumbs'));
-  const html = new Function('DATA', 'esc', src + 'return builtWithHTML;')({ ui: { card: { cls: 'card' } } }, (x) => String(x))({ uses: ['buttonPrimary', 'buttonSecondary'] });
+  const html = new Function('DATA', 'esc', 'cid', src + 'return builtWithHTML;')({ ui: { card: { cls: 'card' } } }, (x) => String(x), (n) => 'c-' + n)({ uses: ['buttonPrimary', 'buttonSecondary'] });
   assert.equal(html, '<div class="sg-card-grid"><a class="sg-card card" href="#c-buttonPrimary"><div class="sg-thumb" aria-hidden="true" data-thumb="buttonPrimary"></div><h3>buttonPrimary</h3></a><a class="sg-card card" href="#c-buttonSecondary"><div class="sg-thumb" aria-hidden="true" data-thumb="buttonSecondary"></div><h3>buttonSecondary</h3></a></div>');
   assert.doesNotMatch(tpl.slice(tpl.indexOf('function importHTML'), tpl.indexOf('function builtWithHTML')), /pg-usage-label">Built with/, 'no longer a row of buttons under the import line');
   assert.match(tpl, /if \(!sec\.querySelector\('\.pg-area\[data-area="' \+ v \+ '"\]'\)\) v = 'play';/, 'a component without it opens on the playground');
@@ -833,7 +837,7 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.deepEqual(coverageOf({ total: {}, '/repo/src/components/Chip.jsx': { lines: { pct: 87.5 } } }, 'src/components/Chip.jsx'), { lines: 87.5 });
   assert.equal(coverageOf({ total: {} }, 'src/components/Chip.jsx'), null);
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
-  assert.match(tpl, /card\(cGrid, 'c-' \+ c\.name, 'Components', c\.name, about\(c\), '', c\.status, cardFacts\(c\)\)/);
+  assert.match(tpl, /card\(cGrid, cid\(c\.name\), 'Components', c\.name, about\(c\), '', c\.status\)/);
   // Where a person reports a problem: the team's tracker with the component's name, else the repository's own.
   const { issueLink } = await import('../styleguide-data.mjs');
   assert.equal(issueLink({ template: 'https://redmine.example.com/projects/ds/issues/new?issue[subject]={title}', name: 'Chip' }), 'https://redmine.example.com/projects/ds/issues/new?issue[subject]=Chip%3A%20');
@@ -941,4 +945,19 @@ test('a foundation\'s size switch: only its samples take the size, no label, roo
   assert.match(tpl, /\.sg-size-switch \{ margin-bottom: var\(--sg-space-xxl\); \}/);
   assert.match(tpl, /\.sg-size-switch \.sg-mode-label \{ position: absolute; width: 1px/);
   assert.doesNotMatch(tpl, /sec\.classList\.add\('sg-scope'\)/);
+});
+
+// A style guide rule: every component with variants has the Variants area, and on/off props count as variants (a
+// modal with Show Close Button and Show Actions has variants as much as a button with a Size).
+test('Variants: a component with a variant prop or an on/off prop has the area; text, slots and swaps alone do not', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const fn = (name) => tpl.slice(tpl.indexOf(`function ${name}(c)`), tpl.indexOf('\n  }', tpl.indexOf(`function ${name}(c)`)) + 4).replace(/^(function \w+\(c\) \{ return [^\n]*\})[\s\S]*$/, '$1');
+  const variantRows = new Function(`${fn('variantProps')}\n${fn('variantRows')}\nreturn variantRows;`)();
+  const rows = (controls) => variantRows({ controls }).map((r) => r.label);
+  assert.deepEqual(rows([{ type: 'BOOLEAN', label: 'Show Close Button', part: '.modal-close' }, { type: 'BOOLEAN', label: 'Show Actions', part: '.modal-footer' }, { type: 'TEXT', label: 'Title' }]), ['Show Close Button', 'Show Actions'], 'on/off props are variants');
+  assert.deepEqual(rows([{ type: 'VARIANT', label: 'Size', options: [{ label: 'S' }, { label: 'M' }] }]), ['Size']);
+  assert.deepEqual(rows([{ type: 'TEXT', label: 'Label' }, { type: 'SLOT', label: 'Slot' }, { type: 'INSTANCE_SWAP', label: 'Icon' }]), [], 'nothing to vary');
+  // The area and its tab follow the same rows.
+  assert.match(tpl, /\(ALL \|\| !variantRows\(c\)\.length \? '' : '<div class="pg-area" data-area="variants">/);
+  assert.match(tpl, /a\[0\] !== 'variants' \|\| \(!ALL && variantRows\(c\)\.length\)/);
 });
