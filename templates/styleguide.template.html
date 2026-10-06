@@ -242,7 +242,21 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par--none { color: var(--sg-muted); }
 .pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text-2); }
 /* Wide enough, the table never scrolls on its own (a box that scrolls would hold its head back); on a phone it does. */
-@media (max-width: 720px) { .pg-par-scroll { overflow-x: auto; } .pg-par-filter { max-width: 100%; overflow-x: auto; padding: 2px; } }   /* the filter scrolls sideways too, as the areas do */
+@media (max-width: 720px) {
+  .pg-par-filter { max-width: 100%; overflow-x: auto; padding: 2px; }   /* the filter scrolls sideways, as the areas do */
+  /* On a phone each row of a table of several columns is a block of its own: its first cell as its title, every other
+     value under the name of its column (data-label, from the head row, kept for screen readers), nothing squeezed or
+     cut, a word broken only where it has to be. */
+  .pg-par-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pg-par-table, .pg-par-table tbody, .pg-par-table tr, .pg-par-table td { display: block; width: auto; }
+  .pg-par-table tr { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); }
+  .pg-par-card .pg-par-table tr:last-child { border-bottom: none; }
+  .pg-par-table td, .pg-par-table .pg-par-type, .pg-par-table .pg-par-at { border-bottom: none; padding: 2px 0; white-space: normal; overflow-wrap: break-word; min-width: 0; }
+  .pg-par-table td:first-child { font-weight: var(--sg-heading-weight); color: var(--sg-text); padding-bottom: var(--sg-space-xs); }
+  .pg-par-table td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+  .pg-par-table td:empty { display: none; }
+  .pg-a11y .pg-par-type { min-width: 0; }
+}
 /* Where it is used: each product's own page pictured, the component marked on it. */
 .pg-usedin { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 .pg-shot { position: relative; overflow: hidden; border-radius: var(--sg-radius); border: var(--sg-line); background: var(--sg-bg-2); }
@@ -1468,6 +1482,19 @@ a.pg-usage-name { color: var(--sg-text); }
       '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Type</th><th>Figma</th><th>Code</th><th>Status</th><th>Updated</th></tr></thead><tbody>' + body + '</tbody></table></div></div>' +
       differencesHTML(c) + '</div>';
   }
+  // Each cell of a table of several columns carries the name of its column (data-label), shown above its value on a
+  // phone where each row is a block; the table keeps its roles there, as a phone's browser drops them for a block.
+  function labelCells(scope) {
+    Array.prototype.forEach.call((scope || document).querySelectorAll('table.pg-par-table'), function (t) {
+      var heads = Array.prototype.map.call(t.querySelectorAll('thead th'), function (th) { th.setAttribute('role', 'columnheader'); return th.textContent.trim(); });
+      t.setAttribute('role', 'table');
+      Array.prototype.forEach.call(t.querySelectorAll('thead, tbody'), function (g) { g.setAttribute('role', 'rowgroup'); });
+      Array.prototype.forEach.call(t.querySelectorAll('tr'), function (tr) { tr.setAttribute('role', 'row'); });
+      Array.prototype.forEach.call(t.querySelectorAll('tbody tr'), function (tr) {
+        Array.prototype.forEach.call(tr.cells, function (td, i) { td.setAttribute('role', 'cell'); if (heads[i]) td.setAttribute('data-label', heads[i]); });
+      });
+    });
+  }
   // ── How a product brings it in: its import line (copied), its file (downloaded), and what it is built with ────────
   function importHTML(c) {
     var out = '';
@@ -1912,6 +1939,7 @@ a.pg-usage-name { color: var(--sg-text); }
       while (d.firstChild) (d.firstChild === h ? head : card).appendChild(d.firstChild);
       d.appendChild(card);
     });
+    labelCells(sec);
     // Parity's filter: every row, or one type (props, variables, values).
     var parFilter = sec.querySelector('.pg-par-filter');
     if (parFilter) {
@@ -2239,6 +2267,7 @@ a.pg-usage-name { color: var(--sg-text); }
       if (live !== undefined) liveNow = live;
       c.__textParts = textParts();
       a11yEl.innerHTML = a11yRows(c, staticItems.concat(liveItems), liveNow);
+      labelCells(a11yEl.closest('.pg-a11y'));
       var n = {};
       Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
       a11ySumEl.innerHTML = [['todo', 'to fix'], ['check', 'to check'], ['done', 'done']].filter(function (x) { return n[x[0]]; })
