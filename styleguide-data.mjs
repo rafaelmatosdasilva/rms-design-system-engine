@@ -521,6 +521,15 @@ export function agreedTokens(check = {}, figmaVars = {}) {
   };
 }
 
+// An instance copied from a page, without its handlers and its ids (a script's hooks, unique to that page), except an id
+// the instance itself points to (aria-labelledby, aria-describedby, aria-controls, for): the label a group is named by
+// stays with it, so the copy is named as the product names it. The style guide makes each one unique where it draws it.
+export function keepReferencedIds(html) {
+  const refs = new Set();
+  for (const r of String(html).matchAll(/\s(?:aria-(?:labelledby|describedby|controls|owns|errormessage|activedescendant|details|flowto)|for|headers|list)\s*=\s*("([^"]*)"|'([^']*)')/gi)) for (const id of (r[2] ?? r[3] ?? '').split(/\s+/)) if (id) refs.add(id);
+  return String(html).replace(/\s(id|on\w+)\s*=\s*("([^"]*)"|'([^']*)'|[^\s>]+)/gi, (all, attr, v, dq, sq) => (/^id$/i.test(attr) && refs.has(dq ?? sq ?? v) ? all : '')).trim();
+}
+
 // ── A component's real markup: the first element in the project's own pages that carries its class ───────────────
 // Static HTML only (a React page renders in the browser). Ids, inline handlers and scripts are taken out, so the copy
 // is markup and nothing else.
@@ -568,7 +577,7 @@ export function instanceMarkups(html, cls, max = 20) {
       while (depth && (t = re.exec(body))) { if (t[1]) depth--; else if (!/\/>$/.test(t[0])) depth++; end = re.lastIndex; }
       if (depth) continue;
     }
-    out.push(body.slice(m.index, end).replace(/\s(id|on\w+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '').trim());
+    out.push(keepReferencedIds(body.slice(m.index, end)));
     open.lastIndex = end;
   }
   return out;
