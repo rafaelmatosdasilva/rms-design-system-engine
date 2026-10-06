@@ -46,5 +46,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-06-hand-built-components-are-found` | The 21 guide tasks on Haiku (engine f78312e) | "Hand-built components found, skipped checks said, style guide component page" |
 | `2026-10-06-unbuilt-components-not-a-product-gap` | The 21 guide tasks on Haiku (engine a53a190) | "A component the DS has not built yet is not a product's gap" |
 | `2026-10-06-anatomy-follows-playground` | The 21 guide tasks on Haiku (engine e46b7bc) | "The anatomy follows every Playground change; no Full width" |
+| `2026-10-06-parity-one-table` | The 21 guide tasks on Haiku (engine 7229c44) | "Parity as one table of every prop, variable and value" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
