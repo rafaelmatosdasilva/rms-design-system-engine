@@ -379,6 +379,9 @@ export function requestFindings(ctx, request, nodes) {
     const named = nodes.some((n) => { const t = wordsOf(`${n.props?.standInFor ?? ''} ${n.props?.purpose ?? ''} ${n.component === 'Missing' ? n.props?.need ?? '' : ''}`); return w.every((x) => t.includes(x)); });
     if (!named) out.push({ rule: null, source: 'the request', level: 'warning', id: null, said: `kind:${kind}`, kind: 'request', message: `the request asks for a ${kind} and the system has none: show it as a Missing box, or a component with "standInFor": "${kind}", and say the system has no ${kind}` });
   }
+  // A request that has a part open another (a confirmation, a menu): something must carry "opens", not a state.
+  if (/\b(opens?|pops? up|brings? up|shows?)( (a|an|the|its|their))? ([a-z]+ )?(confirmation|dialog|modal|menu|popover|panel|sheet|drawer|overlay)s?\b/i.test(request) && !nodes.some((n) => n.props?.opens))
+    out.push({ rule: null, source: 'the request', level: 'warning', id: null, said: 'opens', kind: 'request', message: 'the request has a part open another, and nothing here opens anything: give the part that is clicked "opens" with the "id" of the part it opens (drawn closed until the click), not a state' });
   for (const n of nodes) {
     const k = ctx.components[n.component];
     if (!k || n.props?.standInFor) continue;   // a stand-in is judged by its own need
