@@ -35,13 +35,14 @@ The designer asks for a screen. The rule is to use only the system's components,
 
 | Model | Claude alone | With the skill |
 |---|---|---|
-| Opus, six tasks | 13 of 18 | 18 of 18 |
-| Haiku, six tasks | 2 of 18 | 17 of 18 |
-| Sonnet, three tasks | 2 of 15 | 6 of 6 |
+| Opus, eleven tasks | 17 of 33 | 33 of 33 |
+| Haiku, eleven tasks | 3 of 33 | 32 of 33 |
+| Sonnet, three tasks (an earlier version) | 2 of 15 | 6 of 6 |
 
-- **Without the skill, every failure was an invention.** Opus built its own Switch component, drew its own illustration, and wrote colours and sizes the system does not have. Two Sonnet runs changed the system's own tokens file.
+- **Without the skill, most failures were inventions.** Opus built its own Switch component, drew its own illustration, and wrote colours and sizes the system does not have (10 of its 33 runs, Haiku 29). Two Sonnet runs changed the system's own tokens file. Neither model alone showed a list when it is empty or a form sent with a mistake.
+- **A page has every state and holds to the others.** Five of the eleven tasks ask for what a finished design owes: a list's empty state, a form's error state, the team's four-step sign-up flow with its pages deciding alike, a page at phone width, and a button that opens a confirmation. The skill draws each state, tries every screen width and each click in the browser, and holds the pages of a flow to one wording and one layout.
 - **With the skill nothing is invented.** A need the system cannot meet becomes a labelled box on the page and a line on the gap list for the design team, for example "on/off switch, closest in the system is the chip".
-- **Documentation and consistency.** Two of the six tasks follow the team's written guidelines (one button per screen, a tag is never a confirmation, including guidelines fetched from GitLab and Notion). One keeps a new page consistent with the designed Settings screen. Opus alone passed these when the documentation sat in plain view in the repository. The skill also makes them checks. A prototype that breaks a written limit is not drawn, and a component the documentation rules out cannot stand in.
+- **Documentation and consistency.** Two of the eleven tasks follow the team's written guidelines (one button per screen, a tag is never a confirmation, including guidelines fetched from GitLab and Notion). One keeps a new page consistent with the designed Settings screen. Opus alone passed these when the documentation sat in plain view in the repository. The skill also makes them checks. A prototype that breaks a written limit is not drawn, and a component the documentation rules out cannot stand in.
 
 ### 3. The skill's own efficiency
 
@@ -61,7 +62,7 @@ A rule violation is changing code nobody asked for, committing unasked, writing 
 2. **Nothing is invented, and gaps become visible.** Claude uses only what exists. Everything it needed and could not find goes on one list, counted across screens, so the design team sees the most needed missing pieces first.
 3. **The team's knowledge is used every time.** Figma descriptions and annotations, code notes, recorded decisions, and guidelines from Notion, GitLab or the repository are put in front of Claude for each request. The rules that can be checked are checked.
 4. **Pages of one product stay consistent.** A new page is compared with the designed screens and the pages already made.
-5. **A cheaper model does the job.** Haiku with the skill beat Opus alone at building from Figma (18 of 18 against 8 of 18, for $1.93 against $2.49) and at prototyping (17 of 18 against 13 of 18, for $1.27 against $3.64).
+5. **A cheaper model does the job.** Haiku with the skill beat Opus alone at building from Figma (18 of 18 against 8 of 18, for $1.93 against $2.49) and at prototyping (32 of 33 against 17 of 33, for $3.65 against $7.09).
 6. **It is safe to hand to anyone.** The system's files are never changed unasked. A commit, an accepted difference or a silenced check asks a person first. A secret is never asked for in the chat.
 7. **Every claim is checked.** The same scorers run on every version. Every run is saved, and a result can be summarized again from the records at any time.
 
@@ -75,13 +76,13 @@ Building from Figma costs more with the skill, because Claude checks its work an
 | Opus, 18 builds | $2.49 | $5.65 | $0.31 | $0.31 |
 | Haiku, 18 builds | $0.86 | $1.93 | $0.22 | $0.11 |
 
-Prototyping costs about the same or less with the skill, because Claude does not explore and build components of its own ($3.61 against $3.64 for 18 Opus prototypes, $1.27 against $1.57 for 18 on Haiku). The cheapest way to a build that matches is Haiku with the skill, at about $0.11 for each one that passes.
+Prototyping costs about the same or less with the skill, because Claude does not explore and build components of its own (on the first six tasks, $3.61 against $3.64 for 18 Opus prototypes and $1.27 against $1.57 for 18 on Haiku). On the eleven, with longer flows and every state drawn, Opus with the skill costs more ($9.36 against $7.09 for 33) and passes all of them where Opus alone passes half, and Haiku with the skill costs $3.65 against $3.30 in half the turns. The cheapest way to a build that matches is Haiku with the skill, at about $0.11 for each one that passes.
 
 ## Limits
 
 - **One small system.** Tidepool has four components and one screen, so Claude alone can read all of it in a few steps. The skill should matter more on a real system with many components, documentation spread across tools and many screens. Tests on a real, private system are kept out of this repository.
 - **Opus alone is strong when the task is simple and the documentation is easy to find.** Most of the skill's measured gain on Opus is enforcement. It does not invent, it checks every mode, and it does not stop until the checks pass. The one task Opus alone failed every time is a change in Figma after the code was built.
-- **Not every run passes.** Haiku with the skill missed one prototype (it used the chip for a switch and did not say the system has no switch) and one of 67 everyday task runs (its first answer asked for a GitLab token in the chat, which the engine sent back). Each is recorded with its run, and each is the next check to add.
+- **Not every run passes.** Haiku with the skill missed one of 33 prototypes on each of three engine versions, a different task each time (a confirmation whose reply never said the system has no dialog, a Cancel whose reply never said link, a sign-up flow that ran out of turns), each turned into a check before the next. Earlier it missed one of 67 everyday task runs (its first answer asked for a GitLab token in the chat, which the engine sent back). Each is recorded with its run, and each is the next check to add.
 
 ## Reproduce
 

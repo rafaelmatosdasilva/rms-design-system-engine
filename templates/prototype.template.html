@@ -299,6 +299,8 @@ html, body { margin: 0; }
     e.setAttribute('data-pt-path', path);
     if (!isPiece) e.setAttribute('data-pt-component', node.component);
     var np = node.props || {};
+    // A part that leads to another page of the flow: a click opens it (one of its states when named after #).
+    if (np.goesTo) { var to = String(np.goesTo).split('#'); e.setAttribute('data-pt-goes', np.goesTo); e.addEventListener('click', function (ev) { ev.preventDefault(); location.href = encodeURIComponent(to[0].trim()) + '.html' + (to[1] ? '#state=' + encodeURIComponent(to[1].replace(/^state=/, '').trim()) : ''); }); }
     if (np.opens) { e.setAttribute('data-pt-opens', np.opens); e.setAttribute('aria-haspopup', 'dialog'); e.setAttribute('aria-expanded', 'false'); e.addEventListener('click', function (ev) { ev.preventDefault(); openOverlay(np.opens, e); }); }
     // A system component's children go in its slot: the part its markup names slot, content or body, else itself.
     var into = e;

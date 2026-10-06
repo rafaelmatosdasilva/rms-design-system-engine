@@ -83,6 +83,7 @@ test('--prototype draws each state, owes the states the page lacks, and tries ev
   let r = run('--prototype', 'prototypes/filters.json');
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /⚠️ {2}no error state, and the page owes one \(it takes input \(field\) and sends it \(button\)\)/);
+  assert.match(r.stdout, /🎨 DESIGN REVIEW {2}\d+\/10/, 'the page is reviewed as drawn');
   assert.match(r.stdout, /📱 EVERY SIZE AND STATE {2}Phone 375, Tablet 768, Desktop 1280 · 2 states \(default, empty\)/);
   assert.match(r.stdout, /⚠️ {2}"Weekly summary of your account" in chip wraps onto two lines at Phone, Tablet, in the default state\n/, 'a chip\'s label on two lines on a narrow screen');
   for (const f of ['filters@phone.png', 'filters@desktop.png', 'filters.empty.png']) assert.ok(existsSync(join(dir, '.design-system-engine-out', 'prototypes', f)), f);
@@ -95,4 +96,31 @@ test('--prototype draws each state, owes the states the page lacks, and tries ev
   r = run('--prototype', 'prototypes/wrong.json', '--no-browser');
   assert.equal(r.status, 1);
   assert.match(r.stdout, /state "empty" names "nowhere", and no part has that id/);
+});
+
+test('a value as the person writes it is read as the system writes it; a state that names no component changes the part', async () => {
+  const { normaliseValues, applyState } = await import('../prototype-states.mjs');
+  const catalog = { components: { button: { props: { Disabled: { type: 'enum', values: ['False', 'True'] }, Label: { type: 'text' } } }, chip: { props: { Selected: { type: 'boolean' } } } } };
+  const raw = { component: 'Page', children: [{ id: 'go', component: 'button', props: { Label: 'Save', Disabled: false } }, { component: 'chip', props: { Selected: 'true' } }], states: { busy: { go: { props: { Disabled: 'true' } } } } };
+  const notes = normaliseValues(raw, catalog);
+  assert.equal(raw.children[0].props.Disabled, 'False');
+  assert.equal(raw.children[1].props.Selected, true);
+  assert.equal(raw.states.busy.go.props.Disabled, 'True', 'in every state too');
+  assert.equal(notes.length, 3);
+  const { ui } = applyState({ component: 'Page', children: [{ id: 'go', component: 'button', props: { Label: 'Save', Disabled: 'False' } }] }, { go: { props: { Disabled: 'True' } } });
+  assert.deepEqual(ui.children[0], { id: 'go', component: 'button', props: { Label: 'Save', Disabled: 'True' } }, 'the part kept, its prop changed');
+});
+
+test('a list owes an empty state: rows alike or the request saying list; fields, buttons and chips side by side are not one', async () => {
+  const { statesOwed } = await import('../prototype-states.mjs');
+  const catalog = { components: { tag: {}, button: {}, field: {}, chip: {} } };
+  const context = { components: { chip: { role: 'togglebutton' }, button: { role: 'button' }, field: { role: 'textbox' }, tag: {} } };
+  const row = (name, tone) => ({ component: 'Row', children: [{ component: 'Text', props: { text: name } }, { component: 'tag', props: { Label: tone } }] });
+  const list = { component: 'Page', children: [{ id: 'projects', component: 'Stack', children: [row('A', 'Active'), row('B', 'Done'), row('C', 'Active')] }] };
+  assert.deepEqual(statesOwed(list, { catalog, context }).map((o) => o.state), ['empty']);
+  const form = { component: 'Page', children: [{ component: 'field' }, { component: 'field' }, { component: 'button', props: { Label: 'Continue' } }] };
+  assert.deepEqual(statesOwed(form, { catalog, context }).map((o) => o.state), ['error'], 'a form owes an error state, not an empty one');
+  const chips = { component: 'Page', children: [{ component: 'Stack', children: [{ component: 'chip' }, { component: 'chip' }, { component: 'chip' }] }] };
+  assert.deepEqual(statesOwed(chips, { catalog, context }), []);
+  assert.deepEqual(statesOwed({ component: 'Page', children: [{ component: 'Text', props: { text: 'Projects' } }] }, { catalog, context, request: 'a projects list page' }).map((o) => o.state), ['empty']);
 });
