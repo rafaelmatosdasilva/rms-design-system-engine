@@ -289,7 +289,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   inspecting, what is picked at its left. They keep the stage (the checkerboard) apart from what changes it.
 - **Inspect**, in the top bar (none on the measuring page): the Playground turns into its anatomy, in the live
   component's place, so a prop is changed and inspected in one place: an inert copy of the component as the controls set
-  it, redrawn as they change (a text typed too), drawn larger, each part and each padding and gap outlined, a slot in
+  it, redrawn as they change (a text typed too), at the size the Playground draws it (smaller only to fit), each part and each padding and gap outlined, a slot in
   the accent, never filled with a colour (`annotate`). A click on the component, a part, or a padding or gap band (each
   space over the parts, each part over the component) says in one line what it is and its value (a part's padding,
   gap, fill, line, corners, shadow, text style and colour; an icon's size and colour; a space's token and value),
@@ -374,7 +374,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Accessibility**: its role (the Figma annotation, else `contract.authored.json` semantics) and what it asks for
+- **Accessibility**, one table like Parity's (`a11yRow`): What, What it means (in plain words), Status (✓ Done, ✕ To fix,
+  ! Not checked yet, – Not needed, a sign and the system's colour) and WCAG, with a count of each above it, kept as
+  the live rows change; what to fix first, then the variant shown and its text contrast, then what the role asks for
+  (done once the last browser check ran with nothing found under its criterion). Its rows: its role (the Figma annotation, else `contract.authored.json` semantics) and what it asks for
   (`role-markup.mjs`, `behaviour-contract.mjs`: element, name, keys, part roles), each with its WCAG 2.2 criterion;
   the text contrast measured in the page as drawn (1.4.3, a disabled control exempt); **To fix**, what the audit found
   on it that is about accessibility rather than Figma (a text's contrast in one variant and mode, `splitFindings`),

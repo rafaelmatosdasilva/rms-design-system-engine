@@ -235,11 +235,15 @@ test('in the browser: no script error, a control changes the real component, the
     const a11y = await run(`[...document.querySelectorAll('#c-chip .pg-doc')].find((d) => /Accessibility/.test(d.querySelector('h3').textContent)).textContent`);
     assert.match(a11y, /togglebutton: a <button type="button"> with aria-pressed/);
     assert.match(a11y, /WCAG 2\.1\.1 Keyboard \(A\)/);
-    assert.match(a11y, /Passes: \d+\.\d:1 on "Filter", needs 4\.5:1/);
-    assert.match(a11y, /Last audit.*Not run yet/s);
+    assert.match(a11y, /Text contrast\d+\.\d:1 on "Filter", needs 4\.5:1.*Done/);
+    assert.match(a11y, /Browser checkNot run yet.*Not checked yet/s);
+    // One table like Parity's: what, what it means, a status with its sign, the WCAG criterion; a count above it.
+    assert.match(a11y, /What.*What it means.*Status.*WCAG/);
+    assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /\d+ done.*\d+ not checked yet/);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
     await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
-    assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Passes|Fails/, 'measured again in the other mode');
+    assert.match(await run(`document.querySelector('#c-chip .pg-contrast').textContent`), /Text contrast.*(Done|To fix)/, 'measured again in the other mode');
     // On this variant: tried on the live component when the Accessibility area shows it, and again for another variant.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const live = await run(`document.querySelector('#c-chip .pg-a11y-live').textContent`);
@@ -269,11 +273,12 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'Prop').click()`);
     assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].filter((r) => !r.hidden).map((r) => r.dataset.type))]`), ['Prop']);
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'all').click()`);
-    // Inspect: the Playground turns into its anatomy (an inert copy drawn larger, as the controls set it, each part, padding
+    // Inspect: the Playground turns into its anatomy (an inert copy at the Playground's size, as the controls set it, each part, padding
     // and gap outlined, never filled with a colour); a click on one says in one line what it is and its value; again
     // puts the live component back.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy').hidden`), true, 'off until asked for');
+    const liveH = await run(`document.querySelector('#c-chip .pg-preview .chip').getBoundingClientRect().height`);
     await run(`document.querySelector('#c-chip .pg-stage-tools button').click()`);
     // Drawn on the next frame: waited for, as a busy machine can take longer than a fixed pause.
     for (let i = 0; i < 60 && !(await run(`document.querySelectorAll('#c-chip .pg-anat-space').length`)); i++) await new Promise((r) => setTimeout(r, 50));
@@ -281,7 +286,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.ok(await run(`document.querySelectorAll('#c-chip .pg-anat-space').length`) >= 2);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-anat-marks > *')].every((m) => { const b = getComputedStyle(m).backgroundColor; return m.classList.contains('pg-anat-num') || b === 'rgba(0, 0, 0, 0)'; })`), true, 'no colour fills on the drawing');
     assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').closest('[inert]') !== null`), true, 'the copy is inert and hidden from assistive technology');
-    assert.ok(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`) > 24, 'drawn larger than in the playground');
+    assert.equal(await run(`document.querySelector('#c-chip .pg-anatomy .chip').getBoundingClientRect().height`), liveH, 'drawn at the size the Playground draws it');
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /Click a part, a padding or a gap/);
     await run(`(() => { const m = [...document.querySelectorAll('#c-chip .pg-anat-marks [data-hit]')].find((x) => /^chip padding/.test(x.dataset.hit)); m.scrollIntoView({ block: 'center' }); const r = m.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).click(); })()`);
     assert.match(await run(`document.querySelector('#c-chip .pg-anat-line').textContent`), /^chip padding \w+ {2}· {2}--padding-[a-z]+/, 'one line: what it is and its value');
@@ -566,7 +571,7 @@ test('an accessibility finding goes to Accessibility, a difference from Figma to
   assert.deepEqual(parity.map((x) => x.check), ['Structure', 'Token layering']);
   assert.deepEqual(a11y.map((x) => x.check), ['State contrast']);
   const html = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
-  assert.match(html, /<dt>To fix<\/dt>/, 'the Accessibility area lists what to fix');
+  assert.match(html, /a11yRow\('todo', contrast \? 'Text contrast' : 'To fix'/, 'the Accessibility area lists what to fix');
   assert.match(html, /a\[0\] === 'a11y' \? facts\.a11y/, 'the Accessibility tab carries the alert icon');
   assert.match(html, /if \(o\.icon\) text = '<svg class="sg-seg-icon"[^\n]*' \+ text;/, 'the icon before the label');
   assert.match(html, /n \+= \(c\.a11yFindings \|\| \[\]\)\.length/, 'counting what the audit found with what the browser check found');

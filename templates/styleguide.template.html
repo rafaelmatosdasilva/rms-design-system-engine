@@ -223,6 +223,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par--differs { color: var(--sg-negative); }
 .pg-par--figma .pg-par-sign, .pg-par--code .pg-par-sign { background: var(--sg-warning); }
 .pg-par--figma, .pg-par--code { color: var(--sg-warning); }
+.pg-par--none .pg-par-sign { background: var(--sg-muted); }
+.pg-par--none { color: var(--sg-muted); }
 .pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text-2); }
 /* Wide enough, the table never scrolls on its own (a box that scrolls would hold its head back); on a phone it does. */
 @media (max-width: 720px) { .pg-par-scroll { overflow-x: auto; } }
@@ -1200,10 +1202,9 @@ a.pg-usage-name { color: var(--sg-text); }
       var need = large ? 3 : 4.5, words = (el.tagName === 'INPUT' ? (el.value || el.placeholder) : el.textContent).replace(/\s+/g, ' ').trim().slice(0, 40);
       if (!lowest || ratio / need < lowest.ratio / lowest.need) lowest = { ratio: ratio, need: need, words: words };
     });
-    if (!lowest) return '<p>No text drawn in this state.</p>';
+    if (!lowest) return a11yRow('none', 'Text contrast', 'No text drawn in this state.', 'WCAG 1.4.3 Contrast (Minimum) (AA)');
     var ok = lowest.ratio >= lowest.need;
-    return '<p>' + (ok ? 'Passes' : 'Fails') + ': ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '", needs ' + lowest.need + ':1 (' + (lowest.need === 3 ? 'large text' : 'text') + '), in the mode and state shown.' +
-      '<span class="pg-wcag">WCAG 1.4.3 Contrast (Minimum) (AA)</span></p>';
+    return a11yRow(ok ? 'done' : 'todo', 'Text contrast', esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '", needs ' + lowest.need + ':1 (' + (lowest.need === 3 ? 'large text' : 'text') + '), in the mode and state shown.', 'WCAG 1.4.3 Contrast (Minimum) (AA)');
   }
 
   // ── Its accessibility on the variant shown, tried on the live component: what Tab reaches and in what order, whether
@@ -1312,7 +1313,7 @@ a.pg-usage-name { color: var(--sg-text); }
     return { ok: ok, saw: saw };
   }
   function liveA11yHTML(root, a) {
-    var line = function (ok, text, wcag) { return '<p>' + (ok ? 'Passes' : 'Fails') + ': ' + esc(text) + '<span class="pg-wcag">' + esc(wcag) + '</span></p>'; };
+    var line = function (ok, text, wcag) { return a11yRow(ok ? 'done' : 'todo', 'On this variant', esc(text), wcag); };
     var out = [], stops = tabStops(root), had = document.activeElement;
     var interactive = [root].concat(Array.prototype.slice.call(root.querySelectorAll('[role]'))).filter(function (el) { return INTERACTIVE.test(el.getAttribute('role') || '') && shown(el); });
     var wants = a && a.key && INTERACTIVE.test(a.key);
@@ -1321,7 +1322,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (offAll) return line(true, 'It is disabled as set, so Tab passes it by and a screen reader says it is unavailable.', 'WCAG 4.1.2 Name, Role, Value (A)');
     if (stops.length) out.push(line(true, 'Tab reaches ' + (stops.length === 1 ? 'it once: ' : stops.length + ' stops in this order: ') + stops.map(function (s, i) { return (stops.length > 1 ? (i + 1) + ' ' : '') + who(s); }).join(', ') + '.', 'WCAG 2.1.1 Keyboard (A)'));
     else if (wants || interactive.length) out.push(line(false, 'Tab never reaches it, so it cannot be used without a mouse.', 'WCAG 2.1.1 Keyboard (A)'));
-    else out.push('<p>Nothing in it takes the focus, and as drawn nothing in it needs to.</p>');
+    else out.push(a11yRow('none', 'On this variant', 'Nothing in it takes the focus, and as drawn nothing in it needs to.', 'WCAG 2.1.1 Keyboard (A)'));
     interactive.filter(function (el) { return stops.indexOf(el) < 0 && !el.closest('[disabled], [aria-disabled="true"]') && !(el.type === 'radio' && el.name); }).forEach(function (el) { out.push(line(false, who(el) + ' acts as a ' + el.getAttribute('role') + ' but Tab does not reach it.', 'WCAG 2.1.1 Keyboard (A)')); });
     stops.filter(function (el) { return el.tabIndex > 0; }).forEach(function (el) { out.push(line(false, who(el) + ' sets its own place in the Tab order (tabindex="' + el.tabIndex + '"), ahead of the page.', 'WCAG 2.4.3 Focus Order (A)')); });
     // Drawn as disabled (its class says so) while Tab still reaches it: a screen reader offers a control that does nothing.
@@ -1341,7 +1342,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (stops.length && !out.some(function (h) { return /Focus Visible|Non-text|Name, Role/.test(h); })) out.push(line(true, (stops.length === 1 ? 'It shows its focus' : 'Each stop shows its focus') + ' and has a name.', 'WCAG 2.4.7 Focus Visible (AA)'));
     ((a && a.behaviours) || []).forEach(function (row) {
       var r = tryBehaviour(root, row, a.key);
-      out.push(r.given ? '<p>Given by the browser: ' + esc(row.says) + ' (' + esc(r.given) + ').</p>' : line(r.ok, row.says.replace(/^\w/, function (ch) { return ch.toUpperCase(); }) + (r.ok ? '.' : ', but ' + r.saw + '.'), row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)'));
+      out.push(r.given ? a11yRow('done', 'On this variant', 'Given by the browser: ' + esc(row.says) + ' (' + esc(r.given) + ').', row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)') : line(r.ok, row.says.replace(/^\w/, function (ch) { return ch.toUpperCase(); }) + (r.ok ? '.' : ', but ' + r.saw + '.'), row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)'));
     });
     if (had && had.focus && document.activeElement !== had) had.focus({ preventScroll: true, focusVisible: false });
     return out.join('');
@@ -1511,25 +1512,40 @@ a.pg-usage-name { color: var(--sg-text); }
       return '<div><dt>' + esc(x.title) + '</dt><dd>' + (x.text ? x.text.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '<p class="pg-from">From ' + esc(x.from) + '</p>' : '<p class="pg-missing">Not written yet.</p>') + '</dd></div>';
     }).join('') + '</dl>' + (g.missing.length ? '<p class="pg-from">Write a missing one in Figma, as a line of the component\'s description that starts with its name (' + esc(g.sections.filter(function (x) { return !x.text; })[0].title) + ': …), or in contract.authored.json under guidance.</p>' : '') + '</div>';
   }
+  // Accessibility, one table like Parity's: each thing asked of it in plain words, its status as a sign and the
+  // system's colour (done, to fix, not checked yet, not needed) and its WCAG criterion. What to fix first; then what
+  // the browser finds on the variant shown (tried live) and its text contrast; then what its role asks for, checked by
+  // the last audit in a browser. A count of each above it.
+  var A11Y = { done: ['✓', 'Done', 'match'], todo: ['✕', 'To fix', 'differs'], check: ['!', 'Not checked yet', 'figma'], none: ['–', 'Not needed', 'none'] };
+  function a11yRow(st, what, html, wcag) {
+    var x = A11Y[st];
+    return '<tr data-status="' + st + '"><td class="pg-par-type">' + esc(what) + '</td><td>' + html + '</td>' +
+      '<td><span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span></td>' +
+      '<td class="pg-par-at">' + esc(wcag || '') + '</td></tr>';
+  }
   function a11yHTML(c) {
     var a = c.a11y; if (!a) return '';
-    var p = function (x) { return '<p>' + esc(x.says) + (x.wcag ? '<span class="pg-wcag">' + esc(x.wcag) + '</span>' : '') + '</p>'; };
-    var role = a.role ? '<p>' + esc(a.role) + (a.element ? ': ' + esc(a.element) : '') + '</p>' : '<p>Not stated. Add an annotation to the component in Figma that says its role (role: button), and the page lists what that role asks for.</p>';
-    var ch = a.checked, last;
-    if (!ch) last = '<p>Not run yet. The audit checks it on your pages, with real key presses, and this page shows what it found.</p>';
-    else if (ch.notRead) last = '<p>' + esc(when(ch.at)) + ': it could not be checked (not drawn on the page that was checked).</p>';
-    else if (!ch.issues.length) last = '<p>' + esc(when(ch.at)) + ': nothing found on it.</p>';
-    else last = '<p>' + esc(when(ch.at)) + ':</p>' + ch.issues.map(function (i) { return '<p><b>' + esc(i.title) + '</b>: ' + esc(i.details.join('; ')) + '. ' + esc(i.fix) + (i.wcag ? '<span class="pg-wcag">' + esc(i.wcag) + '</span>' : '') + '</p>'; }).join('');
-    return '<div class="pg-doc"><h3>Accessibility</h3><dl class="pg-updated">' +
-      '<div><dt>Role</dt><dd>' + role + '</dd></div>' +
-      (a.expects.length ? '<div><dt>What it does</dt><dd>' + a.expects.map(p).join('') + '</dd></div>' : '') +
-      ((a.excused || []).length ? '<div><dt>Not asked of it</dt><dd>' + a.excused.map(function (x) { return '<p>' + esc(x.says) + ': ' + esc(x.reason) + '</p>'; }).join('') + '</dd></div>' : '') +
-      (ALL ? '' : '<div><dt>On this variant</dt><dd class="pg-a11y-live"></dd></div>') +
-      '<div><dt>Text contrast</dt><dd class="pg-contrast"></dd></div>' +
-      // What the audit found that needs fixing (a text's contrast in one variant and mode), each with who acts and its number.
-      ((c.a11yFindings || []).length ? '<div><dt>To fix</dt><dd>' + c.a11yFindings.map(function (x) { return '<p>' + (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : '') + '</p>'; }).join('') + '</dd></div>' : '') +
-      '<div><dt>Last audit</dt><dd>' + last + '</dd></div>' +
-      '</dl></div>';
+    var ch = a.checked, ran = ch && !ch.notRead, top = '', bottom = '';
+    // What to fix: what the audit found (a text's contrast in one variant and mode), each with who acts and its number,
+    // then what the last browser check found.
+    (c.a11yFindings || []).forEach(function (x) {
+      var contrast = /contrast/i.test((x.check || '') + ' ' + (x.what || ''));
+      top += a11yRow('todo', contrast ? 'Text contrast' : 'To fix', (x.new ? '<b>New.</b> ' : '') + esc(x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : ''), x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''));
+    });
+    if (ran) ch.issues.forEach(function (i) { top += a11yRow('todo', i.title, esc(i.details.join('; ')) + '. ' + esc(i.fix), i.wcag); });
+    top += a11yRow(a.role ? 'done' : 'check', 'Role', a.role ? 'It is a ' + esc(a.role) + (a.element ? ': ' + esc(a.element) : '') + '.' : 'Not stated yet. Add an annotation to the component in Figma that says its role (role: button), and this table lists what that role asks for.', a.role ? 'WCAG 4.1.2 Name, Role, Value (A)' : '');
+    // What its role asks for: done once the last browser check ran with nothing found under that criterion.
+    (a.expects || []).forEach(function (x) {
+      var failed = ran && ch.issues.some(function (i) { return i.wcag && x.wcag && i.wcag === x.wcag; });
+      bottom += a11yRow(!ran ? 'check' : failed ? 'todo' : 'done', 'What it does', esc(x.says.replace(/^\w/, function (k) { return k.toUpperCase(); })) + (ran ? '' : '. Checked once the audit runs it in a browser.'), x.wcag);
+    });
+    (a.excused || []).forEach(function (x) { bottom += a11yRow('none', 'Not asked of it', esc(x.says) + ': ' + esc(x.reason) + '.', ''); });
+    bottom += !ch ? a11yRow('check', 'Browser check', 'Not run yet. The audit checks it on your pages, with real key presses, and this table shows what it found.', '')
+      : ch.notRead ? a11yRow('check', 'Browser check', esc(when(ch.at)) + ': it could not be checked (not drawn on the page that was checked).', '')
+      : a11yRow(ch.issues.length ? 'todo' : 'done', 'Browser check', esc(when(ch.at)) + ': ' + (ch.issues.length ? (ch.issues.length === 1 ? 'one problem, at the top.' : ch.issues.length + ' problems, at the top.') : 'nothing found on it.'), '');
+    return '<div class="pg-doc pg-par pg-a11y"><h3>Accessibility</h3><div class="pg-par-sum pg-a11y-sum"></div>' +
+      '<div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>What</th><th>What it means</th><th>Status</th><th>WCAG</th></tr></thead>' +
+      '<tbody>' + top + '</tbody>' + (ALL ? '' : '<tbody class="pg-a11y-live"></tbody>') + '<tbody class="pg-contrast"></tbody><tbody>' + bottom + '</tbody></table></div></div>';
   }
 
   // A text that shows only while a boolean is on (Show Text and Text Content, show-label and label-content, or both
@@ -1844,7 +1860,8 @@ a.pg-usage-name { color: var(--sg-text); }
       var root = c.only ? (copy.querySelector(c.only) || copy) : copy;
       if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { anatBox.textContent = 'This component sits over the page, so it is inspected in the browser rather than here.'; return; }
       var whole = copy.getBoundingClientRect(), rr = root.getBoundingClientRect();
-      var k = Math.max(1, Math.min(4, 160 / Math.max(1, rr.height), (anatBox.clientWidth - 64) / Math.max(1, whole.width)));
+      // At the size the Playground draws it: inspecting never makes it bigger, and makes it smaller only to fit.
+      var k = Math.min(1, (anatBox.clientWidth - 64) / Math.max(1, whole.width));
       stage.style.width = whole.width * k + 'px'; stage.style.height = whole.height * k + 'px';
       // Measured from where the copy sits now (the stage moves once it is sized), before it is scaled.
       function box(el) { var r = el.getBoundingClientRect(), o = wrap.getBoundingClientRect(); return { x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height }; }
@@ -1982,6 +1999,16 @@ a.pg-usage-name { color: var(--sg-text); }
       segItems(cmpBar).forEach(function (b) { segSelect(b, b.dataset.v === compareMode); b.addEventListener('click', function () { compareMode = b.dataset.v; segItems(cmpBar).forEach(function (x) { segSelect(x, x === b); }); drawCompare(); }); });
     }
     var contrastEl = sec.querySelector('.pg-contrast');
+    // Above the Accessibility table, a count of each status, as its rows change (the live tries, the contrast).
+    var a11ySumEl = sec.querySelector('.pg-a11y-sum');
+    function a11ySum() {
+      if (!a11ySumEl) return;
+      var rows = sec.querySelectorAll('.pg-a11y tbody tr'), n = {};
+      Array.prototype.forEach.call(rows, function (r) { n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
+      a11ySumEl.innerHTML = [['done', 'done'], ['todo', 'to fix'], ['check', 'not checked yet'], ['none', 'not needed']].filter(function (x) { return n[x[0]]; })
+        .map(function (x) { return '<span class="pg-par-status pg-par--' + A11Y[x[0]][2] + '"><span class="pg-par-sign" aria-hidden="true">' + A11Y[x[0]][0] + '</span>' + n[x[0]] + ' ' + x[1] + '</span>'; }).join('');
+    }
+    a11ySum();
     // On this variant: tried on the live component whenever the Accessibility area shows a variant not tried yet. The
     // Playground is laid out out of sight for it (one task, nothing painted), and what the tries changed (a box ticked)
     // is drawn again as set.
@@ -1995,7 +2022,8 @@ a.pg-usage-name { color: var(--sg-text); }
       Object.keys(state).forEach(function (k) { keep[k] = state[k]; });
       play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false;
       // All it draws, the box around its control too.
-      try { liveEl.innerHTML = liveA11yHTML(preview.firstElementChild || cur, c.a11y); } catch (e) { liveEl.innerHTML = '<p>It could not be tried here.</p>'; }
+      try { liveEl.innerHTML = liveA11yHTML(preview.firstElementChild || cur, c.a11y); } catch (e) { liveEl.innerHTML = a11yRow('check', 'On this variant', 'It could not be tried here.', ''); }
+      a11ySum();
       play.classList.remove('pg-offstage'); play.hidden = wasPlay; preview.hidden = wasPreview;
       Object.keys(keep).forEach(function (k) { state[k] = keep[k]; });
       Object.keys(syncs).forEach(function (k) { syncs[k](); });
@@ -2099,7 +2127,7 @@ a.pg-usage-name { color: var(--sg-text); }
       tTokens.innerHTML = rowsHTML(lookRows(el, true).concat(partRows(el, c.name)));
       ownRows(); writeLink(); checkLive(); codeHeight();
       showCode(e);
-      if (contrastEl) contrastEl.innerHTML = contrastHTML(e);
+      if (contrastEl) { contrastEl.innerHTML = contrastHTML(e); a11ySum(); }
       nudge();
       if (WIDTH !== 'fit') renderFrame();
       if (compareOn) requestAnimationFrame(drawCompare);
