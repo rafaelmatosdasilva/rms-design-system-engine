@@ -257,7 +257,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(own, /border-radius/);
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent).join()`), 'Playground,Variants,Documentation,Accessibility,Parity,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Documentation,Accessibility,Parity,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
@@ -323,9 +323,13 @@ test('in the browser: no script error, a control changes the real component, the
     // Its header: only its version and when it last changed (with the time), its links at the top right, no issue link.
     assert.doesNotMatch(await run(`(document.querySelector('#c-chip .pg-facts') || {}).textContent || ''`), /Figma|Accessibility|Used in/);
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-header').textContent`), /Report an issue/);
-    assert.match(await run(`document.querySelector('#overview .sg-card[href="#c-chip"] .sg-card-facts').textContent`), /^Figma agrees.*Accessibility not checked$/s);
-    // The name stays beside the areas; nothing differs, so Parity carries no alert and the page no line about it.
-    assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + !!document.querySelector('#c-chip .pg-areas [data-v="parity"] .sg-seg-icon') + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|false|false');
+    // What the Parity table marks counts: the chip's pressed prop is only in the code.
+    assert.match(await run(`document.querySelector('#overview .sg-card[href="#c-chip"] .sg-card-facts').textContent`), /^Figma 1 only in code.*Accessibility not checked$/s);
+    // The name stays beside the areas; Parity says what it marks to a screen reader (Tidepool has no alert icon to draw
+    // before its label), and the page no line about it. Accessibility, with nothing found, says nothing.
+    assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="parity"]').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="a11y"]').textContent + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|Parity, 1 only in code|Accessibility|false');
+    // Parity's table head stays in view under the areas as its rows scroll by.
+    assert.equal(await run(`getComputedStyle(document.querySelector('#c-chip .pg-par-table th')).position`), 'sticky');
     // On a phone the areas scroll sideways in one row, never wrap; the one chosen scrolls into view.
     await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 800, deviceScaleFactor: 1, mobile: true }, sessionId);
     await new Promise((r) => setTimeout(r, 100));
@@ -549,7 +553,9 @@ test('an accessibility finding goes to Accessibility, a difference from Figma to
   assert.deepEqual(a11y.map((x) => x.check), ['State contrast']);
   const html = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
   assert.match(html, /<dt>To fix<\/dt>/, 'the Accessibility area lists what to fix');
-  assert.match(html, /a\[0\] === 'a11y' \? \(c\.a11yFindings/, 'the Accessibility tab carries the alert icon');
+  assert.match(html, /a\[0\] === 'a11y' \? facts\.a11y/, 'the Accessibility tab carries the alert icon');
+  assert.match(html, /if \(o\.icon\) text = '<svg class="sg-seg-icon"[^\n]*' \+ text;/, 'the icon before the label');
+  assert.match(html, /n \+= \(c\.a11yFindings \|\| \[\]\)\.length/, 'counting what the audit found with what the browser check found');
 });
 
 test('parity, one table: every prop, variable and value, Figma beside code, with a status and when', async () => {
@@ -580,6 +586,16 @@ test('parity, one table: every prop, variable and value, Figma beside code, with
   assert.equal(rows[0].figma.value, 'M, L · default M');
   assert.equal(rows[4].figma.value, 'light #fff · dark #000', 'each mode');
   assert.deepEqual([rows[5].figma.value, rows[5].code.value], ['Light #111111', 'Light #222222']);
+});
+
+test('parity, what goes inside: a slot or swap in an HTML and CSS system is the markup\'s content; the code\'s props as a list', async () => {
+  const { parityRows } = await import('../styleguide-data.mjs');
+  const props = { 'Main Content#1:0': { type: 'SLOT' }, 'Icon Content#2:0': { type: 'INSTANCE_SWAP' }, 'Badge#3:0': { type: 'BOOLEAN', defaultValue: false } };
+  const html = parityRows({ name: 'panel', propsSnap: { panel: { properties: props } }, unbuilt: [{ label: 'Badge' }] });
+  assert.deepEqual(html.map((r) => [r.figma?.name, r.code?.name ?? '-', r.status]), [['Main Content', 'its content', 'match'], ['Icon Content', 'its content', 'match'], ['Badge', '-', 'figma']], 'one not built stays only in Figma');
+  // With code props (a list, as the API reader gives them): a slot is the children it takes, a swap needs a prop of its own.
+  const jsx = parityRows({ name: 'panel', propsSnap: { panel: { properties: props } }, codeProps: [{ name: 'children' }, { name: 'Badge', default: 'false' }, { name: 'pressed', default: 'false' }] });
+  assert.deepEqual(jsx.map((r) => [r.figma?.name ?? '-', r.code?.name ?? '-', r.status]), [['Main Content', 'children', 'match'], ['Icon Content', '-', 'figma'], ['Badge', 'Badge', 'match'], ['-', 'pressed', 'code']]);
 });
 
 test('import line and nesting: as a product writes the import, and the system\'s components it is built with', async () => {
