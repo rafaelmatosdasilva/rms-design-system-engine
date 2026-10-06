@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: a Width while inspecting draws the anatomy at that width; slots said under the name (continuous evaluation)
+
+What changed since the entry below (engine 066e053): The guide set's usage reference describes the anatomy drawn at the Width chosen while inspecting, and a Figma slot paired with the code part that holds it, said under the component's name. The guide changed in `reference/usage.md`.
+
+Guide set measured: `e92482fdcb7b` · Project measured: `13d811a9d668`
+
+| Haiku, engine ef4872f | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.057 | $0.054 |
+| Input a run | 98k | 94k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below. Failed: fix-chip-height #2: the combination is 32px, the field still 36px. Records: `records/2026-10-06-width-inspect-slots`.
+
 ## 2026-10: Style guide: Inspect follows the modes and reaches nested parts; Accessibility as one status table; --component with --styleguide (continuous evaluation)
 
 What changed since the entry below (engine ff07bde): The guide set's usage reference describes the inspector at the Playground's size, its pick that dims the rest, nested parts one level per click, the modes followed while inspecting, Done leaving nothing behind, Accessibility as one table of statuses, and --component with --styleguide auditing a component before building the page. The guide changed in `reference/usage.md`.
