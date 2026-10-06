@@ -503,7 +503,8 @@ if (process.argv.includes('--figma-edits')) {
   let feConfig = {};
   try { feConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   try {
-    const { figmaEdits, gapEdits, renameEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const { figmaEdits, gapEdits, renameEdits, annotationEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const { annotationUses } = await import('./a11y-check.mjs');
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
     // What the prototypes needed and the system lacks: the design team's to do list.
     let gaps = [];
@@ -514,7 +515,7 @@ if (process.argv.includes('--figma-edits')) {
     // Names written otherwise than most of the system's: renamed in their component sets, after the same yes.
     let renames = [];
     if (propsSnap && feConfig.namingConsistency !== false) { const { namingFindings } = await import('./naming-consistency.mjs'); renames = renameEdits(propsSnap, namingFindings(propsSnap).findings); }
-    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []) : []), ...renames, ...gapEdits(gaps)];
+    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []) : []), ...renames, ...gapEdits(gaps), ...(propsSnap ? annotationEdits(propsSnap, annotationUses) : [])];
     const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits);
     for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null })) console.log(l);
     if (edits.length) console.log(`   (${relative(ROOT, files.json)} · ${relative(ROOT, files.script)})`);
@@ -3605,9 +3606,10 @@ function reportFull(label, items, shown) {
       const cap = await readFreshSnapshot(ROOT, cfg);
       if (cap) {
         const { stateContrastFindings } = await import('./contrast-check.mjs');
-        const { findings, checked } = stateContrastFindings(cap, cfg);
+        const { findings, checked, kept } = stateContrastFindings(cap, cfg);
+        const keptSay = kept ? `; ${kept} kept on purpose (knownLowContrast)` : '';
         if (findings.length) {
-          console.log(C.yellow(`\n⚠️  State contrast: ${findings.length} component state(s) below WCAG AA, as rendered (${checked} checked; disabled states exempt).`));
+          console.log(C.yellow(`\n⚠️  State contrast: ${findings.length} component state(s) below WCAG AA, as rendered (${checked} checked; disabled states exempt${keptSay}).`));
           const { colorHex } = await import('./css-values.mjs');
           const hex = (v, name) => `${colorHex(v) ?? v}${name ? ` (${name})` : ''}`;
           const { codeReason, reasonLine } = await import('./change-reason.mjs');
@@ -3620,7 +3622,7 @@ function reportFull(label, items, shown) {
           const { figmaLinker } = await import('./figma-link.mjs');
           const linkFor = figmaLinker(ROOT, cfg);
           for (const comp of [...new Set(findings.slice(0, 20).map((f) => f.component))]) { const u = linkFor(comp); if (u) console.log(`     🔗 ${comp} in Figma: ${u}`); }
-        } else if (checked) console.log(`\nℹ️  State contrast: every rendered component state meets WCAG AA (${checked} checked; disabled states exempt).`);
+        } else if (checked) console.log(`\nℹ️  State contrast: every rendered component state meets WCAG AA${kept ? ' but the ones kept on purpose' : ''} (${checked} checked; disabled states exempt${keptSay}).`);
       }
     } catch { /* advisory: never fails */ }
   }

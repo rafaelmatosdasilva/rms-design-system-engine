@@ -184,7 +184,8 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').getBoundingClientRect().height`), 24);
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true);
-    assert.match(await run(`document.querySelector('#c-chip .pg-tokens').textContent`), /--chip-background/);
+    // No tokens tables in the Playground: Parity lists every token, Inspect gives a part's value.
+    assert.equal(await run(`document.querySelectorAll('#c-chip [data-area="play"] .pg-tokens, #c-chip [data-area="play"] .pg-own').length`), 0);
     // The code a product writes for what is shown: its own tag, the prop just set, a default left out; copied by the
     // system's own button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-code code').textContent`), '<Chip Size="L" />');
@@ -228,7 +229,8 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
     // A token's name opens a panel in place: its value, the components that use it and a copy button; the page stays where
     // it is, and Escape closes it, the focus back on the name.
-    const tokenBtn = `document.querySelector('#c-chip .pg-tokens .sg-token-link[data-token="--chip-background"]')`;
+    await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
+    const tokenBtn = `document.querySelector('#c-chip .pg-par .sg-token-link[data-token="--chip-background"]')`;
     const hashBefore = await run(`location.hash`);
     await run(`${tokenBtn}.click()`);
     assert.equal(await run(`${tokenBtn}.getAttribute('aria-expanded') + '|' + document.querySelector('.sg-token-pop').hidden + '|' + location.hash`), 'true|false|' + hashBefore);
@@ -273,13 +275,8 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /^1\.4\.3/.test(r.cells[0].textContent)).textContent`), /\d+\.\d:1.*(Done|To fix)/s, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
-    // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
-    assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
-    assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || (c.offsetHeight <= t.offsetHeight + 1 && c.offsetHeight < t.offsetHeight - 2); })()`), true, 'one line of code is not stretched to the tokens');
-    // Its tokens: every one it is drawn with, its corners and spacing too, by Figma's name, with what it sets.
-    const own = await run(`document.querySelector('#c-chip .pg-own').textContent`);
-    for (const v of ['--chip-background', '--chip-text', '--gap-s', '--padding-xs', '--padding-s', '--radii-chip']) assert.ok(own.includes(v), v + ' in Its tokens: ' + own);
-    assert.match(own, /border-radius/);
+    // The code under the stage, as tall as what it holds.
+    assert.equal(await run(`(() => { const c = document.querySelector('#c-chip [data-area="play"] .pg-code'); return !!c && c.offsetHeight < 200; })()`), true, 'one line of code is not stretched');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Documentation,Accessibility,Parity,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
@@ -332,7 +329,6 @@ test('in the browser: no script error, a control changes the real component, the
     const tplSrc = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
     assert.match(tplSrc, /SGModes\.controls\(preview, function \(\) \{ refresh\(\); if \(inspecting\) requestAnimationFrame\(drawAnatomy\); \}/);
     assert.match(tplSrc, /else if \(preview\.hasAttribute\(a\.attr\)\) anatBox\.setAttribute\(a\.attr, preview\.getAttribute\(a\.attr\)\)/);
-    assert.ok(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-own')`), 'Its tokens, in the Playground');
     // A control changed in the Playground redraws the specs under it.
     const before = await run(`document.querySelector('#c-chip .pg-anatomy .chip').className`);
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'M').click()`);
@@ -513,10 +509,10 @@ test('a title in the style guide has no line under it; each type style lists its
   assert.match(tpl, /row\.querySelector\('table'\)\.innerHTML = rowsHTML\(lines\);/);   // a token table, as a component has
 });
 
-test('a component has no Computed box: the tokens behind what is drawn, and its own tokens, are what sits below it', () => {
+test('the Playground has no Computed box and no tokens tables: Parity lists every token, Inspect a part\'s value', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   assert.doesNotMatch(tpl, /pg-computed|>Computed</);
-  assert.match(tpl, /<div class="pg-inspect-head">Tokens<\/div>/);
+  assert.doesNotMatch(tpl, /class="pg-tokens"|class="pg-own"|>Its tokens</);
 });
 
 test('typography follows Figma: its text styles in Figma\'s order, each value named by the Figma variable it binds', () => {
