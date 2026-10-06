@@ -122,7 +122,10 @@ export function usesSystem(ctx, names) {
 export function namesGap(text, thing) {
   const t = String(text ?? '');
   const NOT = "\\b(no|not|n['’]t|missing|lacks?|lacking|without|none|gaps?|closest|would need|doesn['’]t|does not|isn['’]t|is not|stand-?in|instead|placeholder|substitut\\w*)\\b";
-  return new RegExp(`(${thing})[\\s\\S]{0,160}${NOT}|${NOT}[\\s\\S]{0,160}(${thing})`, 'i').test(t);
+  if (new RegExp(`(${thing})[\\s\\S]{0,160}${NOT}|${NOT}[\\s\\S]{0,160}(${thing})`, 'i').test(t)) return true;
+  // Or listed under a heading that says what the system lacks (## Gaps, **What the system would need**).
+  const sections = t.split(/\n(?=#{1,6}\s|\*\*[^*\n]+\*\*\s*:?\s*\n)/);
+  return sections.some((sec) => new RegExp(`^(#{1,6}\\s|\\*\\*)[^\\n]*\\b(gaps?|missing|would need|lacks?|not in the (design )?system)\\b`, 'i').test(sec.trim()) && new RegExp(`(${thing})`, 'i').test(sec));
 }
 
 // The made page's frame and heading, from a composition or from CSS: { padding, gap, heading } as spacing token or
@@ -188,6 +191,77 @@ export function avoids(ctx, name, why) {
   return check(`no ${name}, as the guidelines say (${why})`, !used, used ? `${name} used` : '');
 }
 
+// What the prototype made, as one text: its compositions, pages, scripts and styles.
+const madeText = (ctx) => made(ctx).map((f) => f.text).join('\n');
+
+// A page is more than its happy path: an empty list, a form sent with a mistake.
+export function hasEmptyState(ctx, words) {
+  const ok = new RegExp(`\\bno ${words}\\b|nothing (here|yet)|"empty"\\s*:|empty[- ]state`, 'i').test(madeText(ctx));
+  return check(`shows the list empty too (no ${words} yet), not only full`, ok);
+}
+export function hasErrorState(ctx) {
+  const t = madeText(ctx);
+  const ok = /"State"\s*:\s*"Error"|State=["{]['"]?Error|field--error|aria-invalid=["{]?['"]?true|"error"\s*:\s*\{/i.test(t);
+  return check('shows the form sent with a mistake too (a field in its Error state)', ok);
+}
+// Pages that lead to one another, in a flow: links between the pages made (goesTo, a link to another page, navigation).
+export function linkedPages(ctx, n) {
+  const t = madeText(ctx);
+  const links = (t.match(/"goesTo"\s*:/g) ?? []).length + (t.match(/href=["'][^"'#]+\.html/g) ?? []).length + (t.match(/(location\.href|navigate\(|router\.push|setPage|setStep|setScreen)/g) ?? []).length;
+  return check(`the pages lead to one another (${n - 1} links or more)`, links >= n - 1, `${links} links`);
+}
+// The pages of one flow match: the same words for going on on every page, and the same page padding.
+export function consistentFlow(ctx) {
+  const files = made(ctx);
+  const words = new Set();
+  for (const f of files) for (const m of f.text.matchAll(/(?:"(?:Label|label|text)"\s*:\s*"|>\s*|Label=["'{]\s*['"]?)(Continue|Next|Proceed|Go on|Get started)\b/gi)) words.add(m[1].toLowerCase());
+  const pads = new Set();
+  for (const f of files.filter((x) => /\.json$/.test(x.path))) { try { const j = JSON.parse(f.text); const ui = j?.prototype ?? j; if (ui?.component === 'Page') pads.add(String(ui.props?.padding ?? ui.padding ?? 'none')); } catch { /* not a composition */ } }
+  const ok = words.size <= 1 && pads.size <= 1;
+  return check('the pages of the flow match: one wording for going on, one page padding', ok, [words.size > 1 ? `going on is ${[...words].join(' / ')}` : null, pads.size > 1 ? `padding ${[...pads].join(' / ')}` : null].filter(Boolean).join('; '));
+}
+
+// The team's sign-up flow has a payment step the request leaves out: drawn, or said.
+export function followsFlow(ctx) {
+  const ok = /payment/i.test(madeText(ctx)) || /payment/i.test(String(ctx.final ?? ''));
+  return check('follows the team\'s sign-up flow (Account → Plan → Payment → Welcome): a payment step, or the reply says it is left out', ok);
+}
+// On a phone the chips may not fit one row: they wrap or stack.
+export function fitsPhone(ctx) {
+  // A composition says it: what holds the chips stacks them, or wraps them.
+  const verdicts = [];
+  for (const f of made(ctx)) {
+    if (!/\.json$/.test(f.path)) continue;
+    let tree; try { tree = JSON.parse(f.text); } catch { continue; }
+    (function walk(n) {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      const kids = Array.isArray(n.children) ? n.children.filter((k) => k && typeof k === 'object') : [];
+      if (kids.filter((k) => /chip/i.test(String(k.component ?? ''))).length >= 2) verdicts.push(/^(Stack|Columns)$/.test(n.component) || (n.component === 'Row' && (n.props?.wrap === true || n.wrap === true)));
+      for (const v of Object.values(n)) walk(v);
+    })(tree);
+  }
+  if (verdicts.length) return check('fits a phone: the chips wrap or stack instead of running off the screen', verdicts.every(Boolean));
+  const t = madeText(ctx);
+  const ok = /flex-wrap\s*:\s*wrap|flexWrap\s*:\s*['"]wrap|"wrap"\s*:\s*true|flex-direction\s*:\s*column|flexDirection\s*:\s*['"]column|auto-(fit|fill)|"minWidth"\s*:/i.test(t)
+    || (/"component"\s*:\s*"Stack"/.test(t) && !/"component"\s*:\s*"Row"(?![^}]*"wrap")/.test(t));
+  return check('fits a phone: the chips wrap or stack instead of running off the screen', ok);
+}
+// What a button opens: a part opened and closed by it, not one always shown.
+export function opensConfirmation(ctx) {
+  const t = madeText(ctx);
+  const ok = /"opens"\s*:/.test(t) || /showModal\(|\.open\s*=|setOpen|useState|addEventListener\(\s*['"]click|onclick=|onClick=\{/i.test(t) && /hidden|open|display\s*:\s*none|\?\s*\(/i.test(t);
+  return check('the Delete project button opens the confirmation (shown on a click, closed again)', ok);
+}
+
+// The team's guidelines with its sign-up flow written down.
+const withFlowGuidelines = (dir) => {
+  withSystem(dir);
+  writeFileSync(join(dir, 'guidelines.md'), readFileSync(join(FIX, 'guidelines.md'), 'utf8') + '\n## Sign-up flow\nAccount → Plan → Payment → Welcome. A new account always passes through payment, even on the free plan.\n');
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, guidelines: { sources: ['guidelines.md'] } }, null, 2) + '\n');
+};
+
 const base = { mayChangeAll: true, mayWriteHtml: true, setup: withSystem, source: TIDEPOOL };
 export const PROTO = [
   {
@@ -226,5 +300,32 @@ export const PROTO = [
     prompt: 'prototype an account settings page with our design system: a heading, a field for the display name, a Save button, and a message confirming the changes were saved.',
     score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'button']), avoids(ctx, 'tag', 'a tag is never a message that comes and goes'),
       check('says the system has no toast or banner for the confirmation', namesGap(ctx.final, 'toasts?|banners?|snackbars?|notifications?|alerts?|confirmation (message|component)'))],
+  },
+  // What the skill adds since: every state a page owes, flows, every screen size, parts that open others.
+  {
+    ...base, id: 'proto-list',
+    prompt: 'prototype a projects list page with our design system: a heading, three projects each shown with its name and a status tag, and a New project button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['tag', 'button']), hasEmptyState(ctx, 'projects')],
+  },
+  {
+    ...base, id: 'proto-signin',
+    prompt: 'prototype a sign-in page with our design system: a heading, an email field, a password field and a Sign in button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'button']), hasErrorState(ctx)],
+  },
+  {
+    ...base, id: 'proto-flow', setup: withFlowGuidelines,
+    prompt: 'prototype our sign-up with our design system: a page for the account details (a name field and an email field), a page to choose a plan, and a welcome page; each page\'s button leads to the next.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'button']), linkedPages(ctx, 3), followsFlow(ctx), consistentFlow(ctx)],
+  },
+  {
+    ...base, id: 'proto-phone',
+    prompt: 'prototype a notification preferences page for a phone with our design system: a heading, filter chips for "Every notification by email", "Weekly summary of your account" and "Product news and updates", and a Save button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['chip', 'button']), fitsPhone(ctx)],
+  },
+  {
+    ...base, id: 'proto-confirm',
+    prompt: 'prototype a project page with our design system: a heading, the project\'s name, and a Delete project button that opens a confirmation asking whether to delete it, with a Delete button and a Cancel button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['button']), opensConfirmation(ctx),
+      check('says the system has no dialog for the confirmation', namesGap(ctx.final, 'dialogs?|modals?|overlays?|popovers?'))],
   },
 ];

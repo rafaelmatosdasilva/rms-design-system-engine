@@ -10,7 +10,7 @@ It works inside Claude Code. It keeps your code matching your Figma design, and 
 
 - **High quality.** Every colour, size, font and state in your code is checked against Figma, with the fix in plain words.
 - **A living style guide.** One page with every token and component, built from your system, never written by hand.
-- **Prototypes from your real system.** Describe a screen in your own words and get it made only of your components, following your guidelines and Do and Don't, with every state and screen size checked, and working as your product does.
+- **Prototypes from your real system.** Describe a screen in your own words and get it made only of your components, following your guidelines and Do and Don't, with every state and screen size checked, pages you can click through, a design review before you see it, and working as your product does.
 - **Accessibility tested.** Each component is tried in a real browser, and every problem comes with its fix.
 - **Build from Figma.** Only have the design? Claude builds it in code, piece by piece, each piece checked.
 - **You stay in control.** Nothing in your design or code changes unless you ask.
@@ -22,7 +22,7 @@ Claude on its own guesses and cannot tell when it got something wrong. The engin
 | | Claude alone | Claude with the engine |
 |---|---|---|
 | Building a small design system from Figma | 8 of 18 pieces right (Opus), 4 of 18 (Haiku) | all of them, with every model |
-| Prototypes from six requests | 13 of 18 right (Opus), 2 of 18 (Haiku) | 18 of 18 (Opus), 17 of 18 (Haiku) |
+| Prototypes from eleven requests | 17 of 33 right (Opus), 3 of 33 (Haiku) | 33 of 33 (Opus), 32 of 33 (Haiku) |
 | Knows when the code stops matching Figma | no | yes, on every check, with the fix |
 | Accessibility checked | only if asked, and not tried in a browser | always, tried in a browser |
 | One reference for the whole team | no | the style guide, the documentation and the contracts |
