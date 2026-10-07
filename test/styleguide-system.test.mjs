@@ -177,8 +177,8 @@ test('the style guide check: a button or link the page draws itself fails; a fon
   const page = (css, body) => `<html lang="en"><head><style>${css}</style></head><body><main><h1>S</h1>${body}</main></body></html>`;
   const body = '<a class="chip-link" href="#">A</a><script>var b = document.createElement(\'button\'); b.className = \'mine\';</script>';
   assert.deepEqual([...controlClasses(body)].sort(), ['chip-link', 'mine']);
-  const bad = failures(checkStyleguidePage(page('.chip-link { background: var(--sg-bg-2); border-radius: var(--sg-radius); } .mine { border: var(--sg-line); } .sg-nav a.active { box-shadow: inset 2px 0 0 var(--sg-text); } .x { font-family: var(--font); } .y { font-family: inherit; }', body)));
-  assert.deepEqual(bad.map((f) => `${f.selector} ${f.property}`), ['.chip-link background', '.chip-link border-radius', '.mine border', '.x font-family'], 'an inset line marking the current link is not a button');
+  const bad = failures(checkStyleguidePage(page('.chip-link { background: var(--sg-bg-2); border-radius: var(--sg-radius); } .mine { border: var(--sg-line); } .sg-nav a.active { box-shadow: inset 2px 0 0 var(--sg-text); background: var(--sg-bg); } .sg-nav a { background: var(--sg-bg); } .x { font-family: var(--font); } .y { font-family: inherit; }', body)));
+  assert.deepEqual(bad.map((f) => `${f.selector} ${f.property}`), ['.chip-link background', '.chip-link border-radius', '.mine border', '.sg-nav a background', '.x font-family'], 'the current link marked with an inset line and a system background is not a button; every link with one is');
 });
 
 test('the colour modes in Figma\'s own order (Dark before Light), and the page resting on the root mode when the device is not dark', () => {
