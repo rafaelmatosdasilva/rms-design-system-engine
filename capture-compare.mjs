@@ -357,6 +357,28 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       if (!hh || !hh.rule) continue;                       // same as the default, or only its content's height
       settle(Math.abs(toNum(hh.value) - h) < 0.5, { component: name, field: `height (${variant})`, figma: h, code: toNum(hh.value), rule: hh.rule, at: hh.at });
     }
+    // The fill's own opacity (a Background layer at 8%, or a paint's opacity), against the alpha the code paints its
+    // background with, divided by the alpha of the variable it paints: a tint drawn with color-mix or opacity is
+    // compared as Figma draws it. Default first, then each variant Figma records, against the state the capture produced.
+    if (!low && !/\(style attribute\)/.test(String(c.props?.backgroundColor?.rule ?? '')) && ['direct', 'before'].includes(c.fill)) {
+      const firstM = Object.keys(c.colors ?? {})[0];
+      const varAlpha = (v) => { const t = v ? parseColor(code.tokens?.[v]?.modes?.[firstM]?.value) : null; return t ? t[3] : 1; };
+      const fillAlpha = (bg, v) => { const d = parseColor(bg); return d && varAlpha(v) > 0 ? Math.round((d[3] / varAlpha(v)) * 100) / 100 : null; };
+      const bgOf = (col) => (c.fill === 'before' ? col?.beforeBackground : col?.backgroundColor);
+      const baseFact = c.props?.backgroundColor;
+      const one = (field, want, bg, fact) => {
+        const got = fillAlpha(bg, fact?.var);
+        if (got == null || typeof want !== 'number') return;
+        settle(Math.abs(got - want) < 0.015, { component: name, field, figma: want, code: got, codeVar: fact?.var ?? null, rule: fact?.rule, at: fact?.at, why: 'tint-opacity' });
+      };
+      if (typeof f.fillOpacity === 'number') one('background opacity', f.fillOpacity, bgOf(c.colors?.[firstM]), baseFact);
+      for (const [variant, op] of Object.entries(f.variantFillOpacity ?? {})) {
+        const st = states[key(variant)];
+        if (!st || /^found/i.test(String(st.produced ?? ''))) continue;
+        const fact = st.changed?.backgroundColor ?? baseFact;
+        one(`background opacity (${variant})`, op, st.colors?.[firstM] ? bgOf(st.colors[firstM]) : fact?.value, fact);
+      }
+    }
     for (const [variant, op] of Object.entries(f.variantOpacity ?? {})) {
       const st = Object.entries(states).find(([k]) => k.includes(key(variant)))?.[1];
       const o = st?.changed?.opacity ?? null;
@@ -592,6 +614,7 @@ export function measuredLine(d, moved = null) {
       : d.why === 'figma-no-min' ? `  → Figma sets no minimum height (its content decides); remove min-height from the code, or give the component a minimum height in Figma`
       : d.why === 'figma-fill-code-fixed' ? `  → Figma fills its container; the code fixes ${d.code}px: remove the height so the product's container sets it, or fix the height in Figma`
       : d.why === 'figma-fixed-code-hugs' ? `  → Figma fixes its height at ${want}; the code sets none, so its content decides (${d.code}px drawn): set height: ${want}, or make it hug its content in Figma`
+      : d.why === 'tint-opacity' ? `  → paint the background at ${Math.round(Number(d.figma) * 100)}%, as Figma's layer: color-mix(in srgb, ${d.codeVar ? `var(${d.codeVar})` : 'its colour'} ${Math.round(Number(d.figma) * 100)}%, transparent)`
       : d.why === 'inline' ? `  → the rule sets ${want}, but the element is inline and ignores a height: give it display: inline-flex (or block)`
       : d.why === 'content-box' ? `  → the rule sets ${want}, but padding and border add to it: set box-sizing: border-box`
       : reset && want ? `  → give ${d.component}'s own rule ${want} (not the reset)`

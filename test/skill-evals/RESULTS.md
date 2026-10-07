@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Paint facts: a fill's opacity compared; contrast pairs follow what Figma draws (continuous evaluation)
+
+What changed since the entry below (engine 7554a8c): The Figma capture records the opacity a fill is drawn with, what each text and icon colour is drawn on, and the fills each component paints; Gate 13 compares the fill opacity with the alpha the code paints; the token contrast check pairs a text with the background Figma draws it on and leaves out a name-derived pair Figma never draws together. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `390c62205584` · Project measured: `13d811a9d668`
+
+| Haiku, engine ad30b5f | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.055 |
+| Input a run | 98k | 92k |
+| Rule violations | 1 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 92k a run against 98k. Records: `records/2026-10-07-paint-facts-a-fill-s`.
+
 ## 2026-10: Style guide: tokens table back, card tables with a Source column and named parts; prototypes flip toggles; 320 pixels (continuous evaluation)
 
 What changed since the entry below (engine 7e78e46): The Playground shows the tokens behind what is drawn again; Accessibility is one card table with a Source column, what a criterion means opening from its name, each finding naming the component or part; prototypes flip toggles and show what a part controls; the style guide fits 320 pixels. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.

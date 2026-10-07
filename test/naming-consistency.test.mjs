@@ -44,3 +44,8 @@ test('a naming difference reads plainly, belongs to its component, and the Figma
   assert.match(plainDifference(what), /^In Figma, the option "hover" of State is written differently from the rest of the system: 31 of/);
   assert.deepEqual(plainAction(what, 'buttonPrimary'), { who: 'figma', todo: 'In Figma, rename the option "hover" of buttonPrimary\'s State to "Hover". Then tell Claude to update the code\'s contract to the new name.' });
 });
+
+test('an opacity difference is said in percent, never in pixels', () => {
+  assert.equal(plainDifference('badge background opacity: Figma 0.08, rendered 0.12'), 'The background opacity is 8% in Figma and 12% in the code.');
+  assert.match(plainDifference('badge background opacity (Type=Warning): Figma 0.08, rendered 0.15 via --badge-background-warning  (.badge.medium · theme.css:12)'), /^When Type is Warning, the background opacity is 8% in Figma and 15% \(from --badge-background-warning\) in the code\./);
+});
