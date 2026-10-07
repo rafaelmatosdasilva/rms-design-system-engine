@@ -859,6 +859,7 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /hexOf\(getComputedStyle\(el\)\.backgroundColor\)/, 'each colour shows the value it is drawn with');
   assert.match(tpl, /'<div class="pg-areas-scroll">' \+ tabsHTML\(|<div class="pg-areas-scroll">' \+ tabsHTML\(/, 'the areas are tabs');
   assert.match(tpl, /\.sg-tab\.is-on \{ box-shadow: inset 0 -2px 0 var\(--sg-text\); \}/, 'the page\'s own tabs mark the chosen one with a line, in the system\'s colour');
+  assert.match(tpl, /if \(inspecting && WIDTH !== 'fit'\) showWidth\('fit'\);/, 'Inspect draws the component at Fit, in the middle of the stage');
   assert.match(tpl, /\.sg-token-sample > \.spacing-bar \{ height: var\(--sg-space-xxl\)/, 'every sample as tall as the others');
   assert.match(tpl, /function tokenCard\(head, rows\)/, 'colours, spacing and radii are lists in cards, the group as the head');
   assert.match(tpl, /sizeList\('radii', 'Radii'/, 'radii are listed as spacing is');
