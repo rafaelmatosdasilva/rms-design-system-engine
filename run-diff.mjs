@@ -263,7 +263,7 @@ export function plainAction(what = '', component = '') {
     return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. Tell Claude to do it.` : `Make ${what2} in the code match Figma. Tell Claude to do it.` };
   }
   if (/ has `[^`]+` - Figma has no stroke/.test(s)) return { who: 'both', todo: `Decide: tell Claude to remove the border from the code, or add it to ${name} in Figma.` };
-  if (/: [\d.]+:1 \(needs [\d.]+:1\)/.test(s)) return { who: 'both', todo: `Pick colours with more contrast for ${name}: change them in Figma, then tell Claude to update the code.` };
+  if (/: [\d.]+:1 \(needs [\d.]+:1\)/.test(s)) return { who: 'figma', todo: `Pick colours with more contrast for ${name}: change them in Figma, then tell Claude to update the code.` };
   if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return { who: 'figma', todo: `In Figma, point ${m[1].trim()} at another token instead of a raw colour.` };
   if ((m = /^[\w/-]+ (property|option) "([^"]+)"(?: of (.+?))? is named differently from the rest of the system: rename it "([^"]+)" in Figma/.exec(s))) return { who: 'figma', todo: `In Figma, rename the ${m[1]} "${m[2]}" of ${name}${m[3] ? `'s ${m[3]}` : ''} to "${m[4]}". Then tell Claude to update the code's contract to the new name.` };
   if (/ laid over it /.test(s)) return { who: 'both', todo: `Decide: add a slot or prop for this action to ${name} in Figma (then tell Claude to build it), or tell Claude to leave it as the product's own.` };
