@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Figma refresh: deeper facts every time; a fill on a covering child counts (continuous evaluation)
+
+What changed since the entry below (engine ad30b5f): The deeper facts of every component (box and sizing, padding, gap, corners, colours, text, each variant's visible layers) are recorded on every Figma refresh instead of being recommended; a fill drawn by a child that covers the whole frame counts as a fill on a child layer. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `4e8dc230394d` · Project measured: `13d811a9d668`
+
+| Haiku, engine 05fd813 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.053 |
+| Input a run | 92k | 86k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 92k. Records: `records/2026-10-07-figma-refresh-deeper-facts-every`.
+
 ## 2026-10: Paint facts: a fill's opacity compared; contrast pairs follow what Figma draws (continuous evaluation)
 
 What changed since the entry below (engine 7554a8c): The Figma capture records the opacity a fill is drawn with, what each text and icon colour is drawn on, and the fills each component paints; Gate 13 compares the fill opacity with the alpha the code paints; the token contrast check pairs a text with the background Figma draws it on and leaves out a name-derived pair Figma never draws together. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
