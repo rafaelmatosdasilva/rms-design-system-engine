@@ -728,11 +728,10 @@ test('a control the system lacks: its stand-in draws the switch, and the page sa
   const gaps = standInGaps({ segmented: btn, field: null, button: { cls: 'bSecondary' }, card: null, iconButton: { cls: 'x' } });
   assert.deepEqual(gaps.map((g) => g.say), [
     'This system has no segmented control, so the page uses its buttons side by side.',
-    'This system has no tabs, so the page uses tabs of its own, drawn with its colours, text styles and spacing.',
     'This system has no text field, so the page uses a plain text input drawn with its tokens.',
     'This system has no card, so the page uses plain blocks drawn with its tokens.',
   ]);
-  assert.deepEqual(standInGaps({ segmented: { standIn: null }, tabs: {}, field: {}, button: {}, card: {}, iconButton: {} }), [], 'a system with them all: no note');
+  assert.deepEqual(standInGaps({ segmented: { standIn: null }, field: {}, button: {}, card: {}, iconButton: {} }), [], 'a system with them all: no note');
   // In the page: the stand-in's markup, its selected look swapped in, and each gap on the overview and in the To do list.
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('var SEG = DATA.ui'), tpl.indexOf('function segItems'));
@@ -854,7 +853,7 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
   assert.doesNotMatch(tpl, /'Status: ' \+ kinds|Usage written: |Open the To do list/, 'the overview counts nothing of its own');
   assert.match(tpl, /<div class="pg-stage-bar pg-stage-bar--top"><div class="pg-stage-mode"><\/div>/, 'the sizing mode in the bar above the stage');
-  assert.match(tpl, /<div class="pg-stage-bar pg-stage-bar--bottom"><p class="pg-anat-line" hidden><\/p><div class="pg-stage-mode"><\/div>/, 'the colour mode in the bar below it, at the right');
+  assert.match(tpl, /<div class="pg-stage-bar pg-stage-bar--bottom"><div class="pg-actions"><\/div><p class="pg-anat-line" hidden><\/p><div class="pg-stage-mode"><\/div>/, 'the colour mode in the bar below it, at the right, a button that plays how it moves at its left');
   assert.match(tpl, /\.pg-stage-mode \.sg-mode-label \{ position: absolute; width: 1px/, 'no visible label on the switches inside the playground');
   assert.match(tpl, /var cSet = colourSwitch\(cs, drawColors\)/, 'the colours page has its own Light and Dark switch');
   assert.match(tpl, /hexOf\(getComputedStyle\(el\)\.backgroundColor\)/, 'each colour shows the value it is drawn with');

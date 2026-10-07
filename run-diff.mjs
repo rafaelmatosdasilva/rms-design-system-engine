@@ -223,6 +223,8 @@ export function plainDifference(what = '') {
   }
   // Something the products lay over the component: "node: .a, .b laid over it (file). The component may be missing …"
   if ((m = /^(?:[\w-]+|(a [\w\s]+? \([^)]+\))): (.+?) laid over it \((.+?)\)\. (.+)$/.exec(s))) return `In a product, ${m[2]} ${/,/.test(m[2]) ? 'are' : 'is'} placed on top of ${m[1] ?? 'it'} (${m[3]}). ${m[4]}`;
+  // A product's own version of a system component (Gate [10]): "loader: Acme draws its own instead of using it (.a, .b in file)"
+  if ((m = /^([\w-]+): (.+?) draws its own instead of using it \((.+) in (.+)\)$/.exec(s))) return `${m[2]} draws its own ${m[1]} (${m[3]}) instead of using the system's (${m[4]}).`;
   // A stroke the code draws that Figma does not have.
   if ((m = /^[\w-]+: "([^"]+)" has `([^`]+)` - Figma has no stroke/.exec(s))) return `The code draws a border (${m[2]} on ${m[1]}); Figma has no border in any variant.`;
   // Contrast: "x [State=Hover · light]: 1.23:1 (needs 4.5:1)  #e8e8e8 (--a) on #ffffff (--b)  (file)"
@@ -262,6 +264,7 @@ export function plainAction(what = '', component = '') {
     const fix = (/→\s+(.+?)(?:\s+\[|$)/.exec(s) ?? [])[1];
     return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. Tell Claude to do it.` : `Make ${what2} in the code match Figma. Tell Claude to do it.` };
   }
+  if ((m = /^[\w-]+: (.+?) draws its own instead of using it \(/.exec(s))) return { who: 'code', todo: `Use the system's ${name} in ${m[1]} in place of its own. Tell Claude to do it.` };
   if (/ has `[^`]+` - Figma has no stroke/.test(s)) return { who: 'both', todo: `Decide: tell Claude to remove the border from the code, or add it to ${name} in Figma.` };
   if (/: [\d.]+:1 \(needs [\d.]+:1\)/.test(s)) return { who: 'figma', todo: `Pick colours with more contrast for ${name}: change them in Figma, then tell Claude to update the code.` };
   if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return { who: 'figma', todo: `In Figma, point ${m[1].trim()} at another token instead of a raw colour.` };
