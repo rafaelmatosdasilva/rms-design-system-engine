@@ -376,7 +376,8 @@ Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the 
 //           and a fill agrees with a code height left to the page. A component outside any auto
 //           layout cannot be set to fill in Figma: record 'FILL' when its annotation says
 //           "Sizing: fill", else what Figma reports.
-// fillStructure = 'before' when fill is on a child "Background" rect (→ CSS ::before)
+// fillStructure = 'before' when fill is on a child "Background" rect (→ CSS ::before), or on a
+//                 child (a Slot) that covers the whole frame: either way a layer under the content paints it
 //                 'direct' when on the frame itself
 //                 'none' when default state has no fill (fills === [] - an empty array is a real
 //                 DS fact, not a capture miss; figma.mixed must be treated as no-fill too)
@@ -415,7 +416,7 @@ Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the 
 //                    Omit if no child frames have bound gaps.
 ```
 
-**Deeper facts (recommended).** Also record these on each component's entry, from the same
+**Deeper facts (always).** Also record these on each component's entry, every refresh, from the same
 `State=Default` node. The measured comparison (Gate [13] (Structure) `MEASURED`, `--capture-code --compare`) uses
 each one when present:
 - sizing per axis, a fixed width, and min and max width
@@ -430,7 +431,7 @@ each one when present:
 - which layers each boolean property shows or hides (`toggles`)
 - each slot's preferred components (`slots`), which the contract uses as the slot's `accepts` list
 
-Snapshots without them keep working; the comparison simply skips what Figma did not record.
+Without them the measured comparison has almost nothing to compare (a few facts per component instead of a dozen), so a refresh is not finished until every component has them. An older snapshot without them still works; the comparison simply skips what Figma did not record.
 
 **Each component against its Figma image.** With `codeReading.visual: true` the capture also saves each
 component as the page draws it (first mode, default state, scale 2) under `.design-system-engine-out/visual/code/`, and
