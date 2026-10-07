@@ -623,7 +623,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // Its links (Figma, its code, the team's documentation) and its changelog: the commits that changed it, each with
     // the release it shipped in and its pull request. The system's own links go on the overview.
     try {
-      const { repoUrl, changelogs, commitUrl, prUrl, fileUrl, defaultBranch } = await import('./component-changelog.mjs');
+      const { repoUrl, changelogs, figmaChangelogs, commitUrl, prUrl, fileUrl, defaultBranch } = await import('./component-changelog.mjs');
       const { figmaLink, figmaNodeIds } = await import('./figma-link.mjs');
       const { ruleLines, issueLink } = await import('./styleguide-data.mjs');
       const issues = cfg.styleguide?.issues ?? null;   // the tracker's new-issue address, {name} and {title} filled
@@ -637,13 +637,19 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const own = c.source?.file ?? c.api?.file;
         if (own && inRepo(own)) return { files: [own], at: [own, null] };
         const hit = c.cls ? sheets.map(([f, t]) => [f, ruleLines(t, c.cls)]).filter(([, l]) => l.length) : [];
-        return { files: hit.map(([f]) => f), pattern: c.cls ? `${/^#/.test(c.cls) ? '' : '\\.'}${c.cls}[^a-zA-Z0-9_-]` : null, at: hit[0] ? [hit[0][0], hit[0][1][0]] : null };
+        // Its own rules as line ranges, followed back through history: a change inside a rule counts, not only one to
+        // the line that names its class.
+        const ranges = hit.flatMap(([f, lines]) => lines.reduce((acc, l) => { const last = acc[acc.length - 1]; if (last && l === last[2] + 1) last[2] = l; else acc.push([f, l, l]); return acc; }, []));
+        return { files: hit.map(([f]) => f), ranges, pattern: c.cls ? `${/^#/.test(c.cls) ? '' : '\\.'}${c.cls}[^a-zA-Z0-9_-]` : null, at: hit[0] ? [hit[0][0], hit[0][1][0]] : null };
       };
       const found = new Map(view.components.map((c) => [c.name, where(c)]));
       const logs = changelogs(ROOT, view.components.map((c) => ({ name: c.name, ...found.get(c.name) })));
+      // Each read of Figma that changed what it says of a component, from the snapshots the project commits.
+      const figmaLogs = figmaChangelogs(ROOT, { props: cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json', vars: cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json' }, view.components.map((c) => c.name));
       for (const c of view.components) {
         const w = found.get(c.name);
         c.changelog = (logs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha), prUrl: prUrl(repo, r.pr) }));
+        c.figmaLog = (figmaLogs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha) }));
         const extra = Array.isArray(authored[c.name]?.links) ? authored[c.name].links.filter((l) => l?.url) : [];
         c.links = [
           { label: 'Figma', url: figmaLink(cfg.figmaFileKey, ids[c.name]) },

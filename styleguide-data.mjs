@@ -115,6 +115,19 @@ export function codeSizeCSS(modeVariants = {}, themeCss = '') {
   return '';
 }
 
+// The widths a component is shown at, from Figma: each mode of a collection that sets a viewport or breakpoint width
+// variable (viewport/min-width: Desktop 1680px, Phone 350px), narrowest first. → [{ value, label, px }] | [] (none).
+export function viewportWidths(figmaVars = {}) {
+  for (const col of Object.values(figmaVars?.modeVariants ?? {})) {
+    const name = Object.keys(col?.vars ?? {}).find((n) => /(^|\/)(viewport|breakpoint|screen|device)s?([/-](min-)?width)?$/i.test(n) || /(^|\/)(viewport|breakpoint|screen)[/-]?(min-)?width$/i.test(n));
+    if (!name) continue;
+    const vals = col.vars[name].values ?? {};
+    const out = (col.modes ?? []).map((m) => ({ value: String(m.snapshotKey ?? m.name).toLowerCase(), label: m.name, px: parseFloat(vals[m.snapshotKey] ?? vals[m.name]) })).filter((w) => w.px > 0);
+    if (out.length) return out.sort((a, b) => a.px - b.px);
+  }
+  return [];
+}
+
 export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
   const axes = [];
   const modes = cfg.figma?.modes?.length ? cfg.figma.modes : [{ name: 'Light', cssSelector: 'root' }, { name: 'Dark', cssSelector: 'dark-media' }];
@@ -409,7 +422,7 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
   if (unrealized) said.push(`${unrealized} Figma propert${unrealized === 1 ? 'y' : 'ies'} the code does not build yet`);
   if (waiting.length) said.push(`${waiting.length} component${waiting.length === 1 ? '' : 's'} the code does not have yet (${waiting.map((w) => w.replace(/ \(not built yet\)$/, '')).join(', ')})`);
   const line = said.length ? `Left off this page until Figma and the code agree: ${said.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Each one is in the To do list, with who does it and what to do.` : 'Figma and the code agree on everything this page shows.';
-  return { title, components, tokens, icons, notAgreed: { differences: undecided, unrealized, waiting, line }, modes: modeAxes(cfg, figmaVars, themeCss) };
+  return { title, components, tokens, icons, notAgreed: { differences: undecided, unrealized, waiting, line }, modes: modeAxes(cfg, figmaVars, themeCss), widths: viewportWidths(figmaVars) };
 }
 
 // The primitive colours (Figma's primitives/… ramp) the theme declares with Figma's value in every mode, for the ramp
