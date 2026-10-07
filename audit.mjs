@@ -3617,14 +3617,23 @@ function reportFull(label, items, shown) {
       const cap = await readFreshSnapshot(ROOT, cfg);
       if (cap) {
         const { stateContrastFindings } = await import('./contrast-check.mjs');
-        const { findings, checked } = stateContrastFindings(cap, cfg);
+        // The system's surfaces in each mode (ds-config a11y.surfaces names them, else every Figma colour
+        // token with /surface/ in its name): a tinted background is measured over each one.
+        const surfaces = {};
+        try {
+          const vPath = cfg.paths?.snapshotVars ? join(ROOT, cfg.paths.snapshotVars) : join(ROOT, 'figma-vars.snapshot.json');
+          const vs = JSON.parse(readFileSync(vPath, 'utf8')).color || {};
+          const named = Array.isArray(cfg.a11y?.surfaces) ? cfg.a11y.surfaces : null;
+          for (const [m, toks] of Object.entries(vs)) surfaces[m] = Object.entries(toks).filter(([t]) => (named ? named.includes(t) : /\/surface\//.test(t))).map(([, v]) => v).filter(Boolean);
+        } catch { /* no snapshot: the captured backdrop alone */ }
+        const { findings, checked } = stateContrastFindings(cap, cfg, { surfaces });
         if (findings.length) {
           console.log(C.yellow(`\n⚠️  State contrast: ${findings.length} component state(s) below WCAG AA, as rendered (${checked} checked; disabled states exempt).`));
           const { colorHex } = await import('./css-values.mjs');
           const hex = (v, name) => `${colorHex(v) ?? v}${name ? ` (${name})` : ''}`;
           const { codeReason, reasonLine } = await import('./change-reason.mjs');
           for (const f of findings.slice(0, 20)) {
-            console.log(C.yellow(`     ${f.component} [${f.state} · ${f.mode}]: ${f.ratio}:1 (needs ${f.threshold}:1)  ${hex(f.fg, f.fgVar)} on ${hex(f.bg, f.bgVar)}${f.at ? `  (${f.at})` : ''}`));
+            console.log(C.yellow(`     ${f.component} [${f.state} · ${f.mode}]: ${f.ratio}:1 (needs ${f.threshold}:1)  ${hex(f.fg, f.fgVar)} on ${hex(f.bg, f.bgVar)}${f.onSurface ? ` over the surface ${f.onSurface}` : ''}${f.at ? `  (${f.at})` : ''}`));
             const why = f.at ? reasonLine(codeReason(ROOT, f.at)) : null;
             if (why) console.log(C.dim(`        ↳ ${why}`));
           }
