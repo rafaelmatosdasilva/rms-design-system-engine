@@ -63,7 +63,7 @@ Every run compares your code against Figma and reports it in plain words:
 - **No invented CSS** variables: every variable traces back to a real Figma token.
 - **Docs tell the** truth: they mention only things that actually exist.
 - **No invented text** casing: no forced UPPERCASE the design never asked for.
-- **No hand-built DS** components: a screen uses the real component, not a hand-styled copy.
+- **No hand-built DS** components: a screen uses the real component, not a hand-styled copy. A product's own version of a system component is listed too (advisory): a class it puts on an element, of its own or one the system's CSS holds that no component owns, that loops the same animation a component's part loops (`.spinner` beside the loader's `.loader-spinner`), or a class with a rule of the product's own whose name starts with a component's name and says nothing more than the whole thing (`loading-state`, not `overlay-label-text`). A class beside a system class on the same element, or in a product that uses that component too, dresses the component and is left alone; `"Product/component"` in `knownReimplementations` keeps one on purpose.
 - **Clean CSS:** nothing unused, nothing that contradicts Figma. A focus ring's outline, which Figma has no value for, is listed apart, not failed.
 - **Nested components keep** their own styles: one component's look does not leak into another.
 - **Structure:** the right height, spacing and corners, from the design. A stroke Figma draws inside the box may be an inset ring in the code (`box-shadow: inset 0 0 0 1.5px …`), which adds no size and counts as that stroke.

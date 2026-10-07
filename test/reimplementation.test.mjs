@@ -173,3 +173,37 @@ test('[reimplementation] screens configured but not captured: said on a ⏭ line
   });
   assert.match(out, /⏭ \[reimplementation\] the product screens are not captured from Figma/);
 });
+
+// Part 3: a product's own version of something the system has (a loading state and a spinner beside its loader).
+const LOADER_THEME = `.loader { display: inline-flex; padding: 8px; }
+.loader-spinner { border-radius: 50%; animation: spin 0.8s linear infinite; }
+.spinner { border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }`;
+const LOADER_DS = { componentSelectors: { loader: '.loader' }, paths: { themeCSS: 'theme.css' }, styleguide: { plugins: [{ key: 'A', match: 'app', name: 'Atlas' }] } };
+
+test('[reimplementation] a product drawing its own loader (its loading state, a spinner no component owns) is named, with the system one to use', () => {
+  const { code, out } = runGate(GATE, {
+    'ds-config.json': { ...LOADER_DS, reimplementationSurfaces: ['app/ui.src.html'] },
+    'theme.css': LOADER_THEME,
+    'app/ui.src.html': `<style>.loading-state { display: flex; color: var(--muted); } .graph-node { padding: 4px; }</style>\n<div class="loading-state">Loading…</div><span class="spinner"></span><div class="graph-node"></div>`,
+  });
+  assert.equal(code, 0, out);
+  assert.match(out, /⚠️  \[reimplementation\] loader: Atlas draws its own instead of using it \(\.loading-state, \.spinner in app\/ui\.src\.html\)/);
+  assert.doesNotMatch(out, /graph-node/, 'a name that only ends with a component word is not one');
+});
+
+test('[reimplementation] a product that uses the loader, or dresses it with a class of its own, is not drawing its own', () => {
+  const { out } = runGate(GATE, {
+    'ds-config.json': { ...LOADER_DS, reimplementationSurfaces: ['app/ui.src.html'] },
+    'theme.css': LOADER_THEME,
+    'app/ui.src.html': `<style>.loader-wide { width: 100%; } .loading-state { display: flex; }</style>\n<div class="loader loader-wide"><span class="loader-spinner"></span></div><div class="loading-state"></div>`,
+  });
+  assert.match(out, /✅ \[reimplementation\] no product draws its own version of a system component/);
+});
+
+test('[reimplementation] the finding said plainly, for the code to act on', async () => {
+  const { plainDifference, plainAction } = await import('../run-diff.mjs');
+  const what = 'loader: Atlas draws its own instead of using it (.loading-state, .spinner in app/ui.src.html)';
+  assert.equal(plainDifference(what), 'Atlas draws its own loader (.loading-state, .spinner) instead of using the system\'s (app/ui.src.html).');
+  assert.deepEqual(plainAction(what, 'loader'), { who: 'code', todo: 'Use the system\'s loader in Atlas in place of its own. Tell Claude to do it.' });
+});
