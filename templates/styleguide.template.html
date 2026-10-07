@@ -26,6 +26,9 @@
   --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-border);
   --sg-xs: smaller; --sg-s: small; --sg-s-weight: normal; --sg-m: medium; --sg-m-weight: normal; --sg-l: large; --sg-l-weight: bold;
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: bold; --sg-lh: normal;
+  /* A page's title: the system's largest text style, scaled up, so the guide has its own hierarchy above any system's
+     text styles while every size still comes from the system ("title-scale" in styleguide.chrome, ds-config.json, changes it). */
+  --sg-title-scale: 1.75; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
   --sg-space-xxs: 0.125rem; --sg-space-xs: 0.25rem; --sg-space-s: 0.5rem; --sg-space-m: 0.75rem; --sg-space-l: 1rem; --sg-space-xl: 1.5rem; --sg-space-xxl: 2rem;
   --sg-row-h: calc(var(--sg-space-xxl) + var(--sg-space-m));   /* every table row at least this tall, from the system's spacing */
   --sg-radius-s: 0; --sg-radius: 0; --sg-radius-l: 0; --sg-radius-pill: 0;
@@ -53,12 +56,12 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-sidebar-header .sg-title { font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); }   /* the system's name in the h2 style */
 .sg-sidebar-header > p { font-size: var(--sg-s); font-weight: var(--sg-m-weight); color: var(--sg-muted); margin-top: var(--sg-space-xxs); }
 .sg-nav { padding: var(--sg-space-s) 0; flex: 1; }
-.sg-nav a { display: flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-l); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-text-2); text-decoration: none; transition: background 0.1s, color 0.1s; line-height: var(--sg-lh); }
+.sg-nav a { display: flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-l); font-size: var(--sg-l); font-weight: var(--sg-s-weight);   /* the system's l text size, about 13px */ color: var(--sg-text-2); text-decoration: none; transition: background 0.1s, color 0.1s; line-height: var(--sg-lh); }
 .sg-nav a:hover { color: var(--sg-text); }
 .sg-nav a + a { margin-top: var(--sg-space-xs); }   /* room between the items of the list */
 .sg-nav a.active { color: var(--sg-text); box-shadow: inset 2px 0 0 var(--sg-text); }
 .sg-nav a span.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--sg-muted); flex-shrink: 0; }
-.sg-nav-label { font-size: var(--sg-xs); color: var(--sg-muted); padding: var(--sg-space-m) var(--sg-space-l) var(--sg-space-xs); }
+.sg-nav-label { font-size: var(--sg-xs); color: var(--sg-muted); padding: var(--sg-space-m) var(--sg-space-l) var(--sg-space-xs); margin-top: var(--sg-space-xl); }   /* each group of the menu 24px apart from the one before */
 .sg-main { flex: 1; min-width: 0; padding: var(--sg-space-xxl); }   /* the whole width a screen gives */
 
 /* ── Every switch on the page is the system's segmented control. With none, the browser's own buttons in a row: the page
@@ -72,7 +75,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-mode-ctl { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sg-space-xs); }
 .sg-sidebar .sg-mode-ctl { align-items: stretch; }   /* the page's own switch fills the sidebar; a section's is as wide as its options */
 .sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
-.sg-size-switch { margin-bottom: var(--sg-space-xxl); }   /* a foundation's size switch, well apart from what it changes */
+.sg-size-switch { margin-bottom: var(--sg-space-xxl); position: sticky; top: 0; z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; }   /* a foundation's size switch, well apart from what it changes, kept in view as the page scrolls */
 .sg-size-switch .sg-mode-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* named for a screen reader only */
 .pg-footer { display: flex; flex-direction: column; gap: var(--sg-space-m); margin-top: var(--sg-space-xl); }
 .pg-area-title { margin: var(--sg-space-xl) 0 var(--sg-space-l); }   /* each area's name, its content 16px below */
@@ -90,8 +93,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 
 /* ── Section headings ────────────────────────────────────────────────────── */
 .sg-section { margin-bottom: var(--sg-space-xxl); scroll-margin-top: var(--sg-space-xxl); }   /* as far from the top as the page's own padding: opening one never scrolls the page */
-.sg-section-badge { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-s); font-weight: var(--sg-s-weight); background: color-mix(in srgb, var(--sg-muted) 12%, transparent); color: var(--sg-muted); margin-bottom: var(--sg-space-xs); }
-.sg-section > h2, .pg-head > h2 { font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xs); }
+.sg-section-badge { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-s); font-weight: var(--sg-s-weight); background: color-mix(in srgb, var(--sg-muted) 12%, transparent); color: var(--sg-muted); margin-bottom: var(--sg-space-s);   /* 8px to the title on every page */ }
+.sg-section > h2, .pg-head > h2 { font-size: var(--sg-title); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; margin-bottom: var(--sg-space-xs); }
 .sg-section > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xl); max-width: 560px; }
 .sg-subsection { margin-bottom: var(--sg-space-xxl); }
 .sg-subsection > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-s); }   /* a title with no line under it */
@@ -99,7 +102,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 
 /* ── Overview ────────────────────────────────────────────────────────────── */
 .sg-hero { margin-bottom: var(--sg-space-xxl); }
-.sg-hero > h1 { font-size: var(--sg-h1); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-s); }
+.sg-hero > h1 { font-size: var(--sg-title); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; }   /* the overview's title as every page's */
 .sg-hero > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); max-width: 500px; }
 .sg-pending { font-size: var(--sg-m); color: var(--sg-text); background: color-mix(in srgb, var(--sg-warning) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sg-warning) 40%, transparent); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-xl); max-width: 720px; }
 .sg-usage-count { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-l); max-width: 720px; }
@@ -114,7 +117,6 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-card[hidden], .sg-section[hidden], .sg-hr[hidden], .sg-nav a[hidden] { display: none; }
 .sg-hero > h1[tabindex="-1"]:focus, .pg-head > h2[tabindex="-1"]:focus, .sg-section > h2[tabindex="-1"]:focus { outline: none; }   /* the heading a new view moves focus to, for a screen reader */
 .sg-overview-group { margin-bottom: var(--sg-space-xl); }
-.sg-group-desc { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-l); max-width: 720px; }
 .sg-status { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-s-weight); color: var(--sg-text); background: color-mix(in srgb, var(--sg-muted) 14%, transparent); vertical-align: middle; }
 .sg-status--beta { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }
 .sg-status--deprecated { background: color-mix(in srgb, var(--sg-warning) 24%, transparent); }
@@ -161,12 +163,11 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-demo.sg-demo--col { flex-direction: column; align-items: stretch; gap: var(--sg-space-s); }
 .color-chip { display: flex; flex-direction: column; gap: var(--sg-space-xs); width: 96px; }
 /* Six colours a row, each as wide as the room allows, so its Figma name and variable have room to read. */
-.sg-demo.sg-colors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sg-space-l) var(--sg-space-m); }
+.sg-demo.sg-colors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sg-space-xl); border: 0; padding: 0; }   /* cards on the page, spaced as the overview's, no box around them */
 .sg-colors > .color-chip { width: auto; min-width: 0; }
 .color-chip-swatch { height: 72px; border: var(--sg-line); }   /* square corners, as on the overview; the colour twice the height of its label */
-.color-chip.sg-card > .color-chip-swatch { border: 0; border-bottom: var(--sg-line); }   /* the card rounds its top */
-.color-chip-foot { display: flex; flex-direction: column; gap: var(--sg-space-xxs); padding: var(--sg-space-s) var(--sg-space-m); background: var(--sg-bg-2); }
-.color-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); line-height: var(--sg-lh); overflow-wrap: anywhere; }   /* breaks after a slash, inside a word only when it must */
+.color-chip.sg-card > .color-chip-swatch { border: 0; }   /* the card rounds its top; the name's own line sits under it */
+.color-chip.sg-card > h3 { overflow-wrap: anywhere; }
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: normal; overflow-wrap: anywhere; }   /* a long variable breaks after a hyphen, never inside a word when it fits */
 .sg-uses-link { color: inherit; }   /* a link in the colour around it, underlined */
 /* A token's name opens a panel in place: underlined like a link, in the text around it, no box of its own. */
@@ -193,7 +194,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .token-pill { display: inline-block; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); padding: 1px var(--sg-space-xs); border-radius: var(--sg-radius-s); background: var(--sg-bg-2); color: var(--sg-muted); border: var(--sg-line); }
 
 /* ── Component playground ────────────────────────────────────────────────── */
-.pg-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
+.pg-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
 .pg-head > h2 { margin: 0; }
 .pg-head-links { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-left: auto; }
 .pg-usage { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); align-items: center; }
@@ -206,14 +207,18 @@ a.pg-usage-name { color: var(--sg-text); }
 /* The areas stay at the top while the component's page scrolls, under the top bar when one shows. */
 .pg-areas { margin: var(--sg-space-xs) 0 var(--sg-space-l); position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; display: flex; align-items: center; gap: var(--sg-space-m); flex-wrap: wrap; }
 /* Its name stays in view: in the sticky bar beside the areas once its heading has scrolled away. */
-.pg-areas-name { display: none; font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.pg-areas-name { display: none; font-size: var(--sg-title); line-height: normal; font-weight: var(--sg-heading-weight); color: var(--sg-text); }
 .pg-areas.is-stuck > .pg-areas-name { display: inline; }
 /* On a narrow screen the areas scroll sideways inside the bar, never wrap or squeeze: the system's segmented control
    keeps its own size, and the area chosen scrolls into view. */
 .pg-areas-scroll { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scrollbar-width: thin; }
 .pg-areas-scroll > * { width: max-content; max-width: none; flex-wrap: nowrap; }
+/* Every bar that stays at the top as a page scrolls (a component's areas, a page's title, a foundation's size switch)
+   is one kind: the page's background, 8px above and below, and a line under the lowest one once it is stuck, faded in. */
+.pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch { position: sticky; z-index: 15; background: var(--sg-bg); padding-top: var(--sg-space-s); padding-bottom: var(--sg-space-s); box-shadow: 0 1px 0 0 transparent; transition: box-shadow 0.15s ease; }
+.sg-sticky-edge { box-shadow: 0 1px 0 0 var(--sg-border); }
 /* A foundation's title stays at the top as its page scrolls. */
-.sg-section:not(.pg-card-section) > h2 { position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); margin: 0; padding: var(--sg-space-s) 0; }
+.sg-section:not(.pg-card-section) > h2 { position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); margin: calc(-1 * var(--sg-space-s)) 0 0; padding: var(--sg-space-s) 0; }   /* its words 8px under the tag, as on every page; the bar's own padding above it */
 .pg-import { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); color: var(--sg-text-2); }
 .pg-import code { font-family: inherit; color: var(--sg-text); }
 .pg-parity-sum { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
@@ -469,8 +474,7 @@ a.pg-usage-name { color: var(--sg-text); }
     <div class="sg-nav" id="sg-nav"></div>
   </nav>
   <main class="sg-main" id="sg-main">
-    <section id="overview" class="sg-section"><div class="sg-hero"><div class="sg-section-badge">Living style guide</div><h1 id="sg-hero-title">Design system</h1>
-      <p>Every token and component here is the one the code really has, checked against Figma. Anything Figma and the code do not agree on yet is left out until it is decided.</p></div></section>
+    <section id="overview" class="sg-section"><div class="sg-hero"><div class="sg-section-badge">Living style guide</div><h1 id="sg-hero-title">Design system</h1></div></section>
   </main>
 </div>
 <script type="application/json" id="sg-data">/*{{AGREED}}*/</script>
@@ -719,7 +723,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // Two groups, as the page has them: the foundations, then every component in the order of its sections. Each card
   // is a thumbnail (a few of the real tokens, or the component itself, drawn when its section is built) and its name.
   // Each group says what it holds (styleguide.groups in ds-config.json words it your way).
-  function group(title, desc) { var g = document.createElement('div'); g.className = 'sg-overview-group'; g.innerHTML = '<h3>' + esc(title) + '</h3>' + (desc ? '<p class="sg-group-desc">' + esc(desc) + '</p>' : ''); var grid = document.createElement('div'); grid.className = 'sg-card-grid'; g.appendChild(grid); ov.appendChild(g); return grid; }
+  function group(title, desc) { var g = document.createElement('div'); g.className = 'sg-overview-group'; g.innerHTML = '<h3>' + esc(title) + '</h3>';   /* the group's name only: the cards say the rest */ var grid = document.createElement('div'); grid.className = 'sg-card-grid'; g.appendChild(grid); ov.appendChild(g); return grid; }
   var GROUPS = DATA.groups || {};
   // How ready it is, as a small label: only what the team said, never a guess.
   function statusPill(st) { return st ? '<span class="sg-status sg-status--' + esc(st.kind) + '">' + esc(st.status) + '</span>' : ''; }
@@ -757,11 +761,11 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   var fGrid = group('Foundations', GROUPS.foundations || 'The values every component is made of: colours, type, spacing, radii and icons, each the CSS variable itself, in every mode.');
   var ramp = ((TOKENS.colors || [])[0] || { items: [] }).items, step = Math.max(1, Math.floor(ramp.length / 5));
-  if (FLAT.length) card(fGrid, 'colors', 'Foundations', 'Colors', FLAT.length + ' colour tokens, in every mode.', ramp.filter(function (t, i) { return i % step === 0; }).slice(0, 5).map(function (t) { return '<span class="sg-thumb-dot" style="background:var(' + esc(t.var) + ')"></span>'; }).join(''));
-  if ((TOKENS.typography || []).length) card(fGrid, 'typography', 'Foundations', 'Typography', TOKENS.typography.length + ' text styles.', TOKENS.typography.map(function (t) { return '<span style="' + (t.size ? 'font-size:var(' + esc(t.size.var) + ');' : '') + (t.weight ? 'font-weight:var(' + esc(t.weight.var) + ')' : '') + '">Aa</span>'; }).join(''));
-  if ((TOKENS.spacing || []).length) card(fGrid, 'spacing', 'Foundations', 'Spacing', TOKENS.spacing.length + ' gap and padding tokens.', '<div class="sg-thumb-col">' + TOKENS.spacing.slice().sort(function (a, b) { return parseFloat(a.value) - parseFloat(b.value); }).filter(function (t, i, all) { return i % Math.max(1, Math.floor(all.length / 4)) === 0; }).slice(0, 4).map(function (t) { return '<span class="sg-thumb-bar" style="width:calc(var(' + esc(t.var) + ') * 4)"></span>'; }).join('') + '</div>');
-  if ((TOKENS.radii || []).length) card(fGrid, 'radii', 'Foundations', 'Radii', TOKENS.radii.length + ' radius tokens.', TOKENS.radii.slice(0, 4).map(function (t) { return '<span class="sg-thumb-box" style="border-radius:var(' + esc(t.var) + ')"></span>'; }).join(''));
-  if ((DATA.icons || []).length) card(fGrid, 'icons', 'Foundations', 'Icons', DATA.icons.length + ' icons from the system\'s sheet.', DATA.icons.slice(0, 5).map(function (id) { return '<svg width="24" height="24" aria-hidden="true"><use href="#' + esc(id) + '"/></svg>'; }).join(''));
+  if (FLAT.length) card(fGrid, 'colors', 'Foundations', 'colors', FLAT.length + ' colour tokens, in every mode.', ramp.filter(function (t, i) { return i % step === 0; }).slice(0, 5).map(function (t) { return '<span class="sg-thumb-dot" style="background:var(' + esc(t.var) + ')"></span>'; }).join(''));
+  if ((TOKENS.typography || []).length) card(fGrid, 'typography', 'Foundations', 'typography', TOKENS.typography.length + ' text styles.', TOKENS.typography.map(function (t) { return '<span style="' + (t.size ? 'font-size:var(' + esc(t.size.var) + ');' : '') + (t.weight ? 'font-weight:var(' + esc(t.weight.var) + ')' : '') + '">Aa</span>'; }).join(''));
+  if ((TOKENS.spacing || []).length) card(fGrid, 'spacing', 'Foundations', 'spacing', TOKENS.spacing.length + ' gap and padding tokens.', '<div class="sg-thumb-col">' + TOKENS.spacing.slice().sort(function (a, b) { return parseFloat(a.value) - parseFloat(b.value); }).filter(function (t, i, all) { return i % Math.max(1, Math.floor(all.length / 4)) === 0; }).slice(0, 4).map(function (t) { return '<span class="sg-thumb-bar" style="width:calc(var(' + esc(t.var) + ') * 4)"></span>'; }).join('') + '</div>');
+  if ((TOKENS.radii || []).length) card(fGrid, 'radii', 'Foundations', 'radii', TOKENS.radii.length + ' radius tokens.', TOKENS.radii.slice(0, 4).map(function (t) { return '<span class="sg-thumb-box" style="border-radius:var(' + esc(t.var) + ')"></span>'; }).join(''));
+  if ((DATA.icons || []).length) card(fGrid, 'icons', 'Foundations', 'icons', DATA.icons.length + ' icons from the system\'s sheet.', DATA.icons.slice(0, 5).map(function (id) { return '<svg width="24" height="24" aria-hidden="true"><use href="#' + esc(id) + '"/></svg>'; }).join(''));
   var cGrid = COMPONENTS.length ? group('Components', GROUPS.components || 'Each one drawn from the code itself, with what Figma and the code agree on. Open one to try it, read how to use it and see where it is used.') : null;
   // Its Figma description, else its note, else the props it offers.
   var about = function (c) {
@@ -785,7 +789,7 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   // The To do page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
   hr(); navLink('todo', 'to do');
-  var td = section('todo', 'To do', 'What to do', 'Everything open in the system, parity and accessibility, by component: what differs from Figma, what Figma has that the code does not build, and what fails or is still to check for accessibility. Each says who does it and exactly what to do. Tell Claude the numbers you want done, for example do 3 and 7.');
+  var td = section('todo', 'To do', 'What to do', 'Everything still open in parity and accessibility, by component, each with who does it (You in Figma, Claude in the code, You decide or You check by hand); tell Claude the numbers to do, for example do 3 and 7.');
   // What's new: every component's changes gathered by the release they shipped in, newest first, each a table of
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
@@ -824,7 +828,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var sub = document.createElement('div'); sub.className = 'sg-subsection';
       sub.innerHTML = '<h3>' + esc(g.group) + '</h3><div class="sg-demo sg-colors">' + g.items.map(function (t) {
         // Each colour in a card as a component's: the colour on top, its names below on the table heads' background.
-        return '<div class="color-chip sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : '') + '"><div class="color-chip-swatch" style="background:var(' + esc(t.var) + ')"></div><div class="color-chip-foot"><div class="color-chip-label">' + esc(t.figma).replace(/\//g, '/<wbr>') + '</div><div class="color-chip-value">' + usesLink(t.var) + '</div></div></div>';
+        return '<div class="color-chip sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : '') + '"><div class="color-chip-swatch" style="background:var(' + esc(t.var) + ')"></div><h3>' + esc(t.figma).replace(/\//g, '/<wbr>') + '</h3><p class="color-chip-value">' + usesLink(t.var) + '</p></div>';
       }).join('') + '</div>';
       cs.appendChild(sub);
     });
@@ -1806,8 +1810,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (link) link.lastChild.textContent = wait ? 'to do' : 'to do (' + all + ')';   // its count once every component is tried
     if (!all) { box.innerHTML = wait + '<p class="pg-par-sum">Nothing open: Figma and the code agree, and nothing fails for accessibility.</p>'; return; }
     var sign = function (st) { var x = A11Y[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>'; };
-    var legend = '<p class="pg-wcag-note">Who does it. ' + esc(WHO.figma) + ', a change you make in the Figma file. ' + esc(WHO.code) + ', tell Claude its number and Claude changes the code. ' + esc(WHO.both) + ', Figma and the code each have a case: say which is right, then it is done there. ' + esc(WHO.person) + ', only a person can judge it: look, and it is done.</p>';
-    box.innerHTML = wait + legend + '<p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + order.map(function (g) {
+    box.innerHTML = wait + '<p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + order.map(function (g) {
       g.rows.sort(function (p, q) { return (p.st === 'todo' ? 0 : 1) - (q.st === 'todo' ? 0 : 1) || p.no - q.no; });
       return '<div class="pg-par-card sg-todo-card"><div class="pg-inspect-head">' + (g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system') + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>No.</th><th>Area</th><th>What to do</th><th>Who</th><th>Status</th></tr></thead><tbody>' +
         g.rows.map(function (r) { return '<tr data-status="' + r.st + '"><td class="pg-par-type">' + r.no + '</td><td class="sg-todo-area">' + esc(r.kind) + '</td><td>' + r.html + '</td><td class="pg-a11y-src">' + esc(r.who) + '</td><td>' + sign(r.st) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
@@ -1898,6 +1901,21 @@ a.pg-usage-name { color: var(--sg-text); }
       return { k: k, st: st, its: its, note: note, how: how, fig: fig };
     }).filter(Boolean);
     return rows;
+  }
+  // What is open on its Accessibility area, as the area counts it: { todo, say } (3 to fix, 5 to check).
+  function a11yOpen(c, items, live) {
+    var rows = [];
+    try { rows = a11yStatus(c, items || (c.__a11y ? c.__a11y.items : c.a11y ? a11yStaticItems(c) : []), live !== undefined ? live : c.__a11y ? c.__a11y.live : null).filter(function (r) { return !r.k.extra; }); } catch (e) { rows = []; }
+    var fix = rows.filter(function (r) { return r.st === 'todo'; }).length, check = rows.filter(function (r) { return r.st === 'check'; }).length;
+    return { todo: fix + check > 0, say: [fix ? fix + ' to fix' : '', check ? check + ' to check' : ''].filter(Boolean).join(', ') };
+  }
+  // The alert icon on an area's switch, on or off, with what it means said to a screen reader.
+  function areaMark(btn, on, say) {
+    if (!btn) return;
+    Array.prototype.forEach.call(btn.querySelectorAll('.sg-seg-icon, .sg-hidden-text'), function (n) { n.remove(); });
+    if (!on) return;
+    if (ALERT_ICON) { var svg = '<svg class="sg-seg-icon" aria-hidden="true"><use href="#' + esc(ALERT_ICON) + '"/></svg>', inp = btn.querySelector('input'); if (inp) inp.insertAdjacentHTML('afterend', svg); else btn.insertAdjacentHTML('afterbegin', svg); }
+    if (say) btn.insertAdjacentHTML('beforeend', '<span class="sg-hidden-text">, ' + esc(say) + '</span>');
   }
   function a11yRows(c, items, live) {
     var rows = a11yStatus(c, items, live);
@@ -1991,7 +2009,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // screen reader: Parity while something differs from Figma or is not built, Accessibility while a problem stands
       // (the last browser check's and the audit's), the same counts as its overview card.
       '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)); }).map(function (a) {
-        var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? facts.a11y : null, warn = !!(f && f.todo);
+        var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? a11yOpen(c) : null, warn = !!(f && f.todo);
         return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
       })) + '</div></div>' +
       // Playground: the component drawn, its controls, the tokens behind what is drawn and its code.
@@ -2415,6 +2433,9 @@ a.pg-usage-name { color: var(--sg-text); }
       c.__textParts = textParts();
       a11yEl.innerHTML = a11yRows(c, staticItems.concat(liveItems), liveNow);
       if (liveNow) { c.__a11y = { items: staticItems.concat(liveItems), live: liveNow }; fillTodo(); if (!checking) keepA11y(); }   // the To do page lists what it shows
+      // Its switch carries the alert icon while anything on it is to fix or to check, as the area counts it.
+      var open = a11yOpen(c, staticItems.concat(liveItems), liveNow);
+      areaMark(sec.querySelector('.pg-areas [data-v="a11y"]'), open.todo, open.say);
       labelCells(a11yEl.closest('.pg-a11y'));
       var n = {};
       Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
@@ -3112,6 +3133,9 @@ a.pg-usage-name { color: var(--sg-text); }
     links.forEach(function (a) { var on = a.getAttribute('href').slice(1) === target.id; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (target.id === 'overview') Object.keys(THUMBS).forEach(function (k) { fitThumb(THUMBS[k]); });
     if (target.id === 'todo') setTimeout(a11ySweep, 300);
+    // A foundation's size switch stays in view under its title as the page scrolls.
+    var tTitle = target.querySelector(':scope > h2'), tSwitch = target.querySelector('.sg-size-switch');
+    if (tTitle && tSwitch) tSwitch.style.top = 'calc(var(--sg-sticky-top, 0px) + ' + tTitle.offsetHeight + 'px)';
     if (!ALL) {
       window.scrollTo(0, 0); requestAnimationFrame(function () { window.scrollTo(0, 0); });   // every page opens at its top, the browser's own jump to the address's section undone
       var h = target.querySelector('h1, h2'); document.title = (h && target.id !== 'overview' ? h.textContent + ' · ' : '') + (DATA.title || 'Design system') + ' · Living style guide';
@@ -3119,6 +3143,25 @@ a.pg-usage-name { color: var(--sg-text); }
     }
     route.ran = true; nudge();
   }
+  // Every page's title is its name in the menu, in the menu's own case (overview, to do, colors): one name for one place.
+  Array.prototype.forEach.call(nav.querySelectorAll('a[href^="#"]'), function (a) {
+    var sec = document.getElementById(a.getAttribute('href').slice(1)); if (!sec || sec.classList.contains('pg-card-section')) return;
+    var h = sec.querySelector('h1, h2'), name = a.textContent.replace(/\s*\(\d+\)$/, '').trim();
+    if (h && name) h.textContent = name;
+  });
+  // The lowest bar stuck at the top carries the line under it (sg-sticky-edge), on every page alike.
+  var STICKY = '.pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch', stickQueued = false;
+  function markStuck() {
+    stickQueued = false;
+    var edge = null;
+    Array.prototype.forEach.call(main.querySelectorAll(STICKY), function (el) {
+      el.classList.remove('sg-sticky-edge');
+      if (!el.offsetParent || window.scrollY <= 0) return;
+      if (el.getBoundingClientRect().top <= (parseFloat(getComputedStyle(el).top) || 0) + 1) { if (!edge || el.getBoundingClientRect().bottom > edge.getBoundingClientRect().bottom) edge = el; }
+    });
+    if (edge) edge.classList.add('sg-sticky-edge');
+  }
+  window.addEventListener('scroll', function () { if (!stickQueued) { stickQueued = true; requestAnimationFrame(markStuck); } }, { passive: true });
   window.addEventListener('hashchange', route);
   route();
 })();
