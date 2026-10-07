@@ -59,6 +59,8 @@ const BOX = /^(background(-color)?|border(-(top|right|bottom|left))?(-(width|sty
 function drawsControl(d, classes) {
   if (!BOX.test(d.property) || /^(none|0|0px|transparent|inherit|initial|unset)$/i.test(d.value) || /\.pg-preview\b/.test(d.selector)) return false;
   if (d.property === 'box-shadow' && /\binset\b/.test(d.value)) return false;   // a line marking the current item
+  // The current item of the page's own menu, on one of the system's backgrounds: marked, not drawn as a control.
+  if (/^background(-color)?$/.test(d.property) && /\.active\b|\[aria-current/.test(d.selector) && /^var\(--sg-[\w-]+\)$/.test(d.value.trim())) return false;
   return d.selector.split(',').some((part) => {
     const subject = part.trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
     const tag = /^(a|button)(?![\w-])/i.test(subject);
