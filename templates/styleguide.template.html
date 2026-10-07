@@ -58,10 +58,11 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-nav { padding: var(--sg-space-s) 0; flex: 1; }
 .sg-nav a { display: flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-l); font-size: var(--sg-l); font-weight: var(--sg-s-weight);   /* the system's l text size, about 13px */ color: var(--sg-text-2); text-decoration: none; transition: background 0.1s, color 0.1s; line-height: var(--sg-lh); }
 .sg-nav a:hover { color: var(--sg-text); }
-.sg-nav a + a { margin-top: var(--sg-space-xs); }   /* room between the items of the list */
-.sg-nav a.active { color: var(--sg-text); box-shadow: inset 2px 0 0 var(--sg-text); }
+.sg-nav a + a { margin-top: var(--sg-space-s); }   /* room between the items of the list */
+.sg-nav a.active { color: var(--sg-text); box-shadow: inset 2px 0 0 var(--sg-text); background: var(--sg-bg); }   /* the page shown, on the system's page background: easy to find in the list */
 .sg-nav a span.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--sg-muted); flex-shrink: 0; }
 .sg-nav-label { font-size: var(--sg-xs); color: var(--sg-muted); padding: var(--sg-space-m) var(--sg-space-l) var(--sg-space-xs); margin-top: var(--sg-space-xl); }   /* each group of the menu 24px apart from the one before */
+.sg-nav-label:first-child { margin-top: 0; }   /* the first group starts at the menu's top */
 .sg-main { flex: 1; min-width: 0; padding: var(--sg-space-xxl); }   /* the whole width a screen gives */
 
 /* ── Every switch on the page is the system's segmented control. With none, the browser's own buttons in a row: the page
@@ -176,6 +177,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-token-pop[hidden] { display: none; }
 .sg-token-pop:focus { outline: none; }   /* the panel takes the focus to be read from its start; its controls show theirs */
 .sg-token-pop .pg-updated { margin: var(--sg-space-s) 0; }
+.sg-token-pop .pg-updated > div { grid-template-columns: minmax(max-content, 30%) 1fr; }   /* the names as wide as their words, the values the rest */
 .sg-token-pop-actions { display: flex; gap: var(--sg-space-s); }
 .type-list { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-m); }
 .type-specimen-preview { color: var(--sg-text); padding: var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* the sample on one row, under the style's name */
@@ -197,6 +199,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
 .pg-head > h2 { margin: 0; }
 .pg-head-links { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-left: auto; }
+.sg-link-icon { width: var(--sg-icon, 1em); height: var(--sg-icon, 1em); flex-shrink: 0; vertical-align: middle; margin-left: var(--sg-space-xs); }   /* after the words, the system's own icon size */
 .pg-usage { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); align-items: center; }
 .pg-usage-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-usage-name { font-size: var(--sg-s); color: var(--sg-text-2); }
@@ -309,6 +312,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-header { background: var(--sg-bg); padding: 0 0 var(--sg-space-s); display: flex; flex-direction: column; gap: var(--sg-space-s); }   /* starts where a foundation's does; each line 8px from the next */
 .pg-header > * { margin-top: 0; margin-bottom: 0; }
 .pg-header > .sg-section-badge { align-self: flex-start; }   /* the tag as wide as its word, as on a foundation */
+.pg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s) var(--sg-space-xl); }
+.pg-meta > * { margin: 0; }
 .pg-stage { display: flex; flex-direction: column; gap: var(--sg-space-l); container-type: inline-size; }
 /* The stage never narrower than a phone screen and its margins: with less room the controls go below it, never beside a squeezed stage. */
 .pg-preview-card { --sg-stage-min: 400px; display: grid; grid-template-columns: minmax(min(100%, var(--sg-stage-min)), 1fr) minmax(240px, 340px); gap: var(--sg-space-l); align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: var(--sg-space-l); background: var(--sg-bg); box-shadow: var(--sg-shadow); }
@@ -527,7 +532,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // The panel under (or over) the button that opened it, the focus in it when a click or a key opened it.
   function placePop(btn, focus) {
     tokenPop.hidden = false;
-    var r = btn.getBoundingClientRect(), w = Math.min(360, window.innerWidth - 32);
+    var r = btn.getBoundingClientRect(), w = Math.min(520, window.innerWidth - 32);   // as wide as the room allows, up to 520px
     tokenPop.style.width = w + 'px';
     tokenPop.style.left = Math.max(16, Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - w - 16)) + 'px';
     var below = r.bottom + window.scrollY + 6, h = tokenPop.offsetHeight;
@@ -713,6 +718,8 @@ a.pg-usage-name { color: var(--sg-text); }
   TODO.forEach(function (t, i) { t.no = i + 1; if (t.key) TODO_NO[t.key] = t.no; });
 
   /* ── Overview ─────────────────────────────────────────────────────────────────────────────────────────────── */
+  // The menu's first group under its own label, as Foundations and Components are under theirs.
+  (function () { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'Start here'; nav.appendChild(lab); })();
   navLink('overview', 'overview');
   var ov = document.getElementById('overview');
   document.getElementById('sg-hero-title').textContent = DATA.title || 'Design system';
@@ -1199,12 +1206,15 @@ a.pg-usage-name { color: var(--sg-text); }
   // The system's own scripts lay out what they place (a sliding pill) on a resize: told after the page changes a control.
   var nudgeQueued = false;
   function nudge() { if (nudgeQueued) return; nudgeQueued = true; requestAnimationFrame(function () { nudgeQueued = false; try { window.dispatchEvent(new Event('resize')); } catch (e) {} }); }
-  function sysButton(tag, label, attrs, plainClass) {
-    var b = DATA.ui && DATA.ui.button;
-    if (!b) return '<' + tag + (plainClass ? ' class="' + plainClass + '"' : '') + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + esc(label) + '</' + tag + '>';
+  // icon: one of the system's icons after the words (a link that opens elsewhere).
+  function sysButton(tag, label, attrs, plainClass, icon) {
+    var b = DATA.ui && DATA.ui.button, ic = icon ? '<svg class="sg-link-icon" aria-hidden="true"><use href="#' + esc(icon) + '"/></svg>' : '';
+    if (!b) return '<' + tag + (plainClass ? ' class="' + plainClass + '"' : '') + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + esc(label) + ic + '</' + tag + '>';
     var text = b.label ? '<' + b.label.tag + (b.label.cls ? ' class="' + esc(b.label.cls) + '"' : '') + '>' + esc(label) + '</' + b.label.tag + '>' : esc(label);
-    return '<' + tag + ' class="' + esc(b.cls) + '"' + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + text + '</' + tag + '>';
+    return '<' + tag + ' class="' + esc(b.cls) + '"' + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + text + ic + '</' + tag + '>';
   }
+  // The system's icon for a link that opens elsewhere: one named for it, else an arrow.
+  var LINK_ICON = (DATA.icons || []).find(function (i) { return /external|open|launch|link/i.test(i); }) || (DATA.icons || []).find(function (i) { return /arrow-?(up-)?right|arrow/i.test(i); }) || null;
   // Where the component is used: each product by its full name, linked when the config gives its page.
   function usageBadges(c) {
     var u = (c.usage || []).map(function (k) { return typeof k === 'string' ? { key: k, name: k } : k; });
@@ -1548,7 +1558,9 @@ a.pg-usage-name { color: var(--sg-text); }
   // ── Links: where else it lives (Figma, its code, the team's documentation), each opening in a new tab ────────────
   function headLinksHTML(list) {
     if (!(list || []).length) return '';
-    return '<div class="pg-head-links">' + list.map(function (l) { return sysButton('a', l.label, ' href="' + esc(l.url) + '" target="_blank" rel="noopener"'); }).join('') + '</div>';
+    // Said as where it takes you (See in Figma, See in code), with the system's icon for a link that opens elsewhere.
+    var say = function (label) { return /^figma$/i.test(label) ? 'See in Figma' : /^code$/i.test(label) ? 'See in code' : label; };
+    return '<div class="pg-head-links">' + list.map(function (l) { return sysButton('a', say(l.label), ' href="' + esc(l.url) + '" target="_blank" rel="noopener"', null, LINK_ICON); }).join('') + '</div>';
   }
   function linksHTML(list) {
     if (!(list || []).length) return '';
@@ -2002,8 +2014,8 @@ a.pg-usage-name { color: var(--sg-text); }
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2>' + headLinksHTML(c.links) + '</div>' +
         (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
-        (ALL ? '' : factsHTML(c)) +
-        importHTML(c) +
+        // Its version, when it last changed and how to import it: one line, wrapping only when the room runs out.
+        '<div class="pg-meta">' + (ALL ? '' : factsHTML(c)) + importHTML(c) + '</div>' +
       '</div>' +
       // What is left to do is marked on its area, the system's alert icon before the label and what it is said to a
       // screen reader: Parity while something differs from Figma or is not built, Accessibility while a problem stands
@@ -3132,6 +3144,10 @@ a.pg-usage-name { color: var(--sg-text); }
     if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
     links.forEach(function (a) { var on = a.getAttribute('href').slice(1) === target.id; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (target.id === 'overview') Object.keys(THUMBS).forEach(function (k) { fitThumb(THUMBS[k]); });
+    // Its tag says the menu group it sits under (Start here, Foundations, Components), whatever that label says.
+    var tLink = nav.querySelector('a[href="#' + target.id + '"]'), tGroup = tLink && tLink.previousElementSibling;
+    while (tGroup && !tGroup.classList.contains('sg-nav-label')) tGroup = tGroup.previousElementSibling;
+    var tTag = target.querySelector('.sg-section-badge'); if (tTag && tGroup) tTag.textContent = tGroup.textContent;
     if (target.id === 'todo') setTimeout(a11ySweep, 300);
     // A foundation's size switch stays in view under its title as the page scrolls.
     var tTitle = target.querySelector(':scope > h2'), tSwitch = target.querySelector('.sg-size-switch');
