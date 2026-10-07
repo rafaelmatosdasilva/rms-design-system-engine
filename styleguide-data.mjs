@@ -861,6 +861,10 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
     put('xs', s); put('s', s); put('m', m); put('l', l); put('h1', l); put('h2', l);
     if (l.weight?.var) roles['heading-weight'] = `var(${l.weight.var})`;
     if (m.lh?.var) roles.lh = `var(${m.lh.var})`;
+    // A page's title: the system's own heading style when it has one clearly larger than its body text (at least 20px
+    // and 1.6 times it), as it is; else the page scales the largest style up (--sg-title in the template).
+    const lPx = parseFloat(l.size.value), mPx = parseFloat(m.size.value);
+    if (lPx >= 20 && lPx >= 1.6 * mPx) { roles.title = `var(${l.size.var})`; from.title = `type/${l.scale}, the system's own heading`; }
   }
   // No font role: the page's text inherits the font the system sets on its own page, with its fallbacks, as its
   // components do. A family variable alone (Inter) would fall to the browser's serif where that font is not installed.

@@ -386,7 +386,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#overview .sg-card[href="#c-chip"] > h3').textContent.trim() + '|' + document.querySelector('#overview .sg-card[href="#c-chip"]').children.length`), 'chip|2', 'its picture and its name');
     // The name stays beside the areas; Parity says what it marks to a screen reader (Tidepool has no alert icon to draw
     // before its label), and the page no line about it. Accessibility, with nothing found, says nothing.
-    assert.equal(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="parity"]').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="a11y"]').textContent + '|' + !!document.querySelector('#c-chip [data-area-go]')`), 'chip|Parity, 1 only in code|Accessibility|false');
+    assert.match(await run(`document.querySelector('#c-chip .pg-areas > .pg-areas-name').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="parity"]').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="a11y"]').textContent + '|' + !!document.querySelector('#c-chip [data-area-go]')`), /^chip\|Parity, 1 only in code\|Accessibility, .*to check\|false$/, 'its Accessibility switch says what is open, as its area counts it');
     // Parity's table head stays in view under the areas as its rows scroll by.
     assert.equal(await run(`getComputedStyle(document.querySelector('#c-chip .pg-par-table th')).position`), 'sticky');
     // On a phone the areas scroll sideways in one row, never wrap; the one chosen scrolls into view.
@@ -621,7 +621,7 @@ test('an accessibility finding goes to Accessibility, a difference from Figma to
   assert.deepEqual(a11y.map((x) => x.check), ['State contrast']);
   const html = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
   assert.match(html, /add\(x\.wcag \|\| \(contrast \? 'WCAG 1\.4\.3 Contrast \(Minimum\) \(AA\)' : ''\), 'todo'/, 'the Accessibility area lists what to fix, under its criterion');
-  assert.match(html, /a\[0\] === 'a11y' \? facts\.a11y/, 'the Accessibility tab carries the alert icon');
+  assert.match(html, /a\[0\] === 'a11y' \? a11yOpen\(c\)/, 'the Accessibility tab carries the alert icon while anything on it is to fix or to check');
   assert.match(html, /if \(o\.icon\) text = '<svg class="sg-seg-icon"[^\n]*' \+ text;/, 'the icon before the label');
   assert.match(html, /n \+= \(c\.a11yFindings \|\| \[\]\)\.length/, 'counting what the audit found with what the browser check found');
 });
@@ -947,7 +947,7 @@ test('a foundation\'s size switch: only its samples take the size, no label, roo
   const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
   assert.match(tpl, /var sized = function \(el\) \{ axes\.forEach/);
   assert.match(tpl, /SGModes\.controls\(holder, function \(\) \{ draw\(sized\); \}/, 'the switch acts on a holder, never on the section');
-  assert.match(tpl, /\.sg-size-switch \{ margin-bottom: var\(--sg-space-xxl\); \}/);
+  assert.match(tpl, /\.sg-size-switch \{ margin-bottom: var\(--sg-space-xxl\);/);
   assert.match(tpl, /\.sg-size-switch \.sg-mode-label \{ position: absolute; width: 1px/);
   assert.doesNotMatch(tpl, /sec\.classList\.add\('sg-scope'\)/);
 });
@@ -972,4 +972,14 @@ test('Width: the modes Figma gives a viewport width, narrowest first; none, none
   const vars = { modeVariants: { Sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { values: { desktop: '12px', phone: '14px' } }, 'viewport/min-width': { values: { desktop: '1680px', phone: '350px' } } } } } };
   assert.deepEqual(viewportWidths(vars), [{ value: 'phone', label: 'Phone', px: 350 }, { value: 'desktop', label: 'Desktop', px: 1680 }]);
   assert.deepEqual(viewportWidths({ modeVariants: { Sizing: { modes: [], vars: { 'padding/m': {} } } } }), []);
+});
+
+test('a page title: the system\'s own heading when it has a large one, else its largest style scaled up', async () => {
+  const { chromeRoles } = await import('../styleguide-data.mjs');
+  const type = (sizes) => ({ typography: sizes.map((px, i) => ({ scale: ['s', 'm', 'l', 'xl'][i], size: { var: `--t${i}`, value: `${px}px` } })) });
+  assert.equal(chromeRoles({ tokens: type([10, 11, 13]) }).roles.title, undefined, 'no large heading: the template scales the largest');
+  assert.equal(chromeRoles({ tokens: type([12, 14, 16, 28]) }).roles.title, 'var(--t3)', 'its own heading, as it is');
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /--sg-title: calc\(var\(--sg-h1\) \* var\(--sg-title-scale\)\)/);
+  assert.match(tpl, /\.sg-section > h2, \.pg-head > h2 \{ font-size: var\(--sg-title\);/);
 });
