@@ -48,9 +48,9 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 
 /* ── Page layout ─────────────────────────────────────────────────────────── */
 .sg-layout { display: flex; min-height: 100vh; }
-.sg-sidebar { width: 240px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: var(--sg-line); background: var(--sg-bg-2); display: flex; flex-direction: column; scrollbar-gutter: stable; }
+.sg-sidebar { width: 280px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: var(--sg-line); background: var(--sg-bg-2); display: flex; flex-direction: column; scrollbar-gutter: stable; }
 .sg-sidebar-header { padding: var(--sg-space-l) var(--sg-space-l) var(--sg-space-m); border-bottom: var(--sg-line); }
-.sg-sidebar-header .sg-title { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); }
+.sg-sidebar-header .sg-title { font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); }   /* the system's name in the h2 style */
 .sg-sidebar-header > p { font-size: var(--sg-s); font-weight: var(--sg-m-weight); color: var(--sg-muted); margin-top: var(--sg-space-xxs); }
 .sg-nav { padding: var(--sg-space-s) 0; flex: 1; }
 .sg-nav a { display: flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-l); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-text-2); text-decoration: none; transition: background 0.1s, color 0.1s; line-height: var(--sg-lh); }
@@ -89,7 +89,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 #mode-controls { margin-top: var(--sg-space-m); }
 
 /* ── Section headings ────────────────────────────────────────────────────── */
-.sg-section { margin-bottom: var(--sg-space-xxl); scroll-margin-top: var(--sg-space-l); }
+.sg-section { margin-bottom: var(--sg-space-xxl); scroll-margin-top: var(--sg-space-xxl); }   /* as far from the top as the page's own padding: opening one never scrolls the page */
 .sg-section-badge { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-s); font-weight: var(--sg-s-weight); background: color-mix(in srgb, var(--sg-muted) 12%, transparent); color: var(--sg-muted); margin-bottom: var(--sg-space-xs); }
 .sg-section > h2, .pg-head > h2 { font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xs); }
 .sg-section > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xl); max-width: 560px; }
@@ -164,7 +164,9 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-demo.sg-colors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sg-space-l) var(--sg-space-m); }
 .sg-colors > .color-chip { width: auto; min-width: 0; }
 .color-chip-swatch { height: 72px; border: var(--sg-line); }   /* square corners, as on the overview; the colour twice the height of its label */
-.color-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); line-height: var(--sg-lh); word-break: break-word; }
+.color-chip.sg-card > .color-chip-swatch { border: 0; border-bottom: var(--sg-line); }   /* the card rounds its top */
+.color-chip-foot { display: flex; flex-direction: column; gap: var(--sg-space-xxs); padding: var(--sg-space-s) var(--sg-space-m); background: var(--sg-bg-2); }
+.color-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); line-height: var(--sg-lh); overflow-wrap: anywhere; }   /* breaks after a slash, inside a word only when it must */
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: normal; overflow-wrap: anywhere; }   /* a long variable breaks after a hyphen, never inside a word when it fits */
 .sg-uses-link { color: inherit; }   /* a link in the colour around it, underlined */
 /* A token's name opens a panel in place: underlined like a link, in the text around it, no box of its own. */
@@ -299,7 +301,9 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-todo .pg-par-table th:nth-child(4) { width: 17%; } .sg-todo .pg-par-table th:nth-child(5) { width: 12%; }
 .pg-diff { border-color: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
 .pg-note:last-child { margin-bottom: var(--sg-space-m); }
-.pg-header { background: var(--sg-bg); padding: var(--sg-space-xs) 0 var(--sg-space-s); }   /* scrolls away; the areas below it stay */
+.pg-header { background: var(--sg-bg); padding: 0 0 var(--sg-space-s); display: flex; flex-direction: column; gap: var(--sg-space-s); }   /* starts where a foundation's does; each line 8px from the next */
+.pg-header > * { margin-top: 0; margin-bottom: 0; }
+.pg-header > .sg-section-badge { align-self: flex-start; }   /* the tag as wide as its word, as on a foundation */
 .pg-stage { display: flex; flex-direction: column; gap: var(--sg-space-l); container-type: inline-size; }
 /* The stage never narrower than a phone screen and its margins: with less room the controls go below it, never beside a squeezed stage. */
 .pg-preview-card { --sg-stage-min: 400px; display: grid; grid-template-columns: minmax(min(100%, var(--sg-stage-min)), 1fr) minmax(240px, 340px); gap: var(--sg-space-l); align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: var(--sg-space-l); background: var(--sg-bg); box-shadow: var(--sg-shadow); }
@@ -440,6 +444,7 @@ a.pg-usage-name { color: var(--sg-text); }
   body.sg-nav-open .sg-scrim { display: block; position: fixed; inset: 0; z-index: 30; }
   .sg-scrim:not([class*=" "]) { background: color-mix(in srgb, var(--sg-text) 40%, transparent); }
   .sg-main { padding: var(--sg-space-l); width: 100%; box-sizing: border-box; }
+  .sg-section { scroll-margin-top: var(--sg-space-l); }
   /* On a phone the stage gives the component room of its own below the mode switches, never squeezed under them. */
   .pg-preview, .pg-frame { min-height: 220px; }
   .pg-preview-card { grid-template-columns: minmax(0, 1fr); } .pg-panel { padding-left: 0; padding-top: var(--sg-space-xs); min-width: 0; }
@@ -480,6 +485,11 @@ a.pg-usage-name { color: var(--sg-text); }
   // A component's place on the page: its name, any character an address reads (a slash, a space) as a dash.
   function cid(n) { return 'c-' + String(n).replace(/[^\w-]+/g, '-'); }
   function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; a.innerHTML = '<span class="dot"></span>' + esc(label); (parent || nav).appendChild(a); }
+  // The foundations in the menu under their own label, as the components are under theirs.
+  function foundationLink(id, label) {
+    if (!foundationLink.labelled) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'Foundations'; nav.appendChild(lab); foundationLink.labelled = true; }
+    navLink(id, label);
+  }
   function section(id, badge, title, lead) {
     var s = document.createElement('section'); s.id = id; s.className = 'sg-section';
     s.innerHTML = (badge ? '<div class="sg-section-badge">' + esc(badge) + '</div>' : '') + '<h2>' + esc(title) + '</h2>' + (lead ? '<p>' + esc(lead) + '</p>' : '');
@@ -644,7 +654,8 @@ a.pg-usage-name { color: var(--sg-text); }
       var auto = scope === html && !!axis.media && !axis.classes;
       var items = axis.values.map(function (v) { return { v: v.value, label: v.label, off: !!v.notInCode, title: v.notInCode ? v.label + ' is in Figma, not in the code yet' : '' }; });
       if (auto) items.unshift({ v: '__auto', label: 'Auto', title: 'Follows this device\'s setting' });
-      wrap.innerHTML = '<span class="sg-mode-label">' + esc(axis.label) + '</span>' + segHTML(items);
+      // The page's own switch in the menu has no word over it (its group is still named for a screen reader).
+      wrap.innerHTML = (scope === html ? '' : '<span class="sg-mode-label">' + esc(axis.label) + '</span>') + segHTML(items);
       // On the page's own switch, what the chosen mode changes in the code (axis.changes, from the theme's own values).
       var diff = null;
       if (scope === html && axis.changes) { diff = document.createElement('p'); diff.className = 'sg-mode-diff'; diff.setAttribute('aria-live', 'polite'); wrap.appendChild(diff); }
@@ -807,12 +818,13 @@ a.pg-usage-name { color: var(--sg-text); }
 
   /* ── Colors ───────────────────────────────────────────────────────────────────────────────────────────────── */
   if (FLAT.length) {
-    hr(); navLink('colors', 'colors');
+    hr(); foundationLink('colors', 'colors');
     var cs = section('colors', 'Foundations', 'Colors', 'Each swatch is the CSS variable itself, so it follows the mode switch.');
     TOKENS.colors.forEach(function (g) {
       var sub = document.createElement('div'); sub.className = 'sg-subsection';
       sub.innerHTML = '<h3>' + esc(g.group) + '</h3><div class="sg-demo sg-colors">' + g.items.map(function (t) {
-        return '<div class="color-chip"><div class="color-chip-swatch" style="background:var(' + esc(t.var) + ')"></div><div class="color-chip-label">' + esc(t.figma) + '</div><div class="color-chip-value">' + usesLink(t.var) + '</div></div>';
+        // Each colour in a card as a component's: the colour on top, its names below on the table heads' background.
+        return '<div class="color-chip sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : '') + '"><div class="color-chip-swatch" style="background:var(' + esc(t.var) + ')"></div><div class="color-chip-foot"><div class="color-chip-label">' + esc(t.figma).replace(/\//g, '/<wbr>') + '</div><div class="color-chip-value">' + usesLink(t.var) + '</div></div></div>';
       }).join('') + '</div>';
       cs.appendChild(sub);
     });
@@ -840,7 +852,7 @@ a.pg-usage-name { color: var(--sg-text); }
 
   /* ── Typography ───────────────────────────────────────────────────────────────────────────────────────────── */
   if ((TOKENS.typography || []).length) {
-    hr(); navLink('typography', 'typography');
+    hr(); foundationLink('typography', 'typography');
     var ts = section('typography', 'Foundations', 'Typography', null);
     var demo = document.createElement('div'); demo.className = 'type-list';   // no frame around the list: each style is its own card
     var drawType = function (sized) {
@@ -873,7 +885,7 @@ a.pg-usage-name { color: var(--sg-text); }
   /* ── Spacing, radii, other sizes ──────────────────────────────────────────────────────────────────────────── */
   function spacing(id, title, list) {
     if (!(list || []).length) return;
-    hr(); navLink(id, title.toLowerCase());
+    hr(); foundationLink(id, title.toLowerCase());
     var s = section(id, 'Foundations', title, null);
     // One group per family of the name (gap, padding), each from the smallest to the largest.
     var fams = [], byFam = {};
@@ -893,7 +905,7 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   spacing('spacing', 'Spacing', TOKENS.spacing);
   if ((TOKENS.radii || []).length) {
-    hr(); navLink('radii', 'radii');
+    hr(); foundationLink('radii', 'radii');
     var rs = section('radii', 'Foundations', 'Radii', null);
     var rd = document.createElement('div'); rd.className = 'sg-demo';
     var drawRadii = function (sized) {
@@ -908,7 +920,7 @@ a.pg-usage-name { color: var(--sg-text); }
 
   /* ── Icons: every icon is a real one from the system's symbol sheet, referenced by id ───────────────────────── */
   if ((DATA.icons || []).length) {
-    hr(); navLink('icons', 'icons');
+    hr(); foundationLink('icons', 'icons');
     var is = section('icons', 'Foundations', 'Icons', null);
     // Each icon at the size Figma gives it, named as in Figma; the symbol's own viewBox when Figma does not list it.
     var FIG = DATA.iconFigma || {};
@@ -3101,7 +3113,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (target.id === 'overview') Object.keys(THUMBS).forEach(function (k) { fitThumb(THUMBS[k]); });
     if (target.id === 'todo') setTimeout(a11ySweep, 300);
     if (!ALL) {
-      window.scrollTo(0, 0);
+      window.scrollTo(0, 0); requestAnimationFrame(function () { window.scrollTo(0, 0); });   // every page opens at its top, the browser's own jump to the address's section undone
       var h = target.querySelector('h1, h2'); document.title = (h && target.id !== 'overview' ? h.textContent + ' · ' : '') + (DATA.title || 'Design system') + ' · Living style guide';
       if (h && route.ran) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
     }
