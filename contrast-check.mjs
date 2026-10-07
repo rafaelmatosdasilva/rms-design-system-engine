@@ -24,7 +24,10 @@ export function hexToRgb(hex) {
 // whose ratio is below AA (4.5 normal, 3 large), plus how many were checked / skipped (unresolvable).
 // A see-through text colour is blended over its background before measuring (what the eye sees).
 // A see-through background cannot be measured without the surface under it, so that pair is skipped.
-export function tokenContrastFindings(pairs, resolve) {
+// opts.tinted(bgToken) → true when the code draws that background as a tint (see tintedVars): the
+// solid token is not what the eye sees, so the pair joins sameColour and the rendered state contrast
+// measures it.
+export function tokenContrastFindings(pairs, resolve, opts = {}) {
   const findings = [], sameColour = [];
   let checked = 0, skipped = 0;
   for (const p of pairs || []) {
@@ -32,6 +35,7 @@ export function tokenContrastFindings(pairs, resolve) {
     const bgHex = resolve(p.bg);
     const tc = parseColor(textHex), bc = parseColor(bgHex);
     if (!tc || !bc || bc[3] < 1) { skipped++; continue; }
+    if (opts.tinted?.(p.bg)) { sameColour.push({ name: p.name || `${p.text} on ${p.bg}`, text: p.text, bg: p.bg, hex: textHex, tinted: true }); continue; }
     // Text and background tokens of the same colour: no design shows invisible text, so the
     // component applies the background token as a tint (opacity, color-mix). Not comparable from the
     // tokens alone; the rendered state contrast measures it.
@@ -47,6 +51,23 @@ export function tokenContrastFindings(pairs, resolve) {
     }
   }
   return { findings, checked, skipped, sameColour };
+}
+
+// The CSS variables the code capture saw painted see-through as a background (opacity or
+// color-mix), in any component, state or mode: a tint, measured only as rendered.
+export function tintedVars(code) {
+  const out = new Set();
+  const see = (bg, v) => { const c = parseColor(typeof bg === 'object' ? bg?.value : bg); if (v && c && c[3] > 0 && c[3] < 1) out.add(v); };
+  for (const c of Object.values(code?.components ?? {})) {
+    const v = c.props?.backgroundColor?.var;
+    see(c.props?.backgroundColor, v);
+    for (const st of Object.values(c.states ?? {})) {
+      const ch = st.changed?.backgroundColor, sv = ch?.var ?? v;
+      see(ch, sv);
+      for (const col of Object.values(st.colors ?? {})) see(col.backgroundColor, sv);
+    }
+  }
+  return out;
 }
 
 // State contrast from the code capture (code.snapshot.json), no new browser run: each component's
