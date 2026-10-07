@@ -349,6 +349,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const { parity, a11y } = splitFindings((by.get(c.name) ?? []).map((x) => ({ check: x.check, what: x.what, plain: plainDifference(x.what), ...plainAction(x.what, c.name), new: !!x.new })));
         if (parity.length) c.differences = parity;
         if (a11y.length) c.a11yFindings = a11y;
+        // A product that draws its own version of it (Gate [10]) is in its Used in too, said so, so a product never
+        // reads as not using it when it shows one of its own.
+        for (const x of by.get(c.name) ?? []) {
+          const m = /^[\w-]+: (.+?) draws its own instead of using it \((.+) in (.+)\)$/.exec(x.what ?? '');
+          if (!m) continue;
+          const g = (cfg.styleguide?.plugins ?? []).find((p) => p.name === m[1] || m[3].includes(p.match ?? '\u0000'));
+          const key = g?.key ?? m[1];
+          c.usage = (c.usage ?? []).filter((u) => (u.key ?? u) !== key).concat([{ key, name: g?.name ?? m[1], ...(typeof g?.href === 'string' && /^https?:\/\//.test(g.href) ? { href: g.href } : {}), ownInstead: m[2] }]);
+        }
       }
       view.differences = { total: d.total ?? 0, at: d.at ?? null, file: `${OUT_DIR}/differences.md` };
     } catch { /* no full audit yet: nothing to list */ }

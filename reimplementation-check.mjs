@@ -294,5 +294,112 @@ if (!screenSnap?.screens) {
   }
 }
 
+// ── Part 3: a product's own version of something the system already has ──────────
+// A piece a product draws for itself where a system component would do: a loading state with its own spinner beside
+// the system's loader. Found two ways, for any system:
+//   by what it draws: a class the product puts on an element (its own, or a class the system's CSS holds that no
+//     component owns) that loops the same animation a component's part loops (a spinner, a pulse, a shimmer);
+//   by its name: a class of the product's own, styled by the product, whose name starts with a component's name
+//     (loading-state for loader, tooltip-box for tooltip).
+// A class on an element that also carries a system class (an input the system styles, with a class of the product's
+// beside it), or in a product that uses the component too (its footer, a row around it), is the system's component
+// dressed by the product, not a version of its own.
+// Advisory: each one names the product, its classes and the component to use instead.
+if (SURFACES.length) {
+  partsRun++;
+  const PRODUCTS = (cfg.styleguide?.plugins ?? []).filter((g) => g?.match);
+  const words = (n) => String(n).replace(/^.*\//, '').replace(/^rms[-_]?(figma[-_]?)?/i, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+  const productOf = (surface) => { const g = PRODUCTS.find((x) => surface.includes(x.match)); return g?.name ?? words(dirname(surface)) ?? surface; };
+  // The keyframes each stylesheet defines, by name, as what they do (spaces and the name left out).
+  const keyframes = new Map();
+  const readKeyframes = (css) => { for (const m of css.matchAll(/@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g)) keyframes.set(m[1], m[2].replace(/\s+/g, '')); };
+  readKeyframes(themeText);
+  // The looping animations a rule plays: the keyframes' body for each animation it runs forever.
+  const loops = (decls) => {
+    const out = [];
+    for (const m of String(decls).matchAll(/animation(?:-name)?\s*:\s*([^;]+)/gi)) {
+      const v = m[1];
+      if (!/\binfinite\b/i.test(v) && !/animation-iteration-count\s*:\s*infinite/i.test(decls)) continue;
+      for (const n of v.split(',').map((x) => x.trim().split(/\s+/)).flat()) if (keyframes.has(n)) out.push(keyframes.get(n));
+    }
+    return out;
+  };
+  // Each component: its own class, its parts' classes (what the theme styles inside it) and the loops they play.
+  const themeDecls = new Map();
+  collectClassDecls(themeText, themeDecls);
+  const comps = [];
+  for (const name of universe) {
+    const own = norm(String(selOf(name) ?? '').replace(/^[.#]/, ''));
+    if (!own || !themeDecls.has(own)) continue;
+    const parts = new Set([own]);
+    for (const blk of themeText.match(/[^{}]+\{/g) || []) for (const sel of blk.slice(0, -1).split(',')) {
+      const toks = [...sel.matchAll(/\.([A-Za-z][A-Za-z0-9_-]*)/g)].map((m) => norm(m[1]));
+      if (toks[0] === own) for (const t of toks.slice(1)) if (!dsAll.has(t)) parts.add(t);
+    }
+    // A part named after the component (loader-spinner) is its part even where the theme styles it on its own.
+    for (const k of themeDecls.keys()) if (!k.startsWith('#') && k !== own && k.startsWith(own) && !dsAll.has(k)) parts.add(k);
+    const plays = new Set();
+    for (const t of parts) for (const b of loops(themeDecls.get(t) ?? '')) plays.add(b);
+    comps.push({ name, own, parts, plays });
+  }
+  const partOfAny = new Set(comps.flatMap((c) => [...c.parts]));
+  const stem = (w) => w.toLowerCase().replace(/(ings?|ers?|s)$/, '');
+  const nameWords = (n) => String(n).replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[^A-Za-z0-9]+/).filter(Boolean).map(stem).filter((w) => w.length >= 3);
+  const OWN_RULE = /(?:^|;)\s*[a-z-]+\s*:/i;
+  const own = [];
+  for (const surface of SURFACES) {
+    const raw = readFile(surface);
+    if (!raw) continue;
+    const doc = stripComments(raw);
+    const local = new Map();
+    collectClassDecls(doc, local);
+    readKeyframes(doc);
+    const used = usedClasses(raw);
+    const isSystem = (k) => dsAll.has(k) || partOfAny.has(k) || dsParts.has(k);
+    const dressed = new Set();   // classes that sit beside a system class on an element
+    for (const m of raw.matchAll(/\bclass(?:Name)?\s*=\s*\\?(["'`])([\s\S]*?)\\?\1/g)) {
+      const toks = m[2].replace(/\$\{[^}]*\}/g, ' ').split(/[^A-Za-z0-9_-]+/).filter(Boolean).map(norm);
+      if (toks.some(isSystem)) for (const t of toks) dressed.add(t);
+    }
+    const hits = new Map();   // component → classes
+    for (const cls of used) {
+      const k = norm(cls);
+      if (isSystem(k) || dressed.has(k)) continue;   // the system's own component, one of its parts, or one it dresses
+      const decls = (local.get(k) ?? '') + ';' + (themeDecls.get(k) ?? '');
+      // By what it draws: the same loop a component's part plays.
+      const mine = loops(decls);
+      let match = mine.length ? comps.filter((c) => mine.some((b) => c.plays.has(b))) : [];
+      // Several components play it (a toast's spinner and the loader's): the one its name points at, else the one
+      // built of the fewest parts, the plainest that draws it.
+      if (match.length > 1) {
+        const byName = match.filter((c) => nameWords(c.name).some((w) => stem(cls).includes(w) || cls.toLowerCase().includes(w)));
+        match = byName.length ? byName : [match.sort((a, b) => a.parts.size - b.parts.size)[0]];
+      }
+      // By its name: a rule of the product's own, on a class whose name starts with a component's name.
+      if (!match.length && OWN_RULE.test(local.get(k) ?? '')) {
+        const toks = cls.split(/[^A-Za-z0-9]+|(?<=[a-z])(?=[A-Z])/).filter(Boolean).map(stem);
+        // The rest of its name only says it is the whole thing (loading-state, tooltip-box), never a part of something
+        // else (overlay-label-text is a label).
+        const WHOLE = /^(state|box|wrap|wrapper|container|root|view|block|area|holder|indicator|el|element|ui|main|custom)$/;
+        match = comps.filter((c) => { const ws = nameWords(c.name); return ws.length && ws.length <= toks.length && ws.every((w, i) => toks[i] === w) && toks.slice(ws.length).every((t) => WHOLE.test(t)); });
+      }
+      // A product that uses the component too is dressing it (its footer, a row around it), not drawing its own.
+      match = match.filter((c) => !used.has(String(selOf(c.name) ?? '').replace(/^[.#]/, '')));
+      for (const c of match.slice(0, 1)) (hits.get(c.name) ?? hits.set(c.name, new Set()).get(c.name)).add(cls);
+    }
+    for (const [comp, set] of hits) {
+      const key = `${basename(surface)}#${comp}`;
+      if (KNOWN.has(key) || KNOWN.has(`${productOf(surface)}/${comp}`)) continue;
+      own.push({ surface, product: productOf(surface), comp, classes: [...set].sort() });
+    }
+  }
+  if (!own.length) lines.push(`✅ [reimplementation] no product draws its own version of a system component (${SURFACES.length} product file${SURFACES.length === 1 ? '' : 's'})`);
+  else {
+    lines.push(`⚠️  [reimplementation] ${own.length} piece${own.length === 1 ? '' : 's'} a product draws itself where a system component would do (advisory):`);
+    for (const o of own) lines.push(`⚠️  [reimplementation] ${o.comp}: ${o.product} draws its own instead of using it (${o.classes.map((c) => '.' + c).join(', ')} in ${o.surface})`);
+    lines.push(`  Fix: use the system's component in place of the product's own; if the product deliberately keeps its own, add "${own[0].product}/${own[0].comp}" to ds-config.json → knownReimplementations.`);
+  }
+}
+
 for (const l of lines) console.log(l);
 process.exit(fail ? 1 : partsRun ? 0 : 2);
