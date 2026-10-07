@@ -666,13 +666,12 @@ test('parity, what goes inside: a slot or swap in an HTML and CSS system is the 
   assert.deepEqual(jsx.map((r) => [r.figma?.name ?? '-', r.code?.name ?? '-', r.status]), [['Main Content', 'children', 'match'], ['Icon Content', '-', 'figma'], ['Badge', 'Badge', 'match'], ['-', 'pressed', 'code']]);
 });
 
-test('a Figma slot the code holds in a part of its own is paired with that part, and said under the component\'s name', async () => {
+test('a Figma slot the code holds in a part of its own is paired with that part, and Parity lists it', async () => {
   const { parityRows } = await import('../styleguide-data.mjs');
   const rows = parityRows({ name: 'modal', propsSnap: { modal: { properties: { 'Slot#1:0': { type: 'SLOT' } } } }, slotParts: [{ name: 'Slot', selector: '.modal-slot', slot: true }] });
   assert.deepEqual(rows.map((r) => [r.figma.name, r.code.name, r.status, r.slot]), [['Slot', '.modal-slot', 'match', true]]);
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
-  assert.match(tpl, /function slotsHTML\(c\)/);
-  assert.match(tpl, /factsHTML\(c\)\) \+\s*slotsHTML\(c\) \+/, 'under its name');
+  assert.doesNotMatch(tpl, /function slotsHTML\(c\)/, 'no line of slots under its name: Parity lists them');
 });
 
 test('import line and nesting: as a product writes the import, and the system\'s components it is built with', async () => {
@@ -966,4 +965,11 @@ test('Variants: a component with a variant prop or an on/off prop has the area; 
   // The area and its tab follow the same rows.
   assert.match(tpl, /\(ALL \|\| !variantRows\(c\)\.length \? '' : '<div class="pg-area" data-area="variants">/);
   assert.match(tpl, /a\[0\] !== 'variants' \|\| \(!ALL && variantRows\(c\)\.length\)/);
+});
+
+test('Width: the modes Figma gives a viewport width, narrowest first; none, none', async () => {
+  const { viewportWidths } = await import('../styleguide-data.mjs');
+  const vars = { modeVariants: { Sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { values: { desktop: '12px', phone: '14px' } }, 'viewport/min-width': { values: { desktop: '1680px', phone: '350px' } } } } } };
+  assert.deepEqual(viewportWidths(vars), [{ value: 'phone', label: 'Phone', px: 350 }, { value: 'desktop', label: 'Desktop', px: 1680 }]);
+  assert.deepEqual(viewportWidths({ modeVariants: { Sizing: { modes: [], vars: { 'padding/m': {} } } } }), []);
 });
