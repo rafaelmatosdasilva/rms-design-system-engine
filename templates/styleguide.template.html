@@ -28,7 +28,7 @@
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: bold; --sg-lh: normal;
   /* A page's title: the system's largest text style, scaled up, so the guide has its own hierarchy above any system's
      text styles while every size still comes from the system ("title-scale" in styleguide.chrome, ds-config.json, changes it). */
-  --sg-title-scale: 1.75; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
+  --sg-title-scale: 2.5; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
   --sg-space-xxs: 0.125rem; --sg-space-xs: 0.25rem; --sg-space-s: 0.5rem; --sg-space-m: 0.75rem; --sg-space-l: 1rem; --sg-space-xl: 1.5rem; --sg-space-xxl: 2rem;
   --sg-row-h: calc(var(--sg-space-xxl) + var(--sg-space-m));   /* every table row at least this tall, from the system's spacing */
   --sg-radius-s: 0; --sg-radius: 0; --sg-radius-l: 0; --sg-radius-pill: 0;
@@ -69,6 +69,11 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
    never draws a control of its own (only layout here). ─────────────────────────────────────────────────────────────── */
 .sg-seg { display: flex; flex-wrap: wrap; width: 100%; gap: var(--sg-space-xxs); }
 .sg-seg button { font: inherit; }
+/* The page's own tabs, when the system has none: words in a row, the chosen one in the text colour with a line under it. */
+.sg-tabs { display: flex; gap: var(--sg-space-xl); border-bottom: var(--sg-line); }
+.sg-tab { display: inline-flex; align-items: center; background: none; border: 0; margin: 0; padding: var(--sg-space-s) 0; font: inherit; font-size: var(--sg-m); font-weight: var(--sg-heading-weight); color: var(--sg-muted); white-space: nowrap; cursor: pointer; }
+.sg-tab:hover, .sg-tab.is-on { color: var(--sg-text); }
+.sg-tab.is-on { box-shadow: inset 0 -2px 0 var(--sg-text); }
 .sg-seg button[aria-pressed="true"] { font-weight: var(--sg-heading-weight); }
 
 /* ── Modes ───────────────────────────────────────────────────────────────── */
@@ -162,13 +167,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* Every box on the page is drawn alike: the system card's border and corners, no fill of its own. */
 .sg-demo { background: transparent; border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-space-xl) var(--sg-space-l); display: flex; flex-wrap: wrap; gap: var(--sg-space-m); align-items: flex-start; }
 .sg-demo.sg-demo--col { flex-direction: column; align-items: stretch; gap: var(--sg-space-s); }
-.color-chip { display: flex; flex-direction: column; gap: var(--sg-space-xs); width: 96px; }
 /* Six colours a row, each as wide as the room allows, so its Figma name and variable have room to read. */
-.sg-demo.sg-colors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sg-space-xl); border: 0; padding: 0; }   /* cards on the page, spaced as the overview's, no box around them */
-.sg-colors > .color-chip { width: auto; min-width: 0; }
-.color-chip-swatch { height: 72px; border: var(--sg-line); }   /* square corners, as on the overview; the colour twice the height of its label */
-.color-chip.sg-card > .color-chip-swatch { border: 0; }   /* the card rounds its top; the name's own line sits under it */
-.color-chip.sg-card > h3 { overflow-wrap: anywhere; }
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: normal; overflow-wrap: anywhere; }   /* a long variable breaks after a hyphen, never inside a word when it fits */
 .sg-uses-link { color: inherit; }   /* a link in the colour around it, underlined */
 /* A token's name opens a panel in place: underlined like a link, in the text around it, no box of its own. */
@@ -188,9 +187,16 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .spacing-bar { height: 8px; background: var(--sg-accent); border-radius: var(--sg-radius-s); min-width: 1px; }
 .spacing-meta { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); flex: 1; }
 .spacing-name { color: var(--sg-text-2); font-size: var(--sg-xs); }
-.radius-chip { display: flex; flex-direction: column; align-items: center; gap: var(--sg-space-s); width: 96px; }
-.radius-chip-box { width: 48px; height: 48px; background: var(--sg-bg-2); border: var(--sg-line); }
-.radius-chip-label { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); text-align: center; line-height: var(--sg-lh); word-break: break-all; }
+/* Colours, spacing and radii as lists: one card per group, its name as the head, the columns lined up from card to card. */
+.sg-token-cards { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-m); }
+.pg-inspect.sg-token-card table { table-layout: fixed; }
+.pg-inspect.sg-token-card td, .pg-inspect.sg-token-card td:first-child, .pg-inspect.sg-token-card td:last-child { color: var(--sg-text); width: auto; word-break: normal; overflow-wrap: anywhere; }
+.pg-inspect.sg-token-card td.sg-token-sample { width: calc(var(--sg-space-xxl) * 3); }
+.pg-inspect.sg-token-card td:nth-child(2), .pg-inspect.sg-token-card td:nth-child(3) { width: 35%; }
+.sg-token-sample > span { display: block; }
+.sg-token-swatch { width: var(--sg-space-xxl); height: var(--sg-space-xxl); border: var(--sg-line); border-radius: var(--sg-radius-s); }
+.sg-token-sample > .spacing-bar { height: var(--sg-space-xxl); border-radius: 0; }   /* every sample as tall as the others, so a space reads as its width */
+.sg-token-radius { width: var(--sg-space-xxl); height: var(--sg-space-xxl); background: var(--sg-bg-2); border: var(--sg-line); }
 .icon-chip { display: flex; flex-direction: column; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-l) var(--sg-space-m); min-width: 100px; }
 .icon-chip svg { width: var(--sg-icon); height: var(--sg-icon); color: var(--sg-text); }
 .token-pill { display: inline-block; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); padding: 1px var(--sg-space-xs); border-radius: var(--sg-radius-s); background: var(--sg-bg-2); color: var(--sg-muted); border: var(--sg-line); }
@@ -216,6 +222,7 @@ a.pg-usage-name { color: var(--sg-text); }
    keeps its own size, and the area chosen scrolls into view. */
 .pg-areas-scroll { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scrollbar-width: thin; }
 .pg-areas-scroll > * { width: max-content; max-width: none; flex-wrap: nowrap; }
+.pg-areas-scroll > .sg-tabs { min-width: 100%; }   /* the line under the tabs across the whole width, longer when they scroll */
 /* Every bar that stays at the top as a page scrolls (a component's areas, a page's title, a foundation's size switch)
    is one kind: the page's background, 8px above and below, and a line under the lowest one once it is stuck, faded in. */
 .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch { position: sticky; z-index: 15; background: var(--sg-bg); padding-top: var(--sg-space-s); padding-bottom: var(--sg-space-s); box-shadow: 0 1px 0 0 transparent; transition: box-shadow 0.15s ease; }
@@ -386,7 +393,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-slot-area::after { content: attr(data-slot); position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--sg-s); color: var(--sg-text-2); }
 /* A slot whose content sits straight inside the component: that content gives way to the slot area, which the
    component grows around. */
-.pg-slot-gone { display: none; }
+.pg-slot-gone { display: none !important; }   /* what a slot area stands in for, gone whatever display the system gives it */
 .pg-still, .pg-still * { transition: none !important; }   /* while its colours are measured */
 /* The system's modes inside the playground: the colour mode top left, a sizing collection top right, over the stage. */
 .pg-stage-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sg-space-s); padding: var(--sg-space-s) var(--sg-space-m); background: var(--sg-bg-2); border: var(--sg-line); }
@@ -442,7 +449,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-topbar, .sg-nav-close, .sg-scrim { display: none; }
 .sg-sidebar-header { position: relative; }
 @media (max-width: 720px) {
-  .sg-demo.sg-colors { grid-template-columns: repeat(3, minmax(0, 1fr)); }   /* three a row on a phone */
+  .pg-inspect.sg-token-card td.sg-token-sample { width: calc(var(--sg-space-xxl) * 2); }   /* a narrower sample column on a phone */
   /* A phone: a bar at the top with the menu button; the sidebar is a panel that slides in over the page. */
   .sg-layout { flex-direction: column; }
   .sg-topbar { display: flex; align-items: center; gap: var(--sg-space-s); position: sticky; top: 0; z-index: 20; padding: var(--sg-space-s) var(--sg-space-l); background: var(--sg-bg); border-bottom: var(--sg-line); }
@@ -642,6 +649,28 @@ a.pg-usage-name { color: var(--sg-text); }
     else el.setAttribute('aria-pressed', on ? 'true' : 'false');
     if (on) nudge();   // the system's own script places what follows the selection (a sliding pill) again
   }
+  /* ── The switch between a component's areas is the system's own tabs (DATA.ui.tabs, read from its markup). With none,
+     the page's own: a row of words with a line under the chosen one, in the system's colours, text styles and spacing,
+     and the overview and the To do list say so. ─────────────────────────────────────────────────────────────── */
+  var TABS = DATA.ui && DATA.ui.tabs;
+  function tabsHTML(items) {
+    var tag = TABS ? TABS.item.tag : 'button', cls = TABS ? TABS.item.classes.join(' ') : 'sg-tab';
+    return (TABS ? TABS.open : '<div class="sg-tabs">') + items.map(function (o) {
+      var text = TABS && TABS.item.label ? '<span class="' + esc(TABS.item.label) + '">' + esc(o.label) + '</span>' : esc(o.label);
+      if (o.icon) text = '<svg class="sg-seg-icon" aria-hidden="true"><use href="#' + esc(o.icon) + '"/></svg>' + text;
+      if (o.say) text += '<span class="sg-hidden-text">, ' + esc(o.say) + '</span>';
+      return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '">' + text + '</' + tag + '>';
+    }).join('') + (TABS ? TABS.close : '</div>');
+  }
+  function tabSelect(el, on) {
+    if (TABS) {
+      (TABS.selected.add || []).forEach(function (k) { el.classList.toggle(k, on); });
+      (TABS.selected.remove || []).forEach(function (k) { el.classList.toggle(k, !on); });
+      Object.keys(TABS.selected.attrs || {}).forEach(function (a) { if (on) el.setAttribute(a, TABS.selected.attrs[a]); else el.removeAttribute(a); });
+    } else el.classList.toggle('is-on', on);
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (on) nudge();
+  }
   function segItems(box) { return Array.prototype.slice.call(box.querySelectorAll('[data-v]')); }
 
   var SGModes = (function () {
@@ -715,7 +744,9 @@ a.pg-usage-name { color: var(--sg-text); }
   ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. Tell Claude to do it.' }); });
   var ORDER = ['figma', 'code', 'both'];
   TODO.sort(function (a, b) { return ORDER.indexOf(a.who) - ORDER.indexOf(b.who); });
-  TODO.forEach(function (t, i) { t.no = i + 1; if (t.key) TODO_NO[t.key] = t.no; });
+  TODO.forEach(function (t, i) { t.no = i + 1; if (t.key) TODO_NO[t.key] = t.no; });   // numbered again in the order the To do page shows (fillTodo)
+  // An item's number where a component's own area names it, kept up to date as the To do list is numbered again.
+  function todoRef(key) { var n = TODO_NO[key]; return '<span class="sg-todo-ref" data-key="' + esc(encodeURIComponent(key)) + '">' + (n ? ' (#' + n + ')' : '') + '</span>'; }
 
   /* ── Overview ─────────────────────────────────────────────────────────────────────────────────────────────── */
   // The menu's first group under its own label, as Foundations and Components are under theirs.
@@ -796,7 +827,7 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   // The To do page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
   hr(); navLink('todo', 'to do');
-  var td = section('todo', 'To do', 'What to do', 'Everything still open in parity and accessibility, by component, each with who does it (You in Figma, Claude in the code, You decide or You check by hand); tell Claude the numbers to do, for example do 3 and 7.');
+  var td = section('todo', 'To do', 'What to do', 'List all open parity and accessibility issues by component, showing who handles each one (you in Figma, Claude in code, or manual check). Then tell Claude which ones to do, for example, do 3 and 7.');
   // What's new: every component's changes gathered by the release they shipped in, newest first, each a table of
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
@@ -827,26 +858,15 @@ a.pg-usage-name { color: var(--sg-text); }
     DATA.screens.forEach(function (s) { var f = document.createElement('figure'); f.className = 'sg-screen'; f.innerHTML = '<img alt="" src="' + esc(s.src) + '"><figcaption>' + esc(s.caption || '') + '</figcaption>'; sc.appendChild(f); });
   }
 
-  /* ── Colors ───────────────────────────────────────────────────────────────────────────────────────────────── */
-  if (FLAT.length) {
-    hr(); foundationLink('colors', 'colors');
-    var cs = section('colors', 'Foundations', 'Colors', 'Each swatch is the CSS variable itself, so it follows the mode switch.');
-    TOKENS.colors.forEach(function (g) {
-      var sub = document.createElement('div'); sub.className = 'sg-subsection';
-      sub.innerHTML = '<h3>' + esc(g.group) + '</h3><div class="sg-demo sg-colors">' + g.items.map(function (t) {
-        // Each colour in a card as a component's: the colour on top, its names below on the table heads' background.
-        return '<div class="color-chip sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : '') + '"><div class="color-chip-swatch" style="background:var(' + esc(t.var) + ')"></div><h3>' + esc(t.figma).replace(/\//g, '/<wbr>') + '</h3><p class="color-chip-value">' + usesLink(t.var) + '</p></div>';
-      }).join('') + '</div>';
-      cs.appendChild(sub);
-    });
-  }
-
   /* ── A size switch on each foundation: only its samples and their values change with the chosen mode ── */
   // The chosen size lives on a holder of its own. The samples a drawing makes take it (sized(el)), and their values are
   // read from them; the page around them (the switch, the cards, the tables) stays as it is.
   var DRAWERS = [];   // every foundation's drawing, re-read when the page's mode changes
-  function sizeSwitch(sec, draw) {
-    var axes = AXES.filter(function (a) { return a.scoped && a.attr !== 'data-color' && !a.classes; });
+  function sizeSwitch(sec, draw) { return modeSwitch(sec, draw, function (a) { return a.scoped && a.attr !== 'data-color' && !a.classes; }); }
+  // The same for the colour modes (Light and Dark) on the colours page.
+  function colourSwitch(sec, draw) { return modeSwitch(sec, draw, function (a) { return a.scoped && !a.classes && a.attr !== 'data-size' && (a.colour || a.attr === 'data-color'); }); }
+  function modeSwitch(sec, draw, pick) {
+    var axes = AXES.filter(pick);
     var holder = document.createElement('div'); holder.className = 'sg-scope sg-size-holder'; holder.hidden = true;
     var sized = function (el) { axes.forEach(function (a) { var v = holder.getAttribute(a.attr); if (v) el.setAttribute(a.attr, v); else el.removeAttribute(a.attr); }); return el; };
     DRAWERS.push(function () { draw(sized); });
@@ -860,6 +880,34 @@ a.pg-usage-name { color: var(--sg-text); }
   // A value as the chosen size draws it: read on a sample that carries the size.
   function sizedValue(box, sized, v) { var probe = sized(document.createElement('span')); box.appendChild(probe); var x = live(probe, v); probe.remove(); return x; }
   function live(el, v) { return getComputedStyle(el).getPropertyValue(v).trim(); }
+  // A colour as the browser draws it, written as hex (its alpha after it when it has one).
+  function hexOf(c) {
+    var m = String(c).match(/[\d.]+/g); if (!m || m.length < 3 || /^color\(/.test(c)) return c;
+    var two = function (n) { return ('0' + Math.max(0, Math.min(255, Math.round(n))).toString(16)).slice(-2); };
+    return '#' + m.slice(0, 3).map(function (x) { return two(+x); }).join('') + (m.length > 3 && +m[3] < 1 ? two(+m[3] * 255) : '');
+  }
+  // A group of tokens as one card, as a typography style is: its name as the card's head, then one row per token with
+  // its sample, its Figma name, its variable and its value.
+  function tokenCard(head, rows) {
+    return '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><table>' + rows.map(function (r) {
+      return '<tr><td class="sg-token-sample">' + r.sample + '</td><td>' + esc(r.t.figma) + '</td><td>' + usesLink(r.t.var) + '</td><td class="sg-token-value">' + esc(r.value || '') + '</td></tr>';
+    }).join('') + '</table></div>';
+  }
+
+  /* ── Colors: one card per group, each colour with its value in the mode the switch shows ─────────────────────── */
+  if (FLAT.length) {
+    hr(); foundationLink('colors', 'colors');
+    var cs = section('colors', 'Foundations', 'Colors', null);
+    var cd = document.createElement('div'); cd.className = 'sg-token-cards';
+    var drawColors = function (moded) {
+      cd.innerHTML = TOKENS.colors.map(function (g) {
+        return tokenCard(g.group, g.items.map(function (t) { return { sample: '<span class="sg-token-swatch" style="background:var(' + esc(t.var) + ')"></span>', t: t }; }));
+      }).join('');
+      // Each value read from its own swatch, in the mode it is drawn in.
+      Array.prototype.forEach.call(cd.querySelectorAll('.sg-token-swatch'), function (el) { moded(el); el.closest('tr').querySelector('.sg-token-value').textContent = hexOf(getComputedStyle(el).backgroundColor); });
+    };
+    var cSet = colourSwitch(cs, drawColors); cs.appendChild(cd); drawColors(cSet);
+  }
 
   /* ── Typography ───────────────────────────────────────────────────────────────────────────────────────────── */
   if ((TOKENS.typography || []).length) {
@@ -894,40 +942,26 @@ a.pg-usage-name { color: var(--sg-text); }
   }
 
   /* ── Spacing, radii, other sizes ──────────────────────────────────────────────────────────────────────────── */
-  function spacing(id, title, list) {
+  // One card per family of the name (gap, padding), each from the smallest to the largest, with the family as its head.
+  function sizeList(id, title, list, sample) {
     if (!(list || []).length) return;
     hr(); foundationLink(id, title.toLowerCase());
     var s = section(id, 'Foundations', title, null);
-    // One group per family of the name (gap, padding), each from the smallest to the largest.
     var fams = [], byFam = {};
-    list.forEach(function (t) { var f = t.figma.indexOf('/') > 0 ? t.figma.split('/')[0] : title; if (!byFam[f]) { byFam[f] = []; fams.push(f); } byFam[f].push(t); });
-    var d = document.createElement('div');
+    list.forEach(function (t) { var f = t.figma.indexOf('/') > 0 ? t.figma.split('/')[0] : title.toLowerCase(); if (!byFam[f]) { byFam[f] = []; fams.push(f); } byFam[f].push(t); });
+    var d = document.createElement('div'); d.className = 'sg-token-cards';
     var draw = function (sized) {
       var val = {}; list.forEach(function (t) { val[t.var] = sizedValue(d, sized, t.var) || t.value; });
       d.innerHTML = fams.map(function (f) {
         var rows = byFam[f].slice().sort(function (a, b) { return (parseFloat(val[a.var]) || 0) - (parseFloat(val[b.var]) || 0); });
-        return '<div class="sg-subsection">' + (fams.length > 1 ? '<h3>' + esc(f) + '</h3>' : '') + '<div class="sg-demo sg-demo--col">' + rows.map(function (t) {
-          return '<div class="spacing-row"><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:var(' + esc(t.var) + ')"></div></div><div class="spacing-meta"><span class="spacing-name">' + esc(t.figma) + '</span>  ' + usesLink(t.var) + ' · ' + esc(val[t.var]) + '</div></div>';
-        }).join('') + '</div></div>';
+        return tokenCard(f, rows.map(function (t) { return { sample: sample(t), t: t, value: val[t.var] }; }));
       }).join('');
-      Array.prototype.forEach.call(d.querySelectorAll('.spacing-bar'), sized);
+      Array.prototype.forEach.call(d.querySelectorAll('.sg-token-sample > span'), sized);
     };
     var sSized = sizeSwitch(s, draw); s.appendChild(d); draw(sSized);
   }
-  spacing('spacing', 'Spacing', TOKENS.spacing);
-  if ((TOKENS.radii || []).length) {
-    hr(); foundationLink('radii', 'radii');
-    var rs = section('radii', 'Foundations', 'Radii', null);
-    var rd = document.createElement('div'); rd.className = 'sg-demo';
-    var drawRadii = function (sized) {
-      var val = {}; TOKENS.radii.forEach(function (t) { val[t.var] = sizedValue(rd, sized, t.var) || t.value; });
-      rd.innerHTML = TOKENS.radii.map(function (t) {
-        return '<div class="radius-chip"><div class="radius-chip-box" style="border-radius:var(' + esc(t.var) + ')"></div><div class="radius-chip-label">' + esc(t.figma) + '<br>' + usesLink(t.var) + '<br>' + esc(val[t.var]) + '</div></div>';
-      }).join('');
-      Array.prototype.forEach.call(rd.querySelectorAll('.radius-chip-box'), sized);
-    };
-    var rSized = sizeSwitch(rs, drawRadii); rs.appendChild(rd); drawRadii(rSized);
-  }
+  sizeList('spacing', 'Spacing', TOKENS.spacing, function (t) { return '<span class="spacing-bar" style="width:var(' + esc(t.var) + ')"></span>'; });
+  sizeList('radii', 'Radii', TOKENS.radii, function (t) { return '<span class="sg-token-radius" style="border-radius:var(' + esc(t.var) + ')"></span>'; });
 
   /* ── Icons: every icon is a real one from the system's symbol sheet, referenced by id ───────────────────────── */
   if ((DATA.icons || []).length) {
@@ -1496,7 +1530,7 @@ a.pg-usage-name { color: var(--sg-text); }
   function differencesHTML(c) {
     if (!(c.differences || []).length) return '';
     return '<div class="pg-par-card pg-diff"><table class="pg-par-table"><thead><tr><th>Differs from Figma</th><th>Who acts</th><th>What to do</th></tr></thead><tbody>' + c.differences.map(function (x) {
-      return '<tr data-status="differs"><td>' + (x.new ? '<b>New.</b> ' : '') + onWhat(c, x.plain || x.what) + '</td><td class="pg-par-type">' + (x.todo ? esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')' : '') + '</td><td>' + (x.todo ? esc(doWhat(x.todo)) : '') + '</td></tr>';
+      return '<tr data-status="differs"><td>' + (x.new ? '<b>New.</b> ' : '') + onWhat(c, x.plain || x.what) + '</td><td class="pg-par-type">' + (x.todo ? esc(WHO[x.who] || 'To do') + todoRef(c.name + '\u0000' + x.what) : '') + '</td><td>' + (x.todo ? esc(doWhat(x.todo)) : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }
   // One table of everything the component has (each prop, variable and value, whatever the Playground shows): its type,
@@ -1738,7 +1772,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var add = function (label, st, html, from, listed) { var sc = scOfLabel(label); if (sc) items.push({ sc: sc, label: label, st: st, html: html, from: from, listed: !!listed }); };
     (c.a11yFindings || []).forEach(function (x) {
       var contrast = /contrast/i.test((x.check || '') + ' ' + (x.what || ''));
-      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', (x.new ? '<b>New.</b> ' : '') + onWhat(c, x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + ' (#' + (TODO_NO[c.name + '\u0000' + x.what] || '?') + ')</b> ' + esc(doWhat(x.todo)) + '</span>' : ''), 'The audit, from the code capture', true);
+      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', (x.new ? '<b>New.</b> ' : '') + onWhat(c, x.plain || x.what) + (x.todo ? '<span class="pg-todo"><b>' + esc(WHO[x.who] || 'To do') + todoRef(c.name + '\u0000' + x.what) + '</b> ' + esc(doWhat(x.todo)) + '</span>' : ''), 'The audit, from the code capture', true);
     });
     if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '. ' + i.details.join('; ') + '. ' + i.fix), FROM_AUDIT + ', ' + when(ch.at)); });
     var stat = {};
@@ -1780,9 +1814,9 @@ a.pg-usage-name { color: var(--sg-text); }
   // for accessibility, and the parity rows on one side only. One card table per component; the system's own items first.
   // A check the page runs in the browser shows in the component's Accessibility area once it is open.
   function fillTodo() {
-    var by = {}, order = [], next = TODO.length;
+    var by = {}, order = [];
     var get = function (name) { var k = name || ''; if (!by[k]) { by[k] = { name: name, rows: [] }; order.push(by[k]); } return by[k]; };
-    TODO.forEach(function (t) { get(t.comp).rows.push({ no: t.no, kind: t.kind === 'a11y' ? 'Accessibility' : 'Parity', st: t.kind === 'a11y' || t.who !== 'both' ? 'todo' : 'check', who: WHO[t.who] || WHO.both, html: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>' }); });
+    TODO.forEach(function (t) { get(t.comp).rows.push({ t: t, kind: t.kind === 'a11y' ? 'Accessibility' : 'Parity', st: t.kind === 'a11y' || t.who !== 'both' ? 'todo' : 'check', who: WHO[t.who] || WHO.both, html: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>' }); });
     COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
       var rows = [];
       // Accessibility as its own area shows it: every criterion still to fix or to check, with what was found and what a
@@ -1812,9 +1846,18 @@ a.pg-usage-name { color: var(--sg-text); }
         var n = (r.figma && r.figma.name) || (r.code && r.code.name) || '';
         rows.push({ kind: 'Parity', st: 'check', who: WHO.both, html: esc(r.type + ' ' + n + (r.status === 'figma' ? ', only in Figma.' : ', only in the code.')) + '<span class="pg-todo">' + esc(r.status === 'figma' ? 'Build it in the code, or remove it from Figma.' : 'Add it to Figma, or remove it from the code.') + '</span>' });
       });
-      if (rows.length) { var g = get(c.name); rows.forEach(function (r) { r.no = ++next; g.rows.push(r); }); }
+      if (rows.length) { var g = get(c.name); rows.forEach(function (r) { g.rows.push(r); }); }
     });
     order.sort(function (a, b) { return (a.name ? 1 : 0) - (b.name ? 1 : 0) || String(a.name).localeCompare(String(b.name)); });
+    // Numbered in the order the page shows them, top to bottom: the system first, then each component by name, in each
+    // what is to fix before what is to check. A component's own areas name the same numbers.
+    var no = 0;
+    order.forEach(function (g) {
+      g.rows.forEach(function (r, i) { r.i = i; });
+      g.rows.sort(function (p, q) { return (p.st === 'todo' ? 0 : 1) - (q.st === 'todo' ? 0 : 1) || p.i - q.i; });
+      g.rows.forEach(function (r) { r.no = ++no; if (r.t) { r.t.no = r.no; if (r.t.key) TODO_NO[r.t.key] = r.no; } });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.sg-todo-ref'), function (el) { var n = TODO_NO[decodeURIComponent(el.dataset.key)]; el.textContent = n ? ' (#' + n + ')' : ''; });
     var all = order.reduce(function (n, g) { return n + g.rows.length; }, 0), fix = order.reduce(function (n, g) { return n + g.rows.filter(function (r) { return r.st === 'todo'; }).length; }, 0);
     var link = nav.querySelector('a[href="#todo"]');
     var box = td.querySelector('.sg-todo') || td.appendChild(document.createElement('div')); box.className = 'sg-todo';
@@ -1823,7 +1866,6 @@ a.pg-usage-name { color: var(--sg-text); }
     if (!all) { box.innerHTML = wait + '<p class="pg-par-sum">Nothing open: Figma and the code agree, and nothing fails for accessibility.</p>'; return; }
     var sign = function (st) { var x = A11Y[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>'; };
     box.innerHTML = wait + '<p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + order.map(function (g) {
-      g.rows.sort(function (p, q) { return (p.st === 'todo' ? 0 : 1) - (q.st === 'todo' ? 0 : 1) || p.no - q.no; });
       return '<div class="pg-par-card sg-todo-card"><div class="pg-inspect-head">' + (g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system') + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>No.</th><th>Area</th><th>What to do</th><th>Who</th><th>Status</th></tr></thead><tbody>' +
         g.rows.map(function (r) { return '<tr data-status="' + r.st + '"><td class="pg-par-type">' + r.no + '</td><td class="sg-todo-area">' + esc(r.kind) + '</td><td>' + r.html + '</td><td class="pg-a11y-src">' + esc(r.who) + '</td><td>' + sign(r.st) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
     }).join('');
@@ -2020,7 +2062,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // What is left to do is marked on its area, the system's alert icon before the label and what it is said to a
       // screen reader: Parity while something differs from Figma or is not built, Accessibility while a problem stands
       // (the last browser check's and the audit's), the same counts as its overview card.
-      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + segHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)); }).map(function (a) {
+      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)); }).map(function (a) {
         var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? a11yOpen(c) : null, warn = !!(f && f.todo);
         return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
       })) + '</div></div>' +
@@ -2156,7 +2198,7 @@ a.pg-usage-name { color: var(--sg-text); }
       if (!kept) AREA = v;
       areaNow = v;
       Array.prototype.forEach.call(sec.querySelectorAll('.pg-area'), function (a) { a.hidden = !ALL && a.getAttribute('data-area') !== v; });
-      segItems(areaBar).forEach(function (b) { segSelect(b, b.dataset.v === v); });
+      segItems(areaBar).forEach(function (b) { tabSelect(b, b.dataset.v === v); });
       // The area chosen in view in the scrolling bar, the page itself left where it is.
       var strip = areaBar.querySelector('.pg-areas-scroll'), on = segItems(areaBar).find(function (b) { return b.dataset.v === v; });
       if (strip && on && strip.scrollWidth > strip.clientWidth) { var sr = strip.getBoundingClientRect(), br = on.getBoundingClientRect(); if (br.left < sr.left || br.right > sr.right) strip.scrollLeft += br.left < sr.left ? br.left - sr.left - 8 : br.right - sr.right + 8; }
@@ -3048,7 +3090,7 @@ a.pg-usage-name { color: var(--sg-text); }
       (TOKENS.iconStrokes || []).forEach(function (t) { add('Icon stroke', t.figma, '#icons', t.figma, [t.var, t.value]); });
       var FIGI = DATA.iconFigma || {};
       (DATA.icons || []).forEach(function (id) { var n = (FIGI[id] && FIGI[id].name) || id, px = FIGI[id] && FIGI[id].size; add('Icon' + (px ? ' ' + px + 'px' : ''), n, '#icons', n, [id]); });
-      TODO.forEach(function (t) { add('To do ' + t.no, t.say, '#todo', null, [t.todo, t.comp]); });
+      TODO.forEach(function (t) { add('To do' + (t.comp ? ' in ' + t.comp : ''), t.say, '#todo', null, [t.todo, t.comp]); });   // no number: it follows the list as it grows
       return INDEX;
     };
     var pending = null;
