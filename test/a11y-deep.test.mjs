@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, runGate } from './helpers.mjs';
 import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine, makeStep, pageLoadedExpression } from '../a11y-check.mjs';
-import { stateContrastFindings, tokenContrastFindings } from '../contrast-check.mjs';
+import { stateContrastFindings, tokenContrastFindings, tintedVars } from '../contrast-check.mjs';
 import { deriveContrastPairs } from '../pair-derive.mjs';
 import { findChrome } from '../cdp.mjs';
 
@@ -125,6 +125,18 @@ test('tints: same-colour token pairs are not comparable; a see-through backgroun
   const r = stateContrastFindings(code);
   assert.equal(r.checked, 1);                                   // dark has no backdrop: skipped, not guessed
   assert.equal(r.findings.length, 0);                           // red text on a 12% red tint over white passes
+});
+
+test('tints: a background the code paints see-through is measured as rendered, not as the solid token', () => {
+  const code = { components: { tag: { props: { backgroundColor: { value: 'color(srgb 0.76 0 0 / 0.12)', var: '--tag-bg-red' } },
+    states: { 'Type=Amber': { changed: { backgroundColor: { value: 'color(srgb 0.81 0.62 0 / 0.15)', var: '--tag-bg-amber' } } } } },
+    card: { props: { backgroundColor: { value: 'rgb(255, 255, 255)', var: '--card-bg' } } } } };
+  assert.deepEqual([...tintedVars(code)].sort(), ['--tag-bg-amber', '--tag-bg-red']);
+  const pairs = [{ text: 'tag/label/amber', bg: 'tag/bg/amber' }, { text: 'card/text', bg: 'card/bg' }];
+  const hex = { 'tag/label/amber': '#404040', 'tag/bg/amber': '#cf9e00', 'card/text': '#adadad', 'card/bg': '#ffffff' };
+  const r = tokenContrastFindings(pairs, (n) => hex[n], { tinted: (t) => t === 'tag/bg/amber' });
+  assert.deepEqual(r.sameColour.map((x) => [x.name, x.tinted]), [['tag/label/amber on tag/bg/amber', true]]);
+  assert.deepEqual(r.findings.map((f) => f.name), ['card/text on card/bg']);   // a solid background is still measured
 });
 
 test('the same element failing the same way in many places is one finding with a count', () => {
