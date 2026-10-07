@@ -487,7 +487,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const seenIn = (c) => (c.differences ?? []).filter((d) => PRODUCT_MISUSE.test(d.check ?? '') || / laid over it /.test(d.what ?? '')).map((d) => d.plain ?? d.what);
       for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c) });
     } catch { /* no guidance */ }
-    const { segmentedUi, radioGroupUi, buttonsAsSegmentedUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
+    const { segmentedUi, tabsUi, radioGroupUi, buttonsAsSegmentedUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
     // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
     // every mode), the semantic roles, then each component's own.
@@ -566,7 +566,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       .map(([id, i]) => [id, { name: i.name ?? '', size: Number(String(i.viewBox ?? '').split(/[\s,]+/)[2]) || null }]));
     // Each control the page needs is the system's own; where it has none, its nearest stand-in (a segmented control:
     // tabs, then a radio group, then its buttons side by side), and the page says so (view.ui.gaps).
-    view.ui = { segmented: segmentedUi(view.components) ?? radioGroupUi(view.components, systemCss) ?? buttonsAsSegmentedUi(view.components, systemCss), field: fieldUi(view.components, systemCss), button: buttonUi(view.components, systemCss, sh.ui?.button ?? null), card: cardUi(view.components, systemCss), iconButton: iconButtonUi(view.components, systemCss), overlay: view.components.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
+    view.ui = { segmented: segmentedUi(view.components) ?? radioGroupUi(view.components, systemCss) ?? buttonsAsSegmentedUi(view.components, systemCss), tabs: tabsUi(view.components), field: fieldUi(view.components, systemCss), button: buttonUi(view.components, systemCss, sh.ui?.button ?? null), card: cardUi(view.components, systemCss), iconButton: iconButtonUi(view.components, systemCss), overlay: view.components.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
     view.ui.gaps = standInGaps(view.ui);
     // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
