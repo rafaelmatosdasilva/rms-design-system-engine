@@ -936,6 +936,23 @@ function rgbaOf(v) {
 // that says it (segment, toggle, tabs, switcher, picker) is preferred. → { from, open, close, item: { tag, classes,
 // label }, selected: { add, attrs } } or null (the page then uses a plain row of buttons the browser draws).
 export function segmentedUi(components = []) {
+  const best = choiceGroups(components).sort((a, b) => a.score - b.score)[0];
+  if (!best) return null;
+  const { score, ...ui } = best;
+  return ui;
+}
+
+// The system's own tabs, for the switch between a component's areas: a component named for tabs whose markup is a group
+// with a selected item, read as segmentedUi reads one. → same shape, standIn null, or null (the page then draws its
+// own tabs, a row of words with a line under the chosen one, in the system's colours, text styles and spacing).
+export function tabsUi(components = []) {
+  const best = choiceGroups(components).filter((g) => g.standIn === 'tabs').sort((a, b) => a.score - b.score)[0];
+  if (!best) return null;
+  const { score, ...ui } = best;
+  return { ...ui, standIn: null };
+}
+
+function choiceGroups(components) {
   const found = [];
   for (const c of components) {
     const m = /^\s*<([a-z][\w-]*)\b([^>]*)>([\s\S]*)<\/\1>\s*$/i.exec(c.markup ?? '');
@@ -966,10 +983,7 @@ export function segmentedUi(components = []) {
     const deco = [...inner.matchAll(/<span\b[^>]*aria-hidden\s*=\s*["']true["'][^>]*>\s*<\/span>/gi)].map((d) => d[0]).join('');
     found.push({ score, from: c.name, open: `<${rootTag}${base ? ` class="${base}"` : ''}>${deco}`, close: `</${rootTag}>`, item: { tag: items[0].tag, classes: common, label }, selected, standIn: own ? null : tabs ? 'tabs' : c.name });
   }
-  const best = found.sort((a, b) => a.score - b.score)[0];
-  if (!best) return null;
-  const { score, ...ui } = best;
-  return ui;
+  return found;
 }
 
 // With no segmented control and no tabs: the system's radio group, one radio per choice (a component whose markup holds
@@ -1009,6 +1023,7 @@ export function standInGaps(ui = {}) {
   const seg = ui.segmented;
   if (!seg) gaps.push({ control: 'segmented control', uses: 'plain buttons drawn with its tokens' });
   else if (seg.standIn) gaps.push({ control: 'segmented control', uses: seg.standIn === 'tabs' ? 'its tabs' : seg.standIn === 'radio group' ? 'its radio group' : seg.standIn === 'buttons' ? 'its buttons side by side' : `its ${seg.standIn}` });
+  if (!ui.tabs) gaps.push({ control: 'tabs', uses: 'tabs of its own, drawn with its colours, text styles and spacing' });
   if (!ui.field) gaps.push({ control: 'text field', uses: 'a plain text input drawn with its tokens' });
   else if (ui.field.standIn) gaps.push({ control: 'text field', uses: `its ${ui.field.standIn}` });
   if (!ui.button) gaps.push({ control: 'text button', uses: 'plain links and buttons drawn with its tokens' });

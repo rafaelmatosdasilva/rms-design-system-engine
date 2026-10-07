@@ -2,7 +2,7 @@
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { modeAxes, realizedControls, chromeRoles, segmentedUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } from '../styleguide-data.mjs';
+import { modeAxes, realizedControls, chromeRoles, segmentedUi, tabsUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } from '../styleguide-data.mjs';
 import { checkStyleguidePage, failures, missingRoles, controlClasses } from '../styleguide-check.mjs';
 import { differences, differencesMarkdown, plainDifference, plainAction } from '../run-diff.mjs';
 import { appDir } from '../code-roots.mjs';
@@ -70,6 +70,11 @@ test('the page\'s switches and text fields are the system\'s own components, rea
     { name: 'segmentedControl', markup: '<div class="segmented-control full-width"><span class="seg-pill"></span><button class="selected"><span class="tab-label">A</span></button><button><span class="tab-label">B</span></button></div>' }]);
   assert.deepEqual(seg, { from: 'segmentedControl', open: '<div class="segmented-control">', close: '</div>', item: { tag: 'button', classes: [], label: 'tab-label' }, selected: { add: ['selected'], attrs: {} }, standIn: null });
   assert.equal(segmentedUi([{ name: 'x', markup: '<div><button>A</button><button>B</button></div>' }]), null, 'no selected state, not a segmented control');
+  // The switch between a component's areas: the system's own tabs, never its segmented control; none, the page's own.
+  const tabs = tabsUi([{ name: 'segmentedControl', markup: '<div class="seg"><button class="selected">A</button><button>B</button></div>' },
+    { name: 'tabBar', markup: '<nav class="tabs"><a class="tab is-active">A</a><a class="tab">B</a></nav>' }]);
+  assert.deepEqual(tabs, { from: 'tabBar', open: '<nav class="tabs">', close: '</nav>', item: { tag: 'a', classes: ['tab'], label: null }, selected: { add: ['is-active'], attrs: {} }, standIn: null });
+  assert.equal(tabsUi([{ name: 'segmentedControl', markup: '<div class="seg"><button class="selected">A</button><button>B</button></div>' }]), null, 'no tabs: the page draws its own');
   const field = fieldUi([{ name: 'input', markups: ['<div class="fieldWrap product-x"><input type="number" class="fieldInput"></div>', '<div class="fieldWrap"><svg></svg><input type="text" class="fieldInput extra" value="v"></div>'] }], '.fieldWrap{} .fieldInput{}');
   assert.deepEqual(field, { from: 'input', markup: '<div class="fieldWrap"><input type="text" aria-label="Value" class="fieldInput"></div>' });
 });
