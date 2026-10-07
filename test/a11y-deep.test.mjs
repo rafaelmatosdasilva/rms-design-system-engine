@@ -139,6 +139,15 @@ test('tints: a background the code paints see-through is measured as rendered, n
   assert.deepEqual(r.findings.map((f) => f.name), ['card/text on card/bg']);   // a solid background is still measured
 });
 
+test('tints: a see-through background is measured over every surface of its mode, the worst one reported', () => {
+  const code = { components: { tag: { instance: { hasText: true }, props: { fontSize: { value: '12px' } },
+    colors: { dark: { color: 'rgb(254, 103, 103)', backgroundColor: 'rgba(254, 103, 103, 0.08)', backdrop: 'rgb(28, 28, 28)' } } } } };
+  assert.equal(stateContrastFindings(code).findings.length, 0);                       // over the captured backdrop it passes
+  const r = stateContrastFindings(code, {}, { surfaces: { dark: ['#1c1c1c', '#2c2c2c'] } });
+  assert.equal(r.checked, 1);
+  assert.deepEqual(r.findings.map((f) => [f.mode, f.onSurface, f.ratio < 4.5]), [['dark', '#2c2c2c', true]]);   // the lighter surface fails
+});
+
 test('the same element failing the same way in many places is one finding with a count', () => {
   const f = (text) => ({ kind: 'contrast', desc: 'button in .seg', theme: 'Dark', ratio: 2.02, threshold: 4.5, text });
   const g = groupSame([f('a'), f('b'), f('c'), f('d'), { ...f('e'), ratio: 3 }]);

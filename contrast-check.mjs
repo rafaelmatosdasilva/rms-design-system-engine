@@ -74,7 +74,10 @@ export function tintedVars(code) {
 // text against its own background in every mode, and in every state the capture produced (colours
 // measured in every mode the capture recorded). Disabled states are exempt (WCAG 1.4.3). A see-through
 // background is blended over the backdrop the capture saw behind it, and skipped when there is none. Large text (24px, or 18.66px bold) needs 3:1.
-export function stateContrastFindings(code, cfg = {}) {
+// opts.surfaces: { <mode>: [colour, …] }, the surfaces the system defines in each mode. A see-through
+// background shows whatever it sits on, so it is measured over the backdrop the capture saw and over each
+// of these, and the worst one is reported (with the surface it was).
+export function stateContrastFindings(code, cfg = {}, opts = {}) {
   const findings = [];
   let checked = 0;
   const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
@@ -89,15 +92,25 @@ export function stateContrastFindings(code, cfg = {}) {
     const threshold = size >= 24 || (size >= 18.66 && weight >= 700) ? 3 : 4.5;
     const check = (state, mode, fg, bg, src = {}, backdrop = null) => {
       const f = parseColor(fg);
-      let b = parseColor(bg);
-      // A see-through background (a tint) is blended over what the capture saw behind it.
-      const under = backdrop ? parseColor(backdrop) : null;
-      if (b && b[3] < 1 && under) b = [0, 1, 2].map((i) => b[i] * b[3] + under[i] * (1 - b[3])).concat(1);
-      if (!f || !b || b[3] < 1 || f[3] === 0) return;
+      const b0 = parseColor(bg);
+      if (!f || !b0 || f[3] === 0) return;
+      // A see-through background (a tint) is blended over what the capture saw behind it, and over every
+      // surface the system defines in that mode: it can sit on any of them.
+      let unders = [null];
+      if (b0[3] < 1) {
+        unders = [backdrop, ...(opts.surfaces?.[mode] ?? [])].map((u) => (u ? { u, c: parseColor(u) } : null)).filter((x) => x?.c && x.c[3] >= 1);
+        if (!unders.length) return;
+      }
+      let worst = null;
+      for (const under of unders) {
+        const b = under ? [0, 1, 2].map((i) => b0[i] * b0[3] + under.c[i] * (1 - b0[3])).concat(1) : b0;
+        if (b[3] < 1) return;
+        const a = f[3];
+        const ratio = Math.round(contrastRatio({ r: f[0] * a + b[0] * (1 - a), g: f[1] * a + b[1] * (1 - a), b: f[2] * a + b[2] * (1 - a) }, { r: b[0], g: b[1], b: b[2] }) * 100) / 100;
+        if (!worst || ratio < worst.ratio) worst = { ratio, on: under && under.u !== backdrop ? under.u : null };
+      }
       checked++;
-      const a = f[3];
-      const ratio = Math.round(contrastRatio({ r: f[0] * a + b[0] * (1 - a), g: f[1] * a + b[1] * (1 - a), b: f[2] * a + b[2] * (1 - a) }, { r: b[0], g: b[1], b: b[2] }) * 100) / 100;
-      if (ratio < threshold) findings.push({ component: name, state, mode, ratio, threshold, fg, bg, fgVar: src.fg?.var ?? null, bgVar: src.bg?.var ?? null, at: src.fg?.at ?? src.bg?.at ?? null });
+      if (worst.ratio < threshold) findings.push({ component: name, state, mode, ratio: worst.ratio, threshold, fg, bg, onSurface: worst.on, fgVar: src.fg?.var ?? null, bgVar: src.bg?.var ?? null, at: src.fg?.at ?? src.bg?.at ?? null });
     };
     const baseSrc = { fg: tp.color ?? c.props?.color, bg: c.props?.backgroundColor };
     for (const m of modes) check('default', m, colors[m].color, colors[m].backgroundColor, baseSrc, colors[m].backdrop);
