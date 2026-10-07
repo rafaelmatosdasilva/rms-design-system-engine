@@ -52,3 +52,37 @@ export function deriveContrastPairs(tokenNames, { boundaries = false } = {}) {
   }
   return pairs;
 }
+
+// What Figma draws, from the structure snapshot: drawnOn ([{ fg, on, icon }] per component, a text or icon colour
+// token and the fill token of the layer right under it, 'surface' when nothing in the component paints under it)
+// and fills (every fill token the component's own layers paint). A name-derived pair is left out when Figma paints
+// its background in the same component as the text but never under it (a checkbox's selected text sits beside its
+// box, not on it); a background another component paints (a segment's control) is not known here, so the pair
+// stays. Each pair Figma draws on a token is added. Pure.
+export function applyDrawnOn(derived, structure) {
+  const together = new Set(), apartIn = new Map(), drawn = [];
+  for (const c of Object.values(structure ?? {})) {
+    const list = Array.isArray(c?.drawnOn) ? c.drawnOn.filter((d) => d?.fg && d.on) : [];
+    const fills = new Set(Array.isArray(c?.fills) ? c.fills : []);
+    for (const d of list) { together.add(`${d.fg}|${d.on}`); drawn.push(d); }
+    for (const fg of new Set(list.map((d) => d.fg))) {
+      for (const f of fills) if (!list.some((d) => d.fg === fg && d.on === f)) apartIn.set(`${fg}|${f}`, true);
+    }
+  }
+  if (!drawn.length) return { pairs: derived || [], apart: [], added: 0 };
+  const pairs = [], apart = [], seen = new Set();
+  for (const p of derived || []) {
+    const key = `${p.text}|${p.bg}`;
+    if (apartIn.has(key) && !together.has(key)) { apart.push(p); continue; }
+    seen.add(key); pairs.push(p);
+  }
+  let added = 0;
+  const disabled = (t) => /(^|\/)disabled(\/|$)/i.test(t);
+  for (const d of drawn) {
+    if (d.on === 'surface' || d.on === 'unbound' || d.on === d.fg || disabled(d.fg) || disabled(d.on)) continue;
+    const key = `${d.fg}|${d.on}`;
+    if (seen.has(key)) continue; seen.add(key);
+    pairs.push({ name: `${d.fg} on ${d.on}`, text: d.fg, bg: d.on, large: !!d.icon }); added++;
+  }
+  return { pairs, apart, added };
+}

@@ -1091,12 +1091,16 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **State contrast, no browser needed** — from the code capture: each component's text against its own
   background in every mode and every state the capture produced (hover, selected, error…). Disabled states
   are exempt. A see-through background (a tint made with opacity or `color-mix()`) is blended over what
-  the capture saw behind it. Each finding names the two colour tokens, the rule's file and line, and
+  the capture saw behind it and over each surface the system defines in that mode (its colour tokens with
+  `/surface/` in the name, or `a11y.surfaces`), the worst one reported with its surface. Each finding names the two colour tokens, the rule's file and line, and
   links the component in Figma. Printed with the token contrast in the audit.
 - **Token contrast** — see-through text is blended over its background; a see-through background (no
-  known surface under it) is skipped; disabled pairs are exempt; pairs come from every mode's token names.
-  A text token with the same colour as its background token is reported as not comparable: the component
-  applies that background as a tint, which only the rendered state contrast can measure.
+  known surface under it) is skipped; disabled pairs are exempt; pairs come from every mode's token names,
+  corrected by what Figma draws (the structure snapshot's `drawnOn`): a text is paired with the background
+  Figma draws it on, and a pair the names suggest is left out and listed when Figma paints that background in the same component but never under the text.
+  A text token with the same colour as its background token, or a background the code paints as a tint
+  (a `color-mix` or an opacity), is reported as not comparable: only the rendered state contrast measures it,
+  over every surface the system defines in that mode, worst first.
   Border, outline and focus-ring tokens are paired at 3:1 with `a11y.nonTextPairs: true` (opt-in: a border is
   often decorative); dividers never are.
 - **On the styleguide, only the design system's components are checked** (their selectors), not the page's

@@ -538,6 +538,91 @@ async function deepFacts(node, set) {
 // entry = { h, paddingVar, …, ...(await deepFacts(defaultVariant, componentSet)) }
 ```
 
+**Paint facts (always).** Record these on each component's entry too, from every variant, with the
+`paintFacts` walk below. They are what the colour checks need to know beyond the tokens:
+- `fillOpacity`: the opacity the default variant's fill is drawn with when it is below 1, the paint's
+  opacity times the layer's own when the fill is on a Background child (a badge's tint at 8%). Gate [13]
+  (Structure) compares it with the alpha the code paints its background with (a `color-mix` or an
+  opacity), divided by the alpha of the variable it paints.
+- `variantFillOpacity`: the same for each variant, when any is below 1, compared with the state the code
+  capture produced for that variant.
+- `drawnOn`: each text and icon colour token of the component's own layers, with the fill token of the
+  layer right under it (`surface` when nothing in the component paints under it).
+- `fills`: every fill token the component's own layers paint. The token contrast check pairs a text
+  with the background Figma draws it on, and leaves out a pair the token names suggest when Figma paints
+  that background in the same component but never under the text (a checkbox's selected text sits
+  beside its box, not on it).
+
+```js
+// paintFacts(set): the fill's own opacity, and what each text and icon colour is drawn on.
+async function paintFacts(set) {
+  const variants = set.type === 'COMPONENT_SET' ? set.children.filter((c) => c.type === 'COMPONENT') : [set];
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const solid = (n, key = 'fills') => (Array.isArray(n[key]) ? n[key] : []).find((p) => p.visible !== false && p.type === 'SOLID');
+  const tokenOf = async (p) => { const id = p?.boundVariables?.color?.id; const v = id ? await figma.variables.getVariableByIdAsync(id) : null; return v?.name ?? null; };
+  const isIcon = (n) => n.type === 'INSTANCE' && /icon/i.test(n.name);
+  const shown = (n, root) => { for (let x = n; x && x !== root.parent; x = x.parent) if (x.visible === false) return false; return true; };
+  // Inside another component (an icon's own shapes, a nested button): that component records its own.
+  const nested = (n, root) => { for (let x = n.parent; x && x !== root; x = x.parent) if (x.type === 'INSTANCE') return true; return false; };
+  // The layer that draws the fill: the frame itself (its paint opacity), else its child named
+  // Background (the paint opacity times the layer's own opacity).
+  const fillOpacity = (v) => {
+    if (solid(v)) return r2(solid(v).opacity ?? 1);
+    const l = (v.children ?? []).find((c) => c.visible !== false && /background/i.test(c.name) && solid(c));
+    return l ? r2((solid(l).opacity ?? 1) * l.opacity) : null;
+  };
+  const out = {};
+  const disabled = (name) => /(^|,\s*)(state=disabled|disabled=true)(\s*,|$)/i.test(name);
+  const def = variants.find((v) => /default/i.test(v.name)) ?? variants[0];
+  const op = fillOpacity(def);
+  if (op != null && op < 1) out.fillOpacity = op;
+  const perVariant = {};
+  for (const v of variants) { const o = fillOpacity(v); if (o != null && o < 1) perVariant[v.name] = o; }
+  if (variants.length > 1 && Object.keys(perVariant).length) out.variantFillOpacity = perVariant;
+  // drawnOn: [{ fg, on, icon }], a text or icon colour token and the fill token of the layer right under it
+  // ('surface' when nothing in the component paints under it, 'unbound' for a colour with no variable).
+  const box = (n) => n.absoluteBoundingBox;
+  const covers = (a, b) => { const A = box(a), B = box(b); if (!A || !B) return false; const x = B.x + B.width / 2, y = B.y + B.height / 2; return x >= A.x && x <= A.x + A.width && y >= A.y && y <= A.y + A.height; };
+  const seen = new Set(), drawnOn = [], fills = new Set();
+  for (const v of variants) {
+    if (disabled(v.name)) continue;
+    // fills: every fill token the component's own layers paint (a pair whose background is one of them but
+    // is not under the text is drawn apart; a background painted by a parent component is not known here).
+    for (const l of [v, ...v.findAll((x) => x.type !== 'TEXT' && !isIcon(x))]) {
+      if (l !== v && (!shown(l, v) || nested(l, v) || l.type === 'INSTANCE')) continue;
+      const t = solid(l) ? await tokenOf(solid(l)) : null;
+      if (t) fills.add(t);
+    }
+    for (const n of v.findAll((x) => x.type === 'TEXT' || isIcon(x))) {
+      if (!shown(n, v) || nested(n, v)) continue;
+      let fg = null;
+      if (n.type === 'TEXT') fg = await tokenOf(solid(n));
+      else {
+        const shape = n.findOne((x) => x.visible !== false && !x.isMask && x.type !== 'INSTANCE' && (solid(x) || (x.strokeWeight > 0 && solid(x, 'strokes'))));
+        if (shape) fg = await tokenOf(shape.strokeWeight > 0 && solid(shape, 'strokes') ? solid(shape, 'strokes') : solid(shape));
+      }
+      if (!fg) continue;
+      let bg = null;
+      for (let x = n; x !== v && !bg; x = x.parent) {
+        const p = x.parent, i = p.children.indexOf(x);
+        for (let j = i - 1; j >= 0 && !bg; j--) {
+          const s = p.children[j];
+          if (s.visible !== false && !s.isMask && s.type !== 'TEXT' && !isIcon(s) && solid(s) && covers(s, n)) bg = s;
+        }
+        if (!bg && solid(p)) bg = p;
+      }
+      const on = bg ? ((await tokenOf(solid(bg))) ?? 'unbound') : 'surface';
+      const k = `${fg}|${on}`;
+      if (!seen.has(k)) { seen.add(k); drawnOn.push({ fg, on, icon: n.type !== 'TEXT' }); }
+    }
+  }
+  if (drawnOn.length) out.drawnOn = drawnOn;
+  if (fills.size) out.fills = [...fills];
+  return out;
+}
+// entry = { …, ...(await paintFacts(componentSet)) }
+```
+
 Capture `strokeOnAnyState` with a **deep recursive walk** across all variants:
 
 ```js
