@@ -3557,13 +3557,24 @@ function reportFull(label, items, shown) {
         }
       }
       if (pairs.length) {
-        const { tokenContrastFindings } = await import('./contrast-check.mjs');
+        const { tokenContrastFindings, tintedVars } = await import('./contrast-check.mjs');
         const all = [];
         const same = new Set();
         let anyChecked = 0;
+        // A background the code paints as a tint (color-mix, opacity) is measured as rendered only.
+        let tinted = () => false;
+        try {
+          const { readFreshSnapshot } = await import('./code-capture.mjs');
+          const { colorVarOf, loadParityMaps } = await import('./capture-compare.mjs');
+          const { resolveNamingSpec } = await import('./naming-convention.mjs');
+          const cap = await readFreshSnapshot(ROOT, cfg);
+          const tv = tintedVars(cap);
+          const spec = resolveNamingSpec(cfg), maps = await loadParityMaps(ROOT, cfg);
+          if (tv.size) tinted = (t) => { const v = colorVarOf(t, spec, maps); return !!v && tv.has(v); };
+        } catch { /* no fresh capture: compare the tokens as they are */ }
         for (const mode of modes) {
           const resolve = (t) => vsnap.color[mode]?.[t] ?? vsnap.color[mode]?.[`${t}/color`] ?? null;
-          const { findings, checked, sameColour } = tokenContrastFindings(pairs, resolve);
+          const { findings, checked, sameColour } = tokenContrastFindings(pairs, resolve, { tinted });
           anyChecked += checked;
           for (const f of findings) all.push({ ...f, mode });
           for (const f of sameColour) same.add(f.name);
@@ -3593,7 +3604,7 @@ function reportFull(label, items, shown) {
           console.log(`\nℹ️  Token contrast: all pairs meet WCAG AA across ${modes.length} mode(s) (${provenance}).`);
         }
         if (same.size) {
-          console.log(`\nℹ️  Token contrast: ${same.size} pair(s) not comparable - the text and background tokens are the same colour, so the component applies the background as a tint (opacity or color-mix). The rendered state contrast measures them.`);
+          console.log(`\nℹ️  Token contrast: ${same.size} pair(s) not comparable - the component draws the background as a tint (opacity or color-mix), or the text and background tokens are the same colour. The rendered state contrast measures them.`);
           for (const n of [...same].slice(0, 10)) console.log(`     · ${n}`);
           if (same.size > 10) console.log(`     … ${same.size - 10} more`);
         }
