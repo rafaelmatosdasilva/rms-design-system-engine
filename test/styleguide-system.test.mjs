@@ -217,7 +217,7 @@ test('what to do about each difference, and who does it', () => {
   assert.deepEqual(plainAction('node font size: Figma m (11px), rendered 13px via --l-size  (.x · a.html:75)  → in Figma, set it to the token behind --l-size  [code moved, Figma is behind]'), { who: 'figma', todo: 'In Figma, set the node font size to the token behind --l-size.' });
   assert.equal(plainAction('modal.fontSizeVar: contract=null  Figma="l"').who, 'code');
   assert.equal(plainAction('· overlay/color').who, 'figma');
-  assert.equal(plainAction('x [default · light]: 3.1:1 (needs 4.5:1)  #000 (--a) on #111 (--b)').who, 'both');
+  assert.equal(plainAction('x [default · light]: 3.1:1 (needs 4.5:1)  #000 (--a) on #111 (--b)').who, 'figma', 'a colour that fails contrast is changed in Figma, whose colours are deliberate');
 });
 
 test('a switch whose selector adds a negative class on a layer (no-divider-top::after) turns it on only when off', () => {

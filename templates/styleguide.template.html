@@ -292,7 +292,11 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-todo { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-text-2); }
 .sg-todo { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one card table per component */
 .sg-todo .pg-todo { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); }
-.sg-todo-area, .sg-todo .pg-a11y-src { white-space: nowrap; }   /* Accessibility, Decide, In Figma: never broken mid-word */
+.sg-todo-area, .sg-todo .pg-a11y-src { white-space: nowrap; }   /* Accessibility, You decide: never broken mid-word */
+/* Every component's table has the same columns at the same widths, so they line up down the page. */
+.sg-todo .pg-par-table { table-layout: fixed; }
+.sg-todo .pg-par-table th:nth-child(1) { width: 7%; } .sg-todo .pg-par-table th:nth-child(2) { width: 14%; }
+.sg-todo .pg-par-table th:nth-child(4) { width: 17%; } .sg-todo .pg-par-table th:nth-child(5) { width: 12%; }
 .pg-diff { border-color: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
 .pg-note:last-child { margin-bottom: var(--sg-space-m); }
 .pg-header { background: var(--sg-bg); padding: var(--sg-space-xs) 0 var(--sg-space-s); }   /* scrolls away; the areas below it stay */
@@ -676,7 +680,9 @@ a.pg-usage-name { color: var(--sg-text); }
   /* ── To do: every difference and everything not built yet, numbered, by who acts ──────────────────────────────
      In Figma (the person), in the code (ask Claude), or a decision first. The numbers are the same in each component's
      own list, so "do 3 and 7" names them. */
-  var WHO = { figma: 'In Figma', code: 'In the code', both: 'Decide' };
+  // Who acts on an item: you in the Figma file, Claude in the code (tell Claude its number), you deciding which side is
+  // right when Figma and the code each have a case, or you checking by hand what only a person can judge.
+  var WHO = { figma: 'You in Figma', code: 'Claude in the code', both: 'You decide', person: 'You check by hand' };
   function doWhat(t) { var r = String(t || '').replace(/^In (the code|Figma), /, ''); return r.charAt(0).toUpperCase() + r.slice(1); }   // the label already says where
   var TODO = [], TODO_NO = {};
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
@@ -1711,7 +1717,7 @@ a.pg-usage-name { color: var(--sg-text); }
     (a.static || []).forEach(function (f) { (stat[f.kind] = stat[f.kind] || []).push(f); });
     Object.keys(stat).forEach(function (k) { add(wcagLabelOf(wcagScOf(k)), 'todo', esc(wcagTitle(k, stat[k].length) + '. ' + stat[k].map(function (f) { return f.file + ':' + f.line + ', ' + f.desc; }).join('; ') + '. ' + wcagFix(k, stat[k][0].fix)), 'Its code'); });
     // Its role: what it is and what that role and Figma's notes ask of it (the first duty says what it is).
-    if (!a.role) add('WCAG 4.1.2 Name, Role, Value (A)', 'check', 'The role of ' + esc(c.name) + ' is not stated yet. In Figma, add an annotation to the ' + esc(c.name) + ' component' + (figmaOf(c) ? ' (<a href="' + esc(figmaOf(c)) + '" target="_blank" rel="noopener">open it in Figma</a>)' : '') + ' that says its role in the form Role: name (Role: dialog, Role: button, Role: list), and its duties are listed here.', 'Figma, once annotated');
+    if (!a.role) add('WCAG 4.1.2 Name, Role, Value (A)', 'check', 'The role of ' + esc(c.name) + ' is not stated yet. In Figma, add an annotation to the ' + esc(c.name) + ' component' + (figmaOf(c) ? ' (<a class="sg-uses-link" href="' + esc(figmaOf(c)) + '" target="_blank" rel="noopener">open it in Figma</a>)' : '') + ' that says its role in the form Role: name (Role: dialog, Role: button, Role: list), and its duties are listed here.', 'Figma, once annotated');
     // A duty fails when the audit found its own kind of problem (the role's markup, a behaviour, a part, a name, the
     // keys), not when another finding shares its criterion.
     var DUTY = /^(rolecontract|behaviour|partrole|annotation|semantics|name|keyboard|activate|arrows|escape|focusreturn)$/;
@@ -1748,7 +1754,7 @@ a.pg-usage-name { color: var(--sg-text); }
   function fillTodo() {
     var by = {}, order = [], next = TODO.length;
     var get = function (name) { var k = name || ''; if (!by[k]) { by[k] = { name: name, rows: [] }; order.push(by[k]); } return by[k]; };
-    TODO.forEach(function (t) { get(t.comp).rows.push({ no: t.no, kind: t.kind === 'a11y' ? 'Accessibility' : 'Parity', st: t.kind === 'a11y' || t.who !== 'both' ? 'todo' : 'check', who: WHO[t.who] || 'Decide', html: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>' }); });
+    TODO.forEach(function (t) { get(t.comp).rows.push({ no: t.no, kind: t.kind === 'a11y' ? 'Accessibility' : 'Parity', st: t.kind === 'a11y' || t.who !== 'both' ? 'todo' : 'check', who: WHO[t.who] || WHO.both, html: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>' }); });
     COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
       var rows = [];
       // Accessibility as its own area shows it: every criterion still to fix or to check, with what was found and what a
@@ -1763,20 +1769,20 @@ a.pg-usage-name { color: var(--sg-text); }
           var its = r.its.filter(function (it) { return !it.listed && it.st !== 'done'; });
           if (!its.length && r.its.some(function (it) { return it.listed; }) && !(r.st === 'check' && r.note)) return;
           var from = its.map(function (it) { return it.from || ''; }).join(' ');
-          var who = /Figma/.test(from) ? WHO.figma : /^1\.4\.(3|11)$/.test(r.k.sc) ? WHO.both : r.k.how === 'person' || (!its.length && /a person checks/.test(r.note)) ? 'A person' : WHO.code;
+          var who = /Figma/.test(from) ? WHO.figma : /^1\.4\.(3|11)$/.test(r.k.sc) ? WHO.figma : r.k.how === 'person' || (!its.length && /a person checks/.test(r.note)) ? WHO.person : WHO.code;
           var html = '<b>' + esc(r.k.sc + ' ' + r.k.name + (r.k.level ? ' (' + r.k.level + ')' : '')) + '.</b> ' + (its.length ? its.map(function (it) { return it.html; }).join(' ') : esc(r.note));
           rows.push({ kind: 'Accessibility', st: its.some(function (it) { return it.st === 'todo'; }) ? 'todo' : r.st, who: who, html: html });
         });
         // A Figma annotation no check reads yet: written the way a check reads it.
         ((c.a11y || {}).sources || []).forEach(function (x) {
           if (x.st !== 'agents') return;
-          rows.push({ kind: 'Accessibility', st: 'check', who: /annotation/.test(x.from) ? WHO.figma : 'A person', html: esc(x.from + ', ' + x.what + '.') + '<span class="pg-todo">' + unreadFix(x) + '</span>' });
+          rows.push({ kind: 'Accessibility', st: 'check', who: /annotation/.test(x.from) ? WHO.figma : WHO.person, html: esc(x.from + ', ' + x.what + '.') + '<span class="pg-todo">' + unreadFix(x) + '</span>' });
         });
       } catch (e) { /* its accessibility is read on its own page */ }
       ((c.parity && c.parity.rows) || []).forEach(function (r) {
         if (r.status !== 'figma' && r.status !== 'code') return;
         var n = (r.figma && r.figma.name) || (r.code && r.code.name) || '';
-        rows.push({ kind: 'Parity', st: 'check', who: 'Decide', html: esc(r.type + ' ' + n + (r.status === 'figma' ? ', only in Figma.' : ', only in the code.')) + '<span class="pg-todo">' + esc(r.status === 'figma' ? 'Build it in the code, or remove it from Figma.' : 'Add it to Figma, or remove it from the code.') + '</span>' });
+        rows.push({ kind: 'Parity', st: 'check', who: WHO.both, html: esc(r.type + ' ' + n + (r.status === 'figma' ? ', only in Figma.' : ', only in the code.')) + '<span class="pg-todo">' + esc(r.status === 'figma' ? 'Build it in the code, or remove it from Figma.' : 'Add it to Figma, or remove it from the code.') + '</span>' });
       });
       if (rows.length) { var g = get(c.name); rows.forEach(function (r) { r.no = ++next; g.rows.push(r); }); }
     });
@@ -1788,7 +1794,8 @@ a.pg-usage-name { color: var(--sg-text); }
     if (link) link.lastChild.textContent = wait ? 'to do' : 'to do (' + all + ')';   // its count once every component is tried
     if (!all) { box.innerHTML = wait + '<p class="pg-par-sum">Nothing open: Figma and the code agree, and nothing fails for accessibility.</p>'; return; }
     var sign = function (st) { var x = A11Y[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>'; };
-    box.innerHTML = wait + '<p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + order.map(function (g) {
+    var legend = '<p class="pg-wcag-note">Who does it. ' + esc(WHO.figma) + ', a change you make in the Figma file. ' + esc(WHO.code) + ', tell Claude its number and Claude changes the code. ' + esc(WHO.both) + ', Figma and the code each have a case: say which is right, then it is done there. ' + esc(WHO.person) + ', only a person can judge it: look, and it is done.</p>';
+    box.innerHTML = wait + legend + '<p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + order.map(function (g) {
       g.rows.sort(function (p, q) { return (p.st === 'todo' ? 0 : 1) - (q.st === 'todo' ? 0 : 1) || p.no - q.no; });
       return '<div class="pg-par-card sg-todo-card"><div class="pg-inspect-head">' + (g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system') + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>No.</th><th>Area</th><th>What to do</th><th>Who</th><th>Status</th></tr></thead><tbody>' +
         g.rows.map(function (r) { return '<tr data-status="' + r.st + '"><td class="pg-par-type">' + r.no + '</td><td class="sg-todo-area">' + esc(r.kind) + '</td><td>' + r.html + '</td><td class="pg-a11y-src">' + esc(r.who) + '</td><td>' + sign(r.st) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
@@ -1817,7 +1824,9 @@ a.pg-usage-name { color: var(--sg-text); }
       sec.hidden = false; sec.classList.add('pg-offstage');
       var finish = function () {
         sec.classList.remove('pg-offstage');
-        Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k.id !== 'todo'; });
+        // Only the page being viewed shows: the person may have moved on while this one was tried.
+        var here = document.getElementById(hashParts().id || 'overview'); if (!here || !here.matches('main > section')) here = document.getElementById('overview');
+        Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== here; });
         if (!c.__a11y) c.__a11y = { items: c.a11y ? a11yStaticItems(c) : [], live: null };
         fillTodo(); setTimeout(next, 30);
       };
