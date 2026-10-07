@@ -28,7 +28,7 @@
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: bold; --sg-lh: normal;
   /* A page's title: the system's largest text style, scaled up, so the guide has its own hierarchy above any system's
      text styles while every size still comes from the system ("title-scale" in styleguide.chrome, ds-config.json, changes it). */
-  --sg-title-scale: 2.5; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
+  --sg-title-scale: 3.125; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
   --sg-space-xxs: 0.125rem; --sg-space-xs: 0.25rem; --sg-space-s: 0.5rem; --sg-space-m: 0.75rem; --sg-space-l: 1rem; --sg-space-xl: 1.5rem; --sg-space-xxl: 2rem;
   --sg-row-h: calc(var(--sg-space-xxl) + var(--sg-space-m));   /* every table row at least this tall, from the system's spacing */
   --sg-radius-s: 0; --sg-radius: 0; --sg-radius-l: 0; --sg-radius-pill: 0;
@@ -71,7 +71,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-seg button { font: inherit; }
 /* The page's own tabs, when the system has none: words in a row, the chosen one in the text colour with a line under it. */
 .sg-tabs { display: flex; gap: var(--sg-space-xl); border-bottom: var(--sg-line); }
-.sg-tab { display: inline-flex; align-items: center; background: none; border: 0; margin: 0; padding: var(--sg-space-s) 0 calc(var(--sg-space-s) + var(--sg-space-xs)); font: inherit; font-size: var(--sg-m); font-weight: var(--sg-heading-weight); color: var(--sg-muted); white-space: nowrap; cursor: pointer; }
+.sg-tab { display: inline-flex; align-items: center; background: none; border: 0; margin: 0; padding: var(--sg-space-s) 0 calc(var(--sg-space-s) * 2); font: inherit; font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-muted); white-space: nowrap; cursor: pointer; }
 .sg-tab:hover, .sg-tab.is-on { color: var(--sg-text); }
 .sg-tab.is-on { box-shadow: inset 0 -2px 0 var(--sg-text); }
 .sg-seg button[aria-pressed="true"] { font-weight: var(--sg-heading-weight); }
@@ -2927,6 +2927,8 @@ a.pg-usage-name { color: var(--sg-text); }
       var inspectBtn = tools.lastElementChild;
       inspectBtn.addEventListener('click', function () {
         inspecting = !inspecting;
+        // Inspect always draws it at Fit, the component in the middle of the stage.
+        if (inspecting && WIDTH !== 'fit') showWidth('fit');
         inspectBtn.setAttribute('aria-pressed', inspecting ? 'true' : 'false');
         (inspectBtn.querySelector('span') || inspectBtn).textContent = inspecting ? 'Done inspecting' : 'Inspect';
         drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
