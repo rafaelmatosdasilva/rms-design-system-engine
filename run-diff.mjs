@@ -211,8 +211,8 @@ export function plainDifference(what = '') {
     else if (/^no background$/.test(f)) say = 'Figma has no background; the code draws one.';
     else if (/^border on /.test(f)) say = `Figma has a ${f.replace(/^border on /, 'border on the ')}; the code shows none.`;
     else {
-      const sized = !/weight/i.test(prop);
-      const px = (v) => (sized && /^\d+(\.\d+)?$/.test(v) ? `${v}px` : /^[a-z]{1,3} \(.+\)$/i.test(v) && /font|line/i.test(prop) ? v.replace(/^(\w+) \((.+)\)$/, 'the $1 text style ($2)') : v);
+      const sized = !/weight|opacity/i.test(prop);
+      const px = (v) => (/opacity/i.test(prop) && /^(0(\.\d+)?|1)(?=\s|$)/.test(v) ? v.replace(/^(0(?:\.\d+)?|1)(?=\s|$)/, (n) => `${Math.round(Number(n) * 100)}%`) : sized && /^\d+(\.\d+)?$/.test(v) ? `${v}px` : /^[a-z]{1,3} \(.+\)$/i.test(v) && /font|line/i.test(prop) ? v.replace(/^(\w+) \((.+)\)$/, 'the $1 text style ($2)') : v);
       const p2 = prop.replace(/\(left\/right\)/, 'on the left and right').replace(/\(top\/bottom\)/, 'on the top and bottom');
       say = `${when} ${p2} is ${px(f)} in Figma and ${px(r).replace(/ via (--[\w-]+)/, ' (from $1)')} in the code.`;
     }

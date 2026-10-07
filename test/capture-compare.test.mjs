@@ -261,3 +261,18 @@ test('capture: Figma\'s default variant is drawn with the classes the contract g
   assert.deepEqual(defaultVariantClasses(props, { Type: { Negative: '.chip.high' } }, '.badge'), [], 'another component\'s classes add nothing');
   assert.deepEqual(defaultVariantClasses(null, map, '.badge'), []);
 });
+
+test('components: the fill\'s own opacity in Figma against the alpha the code paints, default and per variant', () => {
+  // A tag whose Background layer is at 8% in Figma; the code paints color-mix(... 12%) by default and 8% for Amber.
+  const tag = (pct, amberPct) => ({ components: { tag: { confidence: 'high', instance: { hasText: true }, fill: 'direct',
+    props: { backgroundColor: { value: `color(srgb 0.76 0 0 / ${pct})`, var: '--tag-bg', rule: '.tag', at: 'theme.css:10' } },
+    colors: { light: { backgroundColor: `color(srgb 0.76 0 0 / ${pct})` } },
+    states: { 'Type=Amber': { changed: { backgroundColor: { value: `color(srgb 0.8 0.6 0 / ${amberPct})`, var: '--tag-bg-amber', rule: '.tag.amber' } }, colors: { light: { backgroundColor: `color(srgb 0.8 0.6 0 / ${amberPct})` } } } } } },
+    tokens: { '--tag-bg': tok('#c20000'), '--tag-bg-amber': tok('#cf9e00') } });
+  const structure = { tag: { fillStructure: 'before', fillOpacity: 0.08, variantFillOpacity: { 'Type=Red': 0.08, 'Type=Amber': 0.08 } } };
+  const differ = (code) => compareComponents(code, structure, {}, cfg, maps()).differ.filter((x) => /opacity/.test(x.field)).map((x) => `${x.field}: ${x.figma} / ${x.code}`);
+  assert.deepEqual(differ(tag(0.12, 0.15)), ['background opacity: 0.08 / 0.12', 'background opacity (Type=Amber): 0.08 / 0.15']);
+  assert.deepEqual(differ(tag(0.08, 0.08)), []);
+  const line = measuredLine(compareComponents(tag(0.12, 0.08), structure, {}, cfg, maps()).differ.find((x) => x.field === 'background opacity'));
+  assert.match(line, /→ paint the background at 8%, as Figma's layer: color-mix\(in srgb, var\(--tag-bg\) 8%, transparent\)$/);
+});

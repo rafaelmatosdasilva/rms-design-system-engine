@@ -3547,6 +3547,18 @@ function reportFull(label, items, shown) {
         const { deriveContrastPairs } = await import('./pair-derive.mjs');
         derived = deriveContrastPairs([...new Set(modes.flatMap((m) => Object.keys(vsnap.color[m] || {})))], { boundaries: cfg.a11y?.nonTextPairs === true });   // every mode's names
       }
+      // What Figma draws (the structure snapshot's drawnOn) corrects the names: a derived pair Figma never draws
+      // together is dropped, and each text Figma draws on a background token is paired with it.
+      let apart = [], nDrawn = 0;
+      try {
+        const sPath = join(ROOT, cfg.paths?.snapshotStructure || 'figma-structure.snapshot.json');
+        if (existsSync(sPath)) {
+          const st = JSON.parse(readFileSync(sPath, 'utf8'));
+          const { applyDrawnOn } = await import('./pair-derive.mjs');
+          const r = applyDrawnOn(derived, st.components ?? st);
+          derived = r.pairs; apart = r.apart; nDrawn = r.added;
+        }
+      } catch { /* no structure snapshot: the names alone */ }
       // Merge + dedupe by text|bg; an authored pair wins over a derived one with the same endpoints.
       const seen = new Set(); const pairs = []; let nAuthored = 0, nDerived = 0;
       for (const [src, list] of [['authored', authored], ['derived', derived]]) {
@@ -3579,7 +3591,7 @@ function reportFull(label, items, shown) {
           for (const f of findings) all.push({ ...f, mode });
           for (const f of sameColour) same.add(f.name);
         }
-        const provenance = `${nDerived} derived from token names${nAuthored ? ` + ${nAuthored} declared` : ''}`;
+        const provenance = `${nDerived - nDrawn} derived from token names${nDrawn ? ` + ${nDrawn} drawn together in Figma` : ''}${nAuthored ? ` + ${nAuthored} declared` : ''}`;
         if (all.length) {
           // Where each text token is declared in code, from the code capture when it is fresh.
           let whereOf = () => null;
@@ -3602,6 +3614,11 @@ function reportFull(label, items, shown) {
           console.log('   Advisory: pairs are derived from the token-name convention and/or declared in ds-config → a11y.tokenPairs; the engine only surfaces the math.');
         } else if (anyChecked) {
           console.log(`\nℹ️  Token contrast: all pairs meet WCAG AA across ${modes.length} mode(s) (${provenance}).`);
+        }
+        if (apart.length) {
+          console.log(`\nℹ️  Token contrast: ${apart.length} pair(s) from the token names left out - Figma never draws that text on that background, so the pair is not a real one.`);
+          for (const p of apart.slice(0, 10)) console.log(`     · ${p.text} on ${p.bg}`);
+          if (apart.length > 10) console.log(`     … ${apart.length - 10} more`);
         }
         if (same.size) {
           console.log(`\nℹ️  Token contrast: ${same.size} pair(s) not comparable - the component draws the background as a tint (opacity or color-mix), or the text and background tokens are the same colour. The rendered state contrast measures them.`);
