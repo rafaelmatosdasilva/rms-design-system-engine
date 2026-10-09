@@ -497,3 +497,30 @@ test('page: a control edge too faint only in the dark mode is found, with its mo
   assert.match(edges[0].selector, /input\.fades/, out);
   assert.deepEqual(edges[0].modes, ['Dark'], out);
 });
+
+// On the style guide, a component's role is read on the component drawn in its own section, never on the page's own
+// chrome that shares its class (a navigation card, a hidden menu button). A role Figma names "presentation" is the
+// role the browser calls "none".
+test('annotations on the style guide: read in the component\'s own section; presentation is none', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><body><main><h1>Style guide</h1>
+    <nav><a class="tile" href="#c-tile">tile</a><button class="act" hidden>Menu</button></nav>
+    <section id="c-tile"><div class="pg-preview"><div class="tile" role="article"><p>Story</p></div></div></section>
+    <section id="c-act"><div class="pg-preview"><div class="act"><button>Go</button></div></div></section>
+    <section id="c-veil"><div class="pg-preview"><div class="veil" role="presentation"></div></div></section>
+  </main></body></html>`;
+  const dir = makeFixture({
+    'sg/index.html': page,
+    'figma-component-props.snapshot.json': {
+      tile: { nodeId: '1:1', annotations: [{ label: 'Role: article' }] },
+      act: { nodeId: '1:2', annotations: [{ label: 'Role: button' }] },
+      veil: { nodeId: '1:3', annotations: [{ label: 'Role: presentation' }] },
+    },
+    'ds-config.json': { styleguide: { out: 'sg/index.html' }, componentSelectors: { tile: '.tile', act: '.act', veil: '.veil' } },
+  });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  assert.equal(d.usedStyleguide, true, out);
+  assert.deepEqual(d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector), [], out);
+});
