@@ -112,8 +112,15 @@ test('api: the reader joins Code Connect by Figma node id and falls back to text
     'src/Pill.tsx': "type PillProps = { tone?: 'a' | 'b' };\nexport function Pill({ tone = 'a' }: PillProps) { return null; }\n",
     'src/Pill.figma.tsx': "import { Pill } from './Pill';\nfigma.connect(Pill, 'https://figma.com/design/k?node-id=5-6', { props: { tone: figma.enum('Tone', {}) } });\n",
   });
-  const r = createApiReader(dir, {}, { classFor: () => '.pill', nodeIds: { 'Status pill': '5:6' } });
-  const a = r.apiFor('Status pill');
+  // The fixture has no TypeScript of its own: one installed for the whole machine is not used, so the reading is the
+  // text's alone wherever the test runs.
+  const was = process.env.DESIGN_SYSTEM_ENGINE_TYPESCRIPT;
+  process.env.DESIGN_SYSTEM_ENGINE_TYPESCRIPT = 'project';
+  let a;
+  try {
+    const r = createApiReader(dir, {}, { classFor: () => '.pill', nodeIds: { 'Status pill': '5:6' } });
+    a = r.apiFor('Status pill');
+  } finally { if (was === undefined) delete process.env.DESIGN_SYSTEM_ENGINE_TYPESCRIPT; else process.env.DESIGN_SYSTEM_ENGINE_TYPESCRIPT = was; }
   assert.equal(a.how, 'code connect');
   assert.deepEqual(a.codeConnect, { Tone: 'tone' });
   assert.deepEqual(a.props.tone, { readBy: ['text'], default: 'a', options: ['a', 'b'], required: false, confidence: 'single-source' });
@@ -257,4 +264,14 @@ test('styleguide: the capture builds a private copy from the template, or names 
   assert.match(html, /<head><base href="file:\/\/.*\/apps\/guide\/">/);
   assert.match(html, /--a: 1px/);
   assert.equal(existsSync(join(dir, 'apps/guide/index.html')), false, 'the project page is never written');
+});
+
+// Which TypeScript the engine may use: with DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project only one inside the project (or a
+// workspace above it), never one a machine-wide folder holds.
+test('typescript: a package inside the project or a workspace above it is the project\'s; a machine-wide one is not', async () => {
+  const { withinProject } = await import('../project-typescript.mjs');
+  assert.equal(withinProject('/w/app', '/w/app/node_modules/typescript/lib/typescript.js'), true);
+  assert.equal(withinProject('/w/app', '/w/node_modules/typescript/lib/typescript.js'), true);
+  assert.equal(withinProject('/w/app', '/usr/local/lib/node_modules_global/typescript/lib/typescript.js'), false);
+  assert.equal(withinProject('/w/app', '/w/app-other/node_modules/typescript/lib/typescript.js'), false);
 });

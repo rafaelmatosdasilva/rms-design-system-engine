@@ -13,6 +13,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { OUT_DIR } from './names.mjs';
+import { projectTypeScriptOnly, withinProject } from './project-typescript.mjs';
 
 const pascal = (s) => String(s).replace(/(^|[-_\s]+)(\w)/g, (_, __, c) => c.toUpperCase());
 const ident = (s) => /^[A-Za-z_$][\w$]*$/.test(s) ? s : JSON.stringify(s);
@@ -41,8 +42,11 @@ export function compileShim(catalog = {}) {
 export function findTsc(ROOT) {
   try {
     const req = createRequire(join(resolve(ROOT), 'package.json'));
-    return { cmd: process.execPath, args: [req.resolve('typescript/bin/tsc')] };
+    const at = req.resolve('typescript/bin/tsc');
+    if (!projectTypeScriptOnly() || withinProject(ROOT, at)) return { cmd: process.execPath, args: [at] };
   } catch { /* not in the project */ }
+  // The machine's tsc on the PATH, unless only the project's own is wanted (DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project).
+  if (projectTypeScriptOnly()) return null;
   const which = spawnSync('/bin/sh', ['-c', 'command -v tsc'], { encoding: 'utf8' });
   return which.status === 0 && which.stdout.trim() ? { cmd: which.stdout.trim(), args: [] } : null;
 }

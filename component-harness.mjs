@@ -11,6 +11,7 @@ import { join, dirname, relative, resolve, extname } from 'node:path';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
+import { projectTypeScriptOnly, withinProject } from './project-typescript.mjs';
 
 // ── The React stand-in: enough for a presentational component, nothing more ──────────────────────────────────
 export const REACT_SHIM = `
@@ -105,15 +106,19 @@ export const createContext = (v) => ({ Provider: ({ children }) => children, _v:
 export default { createElement, Fragment, useState, useReducer, useEffect, useLayoutEffect, useRef, useMemo, useCallback, useId, forwardRef, memo, createContext, useContext };
 `;
 
-// TypeScript: the project's own, else the global npm folder's. null when neither is there.
+// TypeScript: the project's own, else the global npm folder's. null when neither is there. Only the project's own when
+// DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project (project-typescript.mjs).
 const tsCache = new Map();
 export function loadTypeScript(ROOT) {
-  if (tsCache.has(ROOT)) return tsCache.get(ROOT);
+  const key = `${ROOT}|${projectTypeScriptOnly()}`;
+  if (tsCache.has(key)) return tsCache.get(key);
   let ts = null;
-  for (const from of [() => join(ROOT, 'package.json'), () => join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(), 'noop.js')]) {
-    try { ts = createRequire(from())('typescript'); break; } catch { /* not there */ }
+  const own = () => { const req = createRequire(join(ROOT, 'package.json')); const at = req.resolve('typescript'); if (projectTypeScriptOnly() && !withinProject(ROOT, at)) throw new Error('not the project\'s'); return req(at); };
+  const global = () => createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(), 'noop.js'))('typescript');
+  for (const load of projectTypeScriptOnly() ? [own] : [own, global]) {
+    try { ts = load(); break; } catch { /* not there */ }
   }
-  tsCache.set(ROOT, ts);
+  tsCache.set(key, ts);
   return ts;
 }
 
