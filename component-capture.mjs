@@ -60,12 +60,16 @@ export const TRACE = {
   justifyContent: ['justify-content', 'place-content'],
   alignItems: ['align-items', 'place-items'],
   flexWrap: ['flex-wrap', 'flex-flow'],
+  // The first text's decoration, italic and alignment.
+  textDecorationLine: ['text-decoration-line', 'text-decoration'],
+  fontStyle: ['font-style', 'font'],
+  textAlign: ['text-align'],
 };
 const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'boxSizing', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
 const COLOR_PROPS = new Set(['color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor']);
 const GUARD_PROPS = ['color', 'backgroundColor', 'borderTopColor', 'opacity'];
 const BREAKPOINT_PROPS = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'columnGap', 'rowGap', 'borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius', 'fontSize', 'lineHeight'];
-const INHERITED = new Set(['color', 'fontSize', 'fontWeight', 'lineHeight', 'fontFamily', 'letterSpacing', 'textTransform']);
+const INHERITED = new Set(['color', 'fontSize', 'fontWeight', 'lineHeight', 'fontFamily', 'letterSpacing', 'textTransform', 'fontStyle', 'textAlign']);
 
 // Which slot of a box shorthand a property reads (1 to 4 values: top right bottom left).
 const BOX_SIDE = { paddingTop: 0, paddingRight: 1, paddingBottom: 2, paddingLeft: 3, borderTopWidth: 0, borderRightWidth: 1, borderBottomWidth: 2, borderLeftWidth: 3, borderTopColor: 0, borderRightColor: 1, borderBottomColor: 2, borderLeftColor: 3 };
@@ -702,7 +706,8 @@ export async function captureComponents(ctx) {
       if (comp.childParts?.length) { const l = await P.evaluate(layersExpression(capSel(loc.i), comp.childParts)); if (l) entry.layers = l; }
       if (atBreakpoints && Object.keys(atBreakpoints).length) entry.breakpoints = atBreakpoints;
       // Parts: each measured and traced like the instance, keeping only the properties the part is for.
-      const PART_PROPS = { font: ['fontSize', 'fontWeight', 'lineHeight', 'color', 'fontFamily', 'letterSpacing', 'textTransform'], text: ['fontSize', 'fontWeight', 'lineHeight', 'color', 'fontFamily', 'letterSpacing', 'textTransform'], radius: ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'], gap: ['rowGap', 'columnGap'], before: ['borderTopLeftRadius', 'backgroundColor'] };
+      const TEXT_PROPS = ['fontSize', 'fontWeight', 'lineHeight', 'color', 'fontFamily', 'letterSpacing', 'textTransform', 'textDecorationLine', 'fontStyle', 'textAlign'];
+      const PART_PROPS = { font: TEXT_PROPS, text: TEXT_PROPS, radius: ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'], gap: ['rowGap', 'columnGap'], before: ['borderTopLeftRadius', 'backgroundColor'] };
       for (const kind of Object.keys(loc.parts ?? {})) {
         const sel = `[data-design-system-engine-part~="${loc.i}-${kind}"]`;
         const pNode = await P.nodeOf(sel);

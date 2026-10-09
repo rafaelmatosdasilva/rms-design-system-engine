@@ -396,3 +396,16 @@ test('components: min and max width, alignment, wrap and a dashed stroke against
   assert.deepEqual(d, ['row alignment (main axis): center / flex-start', 'row max width: 320 / none', 'row stroke style: dashed / solid', 'row wrap: wrap / nowrap']);
   assert.ok(r.notComparable.some((n) => n.component === 'ok' && n.field === 'alignment (cross axis)'), JSON.stringify(r.notComparable));
 });
+
+// B9: the first text's decoration, italic and alignment, as the refresh records them, against the text the code draws.
+test('components: text decoration, italic and text alignment against Figma\'s first text', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.link' });
+  const code = { components: {
+    link: { confidence: 'high', instance: { hasText: true }, props: { textDecorationLine: v('none'), fontStyle: v('normal'), textAlign: v('start') } },
+    ok: { confidence: 'high', instance: { hasText: true }, props: { textDecorationLine: v('underline'), fontStyle: v('italic'), textAlign: v('center') } },
+  } };
+  const text = { textDecoration: 'UNDERLINE', italic: true, textAlign: 'CENTER' };
+  const r = compareComponents(code, { link: { text }, ok: { text } }, {}, cfg, maps());
+  assert.deepEqual(r.differ.map((x) => `${x.component} ${x.field}: ${x.figma} / ${x.code}`).sort(),
+    ['link italic: italic / normal', 'link text alignment: center / start', 'link text decoration: underline / none']);
+});
