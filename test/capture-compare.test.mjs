@@ -353,3 +353,15 @@ test('colours: a mode Figma has no value for is counted as not comparable, with 
   assert.deepEqual(r.differ, []);
   assert.deepEqual(r.notComparable.map((n) => [n.field, n.why]), [['background [contrast]', 'Figma has no value for this mode']]);
 });
+
+// B5: padding, radius and gap Figma sets with no variable are compared on the default variant too (as each variant is):
+// a raw 12px padding drawn as 8px is a difference; values that agree are matches.
+test('components: raw padding, radius and gap on the default variant are compared', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.p' });
+  const code = { components: { p: { confidence: 'high', instance: { hasText: true }, props: {
+    paddingTop: v('4px'), paddingRight: v('8px'), paddingBottom: v('4px'), paddingLeft: v('8px'),
+    borderTopLeftRadius: v('4px'), borderTopRightRadius: v('4px'), borderBottomRightRadius: v('4px'), borderBottomLeftRadius: v('4px'), columnGap: v('6px'), rowGap: v('6px') } } } };
+  const f = { p: { defaultVariant: 'Size=M', variants: { 'Size=M': { paddingPx: [4, 12, 4, 12], radiusPx: [4, 4, 4, 4], gapPx: 8 } } } };
+  const d = compareComponents(code, f, {}, cfg, maps()).differ.map((x) => `${x.field}: ${x.figma} / ${x.code}`).sort();
+  assert.deepEqual(d, ['gap: 8 / 6px', 'padding left: 12 / 8px', 'padding right: 12 / 8px']);
+});
