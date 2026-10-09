@@ -663,7 +663,12 @@ function sweepExpression(roots, doFocus, stateMap) {
         const interactiveRole = role && IROLES.includes(role);
         if ((interactiveRole || isInteractive) && !disabled(el)) {
           const ti = el.getAttribute('tabindex');
-          const focusable = el.matches(NATIVE_FOCUSABLE) ? ti !== '-1' : (ti !== null && Number(ti) >= 0);
+          const tabStop = (n) => (n.matches(NATIVE_FOCUSABLE) ? n.getAttribute('tabindex') !== '-1' : (n.getAttribute('tabindex') !== null && Number(n.getAttribute('tabindex')) >= 0));
+          // A composite (a radio group, a tab list, a menu) has one Tab stop and its arrow keys for the rest: an option
+          // left out of the Tab order there is reached through the group, when the group has a stop at all.
+          const group = el.closest('[role=radiogroup],[role=tablist],[role=listbox],[role=menu],[role=menubar],[role=tree],[role=grid],[role=treegrid],[role=toolbar]');
+          const roving = !!group && group !== el && [...group.querySelectorAll('[role]')].some((n) => n !== el && n.getAttribute('role') === role && tabStop(n));
+          const focusable = tabStop(el) || roving;
           if (!focusable) notKeyboard.push((desc+(role?('[role='+role+']'):'')).slice(0,70));
         }
       }
