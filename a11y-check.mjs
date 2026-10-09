@@ -752,6 +752,10 @@ export function makeStep(findings, unfinished, label) {
 
 // Chrome's accessibility tree names a few roles differently from ARIA.
 export const sameRole = (got, want) => got === want || (want === 'img' && got === 'image') || (want === 'textbox' && got === 'searchbox');
+// The same equivalences, to look a role up in Chrome's tree (Accessibility.queryAXTree) by the name an annotation uses.
+const AX_ROLE_ALIASES = { img: ['image'], textbox: ['searchbox'] };
+// The controls a wrapper can hold, for a note that names no role (a name, a heading level, a pressed state).
+const WRAPPED_CONTROL = 'button,input:not([type=hidden]),select,textarea,a[href],summary,[role]:not([role=presentation]):not([role=none]):not([role=group])';
 
 // What a role requires, checked on up to 20 rendered instances of a component (idea I39). Returns the
 // problems as short sentences. A toggle button is clicked to see aria-pressed change, then clicked
@@ -1465,14 +1469,32 @@ async function main() {
         if (!q?.nodeId) return null;
         let ax = (await send('Accessibility.getPartialAXTree', { nodeId: q.nodeId, fetchRelatives: false }, sessionId))?.nodes?.[0];
         if (!ax) return null;
-        // A plain wrapper (a div, a label around its input) is not the control: the role is read on the component's
-        // own control inside it, the first element there with a role of its own.
+        // A plain wrapper (a div, a label around its input) may hold the component's own control, but a control it holds
+        // is not always the component (a card is not the link inside it, a dialog's wrapper is not its Close button).
         if (/^(generic|none|labeltext|group|section|presentation)$/i.test(String(ax.role?.value ?? '')) || ax.ignored) {
-          // The role the annotation names first (a stepper's spinbutton, not its first step button), else the first control.
-          const wanted = want ? `[role="${want}"],${want === 'textbox' ? 'input:not([type]),input[type=text],input[type=email],input[type=search],textarea,' : ''}${want === 'spinbutton' ? 'input[type=number],' : ''}${want === 'button' ? 'button,' : ''}` : '';
-          let inner = wanted ? await send('DOM.querySelector', { nodeId: q.nodeId, selector: wanted.replace(/,$/, '') }, sessionId).catch(() => null) : null;
-          if (!inner?.nodeId) inner = await send('DOM.querySelector', { nodeId: q.nodeId, selector: 'button,input,select,textarea,a[href],summary,[role]:not([role=presentation]):not([role=none]):not([role=group])' }, sessionId).catch(() => null);
-          const ix = inner?.nodeId ? (await send('Accessibility.getPartialAXTree', { nodeId: inner.nodeId, fetchRelatives: false }, sessionId))?.nodes?.[0] : null;
+          let ix = null;
+          if (want) {
+            // The role the annotation names, looked for by the role the browser gives each element inside (a native
+            // <dialog>, <a href>, <li> or <input type=number> counts, not only a role attribute). When nothing inside
+            // has it, the wrapper's own role is the answer.
+            for (const role of [want, ...(AX_ROLE_ALIASES[want] ?? [])]) {
+              const found = (await send('Accessibility.queryAXTree', { nodeId: q.nodeId, role }, sessionId).catch(() => null))?.nodes ?? [];
+              ix = found.find((n) => !n.ignored) ?? null;
+              if (ix) break;
+            }
+          } else {
+            // No role named (a name, a heading level, a pressed state): the one control it wraps, when it wraps exactly
+            // one. A control inside another (an icon's role inside its button) is not counted; a container of several
+            // controls is read as itself.
+            const obj = await send('DOM.resolveNode', { nodeId: q.nodeId }, sessionId).catch(() => null);
+            const one = obj?.object?.objectId ? await send('Runtime.callFunctionOn', { objectId: obj.object.objectId, returnByValue: true, arguments: [{ value: WRAPPED_CONTROL }],
+              functionDeclaration: 'function (sel) { const all = [...this.querySelectorAll(sel)]; const top = all.filter((el) => !all.some((o) => o !== el && o.contains(el))); return top.length === 1 ? all.indexOf(top[0]) : -1; }' }, sessionId).catch(() => null) : null;
+            const at = one?.result?.value;
+            if (Number.isInteger(at) && at >= 0) {
+              const id = (await send('DOM.querySelectorAll', { nodeId: q.nodeId, selector: WRAPPED_CONTROL }, sessionId).catch(() => null))?.nodeIds?.[at];
+              if (id) ix = (await send('Accessibility.getPartialAXTree', { nodeId: id, fetchRelatives: false }, sessionId))?.nodes?.[0] ?? null;
+            }
+          }
           if (ix && !/^(generic|none)$/i.test(String(ix.role?.value ?? ''))) ax = ix;
         }
         const prop = (n) => ax.properties?.find((p) => p.name === n)?.value?.value;

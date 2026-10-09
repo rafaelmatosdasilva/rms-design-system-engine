@@ -252,6 +252,47 @@ test('annotations in the browser: a toggle button without aria-pressed, and a no
   assert.ok(got.some((x) => /^fav › Badge: not checked, the contract has no part named "Badge"/.test(x)), out);
 });
 
+test('annotations in the browser: a role is read on the component, never on a control inside it', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  // tile: a plain container holding a link and a button, its note says article. Its first control is not the component.
+  // sheet: a native <dialog> inside a wrapper, found by the role the browser gives it (no role attribute written).
+  // act: a wrapper around its one button reads as that button, as before.
+  const page = `<!doctype html><html><body>
+    <div class="tile"><a href="#a">Open</a><button>Like</button></div>
+    <div class="sheet"><dialog open><p>Hello</p><button>Close</button></dialog></div>
+    <div class="act"><button>Go</button></div>
+    <div class="duo"><button>Yes</button><button>No</button></div>
+    <div class="solo"><button aria-label="Save"><svg role="img" aria-label="disk" width="8" height="8"></svg></button></div>
+  </body></html>`;
+  // duo and solo name no role: a container of two buttons is read as itself; a wrapper around one button (an icon's
+  // role inside it does not count) reads as that button.
+  const dir = makeFixture({
+    'page.html': page,
+    'figma-component-props.snapshot.json': {
+      tile: { nodeId: '1:1', annotations: [{ label: 'Role: article' }] },
+      sheet: { nodeId: '1:2', annotations: [{ label: 'Role: dialog' }] },
+      act: { nodeId: '1:3', annotations: [{ label: 'Role: button' }] },
+      duo: { nodeId: '1:4', annotations: [{ label: 'aria-label: Choice' }] },
+      solo: { nodeId: '1:5', annotations: [{ label: 'aria-label: Save' }] },
+    },
+    'ds-config.json': { componentSelectors: { tile: '.tile', sheet: '.sheet', act: '.act', duo: '.duo', solo: '.solo' } },
+  });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const got = d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector);
+  // The tile's own role is reported, not the link inside it.
+  assert.ok(got.some((x) => /^tile: Figma says role "article", it renders as "generic"/.test(x)), out);
+  assert.ok(!got.some((x) => /^tile: .*renders as "(link|button)"/.test(x)), out);
+  // The dialog is found by its computed role, and the wrapper around one button still reads as that button.
+  assert.ok(!got.some((x) => /^sheet: /.test(x)), out);
+  assert.ok(!got.some((x) => /^act: /.test(x)), out);
+  // The container's name is its own (none), not its first button's.
+  assert.ok(got.some((x) => /^duo: Figma says its name is "Choice", it is announced as ""/.test(x)), out);
+  assert.ok(!got.some((x) => /^duo: .*announced as "Yes"/.test(x)), out);
+  assert.ok(!got.some((x) => /^solo: /.test(x)), out);
+});
+
 test('role contracts: what each role requires, on the rendered component', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
   const page = `<!doctype html><html><body>
     <button class="fav" aria-label="Favorite" aria-pressed="false" onclick="this.setAttribute('aria-pressed', this.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')">★</button>
