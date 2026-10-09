@@ -110,6 +110,8 @@ await Promise.all(Array.from({ length: Math.max(1, JOBS) }, async () => {
 const cost = rows.reduce((k, r) => k + r.usage.cost, 0);
 console.log(`\n${rows.filter((r) => r.pass).length}/${rows.length} passed · $${cost.toFixed(2)}`);
 const left = jobs.length - rows.length;
+// A run with no login never gets one by waiting: stop, so continuous.mjs does not wait out a usage limit that is not there.
+if (refused && /not logged in/i.test(refused)) { console.log('✗ a run is not logged in: its fresh HOME holds no login (macOS keeps it in the keychain). Run `claude setup-token` and set CLAUDE_CODE_OAUTH_TOKEN, or ANTHROPIC_API_KEY.'); process.exit(2); }
 if (refused) console.log(`⏸ stopped: the API refused a run (${refused}). ${left} runs not measured; run the same command with --resume after the limit resets.`);
 else if (left) console.log(`⚠ ${left} runs failed in the harness; run the same command with --resume to retry them.`);
 process.exit(refused || left ? 3 : 0);
