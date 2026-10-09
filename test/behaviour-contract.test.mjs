@@ -86,3 +86,19 @@ test('a stepper is a spinbutton: its value and range in the markup, ArrowUp in t
   assert.deepEqual(roleObligations('<input type="number" min={0} max={10} aria-label="Guests" />', 'spinbutton'), { missing: [], owed: [] });
   assert.deepEqual(roleObligations('<div><button>-</button><span>{v}</span><button>+</button></div>', 'spinbutton').missing.length, 2);
 });
+
+// E11, E12: the attribute a state is owed follows what the state means. The step a person is on (Current) is
+// aria-current, never checked; an error on a message (a notice with role status) is announced (role="alert"), while an
+// error on a field is still aria-invalid.
+test('states: Current is aria-current; an error on a message is announced, on a field it is aria-invalid', async () => {
+  const { stateFindings } = await import('../behaviour-contract.mjs');
+  const comp = (name, role, label, effect) => ({ name, role, controls: [{ label: 'State', type: 'VARIANT', options: [{ label, ...effect }] }] });
+  const want = (c) => stateFindings([c]).map((f) => f.want.join(' or '));
+  assert.deepEqual(want(comp('step', 'radio', 'Current', { add: ['step--current'] })), ['aria-current']);
+  assert.deepEqual(want(comp('step', 'radio', 'Current', { add: ['step--current'], attrs: { 'aria-current': 'step' } })), []);
+  assert.deepEqual(want(comp('notice', 'status', 'Error', { add: ['notice--error'] })), ['role or aria-live']);
+  assert.deepEqual(want(comp('notice', 'status', 'Error', { add: ['notice--error'], attrs: { role: 'alert' } })), []);
+  assert.deepEqual(want(comp('field', 'textbox', 'Error', { add: ['field--error'] })), ['aria-invalid']);
+  // A component whose role is not known: an error the option itself announces (role="alert") is heard.
+  assert.deepEqual(want(comp('notice', undefined, 'Error', { add: ['notice--error'], attrs: { role: 'alert' } })), []);
+});
