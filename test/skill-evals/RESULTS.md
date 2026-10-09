@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Annotation categories; roles read on the component; a role the code fails is Claude's (continuous evaluation)
+
+What changed since the entry below (engine 05fd813): Tests: a browser that cannot start is /usr/bin/false, on macOS too; Roles: read on the component, never on a control inside it (E2); To do: a role the code fails is Claude's, even when a Figma note asked (E1); Chrome never touches the person's keychain (no "Keychain Not Found" prompt); Annotation categories: only an accessibility note is a requirement (E3); Skill evaluation runs on macOS: claude found by path, login by token. The guide changed in `cookbook/a11y-notes.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/gates.md`, `reference/usage.md`.
+
+Guide set measured: `6169ae8a3717` · Project measured: `13d811a9d668`
+
+| Haiku, engine 67f75ee | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.055 |
+| Input a run | 86k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 86k. Records: `records/2026-10-08-annotation-categories-roles-on-component`.
+
 ## 2026-10: Figma refresh: deeper facts every time; a fill on a covering child counts (continuous evaluation)
 
 What changed since the entry below (engine ad30b5f): The deeper facts of every component (box and sizing, padding, gap, corners, colours, text, each variant's visible layers) are recorded on every Figma refresh instead of being recommended; a fill drawn by a child that covers the whole frame counts as a fill on a child layer. The guide changed in `cookbook/refresh-figma.md`.
