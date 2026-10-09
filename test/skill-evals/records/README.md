@@ -61,5 +61,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-07-figma-refresh-deeper-facts-every` | The 21 guide tasks on Haiku (engine 05fd813) | "Figma refresh: deeper facts every time; a fill on a covering child counts" |
 | `2026-10-08-annotation-categories-roles-on-component` | The 21 guide tasks on Haiku (engine 67f75ee) | "Annotation categories; roles read on the component; a role the code fails is Claude's" |
 | `2026-10-09-colours-by-variable-freshness-by-content` | The 21 guide tasks on Haiku (engine 6706b73) | "Colours named by their Figma variable; freshness by content; edges read at rest; paired variables; deeper facts on the right side" |
+| `2026-10-09-accessibility-parity-readings` | The 21 guide tasks on Haiku (engine af1bcf1) | "Accessibility and parity readings: text as drawn, focus rings, ARIA states, edges in every mode, box and text facts" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
