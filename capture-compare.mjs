@@ -291,7 +291,8 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     // Line height from the same text style (a unitless line height is a multiple of the font size).
     const lhText = f.text?.lineHeight;   // { unit: 'PIXELS' | 'PERCENT' | 'AUTO', value } from the extended capture
     // A share in % is of Figma's font size: a wrong font size in the code must not carry the expectation with it.
-    const figFs = toNum(f.text?.fontSize) || toNum(f.fontSizeVar ? ty(f.fontSizeVar)?.size : null) || toNum(fp?.fontSize?.value);
+    // Figma's font size of the first text: the default variant's (the refresh records it per variant), else the text style's.
+    const figFs = toNum((f.variants?.[f.defaultVariant] ?? f).fontSize) || toNum(f.fontSizeVar ? ty(f.fontSizeVar)?.size : null) || toNum(fp?.fontSize?.value);
     const lhFig = lhText && lhText.unit !== 'AUTO'
       ? (lhText.unit === 'PERCENT' ? `${+((lhText.value / 100) * figFs).toFixed(2)}px` : `${lhText.value}px`)
       : (f.fontSizeVar ? ty(f.fontSizeVar)?.lh : null);

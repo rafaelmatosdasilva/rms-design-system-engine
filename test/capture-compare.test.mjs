@@ -310,7 +310,8 @@ test('variants: a radius set on every corner is one difference, not four', () =>
 test('components: a % line height and letter spacing are worked out from Figma\'s font size', () => {
   const v = (value) => ({ value, confidence: 'verified', rule: '.k' });
   const code = { components: { k: { confidence: 'high', instance: { hasText: true }, props: { fontSize: v('14px'), lineHeight: v('21px'), letterSpacing: v('0.7px') } } } };
-  const f = { k: { text: { fontSize: 12, lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PERCENT', value: 5 } } } };
+  // The refresh records the first text's font size on each variant (geometry), not on the text facts.
+  const f = { k: { defaultVariant: 'Size=M', variants: { 'Size=M': { fontSize: 12 } }, text: { lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PERCENT', value: 5 } } } };
   const d = Object.fromEntries(compareComponents(code, f, {}, cfg, maps()).differ.map((x) => [x.field, `${x.figmaValue ?? x.figma} / ${x.code}`]));
   assert.equal(d['line height'], '18px / 21px');
   assert.equal(d['letter spacing'], '0.6px / 0.7px');
