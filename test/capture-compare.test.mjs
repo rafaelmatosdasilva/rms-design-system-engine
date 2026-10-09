@@ -330,3 +330,15 @@ test('components: colours equal within a rounding step; a variant found by its v
   const r = compareComponents(code, { t: { variantOpacity: { on: 0.5 } } }, {}, cfg, maps());
   assert.deepEqual(r.differ.filter((d) => /opacity/.test(d.field)), []);
 });
+
+// B1: a text part with its own colour rule is compared in every mode from the part's own colours, never only in the first.
+test('colours: a text part that sets its own colour is compared in dark mode too', () => {
+  const fact = (value) => ({ value, rule: '.chip__label', at: 'a.css:4', confidence: 'verified' });
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, fill: 'none', props: { color: fact('rgb(0, 0, 0)') },
+    colors: { light: { color: 'rgb(0, 0, 0)' }, dark: { color: 'rgb(255, 255, 255)' } },
+    parts: { text: { selector: '(first text)', props: { color: fact('rgb(20, 20, 20)') }, colors: { light: { color: 'rgb(20, 20, 20)' }, dark: { color: 'rgb(20, 20, 20)' } } } } } } };
+  const structure = { chip: { colors: { text: { token: 'label/color', hex: '#141414', opacity: 1 } } } };
+  const vars = { color: { light: { 'label/color': '#141414' }, dark: { 'label/color': '#f0f0f0' } } };
+  const r = compareComponents(code, structure, vars, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => d.field), ['text colour [dark]']);
+});

@@ -705,7 +705,9 @@ export async function captureComponents(ctx) {
         const pSel = kind === 'text' ? null : comp.parts?.[kind];
         const pStat = pSel ? staticComponentReading(staticSources, pSel, staticRootVars) : {};
         const pFacts = facts({ ...comp, selector: pSel ?? comp.selector }, loc.how, pMode[firstMode], pTraced, pStat);
-        (entry.parts ??= {})[kind] = { selector: pSel ?? '(first text)', props: Object.fromEntries(Object.entries(pFacts).filter(([k]) => PART_PROPS[kind]?.includes(k))) };
+        (entry.parts ??= {})[kind] = { selector: pSel ?? '(first text)', props: Object.fromEntries(Object.entries(pFacts).filter(([k]) => PART_PROPS[kind]?.includes(k))),
+          // A text part's colours in every mode: one with its own colour rule is compared in dark mode too.
+          ...(kind === 'text' || kind === 'font' ? { colors: colorsOf(pMode) } : {}) };
       }
       for (const st of comp.states ?? []) {
         const how = stateRecipe(comp.selector, st.selector);
