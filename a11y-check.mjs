@@ -519,6 +519,16 @@ function sweepExpression(roots, doFocus, stateMap) {
         bgImage: !!(cs.backgroundImage && cs.backgroundImage !== 'none'),
       });
     }
+    // A placeholder on show is text (WCAG 1.4.3): its own colour against the field.
+    for (const el of scope) {
+      if (!el.matches || !el.matches('input[placeholder],textarea[placeholder]') || !el.getAttribute('placeholder').trim() || el.value || !vis(el) || el.closest(':disabled,[aria-disabled="true"]')) continue;
+      const ps = getComputedStyle(el, '::placeholder'), cs = getComputedStyle(el);
+      const layers = []; let node = el;
+      while (node && node.nodeType===1) { const b = getComputedStyle(node).backgroundColor; layers.push(b); const mm = b.match(/^rgba?\\(([^)]+)\\)/); const parts = mm ? mm[1].split(',') : null; if ((parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0) === 1) break; node = node.parentElement; }
+      const cls = (el.className && typeof el.className==='string') ? '.'+el.className.trim().split(/\\s+/).join('.') : '';
+      textEls.push({ desc: (el.tagName.toLowerCase() + (el.id?('#'+el.id):'') + cls).slice(0,80) + '::placeholder' + ownerOf(el), text: el.getAttribute('placeholder').trim().slice(0,40),
+        color: ps.color, bgLayers: layers, fontSize: parseFloat(ps.fontSize || cs.fontSize) || 16, fontWeight: ps.fontWeight || cs.fontWeight, bgImage: !!(cs.backgroundImage && cs.backgroundImage !== 'none') });
+    }
     // Icons that carry meaning: the only content of a control, or named themselves (role="img", aria-label, a <title>).
     // Their colour: an svg's painted fill or stroke, a masked icon's background, an icon font's text colour.
     const iconEls = [];
