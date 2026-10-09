@@ -254,17 +254,20 @@ export function partRoleExpression(selector, partSelector, layer, part) {
 // its role names. An option that only changes the look (a class) is heard as nothing. Read from the style guide's
 // controls: each option's effect is what the code's selector for it sets (classes and attributes).
 const STATE_WORDS = [
-  { re: /^(selected|pressed|active|on|toggled|current)$/i, by: { togglebutton: ['aria-pressed'], button: ['aria-pressed'], tab: ['aria-selected'], option: ['aria-selected'], switch: ['aria-checked', 'checked'], checkbox: ['aria-checked', 'checked'], radio: ['aria-checked', 'checked'] } },
+  // The step or page a person is on is aria-current, whatever the role (never checked: a current step is not chosen).
+  { re: /^(current)$/i, all: ['aria-current'] },
+  { re: /^(selected|pressed|active|on|toggled)$/i, by: { togglebutton: ['aria-pressed'], button: ['aria-pressed'], tab: ['aria-selected'], option: ['aria-selected'], switch: ['aria-checked', 'checked'], checkbox: ['aria-checked', 'checked'], radio: ['aria-checked', 'checked'] } },
   { re: /^(checked)$/i, all: ['aria-checked', 'checked'] },
   { re: /^(expanded|open|opened)$/i, all: ['aria-expanded'] },
-  { re: /^(error|invalid)$/i, all: ['aria-invalid'] },
+  // An error on a field is aria-invalid; on a message (a toast, a status) it is announced: role="alert" or aria-live.
+  { re: /^(error|invalid)$/i, by: { status: ['role', 'aria-live'], alert: ['role', 'aria-live'], log: ['role', 'aria-live'] }, all: ['aria-invalid'] },
   { re: /^(disabled)$/i, all: ['disabled', 'aria-disabled'] },
 ];
 const stateWord = (s) => String(s ?? '').replace(/^is[\s_-]*/i, '').replace(/[\s_-]+/g, '');
 function expectedFor(word, role) {
   const w = STATE_WORDS.find((x) => x.re.test(stateWord(word)));
   if (!w) return null;
-  return w.all ?? w.by[roleKey(role)] ?? null;
+  return w.by?.[roleKey(role)] ?? w.all ?? null;
 }
 // components: [{ name, role, controls: [{ label, type: 'VARIANT' | 'BOOLEAN', options: [{ label, add, attrs }], on: { add, attrs } }] }]
 export function stateFindings(components = []) {
