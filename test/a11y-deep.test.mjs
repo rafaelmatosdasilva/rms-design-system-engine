@@ -438,3 +438,22 @@ test('page: a field edge is read at rest, never halfway back from its focus look
   const d = pageResult(out);
   assert.deepEqual(d.issues.filter((i) => i.issue === 'boundary').map((i) => i.selector.split(' ')[0]).sort(), ['input#a', 'input#b', 'input#c'], out);
 });
+
+// Text contrast in the browser: a colour Chrome reports as oklch() is read, see-through text is measured as drawn,
+// and text inside a disabled control is exempt (WCAG 1.4.3), wherever in the control it sits.
+test('page: oklch and see-through text are measured as drawn; text inside a disabled control is left alone', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
+    .ok-l { color: oklch(0.75 0 0); } .ghost { color: rgba(0, 0, 0, 0.3); } button { color: #ccc; background: #fff; border: 1px solid #000; }</style></head><body><main><h1>Text</h1>
+    <p class="ok-l">Grey in oklch</p>
+    <p class="ghost">Faded black</p>
+    <p class="fine">Plain black</p>
+    <button disabled><span class="inner">Save</span></button>
+  </main></body></html>`;
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const contrast = d.issues.filter((i) => i.issue === 'contrast').map((i) => i.selector).sort();
+  assert.deepEqual(contrast, ['p.ghost', 'p.ok-l'], out);
+});

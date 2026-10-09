@@ -78,6 +78,7 @@ import { loadModes } from './mode-resolver.mjs';
 import { modeSwitch } from './code-capture.mjs';
 import { codeSnapshotPath, OUT_DIR } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
+import { parseColor as parseCssColor } from './css-values.mjs';
 import { WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from './wcag21.mjs';
 import { loadCategories, requirementEntry, noteKind, isRequirement } from './annotation-categories.mjs';
 import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
@@ -93,8 +94,10 @@ export function parseColor(s) {
   if (typeof s !== 'string') return null;
   if (s === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
   const m = s.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+))?\s*\)$/i);
-  if (!m) return null;
-  return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+  if (m) return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+  // Chrome keeps oklch(), oklab() and color(srgb …) as written (Tailwind v4 colours are oklch): read them too.
+  const c = /^(oklch|oklab|color|hsla?)\(/i.test(s) ? parseCssColor(s) : null;
+  return c ? { r: c[0], g: c[1], b: c[2], a: c[3] } : null;
 }
 
 // Composite a translucent foreground over an opaque background (both {r,g,b}, fg has a).
@@ -148,10 +151,14 @@ export function contrastFindings(textEls, theme) {
   const out = [];
   for (const el of textEls) {
     if (el.bgImage) { out.push({ kind: 'contrast', theme, desc: el.desc, text: el.text, cannotCompute: 'background-image/gradient' }); continue; }
+    // A colour in a space not converted (display-p3 …) is said, never skipped as if it passed.
+    const unread = [el.color, ...(el.bgLayers ?? [])].find((c) => typeof c === 'string' && !parseColor(c));
+    if (unread) { out.push({ kind: 'contrast', theme, desc: el.desc, text: el.text, cannotCompute: `colour space not read (${unread.slice(0, 40)})` }); continue; }
     const fg = parseColor(el.color);
-    if (!fg) continue;
+    if (fg.a === 0) continue;
     const bg = effectiveBg(el.bgLayers);
-    const ratio = contrastRatio(fg, bg);
+    // See-through text draws as its blend over the background: measured as drawn, not as its solid colour.
+    const ratio = contrastRatio(fg.a < 1 ? over(fg, bg) : fg, bg);
     const threshold = aaThreshold(el.fontSize, el.fontWeight);
     if (ratio + 1e-9 < threshold) {
       out.push({ kind: 'contrast', theme, desc: el.desc, text: el.text, ratio: Math.round(ratio * 100) / 100, threshold });
@@ -489,7 +496,8 @@ function sweepExpression(roots, doFocus, stateMap) {
     const textEls = [];
     for (const el of scope) {
       if (seen.has(el)) continue; seen.add(el);
-      if (!vis(el) || disabled(el)) continue;
+      // Text in a disabled control is exempt (WCAG 1.4.3) wherever in the control it sits: <button disabled><span>.
+      if (!vis(el) || disabled(el) || el.closest(':disabled,[aria-disabled="true"]')) continue;
       const hasText = [...el.childNodes].some(n => n.nodeType===3 && n.textContent.trim());
       if (!hasText) continue;
       const cs = getComputedStyle(el);
