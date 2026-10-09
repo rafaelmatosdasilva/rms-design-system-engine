@@ -350,7 +350,8 @@ export function borderSnaps(declared, drawn) {
 }
 export function sameValue(prop, a, b) {
   if (a == null || b == null) return null;
-  if (COLOR_PROPS.has(prop)) { const x = toRgba(a), y = toRgba(b); return x && y ? x.every((n, i) => n === y[i]) : null; }
+  // One step either way on a channel is rounding between colour spaces (an oklch colour and Figma's hex), as sameColor reads it.
+  if (COLOR_PROPS.has(prop)) { const x = toRgba(a), y = toRgba(b); return x && y ? x.every((n, i) => Math.abs(n - y[i]) <= (i === 3 ? 0.01 : 1)) : null; }
   const x = toPx(a), y = toPx(b);
   if (x != null && y != null) return Math.abs(x - y) < 0.01;
   return String(a).trim() === String(b).trim() ? true : null;

@@ -304,3 +304,29 @@ test('variants: a radius set on every corner is one difference, not four', () =>
   const r = compareComponents(code, structure, {}, cfg, maps());
   assert.deepEqual(r.differ.map((d) => `${d.field}: ${d.figma} / ${d.code}`), ['radius (State=Selected): 8 / 4px']);
 });
+
+// B3: a line height or letter spacing Figma gives in % is a share of Figma's font size, not the code's: a wrong font size
+// in the code must not move the line height Figma expects with it.
+test('components: a % line height and letter spacing are worked out from Figma\'s font size', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.k' });
+  const code = { components: { k: { confidence: 'high', instance: { hasText: true }, props: { fontSize: v('14px'), lineHeight: v('21px'), letterSpacing: v('0.7px') } } } };
+  const f = { k: { text: { fontSize: 12, lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PERCENT', value: 5 } } } };
+  const d = Object.fromEntries(compareComponents(code, f, {}, cfg, maps()).differ.map((x) => [x.field, `${x.figmaValue ?? x.figma} / ${x.code}`]));
+  assert.equal(d['line height'], '18px / 21px');
+  assert.equal(d['letter spacing'], '0.6px / 0.7px');
+});
+
+// B4: a colour drawn in oklch or hsl that rounds one step away from Figma's hex is the same colour (as css-values
+// sameColor reads it), and a variant's opacity is read on the state that has that value, never one whose name only
+// contains it ("on" is not "Icon=Only").
+test('components: colours equal within a rounding step; a variant found by its value, not by a substring', async () => {
+  const { sameValue } = await import('../component-capture.mjs');
+  assert.equal(sameValue('color', 'rgb(10, 20, 30)', 'rgb(11, 20, 30)'), true);
+  assert.equal(sameValue('color', 'rgb(10, 20, 30)', 'rgb(13, 20, 30)'), false);
+  assert.equal(sameValue('color', 'rgba(10, 20, 30, 0.5)', 'rgba(10, 20, 30, 0.6)'), false);
+  const v = (value) => ({ value, confidence: 'verified', rule: '.t' });
+  const code = { components: { t: { confidence: 'high', instance: { hasText: true }, props: { opacity: v('1') },
+    states: { 'Icon=Only': { changed: { opacity: v('0.3') } }, 'State=On': { changed: { opacity: v('0.5') } } } } } };
+  const r = compareComponents(code, { t: { variantOpacity: { on: 0.5 } } }, {}, cfg, maps());
+  assert.deepEqual(r.differ.filter((d) => /opacity/.test(d.field)), []);
+});
