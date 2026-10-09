@@ -54,6 +54,12 @@ export const TRACE = {
   letterSpacing: ['letter-spacing'],
   textTransform: ['text-transform'],
   boxShadow: ['box-shadow'],   // an inside stroke can be drawn as an inset ring
+  // The rest of the box Figma's auto layout sets: min and max width, how children line up, whether they wrap.
+  minWidth: ['min-width'],
+  maxWidth: ['max-width'],
+  justifyContent: ['justify-content', 'place-content'],
+  alignItems: ['align-items', 'place-items'],
+  flexWrap: ['flex-wrap', 'flex-flow'],
 };
 const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'boxSizing', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
 const COLOR_PROPS = new Set(['color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor']);
@@ -682,7 +688,8 @@ export async function captureComponents(ctx) {
         confidence: loc.how === 'bare' ? 'low' : loc.how === 'hidden-copy' ? 'medium' : 'high',
         size: { height: base?.rect?.height, width: base?.rect?.width },
         // How the box is laid out: an inline element ignores a height; content-box adds padding and border to it.
-        layout: { display: base?.cs?.display ?? null, boxSizing: base?.cs?.boxSizing ?? null },
+        layout: { display: base?.cs?.display ?? null, boxSizing: base?.cs?.boxSizing ?? null,
+          borderStyles: Object.fromEntries(['Top', 'Right', 'Bottom', 'Left'].map((sd) => [sd, base?.cs?.[`border${sd}Style`] ?? null])) },
         props, fill: bg && bg[3] > 0 ? 'direct' : beforeBg && beforeBg[3] > 0 && coversBox(base) ? 'before' : 'none', colors: colorsOf(perMode),
       };
       if (base?.before) entry.before = base.before;
