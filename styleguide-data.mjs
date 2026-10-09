@@ -1362,8 +1362,8 @@ export function splitFindings(list = []) {
 // check's result (passVars, fail, skip) · agreed: the agreed record (facts, seen) · propsAt / checkedAt: when Figma's props
 // were read and when the tokens were checked.
 // → [{ type: 'Prop'|'Variable'|'Value', figma: { name, value } | null, code: { name, value } | null,
-//      status: 'match'|'differs'|'figma'|'code', at }], props first, then variables, then values. status figma: only in
-// Figma; code: only in code. at: a value's time is since both sides agreed, or when it last moved.
+//      status: 'match'|'differs'|'figma'|'code'|'paired', at }], props first, then variables, then values. status figma:
+// only in Figma; code: only in code; paired: both sides have it, and the token check did not compare it (why says why). at: a value's time is since both sides agreed, or when it last moved.
 export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], codeProps = {}, allTokens = [], check = null, agreed = {}, propsAt = null, checkedAt = null, slotParts = [] } = {}) {
   const lc = (x) => String(x ?? '').toLowerCase().replace(/[\s_-]+/g, '');
   const rows = [];
@@ -1408,11 +1408,25 @@ export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], 
   // variables named after it that have no CSS variable.
   const modes = (list) => [...new Set(list.map((v) => (v.mode && v.mode !== '-' ? `${v.mode} ` : '') + (v.value ?? v.css ?? '')))].join(' · ');
   const seenVar = new Set();
+  // A pair the token check found but did not compare (a variable declared in a component's own rule, injected at run
+  // time, a value it cannot read as a colour) or found waiting on a library update: one row with both names, never a
+  // Figma-only row beside a code-only one.
+  const found = [...(check?.skip ?? []), ...(check?.newSkip ?? []), ...(check?.pendingFigmaSync ?? []).map((v) => ({ ...v, pending: true }))].filter((v) => v.cssVar && v.token);
+  const pairedTokens = new Set();
   for (const t of allTokens) {
     if (!t?.var || seenVar.has(t.var)) continue;
     seenVar.add(t.var);
     const pass = (check?.passVars ?? []).filter((v) => v.cssVar === t.var);
     const fail = (check?.fail ?? []).filter((v) => v.cssVar === t.var);
+    const other = !t.figma && !pass.length && !fail.length ? found.filter((v) => v.cssVar.toLowerCase() === t.var.toLowerCase()) : [];
+    if (other.length) {
+      for (const v of other) pairedTokens.add(v.token);
+      const figmaName = String(other[0].token).replace(/\/color$/, '');
+      const pending = other.filter((v) => v.pending);
+      if (pending.length) rows.push({ type: 'Variable', figma: { name: figmaName, value: modes(pending.map((v) => ({ mode: v.mode, value: v.consumerFigma }))) }, code: { name: t.var, value: modes(pending.map((v) => ({ mode: v.mode, value: v.css }))) }, status: 'differs', at: checkedAt, why: 'the code has the library\'s newer value; this file has not taken the library update' });
+      else rows.push({ type: 'Variable', figma: { name: figmaName, value: '' }, code: { name: t.var, value: '' }, status: 'paired', at: checkedAt, why: other[0].reason ?? null });
+      continue;
+    }
     if (!t.figma && !pass.length && !fail.length) { rows.push({ type: 'Variable', figma: null, code: { name: t.var, value: '' }, status: 'code', at: checkedAt }); continue; }
     const figmaName = t.figma ?? String((pass[0] ?? fail[0]).token ?? '').replace(/\/color$/, '');
     if (fail.length) rows.push({ type: 'Variable', figma: { name: figmaName, value: [...new Set(fail.map((v) => (v.mode && v.mode !== '-' ? `${v.mode} ` : '') + (v.figma ?? v.value ?? '')))].join(' · ') }, code: { name: t.var, value: [...new Set(fail.map((v) => (v.mode && v.mode !== '-' ? `${v.mode} ` : '') + (v.css ?? 'not declared')))].join(' · ') }, status: 'differs', at: checkedAt });
@@ -1422,7 +1436,7 @@ export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], 
   const figmaOnly = new Map();
   for (const sk of check?.skip ?? []) {
     const tok = String(sk.token ?? '');
-    if (lc(tok.split('/')[0]) !== prefix || figmaOnly.has(tok)) continue;
+    if (lc(tok.split('/')[0]) !== prefix || figmaOnly.has(tok) || pairedTokens.has(tok)) continue;
     figmaOnly.set(tok, { type: 'Variable', figma: { name: tok, value: '' }, code: null, status: 'figma', at: checkedAt, why: sk.reason ?? null });
   }
   rows.push(...figmaOnly.values());

@@ -268,8 +268,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par--differs { color: var(--sg-negative); }
 .pg-par--figma .pg-par-sign, .pg-par--code .pg-par-sign { background: var(--sg-warning); }
 .pg-par--figma, .pg-par--code { color: var(--sg-warning); }
-.pg-par--none .pg-par-sign { background: var(--sg-muted); }
-.pg-par--none { color: var(--sg-muted); }
+.pg-par--none .pg-par-sign, .pg-par--paired .pg-par-sign { background: var(--sg-muted); }
+.pg-par--none, .pg-par--paired { color: var(--sg-muted); }
 .pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text-2); }
 /* Wide enough, the table never scrolls on its own (a box that scrolls would hold its head back); on a phone it does. */
 @media (max-width: 720px) {
@@ -1548,12 +1548,12 @@ a.pg-usage-name { color: var(--sg-text); }
   // One table of everything the component has (each prop, variable and value, whatever the Playground shows): its type,
   // Figma's name and value, the code's, a status as a sign and its colour (in both and the same, differs, only in Figma,
   // only in code) and when it last held. A filter by type above it; what differs, with who acts, below it.
-  var PAR = { match: ['✓', 'Same'], differs: ['✕', 'Differs'], figma: ['!', 'Only in Figma'], code: ['!', 'Only in code'] };
+  var PAR = { match: ['✓', 'Same'], differs: ['✕', 'Differs'], figma: ['!', 'Only in Figma'], code: ['!', 'Only in code'], paired: ['–', 'Both, not compared'] };
   function parityHTML(c) {
     var p = c.parity; if (!p) return differencesHTML(c);
     var rows = p.rows || [];
     if (!rows.length) return '<div class="pg-doc"><p class="pg-parity-sum">Nothing of it was read from Figma or the code yet.</p>' + differencesHTML(c) + '</div>';
-    var n = { match: 0, differs: 0, figma: 0, code: 0 };
+    var n = { match: 0, differs: 0, figma: 0, code: 0, paired: 0 };
     rows.forEach(function (r) { n[r.status] = (n[r.status] || 0) + 1; });
     var types = ['Prop', 'Variable', 'Value'].filter(function (t) { return rows.some(function (r) { return r.type === t; }); });
     var plural = { Prop: 'Props', Variable: 'Variables', Value: 'Values' };
@@ -1564,7 +1564,7 @@ a.pg-usage-name { color: var(--sg-text); }
         '<td><span class="pg-par-status pg-par--' + esc(r.status) + '"><span class="pg-par-sign" aria-hidden="true">' + st[0] + '</span>' + esc(st[1]) + '</span></td>' +
         '<td class="pg-par-at">' + (r.at ? esc(when(r.at)) : '') + '</td></tr>';
     }).join('');
-    var sum = [['match', n.match + ' the same'], ['differs', n.differs + ' differ'], ['figma', n.figma + ' only in Figma'], ['code', n.code + ' only in code']]
+    var sum = [['match', n.match + ' the same'], ['differs', n.differs + ' differ'], ['figma', n.figma + ' only in Figma'], ['code', n.code + ' only in code']].concat(n.paired ? [['paired', n.paired + ' in both, not compared']] : [])
       .map(function (x) { return '<span class="pg-par-status pg-par--' + x[0] + '"><span class="pg-par-sign" aria-hidden="true">' + PAR[x[0]][0] + '</span>' + esc(x[1]) + '</span>'; }).join('');
     var filter = types.length > 1 ? '<div class="pg-par-filter">' + segHTML([{ label: 'All (' + rows.length + ')', v: 'all' }].concat(types.map(function (t) { return { label: plural[t] + ' (' + rows.filter(function (r) { return r.type === t; }).length + ')', v: t }; }))) + '</div>' : '';
     return '<div class="pg-doc pg-par"><div class="pg-par-sum">' + sum + '</div>' + filter +
