@@ -7,7 +7,8 @@
 1. Run `rms-design-system-engine --refresh-figma` first. It picks the best way to read Figma: a `design.json` newer than the snapshots, else figma-cli when Figma Desktop is connected to it (it runs `figma-cli snapshot` and reads the result), else it says the Figma tool of this session reads it (the steps below), or the API with FIGMA_TOKEN. A design.json read this way keeps what it does not hold (text styles, other variants, descriptions, annotations) from the snapshots already there.
 2. Otherwise refresh only with a capture faithful to the steps below (the Plugin API capture works on any plan). Never hand-edit a snapshot: the project's hooks refuse it. Every value in a refreshed snapshot is one read from Figma in this capture: a value the capture cannot read is never kept from the old snapshot, it is told to the person (which variable, in which mode, and what Figma holds there) so they can fix the file or report the capture.
 3. When no refresh path is available (no figma-cli, no token, no Figma MCP, no Plugin API), say so and audit the committed snapshots.
-4. After a refresh, run the audit (`--recipe full-audit` or `--recipe audit-component`).
+4. When the Figma tool of this session can read the file, also refresh the annotation categories, which no other path returns: run `rms-design-system-engine --annotation-categories`, run the script it writes with that tool (once per page on a large file), save each result unchanged under `.design-system-engine-out/figma-capture/`, then run `rms-design-system-engine --annotation-categories <each file>`.
+5. After a refresh, run the audit (`--recipe full-audit` or `--recipe audit-component`).
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 

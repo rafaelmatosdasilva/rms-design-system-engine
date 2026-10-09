@@ -861,12 +861,15 @@ variant's name (`state=default` → `state=Default`), then a property (`editComp
 Icon"); one already renamed is skipped. Every need the prototypes found the system lacks (`prototypes/gaps.json`, merged) becomes
 the design team's to do list: a page "Design system to do" with a frame "Gaps from prototypes", one card per need (what
 kind, what the prototypes use meanwhile or the closest component, and which prototypes need it), the most needed first,
-written afresh each time; nothing else in the file is touched. Each Figma annotation no check reads (`annotationUses`
-gives it no use) goes on the same page, in a frame "Annotations no check reads": its component and layer, its words, and
-the wording a check reads when the engine can tell what it means (`annotationWording`: "This is a button" → `Role:
-button`, "Esc" → `Escape closes it`, "H2" → `Heading level 2`, a quoted name → `aria-label: …`, a layer named Error →
-`Role: errormessage`); one it cannot tell stays a note for people. The annotations themselves are never changed. With
-gaps and no Figma snapshot, only the gaps list is written.
+written afresh each time; nothing else in the file is touched. Each accessibility annotation no check reads
+(`annotationUses` gives it no use) goes on the same page, in a frame "Annotations no check reads": its component and
+layer, its words, and the wording a check reads when the engine can tell what it means (`annotationWording`: "This is a
+button" → `Role: button`, "Esc" → `Escape closes it`, "H2" → `Heading level 2`, a quoted name → `aria-label: …`, a
+layer named Error → `Role: errormessage`). A note is listed when its category is Accessibility, or when it has no
+category and the engine reads an accessibility meaning in it; a note in a design-intent category (Intent,
+Implementation, Content, Authoring), or one the engine reads nothing in, is for people and the agents, never a to do
+(see *Annotation categories*). The annotations themselves are never changed. With gaps and no Figma snapshot, only the
+gaps list is written.
 
 It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its Figma node, what it adds and why) and
 `figma-apply.js`, a Figma plugin script that makes exactly those edits, leaves a component that already states a role
@@ -1020,9 +1023,26 @@ there, never a failure.
   the real one does.
 
 **Writing accessibility notes in Figma.** Use Figma's annotation tool on the component (the component set or
-a standalone component). A category such as "Accessibility" helps people find them; the skill reads the text.
-One fact per line, or per sentence ending in `. ` or `;`. The keywords are English; the value can be in any
-language.
+a standalone component), in the **Accessibility** category. One fact per line, or per sentence ending in `. ` or
+`;`. The keywords are English; the value can be in any language.
+
+**Annotation categories.** Figma lets each note carry one category, and the category says what the note is:
+
+| Category | What the engine does with the note |
+|---|---|
+| Accessibility | A requirement: the accessibility check verifies it, and one no check reads is a To do (rewrite it so a check reads it) |
+| Intent, Implementation, Content, Authoring | Design intent: the agents read it; never a requirement, never a To do, never acknowledged in Gate [13] (Structure) |
+| No category, or one the file deleted | Read as before: the text decides (a note the engine reads no accessibility in is design intent) |
+
+The REST API does not return a note's category, so it is captured apart with the Plugin API:
+`rms-design-system-engine --annotation-categories` writes the read-only script for the Figma tool of the session
+(`.design-system-engine-out/figma-capture/annotation-categories.js`); save what it returns, as it is, under the same
+folder, then run `rms-design-system-engine --annotation-categories <file …>`, which keeps it in
+`figma-annotation-categories.snapshot.json` beside the component-props snapshot. On a large file, run the script once
+per page (`PAGE_IDS` at its top) and pass every result. A note finds its category by its node and its words, so a note
+reworded in Figma has none until the next capture. Other category names map in `ds-config.json → annotations.categories`
+(`{ "Notas de acessibilidade": "accessibility" }`); the defaults also read Development and Interaction as
+Implementation, Documentation as Intent, Designers and Figma as Authoring.
 
 | Note | Checked against the rendered component |
 |---|---|
@@ -1037,8 +1057,9 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **On an inner layer.** A note on a layer inside the component's default variant (the first one) is checked on
   the part the contract names the same way: `CONTRACT[component].children` with that `name` and a
   `cssSelector`. A layer with no such part is listed as not checked, with what to add.
-- **No Gate [13] (Structure) entry needed.** A note the accessibility check can verify passes Gate [13] (Structure) on its own; only
-  prose notes still need `CONTRACT.annotations`.
+- **No Gate [13] (Structure) entry needed.** A note the accessibility check can verify passes Gate [13] (Structure) on its own,
+  and a note in a design-intent category is not counted there; only prose notes with no category (or in Accessibility)
+  still need `CONTRACT.annotations`.
 - **Where the notes come from.** The component-props snapshot, refreshed with `FIGMA_TOKEN` or the Plugin API
   capture below (both record `annotations` on the component and `layerAnnotations` on its inner layers).
 - **A name that changes with content** ("3 items") is compared as written, so it is reported as a difference.

@@ -13,7 +13,8 @@ Every Figma annotation attached to a component node is a design specification. T
 
 1. **`audit.mjs` refresh** - `refreshComponentProps()` fetches `doc.annotations[]` alongside `componentPropertyDefinitions` for every component node. Nodes with either properties **or** annotations are included in the snapshot. (`/nodes` works on any plan with a token.)
 2. **Gate [13] (Structure) check** - for every component in the snapshot that has annotations, `structure-check.mjs` looks up `CONTRACT[key].annotations` and verifies each annotation label is present. Missing label → `FAIL`. If a CSS selector is provided, it must exist in the CSS - not found → `FAIL`. An accessibility note the accessibility check verifies (a role, name, heading level or alt text, see *Writing accessibility notes in Figma* in `rms-design-system-engine --reference usage`) passes without an entry.
-3. **`anyFail`** - annotation failures count the same as property failures; the gate exits non-zero.
+3. **Only requirements are counted** - a note whose Figma category is a design-intent one (Intent, Implementation, Content, Authoring, or a name the project maps to one) is read by the agents and never acknowledged here, nor counted in the total. The categories come from `figma-annotation-categories.snapshot.json` (`--annotation-categories`, see *Annotation categories* in `rms-design-system-engine --reference usage`); without it every note is counted, as before.
+4. **`anyFail`** - annotation failures count the same as property failures; the gate exits non-zero.
 
 ### Plugin API capture (no token, any plan)
 

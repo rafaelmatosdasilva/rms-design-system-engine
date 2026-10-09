@@ -9,6 +9,7 @@
 // Pure: agreedView takes what the generator read and returns { components, notAgreed, modes }.
 import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
 import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs';
+import { requirementEntry } from './annotation-categories.mjs';
 import { WCAG21, WCAG21_KIND } from './wcag21.mjs';
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -333,7 +334,7 @@ export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}
 // from the contract's children. · jsx: { name: the markup a React component's own JSX returns (jsx-markup.mjs) }, used
 // when neither the contract nor a page has it.
 export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, classFor = () => null, cssText = '', probes = {}, probeList = [], unbuilt = [], cfg = {},
-  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, parts = {}, jsx = {}, alsoNames = [], themeCss = '' } = {}) {
+  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, parts = {}, jsx = {}, alsoNames = [], themeCss = '', cats = null } = {}) {
   const byComponent = new Map();
   for (const r of rows) { if (!byComponent.has(r.component)) byComponent.set(r.component, []); byComponent.get(r.component).push(r); }
   const components = [], waiting = [];
@@ -410,7 +411,9 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     // Every other markup the code shows for it, fullest first: a drawing picks the one that fits each instance's words.
     const markups = [...new Set(candidates.map((c) => c.markup).filter((m) => m && elementsIn(m) <= 30))].sort((a, b) => elementsIn(b) - elementsIn(a)).slice(0, 6);
     if (entry.noProps && !markup) continue;
-    components.push({ name, cls, role: roleWord(entry.annotations), description: entry.description ?? '', note: notes[name.toLowerCase()] ?? notes[name] ?? '',
+    // Its role as a Figma note states it: only a note that is a requirement (annotation-categories.mjs), never one
+    // in a design-intent category.
+    components.push({ name, cls, role: roleWord(requirementEntry(entry, cats, cfg).annotations), description: entry.description ?? '', note: notes[name.toLowerCase()] ?? notes[name] ?? '',
       markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls, ...(propsNotBuilt.length ? { unbuilt: propsNotBuilt } : {}) });
   }
   // A recorded value that moved on one side since it was agreed is not agreed any more.

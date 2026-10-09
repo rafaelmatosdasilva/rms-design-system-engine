@@ -515,12 +515,58 @@ if (process.argv.includes('--figma-edits')) {
     // Names written otherwise than most of the system's: renamed in their component sets, after the same yes.
     let renames = [];
     if (propsSnap && feConfig.namingConsistency !== false) { const { namingFindings } = await import('./naming-consistency.mjs'); renames = renameEdits(propsSnap, namingFindings(propsSnap).findings); }
-    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []) : []), ...renames, ...gapEdits(gaps), ...(propsSnap ? annotationEdits(propsSnap, annotationUses) : [])];
+    const { loadCategories } = await import('./annotation-categories.mjs');
+    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []) : []), ...renames, ...gapEdits(gaps), ...(propsSnap ? annotationEdits(propsSnap, annotationUses, loadCategories(ROOT, feConfig), feConfig) : [])];
     const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits);
     for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null })) console.log(l);
     if (edits.length) console.log(`   (${relative(ROOT, files.json)} · ${relative(ROOT, files.script)})`);
     process.exit(0);
   } catch (e) { console.error(`❌ Figma edits not listed: ${e.message}`); process.exit(1); }
+}
+
+// ── --annotation-categories [capture.json …]: the category of each Figma note, read with the Plugin API ──
+// Figma's REST API does not return a note's category (Intent, Accessibility…). With no file, the engine writes the
+// read-only script for the Figma tool of the session; with the files that script returned, it keeps them in the
+// categories snapshot, which the checks and the To do list read (annotation-categories.mjs).
+if (process.argv.includes('--annotation-categories')) {
+  let acConfig = {};
+  try { acConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const ac = await import('./annotation-categories.mjs');
+  const files = [];
+  for (const a of process.argv.slice(process.argv.indexOf('--annotation-categories') + 1)) { if (a.startsWith('--')) break; files.push(a); }
+  const dir = join(ROOT, OUT_DIR, 'figma-capture');
+  if (!files.length) {
+    mkdirSync(dir, { recursive: true });
+    const script = join(dir, 'annotation-categories.js');
+    writeFileSync(script, ac.captureScript());
+    console.log(`📝 The script that reads the category of each Figma annotation (it reads, it changes nothing): ${relative(ROOT, script)}`);
+    console.log(`   Run it with the Figma tool of this session on the file ${acConfig.figmaFileKey ?? 'named by figmaFileKey in ds-config.json'}. On a large file, run it once per page (PAGE_IDS at its top) and keep every result.`);
+    console.log(`   Save what it returns, as it is, under ${relative(ROOT, dir)}/ (one .json file per run).`);
+    console.log(`NEXT: rms-design-system-engine --annotation-categories ${relative(ROOT, join(dir, 'annotation-categories.json'))}`);
+    process.exit(0);
+  }
+  try {
+    const captures = files.map((f) => JSON.parse(readFileSync(resolve(ROOT, f), 'utf8')));
+    const r = ac.mergeCaptures(ac.loadCategories(ROOT, acConfig), captures);
+    const path = ac.categoriesPath(ROOT, acConfig);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(r.snapshot, null, 2) + '\n');
+    console.log(`✅ Annotation categories kept: ${r.categories} categor${r.categories === 1 ? 'y' : 'ies'}, ${r.notes} categorised note${r.notes === 1 ? '' : 's'} on ${r.nodes} node${r.nodes === 1 ? '' : 's'} → ${relative(ROOT, path)}`);
+    // What that means for the notes the checks read: the component-props snapshot's notes, by kind.
+    let props = {};
+    try { props = JSON.parse(readFileSync(resolve(ROOT, acConfig.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { /* no component snapshot yet */ }
+    const by = {};
+    for (const [name, e] of Object.entries(props)) {
+      if (name.startsWith('_') || !e || typeof e !== 'object') continue;
+      for (const [a, node] of [...(e.annotations ?? []).map((x) => [x, e.nodeId]), ...(e.layerAnnotations ?? []).flatMap((l) => (l.annotations ?? []).map((x) => [x, l.nodeId]))]) {
+        const k = ac.noteKind(a, node, r.snapshot, acConfig) ?? 'no category';
+        by[k] = (by[k] ?? 0) + 1;
+      }
+    }
+    if (Object.keys(by).length) console.log(`   The component notes: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ')}. Accessibility and uncategorised notes are requirements; the rest is design intent, never a To do.`);
+    console.log('NEXT: rms-design-system-engine (the audit, reading each note as a requirement or as design intent)');
+    process.exit(0);
+  } catch (e) { console.error(`❌ Annotation categories not kept: ${e.message}`); process.exit(1); }
 }
 
 // ── --prototype <composition.json>: draw a prototype from the system's own components (prototype.mjs) ──

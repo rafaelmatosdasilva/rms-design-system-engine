@@ -143,13 +143,14 @@ test('each annotation no check reads goes to Figma with the wording a check read
   const snap = { dialog: { nodeId: '2:2', annotations: [{ label: 'Role: dialog' }, { label: 'Esc' }, { label: 'Sizing: fill' }], layerAnnotations: [{ layer: 'Hint', annotations: [{ label: 'shown under the field' }] }] } };
   const edits = annotationEdits(snap, annotationUses);
   assert.equal(edits.length, 1);
-  assert.deepEqual(edits[0].items.map((i) => [i.text, i.layer ?? null, i.wording]), [['Esc', null, 'Escape closes it'], ['Sizing: fill', null, null], ['shown under the field', 'Hint', 'Role: description']]);
+  // A note the engine reads no accessibility in ("Sizing: fill") is for people and agents: not a to do (E3).
+  assert.deepEqual(edits[0].items.map((i) => [i.text, i.layer ?? null, i.wording]), [['Esc', null, 'Escape closes it'], ['shown under the field', 'Hint', 'Role: description']]);
   assert.deepEqual(annotationEdits({ x: { annotations: [{ label: 'Role: button' }] } }, annotationUses), [], 'every annotation read: nothing to send');
   const lines = editLines(edits).join('\n');
-  assert.match(lines, /Annotations no check reads, listed in Figma on the page "Design system to do", frame "Annotations no check reads" \(3 annotations no check reads, 2 with a wording a check reads\)/);
+  assert.match(lines, /Annotations no check reads, listed in Figma on the page "Design system to do", frame "Annotations no check reads" \(2 accessibility annotations no check reads, 2 with a wording a check reads\)/);
   assert.match(lines, /• dialog: "Esc" → write it as "Escape closes it"/);
   assert.match(lines, /• dialog › Hint: "shown under the field" → write it as "Role: description"/);
-  assert.match(lines, /• dialog: "Sizing: fill" \(a note for people\)/);
+  assert.doesNotMatch(lines, /Sizing: fill/);
   const all = [...edits, ...gapEdits([{ need: 'a toggle switch', kind: 'component', prototypes: ['notify'] }])];
   const node = (type) => ({ type, name: '', children: [], x: 0, y: 0, appendChild(k) { this.children.push(k); k.parent = this; }, remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); } });
   const doc = { children: [] };
@@ -157,10 +158,25 @@ test('each annotation no check reads goes to Figma with the wording a check read
     createPage() { const p = node('PAGE'); p.parent = doc; doc.children.push(p); return p; }, createFrame: () => node('FRAME'), createText: () => node('TEXT') };
   const go = () => new Function('figma', `return (async () => { ${applyScript(all)} })();`)(fake);
   const r = await go();
-  assert.equal(r.todo, 'Design system to do › Gaps from prototypes: 1 need; Design system to do › Annotations no check reads: 3 annotations');
+  assert.equal(r.todo, 'Design system to do › Gaps from prototypes: 1 need; Design system to do › Annotations no check reads: 2 annotations');
   const page = doc.children[0];
   const notes = page.children.find((n) => n.name === 'Annotations no check reads');
   assert.equal(notes.children[1].children[1].characters, 'on the component · says: Esc · a check reads it written as: Escape closes it');
   await go();
   assert.deepEqual([doc.children.length, page.children.length], [1, 2], 'written afresh, not added twice');
+});
+
+test('with Figma\'s categories: a note in a design-intent category is never a to do, one in Accessibility always is; the capture only reads', async () => {
+  const { annotationEdits } = await import('../figma-edits.mjs');
+  const { annotationUses } = await import('../a11y-check.mjs');
+  const { noteKey, captureScript } = await import('../annotation-categories.mjs');
+  const texts = ['The remove button is enabled with two lines.', 'Announce the total when it changes.', 'Esc', 'Role: dialog'];
+  const cats = { categories: { i: { label: 'Intent' }, a: { label: 'Accessibility' } }, notes: { '2:2': { [noteKey(texts[0])]: 'i', [noteKey(texts[1])]: 'a' } } };
+  const snap = { dialog: { nodeId: '2:2', annotations: texts.map((label) => ({ label })) } };
+  const edits = annotationEdits(snap, annotationUses, cats);
+  // Intent says "button" yet asks nothing; Accessibility prose is work, with no wording yet; "Esc", uncategorised, reads as a key.
+  assert.deepEqual(edits[0].items.map((i) => [i.text, i.wording]), [['Announce the total when it changes.', null], ['Esc', 'Escape closes it']]);
+  assert.match(editLines(edits).join('\n'), /"Announce the total when it changes\." \(an accessibility note: write it as Role:/);
+  // The capture script only reads Figma: the guard never takes it for a change.
+  assert.equal(figmaWriteVerdict(captureScript(), { root: mkdtempSync(join(tmpdir(), 'cap-')) }), null);
 });

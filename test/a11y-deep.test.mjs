@@ -232,6 +232,33 @@ test('Gate 10g: a note the accessibility check verifies passes without a contrac
   assert.match(r.out, /annotation "Only on wide screens" not acknowledged/, r.out);
 });
 
+test('Gate 10g and the accessibility facts: a note in a design-intent category asks nothing; an uncategorised one still does', async () => {
+  const { noteKey } = await import('../annotation-categories.mjs');
+  const { annotationFactsFor, annotationUses } = await import('../a11y-check.mjs');
+  const props = { chip: { nodeId: '1:2', properties: {}, annotations: [{ label: 'Role: button' }, { label: 'Only on wide screens' }, { label: 'Use h1 only on page title' }] } };
+  const cats = { _updated: '2026-10-08T10:00:00Z', categories: { i: { label: 'Intent' } }, notes: { '1:2': { [noteKey('Only on wide screens')]: 'i', [noteKey('Use h1 only on page title')]: 'i' } } };
+  const files = {
+    'ds-config.json': { paths: { themeCSS: 'theme.css', snapshotStructure: 's.json', pluginCSS: ['app.css'], compPropsSnapshot: 'props.json' } },
+    's.json': { components: { chip: {} } },
+    'app.css': '.chip {}',
+    'theme.css': ':root {}',
+    'structure-contract.mjs': "export const CONTRACT = { chip: {} };\nexport const COMPONENT_CSS_SELECTORS = { chip: { main: '.chip' } };\nexport const FIGMA_LAYOUT_TO_CSS = {};",
+    'props.json': props,
+  };
+  // The intent notes need no acknowledgement in the contract; the role note is still checked.
+  const r = runGate('structure-check.mjs', { ...files, 'figma-annotation-categories.snapshot.json': cats });
+  assert.doesNotMatch(r.out, /not acknowledged/, r.out);
+  assert.match(r.out, /1\/1 Figma annotation acknowledgments/, r.out);   // the role note only: the intent notes are not counted
+  // The facts the browser check verifies: the intent note's "h1" is no heading level. Without categories it still is.
+  const cfg = { paths: { compPropsSnapshot: 'props.json' } };
+  const withCats = annotationFactsFor(makeFixture({ 'props.json': props, 'figma-annotation-categories.snapshot.json': cats }), cfg).chip.facts;
+  assert.deepEqual([withCats.role, withCats.level], ['button', undefined]);
+  assert.equal(annotationFactsFor(makeFixture({ 'props.json': props }), cfg).chip.facts.level, 1);
+  // Every note is still listed for the agents, an intent one with its kind and no check's use.
+  assert.deepEqual(annotationUses(props.chip, { cats }).map((u) => [u.text, u.kind ?? null, u.uses.length > 0]),
+    [['Role: button', null, true], ['Only on wide screens', 'intent', false], ['Use h1 only on page title', 'intent', false]]);
+});
+
 test('annotations in the browser: a toggle button without aria-pressed, and a note on an inner layer', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
   const page = `<!doctype html><html><body>
     <button class="fav" aria-label="Favorito"><span class="lbl" aria-label="Salvar">★</span></button>
@@ -250,6 +277,47 @@ test('annotations in the browser: a toggle button without aria-pressed, and a no
   assert.ok(got.includes('fav: Figma says it is a toggle button, it has no aria-pressed'), out);
   assert.ok(got.some((x) => /^fav › Icon: Figma says its name is "Favoritar", it is announced as "Salvar"/.test(x)), out);
   assert.ok(got.some((x) => /^fav › Badge: not checked, the contract has no part named "Badge"/.test(x)), out);
+});
+
+test('annotations in the browser: a role is read on the component, never on a control inside it', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  // tile: a plain container holding a link and a button, its note says article. Its first control is not the component.
+  // sheet: a native <dialog> inside a wrapper, found by the role the browser gives it (no role attribute written).
+  // act: a wrapper around its one button reads as that button, as before.
+  const page = `<!doctype html><html><body>
+    <div class="tile"><a href="#a">Open</a><button>Like</button></div>
+    <div class="sheet"><dialog open><p>Hello</p><button>Close</button></dialog></div>
+    <div class="act"><button>Go</button></div>
+    <div class="duo"><button>Yes</button><button>No</button></div>
+    <div class="solo"><button aria-label="Save"><svg role="img" aria-label="disk" width="8" height="8"></svg></button></div>
+  </body></html>`;
+  // duo and solo name no role: a container of two buttons is read as itself; a wrapper around one button (an icon's
+  // role inside it does not count) reads as that button.
+  const dir = makeFixture({
+    'page.html': page,
+    'figma-component-props.snapshot.json': {
+      tile: { nodeId: '1:1', annotations: [{ label: 'Role: article' }] },
+      sheet: { nodeId: '1:2', annotations: [{ label: 'Role: dialog' }] },
+      act: { nodeId: '1:3', annotations: [{ label: 'Role: button' }] },
+      duo: { nodeId: '1:4', annotations: [{ label: 'aria-label: Choice' }] },
+      solo: { nodeId: '1:5', annotations: [{ label: 'aria-label: Save' }] },
+    },
+    'ds-config.json': { componentSelectors: { tile: '.tile', sheet: '.sheet', act: '.act', duo: '.duo', solo: '.solo' } },
+  });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const got = d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector);
+  // The tile's own role is reported, not the link inside it.
+  assert.ok(got.some((x) => /^tile: Figma says role "article", it renders as "generic"/.test(x)), out);
+  assert.ok(!got.some((x) => /^tile: .*renders as "(link|button)"/.test(x)), out);
+  // The dialog is found by its computed role, and the wrapper around one button still reads as that button.
+  assert.ok(!got.some((x) => /^sheet: /.test(x)), out);
+  assert.ok(!got.some((x) => /^act: /.test(x)), out);
+  // The container's name is its own (none), not its first button's.
+  assert.ok(got.some((x) => /^duo: Figma says its name is "Choice", it is announced as ""/.test(x)), out);
+  assert.ok(!got.some((x) => /^duo: .*announced as "Yes"/.test(x)), out);
+  assert.ok(!got.some((x) => /^solo: /.test(x)), out);
 });
 
 test('role contracts: what each role requires, on the rendered component', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
@@ -312,7 +380,9 @@ test('a page counts as loaded only once it is no longer the about:blank a new ta
 
 test('a page that was not checked says so in --json, with the reason, never as a clean result', () => {
   const dir = makeFixture({ 'page.html': '<!doctype html><html><body><button>x</button></body></html>' });
-  const out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: '/bin/false' } });
+  // A browser that exits at once. /usr/bin/false is on Linux and macOS alike (macOS has no /bin/false, so the
+  // engine would skip the path and start a real Chrome).
+  const out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: '/usr/bin/false' } });
   const d = JSON.parse(out.slice(out.indexOf('{')));
   assert.match(d.notChecked, /^Chrome failed to start/);
   assert.equal(d.issues, undefined);

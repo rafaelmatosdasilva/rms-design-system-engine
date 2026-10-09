@@ -733,6 +733,14 @@ a.pg-usage-name { color: var(--sg-text); }
   // Who acts on an item: you in the Figma file, Claude in the code (tell Claude its number), you deciding which side is
   // right when Figma and the code each have a case, or you checking by hand what only a person can judge.
   var WHO = { figma: 'You in Figma', code: 'Claude in the code', both: 'You decide', person: 'You check by hand' };
+  // Who acts on an accessibility row: Figma when what is missing is in Figma (a role not stated yet), never when the
+  // code fails what a Figma note asks (the note is right, the code changes); a colour pair is a design decision; what
+  // only a person can judge is checked by hand; the rest is the code's. its: the row's open items ({ st, from }).
+  function a11yWho(sc, how, its, note) {
+    var from = its.map(function (it) { return it.from || ''; }).join(' ');
+    var failed = its.some(function (it) { return it.st === 'todo'; });
+    return /Figma/.test(from) && !failed ? WHO.figma : /^1\.4\.(3|11)$/.test(sc) ? WHO.figma : how === 'person' || (!its.length && /a person checks/.test(note)) ? WHO.person : WHO.code;
+  }
   function doWhat(t) { var r = String(t || '').replace(/^In (the code|Figma), /, ''); return r.charAt(0).toUpperCase() + r.slice(1); }   // the label already says where
   var TODO = [], TODO_NO = {};
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
@@ -1758,7 +1766,7 @@ a.pg-usage-name { color: var(--sg-text); }
       return '<tr><td class="pg-par-type">' + esc(x.from) + '</td><td>' + esc(x.what) + '</td><td>' + unreadFix(x) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }  // How an annotation no check reads is written so one does.
-  function unreadFix(x) { return (x.wording ? 'Write it in Figma as ' + esc(x.wording) + ' (--figma-edits lists it).' : /annotation/.test(x.from) ? 'Write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer.' : 'Nothing: the agents read it as design intent.'); }
+  function unreadFix(x) { return (x.kind && x.kind !== 'accessibility' ? 'Nothing: its Figma category (' + esc(x.kind.charAt(0).toUpperCase() + x.kind.slice(1)) + ') makes it design intent, which the agents read.' : x.wording ? 'Write it in Figma as ' + esc(x.wording) + ' (--figma-edits lists it).' : /annotation/.test(x.from) ? 'Write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer.' : 'Nothing: the agents read it as design intent.'); }
 
   // Where a finding or a duty is, said with it: the component, its variant or the part it is on.
   function figmaOf(c) { var l = (c.links || []).find(function (x) { return /figma/i.test(x.label); }); return l ? l.url : null; }
@@ -1834,14 +1842,15 @@ a.pg-usage-name { color: var(--sg-text); }
           if (!(tried && tried.live) && !r.its.length && pending.test(r.note)) return;   // waits for its try in the browser
           var its = r.its.filter(function (it) { return !it.listed && it.st !== 'done'; });
           if (!its.length && r.its.some(function (it) { return it.listed; }) && !(r.st === 'check' && r.note)) return;
-          var from = its.map(function (it) { return it.from || ''; }).join(' ');
-          var who = /Figma/.test(from) ? WHO.figma : /^1\.4\.(3|11)$/.test(r.k.sc) ? WHO.figma : r.k.how === 'person' || (!its.length && /a person checks/.test(r.note)) ? WHO.person : WHO.code;
+          var who = a11yWho(r.k.sc, r.k.how, its, r.note);
           var html = '<b>' + esc(r.k.sc + ' ' + r.k.name + (r.k.level ? ' (' + r.k.level + ')' : '')) + '.</b> ' + (its.length ? its.map(function (it) { return it.html; }).join(' ') : esc(r.note));
           rows.push({ kind: 'Accessibility', st: its.some(function (it) { return it.st === 'todo'; }) ? 'todo' : r.st, who: who, html: html });
         });
-        // A Figma annotation no check reads yet: written the way a check reads it.
+        // A Figma annotation no check reads yet, when it states accessibility (todo: its category, or a wording a check
+        // reads): written the way a check reads it. A note in a design-intent category, the guidelines and the authored
+        // contract are design intent the agents read, listed under the Accessibility area, never a To do.
         ((c.a11y || {}).sources || []).forEach(function (x) {
-          if (x.st !== 'agents') return;
+          if (x.st !== 'agents' || !x.todo) return;
           rows.push({ kind: 'Accessibility', st: 'check', who: /annotation/.test(x.from) ? WHO.figma : WHO.person, html: esc(x.from + ', ' + x.what + '.') + '<span class="pg-todo">' + unreadFix(x) + '</span>' });
         });
       } catch (e) { /* its accessibility is read on its own page */ }

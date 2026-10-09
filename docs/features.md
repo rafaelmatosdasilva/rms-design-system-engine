@@ -58,7 +58,8 @@ When the code already states something Figma does not, the engine can write it i
 |---|---|---|
 | Update Figma to match the code | `/rms-design-system-engine update Figma to match the code` | `rms-design-system-engine --figma-edits` |
 | Send the prototypes' gaps to Figma as a to do list | `/rms-design-system-engine send the gaps to Figma` | `rms-design-system-engine --figma-edits` |
-| List in Figma the annotations no check reads, with the wording one reads | `/rms-design-system-engine update Figma to match the code` | `rms-design-system-engine --figma-edits` |
+| List in Figma the accessibility annotations no check reads, with the wording one reads | `/rms-design-system-engine update Figma to match the code` | `rms-design-system-engine --figma-edits` |
+| Read the category of each Figma annotation (Accessibility is a requirement; Intent, Implementation, Content and Authoring are design intent, never a To do) | `/rms-design-system-engine refresh the Figma data` | `rms-design-system-engine --annotation-categories` |
 
 - **You see the list first.** Each change names the component, what it adds and why (what the code renders, in how many places). Nothing changes until you say yes.
 - **The engine writes the change, not the AI.** It writes the script, Claude runs it through the Figma MCP, and the project hooks refuse any other write to Figma.
