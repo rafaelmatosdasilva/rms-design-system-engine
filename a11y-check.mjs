@@ -663,7 +663,12 @@ function sweepExpression(roots, doFocus, stateMap) {
         const interactiveRole = role && IROLES.includes(role);
         if ((interactiveRole || isInteractive) && !disabled(el)) {
           const ti = el.getAttribute('tabindex');
-          const focusable = el.matches(NATIVE_FOCUSABLE) ? ti !== '-1' : (ti !== null && Number(ti) >= 0);
+          const tabStop = (n) => (n.matches(NATIVE_FOCUSABLE) ? n.getAttribute('tabindex') !== '-1' : (n.getAttribute('tabindex') !== null && Number(n.getAttribute('tabindex')) >= 0));
+          // A composite (a radio group, a tab list, a menu) has one Tab stop and its arrow keys for the rest: an option
+          // left out of the Tab order there is reached through the group, when the group has a stop at all.
+          const group = el.closest('[role=radiogroup],[role=tablist],[role=listbox],[role=menu],[role=menubar],[role=tree],[role=grid],[role=treegrid],[role=toolbar]');
+          const roving = !!group && group !== el && [...group.querySelectorAll('[role]')].some((n) => n !== el && n.getAttribute('role') === role && tabStop(n));
+          const focusable = tabStop(el) || roving;
           if (!focusable) notKeyboard.push((desc+(role?('[role='+role+']'):'')).slice(0,70));
         }
       }
@@ -793,7 +798,10 @@ export function makeStep(findings, unfinished, label) {
 }
 
 // Chrome's accessibility tree names a few roles differently from ARIA.
-export const sameRole = (got, want) => got === want || (want === 'img' && got === 'image') || (want === 'textbox' && got === 'searchbox');
+// presentation and none are one role (ARIA 1.1 named it none); Chrome reports either as "none", and a plain element
+// with no role of its own (generic) holds no meaning either, as presentation asks.
+export const sameRole = (got, want) => got === want || (want === 'img' && got === 'image') || (want === 'textbox' && got === 'searchbox')
+  || (/^(presentation|none)$/.test(want) && /^(presentation|none|generic)$/.test(got));   // a plain element means nothing either
 // The same equivalences, to look a role up in Chrome's tree (Accessibility.queryAXTree) by the name an annotation uses.
 const AX_ROLE_ALIASES = { img: ['image'], textbox: ['searchbox'] };
 // The controls a wrapper can hold, for a note that names no role (a name, a heading level, a pressed state).
@@ -1381,6 +1389,9 @@ async function main() {
     //    forced colours, text spacing, reflow (opt-in a11y.reflow), and semantics against the contract.
     //    Each one is isolated: a failure in one never stops the others or the check as a whole.
     const evalv = async (expr) => (await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
+    // On the style guide a component is read where it is drawn, in its own section's playground: the page's own chrome
+    // (a navigation card, a hidden menu button) shares the system's classes and is never the component.
+    const ownSection = (comp, sel) => (target.styleguide && sel ? `#c-${String(comp).replace(/[^\w-]+/g, '-')} .pg-preview :is(${sel})` : sel);
     const media0 = modes[0].sw.media;
     const step = makeStep(findings, unfinished, label);
     await step(async () => {
@@ -1584,7 +1595,13 @@ async function main() {
       for (const [comp, { facts: f, layers }] of Object.entries(facts)) {
         if (components.length && !components.includes(comp)) continue;
         if (Object.keys(f).length) {
-          const got = await axOf(selOf(comp), f.role ? String(f.role).toLowerCase() : null);
+          // A component the code has no markup for is drawn as a stand-in on the style guide: there is nothing of the
+          // code's to read, so it is said not checked.
+          if (target.styleguide && await evalv(`!!document.querySelector(${JSON.stringify(ownSection(comp, selOf(comp)))})?.matches('[data-sg-standin]')`)) {
+            findings.push({ kind: 'annotation', plugin: label, desc: `${comp}: not checked, the code has no markup for it (the style guide draws a stand-in)` });
+            continue;
+          }
+          const got = await axOf(ownSection(comp, selOf(comp)), f.role ? String(f.role).toLowerCase() : null);
           if (got) for (const d of annotationMismatches(f, got)) findings.push({ kind: 'annotation', plugin: label, desc: `${comp}: ${d}` });
         }
         // A note on an inner layer is checked on the part the contract names the same way.
@@ -1592,7 +1609,7 @@ async function main() {
           if (lf.part && !lf.role && !lf.name && !lf.level) continue;   // a part role: the part-role step below checks it
           const part = (contract[comp]?.children ?? []).find((c) => String(c.name ?? '').toLowerCase() === String(layer).toLowerCase());
           if (!part?.cssSelector) { findings.push({ kind: 'annotation', plugin: label, desc: `${comp} › ${layer}: not checked, the contract has no part named "${layer}" (add it to children with its cssSelector)` }); continue; }
-          const got = await axOf(part.cssSelector);
+          const got = await axOf(ownSection(comp, part.cssSelector));
           if (got) for (const d of annotationMismatches(lf, got)) findings.push({ kind: 'annotation', plugin: label, desc: `${comp} › ${layer}: ${d}` });
         }
       }
@@ -1604,7 +1621,7 @@ async function main() {
       for (const [c, { facts: f }] of Object.entries(annotationFactsFor(ROOT, cfg))) if (f.role) roles[c] = { role: f.role, pressed: !!f.pressed };
       for (const [comp, r] of Object.entries(roles)) {
         if (components.length && !components.includes(comp)) continue;
-        const sel = selOf(comp);
+        const sel = ownSection(comp, selOf(comp));
         if (!sel) continue;
         for (const problem of (await evalv(roleContractExpression(sel, r.role, { pressed: r.pressed }))) ?? []) findings.push({ kind: 'rolecontract', plugin: label, desc: `${comp} (${r.pressed ? 'toggle button' : r.role}): ${problem}` });
       }
