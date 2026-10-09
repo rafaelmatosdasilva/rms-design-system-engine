@@ -54,9 +54,11 @@ function whichBin(name) {
 // Gives up after timeoutMs (default 30 s) so a Chrome that never starts cannot hang a run.
 export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engine-chrome-', timeoutMs = 30000 } = {}) {
   const userDataDir = mkdtempSync(join(tmpdir(), tmpPrefix));
+  // --use-mock-keychain (macOS) and --password-store=basic (Linux): a throwaway profile never touches the person's
+  // keychain, so no "Keychain Not Found" or keyring prompt appears while the engine or its tests read pages.
   const chrome = spawn(chromePath, [
     '--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-sandbox',
-    '--disable-gpu', '--disable-extensions', `--user-data-dir=${userDataDir}`, 'about:blank',
+    '--disable-gpu', '--disable-extensions', '--use-mock-keychain', '--password-store=basic', `--user-data-dir=${userDataDir}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   const kill = () => {
     try { chrome.kill(); } catch { /* already dead */ }
