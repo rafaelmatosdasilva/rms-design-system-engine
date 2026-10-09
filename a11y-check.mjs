@@ -1366,6 +1366,10 @@ async function main() {
             if (seen.length >= 3) break;
             if (seen.some((s) => s.contains(el)) || !el.getClientRects().length) continue;
             seen.push(el);
+            // Read at rest: the focus the checks above gave a field is taken away and every transition it starts
+            // jumps to its end, so an edge never reads halfway back from its focus look (a pass in one run, a fail in the next).
+            if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+            ${SETTLE_TRANSITIONS};
             out.push(...window.__wcag21.check(el, { name: sel || '' }).findings);
             if (seen.length === 1) out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings);
           }
