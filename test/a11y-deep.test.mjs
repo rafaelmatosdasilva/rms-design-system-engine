@@ -457,3 +457,23 @@ test('page: oklch and see-through text are measured as drawn; text inside a disa
   const contrast = d.issues.filter((i) => i.issue === 'contrast').map((i) => i.selector).sort();
   assert.deepEqual(contrast, ['p.ghost', 'p.ok-l'], out);
 });
+
+// Focus (WCAG 2.4.7, 1.4.11): a ring kept transparent at rest that only takes a colour on focus is a focus style (the
+// advice the check itself gives); a ring drawn on ::after is measured; a two-tone ring passes when one of its tones shows.
+test('page: focus by outline colour alone, a faint ring on ::after, and a two-tone shadow ring', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
+    button { background: #fff; color: #000; border: 1px solid #000; margin: 8px; outline: none; position: relative; }
+    .tint { outline: 2px solid transparent; outline-offset: 2px; } .tint:focus { outline-color: #0050c8; }
+    .pseudo::after { content: ''; position: absolute; inset: -4px; border: 2px solid transparent; } .pseudo:focus::after { border-color: #eeeeee; }
+    .duo:focus { box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #0050c8; }</style></head><body><main><h1>Focus</h1>
+    <button id="tint">Tint</button><button id="pseudo">Pseudo</button><button id="duo">Duo</button>
+  </main></body></html>`.replace('id="tint"', 'id="tint" class="tint"').replace('id="pseudo"', 'id="pseudo" class="pseudo"').replace('id="duo"', 'id="duo" class="duo"');
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();
+  assert.deepEqual(kinds('focus'), [], out);
+  assert.deepEqual(kinds('focuscontrast'), ['button#pseudo'], out);
+});

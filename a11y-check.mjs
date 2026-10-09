@@ -579,11 +579,14 @@ function sweepExpression(roots, doFocus, stateMap) {
         if (!disabled(el) && el.matches('a[href],button,input:not([type=hidden]),select,textarea,[tabindex],[role=button],[role=link]')) {
           // A focus style may be an outline, a shadow, a border, a background change, an underline,
           // or drawn on ::before / ::after: every one of those counts as a visible change.
-          const look = (s, pb, pa) => [s.outlineStyle, s.outlineWidth, s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor, s.textDecorationLine,
-            pb.outlineStyle, pb.boxShadow, pb.borderColor, pb.backgroundColor, pb.opacity, pa.outlineStyle, pa.boxShadow, pa.borderColor, pa.backgroundColor, pa.opacity].join('|');
+          // An outline's colour counts only while an outline is drawn (a ring kept transparent at rest that takes a colour on focus).
+          const ring = (x) => (x.outlineStyle !== 'none' && parseFloat(x.outlineWidth) > 0 ? x.outlineColor : '');
+          const look = (s, pb, pa) => [s.outlineStyle, s.outlineWidth, ring(s), s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor, s.textDecorationLine,
+            pb.outlineStyle, ring(pb), pb.boxShadow, pb.borderColor, pb.backgroundColor, pb.opacity, pa.outlineStyle, ring(pa), pa.boxShadow, pa.borderColor, pa.backgroundColor, pa.opacity].join('|');
           // The element the keyboard is already on (the page's first Tab) is let go first, so its look before is its rest.
           if (document.activeElement === el) { try { el.blur(); } catch(e){} }
-          const b = getComputedStyle(el); const before = look(b, getComputedStyle(el, '::before'), getComputedStyle(el, '::after'));
+          const b = getComputedStyle(el); const pseudoAt = (s) => ['::before', '::after'].map((w) => { const p = getComputedStyle(el, w); return { w, outline: p.outlineStyle !== 'none' && parseFloat(p.outlineWidth) > 0 ? p.outlineColor : null, border: p.borderTopColor, shadow: p.boxShadow, bg: p.backgroundColor }; });
+          const before = look(b, getComputedStyle(el, '::before'), getComputedStyle(el, '::after')); const pseudoBefore = pseudoAt();
           // The box that holds only this control (a field's frame around its borderless input) may show the focus
           // for it (:focus-within): up to two levels up, while no other control is inside.
           const boxes = []; for (let p = el.parentElement, i = 0; p && i < 2 && p.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[tabindex]').length === 1; p = p.parentElement, i++) boxes.push(p);
@@ -598,9 +601,24 @@ function sweepExpression(roots, doFocus, stateMap) {
             // check it is perceivable (WCAG 1.4.11, >= 3:1). A ring that "changes" but is nearly the
             // same colour as its background is still invisible to a keyboard user.
             let ind = null, outside = false, px = null;
-            if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0) { ind = a.outlineColor; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
-            else if (a.boxShadow !== b.boxShadow && a.boxShadow !== 'none') { const m = a.boxShadow.match(/rgba?\\([^)]+\\)/); ind = m ? m[0] : null; outside = !/inset/.test(a.boxShadow); const lens = a.boxShadow.replace(/rgba?\\([^)]+\\)/g, '').match(/-?[\\d.]+px/g) || []; px = Math.max(parseFloat(lens[2] || '0'), parseFloat(lens[3] || '0')); }
-            else if (a.borderColor !== b.borderColor) { ind = a.borderColor; px = parseFloat(a.borderTopWidth); }
+            // A shadow ring may have several layers (a white gap, then a coloured ring): each colour is kept, and the
+            // ring counts as seen when one of them stands out.
+            const shadowLayers = (v) => v.split(/,(?![^(]*\\))/).map((l) => { const m = l.match(/(?:rgba?|oklch|oklab|color|hsla?)\\([^)]+\\)/); const lens = l.replace(/[a-z]+\\([^)]+\\)/g, '').match(/-?[\\d.]+px/g) || []; return { color: m ? m[0] : null, px: Math.max(parseFloat(lens[2] || '0'), parseFloat(lens[3] || '0')) }; }).filter((l) => l.color);
+            if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0 && (a.outlineColor !== b.outlineColor || a.outlineStyle !== b.outlineStyle || a.outlineWidth !== b.outlineWidth)) { ind = [a.outlineColor]; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
+            else if (a.boxShadow !== b.boxShadow && a.boxShadow !== 'none') { const ls = shadowLayers(a.boxShadow); ind = ls.length ? ls.map((l) => l.color) : null; outside = !/inset/.test(a.boxShadow); px = ls.length ? Math.max(...ls.map((l) => l.px)) : null; }
+            else if (a.borderColor !== b.borderColor) { ind = [a.borderColor]; px = parseFloat(a.borderTopWidth); }
+            else if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0) { ind = [a.outlineColor]; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
+            else {
+              // A ring drawn on ::before / ::after: the part of it that changed is measured, against the element.
+              const now = pseudoAt();
+              for (let i = 0; i < 2 && !ind; i++) {
+                const was = pseudoBefore[i], is = now[i];
+                if (is.outline && is.outline !== was.outline) ind = [is.outline];
+                else if (is.shadow !== was.shadow && is.shadow !== 'none') ind = shadowLayers(is.shadow).map((l) => l.color);
+                else if (is.border !== was.border) ind = [is.border];
+                else if (is.bg !== was.bg) ind = [is.bg];
+              }
+            }
             // WCAG 2.4.13 (AAA, advisory): a focus indicator at least 2 CSS pixels thick.
             // The browser's own ring (outline-style: auto) is drawn by the browser, not by this width.
             if (px != null && px < 2 && a.outlineStyle !== 'auto') thinFocus.push({ desc, px: Math.round(px * 10) / 10 });
@@ -614,7 +632,7 @@ function sweepExpression(roots, doFocus, stateMap) {
                 const al = parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0;
                 if (al === 1) break; node = node.parentElement;
               }
-              faintFocus.push({ desc, color: ind, bgLayers: layers });
+              faintFocus.push({ desc, colors: ind, bgLayers: layers });
             }
           }
           try { el.blur(); } catch(e){}
@@ -1313,10 +1331,11 @@ async function main() {
       for (const desc of noFocus) note('focus', desc, mode.name);
       // Focus indicator visible? (WCAG 1.4.11 for the focus ring — computed in Node)
       for (const f of faintFocus) {
-        const raw = parseColor(f.color); if (!raw) continue;
         const bg = effectiveBg(f.bgLayers);
-        const fg = raw.a < 1 ? over(raw, bg) : raw;
-        const ratio = contrastRatio(fg, bg);
+        // The ring is seen when its clearest tone stands out (a two-tone ring is built that way).
+        const ratios = (f.colors ?? [f.color]).map(parseColor).filter((c) => c && c.a > 0).map((raw) => contrastRatio(raw.a < 1 ? over(raw, bg) : raw, bg));
+        if (!ratios.length) continue;
+        const ratio = Math.max(...ratios);
         if (ratio + 1e-9 < 3) note('focuscontrast', f.desc, mode.name, { ratio: Math.round(ratio * 100) / 100, threshold: 3 });
       }
       if (first) {
