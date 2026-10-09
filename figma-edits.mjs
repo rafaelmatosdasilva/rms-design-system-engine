@@ -23,6 +23,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { roleWord } from './role-markup.mjs';
+import { noteIsTodo } from './annotation-categories.mjs';
 
 const attr = (attrs, name) => { const m = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|\\{\\s*["']?([^}"']*)["']?\\s*\\})`, 'i').exec(attrs); return m ? (m[1] ?? m[2] ?? m[3] ?? '').trim() : null; };
 const has = (attrs, name) => new RegExp(`\\b${name}\\b`, 'i').test(attrs);
@@ -159,17 +160,25 @@ export function annotationWording(text = '', layer = null) {
 // Each Figma annotation no check reads, with the wording a check reads. usesOf: annotationUses (a11y-check.mjs), passed in
 // so this file stays free of the browser check. → [] or [{ kind: 'notes', page, frame, items: [{ component, layer?, text, wording }], why }]
 export const NOTES_FRAME = 'Annotations no check reads';
-export function annotationEdits(propsSnap = {}, usesOf = () => []) {
+// Only a note that states accessibility is listed (annotation-categories.mjs noteIsTodo): its category says so, or
+// the engine reads an accessibility meaning in it. A note in a design-intent category (Intent, Implementation…), or
+// one with no category the engine reads nothing in, is for the agents, not a to do. cats, cfg: the categories.
+export function annotationEdits(propsSnap = {}, usesOf = () => [], cats = null, cfg = {}) {
   const items = [];
   for (const [name, entry] of Object.entries(propsSnap ?? {})) {
     if (name.startsWith('_') || !entry || typeof entry !== 'object') continue;
-    for (const u of usesOf(entry)) if (!u.uses.length) items.push({ component: name, ...(u.layer ? { layer: u.layer } : {}), text: u.text, wording: annotationWording(u.text, u.layer ?? null) });
+    for (const u of usesOf(entry, { cats, cfg })) {
+      if (u.uses.length) continue;
+      const wording = u.kind && u.kind !== 'accessibility' ? null : annotationWording(u.text, u.layer ?? null);
+      if (!noteIsTodo(u.kind ?? null, wording)) continue;
+      items.push({ component: name, ...(u.layer ? { layer: u.layer } : {}), text: u.text, wording });
+    }
   }
   if (!items.length) return [];
   const can = items.filter((i) => i.wording).length;
-  return [{ kind: 'notes', page: TODO_PAGE, frame: NOTES_FRAME, items, why: `${items.length} annotation${items.length === 1 ? '' : 's'} no check reads, ${can} with a wording a check reads` }];
+  return [{ kind: 'notes', page: TODO_PAGE, frame: NOTES_FRAME, items, why: `${items.length} accessibility annotation${items.length === 1 ? '' : 's'} no check reads, ${can} with a wording a check reads` }];
 }
-const noteText = (n) => [n.layer ? `on the layer "${n.layer}"` : 'on the component', `says: ${n.text}`, n.wording ? `a check reads it written as: ${n.wording}` : 'a note for people: no check reads it, the agents still get it as design intent'].join(' · ');
+const noteText = (n) => [n.layer ? `on the layer "${n.layer}"` : 'on the component', `says: ${n.text}`, n.wording ? `a check reads it written as: ${n.wording}` : 'an accessibility note no check reads yet: write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, or Role: label on a layer'].join(' · ');
 
 // The Figma plugin script for the edits a person approved (decisions are never in it). Idempotent: a node that
 // already states a role is left as it is. Returns { changed, skipped, missing } for the agent to report.
@@ -259,7 +268,7 @@ export function editLines(edits, { fileKey = null } = {}) {
     ...(roles.length ? [`Figma changes the engine can make (${roles.length}), each read from the code:`, ...roles.map((e) => `   • ${e.component}: add the annotation "${e.label}" (${e.why})`)] : ['✅ Figma states every role the code has.']),
     ...(renames.length ? [`Names written as the rest of the system writes them (${renames.length}):`, ...renames.map((e) => `   • ${e.component}: ${e.what === 'option' ? `${e.prop}=${e.from} → ${e.to}` : `"${e.from}" → "${e.to}"`}`), '   Each component\'s code contract follows the new names once Figma is read again.'] : []),
     ...(todo ? [`The design team's to do list in Figma, page "${todo.page}", frame "${todo.frame}" (${todo.why}), written afresh:`, ...todo.items.map((g) => `   • ${g.need}: ${todoText(g)}`)] : []),
-    ...(notes ? [`Annotations no check reads, listed in Figma on the page "${notes.page}", frame "${notes.frame}" (${notes.why}); the annotations themselves are not changed:`, ...notes.items.map((n) => `   • ${n.component}${n.layer ? ` › ${n.layer}` : ''}: "${n.text}"${n.wording ? ` → write it as "${n.wording}"` : ' (a note for people)'}`)] : []),
+    ...(notes ? [`Annotations no check reads, listed in Figma on the page "${notes.page}", frame "${notes.frame}" (${notes.why}); the annotations themselves are not changed:`, ...notes.items.map((n) => `   • ${n.component}${n.layer ? ` › ${n.layer}` : ''}: "${n.text}"${n.wording ? ` → write it as "${n.wording}"` : ' (an accessibility note: write it as Role:, Alt:, Heading level or a key, so a check reads it)'}`)] : []),
     ...(decide.length ? [`For a person to decide (${decide.length}), never applied:`, ...decide.map((e) => `   • ${e.component}: ${e.why}`)] : []),
     ...(apply.length ? [`NEXT: show the person the ${[roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : '', renames.length ? `${renames.length} rename${renames.length === 1 ? '' : 's'}` : '', todo ? 'to do list' : '', notes ? 'annotations no check reads' : ''].filter(Boolean).join(' and ')} above and ask; only when they say yes, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
   ];

@@ -151,6 +151,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 - `designA11y: false` - turns off the `♿ Accessibility in the Figma file` block: an interactive component with no focus state, an error state that adds no message (an error shown by colour alone), a control under 24px tall, read from the props and structure snapshots for whoever keeps the Figma file. Never a code finding; the build sheet says what to write meanwhile (a focus ring on `:focus-visible`) and what to leave to the person (an error message's words).
 - `a11y.harness: false` - the accessibility check never renders the components from their own code (`component-harness.mjs`; used in build mode or when there is no page to open).
 - `figmaHygiene: false` - turns off the `🎨 Figma file hygiene` block (values with no variable or style, detached instances, variants with no auto layout, components with no description, read from `component-values.snapshot.json`). `--hygiene` lists every finding.
+- `annotations.categories` - the project's own names for Figma's annotation categories, `{ "<category name>": "accessibility" | "intent" | "implementation" | "content" | "authoring" }`, matched ignoring case and accents. Only an Accessibility note (or one with no category) is a requirement; the rest is design intent, never a To do (see *Annotation categories* in `rms-design-system-engine --reference usage`). The defaults read Accessibility, Intent, Implementation, Content and Authoring, and also Development and Interaction (Implementation), Documentation (Intent), Designers and Figma (Authoring). `paths.annotationCategoriesSnapshot` moves the categories snapshot.
 
 ## Key Architecture Assumptions
 
@@ -174,6 +175,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 |---|---|---|
 | `figma-vars.snapshot.json` | color (all modes), sizing, typography, `modeVariants` (per-collection, per-mode non-colour maps) | `paths.snapshotVars` |
 | `figma-structure.snapshot.json` | per-component State=Default structure | `paths.snapshotStructure` |
+| `figma-annotation-categories.snapshot.json` | the category of each Figma note, which the REST API does not return: the file's categories and each categorised note by its node and words, captured with the Plugin API (`--annotation-categories`) | `paths.annotationCategoriesSnapshot`, else beside the component-props snapshot |
 | `component-values.snapshot.json` | per component: every raw number and colour its nodes use (scopes the literal check), and its Figma file hygiene | project root |
 | `figma-templates.snapshot.json` | per template frame (`templates`): the components it composes, in order; prototypes list them | `paths.snapshotTemplates`, else project root or beside the structure snapshot |
 | `figma-screen-layout.snapshot.json` | designed screens read with `SCREEN_CAPTURE_JS` (read only): prototypes take the product's page arrangement and a starting point from them | `paths.screenLayout`, else beside the structure snapshot |

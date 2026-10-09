@@ -1766,7 +1766,7 @@ a.pg-usage-name { color: var(--sg-text); }
       return '<tr><td class="pg-par-type">' + esc(x.from) + '</td><td>' + esc(x.what) + '</td><td>' + unreadFix(x) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }  // How an annotation no check reads is written so one does.
-  function unreadFix(x) { return (x.wording ? 'Write it in Figma as ' + esc(x.wording) + ' (--figma-edits lists it).' : /annotation/.test(x.from) ? 'Write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer.' : 'Nothing: the agents read it as design intent.'); }
+  function unreadFix(x) { return (x.kind && x.kind !== 'accessibility' ? 'Nothing: its Figma category (' + esc(x.kind.charAt(0).toUpperCase() + x.kind.slice(1)) + ') makes it design intent, which the agents read.' : x.wording ? 'Write it in Figma as ' + esc(x.wording) + ' (--figma-edits lists it).' : /annotation/.test(x.from) ? 'Write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer.' : 'Nothing: the agents read it as design intent.'); }
 
   // Where a finding or a duty is, said with it: the component, its variant or the part it is on.
   function figmaOf(c) { var l = (c.links || []).find(function (x) { return /figma/i.test(x.label); }); return l ? l.url : null; }
@@ -1846,9 +1846,11 @@ a.pg-usage-name { color: var(--sg-text); }
           var html = '<b>' + esc(r.k.sc + ' ' + r.k.name + (r.k.level ? ' (' + r.k.level + ')' : '')) + '.</b> ' + (its.length ? its.map(function (it) { return it.html; }).join(' ') : esc(r.note));
           rows.push({ kind: 'Accessibility', st: its.some(function (it) { return it.st === 'todo'; }) ? 'todo' : r.st, who: who, html: html });
         });
-        // A Figma annotation no check reads yet: written the way a check reads it.
+        // A Figma annotation no check reads yet, when it states accessibility (todo: its category, or a wording a check
+        // reads): written the way a check reads it. A note in a design-intent category, the guidelines and the authored
+        // contract are design intent the agents read, listed under the Accessibility area, never a To do.
         ((c.a11y || {}).sources || []).forEach(function (x) {
-          if (x.st !== 'agents') return;
+          if (x.st !== 'agents' || !x.todo) return;
           rows.push({ kind: 'Accessibility', st: 'check', who: /annotation/.test(x.from) ? WHO.figma : WHO.person, html: esc(x.from + ', ' + x.what + '.') + '<span class="pg-todo">' + unreadFix(x) + '</span>' });
         });
       } catch (e) { /* its accessibility is read on its own page */ }

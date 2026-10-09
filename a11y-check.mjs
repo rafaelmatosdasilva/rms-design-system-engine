@@ -79,6 +79,7 @@ import { modeSwitch } from './code-capture.mjs';
 import { codeSnapshotPath, OUT_DIR } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
 import { WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from './wcag21.mjs';
+import { loadCategories, requirementEntry, noteKind, isRequirement } from './annotation-categories.mjs';
 import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
 
 // ── Pure, unit-testable core (exported; importing this module runs NOTHING) ─────
@@ -688,11 +689,15 @@ export function annotationFacts(annotations = []) {
 // part's role on a layer, a behaviour (Escape closes, arrow keys move, Enter and Space activate). Every note also reaches
 // the agents as design intent. entry: the component's snapshot entry ({ annotations, layerAnnotations }).
 // → [{ text, layer?, uses: [what it feeds], sc: [criteria] }]
-export function annotationUses(entry = {}) {
+// cats, cfg: the annotation categories (annotation-categories.mjs). A note in a design-intent category is no check's: it
+// is listed with its kind and no use, for the agents only.
+export function annotationUses(entry = {}, { cats = null, cfg = {} } = {}) {
   const out = [];
-  const one = (a, layer) => {
+  const one = (a, layer, nodeId) => {
     const text = String(a?.label ?? a?.labelMarkdown ?? '').trim();
     if (!text) return;
+    const kind = noteKind(a, nodeId, cats, cfg);
+    if (!isRequirement(a, nodeId, cats, cfg)) { out.push({ text, ...(layer ? { layer } : {}), uses: [], sc: [], kind }); return; }
     const f = annotationFacts([a]), uses = [], sc = [];
     if (f.part && layer) { uses.push(`the role of its "${layer}" part (${f.part}), checked in the browser`); sc.push('1.3.1'); }
     else if (f.part) { uses.push(`a part's role (${f.part}), checked once it sits on the layer of that part`); }
@@ -700,18 +705,20 @@ export function annotationUses(entry = {}) {
     if (f.name) { uses.push(`its spoken name ("${f.name}"), checked against what it renders`); sc.push('4.1.2', '1.1.1'); }
     if (f.level) { uses.push(`its heading level (${f.level}), checked against what it renders`); sc.push('1.3.1'); }
     for (const b of annotatedBehaviours([a])) { uses.push(`a behaviour (${b.says}), tried in the browser`); sc.push('2.1.1'); }
-    out.push({ text, ...(layer ? { layer } : {}), uses, sc: [...new Set(sc)] });
+    out.push({ text, ...(layer ? { layer } : {}), uses, sc: [...new Set(sc)], kind });
   };
-  for (const a of entry.annotations ?? []) one(a, null);
-  for (const l of entry.layerAnnotations ?? []) for (const a of l.annotations ?? []) one(a, l.layer);
+  for (const a of entry.annotations ?? []) one(a, null, entry.nodeId);
+  for (const l of entry.layerAnnotations ?? []) for (const a of l.annotations ?? []) one(a, l.layer, l.nodeId);
   return out;
 }
 export function annotationFactsFor(ROOT, cfg = {}) {
   let snap = {};
   try { snap = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { return {}; }
+  const cats = loadCategories(ROOT, cfg);   // a note in a design-intent category states nothing to check
   const out = {};
-  for (const [name, v] of Object.entries(snap)) {
-    if (name.startsWith('_') || !v || typeof v !== 'object') continue;
+  for (const [name, v0] of Object.entries(snap)) {
+    if (name.startsWith('_') || !v0 || typeof v0 !== 'object') continue;
+    const v = requirementEntry(v0, cats, cfg);
     const facts = annotationFacts(v.annotations ?? []);
     const layers = (v.layerAnnotations ?? []).map((l) => ({ layer: l.layer, facts: annotationFacts(l.annotations ?? []) })).filter((l) => Object.keys(l.facts).length);
     if (Object.keys(facts).length || layers.length) out[name] = { facts, layers };
@@ -1534,12 +1541,14 @@ async function main() {
       // engine's style guide, which draws markup only, they are listed as not checked.
       let snap = {};
       try { snap = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { /* no annotations */ }
+      // Only the notes that are requirements: a note in a design-intent category (Intent, Implementation…) asks nothing.
+      const cats = loadCategories(ROOT, cfg);
       let authored = {};
       try { authored = JSON.parse(readFileSync(resolve(ROOT, cfg.contracts?.authored ?? 'contract.authored.json'), 'utf8'))?.components ?? {}; } catch { /* none */ }
       let contract = {};
       try { contract = (await import(pathToFileURL(resolve(ROOT, cfg.paths?.structureContract ?? 'structure-contract.mjs')).href)).CONTRACT ?? {}; } catch { /* parts are optional */ }
       const roles = Object.fromEntries(Object.entries(contractSemantics(ROOT, cfg)).map(([c, r]) => [c, r]));
-      for (const [c, v] of Object.entries(snap)) { const w = !c.startsWith('_') && roleWordOf(v?.annotations ?? []); if (w) roles[c] = w; }   // the role as Figma writes it (togglebutton, disclosure)
+      for (const [c, v] of Object.entries(snap)) { const w = !c.startsWith('_') && roleWordOf(requirementEntry(v, cats, cfg)?.annotations ?? []); if (w) roles[c] = w; }   // the role as Figma writes it (togglebutton, disclosure)
       // States follow their props: on the style guide, each option's effect is in its data (the code's selector for it).
       if (target.styleguide) {
         const sg = await evalv(`(() => { try { return JSON.parse(document.getElementById('sg-data').textContent).components || []; } catch (e) { return []; } })()`);
@@ -1554,7 +1563,7 @@ async function main() {
         if (components.length && !components.includes(comp)) continue;
         const sel = selOf(comp);
         if (!sel) continue;
-        const entry = snap[comp] ?? {};
+        const entry = requirementEntry(snap[comp] ?? {}, cats, cfg);
         for (const { layer, part } of partRolesOf(entry)) {
           const partSel = (contract[comp]?.children ?? []).find((c) => String(c.name ?? '').toLowerCase() === String(layer).toLowerCase())?.cssSelector ?? null;
           for (const problem of (await evalv(partRoleExpression(sel, partSel, layer, part))) ?? []) findings.push({ kind: 'partrole', plugin: label, desc: `${comp}: ${problem}` });
