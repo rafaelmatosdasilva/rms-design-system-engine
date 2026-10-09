@@ -378,3 +378,21 @@ test('breakpoints: bottom and right padding, every corner, and a vertical gap', 
   const r = compareBreakpoints(code, structure, vars);
   assert.deepEqual(r.differ.map((d) => d.field).sort(), ['gap @ Phone (375px)', 'padding (bottom) @ Phone (375px)', 'radius (bottom right) @ Phone (375px)']);
 });
+
+// B8: what the refresh records of a component's box and stroke is compared: min and max width, how auto layout lines its
+// children up (main axis, cross axis), whether it wraps, and a dashed stroke. A cross axis Figma lines up at the start
+// while the code stretches is not comparable (it shows only when a child is smaller than the row).
+test('components: min and max width, alignment, wrap and a dashed stroke against the box Figma records', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.row' });
+  const comp = (props, layout) => ({ confidence: 'high', instance: { hasText: true }, props: { borderTopWidth: v('1px'), borderRightWidth: v('1px'), borderBottomWidth: v('1px'), borderLeftWidth: v('1px'), ...props }, layout: { display: 'flex', ...layout } });
+  const code = { components: {
+    row: comp({ minWidth: v('80px'), maxWidth: { value: 'none', confidence: 'default' }, justifyContent: v('flex-start'), alignItems: v('center'), flexWrap: v('nowrap') }, { borderStyles: { Top: 'solid', Right: 'solid', Bottom: 'solid', Left: 'solid' } }),
+    ok: comp({ minWidth: v('80px'), maxWidth: v('320px'), justifyContent: v('space-between'), alignItems: v('normal'), flexWrap: v('wrap') }, { borderStyles: { Top: 'dashed', Right: 'dashed', Bottom: 'dashed', Left: 'dashed' } }),
+  } };
+  const box = (primary, counter) => ({ layout: 'HORIZONTAL', minWidth: 80, maxWidth: 320, align: { primary, counter }, wrap: 'WRAP' });
+  const f = { row: { box: box('CENTER', 'CENTER'), stroke: { weights: [1, 1, 1, 1], dashed: true } }, ok: { box: box('SPACE_BETWEEN', 'MIN'), stroke: { weights: [1, 1, 1, 1], dashed: true } } };
+  const r = compareComponents(code, f, {}, cfg, maps());
+  const d = r.differ.map((x) => `${x.component} ${x.field}: ${x.figma} / ${x.code}`).sort();
+  assert.deepEqual(d, ['row alignment (main axis): center / flex-start', 'row max width: 320 / none', 'row stroke style: dashed / solid', 'row wrap: wrap / nowrap']);
+  assert.ok(r.notComparable.some((n) => n.component === 'ok' && n.field === 'alignment (cross axis)'), JSON.stringify(r.notComparable));
+});

@@ -320,6 +320,12 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     const figmaSides = Array.isArray(f.stroke?.weights) ? SIDES.filter((s, i) => f.stroke.weights[i] > 0) : [];
     const strokeSide = figmaSides.find((s) => codeSides.includes(s)) ?? codeSides[0] ?? 'Top';
     const strokeKey = c.props?.[`border${strokeSide}Color`] ? `border${strokeSide}Color` : 'borderTopColor';   // a capture from before every side was read
+    // A dashed stroke, on the side the stroke is read on (dotted counts: Figma draws both as a dash pattern).
+    const styleOf = c.layout?.borderStyles?.[strokeSide];
+    if (typeof f.stroke?.dashed === 'boolean' && styleOf && codeSides.includes(strokeSide) && !low) {
+      const wf = c.props?.[`border${strokeSide}Width`];
+      settle(f.stroke.dashed === /^(dashed|dotted)$/.test(styleOf), { component: name, field: 'stroke style', figma: f.stroke.dashed ? 'dashed' : 'solid', code: styleOf, rule: wf?.rule, at: wf?.at });
+    }
     if (f.strokeOnDefault === true && !low && c.props?.borderTopWidth && !c.before && drawsNothing) {
       out.notComparable.push({ component: name, field: 'stroke', figma: 'draws a border', why: 'the code root draws nothing (a wrapper); name the part that draws the box in componentSelectors or the contract' });
     } else if (f.strokeOnDefault === true && !low && c.props?.borderTopWidth && !c.before) {
@@ -342,6 +348,32 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       if (!w?.rule) out.notComparable.push({ component: name, field: 'width', figma: f.box.width, why: 'the code width follows its content or container' });
       else if (RELATIVE_SIZE.test(String(w.declared ?? ''))) out.notComparable.push({ component: name, field: 'width', figma: f.box.width, why: `the code width follows its container (${w.declared})` });
       else settle(Math.abs((c.size?.width ?? toNum(w.value)) - f.box.width) < 0.5, { component: name, field: 'width', figma: f.box.width, code: c.size?.width ?? toNum(w.value), rule: w.rule, at: w.at });
+    }
+    // The rest of the box Figma records: min and max width, how auto layout lines its children up, and whether it wraps.
+    // A capture from before these were read has none of them: not compared.
+    if (f.box && !low) {
+      for (const [k, field] of [['minWidth', 'min width'], ['maxWidth', 'max width']]) {
+        const fig = f.box[k], fact = c.props?.[k];
+        if (typeof fig !== 'number' || !(fig > 0) || !Number.isFinite(fig) || !fact) continue;
+        if (fact.rule && RELATIVE_SIZE.test(String(fact.declared ?? ''))) { out.notComparable.push({ component: name, field, figma: fig, why: `the code ${field} follows its container (${fact.declared})` }); continue; }
+        const unset = fact.confidence === 'default' || /^(none|auto|0px|0)$/.test(String(fact.value).trim());
+        settle(!unset && Math.abs(toNum(fact.value) - fig) < 0.5, { component: name, field, figma: fig, code: fact.value, rule: fact.rule, at: fact.at, confidence: fact.confidence });
+      }
+      const flex = /flex$/.test(String(c.layout?.display ?? '')) && ['HORIZONTAL', 'VERTICAL'].includes(f.box.layout ?? f.layout);
+      if (flex) {
+        const MAIN = { MIN: ['flex-start', 'start', 'normal', 'left'], CENTER: ['center'], MAX: ['flex-end', 'end', 'right'], SPACE_BETWEEN: ['space-between'] };
+        const CROSS = { MIN: ['flex-start', 'start', 'self-start'], CENTER: ['center'], MAX: ['flex-end', 'end', 'self-end'], BASELINE: ['baseline', 'first baseline'] };
+        const word = (x) => ({ MIN: 'start', MAX: 'end', SPACE_BETWEEN: 'space-between' }[x] ?? String(x).toLowerCase());
+        const jc = c.props?.justifyContent, ai = c.props?.alignItems, a = f.box.align ?? {};
+        if (MAIN[a.primary] && jc) settle(MAIN[a.primary].includes(String(jc.value).trim()), { component: name, field: 'alignment (main axis)', figma: word(a.primary), code: jc.value, rule: jc.rule, at: jc.at, confidence: jc.confidence });
+        if (CROSS[a.counter] && ai) {
+          // Stretched children against children lined up at the start: the same until one is smaller than the row.
+          if (a.counter === 'MIN' && /^(normal|stretch)$/.test(String(ai.value).trim())) out.notComparable.push({ component: name, field: 'alignment (cross axis)', figma: word(a.counter), code: ai.value, why: 'the code stretches its children; Figma lines them up at the start, which shows only when one is smaller than the row' });
+          else settle(CROSS[a.counter].includes(String(ai.value).trim()), { component: name, field: 'alignment (cross axis)', figma: word(a.counter), code: ai.value, rule: ai.rule, at: ai.at, confidence: ai.confidence });
+        }
+        const fw = c.props?.flexWrap;
+        if (['WRAP', 'NO_WRAP'].includes(f.box.wrap) && fw) settle((f.box.wrap === 'WRAP') === /^wrap/.test(String(fw.value).trim()), { component: name, field: 'wrap', figma: f.box.wrap === 'WRAP' ? 'wrap' : 'nowrap', code: fw.value, rule: fw.rule, at: fw.at, confidence: fw.confidence });
+      }
     }
     // Stroke weight per side, when Figma records it: each side's width, not only whether it draws.
     if (Array.isArray(f.stroke?.weights) && !low && c.props?.borderTopWidth && !drawsNothing) {
