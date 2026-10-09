@@ -99,4 +99,6 @@ test('states: Current is aria-current; an error on a message is announced, on a 
   assert.deepEqual(want(comp('toast', 'status', 'Error', { add: ['toast-error'] })), ['role or aria-live']);
   assert.deepEqual(want(comp('toast', 'status', 'Error', { add: ['toast-error'], attrs: { role: 'alert' } })), []);
   assert.deepEqual(want(comp('input', 'textbox', 'Error', { add: ['inputWrap--error'] })), ['aria-invalid']);
+  // A component whose role is not known: an error the option itself announces (role="alert") is heard.
+  assert.deepEqual(want(comp('toast', undefined, 'Error', { add: ['toast-error'], attrs: { role: 'alert' } })), []);
 });
