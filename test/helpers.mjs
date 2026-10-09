@@ -73,21 +73,25 @@ export function fixtureProject(fixture, prefix = 'ds-', { overlay = null } = {})
   return dir;
 }
 
-// A PATH with only git and which, so a run meant to be without Chrome cannot find one.
+// A PATH with only git and which, so a run meant to be without Chrome cannot find one; and no TypeScript but the
+// project's own (no NODE_PATH, DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project), so a machine that has one installed for every
+// project runs the same as one that has none.
 export function bareEnv() {
   const bin = mkdtempSync(join(tmpdir(), 'demo-bin-'));
   for (const name of ['git', 'which']) {
     const p = spawnSync('which', [name], { encoding: 'utf8' }).stdout.trim();
     if (p) symlinkSync(p, join(bin, name));
   }
-  const { CHROME_PATH, ...rest } = process.env;
-  return { ...rest, PATH: bin, PLAYWRIGHT_BROWSERS_PATH: join(bin, 'none') };
+  const { CHROME_PATH, NODE_PATH, ...rest } = process.env;
+  return { ...rest, PATH: bin, PLAYWRIGHT_BROWSERS_PATH: join(bin, 'none'), DESIGN_SYSTEM_ENGINE_TYPESCRIPT: 'project' };
 }
 
-// Dates, durations, ages, commit hashes and the temporary directory change from run to run.
+// Dates, durations, ages, commit hashes and the temporary directory change from run to run; so does the share of a
+// visual diff that counts the text, which follows the fonts the machine has (the share outside the text does not).
 export function normalise(text, dir) {
   return text.split(dir).join('<DIR>')
     .replace(/\x1b\[[0-9;]*m/g, '')
+    .replace(/(% of pixels differ outside text, )[\d.]+% with it/g, '$1<N>% with it')
     .replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, '<TS>')
     .replace(/PARITY AUDIT {2}· {2}[\d-]+/, 'PARITY AUDIT  ·  <DATE>')
     .replace(/\b\d+(\.\d+)?m?s\b/g, '<DUR>')
