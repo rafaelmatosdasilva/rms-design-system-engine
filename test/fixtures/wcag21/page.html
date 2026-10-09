@@ -10,6 +10,10 @@
   .blinky { animation: blink 0.2s infinite; }
   .marquee { animation: blink 3s infinite; }
   .loader { animation: blink 1s infinite; }
+  @keyframes turn { to { transform: rotate(360deg) } }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #111; border-top-color: transparent; border-radius: 50%; animation: turn 0.3s linear infinite; }
+  .ok-field { border: 1px solid oklch(0.45 0 0); padding: 4px; }
+  .faint-ok { border: 1px solid oklch(0.95 0 0); padding: 4px; background: #fff; }
   .tip { position: absolute; background: #222; color: #fff; padding: 2px; }
   .check-box { display: inline-block; width: 14px; height: 14px; border: 1px solid #f2f2f2; }
   .check input { opacity: 0; position: absolute; }
@@ -26,6 +30,12 @@
   <div class="loader" role="progressbar" aria-label="Loading"></div>
   <table><tr><th scope="col">Name</th></tr><tr><td>A</td></tr><tr><td>B</td></tr></table>
   <button class="tipper" data-tip="More">i</button>
+  <span class="spinner" role="progressbar" aria-label="Saving"></span>
+  <section role="doc-chapter" aria-label="Chapter one"><p>Text</p></section>
+  <div role="slider" tabindex="0" aria-label="Volume" aria-valuenow="3" aria-valuemin="0" aria-valuemax="5">3</div>
+  <div role="combobox" tabindex="0" aria-label="Pick a size" aria-expanded="false">S</div>
+  <label for="q1">Search</label><input id="q1" class="ok-field" type="text" placeholder="Type a word">
+  <div aria-live="polite" aria-current="page">Here</div>
 </div>
 <div id="bad">
   <input class="faint" type="text" name="email" aria-label="Email">
@@ -47,6 +57,11 @@
   <button class="tipper2" data-tip="Help">?</button>
   <button class="presser">Press</button>
   <select class="jumper"><option>One</option><option>Two</option></select>
+  <input class="field placeholder-only" type="text" placeholder="Search">
+  <div role="slider" class="bare-slider" tabindex="0" aria-label="Level">1</div>
+  <div role="combobox" class="bare-combo" tabindex="0" aria-label="Pick">S</div>
+  <div class="loud" aria-live="loud">News</div>
+  <input class="faint-ok" type="text" aria-label="Code">
 </div>
 <script>
   // A tooltip that ignores Escape and hides as the pointer leaves the trigger.

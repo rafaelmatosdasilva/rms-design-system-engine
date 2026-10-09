@@ -448,14 +448,15 @@ test('page: oklch and see-through text are measured as drawn; text inside a disa
     <p class="ghost">Faded black</p>
     <p class="fine">Plain black</p>
     <button disabled><span class="inner">Save</span></button>
-  </main></body></html>`;
+    <input class="hint" aria-label="Search" placeholder="Faint hint"><input class="clear" aria-label="Name" placeholder="Clear hint"><input class="typed" aria-label="City" placeholder="Hidden once typed" value="Lisbon">
+  </main></body></html>`.replace('</style>', '.hint::placeholder { color: #cccccc; } .clear::placeholder, .typed::placeholder { color: #595959; } input { border: 1px solid #000; background: #fff; }</style>');
   const dir = makeFixture({ 'page.html': page });
   let out = '';
   try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const contrast = d.issues.filter((i) => i.issue === 'contrast').map((i) => i.selector).sort();
-  assert.deepEqual(contrast, ['p.ghost', 'p.ok-l'], out);
+  assert.deepEqual(contrast, ['input.hint::placeholder', 'p.ghost', 'p.ok-l'], out);   // a placeholder shown is text too (1.4.3)
 });
 
 // Focus (WCAG 2.4.7, 1.4.11): a ring kept transparent at rest that only takes a colour on focus is a focus style (the
