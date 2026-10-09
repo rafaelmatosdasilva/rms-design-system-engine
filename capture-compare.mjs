@@ -546,9 +546,13 @@ export function compareBreakpoints(code, structure, vars) {
   for (const [name, f] of Object.entries(structure ?? {})) {
     const c = code.components?.[name];
     if (!c?.breakpoints) continue;
+    // Every side and every corner (a component padded or rounded on one side only at a width is a difference); a vertical
+    // stack's gap is between rows. A capture from before every side was measured has none of the new ones: not compared.
     const fields = [
-      ['padding (top)', f.paddingVar?.tb, 'paddingTop'], ['padding (left)', f.paddingVar?.lr, 'paddingLeft'],
-      ['gap', f.gapVar, 'columnGap'], ['radius', f.innerRadiusVar, 'borderTopLeftRadius'],
+      ['padding (top)', f.paddingVar?.tb, 'paddingTop'], ['padding (bottom)', f.paddingVar?.tb, 'paddingBottom'],
+      ['padding (left)', f.paddingVar?.lr, 'paddingLeft'], ['padding (right)', f.paddingVar?.lr, 'paddingRight'],
+      ['gap', f.gapVar, (f.layout ?? f.box?.layout) === 'VERTICAL' ? 'rowGap' : 'columnGap'], ['radius', f.innerRadiusVar, 'borderTopLeftRadius'],
+      ['radius (top right)', f.innerRadiusVar, 'borderTopRightRadius'], ['radius (bottom right)', f.innerRadiusVar, 'borderBottomRightRadius'], ['radius (bottom left)', f.innerRadiusVar, 'borderBottomLeftRadius'],
     ];
     for (const [mode, tokens] of Object.entries(bp)) {
       const at = c.breakpoints[mode];

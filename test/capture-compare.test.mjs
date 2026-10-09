@@ -365,3 +365,15 @@ test('components: raw padding, radius and gap on the default variant are compare
   const d = compareComponents(code, f, {}, cfg, maps()).differ.map((x) => `${x.field}: ${x.figma} / ${x.code}`).sort();
   assert.deepEqual(d, ['gap: 8 / 6px', 'padding left: 12 / 8px', 'padding right: 12 / 8px']);
 });
+
+// B6: at each breakpoint every side of the padding and every corner is compared, and a vertical stack's gap is its row gap.
+test('breakpoints: bottom and right padding, every corner, and a vertical gap', async () => {
+  const { compareBreakpoints } = await import('../capture-compare.mjs');
+  const at = { width: 375, paddingTop: '12px', paddingRight: '12px', paddingBottom: '4px', paddingLeft: '12px', rowGap: '2px', columnGap: '8px',
+    borderTopLeftRadius: '8px', borderTopRightRadius: '8px', borderBottomRightRadius: '0px', borderBottomLeftRadius: '8px' };
+  const code = { components: { card: { props: {}, breakpoints: { Phone: at } } } };
+  const structure = { card: { paddingVar: { lr: 'pad', tb: 'pad' }, gapVar: 'gap', innerRadiusVar: 'rad', layout: 'VERTICAL' } };
+  const vars = { breakpoints: { Phone: { pad: '12px', gap: '8px', rad: '8px' } } };
+  const r = compareBreakpoints(code, structure, vars);
+  assert.deepEqual(r.differ.map((d) => d.field).sort(), ['gap @ Phone (375px)', 'padding (bottom) @ Phone (375px)', 'radius (bottom right) @ Phone (375px)']);
+});
