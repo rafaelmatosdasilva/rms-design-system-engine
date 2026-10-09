@@ -474,7 +474,9 @@ async function deepFacts(node, set) {
     const v = id ? await figma.variables.getVariableByIdAsync(id) : null;
     return { token: v?.name ?? null, hex: hex(p.color), opacity: n(p.opacity ?? 1) };
   };
-  const firstText = (x) => x.findOne?.((t) => t.type === 'TEXT');
+  // The first text drawn: a layer hidden in this variant (a label a boolean property turns off) is not its text.
+  const shownIn = (t, root) => { for (let p = t; p && p !== root; p = p.parent) if (p.visible === false) return false; return true; };
+  const firstText = (x) => x.findOne?.((t) => t.type === 'TEXT' && shownIn(t, x));
   const geometry = async (x) => {
     const t = firstText(x);
     return {

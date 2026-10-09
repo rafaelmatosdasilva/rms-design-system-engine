@@ -288,6 +288,13 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     const drawsNothing = ['Top', 'Right', 'Bottom', 'Left'].every((s) => toNum(c.props?.[`border${s}Width`]?.value) === 0)
       && /^(transparent|rgba\([^)]*,\s*0\))$/i.test(String(c.props?.backgroundColor?.value ?? 'transparent').trim())
       && toNum(c.props?.borderTopLeftRadius?.value) === 0;
+    // The side a stroke is read on: the first side the code draws, a side Figma draws first. A stroke on one side only
+    // (a bottom rule) is read on that side, never through the top, whose colour is the text's when it draws nothing.
+    const SIDES = ['Top', 'Right', 'Bottom', 'Left'];
+    const codeSides = SIDES.filter((s) => toNum(c.props?.[`border${s}Width`]?.drawn ?? c.props?.[`border${s}Width`]?.value) > 0);
+    const figmaSides = Array.isArray(f.stroke?.weights) ? SIDES.filter((s, i) => f.stroke.weights[i] > 0) : [];
+    const strokeSide = figmaSides.find((s) => codeSides.includes(s)) ?? codeSides[0] ?? 'Top';
+    const strokeKey = c.props?.[`border${strokeSide}Color`] ? `border${strokeSide}Color` : 'borderTopColor';   // a capture from before every side was read
     if (f.strokeOnDefault === true && !low && c.props?.borderTopWidth && !c.before && drawsNothing) {
       out.notComparable.push({ component: name, field: 'stroke', figma: 'draws a border', why: 'the code root draws nothing (a wrapper); name the part that draws the box in componentSelectors or the contract' });
     } else if (f.strokeOnDefault === true && !low && c.props?.borderTopWidth && !c.before) {
@@ -295,17 +302,20 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       // A stroke drawn inside the box, as Figma draws an inside stroke: an inset ring (box-shadow: inset 0 0 0 1.5px …)
       // is a border on every side, in the ring's colour.
       const insetRing = !!insetRingOf(c.props?.boxShadow?.value);
-      const colorSeen = insetRing || !/^(transparent|rgba\([^)]*,\s*0\))$/i.test(String(c.props?.borderTopColor?.value ?? '').replace(/\s+/g, ' ').trim());
+      const colorSeen = insetRing || !/^(transparent|rgba\([^)]*,\s*0\))$/i.test(String(c.props?.[strokeKey]?.value ?? '').replace(/\s+/g, ' ').trim());
       const drawn = insetRing && !['Top', 'Right', 'Bottom', 'Left'].some(visible) ? ['top', 'right', 'bottom', 'left'] : ['Top', 'Right', 'Bottom', 'Left'].filter(visible).map((s) => s.toLowerCase());
       const named = f.strokeSides && !['all', 'none'].includes(f.strokeSides) ? [f.strokeSides] : null;
       const ok = named ? drawn.length === named.length && named.every((s) => drawn.includes(s)) : (drawn.length > 0 && colorSeen);
-      settle(ok, { component: name, field: 'stroke', figma: named ? `border on ${named.join(', ')}` : 'draws a border', code: drawn.length && colorSeen ? `border on ${drawn.length === 4 ? 'all sides' : drawn.join(', ')}` : 'no visible border', rule: c.props?.borderTopWidth?.rule, at: c.props?.borderTopWidth?.at });
+      settle(ok, { component: name, field: 'stroke', figma: named ? `border on ${named.join(', ')}` : 'draws a border', code: drawn.length && colorSeen ? `border on ${drawn.length === 4 ? 'all sides' : drawn.join(', ')}` : 'no visible border', rule: c.props?.[`border${strokeSide}Width`]?.rule, at: c.props?.[`border${strokeSide}Width`]?.at });
     }
     // Deeper facts from the extended Step 1c capture (present when the snapshot has them).
     // Width: a component Figma sizes FIXED must have its width fixed in code too.
     if (f.box?.sizing?.h === 'FIXED' && typeof f.box.width === 'number' && !low) {
       const w = c.props?.width;
+      // A main component on the canvas always reads FIXED (FILL needs an auto-layout parent): a code width relative to
+      // its container (width: 100%) is the page's, and what the page draws is not the component's to compare.
       if (!w?.rule) out.notComparable.push({ component: name, field: 'width', figma: f.box.width, why: 'the code width follows its content or container' });
+      else if (RELATIVE_SIZE.test(String(w.declared ?? ''))) out.notComparable.push({ component: name, field: 'width', figma: f.box.width, why: `the code width follows its container (${w.declared})` });
       else settle(Math.abs((c.size?.width ?? toNum(w.value)) - f.box.width) < 0.5, { component: name, field: 'width', figma: f.box.width, code: c.size?.width ?? toNum(w.value), rule: w.rule, at: w.at });
     }
     // Stroke weight per side, when Figma records it: each side's width, not only whether it draws.
@@ -397,7 +407,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       const slots = [
         ['fill', 'background', (col) => (c.fill === 'before' ? col.beforeBackground : col.backgroundColor), c.props?.backgroundColor],
         ['text', 'text colour', (col, m) => (m === firstMode && !suffix ? textFact?.value : textInherits ? col.color : null), textFact],
-        ['stroke', 'border colour', (col) => col.borderTopColor, c.props?.borderTopColor],
+        ['stroke', 'border colour', (col) => col[strokeKey] ?? col.borderTopColor, c.props?.[strokeKey]],
       ];
       for (const [slot, field, pick, fact] of slots) {
         const paint = paints?.[slot];
@@ -408,7 +418,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
           const want = paintIn(vars, mode, paint), got = col && pick(col, mode);
           if (!want || !got) continue;
           const expectedVar = paint.token && !suffix ? colorVarOf(paint.token, spec, maps) : undefined;
-          const src = changed[{ fill: 'backgroundColor', text: 'color', stroke: 'borderTopColor' }[slot]] ?? fact;
+          const src = changed[{ fill: 'backgroundColor', text: 'color', stroke: strokeKey }[slot]] ?? fact;
           push(name, `${field}${suffix} [${mode}]`, paint.token ?? paint.hex, { ...(src ?? {}), value: got, confidence: src?.confidence ?? 'single-source' }, { expectedVar, figmaValue: want });
         }
       }
@@ -452,7 +462,12 @@ export function compareComponents(code, structure, vars, cfg, maps) {
           settle(Math.abs(got - fig) < 0.5, { component: name, field: `${field} (${label})`, figma: fig, code: fact.value, rule: fact.rule, at: fact.at, confidence: fact.confidence });
         };
         if (!same(v.paddingPx, def.paddingPx)) ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].forEach((p, i) => num(v.paddingPx?.[i], now(p), p.replace('padding', 'padding ').toLowerCase()));
-        if (!same(v.radiusPx, def.radiusPx)) ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'].forEach((p, i) => num(v.radiusPx?.[i], now(p), 'radius'));
+        // One radius, however many corners set it: the first corner that differs stands for the rest, as on the default.
+        if (!same(v.radiusPx, def.radiusPx)) {
+          const corners = ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'].map((p, i) => [v.radiusPx?.[i], now(p)]).filter(([fig, fact]) => typeof fig === 'number' && fact);
+          const wrong = corners.find(([fig, fact]) => !(Math.abs(toNum(fact.value) - fig) < 0.5));
+          if (corners.length) num(...(wrong ?? corners[0]), 'radius');
+        }
         if (!same(v.gapPx, def.gapPx)) num(v.gapPx, now('columnGap'), 'gap');
         if (!same(v.fontSize, def.fontSize)) num(v.fontSize, st.changed?.fontSize ?? fp?.fontSize, 'font size');
         // Height, only where the code fixes one (otherwise it follows the content).
@@ -598,6 +613,7 @@ export async function compareCapture(ROOT, cfg, code, { readJSON }) {
 // (the browser or the stylesheet, not both) says so, since it has not been confirmed.
 // A global rule (html, body, :root, *): the value is the page's reset, not the component's own. The fix
 // is a declaration on the component's own rule, never an edit of the reset (it would change every element).
+const RELATIVE_SIZE = /%|\b(auto|stretch|fit-content|min-content|max-content|-webkit-fill-available)\b|\d(d|s|l)?v(w|h|i|b|min|max)\b/i;
 export const pageLevelRule = (r) => /^(html|body|:root|\*)(\s*,\s*(html|body|:root|\*))*$/i.test(String(r ?? '').trim());
 
 export function measuredLine(d, moved = null) {
