@@ -281,6 +281,8 @@ export function stateFindings(components = []) {
         const attrs = Object.keys(effect.attrs ?? {});
         if (!(effect.add ?? []).length && !attrs.length) continue;   // the option changes nothing that is drawn
         if (attrs.some((a) => want.includes(a))) continue;
+        // An error the option itself announces (role="alert" or "status", aria-live) is heard, whatever the role is.
+        if (/^(error|invalid)$/i.test(stateWord(word)) && (['alert', 'status', 'log'].includes(effect.attrs?.role) || attrs.includes('aria-live'))) continue;
         out.push({ component: c.name, control: ctl.label, value, want, message: `${c.name}: ${ctl.label}=${value} changes how it looks (${(effect.add ?? []).map((k) => `.${k}`).join(' ') || 'its attributes'}) but not what a screen reader hears: set ${want.join(' or ')} with it` });
       }
     }
