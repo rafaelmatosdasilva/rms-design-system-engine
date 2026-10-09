@@ -1489,6 +1489,13 @@ async function main() {
               ix = found.find((n) => !n.ignored) ?? null;
               if (ix) break;
             }
+            // A subtree the tree leaves out (a harness host it ignores) has no computed roles to search: the element
+            // that declares the role, or its native equivalent, is read on its own.
+            if (!ix) {
+              const wanted = `[role="${want}"]${{ textbox: ',input:not([type]),input[type=text],input[type=email],input[type=search],textarea', spinbutton: ',input[type=number]', button: ',button' }[want] ?? ''}`;
+              const inner = await send('DOM.querySelector', { nodeId: q.nodeId, selector: wanted }, sessionId).catch(() => null);
+              if (inner?.nodeId) ix = (await send('Accessibility.getPartialAXTree', { nodeId: inner.nodeId, fetchRelatives: false }, sessionId))?.nodes?.[0] ?? null;
+            }
           } else {
             // No role named (a name, a heading level, a pressed state): the one control it wraps, when it wraps exactly
             // one. A control inside another (an icon's role inside its button) is not counted; a container of several
