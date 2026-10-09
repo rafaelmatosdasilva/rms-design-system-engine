@@ -232,6 +232,33 @@ test('Gate 10g: a note the accessibility check verifies passes without a contrac
   assert.match(r.out, /annotation "Only on wide screens" not acknowledged/, r.out);
 });
 
+test('Gate 10g and the accessibility facts: a note in a design-intent category asks nothing; an uncategorised one still does', async () => {
+  const { noteKey } = await import('../annotation-categories.mjs');
+  const { annotationFactsFor, annotationUses } = await import('../a11y-check.mjs');
+  const props = { chip: { nodeId: '1:2', properties: {}, annotations: [{ label: 'Role: button' }, { label: 'Only on wide screens' }, { label: 'Use h1 only on page title' }] } };
+  const cats = { _updated: '2026-10-08T10:00:00Z', categories: { i: { label: 'Intent' } }, notes: { '1:2': { [noteKey('Only on wide screens')]: 'i', [noteKey('Use h1 only on page title')]: 'i' } } };
+  const files = {
+    'ds-config.json': { paths: { themeCSS: 'theme.css', snapshotStructure: 's.json', pluginCSS: ['app.css'], compPropsSnapshot: 'props.json' } },
+    's.json': { components: { chip: {} } },
+    'app.css': '.chip {}',
+    'theme.css': ':root {}',
+    'structure-contract.mjs': "export const CONTRACT = { chip: {} };\nexport const COMPONENT_CSS_SELECTORS = { chip: { main: '.chip' } };\nexport const FIGMA_LAYOUT_TO_CSS = {};",
+    'props.json': props,
+  };
+  // The intent notes need no acknowledgement in the contract; the role note is still checked.
+  const r = runGate('structure-check.mjs', { ...files, 'figma-annotation-categories.snapshot.json': cats });
+  assert.doesNotMatch(r.out, /not acknowledged/, r.out);
+  assert.match(r.out, /1\/1 Figma annotation acknowledgments/, r.out);   // the role note only: the intent notes are not counted
+  // The facts the browser check verifies: the intent note's "h1" is no heading level. Without categories it still is.
+  const cfg = { paths: { compPropsSnapshot: 'props.json' } };
+  const withCats = annotationFactsFor(makeFixture({ 'props.json': props, 'figma-annotation-categories.snapshot.json': cats }), cfg).chip.facts;
+  assert.deepEqual([withCats.role, withCats.level], ['button', undefined]);
+  assert.equal(annotationFactsFor(makeFixture({ 'props.json': props }), cfg).chip.facts.level, 1);
+  // Every note is still listed for the agents, an intent one with its kind and no check's use.
+  assert.deepEqual(annotationUses(props.chip, { cats }).map((u) => [u.text, u.kind ?? null, u.uses.length > 0]),
+    [['Role: button', null, true], ['Only on wide screens', 'intent', false], ['Use h1 only on page title', 'intent', false]]);
+});
+
 test('annotations in the browser: a toggle button without aria-pressed, and a note on an inner layer', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
   const page = `<!doctype html><html><body>
     <button class="fav" aria-label="Favorito"><span class="lbl" aria-label="Salvar">★</span></button>

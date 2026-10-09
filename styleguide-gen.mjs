@@ -325,7 +325,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     let title = cfg.name ?? '';
     if (!title) { try { title = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { /* no package.json */ } }
     const probeList = [...new Set([...probeBySelector.values()])];
-    const view = agreedView({ propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, probeList, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
+    // The category of each Figma note (Accessibility, Intent…): only the notes that are requirements state a role or
+    // a duty; the rest is design intent for the agents (annotation-categories.mjs).
+    const { loadCategories, requirementEntry, noteIsTodo } = await import('./annotation-categories.mjs');
+    const cats = loadCategories(ROOT, cfg);
+    const view = agreedView({ cats, propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, probeList, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
       check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: [...new Set([...(opts.names ?? []), ...structNames])], themeCss: themeFiles.map(readText).join('\n'),
       // A contract entry named apart from its Figma component (figmaName) maps that component's props too.
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).flatMap(([n, c]) => [[n, c.propertyMap], ...(c.figmaName && c.figmaName !== n && !contract.CONTRACT[c.figmaName]?.propertyMap ? [[c.figmaName, c.propertyMap]] : [])])),
@@ -441,9 +445,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
       const result = readJson(join(OUT_DIR, 'a11y.json'));
       for (const c of view.components) {
-        const entry = ctx?.propsSnap?.[c.name] ?? {};
+        const all = ctx?.propsSnap?.[c.name] ?? {};
+        const entry = requirementEntry(all, cats, cfg);   // its duties come only from the notes that are requirements
         c.a11y = a11yView({ name: c.name, cls: c.cls, role: c.role ?? authoredRoles[c.name] ?? null, roleFrom: c.role ? 'figma' : authoredRoles[c.name] ? 'contract' : null,
-          annotations: entry.annotations ?? [], parts: partRolesOf(entry), exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE, notes: annotationUses(entry) });
+          annotations: entry.annotations ?? [], parts: partRolesOf(entry), exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE, notes: annotationUses(all, { cats, cfg }) });
       }
       // WCAG 2.1 at level A and AA: every criterion, how the engine covers it, in plain words, and what the checks
       // found (the page runs the in-page checks itself on every variant, wcag-page.js). What the code does (shortcuts,
@@ -466,8 +471,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         if (!c.a11y) continue;
         const src = [];
         for (const n of c.a11y.notes ?? []) {
-          const wording = n.uses.length ? null : annotationWording(n.text, n.layer ?? null);
-          src.push({ st: n.uses.length ? 'done' : 'agents', from: n.layer ? `Figma annotation on its "${n.layer}" layer` : 'Figma annotation', what: n.text, used: n.uses, ...(wording ? { wording } : {}) });
+          // A note in a design-intent category is never rewritten for a check; one no check reads is work to do only
+          // when it states accessibility (its category, else a wording a check reads).
+          const intent = n.kind && n.kind !== 'accessibility';
+          const wording = n.uses.length || intent ? null : annotationWording(n.text, n.layer ?? null);
+          const todo = !n.uses.length && noteIsTodo(n.kind ?? null, wording);
+          src.push({ st: n.uses.length ? 'done' : 'agents', from: n.layer ? `Figma annotation on its "${n.layer}" layer` : 'Figma annotation', what: n.text, used: n.uses, ...(n.kind ? { kind: n.kind } : {}), ...(wording ? { wording } : {}), ...(todo ? { todo: true } : {}) });
         }
         if (!(c.a11y.notes ?? []).length) src.push({ st: 'none', from: 'Figma annotations', what: 'None on it.', used: [] });
         const gl = intentNow.components?.[c.name]?.guidelines;
