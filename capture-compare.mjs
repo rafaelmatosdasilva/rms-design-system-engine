@@ -268,8 +268,10 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     if (f.fontWeightVar && ty(f.fontWeightVar)) push(name, 'font weight', f.fontWeightVar, fp?.fontWeight, { figmaValue: ty(f.fontWeightVar).weight });
     // Line height from the same text style (a unitless line height is a multiple of the font size).
     const lhText = f.text?.lineHeight;   // { unit: 'PIXELS' | 'PERCENT' | 'AUTO', value } from the extended capture
+    // A share in % is of Figma's font size: a wrong font size in the code must not carry the expectation with it.
+    const figFs = toNum(f.text?.fontSize) || toNum(f.fontSizeVar ? ty(f.fontSizeVar)?.size : null) || toNum(fp?.fontSize?.value);
     const lhFig = lhText && lhText.unit !== 'AUTO'
-      ? (lhText.unit === 'PERCENT' ? `${(lhText.value / 100) * toNum(fp?.fontSize?.value)}px` : `${lhText.value}px`)
+      ? (lhText.unit === 'PERCENT' ? `${+((lhText.value / 100) * figFs).toFixed(2)}px` : `${lhText.value}px`)
       : (f.fontSizeVar ? ty(f.fontSizeVar)?.lh : null);
     // A line height inherited from a page-level rule (html, body, :root, *) is the page's, not the
     // component's, so it is not compared.
@@ -338,7 +340,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       }
       const ls = f.text.letterSpacing;
       if (ls && fp.letterSpacing && fs) {
-        const want = ls.unit === 'PERCENT' ? (ls.value / 100) * fs : ls.value;
+        const want = ls.unit === 'PERCENT' ? (ls.value / 100) * figFs : ls.value;
         const got = /normal/i.test(fp.letterSpacing.value) ? 0 : toNum(fp.letterSpacing.value);
         settle(Math.abs(got - want) < 0.05, { component: name, field: 'letter spacing', figma: `${+want.toFixed(2)}px`, code: fp.letterSpacing.value, rule: fp.letterSpacing.rule, at: fp.letterSpacing.at });
       }
@@ -390,7 +392,11 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       }
     }
     for (const [variant, op] of Object.entries(f.variantOpacity ?? {})) {
-      const st = Object.entries(states).find(([k]) => k.includes(key(variant)))?.[1];
+      // The state named exactly, or one of whose axes has that value (or axis=value, or a boolean axis of that name set
+      // on, as Disabled=true): never a name that only contains it.
+      const want = key(variant);
+      const st = (Object.entries(states).find(([k]) => key(k) === want)
+        ?? Object.entries(states).find(([k]) => Object.entries(axesOf(k)).some(([ax, val]) => key(val) === want || key(`${ax}=${val}`) === want || (key(ax) === want && /^(true|yes|on)$/.test(val)))))?.[1];
       const o = st?.changed?.opacity ?? null;
       if (!st || typeof op !== 'number') continue;
       const got = o ? toNum(o.value) : toNum(c.props?.opacity?.value ?? 1);
