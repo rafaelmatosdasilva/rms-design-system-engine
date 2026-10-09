@@ -478,3 +478,22 @@ test('page: focus by outline colour alone, a faint ring on ::after, and a two-to
   assert.deepEqual(kinds('focus'), [], out);
   assert.deepEqual(kinds('focuscontrast'), ['button#pseudo'], out);
 });
+
+// A5: a control edge is read in every colour mode: a field whose border holds in light but fades into the dark
+// background is found in Dark, and named with that mode; one that holds in both is left alone.
+test('page: a control edge too faint only in the dark mode is found, with its mode', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
+    input { border: 1px solid #555; background: #fff; color: #000; padding: 4px; margin: 4px; }
+    @media (prefers-color-scheme: dark) { body { background: #111; color: #eee; } input { background: #111; color: #eee; } .fades { border-color: #222; } .holds { border-color: #aaa; } }</style></head>
+    <body><main><h1>Fields</h1><label>Name <input class="fades"></label><label>City <input class="holds"></label></main></body></html>`;
+  const LIGHT_DARK = [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }, { name: 'Dark', snapshotKey: 'dark', cssSelector: 'dark-media' }];
+  const dir = makeFixture({ 'page.html': page, 'ds-config.json': { figma: { modes: LIGHT_DARK } } });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const edges = d.issues.filter((i) => i.issue === 'boundary');
+  assert.equal(edges.length, 1, out);
+  assert.match(edges[0].selector, /input\.fades/, out);
+  assert.deepEqual(edges[0].modes, ['Dark'], out);
+});

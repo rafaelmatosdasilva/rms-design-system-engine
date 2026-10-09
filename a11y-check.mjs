@@ -1390,36 +1390,63 @@ async function main() {
     // tables, reading order, input purpose, control edges, moving and flashing content, link words, empty headings,
     // label in name, valid ARIA, status messages; then what it does when used (hover content, focus, input, press).
     // The first few of each component on the page; findings say the component they sit in.
+    // The checks on the first few of each component, at rest; `edgesOnly` keeps the control edges (1.4.11), which
+    // depend on the colour mode and are read again in every other mode.
+    const wcagRun = (sel, edgesOnly) => evalv(`(async () => {
+      const sel = ${JSON.stringify(sel)};
+      const all = sel ? [...document.querySelectorAll(sel)] : [document.body];
+      const seen = [], out = [];
+      for (const el of all) {
+        if (seen.length >= 3) break;
+        if (seen.some((s) => s.contains(el)) || !el.getClientRects().length) continue;
+        seen.push(el);
+        // Read at rest: the focus the checks above gave a field is taken away and every transition it starts
+        // jumps to its end, so an edge never reads halfway back from its focus look (a pass in one run, a fail in the next).
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        ${SETTLE_TRANSITIONS};
+        out.push(...window.__wcag21.check(el, { name: sel || '' }).findings.filter((f) => !${edgesOnly} || f.kind === 'boundary'));
+        if (!${edgesOnly} && seen.length === 1) out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings);
+      }
+      return out;
+    })()`);
+    // A control edge is one finding per element, with every mode it is too faint in.
+    const edgeOf = new Map();
+    const edgeKey = (sel, f) => `${String(f.desc).replace(/ \(.*$/, '')}|${sel ?? ''}`;
     await step(async () => {
       await evalv(WCAG_PAGE_SOURCE + '; true');
       const sels = roots ?? [null];
       for (const sel of sels) {
-        const res = await evalv(`(async () => {
-          const sel = ${JSON.stringify(sel)};
-          const all = sel ? [...document.querySelectorAll(sel)] : [document.body];
-          const seen = [], out = [];
-          for (const el of all) {
-            if (seen.length >= 3) break;
-            if (seen.some((s) => s.contains(el)) || !el.getClientRects().length) continue;
-            seen.push(el);
-            // Read at rest: the focus the checks above gave a field is taken away and every transition it starts
-            // jumps to its end, so an edge never reads halfway back from its focus look (a pass in one run, a fail in the next).
-            if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-            ${SETTLE_TRANSITIONS};
-            out.push(...window.__wcag21.check(el, { name: sel || '' }).findings);
-            if (seen.length === 1) out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings);
-          }
-          return out;
-        })()`);
+        const res = await wcagRun(sel, false);
         const once = new Set();
         for (const f of res ?? []) {
           const desc = sel ? `${f.desc} in ${sel}` : f.desc;
           if (once.has(f.kind + desc)) continue;
           once.add(f.kind + desc);
-          findings.push({ kind: f.kind, plugin: label, desc });
+          const nf = { kind: f.kind, plugin: label, desc, ...(f.kind === 'boundary' && modes.length > 1 ? { modes: [modes[0].name] } : {}) };
+          if (f.kind === 'boundary') edgeOf.set(edgeKey(sel, f), nf);
+          findings.push(nf);
         }
       }
       ranChecks.add('wcag21');
+    });
+    // WCAG 1.4.11 in every other colour mode: a field edge that holds in light can fade into a dark background.
+    if (modes.length > 1) await step(async () => {
+      for (const mode of modes.slice(1)) {
+        await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
+        if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
+        try {
+          for (const sel of roots ?? [null]) {
+            for (const f of (await wcagRun(sel, true)) ?? []) {
+              const k = edgeKey(sel, f), had = edgeOf.get(k);
+              if (had) { if (!had.modes.includes(mode.name)) had.modes.push(mode.name); continue; }
+              const nf = { kind: 'boundary', plugin: label, desc: sel ? `${f.desc} in ${sel}` : f.desc, modes: [mode.name] };
+              edgeOf.set(k, nf); findings.push(nf);
+            }
+          }
+        } finally { if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); }
+      }
+      await send('Emulation.setEmulatedMedia', { features: modes[0].sw.media }, sessionId);
+      if (modes[0].sw.apply) await send('Runtime.evaluate', { expression: modes[0].sw.apply }, sessionId);
     });
     await step(async () => {
       // Positive tabindex, then a real walk: Tab through the page and watch where the focus goes.
