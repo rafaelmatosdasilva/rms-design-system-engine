@@ -42,6 +42,7 @@ import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-pa
 import { ZERO_FAIL }                                             from './run-diff.mjs';
 import { loadBaselineLabels, loadBaselineFindings, classifyBaseline, writeBaseline } from './baseline.mjs';
 import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, newPath, projectPath } from './names.mjs';
+import { buildFreshness, buildRecordPath }                    from './build-freshness.mjs';
 import { codeRoots } from './code-roots.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -2699,28 +2700,21 @@ function reportFull(label, items, shown) {
     if (process.env.CI) {
       return { pass: true, lines: ['⏭ Build freshness skipped on CI (mtime unreliable after fresh clone)'] };
     }
-    const stale      = [];
-    // Use the most recently modified token file as the freshness reference
-    const themeMtime = THEMES.filter(p => existsSync(join(ROOT, p)))
-      .map(p => statSync(join(ROOT, p)).mtime)
-      .sort((a, b) => b - a)[0] ?? null;
-    for (let i = 0; i < PLUGINS.length; i++) {
-      const p = PLUGINS[i];
-      // Source is the configured pluginCSS (e.g. …/ui.src.html); the build drops `.src`.
-      // Fall back to the apps/<name>/ layout only when pluginCSS isn't configured.
+    // Source is the configured pluginCSS (e.g. …/ui.src.html); the build drops `.src`.
+    // Fall back to the apps/<name>/ layout only when pluginCSS isn't configured.
+    const products = PLUGINS.map((p, i) => {
       const src = join(ROOT, PLUGIN_CSS[i] ?? `apps/${p}/ui.src.html`);
-      const out = src.replace(/\.src\.html$/, '.html');
-      if (!existsSync(src) || !existsSync(out)) continue;
-      if (statSync(src).mtime > statSync(out).mtime) stale.push(p);
-      else if (themeMtime && themeMtime > statSync(out).mtime && !stale.includes(p))
-        stale.push(`${p} (theme newer)`);
-    }
+      return { name: p, src, out: src.replace(/\.src\.html$/, '.html') };
+    });
+    // A newer date with the content the build was made from (a checkout, a save with nothing new) is not stale.
+    const { stale, datesOnly } = buildFreshness({ products, themes: THEMES.map(p => join(ROOT, p)), recordFile: buildRecordPath(ROOT, OUT_DIR) });
     const pass = stale.length === 0;
+    const moved = datesOnly.length ? [`ℹ Newer dates, same content as their build: ${datesOnly.join(', ')}`] : [];
     return {
       pass,
       lines: pass
-        ? ['✅ All outputs current']
-        : [`❌ Stale - rebuild: ${stale.join(', ')}`],
+        ? ['✅ All outputs current', ...moved]
+        : [`❌ Stale - rebuild: ${stale.join(', ')}`, ...moved],
     };
   }
 
