@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Colours named by their Figma variable; freshness by content; edges read at rest; paired variables; deeper facts on the right side (continuous evaluation)
+
+What changed since the entry below (engine 67f75ee): Roles: a role the tree leaves out is read on the element that declares it (E2 follow-up); Accessibility: an edge is read at rest, never halfway back from focus (E8); Build freshness: a newer date is stale only when the content changed (E7); Deeper facts: the side a stroke is drawn on, the component's own width, one radius, the text drawn (E10); Parity: a variable the token check found but did not compare is one pair (E9); Rendered assertions: a colour named by its Figma variable never goes stale (E4). The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`.
+
+Guide set measured: `273d9518068e` · Project measured: `13d811a9d668`
+
+| Haiku, engine 6706b73 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.054 |
+| Input a run | 103k | 92k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 92k a run against 103k. Records: `records/2026-10-09-colours-by-variable-freshness-by-content`.
+
 ## 2026-10: Annotation categories; roles read on the component; a role the code fails is Claude's (continuous evaluation)
 
 What changed since the entry below (engine 05fd813): Tests: a browser that cannot start is /usr/bin/false, on macOS too; Roles: read on the component, never on a control inside it (E2); To do: a role the code fails is Claude's, even when a Figma note asked (E1); Chrome never touches the person's keychain (no "Keychain Not Found" prompt); Annotation categories: only an accessibility note is a requirement (E3); Skill evaluation runs on macOS: claude found by path, login by token. The guide changed in `cookbook/a11y-notes.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/gates.md`, `reference/usage.md`.
