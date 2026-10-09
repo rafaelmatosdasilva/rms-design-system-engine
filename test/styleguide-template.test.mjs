@@ -614,6 +614,22 @@ test('parity per component: what agrees (since when), its props and tokens, what
   assert.equal(v.notCompared, null);
 });
 
+test('To do: a role the code fails is Claude\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const src = tpl.slice(tpl.indexOf('var WHO = {'), tpl.indexOf('function doWhat('));
+  const a11yWho = new Function(src + 'return a11yWho;')();
+  const audit = { st: 'todo', from: 'The last audit, in a browser, 5 Oct' };
+  // The rendered role differs from the note: the note is right, the code changes.
+  assert.equal(a11yWho('4.1.2', 'audit', [audit, { st: 'todo', from: 'Figma annotation Role: button' }], ''), 'Claude in the code');
+  assert.equal(a11yWho('1.3.1', 'audit', [{ st: 'todo', from: 'Figma annotation on the "Label" layer' }], ''), 'Claude in the code');
+  // Nothing failed and what is missing is in Figma: its role is not stated yet.
+  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma, once annotated' }], ''), 'You in Figma');
+  // A colour pair is a design decision; what only a person judges is checked by hand; the code's own finding is Claude's.
+  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'You in Figma');
+  assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'You check by hand');
+  assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Its code' }], ''), 'Claude in the code');
+});
+
 test('an accessibility finding goes to Accessibility, a difference from Figma to Parity', async () => {
   const { splitFindings } = await import('../styleguide-data.mjs');
   const { parity, a11y } = splitFindings([{ check: 'State contrast', what: 'badge [Type=Warning · light]: 2.04:1 (needs 4.5:1)' }, { check: 'Structure', what: 'badge · height: Figma 20, code 22' }, { check: 'Token layering', what: 'x' }]);
