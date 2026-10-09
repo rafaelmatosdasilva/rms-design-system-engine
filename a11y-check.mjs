@@ -55,11 +55,10 @@
 // come from measured pixels and the accessibility tree, not from any presumed token/tier model.
 //
 // NOT yet (v2, by design):
-//   - Non-text / component contrast (WCAG 1.4.11, >= 3:1): the focus ring (check 3) and icons (check 7)
-//     are checked natively; the rest (control borders, graphics) comes from --axe.
-//   - Live pseudo-class states (:hover / :active) — the styleguide target below renders every
-//     variant state (disabled / checked / selected / error) as its OWN instance, so those are
-//     covered in the resting DOM; forcing true interaction pseudo-states is the remaining step.
+//   - Non-text contrast (WCAG 1.4.11, >= 3:1): the focus ring (check 3), icons (check 7) and control edges
+//     (wcag-page.js) are checked natively, control edges in the first mode only; graphics come from --axe.
+//   - Live pseudo-class states: :hover text contrast is forced with --states (first mode); :focus and :active
+//     text, and edges in those states, are not measured yet.
 //   - Reading order, skip links, landmark completeness — and anything the render cannot reveal:
 //     only when the project declares it in ds-config.json, never imposed (No-imposed-structure).
 
@@ -78,6 +77,7 @@ import { loadModes } from './mode-resolver.mjs';
 import { modeSwitch } from './code-capture.mjs';
 import { codeSnapshotPath, OUT_DIR } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
+import { parseColor as parseCssColor } from './css-values.mjs';
 import { WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from './wcag21.mjs';
 import { loadCategories, requirementEntry, noteKind, isRequirement } from './annotation-categories.mjs';
 import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
@@ -93,8 +93,10 @@ export function parseColor(s) {
   if (typeof s !== 'string') return null;
   if (s === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
   const m = s.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+))?\s*\)$/i);
-  if (!m) return null;
-  return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+  if (m) return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+  // Chrome keeps oklch(), oklab() and color(srgb …) as written (Tailwind v4 colours are oklch): read them too.
+  const c = /^(oklch|oklab|color|hsla?)\(/i.test(s) ? parseCssColor(s) : null;
+  return c ? { r: c[0], g: c[1], b: c[2], a: c[3] } : null;
 }
 
 // Composite a translucent foreground over an opaque background (both {r,g,b}, fg has a).
@@ -148,10 +150,14 @@ export function contrastFindings(textEls, theme) {
   const out = [];
   for (const el of textEls) {
     if (el.bgImage) { out.push({ kind: 'contrast', theme, desc: el.desc, text: el.text, cannotCompute: 'background-image/gradient' }); continue; }
+    // A colour in a space not converted (display-p3 …) is said, never skipped as if it passed.
+    const unread = [el.color, ...(el.bgLayers ?? [])].find((c) => typeof c === 'string' && !parseColor(c));
+    if (unread) { out.push({ kind: 'contrast', theme, desc: el.desc, text: el.text, cannotCompute: `colour space not read (${unread.slice(0, 40)})` }); continue; }
     const fg = parseColor(el.color);
-    if (!fg) continue;
+    if (fg.a === 0) continue;
     const bg = effectiveBg(el.bgLayers);
-    const ratio = contrastRatio(fg, bg);
+    // See-through text draws as its blend over the background: measured as drawn, not as its solid colour.
+    const ratio = contrastRatio(fg.a < 1 ? over(fg, bg) : fg, bg);
     const threshold = aaThreshold(el.fontSize, el.fontWeight);
     if (ratio + 1e-9 < threshold) {
       out.push({ kind: 'contrast', theme, desc: el.desc, text: el.text, ratio: Math.round(ratio * 100) / 100, threshold });
@@ -489,7 +495,8 @@ function sweepExpression(roots, doFocus, stateMap) {
     const textEls = [];
     for (const el of scope) {
       if (seen.has(el)) continue; seen.add(el);
-      if (!vis(el) || disabled(el)) continue;
+      // Text in a disabled control is exempt (WCAG 1.4.3) wherever in the control it sits: <button disabled><span>.
+      if (!vis(el) || disabled(el) || el.closest(':disabled,[aria-disabled="true"]')) continue;
       const hasText = [...el.childNodes].some(n => n.nodeType===3 && n.textContent.trim());
       if (!hasText) continue;
       const cs = getComputedStyle(el);
@@ -510,6 +517,16 @@ function sweepExpression(roots, doFocus, stateMap) {
         fontSize: parseFloat(cs.fontSize) || 16, fontWeight: cs.fontWeight,
         bgImage: !!(cs.backgroundImage && cs.backgroundImage !== 'none'),
       });
+    }
+    // A placeholder on show is text (WCAG 1.4.3): its own colour against the field.
+    for (const el of scope) {
+      if (!el.matches || !el.matches('input[placeholder],textarea[placeholder]') || !el.getAttribute('placeholder').trim() || el.value || !vis(el) || el.closest(':disabled,[aria-disabled="true"]')) continue;
+      const ps = getComputedStyle(el, '::placeholder'), cs = getComputedStyle(el);
+      const layers = []; let node = el;
+      while (node && node.nodeType===1) { const b = getComputedStyle(node).backgroundColor; layers.push(b); const mm = b.match(/^rgba?\\(([^)]+)\\)/); const parts = mm ? mm[1].split(',') : null; if ((parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0) === 1) break; node = node.parentElement; }
+      const cls = (el.className && typeof el.className==='string') ? '.'+el.className.trim().split(/\\s+/).join('.') : '';
+      textEls.push({ desc: (el.tagName.toLowerCase() + (el.id?('#'+el.id):'') + cls).slice(0,80) + '::placeholder' + ownerOf(el), text: el.getAttribute('placeholder').trim().slice(0,40),
+        color: ps.color, bgLayers: layers, fontSize: parseFloat(ps.fontSize || cs.fontSize) || 16, fontWeight: ps.fontWeight || cs.fontWeight, bgImage: !!(cs.backgroundImage && cs.backgroundImage !== 'none') });
     }
     // Icons that carry meaning: the only content of a control, or named themselves (role="img", aria-label, a <title>).
     // Their colour: an svg's painted fill or stroke, a masked icon's background, an icon font's text colour.
@@ -571,11 +588,14 @@ function sweepExpression(roots, doFocus, stateMap) {
         if (!disabled(el) && el.matches('a[href],button,input:not([type=hidden]),select,textarea,[tabindex],[role=button],[role=link]')) {
           // A focus style may be an outline, a shadow, a border, a background change, an underline,
           // or drawn on ::before / ::after: every one of those counts as a visible change.
-          const look = (s, pb, pa) => [s.outlineStyle, s.outlineWidth, s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor, s.textDecorationLine,
-            pb.outlineStyle, pb.boxShadow, pb.borderColor, pb.backgroundColor, pb.opacity, pa.outlineStyle, pa.boxShadow, pa.borderColor, pa.backgroundColor, pa.opacity].join('|');
+          // An outline's colour counts only while an outline is drawn (a ring kept transparent at rest that takes a colour on focus).
+          const ring = (x) => (x.outlineStyle !== 'none' && parseFloat(x.outlineWidth) > 0 ? x.outlineColor : '');
+          const look = (s, pb, pa) => [s.outlineStyle, s.outlineWidth, ring(s), s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor, s.textDecorationLine,
+            pb.outlineStyle, ring(pb), pb.boxShadow, pb.borderColor, pb.backgroundColor, pb.opacity, pa.outlineStyle, ring(pa), pa.boxShadow, pa.borderColor, pa.backgroundColor, pa.opacity].join('|');
           // The element the keyboard is already on (the page's first Tab) is let go first, so its look before is its rest.
           if (document.activeElement === el) { try { el.blur(); } catch(e){} }
-          const b = getComputedStyle(el); const before = look(b, getComputedStyle(el, '::before'), getComputedStyle(el, '::after'));
+          const b = getComputedStyle(el); const pseudoAt = (s) => ['::before', '::after'].map((w) => { const p = getComputedStyle(el, w); return { w, outline: p.outlineStyle !== 'none' && parseFloat(p.outlineWidth) > 0 ? p.outlineColor : null, border: p.borderTopColor, shadow: p.boxShadow, bg: p.backgroundColor }; });
+          const before = look(b, getComputedStyle(el, '::before'), getComputedStyle(el, '::after')); const pseudoBefore = pseudoAt();
           // The box that holds only this control (a field's frame around its borderless input) may show the focus
           // for it (:focus-within): up to two levels up, while no other control is inside.
           const boxes = []; for (let p = el.parentElement, i = 0; p && i < 2 && p.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[tabindex]').length === 1; p = p.parentElement, i++) boxes.push(p);
@@ -590,9 +610,24 @@ function sweepExpression(roots, doFocus, stateMap) {
             // check it is perceivable (WCAG 1.4.11, >= 3:1). A ring that "changes" but is nearly the
             // same colour as its background is still invisible to a keyboard user.
             let ind = null, outside = false, px = null;
-            if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0) { ind = a.outlineColor; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
-            else if (a.boxShadow !== b.boxShadow && a.boxShadow !== 'none') { const m = a.boxShadow.match(/rgba?\\([^)]+\\)/); ind = m ? m[0] : null; outside = !/inset/.test(a.boxShadow); const lens = a.boxShadow.replace(/rgba?\\([^)]+\\)/g, '').match(/-?[\\d.]+px/g) || []; px = Math.max(parseFloat(lens[2] || '0'), parseFloat(lens[3] || '0')); }
-            else if (a.borderColor !== b.borderColor) { ind = a.borderColor; px = parseFloat(a.borderTopWidth); }
+            // A shadow ring may have several layers (a white gap, then a coloured ring): each colour is kept, and the
+            // ring counts as seen when one of them stands out.
+            const shadowLayers = (v) => v.split(/,(?![^(]*\\))/).map((l) => { const m = l.match(/(?:rgba?|oklch|oklab|color|hsla?)\\([^)]+\\)/); const lens = l.replace(/[a-z]+\\([^)]+\\)/g, '').match(/-?[\\d.]+px/g) || []; return { color: m ? m[0] : null, px: Math.max(parseFloat(lens[2] || '0'), parseFloat(lens[3] || '0')) }; }).filter((l) => l.color);
+            if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0 && (a.outlineColor !== b.outlineColor || a.outlineStyle !== b.outlineStyle || a.outlineWidth !== b.outlineWidth)) { ind = [a.outlineColor]; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
+            else if (a.boxShadow !== b.boxShadow && a.boxShadow !== 'none') { const ls = shadowLayers(a.boxShadow); ind = ls.length ? ls.map((l) => l.color) : null; outside = !/inset/.test(a.boxShadow); px = ls.length ? Math.max(...ls.map((l) => l.px)) : null; }
+            else if (a.borderColor !== b.borderColor) { ind = [a.borderColor]; px = parseFloat(a.borderTopWidth); }
+            else if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0) { ind = [a.outlineColor]; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
+            else {
+              // A ring drawn on ::before / ::after: the part of it that changed is measured, against the element.
+              const now = pseudoAt();
+              for (let i = 0; i < 2 && !ind; i++) {
+                const was = pseudoBefore[i], is = now[i];
+                if (is.outline && is.outline !== was.outline) ind = [is.outline];
+                else if (is.shadow !== was.shadow && is.shadow !== 'none') ind = shadowLayers(is.shadow).map((l) => l.color);
+                else if (is.border !== was.border) ind = [is.border];
+                else if (is.bg !== was.bg) ind = [is.bg];
+              }
+            }
             // WCAG 2.4.13 (AAA, advisory): a focus indicator at least 2 CSS pixels thick.
             // The browser's own ring (outline-style: auto) is drawn by the browser, not by this width.
             if (px != null && px < 2 && a.outlineStyle !== 'auto') thinFocus.push({ desc, px: Math.round(px * 10) / 10 });
@@ -606,7 +641,7 @@ function sweepExpression(roots, doFocus, stateMap) {
                 const al = parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0;
                 if (al === 1) break; node = node.parentElement;
               }
-              faintFocus.push({ desc, color: ind, bgLayers: layers });
+              faintFocus.push({ desc, colors: ind, bgLayers: layers });
             }
           }
           try { el.blur(); } catch(e){}
@@ -1305,10 +1340,11 @@ async function main() {
       for (const desc of noFocus) note('focus', desc, mode.name);
       // Focus indicator visible? (WCAG 1.4.11 for the focus ring — computed in Node)
       for (const f of faintFocus) {
-        const raw = parseColor(f.color); if (!raw) continue;
         const bg = effectiveBg(f.bgLayers);
-        const fg = raw.a < 1 ? over(raw, bg) : raw;
-        const ratio = contrastRatio(fg, bg);
+        // The ring is seen when its clearest tone stands out (a two-tone ring is built that way).
+        const ratios = (f.colors ?? [f.color]).map(parseColor).filter((c) => c && c.a > 0).map((raw) => contrastRatio(raw.a < 1 ? over(raw, bg) : raw, bg));
+        if (!ratios.length) continue;
+        const ratio = Math.max(...ratios);
         if (ratio + 1e-9 < 3) note('focuscontrast', f.desc, mode.name, { ratio: Math.round(ratio * 100) / 100, threshold: 3 });
       }
       if (first) {

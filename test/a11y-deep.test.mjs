@@ -438,3 +438,43 @@ test('page: a field edge is read at rest, never halfway back from its focus look
   const d = pageResult(out);
   assert.deepEqual(d.issues.filter((i) => i.issue === 'boundary').map((i) => i.selector.split(' ')[0]).sort(), ['input#a', 'input#b', 'input#c'], out);
 });
+
+// Text contrast in the browser: a colour Chrome reports as oklch() is read, see-through text is measured as drawn,
+// and text inside a disabled control is exempt (WCAG 1.4.3), wherever in the control it sits.
+test('page: oklch and see-through text are measured as drawn; text inside a disabled control is left alone', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
+    .ok-l { color: oklch(0.75 0 0); } .ghost { color: rgba(0, 0, 0, 0.3); } button { color: #ccc; background: #fff; border: 1px solid #000; }</style></head><body><main><h1>Text</h1>
+    <p class="ok-l">Grey in oklch</p>
+    <p class="ghost">Faded black</p>
+    <p class="fine">Plain black</p>
+    <button disabled><span class="inner">Save</span></button>
+    <input class="hint" aria-label="Search" placeholder="Faint hint"><input class="clear" aria-label="Name" placeholder="Clear hint"><input class="typed" aria-label="City" placeholder="Hidden once typed" value="Lisbon">
+  </main></body></html>`.replace('</style>', '.hint::placeholder { color: #cccccc; } .clear::placeholder, .typed::placeholder { color: #595959; } input { border: 1px solid #000; background: #fff; }</style>');
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const contrast = d.issues.filter((i) => i.issue === 'contrast').map((i) => i.selector).sort();
+  assert.deepEqual(contrast, ['input.hint::placeholder', 'p.ghost', 'p.ok-l'], out);   // a placeholder shown is text too (1.4.3)
+});
+
+// Focus (WCAG 2.4.7, 1.4.11): a ring kept transparent at rest that only takes a colour on focus is a focus style (the
+// advice the check itself gives); a ring drawn on ::after is measured; a two-tone ring passes when one of its tones shows.
+test('page: focus by outline colour alone, a faint ring on ::after, and a two-tone shadow ring', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
+    button { background: #fff; color: #000; border: 1px solid #000; margin: 8px; outline: none; position: relative; }
+    .tint { outline: 2px solid transparent; outline-offset: 2px; } .tint:focus { outline-color: #0050c8; }
+    .pseudo::after { content: ''; position: absolute; inset: -4px; border: 2px solid transparent; } .pseudo:focus::after { border-color: #eeeeee; }
+    .duo:focus { box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #0050c8; }</style></head><body><main><h1>Focus</h1>
+    <button id="tint">Tint</button><button id="pseudo">Pseudo</button><button id="duo">Duo</button>
+  </main></body></html>`.replace('id="tint"', 'id="tint" class="tint"').replace('id="pseudo"', 'id="pseudo" class="pseudo"').replace('id="duo"', 'id="duo" class="duo"');
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();
+  assert.deepEqual(kinds('focus'), [], out);
+  assert.deepEqual(kinds('focuscontrast'), ['button#pseudo'], out);
+});
