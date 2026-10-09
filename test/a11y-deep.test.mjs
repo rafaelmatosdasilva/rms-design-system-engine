@@ -422,3 +422,19 @@ test('icons: one that carries meaning and fades into its background, and a contr
   assert.deepEqual(kinds('tooltipname'), ['<button> "Dark mode", named only by its title'], out);
   assert.equal(kinds('name').length, 0, out);
 });
+
+// E8: the focus the check gives a field (its Tab walk) is taken away with a transition: an edge is read once the
+// field is back at rest, so a faint edge fails every run, never only when the read comes before the transition ends.
+test('page: a field edge is read at rest, never halfway back from its focus look', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>
+    body { font: 14px sans-serif; background: #fff; }
+    input { border: 1px solid #bbbbbb; transition: border-color 60s; }
+    input:focus { border-color: #222222; outline: 2px solid #222222; }
+  </style></head><body><main><h1>Form</h1><label>Name <input id="a"></label> <label>Town <input id="b"></label> <label>Code <input id="c"></label></main></body></html>`;
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  assert.deepEqual(d.issues.filter((i) => i.issue === 'boundary').map((i) => i.selector.split(' ')[0]).sort(), ['input#a', 'input#b', 'input#c'], out);
+});
