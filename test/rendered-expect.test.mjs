@@ -52,3 +52,15 @@ test('[rendered-check] a figmaVar assertion passes on the variable\'s value and 
   const moved = runGate('rendered-check.mjs', files('#828282'));
   assert.match(moved.out, /rendered "rgb\(173, 173, 173\)" ≠ expected "rgb\(130, 130, 130\)"/, moved.out);
 });
+
+// B7: an automatic height is asserted only where Figma fixes one: a component that hugs its content would be measured
+// on an empty probe, which has no content, and fail for a reason that is not a difference.
+test('[rendered-check] rendered.auto asserts a fixed height and leaves a hugging one alone', { skip: CHROME && typeof WebSocket !== 'undefined' ? false : 'no Chrome available' }, () => {
+  const r = runGate('rendered-check.mjs', {
+    'ds-config.json': { rendered: { auto: true }, paths: { plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'figma-structure.snapshot.json' } },
+    'app/ui.html': '<!doctype html><style>.bar { height: 40px; } .tag { padding: 4px; }</style><div class="bar"></div><span class="tag">New</span>',
+    'figma-structure.snapshot.json': { components: { bar: { h: 40, sizingV: 'FIXED' }, tag: { h: 24, sizingV: 'HUG' } } },
+  });
+  assert.match(r.out, /generated 1 height assertion/, r.out);
+  assert.match(r.out, /PASS {2}1\/1 rendered assertions/, r.out);
+});

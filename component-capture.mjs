@@ -58,7 +58,7 @@ export const TRACE = {
 const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'boxSizing', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
 const COLOR_PROPS = new Set(['color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor']);
 const GUARD_PROPS = ['color', 'backgroundColor', 'borderTopColor', 'opacity'];
-const BREAKPOINT_PROPS = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'columnGap', 'rowGap', 'borderTopLeftRadius', 'fontSize', 'lineHeight'];
+const BREAKPOINT_PROPS = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'columnGap', 'rowGap', 'borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius', 'fontSize', 'lineHeight'];
 const INHERITED = new Set(['color', 'fontSize', 'fontWeight', 'lineHeight', 'fontFamily', 'letterSpacing', 'textTransform']);
 
 // Which slot of a box shorthand a property reads (1 to 4 values: top right bottom left).
@@ -350,7 +350,8 @@ export function borderSnaps(declared, drawn) {
 }
 export function sameValue(prop, a, b) {
   if (a == null || b == null) return null;
-  if (COLOR_PROPS.has(prop)) { const x = toRgba(a), y = toRgba(b); return x && y ? x.every((n, i) => n === y[i]) : null; }
+  // One step either way on a channel is rounding between colour spaces (an oklch colour and Figma's hex), as sameColor reads it.
+  if (COLOR_PROPS.has(prop)) { const x = toRgba(a), y = toRgba(b); return x && y ? x.every((n, i) => Math.abs(n - y[i]) <= (i === 3 ? 0.01 : 1)) : null; }
   const x = toPx(a), y = toPx(b);
   if (x != null && y != null) return Math.abs(x - y) < 0.01;
   return String(a).trim() === String(b).trim() ? true : null;
@@ -704,7 +705,9 @@ export async function captureComponents(ctx) {
         const pSel = kind === 'text' ? null : comp.parts?.[kind];
         const pStat = pSel ? staticComponentReading(staticSources, pSel, staticRootVars) : {};
         const pFacts = facts({ ...comp, selector: pSel ?? comp.selector }, loc.how, pMode[firstMode], pTraced, pStat);
-        (entry.parts ??= {})[kind] = { selector: pSel ?? '(first text)', props: Object.fromEntries(Object.entries(pFacts).filter(([k]) => PART_PROPS[kind]?.includes(k))) };
+        (entry.parts ??= {})[kind] = { selector: pSel ?? '(first text)', props: Object.fromEntries(Object.entries(pFacts).filter(([k]) => PART_PROPS[kind]?.includes(k))),
+          // A text part's colours in every mode: one with its own colour rule is compared in dark mode too.
+          ...(kind === 'text' || kind === 'font' ? { colors: colorsOf(pMode) } : {}) };
       }
       for (const st of comp.states ?? []) {
         const how = stateRecipe(comp.selector, st.selector);
