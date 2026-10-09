@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Accessibility and parity readings: text as drawn, focus rings, ARIA states, edges in every mode, box and text facts (continuous evaluation)
+
+What changed since the entry below (engine 6706b73): Text contrast: oklch colours read, see-through text blended, text in a disabled control exempt; Focus: a ring that only takes a colour on focus counts, a ring on ::before/::after is measured, a two-tone shadow passes on its clearer tone; WCAG checks: placeholder text measured, a field named only by its placeholder found, required ARIA states and values, publishing and graphics roles, a spinner is not a flash, edges in oklch read; Parity: a % line height and letter spacing from Figma's font size; colours equal within a rounding step; a variant's opacity read on its own state; Parity: a text part with its own colour is compared in every mode; Parity: a mode the code draws and Figma has no value for is said, not skipped; Parity: padding, radius and gap Figma sets with no variable are compared on the default variant; Parity at breakpoints: every side of the padding, every corner, and a vertical stack's row gap; Gate 16 auto heights: only a height Figma fixes, never one that hugs or fills; Docs: what the accessibility and parity checks now read; Parity: Figma's font size for a % line height is the default variant's, where the refresh records it; Accessibility: a control edge is read in every colour mode, one finding with the modes it fades in; Parity: min and max width, alignment, wrap and a dashed stroke compared with the box Figma records; Parity: text decoration, italic and text alignment of the first text, recorded in Figma and compared; Docs: the deeper facts the refresh records and compares; edges in every mode. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `26f7ea4081e5` · Project measured: `13d811a9d668`
+
+| Haiku, engine af1bcf1 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.057 |
+| Input a run | 92k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 92k. Records: `records/2026-10-09-accessibility-parity-readings`.
+
 ## 2026-10: Colours named by their Figma variable; freshness by content; edges read at rest; paired variables; deeper facts on the right side (continuous evaluation)
 
 What changed since the entry below (engine 67f75ee): Roles: a role the tree leaves out is read on the element that declares it (E2 follow-up); Accessibility: an edge is read at rest, never halfway back from focus (E8); Build freshness: a newer date is stale only when the content changed (E7); Deeper facts: the side a stroke is drawn on, the component's own width, one radius, the text drawn (E10); Parity: a variable the token check found but did not compare is one pair (E9); Rendered assertions: a colour named by its Figma variable never goes stale (E4). The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`.
