@@ -793,9 +793,10 @@ export function makeStep(findings, unfinished, label) {
 }
 
 // Chrome's accessibility tree names a few roles differently from ARIA.
-// presentation and none are one role (ARIA 1.1 named it none); Chrome reports either as "none".
+// presentation and none are one role (ARIA 1.1 named it none); Chrome reports either as "none", and a plain element
+// with no role of its own (generic) holds no meaning either, as presentation asks.
 export const sameRole = (got, want) => got === want || (want === 'img' && got === 'image') || (want === 'textbox' && got === 'searchbox')
-  || (/^(presentation|none)$/.test(want) && /^(presentation|none)$/.test(got));
+  || (/^(presentation|none)$/.test(want) && /^(presentation|none|generic)$/.test(got));   // a plain element means nothing either
 // The same equivalences, to look a role up in Chrome's tree (Accessibility.queryAXTree) by the name an annotation uses.
 const AX_ROLE_ALIASES = { img: ['image'], textbox: ['searchbox'] };
 // The controls a wrapper can hold, for a note that names no role (a name, a heading level, a pressed state).
@@ -1589,6 +1590,12 @@ async function main() {
       for (const [comp, { facts: f, layers }] of Object.entries(facts)) {
         if (components.length && !components.includes(comp)) continue;
         if (Object.keys(f).length) {
+          // A component the code has no markup for is drawn as a stand-in on the style guide: there is nothing of the
+          // code's to read, so it is said not checked.
+          if (target.styleguide && await evalv(`!!document.querySelector(${JSON.stringify(ownSection(comp, selOf(comp)))})?.matches('[data-sg-standin]')`)) {
+            findings.push({ kind: 'annotation', plugin: label, desc: `${comp}: not checked, the code has no markup for it (the style guide draws a stand-in)` });
+            continue;
+          }
           const got = await axOf(ownSection(comp, selOf(comp)), f.role ? String(f.role).toLowerCase() : null);
           if (got) for (const d of annotationMismatches(f, got)) findings.push({ kind: 'annotation', plugin: label, desc: `${comp}: ${d}` });
         }
