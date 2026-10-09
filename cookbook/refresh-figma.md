@@ -420,9 +420,9 @@ Navigate to your DS Components page, find each `COMPONENT_SET`, navigate to the 
 **Deeper facts (always).** Also record these on each component's entry, every refresh, from the same
 `State=Default` node. The measured comparison (Gate [13] (Structure) `MEASURED`, `--capture-code --compare`) uses
 each one when present:
-- sizing per axis, a fixed width, and min and max width
-- the gap, the stroke width on each side, and opacity
-- the text node's family, line height (px, % or auto), letter spacing and text case
+- sizing per axis, a fixed width, min and max width, how auto layout lines children up on each axis, and wrap
+- the gap, the stroke width on each side, whether the stroke is dashed, and opacity
+- the text node's family, line height (px, % or auto), letter spacing, text case, decoration, italic and alignment
 - the fill, text and stroke colour tokens with their paint opacity, compared in every mode
 - one entry per variant (height, padding, gap, radius, font size, colours, visible layers); only what a
   variant changes from the default is compared, against the state the code capture produced. A variant
@@ -515,6 +515,9 @@ async function deepFacts(node, set) {
       lineHeight: lh && lh !== figma.mixed ? (lh.unit === 'AUTO' ? { unit: 'AUTO' } : { unit: lh.unit, value: n(lh.value) }) : null,
       letterSpacing: ls && ls !== figma.mixed ? { unit: ls.unit, value: n(ls.value) } : null,
       textCase: text.textCase !== figma.mixed ? text.textCase : null,
+      textDecoration: text.textDecoration !== figma.mixed ? text.textDecoration : null,
+      italic: fn && fn !== figma.mixed ? /italic|oblique/i.test(fn.style) : null,
+      textAlign: text.textAlignHorizontal,
     };
   }
   // Which layers each boolean property shows or hides.
