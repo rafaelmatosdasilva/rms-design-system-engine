@@ -149,6 +149,8 @@ What the design itself owes is listed for whoever keeps the Figma file: an inter
 
 ## Good to know
 
+- **Which TypeScript reads your components.** Your project's own, else one installed for the whole machine (a global npm folder, `NODE_PATH`, `tsc` on the PATH). Set `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` to use only the project's own, so a run depends on the project alone; the engine's tests do this where they expect none.
+
 - **Share the results with your team.** Commit the files it creates in your project, so everyone, and your automated builds, check against the same design.
 - **Figma stays as it is.** It only reads Figma. It tells you what to change there, and a person makes that change.
 - **Reading Figma, the best way available.** `rms-design-system-engine --refresh-figma` picks it for you: a `design.json` newer than the saved data, then [figma-cli](https://github.com/silships/figma-cli) when Figma Desktop is connected to it (no API key, no rate limit, every mode), then the Figma tool of your Claude session, then the Figma API with a token. After you run `figma-cli snapshot`, the next check reads its `design.json` on its own; `--from-figma-cli` reads one directly.
