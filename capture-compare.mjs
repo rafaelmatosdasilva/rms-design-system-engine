@@ -409,10 +409,12 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     const textFact = c.parts?.text?.props?.color ?? c.props?.color;
     const firstMode = Object.keys(c.colors ?? {})[0];
     const textInherits = !c.parts?.text?.props?.color || c.parts.text.props.color.value === c.colors?.[firstMode]?.color;
+    const partColors = c.parts?.text?.colors ?? (c.parts?.text ? null : c.parts?.font?.colors);
     const colourChecks = (label, paints, perMode, suffix = '', changed = {}) => {
       const slots = [
         ['fill', 'background', (col) => (c.fill === 'before' ? col.beforeBackground : col.backgroundColor), c.props?.backgroundColor],
-        ['text', 'text colour', (col, m) => (m === firstMode && !suffix ? textFact?.value : textInherits ? col.color : null), textFact],
+        // A text part with its own colour rule is read on the part in every mode (its colours per mode, from the capture).
+        ['text', 'text colour', (col, m) => (m === firstMode && !suffix ? textFact?.value : textInherits ? col.color : !suffix ? partColors?.[m]?.color ?? null : null), textFact],
         ['stroke', 'border colour', (col) => col[strokeKey] ?? col.borderTopColor, c.props?.[strokeKey]],
       ];
       for (const [slot, field, pick, fact] of slots) {
