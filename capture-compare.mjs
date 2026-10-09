@@ -424,6 +424,8 @@ export function compareComponents(code, structure, vars, cfg, maps) {
         if (slot === 'stroke' && drawsNothing) continue;                                          // drawing at all is the stroke check's job
         for (const [mode, col] of Object.entries(perMode ?? {})) {
           const want = paintIn(vars, mode, paint), got = col && pick(col, mode);
+          // A mode the code draws that Figma gives no value for is said, never skipped as if it matched.
+          if (!want && got && paint.token) { out.notComparable.push({ component: name, field: `${field}${suffix} [${mode}]`, figma: paint.token, code: got, why: 'Figma has no value for this mode' }); continue; }
           if (!want || !got) continue;
           const expectedVar = paint.token && !suffix ? colorVarOf(paint.token, spec, maps) : undefined;
           const src = changed[{ fill: 'backgroundColor', text: 'color', stroke: strokeKey }[slot]] ?? fact;
