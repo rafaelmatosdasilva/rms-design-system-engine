@@ -312,7 +312,9 @@ test('a page counts as loaded only once it is no longer the about:blank a new ta
 
 test('a page that was not checked says so in --json, with the reason, never as a clean result', () => {
   const dir = makeFixture({ 'page.html': '<!doctype html><html><body><button>x</button></body></html>' });
-  const out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: '/bin/false' } });
+  // A browser that exits at once. /usr/bin/false is on Linux and macOS alike (macOS has no /bin/false, so the
+  // engine would skip the path and start a real Chrome).
+  const out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: '/usr/bin/false' } });
   const d = JSON.parse(out.slice(out.indexOf('{')));
   assert.match(d.notChecked, /^Chrome failed to start/);
   assert.equal(d.issues, undefined);
