@@ -55,11 +55,10 @@
 // come from measured pixels and the accessibility tree, not from any presumed token/tier model.
 //
 // NOT yet (v2, by design):
-//   - Non-text / component contrast (WCAG 1.4.11, >= 3:1): the focus ring (check 3) and icons (check 7)
-//     are checked natively; the rest (control borders, graphics) comes from --axe.
-//   - Live pseudo-class states (:hover / :active) — the styleguide target below renders every
-//     variant state (disabled / checked / selected / error) as its OWN instance, so those are
-//     covered in the resting DOM; forcing true interaction pseudo-states is the remaining step.
+//   - Non-text contrast (WCAG 1.4.11, >= 3:1): the focus ring (check 3), icons (check 7) and control edges
+//     (wcag-page.js) are checked natively, control edges in the first mode only; graphics come from --axe.
+//   - Live pseudo-class states: :hover text contrast is forced with --states (first mode); :focus and :active
+//     text, and edges in those states, are not measured yet.
 //   - Reading order, skip links, landmark completeness — and anything the render cannot reveal:
 //     only when the project declares it in ds-config.json, never imposed (No-imposed-structure).
 
