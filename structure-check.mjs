@@ -24,6 +24,7 @@ import { createLocator } from './component-locator.mjs';
 import { pathToFileURL } from 'url';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
 import { codeSnapshotPath, projectPath } from './names.mjs';
+import { loadCategories, requirementEntry } from './annotation-categories.mjs';
 
 const ROOT = process.cwd();
 
@@ -1395,8 +1396,13 @@ for (const [comp, contract] of Object.entries(CONTRACT)) {
 const CANN_PASS = [], CANN_FAIL = [], CANN_WARN = [];
 const { annotationFacts } = await import('./a11y-check.mjs');
 
-for (const [figmaName, entry] of Object.entries(COMP_PROPS)) {
-  if (figmaName === '_updated' || !entry?.annotations?.length) continue;
+// A note in a design-intent category (Intent, Implementation, Content, Authoring) asks nothing of the code: the agents
+// read it. Only the notes that are requirements (Accessibility, or no category) are acknowledged here.
+const ANN_CATS = loadCategories(ROOT, cfg);
+for (const [figmaName, entry0] of Object.entries(COMP_PROPS)) {
+  if (figmaName === '_updated' || !entry0?.annotations?.length) continue;
+  const entry = requirementEntry(entry0, ANN_CATS, cfg);
+  if (!entry.annotations?.length) continue;
   const contractKey = figmaNameToContractKey[figmaName];
   if (!contractKey) {
     if (!KNOWN_UNIMPLEMENTED.has(figmaName)) {

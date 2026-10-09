@@ -16,6 +16,9 @@ import { findChrome } from '../../cdp.mjs';
 export const ENGINE = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 export const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
 export const TOOLS = 'Bash,Read,Edit,Write,Glob,Grep,Skill';
+// The CLI that runs each task, found once on this machine's PATH: a run's own PATH leaves out ~/.local/bin (where
+// install.sh puts the engine's command), and the Claude Code installer puts `claude` there too.
+const CLAUDE = (() => { try { return execFileSync('which', ['claude'], { encoding: 'utf8' }).trim() || 'claude'; } catch { return 'claude'; } })();
 const GIT_ENV = { GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.com', GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' };
 
 const NOT_PROJECT = /expected-report|\/\.design-system-engine-out(\/|$)|\/\.git(\/|$)|node_modules/;
@@ -95,10 +98,12 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
 // The environment of a run: a fresh user's, not a child of the session that started the evaluation. Every
 // CLAUDE* variable goes (the parent's session id, effort, extra directories, messaging), and so do tokens a
 // user would not hand the agent (GitHub, cloud, Figma, GitLab) and the evaluation's own settings. The
-// model's credentials stay.
+// model's credentials stay: CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`) is how a run logs in where the fresh
+// HOME holds no login, as on macOS, whose login lives in the keychain.
 const DROP = [/^CLAUDE/, /^MAX_THINKING_TOKENS$/, /^(GH|GITHUB)_TOKEN$/, /^CLOUDSDK_/, /^SESSION_INGRESS/, /^FIGMA_/, /^GITLAB_/, /^DESIGN_SYSTEM_ENGINE_EVAL/];
+const KEEP_ENV = new Set(['CLAUDE_CODE_OAUTH_TOKEN']);
 export function childEnv(env, extra = {}) {
-  return { ...Object.fromEntries(Object.entries(env).filter(([k]) => !DROP.some((re) => re.test(k)))), ...extra };
+  return { ...Object.fromEntries(Object.entries(env).filter(([k]) => KEEP_ENV.has(k) || !DROP.some((re) => re.test(k)))), ...extra };
 }
 
 // A run that did not run: the API refused it (a usage limit, a 429, an overload) or it spent nothing and
@@ -124,7 +129,7 @@ export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTu
     // A run that installs its own Playwright must not clean up the machine's shared browsers (its garbage collection
     // removes every browser no installed copy links to, which leaves the scorer with no Chrome).
     const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
-    const child = spawn('claude', args, { cwd, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(CLAUDE, args, { cwd, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '', err = '', timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
     child.stdout.on('data', (d) => { out += d; });

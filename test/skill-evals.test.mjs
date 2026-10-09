@@ -182,8 +182,8 @@ test('a run the API refused is not a result', async () => {
 
 test('a run starts as a fresh user, not a child of the evaluating session', async () => {
   const { childEnv } = await import('./skill-evals/lib.mjs');
-  const env = childEnv({ PATH: '/bin', ANTHROPIC_BASE_URL: 'x', CLAUDE_CODE_SESSION_ID: 's', CLAUDECODE: '1', CLAUDE_EFFORT: 'high', MAX_THINKING_TOKENS: '9', GH_TOKEN: 't', FIGMA_TOKEN: 'f', DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT: '/p' }, { HOME: '/h' });
-  assert.deepEqual(env, { PATH: '/bin', ANTHROPIC_BASE_URL: 'x', HOME: '/h' });
+  const env = childEnv({ PATH: '/bin', ANTHROPIC_BASE_URL: 'x', CLAUDE_CODE_OAUTH_TOKEN: 'o', CLAUDE_CODE_SESSION_ID: 's', CLAUDECODE: '1', CLAUDE_EFFORT: 'high', MAX_THINKING_TOKENS: '9', GH_TOKEN: 't', FIGMA_TOKEN: 'f', DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT: '/p' }, { HOME: '/h' });
+  assert.deepEqual(env, { PATH: '/bin', ANTHROPIC_BASE_URL: 'x', CLAUDE_CODE_OAUTH_TOKEN: 'o', HOME: '/h' });
 });
 
 test('no CLI on PATH: a run by path that ends "not in parity" (exit 1) still counts as run', () => {

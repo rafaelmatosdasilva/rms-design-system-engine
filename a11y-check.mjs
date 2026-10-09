@@ -79,6 +79,7 @@ import { modeSwitch } from './code-capture.mjs';
 import { codeSnapshotPath, OUT_DIR } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
 import { WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from './wcag21.mjs';
+import { loadCategories, requirementEntry, noteKind, isRequirement } from './annotation-categories.mjs';
 import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
 
 // ── Pure, unit-testable core (exported; importing this module runs NOTHING) ─────
@@ -688,11 +689,15 @@ export function annotationFacts(annotations = []) {
 // part's role on a layer, a behaviour (Escape closes, arrow keys move, Enter and Space activate). Every note also reaches
 // the agents as design intent. entry: the component's snapshot entry ({ annotations, layerAnnotations }).
 // → [{ text, layer?, uses: [what it feeds], sc: [criteria] }]
-export function annotationUses(entry = {}) {
+// cats, cfg: the annotation categories (annotation-categories.mjs). A note in a design-intent category is no check's: it
+// is listed with its kind and no use, for the agents only.
+export function annotationUses(entry = {}, { cats = null, cfg = {} } = {}) {
   const out = [];
-  const one = (a, layer) => {
+  const one = (a, layer, nodeId) => {
     const text = String(a?.label ?? a?.labelMarkdown ?? '').trim();
     if (!text) return;
+    const kind = noteKind(a, nodeId, cats, cfg);
+    if (!isRequirement(a, nodeId, cats, cfg)) { out.push({ text, ...(layer ? { layer } : {}), uses: [], sc: [], kind }); return; }
     const f = annotationFacts([a]), uses = [], sc = [];
     if (f.part && layer) { uses.push(`the role of its "${layer}" part (${f.part}), checked in the browser`); sc.push('1.3.1'); }
     else if (f.part) { uses.push(`a part's role (${f.part}), checked once it sits on the layer of that part`); }
@@ -700,18 +705,20 @@ export function annotationUses(entry = {}) {
     if (f.name) { uses.push(`its spoken name ("${f.name}"), checked against what it renders`); sc.push('4.1.2', '1.1.1'); }
     if (f.level) { uses.push(`its heading level (${f.level}), checked against what it renders`); sc.push('1.3.1'); }
     for (const b of annotatedBehaviours([a])) { uses.push(`a behaviour (${b.says}), tried in the browser`); sc.push('2.1.1'); }
-    out.push({ text, ...(layer ? { layer } : {}), uses, sc: [...new Set(sc)] });
+    out.push({ text, ...(layer ? { layer } : {}), uses, sc: [...new Set(sc)], kind });
   };
-  for (const a of entry.annotations ?? []) one(a, null);
-  for (const l of entry.layerAnnotations ?? []) for (const a of l.annotations ?? []) one(a, l.layer);
+  for (const a of entry.annotations ?? []) one(a, null, entry.nodeId);
+  for (const l of entry.layerAnnotations ?? []) for (const a of l.annotations ?? []) one(a, l.layer, l.nodeId);
   return out;
 }
 export function annotationFactsFor(ROOT, cfg = {}) {
   let snap = {};
   try { snap = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { return {}; }
+  const cats = loadCategories(ROOT, cfg);   // a note in a design-intent category states nothing to check
   const out = {};
-  for (const [name, v] of Object.entries(snap)) {
-    if (name.startsWith('_') || !v || typeof v !== 'object') continue;
+  for (const [name, v0] of Object.entries(snap)) {
+    if (name.startsWith('_') || !v0 || typeof v0 !== 'object') continue;
+    const v = requirementEntry(v0, cats, cfg);
     const facts = annotationFacts(v.annotations ?? []);
     const layers = (v.layerAnnotations ?? []).map((l) => ({ layer: l.layer, facts: annotationFacts(l.annotations ?? []) })).filter((l) => Object.keys(l.facts).length);
     if (Object.keys(facts).length || layers.length) out[name] = { facts, layers };
@@ -752,6 +759,10 @@ export function makeStep(findings, unfinished, label) {
 
 // Chrome's accessibility tree names a few roles differently from ARIA.
 export const sameRole = (got, want) => got === want || (want === 'img' && got === 'image') || (want === 'textbox' && got === 'searchbox');
+// The same equivalences, to look a role up in Chrome's tree (Accessibility.queryAXTree) by the name an annotation uses.
+const AX_ROLE_ALIASES = { img: ['image'], textbox: ['searchbox'] };
+// The controls a wrapper can hold, for a note that names no role (a name, a heading level, a pressed state).
+const WRAPPED_CONTROL = 'button,input:not([type=hidden]),select,textarea,a[href],summary,[role]:not([role=presentation]):not([role=none]):not([role=group])';
 
 // What a role requires, checked on up to 20 rendered instances of a component (idea I39). Returns the
 // problems as short sentences. A toggle button is clicked to see aria-pressed change, then clicked
@@ -1465,14 +1476,39 @@ async function main() {
         if (!q?.nodeId) return null;
         let ax = (await send('Accessibility.getPartialAXTree', { nodeId: q.nodeId, fetchRelatives: false }, sessionId))?.nodes?.[0];
         if (!ax) return null;
-        // A plain wrapper (a div, a label around its input) is not the control: the role is read on the component's
-        // own control inside it, the first element there with a role of its own.
+        // A plain wrapper (a div, a label around its input) may hold the component's own control, but a control it holds
+        // is not always the component (a card is not the link inside it, a dialog's wrapper is not its Close button).
         if (/^(generic|none|labeltext|group|section|presentation)$/i.test(String(ax.role?.value ?? '')) || ax.ignored) {
-          // The role the annotation names first (a stepper's spinbutton, not its first step button), else the first control.
-          const wanted = want ? `[role="${want}"],${want === 'textbox' ? 'input:not([type]),input[type=text],input[type=email],input[type=search],textarea,' : ''}${want === 'spinbutton' ? 'input[type=number],' : ''}${want === 'button' ? 'button,' : ''}` : '';
-          let inner = wanted ? await send('DOM.querySelector', { nodeId: q.nodeId, selector: wanted.replace(/,$/, '') }, sessionId).catch(() => null) : null;
-          if (!inner?.nodeId) inner = await send('DOM.querySelector', { nodeId: q.nodeId, selector: 'button,input,select,textarea,a[href],summary,[role]:not([role=presentation]):not([role=none]):not([role=group])' }, sessionId).catch(() => null);
-          const ix = inner?.nodeId ? (await send('Accessibility.getPartialAXTree', { nodeId: inner.nodeId, fetchRelatives: false }, sessionId))?.nodes?.[0] : null;
+          let ix = null;
+          if (want) {
+            // The role the annotation names, looked for by the role the browser gives each element inside (a native
+            // <dialog>, <a href>, <li> or <input type=number> counts, not only a role attribute). When nothing inside
+            // has it, the wrapper's own role is the answer.
+            for (const role of [want, ...(AX_ROLE_ALIASES[want] ?? [])]) {
+              const found = (await send('Accessibility.queryAXTree', { nodeId: q.nodeId, role }, sessionId).catch(() => null))?.nodes ?? [];
+              ix = found.find((n) => !n.ignored) ?? null;
+              if (ix) break;
+            }
+            // A subtree the tree leaves out (a harness host it ignores) has no computed roles to search: the element
+            // that declares the role, or its native equivalent, is read on its own.
+            if (!ix) {
+              const wanted = `[role="${want}"]${{ textbox: ',input:not([type]),input[type=text],input[type=email],input[type=search],textarea', spinbutton: ',input[type=number]', button: ',button' }[want] ?? ''}`;
+              const inner = await send('DOM.querySelector', { nodeId: q.nodeId, selector: wanted }, sessionId).catch(() => null);
+              if (inner?.nodeId) ix = (await send('Accessibility.getPartialAXTree', { nodeId: inner.nodeId, fetchRelatives: false }, sessionId))?.nodes?.[0] ?? null;
+            }
+          } else {
+            // No role named (a name, a heading level, a pressed state): the one control it wraps, when it wraps exactly
+            // one. A control inside another (an icon's role inside its button) is not counted; a container of several
+            // controls is read as itself.
+            const obj = await send('DOM.resolveNode', { nodeId: q.nodeId }, sessionId).catch(() => null);
+            const one = obj?.object?.objectId ? await send('Runtime.callFunctionOn', { objectId: obj.object.objectId, returnByValue: true, arguments: [{ value: WRAPPED_CONTROL }],
+              functionDeclaration: 'function (sel) { const all = [...this.querySelectorAll(sel)]; const top = all.filter((el) => !all.some((o) => o !== el && o.contains(el))); return top.length === 1 ? all.indexOf(top[0]) : -1; }' }, sessionId).catch(() => null) : null;
+            const at = one?.result?.value;
+            if (Number.isInteger(at) && at >= 0) {
+              const id = (await send('DOM.querySelectorAll', { nodeId: q.nodeId, selector: WRAPPED_CONTROL }, sessionId).catch(() => null))?.nodeIds?.[at];
+              if (id) ix = (await send('Accessibility.getPartialAXTree', { nodeId: id, fetchRelatives: false }, sessionId))?.nodes?.[0] ?? null;
+            }
+          }
           if (ix && !/^(generic|none)$/i.test(String(ix.role?.value ?? ''))) ax = ix;
         }
         const prop = (n) => ax.properties?.find((p) => p.name === n)?.value?.value;
@@ -1512,12 +1548,14 @@ async function main() {
       // engine's style guide, which draws markup only, they are listed as not checked.
       let snap = {};
       try { snap = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { /* no annotations */ }
+      // Only the notes that are requirements: a note in a design-intent category (Intent, Implementation…) asks nothing.
+      const cats = loadCategories(ROOT, cfg);
       let authored = {};
       try { authored = JSON.parse(readFileSync(resolve(ROOT, cfg.contracts?.authored ?? 'contract.authored.json'), 'utf8'))?.components ?? {}; } catch { /* none */ }
       let contract = {};
       try { contract = (await import(pathToFileURL(resolve(ROOT, cfg.paths?.structureContract ?? 'structure-contract.mjs')).href)).CONTRACT ?? {}; } catch { /* parts are optional */ }
       const roles = Object.fromEntries(Object.entries(contractSemantics(ROOT, cfg)).map(([c, r]) => [c, r]));
-      for (const [c, v] of Object.entries(snap)) { const w = !c.startsWith('_') && roleWordOf(v?.annotations ?? []); if (w) roles[c] = w; }   // the role as Figma writes it (togglebutton, disclosure)
+      for (const [c, v] of Object.entries(snap)) { const w = !c.startsWith('_') && roleWordOf(requirementEntry(v, cats, cfg)?.annotations ?? []); if (w) roles[c] = w; }   // the role as Figma writes it (togglebutton, disclosure)
       // States follow their props: on the style guide, each option's effect is in its data (the code's selector for it).
       if (target.styleguide) {
         const sg = await evalv(`(() => { try { return JSON.parse(document.getElementById('sg-data').textContent).components || []; } catch (e) { return []; } })()`);
@@ -1532,7 +1570,7 @@ async function main() {
         if (components.length && !components.includes(comp)) continue;
         const sel = selOf(comp);
         if (!sel) continue;
-        const entry = snap[comp] ?? {};
+        const entry = requirementEntry(snap[comp] ?? {}, cats, cfg);
         for (const { layer, part } of partRolesOf(entry)) {
           const partSel = (contract[comp]?.children ?? []).find((c) => String(c.name ?? '').toLowerCase() === String(layer).toLowerCase())?.cssSelector ?? null;
           for (const problem of (await evalv(partRoleExpression(sel, partSel, layer, part))) ?? []) findings.push({ kind: 'partrole', plugin: label, desc: `${comp}: ${problem}` });
