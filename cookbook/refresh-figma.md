@@ -515,6 +515,9 @@ async function deepFacts(node, set) {
       lineHeight: lh && lh !== figma.mixed ? (lh.unit === 'AUTO' ? { unit: 'AUTO' } : { unit: lh.unit, value: n(lh.value) }) : null,
       letterSpacing: ls && ls !== figma.mixed ? { unit: ls.unit, value: n(ls.value) } : null,
       textCase: text.textCase !== figma.mixed ? text.textCase : null,
+      textDecoration: text.textDecoration !== figma.mixed ? text.textDecoration : null,
+      italic: fn && fn !== figma.mixed ? /italic|oblique/i.test(fn.style) : null,
+      textAlign: text.textAlignHorizontal,
     };
   }
   // Which layers each boolean property shows or hides.

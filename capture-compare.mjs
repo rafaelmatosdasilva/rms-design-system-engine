@@ -403,6 +403,19 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       if (f.text.textCase && CASE[f.text.textCase] && fp.textTransform) {
         settle(String(fp.textTransform.value) === CASE[f.text.textCase], { component: name, field: 'text case', figma: CASE[f.text.textCase], code: fp.textTransform.value, rule: fp.textTransform.rule, at: fp.textTransform.at });
       }
+      // Decoration, italic and alignment of the first text (a capture from before they were read has none: not compared).
+      const DECO = { UNDERLINE: 'underline', STRIKETHROUGH: 'line-through', NONE: 'none' };
+      const td = fp.textDecorationLine;
+      if (DECO[f.text.textDecoration] && td) {
+        const lines = String(td.value).split(/\s+/);
+        settle(f.text.textDecoration === 'NONE' ? lines.every((l) => l === 'none') : lines.includes(DECO[f.text.textDecoration]), { component: name, field: 'text decoration', figma: DECO[f.text.textDecoration], code: td.value, rule: td.rule, at: td.at });
+      }
+      const fst = fp.fontStyle;
+      if (typeof f.text.italic === 'boolean' && fst) settle(f.text.italic === /^(italic|oblique)/.test(String(fst.value)), { component: name, field: 'italic', figma: f.text.italic ? 'italic' : 'normal', code: fst.value, rule: fst.rule, at: fst.at });
+      // Left is where a left-to-right page starts; justified is justify.
+      const ALIGN = { LEFT: ['left', 'start', '-webkit-left'], CENTER: ['center', '-webkit-center'], RIGHT: ['right', 'end', '-webkit-right'], JUSTIFIED: ['justify'] };
+      const ta = fp.textAlign;
+      if (ALIGN[f.text.textAlign] && ta) settle(ALIGN[f.text.textAlign].includes(String(ta.value).trim()), { component: name, field: 'text alignment', figma: f.text.textAlign === 'JUSTIFIED' ? 'justify' : f.text.textAlign.toLowerCase(), code: ta.value, rule: ta.rule, at: ta.at });
     }
 
     // Per state: height, stroke and opacity Figma records for each variant, against the state the
