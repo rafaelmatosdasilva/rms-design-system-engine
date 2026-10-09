@@ -342,3 +342,14 @@ test('colours: a text part that sets its own colour is compared in dark mode too
   const r = compareComponents(code, structure, vars, cfg, maps());
   assert.deepEqual(r.differ.map((d) => d.field), ['text colour [dark]']);
 });
+
+// B2: a mode the code draws but Figma has no value for is said (not comparable, with why), never skipped silently.
+test('colours: a mode Figma has no value for is counted as not comparable, with why', () => {
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, fill: 'direct', props: { backgroundColor: { value: 'rgb(255, 255, 255)', confidence: 'verified' } },
+    colors: { light: { backgroundColor: 'rgb(255, 255, 255)' }, contrast: { backgroundColor: 'rgb(0, 0, 0)' } } } } };
+  const structure = { chip: { fillStructure: 'direct', colors: { fill: { token: 'chip/bg/color', hex: '#ffffff', opacity: 1 } } } };
+  const vars = { color: { light: { 'chip/bg/color': '#ffffff' } } };
+  const r = compareComponents(code, structure, vars, cfg, maps());
+  assert.deepEqual(r.differ, []);
+  assert.deepEqual(r.notComparable.map((n) => [n.field, n.why]), [['background [contrast]', 'Figma has no value for this mode']]);
+});
