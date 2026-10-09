@@ -67,6 +67,9 @@ export const RENDERED_ASSERTIONS = [
   // { plugin: 'my-plugin', selector: 'button.listRow', prop: 'columnGap', expected: '4px',
   //   forcePseudo: ['hover'], probe: '<button class="listRow">Item</button>',
   //   note: 'gap unchanged on hover - label must not move' },
+  // figmaVar: a colour taken from its Figma variable in the entry's mode, never typed (it cannot go stale):
+  // { plugin: 'my-plugin', selector: '#search', prop: 'borderTopColor', figmaVar: 'input/border/default',
+  //   colorScheme: 'dark' },
 ];
 
 // ─── Plugin overrides of DS base classes (Gate [9] second check) ──────────────

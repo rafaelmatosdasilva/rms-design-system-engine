@@ -39,6 +39,10 @@ export const TRACE = {
   borderBottomWidth: ['border-bottom-width', 'border-bottom', 'border-width', 'border-block-end', 'border'],
   borderLeftWidth: ['border-left-width', 'border-left', 'border-width', 'border-inline-start', 'border'],
   borderTopColor: ['border-top-color', 'border-top', 'border-color', 'border'],
+  // Every side's colour: a stroke Figma draws on one side only (a bottom rule) is read on that side.
+  borderRightColor: ['border-right-color', 'border-right', 'border-color', 'border'],
+  borderBottomColor: ['border-bottom-color', 'border-bottom', 'border-color', 'border'],
+  borderLeftColor: ['border-left-color', 'border-left', 'border-color', 'border'],
   fontSize: ['font-size', 'font'],
   fontWeight: ['font-weight', 'font'],
   lineHeight: ['line-height', 'font'],
@@ -52,13 +56,13 @@ export const TRACE = {
   boxShadow: ['box-shadow'],   // an inside stroke can be drawn as an inset ring
 };
 const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'boxSizing', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
-const COLOR_PROPS = new Set(['color', 'backgroundColor', 'borderTopColor']);
+const COLOR_PROPS = new Set(['color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor']);
 const GUARD_PROPS = ['color', 'backgroundColor', 'borderTopColor', 'opacity'];
 const BREAKPOINT_PROPS = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'columnGap', 'rowGap', 'borderTopLeftRadius', 'fontSize', 'lineHeight'];
 const INHERITED = new Set(['color', 'fontSize', 'fontWeight', 'lineHeight', 'fontFamily', 'letterSpacing', 'textTransform']);
 
 // Which slot of a box shorthand a property reads (1 to 4 values: top right bottom left).
-const BOX_SIDE = { paddingTop: 0, paddingRight: 1, paddingBottom: 2, paddingLeft: 3, borderTopWidth: 0, borderRightWidth: 1, borderBottomWidth: 2, borderLeftWidth: 3, borderTopColor: 0 };
+const BOX_SIDE = { paddingTop: 0, paddingRight: 1, paddingBottom: 2, paddingLeft: 3, borderTopWidth: 0, borderRightWidth: 1, borderBottomWidth: 2, borderLeftWidth: 3, borderTopColor: 0, borderRightColor: 1, borderBottomColor: 2, borderLeftColor: 3 };
 export function splitTop(value) {
   const out = []; let depth = 0, cur = '';
   for (const ch of String(value).trim()) {
@@ -208,9 +212,11 @@ function locateExpression(specs) {
       // A text field's text is its <input> or <textarea> value, not a text node: that element is the text part.
       const field = el.matches('input,textarea') ? el : el.querySelector('input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=range]),textarea');
       if (field) { field.setAttribute('data-design-system-engine-part', ((field.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; }
+      // Only text that is drawn: a visually hidden label (clipped to a pixel) or a hidden span is not the text Figma shows.
+      const drawn = (e) => { const r = e.getBoundingClientRect(), st = getComputedStyle(e); return r.width > 1 && r.height > 1 && st.visibility !== 'hidden' && st.opacity !== '0'; };
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       for (let t = field ? null : walker.nextNode(); t; t = walker.nextNode()) {
-        if (t.textContent.trim() && t.parentElement) { t.parentElement.setAttribute('data-design-system-engine-part', ((t.parentElement.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; break; }
+        if (t.textContent.trim() && t.parentElement && drawn(t.parentElement)) { t.parentElement.setAttribute('data-design-system-engine-part', ((t.parentElement.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; break; }
       }
       return { i, how, count, stripped, parts, hasText: !!(el.textContent.trim() || field) };
     });
@@ -549,7 +555,8 @@ export async function captureComponents(ctx) {
         if (prop === 'height' && agree === false && (toPx(base?.cs?.minHeight) === toPx(value) || toPx(base?.cs?.maxHeight) === toPx(value))) { agree = true; fact.declared = s.value; fact.note = `${toPx(base?.cs?.minHeight) === toPx(value) ? 'min-height' : 'max-height'} wins over the declared height`; }
         // Agree → verified; disagree → uncertain (a reading problem, never a design difference);
         // not comparable → single-source. Where the value is located is a separate question.
-        if (agree === null) { fact.confidence = 'single-source'; fact.why = 'the two readings are not comparable'; }
+        // A size the CSS gives relative to the page (width: 100%) is kept as written: the page draws it, not the component.
+        if (agree === null) { fact.confidence = 'single-source'; fact.why = 'the two readings are not comparable'; if (/^(width|height)$/.test(prop)) fact.declared ??= s.value; }
         else if (agree) fact.confidence = 'verified';
         else { fact.confidence = 'uncertain'; fact.readings = { browser: value, static: s.value, staticAt: s.at }; }
         // Point at the source, not the built page (which may inline and minify it); keep both.

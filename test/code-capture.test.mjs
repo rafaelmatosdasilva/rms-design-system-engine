@@ -353,3 +353,22 @@ test("the project's own style guide page is opened with ?all, so its shrunken ca
   const src = (await import('node:fs')).readFileSync(new URL('../code-capture.mjs', import.meta.url), 'utf8');
   assert.equal((src.match(/label === 'styleguide' \? '\?all' : ''/g) ?? []).length, 2);
 });
+
+// E10: every side's border colour, a width the page gives as written, and only text that is drawn.
+browserTest('components: a bottom border\'s own colour, a relative width as written, and the first text drawn', async () => {
+  const theme = `.rule { display: block; width: 100%; border: 0; border-bottom: 1px solid #c80000; color: #111111; }
+.sw { display: inline-flex; gap: 4px; }
+.sw .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); font-size: 30px; }
+.sw .label { font-size: 12px; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body>
+    <div class="rule"></div>
+    <label class="sw"><span class="sr">Hidden name</span><span class="label">On</span></label>
+  </body></html>`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'struct.json': { components: { rule: {}, sw: {} } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const rule = snapshot.components.rule;
+  assert.equal(rule.props.borderBottomColor.value, 'rgb(200, 0, 0)');
+  assert.equal(rule.props.width.declared, '100%');
+  assert.equal(snapshot.components.sw.parts.text.props.fontSize.value, '12px');   // the drawn label, not the clipped name
+});

@@ -672,6 +672,25 @@ test('parity, one table: every prop, variable and value, Figma beside code, with
   assert.deepEqual([rows[5].figma.value, rows[5].code.value], ['Light #111111', 'Light #222222']);
 });
 
+// E9: a Figma variable the token check found under another heading is paired with its CSS variable, never listed twice.
+test('parity: a variable the token check found but did not compare is one row with both names', async () => {
+  const { parityRows } = await import('../styleguide-data.mjs');
+  const rows = parityRows({ name: 'highlight',
+    allTokens: [{ var: '--highlight-background', figma: null }, { var: '--highlight-text', figma: null }, { var: '--highlight-extra', figma: null }],
+    check: { passVars: [], fail: [],
+      skip: [{ token: 'highlight/background', cssVar: '--highlight-background', mode: 'Light', reason: 'declared outside :root (component-scoped) - not compared by this gate' }, { token: 'highlight/border', reason: 'no dedicated CSS var' }],
+      pendingFigmaSync: [{ token: 'highlight/text/color', cssVar: '--highlight-text', mode: 'Light', consumerFigma: '#111111', css: '#222222' }] },
+    checkedAt: '2026-10-06T07:00:00Z' });
+  assert.deepEqual(rows.map((r) => [r.figma?.name ?? '-', r.code?.name ?? '-', r.status]), [
+    ['highlight/background', '--highlight-background', 'paired'],
+    ['highlight/text', '--highlight-text', 'differs'],
+    ['-', '--highlight-extra', 'code'],
+    ['highlight/border', '-', 'figma'],
+  ]);
+  assert.match(rows[0].why, /component-scoped/);
+  assert.deepEqual([rows[1].figma.value, rows[1].code.value], ['Light #111111', 'Light #222222']);
+});
+
 test('parity, what goes inside: a slot or swap in an HTML and CSS system is the markup\'s content; the code\'s props as a list', async () => {
   const { parityRows } = await import('../styleguide-data.mjs');
   const props = { 'Main Content#1:0': { type: 'SLOT' }, 'Icon Content#2:0': { type: 'INSTANCE_SWAP' }, 'Badge#3:0': { type: 'BOOLEAN', defaultValue: false } };

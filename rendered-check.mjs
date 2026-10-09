@@ -19,7 +19,9 @@
 //       prop: 'height', expected: '32px', note: 'DS toast success state' },
 //   ];
 // prop is a camelCase computed-style key (height, paddingLeft, columnGap, minHeight…).
-// expected is compared as an exact string against getComputedStyle(el)[prop].
+// expected is compared as an exact string against getComputedStyle(el)[prop] (a colour by its value: #adadad is
+// rgb(173, 173, 173)). figmaVar: 'input/border/default' instead of expected takes the colour from that Figma variable
+// in the assertion's mode, so it never goes stale.
 // pseudo: '::before' or '::after' reads that layer instead (a component that draws its background or
 // its lines as their own layers, as Figma does): getComputedStyle(el, pseudo)[prop].
 //
@@ -31,6 +33,8 @@ import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from './cdp.mjs';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
+import { expandFigmaVars, renderedMatches } from './rendered-expect.mjs';
+import { loadModes } from './mode-resolver.mjs';
 
 const ROOT = process.cwd();
 
@@ -155,6 +159,16 @@ try {
   }
   ASSERTIONS = expanded;
 } catch { /* vars snapshot optional - textStyle assertions simply won't resolve */ }
+
+// DS-sourced colours: an assertion with `figmaVar: '<figma path>'` takes its expected colour from that Figma variable in
+// its mode (colorScheme), so a colour typed into the contract never goes stale when the variable changes.
+{
+  let color = {};
+  try { color = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')).color ?? {}; } catch { /* no snapshot: figmaVar assertions are skipped, said below */ }
+  const { assertions, skipped } = expandFigmaVars(ASSERTIONS, color, loadModes(cfg), cfg.rendered?.colorScheme ?? 'light');
+  ASSERTIONS = assertions;
+  for (const why of skipped) console.log(`⚠️  [16] ${why} - assertion skipped`);
+}
 
 // ── Auto-generate assertions from the snapshots (opt-in: rendered.auto) ───────
 // So you don't hand-type expected values. For every component that has a fixed
@@ -299,7 +313,7 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
   asserts.forEach((a, i) => {
     if (a.forcePseudo) return; // handled below via CSS.forcePseudoState
     const label = `${plugin} ${a.selector}${a.pseudo ?? ''} → ${a.prop}`;
-    if (got[i] === a.expected) PASS.push(label);
+    if (renderedMatches(got[i], a.expected)) PASS.push(label);
     else FAIL.push(`${label}: rendered "${got[i]}" ≠ expected "${a.expected}"${a.note ? `  [${a.note}]` : ''}`);
   });
 
@@ -355,7 +369,7 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
       }, sessionId);
       await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] }, sessionId);
       const val = pr.result.value;
-      if (val === a.expected) PASS.push(label);
+      if (renderedMatches(val, a.expected)) PASS.push(label);
       else FAIL.push(`${label}: rendered "${val}" ≠ expected "${a.expected}"${a.note ? `  [${a.note}]` : ''}`);
     }
   }

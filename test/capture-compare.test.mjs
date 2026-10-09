@@ -276,3 +276,31 @@ test('components: the fill\'s own opacity in Figma against the alpha the code pa
   const line = measuredLine(compareComponents(tag(0.12, 0.08), structure, {}, cfg, maps()).differ.find((x) => x.field === 'background opacity'));
   assert.match(line, /→ paint the background at 8%, as Figma's layer: color-mix\(in srgb, var\(--tag-bg\) 8%, transparent\)$/);
 });
+
+// E10: deeper facts read on the right side, the component's own width, and one radius however many corners set it.
+test('components: a bottom-only stroke is read on its bottom, never through the top', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.rule' });
+  const code = { components: { rule: { confidence: 'high', instance: { hasText: false },
+    props: { borderTopWidth: v('0px'), borderRightWidth: v('0px'), borderBottomWidth: v('1px'), borderLeftWidth: v('0px'), borderTopColor: v('rgb(0, 0, 0)'), borderBottomColor: v('rgb(200, 0, 0)'), backgroundColor: v('rgb(255, 255, 255)') },
+    colors: { light: { borderTopColor: 'rgb(0, 0, 0)', borderBottomColor: 'rgb(200, 0, 0)', backgroundColor: 'rgb(255, 255, 255)' } } } } };
+  const structure = { rule: { strokeOnDefault: true, stroke: { weights: [0, 0, 1, 0] }, colors: { stroke: { token: 'line/color', hex: '#c80000', opacity: 1 } } } };
+  const r = compareComponents(code, structure, { color: { light: { 'line/color': '#c80000' } } }, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => d.field), [], JSON.stringify(r.differ));
+});
+
+test('components: a width the page gives (width: 100%) is not the component\'s to compare', () => {
+  const code = { components: { divider: { confidence: 'high', instance: { hasText: false }, size: { width: 600 },
+    props: { width: { value: '600px', declared: '100%', confidence: 'single-source', rule: '.divider' } } } } };
+  const r = compareComponents(code, { divider: { box: { width: 240, sizing: { h: 'FIXED' } } } }, {}, cfg, maps());
+  assert.deepEqual(r.differ, []);
+  assert.match(r.notComparable.find((n) => n.field === 'width').why, /follows its container \(100%\)/);
+});
+
+test('variants: a radius set on every corner is one difference, not four', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.tab' });
+  const corners = (px) => Object.fromEntries(['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'].map((k) => [k, v(px)]));
+  const code = { components: { tab: { confidence: 'high', instance: { hasText: true }, props: corners('4px'), states: { 'State=Selected': { changed: corners('4px') } } } } };
+  const structure = { tab: { defaultVariant: 'State=Default', variants: { 'State=Default': { radiusPx: [4, 4, 4, 4] }, 'State=Selected': { radiusPx: [8, 8, 8, 8] } } } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => `${d.field}: ${d.figma} / ${d.code}`), ['radius (State=Selected): 8 / 4px']);
+});
