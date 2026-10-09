@@ -59,5 +59,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-06-prototypes-flip-toggles-and-show` | The 21 guide tasks on Haiku (engine 7554a8c) | "Style guide: tokens table back, card tables with a Source column and named parts; prototypes flip toggles; 320 pixels" |
 | `2026-10-07-paint-facts-a-fill-s` | The 21 guide tasks on Haiku (engine ad30b5f) | "Paint facts: a fill's opacity compared; contrast pairs follow what Figma draws" |
 | `2026-10-07-figma-refresh-deeper-facts-every` | The 21 guide tasks on Haiku (engine 05fd813) | "Figma refresh: deeper facts every time; a fill on a covering child counts" |
+| `2026-10-08-annotation-categories-roles-on-component` | The 21 guide tasks on Haiku (engine 67f75ee) | "Annotation categories; roles read on the component; a role the code fails is Claude's" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
