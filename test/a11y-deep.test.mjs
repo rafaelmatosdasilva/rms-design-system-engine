@@ -507,6 +507,8 @@ test('annotations on the style guide: read in the component\'s own section; pres
     <section id="c-tile"><div class="pg-preview"><div class="tile" role="article"><p>Story</p></div></div></section>
     <section id="c-act"><div class="pg-preview"><div class="act"><button>Go</button></div></div></section>
     <section id="c-veil"><div class="pg-preview"><div class="veil" role="presentation"></div></div></section>
+    <section id="c-scrim"><div class="pg-preview"><div class="scrim"></div></div></section>
+    <section id="c-ghost"><div class="pg-preview"><span class="ghost" data-sg-standin="">Ghost</span></div></section>
   </main></body></html>`;
   const dir = makeFixture({
     'sg/index.html': page,
@@ -514,13 +516,17 @@ test('annotations on the style guide: read in the component\'s own section; pres
       tile: { nodeId: '1:1', annotations: [{ label: 'Role: article' }] },
       act: { nodeId: '1:2', annotations: [{ label: 'Role: button' }] },
       veil: { nodeId: '1:3', annotations: [{ label: 'Role: presentation' }] },
+      scrim: { nodeId: '1:4', annotations: [{ label: 'Role: presentation' }] },
+      ghost: { nodeId: '1:5', annotations: [{ label: 'Role: group' }] },
     },
-    'ds-config.json': { styleguide: { out: 'sg/index.html' }, componentSelectors: { tile: '.tile', act: '.act', veil: '.veil' } },
+    'ds-config.json': { styleguide: { out: 'sg/index.html' }, componentSelectors: { tile: '.tile', act: '.act', veil: '.veil', scrim: '.scrim', ghost: '.ghost' } },
   });
   let out = '';
   try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   assert.equal(d.usedStyleguide, true, out);
-  assert.deepEqual(d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector), [], out);
+  // A plain element with no role (generic) holds no meaning, as presentation asks; a component the code has no markup
+  // for is drawn as a stand-in, and its role is said not checked, never read on the stand-in.
+  assert.deepEqual(d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector), ['ghost: not checked, the code has no markup for it (the style guide draws a stand-in)'], out);
 });

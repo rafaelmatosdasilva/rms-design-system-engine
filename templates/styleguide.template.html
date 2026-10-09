@@ -1153,6 +1153,8 @@ a.pg-usage-name { color: var(--sg-text); }
       case 'link': e = document.createElement('a'); e.href = '#'; break;
       default: e = document.createElement('span');
     }
+    // A stand-in, not the code's markup: the accessibility check says it is not checked instead of reading it.
+    e.setAttribute('data-sg-standin', '');
     if (c.cls) e.classList.add(clsName(c));
     // Its name as the words only when no text prop fills it.
     if (e.tagName !== 'INPUT' && !(c.controls || []).some(function (k) { return k.type === 'TEXT'; })) e.textContent = c.name.charAt(0).toUpperCase() + c.name.slice(1);
