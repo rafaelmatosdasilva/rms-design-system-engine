@@ -23,9 +23,9 @@
 
 import { usedClasses } from './class-use.mjs';
 import { appDir } from './code-roots.mjs';
-import { codeSizeCSS, modeRootCSS } from './styleguide-data.mjs';
+import { codeSizeCSS, modeRootCSS, scopeView } from './styleguide-data.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
-import { join, dirname, resolve, relative } from 'path';
+import { join, dirname, resolve, relative, basename } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import { OUT_DIR } from './names.mjs';
@@ -167,7 +167,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const projectOut = resolve(ROOT, sh.out || (engineTemplate ? `${OUT_DIR}/styleguide/index.html` : 'apps/styleguide/index.html'));
   // opts.out writes the page somewhere else (the code capture keeps a private copy in .design-system-engine-out);
   // a <base> then keeps the template's relative links pointing where the project's page would be.
-  const outPath = opts.out ? resolve(ROOT, opts.out) : projectOut;
+  // A page for some components only (opts.only) goes beside the whole system's, named after them, so neither replaces the other.
+  const outPath = opts.out ? resolve(ROOT, opts.out) : opts.only?.length ? join(dirname(projectOut), `${opts.only.map((n) => String(n).replace(/[^\w-]+/g, '-')).join('+')}.html`) : projectOut;
   if (!existsSync(templatePath)) throw new Error('styleguide template not found: ' + templatePath);
   let html = readFileSync(templatePath, 'utf8');
   if (opts.out && outPath !== projectOut) {
@@ -298,6 +299,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // A component the pages do not show: the markup its own source renders, as the code capture draws it (what a React
     // component returns, a Vue component's template).
     const jsx = {};
+    const fileOf = {};   // each component's own file, read for the components it nests (a scoped page, E27)
     // The components the code has that Figma does not list (every one, before Figma's data is captured): each with its
     // file, the props its code declares and the markup its source renders (codeComponents, E26).
     const codeOnly = [];
@@ -312,7 +314,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const name of drawNames) {
         if (name.startsWith('_')) continue;
         const { file } = resolveComponentFile(name, { ROOT, cfg, files, read, classFor: locator.classFor });
-        if (file) covered.add(resolve(file));
+        if (file) { covered.add(resolve(file)); fileOf[name] = file; }
         if (probes[name] || !file || !/\.(jsx|tsx|js|vue)$/.test(file)) continue;
         const m = sourceMarkup(file, locator.classFor(name));
         if (m) jsx[name] = m;
@@ -326,6 +328,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const api = textComponentApi(abs, read(abs));
         const props = Object.entries(api?.props ?? {}).map(([prop, d]) => ({ name: prop, ...(d.default != null ? { default: String(d.default) } : {}), ...(d.options ? { options: [...d.options] } : {}), ...(d.required ? { required: true } : {}) }));
         codeOnly.push({ ...k, props, markup: sourceMarkup(abs, k.cls), from: /\.vue$/.test(k.file) ? 'vue' : 'jsx' });
+        fileOf[k.name] = abs;
       }
     } catch { /* no component sources */ }
     // The token check's own result: each token equal to Figma, with its CSS variable. Run it, read it, tidy up.
@@ -355,6 +358,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // An option heard on a part (heardOn: the field disabled inside its wrapper), set with the option's look.
       heardOn: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.heardOn).flatMap(([n, c]) => [[n, c.heardOn], ...(c.figmaName && c.figmaName !== n ? [[c.figmaName, c.heardOn]] : [])])),
       parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
+    // opts.only: a page for the components asked for and the ones they nest, each nested one followed in turn (E27).
+    // Everything after this reads, measures and dates only those; the page's own controls still come from the whole
+    // system (view.ui), so it looks as the full page does.
+    if (opts.only?.length) {
+      const { nestedComponents } = await import('./styleguide-data.mjs');
+      Object.defineProperty(view, 'allComponents', { value: view.components, enumerable: false });   // not written to the page
+      const tags = Object.fromEntries(Object.entries(fileOf).map(([n, f]) => [n, [basename(f).replace(/\.\w+$/, '')]]));   // HbBadge.vue → <HbBadge>
+      Object.assign(view, scopeView(view.components, opts.only, (c, names) => nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text: fileOf[c.name] ? readText(fileOf[c.name]) : '', names, tags })));
+    }
     // "In use": the approved pictures of the system's own frames (Gate [2]'s references), embedded, six at most.
     const refsDir = resolve(ROOT, cfg.visualRefs ?? '.design-system-engine-refs');
     view.screens = (cfg.frames ?? []).filter((f) => f?.nodeId).map((f) => ({ f, file: join(refsDir, `${String(f.nodeId).replace(/[:\/]/g, '-')}.png`) }))
@@ -605,7 +617,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       .map(([id, i]) => [id, { name: i.name ?? '', size: Number(String(i.viewBox ?? '').split(/[\s,]+/)[2]) || null }]));
     // Each control the page needs is the system's own; where it has none, its nearest stand-in (a segmented control:
     // tabs, then a radio group, then its buttons side by side), and the page says so (view.ui.gaps).
-    view.ui = { segmented: segmentedUi(view.components) ?? radioGroupUi(view.components, systemCss) ?? buttonsAsSegmentedUi(view.components, systemCss), tabs: tabsUi(view.components), field: fieldUi(view.components, systemCss), button: buttonUi(view.components, systemCss, sh.ui?.button ?? null), card: cardUi(view.components, systemCss), iconButton: iconButtonUi(view.components, systemCss), overlay: view.components.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
+    const every = view.allComponents ?? view.components;
+    view.ui = { segmented: segmentedUi(every) ?? radioGroupUi(every, systemCss) ?? buttonsAsSegmentedUi(every, systemCss), tabs: tabsUi(every), field: fieldUi(every, systemCss), button: buttonUi(every, systemCss, sh.ui?.button ?? null), card: cardUi(every, systemCss), iconButton: iconButtonUi(every, systemCss), overlay: every.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
     view.ui.gaps = standInGaps(view.ui);
     // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
@@ -617,6 +630,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const agreedRec = loadAgreed(ROOT);
       const census = readJson(join(OUT_DIR, 'census.json'))?.components ?? {};
       const names = view.components.map((c) => ({ name: c.name, cls: c.cls }));
+      const fileTags = Object.fromEntries(Object.entries(fileOf).map(([n, f]) => [n, [basename(f).replace(/\.\w+$/, '')]]));
       // the package a file belongs to (a package.json between it and the project root, the root's own not counted)
       const pkgOf = (file) => {
         for (let d = dirname(file); d && d !== '.' && d !== '/'; d = dirname(d)) {
@@ -648,7 +662,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
         c.parity.rows = parityRows({ name: c.name, propsSnap, controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], codeProps: c.api?.props ?? {}, allTokens: c.allTokens ?? [], check, agreed: agreedRec, propsAt: propsSnap._updated ?? null, checkedAt, slotParts: (c.anatomy ?? []).filter((x) => x.slot) });
         const text = c.api?.file ? readText(c.api.file) : '';
-        const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names });
+        const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names, tags: fileTags });
         if (uses.length) c.uses = uses;
         if (c.api?.tag) {
           const imp = importOf({ tag: c.api.tag, syntax: c.api.syntax, file: c.api.file, text, pkg: pkgOf(c.api.file), template: cfg.styleguide?.importFrom ?? null });
@@ -777,7 +791,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       } catch { /* no pictures: the cards show the names */ }
     }
     lastView = view;
-    agreedSummary = { components: view.components.length, codeOnly: view.codeOnly ?? 0, line: view.notAgreed.line };
+    agreedSummary = { components: view.components.length, codeOnly: view.codeOnly ?? 0, line: view.notAgreed.line, ...(view.scope ? { scope: view.scope } : {}) };
     return JSON.stringify(view).replace(/</g, '\\u003c');
   }
   // The component rules outside the theme files: compiled component CSS and each component's own stylesheet.
@@ -802,7 +816,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const count = {}; for (const b of boxes) count[b] = (count[b] ?? 0) + 1;
     const size = Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0];
     const sysCss = themeFiles.map(readText).join('\n');
-    chrome = chromeRoles({ tokens: lastView.tokens, themeCss: sysCss, componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome, card: cardUi(lastView.components ?? [], sysCss) });
+    chrome = chromeRoles({ tokens: lastView.tokens, themeCss: sysCss, componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome, card: cardUi(lastView.allComponents ?? lastView.components ?? [], sysCss) });
     // The page's own contrast in every mode, for the style guide check to read from the page.
     return chrome.css + (chrome.contrast?.length ? `\n/*sg-contrast:${JSON.stringify(chrome.contrast)}*/` : '');
   }
@@ -846,5 +860,5 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
 
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html);
-  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
+  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
 }

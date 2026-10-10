@@ -1562,16 +1562,35 @@ export function scriptUses({ text = '', cls = '', name = '' } = {}) {
 
 // The system's components a component is built with: those whose class its markup holds (HTML), or that its own file
 // uses (a tag, an import). Itself and its own parts never count. names: [{ name, cls }].
-export function nestedComponents({ name, cls = null, markup = '', text = '', names = [] } = {}) {
+// tags: { name: [the tag its own file gives it (HbBadge for a Figma badge)] }, so a prefixed tag is known as well.
+export function nestedComponents({ name, cls = null, markup = '', text = '', names = [], tags = {} } = {}) {
   const classes = new Set([...String(markup).matchAll(/class\s*=\s*["']([^"']*)["']/g)].flatMap((m) => m[1].split(/\s+/)).filter(Boolean));
   const out = [];
   for (const o of names) {
     if (o.name === name || (cls && o.cls === cls)) continue;
     const inMarkup = o.cls && classes.has(o.cls) && !(cls && o.cls.startsWith(cls + '-') || cls && o.cls.startsWith(cls + '__'));
-    const tagName = o.name.replace(/(^|[-_/\s]+)(\w)/g, (m, s2, ch) => ch.toUpperCase());
-    const inText = text && new RegExp(`<${tagName}\\b|import\\s+\\{?[^;]*\\b${tagName}\\b[^;]*from`).test(text);
+    const tagNames = [o.name.replace(/(^|[-_/\s]+)(\w)/g, (m, s2, ch) => ch.toUpperCase()), ...(tags[o.name] ?? [])].filter((x) => /^[A-Za-z][\w-]*$/.test(x));
+    const inText = text && tagNames.some((tagName) => new RegExp(`<${tagName}\\b|import\\s+\\{?[^;]*\\b${tagName}\\b[^;]*from`).test(text));
     if (inMarkup || inText) out.push(o.name);
   }
   return out;
 }
 
+
+// A page for some components only (--component X --styleguide, E27): the ones asked for, as named in any case or
+// spacing, and every component they nest, each nested one followed in turn. nestsOf(c, names) → the names c nests.
+// → { components, codeOnly, scope: { asked, nested, missing } }, in the page's own order.
+export function scopeView(components = [], asked = [], nestsOf = () => []) {
+  const squash = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const byName = new Map(components.map((c) => [squash(c.name), c]));
+  const names = components.map((c) => ({ name: c.name, cls: c.cls }));
+  const found = [], missing = [];
+  for (const a of asked) { const c = byName.get(squash(a)) ?? components.find((x) => x.cls && squash(x.cls) === squash(a)); if (c) found.push(c.name); else missing.push(String(a)); }
+  const keep = new Set(found), queue = [...found];
+  while (queue.length) {
+    const c = byName.get(squash(queue.shift()));
+    for (const n of c ? nestsOf(c, names) : []) if (!keep.has(n)) { keep.add(n); queue.push(n); }
+  }
+  const kept = components.filter((c) => keep.has(c.name));
+  return { components: kept, codeOnly: kept.filter((c) => c.codeOnly).length, scope: { asked: [...new Set(found)], nested: kept.map((c) => c.name).filter((n) => !found.includes(n)), missing } };
+}

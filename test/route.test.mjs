@@ -1,7 +1,7 @@
 // route.mjs: the request routed to a recipe and the exact command by the engine (I56), the same on any model.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { route, routeText, namedComponents } from '../route.mjs';
+import { route, routeText, namedComponents, otherSystem } from '../route.mjs';
 
 const P = { hasConfig: true, components: ['button', 'chip', 'field', 'statusBar'] };
 const r = (text, p = P) => route(text, p);
@@ -154,4 +154,36 @@ test('a request to build from Figma goes to the build recipe; new UI in a built 
   assert.equal(r('add a Saved confirmation next to the Save button', build).recipe, 'ask-the-system');
   assert.equal(r('set the radius to 16 in Figma', build).recipe, 'fix-a-difference');
   assert.deepEqual(r('how do I build components from figma?', build).run, []);
+});
+
+// The style guide asked for is built (for the component named, when there is one); never a plain audit in its place.
+test('a request for the style guide builds it, scoped to the component it names', () => {
+  const comps = ['buttonPrimary', 'modal'];
+  assert.deepEqual(route('build the style guide', { components: comps }).run, ['rms-design-system-engine --styleguide']);
+  assert.deepEqual(route('build the style guide for buttonprimary', { components: comps }).run, ['rms-design-system-engine --component buttonPrimary --styleguide']);
+  assert.deepEqual(route('show the accessibility of buttonPrimary in the styleguide', { components: comps }).run, ['rms-design-system-engine --component buttonPrimary --styleguide'], 'a request that names the style guide gets it (E25)');
+  assert.deepEqual(route('check the accessibility of buttonPrimary', { components: comps }).run, ['rms-design-system-engine --component buttonPrimary --only accessibility'], 'accessibility alone stays in the chat');
+  assert.equal(route('fix the focus ring in the style guide', { components: comps }).recipe, 'fix-a-difference');
+});
+
+// A design system the request names that is not this folder's: where its code is (a folder on this computer or a
+// git link) and its Figma file are asked for at once, and the request runs there; this folder's system never stands in.
+test('another design system than the one set up here: its code and Figma link are asked for, then it runs there', () => {
+  const names = ['Harbor Design System', '@harbor/ui', 'harbor-ds'];
+  const ask = route('build the style guide for buttonPrimary of the Innova DS', { names, components: ['buttonPrimary'] });
+  assert.equal(ask.run[0], "rms-design-system-engine --project='<Innova's folder or git link>' --styleguide");
+  assert.match(ask.ask, /^where Innova's code is \(this folder, another folder on this computer, or a git link\), and the link to Innova's Figma file/);
+  assert.match(ask.notes[0], /never run this folder's system in its place/);
+  const given = route("build the style guide for innova DS: the code is in '/Users/me/Work/innova ds', Figma https://www.figma.com/design/AbC123/Innova", { names });
+  assert.deepEqual(given.run, ["rms-design-system-engine --project='/Users/me/Work/innova ds' --figma-url='https://www.figma.com/design/AbC123/Innova' --styleguide"]);
+  assert.equal(given.ask, undefined);
+  assert.match(routeText(given, ''), /NEXT: run the command above/);
+  // In a cloud session a folder on the person's computer cannot be read: the git link is asked for, and how to work on
+  // a local folder is said.
+  const cloud = route('check the innova design system', { names, cloud: true });
+  assert.match(cloud.ask, /its git link \(a private GitHub repository works once it is attached to this session\)\. This session runs in the cloud and cannot read a folder on the person's computer: to work on a local folder, they run `claude remote-control` in it/);
+  // This folder's own system, however it is named, and words that are no name, are not another system.
+  assert.equal(otherSystem('build the tag from our Figma design system as a React component', names), null, 'Figma is a tool, not a system');
+  assert.equal(otherSystem('check the React DS components', names), null);
+  for (const t of ['build the Harbor DS style guide', 'check our design system', 'audit the whole DS', 'check the harbor design system', 'check DS', 'write ds-config.json by hand']) assert.ok(!route(t, { names }).ask, t);
 });

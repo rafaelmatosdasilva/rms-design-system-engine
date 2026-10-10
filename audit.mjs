@@ -474,21 +474,31 @@ if (process.argv.includes('--styleguide')) {
   let sgConfig = {};
   try { sgConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   // With --component: the audit of those components first (the gates against Figma and the accessibility check in a
-  // browser, as any scoped run), so the page shows their Parity and Accessibility as of now; then the whole page.
-  // A finding does not stop the page: it is what the page shows.
+  // browser, as any scoped run), so the page shows their Parity and Accessibility as of now; then a page of those
+  // components and the ones they nest only, beside the whole system's (E27). A finding does not stop the page: it is
+  // what the page shows.
   if (SCOPE_COMPONENTS.length) {
     console.log(`Auditing ${SCOPE_COMPONENTS.join(', ')}, then building the style guide.`);
     spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...process.argv.slice(2).filter((a) => a !== '--styleguide')], { cwd: ROOT, stdio: 'inherit' });
   }
   try {
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
-    const r = await generateStyleguide(ROOT, sgConfig, {});
+    const r = await generateStyleguide(ROOT, sgConfig, SCOPE_COMPONENTS.length ? { only: SCOPE_COMPONENTS } : {});
     // What agrees with Figma and what only the code has (shown, compared with nothing), never one count called agreed.
     const agreedN = r.components - (r.codeOnly ?? 0);
     const counted = [agreedN || !r.codeOnly ? `${agreedN} component${agreedN === 1 ? '' : 's'} agreed` : null, r.codeOnly ? `${r.codeOnly} only in the code` : null].filter(Boolean).join(', ');
-    console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${counted} · ${r.template === 'engine' ? "the engine's template" : "the project's template"})`);
-    if (r.notAgreed) console.log(`   ${r.notAgreed}`);
-    for (const name of SCOPE_COMPONENTS) console.log(`   ${name}: ${relative(ROOT, r.out)}#c-${name}  (its Accessibility and Parity areas)`);
+    const tpl = r.template === 'engine' ? "the engine's template" : "the project's template";
+    if (r.scope) {
+      // A page for the components asked for: which they are, what they nest, and one asked for that the system lacks.
+      const { asked, nested, missing } = r.scope;
+      console.log(`🖼  Style guide of ${asked.join(', ') || SCOPE_COMPONENTS.join(', ')} → ${relative(ROOT, r.out)}  (${nested.length ? `and the ${nested.length === 1 ? 'component' : `${nested.length} components`} ${asked.length > 1 ? 'they nest' : 'it nests'}: ${nested.join(', ')}` : `${asked.length > 1 ? 'they nest' : 'it nests'} no other component`} · ${tpl})`);
+      if (missing.length) console.log(`   ${missing.join(', ')}: not a component of this system (neither Figma's nor the code's), so not on the page.`);
+      console.log('   The whole system\'s style guide: rms-design-system-engine --styleguide');
+    } else {
+      console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${counted} · ${tpl})`);
+      if (r.notAgreed) console.log(`   ${r.notAgreed}`);
+    }
+    for (const name of r.scope?.asked ?? SCOPE_COMPONENTS) console.log(`   ${name}: ${relative(ROOT, r.out)}#c-${name}  (its Accessibility and Parity areas)`);
     // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
     const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
     const found = checkFile(r.out);

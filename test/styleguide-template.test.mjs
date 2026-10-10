@@ -128,7 +128,7 @@ test('tokens are shown only when equal to Figma in every mode, grouped like the 
   assert.equal(t.differences, 1);
 });
 
-test('--component with --styleguide: that component audited first, then the page, its address printed', { timeout: 600000 }, () => {
+test('--component with --styleguide: that component audited first, then its own page beside the whole one, its address printed', { timeout: 600000 }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sgc-');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -136,7 +136,7 @@ test('--component with --styleguide: that component audited first, then the page
   assert.match(out, /Auditing button, then building the style guide\./);
   assert.match(out, /scope|button/i, 'the scoped audit ran');
   assert.ok(existsSync(join(dir, '.design-system-engine-out', 'census.json')), 'the audit wrote its results');
-  assert.match(out, /button: \.design-system-engine-out\/styleguide\/index\.html#c-button/);
+  assert.match(out, /button: \.design-system-engine-out\/styleguide\/button\.html#c-button/);
 });
 
 test('the demo design system: its real markup from its page, and props named differently stay out', { timeout: 300000 }, () => {
