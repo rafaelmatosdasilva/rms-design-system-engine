@@ -585,6 +585,8 @@ export async function captureComponents(ctx) {
     for (const [mk, mv] of Object.entries(perMode)) {
       if (!mv) continue;
       out[mk] = Object.fromEntries([...COLOR_PROPS].map((k) => [k, mv.cs[k]]));
+      // An inside stroke drawn as an inset ring has its colour there, not in border-color (which then follows the text).
+      if (mv.cs.boxShadow && mv.cs.boxShadow !== 'none') out[mk].boxShadow = mv.cs.boxShadow;
       if (mv.before) out[mk].beforeBackground = mv.before.backgroundColor;
       const bd = backdropOf(mv.behind);
       if (bd) out[mk].backdrop = bd;

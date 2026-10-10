@@ -77,6 +77,7 @@ rms-design-system-engine --refresh-figma                 # read Figma the best w
 rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then a page of it and the components it nests (styleguide/modal.html), its address printed
+rms-design-system-engine --publish-styleguide            # write the CI job that publishes the style guide on every push (GitHub Pages or GitLab Pages, from the git remote; --host github|gitlab, --print to only show it)
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
@@ -467,6 +468,15 @@ height, corner radius or space that is not one of the system's tokens fails it, 
 accessibility check finds in its markup; the run exits 1. `--styleguide-check [page]` runs the same check on a page
 already built, after a project added its own links to it.
 
+**Published for the team.** A local `--styleguide` is a preview. `--publish-styleguide` writes the CI job that makes
+it one link everyone opens, rebuilt from what is merged on every push to the default branch: for GitHub Pages
+(`.github/workflows/style-guide.yml`) or GitLab Pages (a `pages` job, in `.gitlab-ci.yml` or, beside a pipeline the
+project has, `.gitlab/style-guide.gitlab-ci.yml` to include), as the git remote says. The job checks out the engine and
+the products in `products.json` beside the system, builds the page, runs the audit (a failing audit still publishes:
+the page shows the differences), builds the page again, checks it (a page that fails is not published) and publishes
+`public/`. A job already there is never overwritten, and nothing is committed. A GitHub Pages site is public even from
+a private repository (only GitHub Enterprise Cloud keeps it private); GitLab Pages can be kept to project members.
+
 Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome? }`. `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
 DS actually contains and agrees on, the styleguide can never invent or drift — the same guarantee Gate 20
 (docs-truth) checks on the output.
@@ -620,7 +630,9 @@ capture with the browser.
 - **Confidence on every fact.** `verified` (the browser and the source agree on the rule that won),
   `single-source`, `uncertain` (the readings disagree: reported as a reading problem, never as a design
   difference), `not-read` with the reason, or `default`. Known browser rules are applied, not flagged:
-  border widths drawn in whole pixels (the declared `1.5px` stays the code's fact, `drawn: 1px` beside it),
+  border widths drawn in whole pixels (the declared `1.5px` stays the code's fact, `drawn: 1px` beside it), an
+  inside stroke drawn as an inset ring (`box-shadow: inset 0 0 0 1.5px`, so it adds no height) compared by the
+  ring's width and colour, never by the border it does not have,
   a unitless line-height is a multiple of the font size, a `min-height` larger than `height` wins.
 - **Cached by content.** A hash of every input; an unchanged project reuses the snapshot instantly
   (`--force` recaptures). `ds-config.json → codeReading: { browser: "auto" | "off", pages: [...], out }`.
