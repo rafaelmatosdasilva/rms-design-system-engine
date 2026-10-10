@@ -425,6 +425,8 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
       // The design's fonts, wherever the page finds them: measured once they are in (or after 3s without them, drawn in
       // the system's own stack).
       const fonts = (await cdp.send('Runtime.evaluate', { expression: FONTS_IN, awaitPromise: true, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? {};
+      // Measured and pictured as it will be: without the page's marks on its stand-ins.
+      await cdp.send('Runtime.evaluate', { expression: 'window.PT_MARKS && window.PT_MARKS(false)' }, sessionId).catch(() => null);
       const rendered = (await cdp.send('Runtime.evaluate', { expression: RENDER_EXPRESSION, returnByValue: true }, sessionId)).result?.value ?? [];
       // A design review of the page as drawn: alignment, spacing, one main action, hierarchy, line length.
       const review = visualFindings((await cdp.send('Runtime.evaluate', { expression: VISUAL_EXPRESSION, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? null, { textStyles });
