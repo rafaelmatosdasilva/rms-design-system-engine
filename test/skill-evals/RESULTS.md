@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Prototype quality on a real system (continuous evaluation)
+
+What changed since the entry below (engine a1ca3dd): Style guide findings that were the engine's: unnamed switches, states said by their role, content that covers nothing; Prototype quality on a real system: drawn as the system draws it, working as the product does, from every source of intent. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `687e1c0f97a9` · Project measured: `13d811a9d668`
+
+| Haiku, engine d8e021e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.053 |
+| Input a run | 94k | 101k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 94k. Records: `records/2026-10-10-prototype-quality`.
+
 ## 2026-10: States heard on a part (heardOn); colours in any notation in the edit check (continuous evaluation)
 
 What changed since the entry below (engine af1bcf1): States: Current is owed aria-current; an error on a message is announced (role or aria-live), on a field aria-invalid (E11, E12); States: an error the option announces itself is heard, whatever the component's role; Docs: the words each state is heard in; neutral names in the state test; Roles on the style guide are read in the component's own section, never on the page's chrome; presentation is none; Roles: a component the code has no markup for is said not checked on the style guide (its stand-in is marked); a plain element counts as presentation; Keyboard: an option a composite reaches by its arrow keys (one Tab stop for the group) is reachable; Docs: roles read in their own section on the style guide, stand-ins not checked, one Tab stop per group; Tests run the same on every machine: no machine-wide TypeScript where a test expects none, and the font-dependent share of a visual diff left out of the golden (E14); States heard on a part: the contract's heardOn names the part and its state per option; the style guide sets it with the look and the state check counts it (E13); Edit check: a colour written as rgb(), hsl(), oklch() or a CSS name is read too. The guide changed in `reference/config.md`, `reference/usage.md`.
