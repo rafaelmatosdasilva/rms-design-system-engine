@@ -268,7 +268,13 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(a11y, /The audit has not run in a browser yet/);
     assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /\d+ done/);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
-    const live = await run(`document.querySelector('#c-chip .pg-a11y-rows').textContent`);
+    // The page tries the keyboard on every variant after it is drawn: wait for that result (its 2.1.1 row says what Tab
+    // reached), never for a fixed time, so a busy machine reads it as a quiet one does (E17).
+    let live = '';
+    for (let i = 0; i < 240 && !(/Tab reaches it once: "Filter"\..*In all \d+ variants\./.test(live) && /Given by the browser: Space flips aria-pressed/.test(live)); i++) {
+      if (i) await new Promise((r) => setTimeout(r, 250));
+      live = await run(`document.querySelector('#c-chip .pg-a11y-rows').textContent`);
+    }
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
     assert.match(live, /The style guide, in the browser/, 'each finding says where it comes from');
