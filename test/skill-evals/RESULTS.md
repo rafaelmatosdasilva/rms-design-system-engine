@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The style guide published from CI; an inset-ring stroke compared by its own width and colour; a test waits on state (continuous evaluation)
+
+What changed since the entry below (engine f4f0402): The style guide published from CI; an inset-ring stroke compared by its own width and colour; a test waits on state. The guide changed in `cookbook/publish-styleguide.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `7efb14643772` · Project measured: `13d811a9d668`
+
+| Haiku, engine ff08c96 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.058 |
+| Input a run | 104k | 111k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 111k a run against 104k. Records: `records/2026-10-10-the-style-guide-published-from`.
+
 ## 2026-10: Setup routes the request it came from; nothing compared and nothing found are said; the style guide fits a phone (continuous evaluation)
 
 What changed since the entry below (engine 8f8b5ed): Setup routes the request it came from; nothing compared and nothing found are said; the style guide fits a phone. The guide changed in `cookbook/first-setup.md`, `reference/usage.md`, `rms-design-system-engine.md`.

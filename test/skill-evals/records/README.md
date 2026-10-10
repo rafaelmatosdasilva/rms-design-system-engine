@@ -73,5 +73,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-10-a-style-guide-request-builds` | The 21 guide tasks on Haiku (engine 58d7ee7) | "A style guide request builds it, accessibility named or not; a component's own style guide page" |
 | `2026-10-10-every-variant-of-a-component` | The 21 guide tasks on Haiku (engine 8f8b5ed) | "Every variant of a component checked, every run; Vue components drawn and tried from their code" |
 | `2026-10-10-setup-routes-the-request-it` | The 21 guide tasks on Haiku (engine f4f0402) | "Setup routes the request it came from; nothing compared and nothing found are said; the style guide fits a phone" |
+| `2026-10-10-the-style-guide-published-from` | The 21 guide tasks on Haiku (engine ff08c96) | "The style guide published from CI; an inset-ring stroke compared by its own width and colour; a test waits on state" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
