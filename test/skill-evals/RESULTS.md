@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: States heard on a part (heardOn); colours in any notation in the edit check (continuous evaluation)
+
+What changed since the entry below (engine af1bcf1): States: Current is owed aria-current; an error on a message is announced (role or aria-live), on a field aria-invalid (E11, E12); States: an error the option announces itself is heard, whatever the component's role; Docs: the words each state is heard in; neutral names in the state test; Roles on the style guide are read in the component's own section, never on the page's chrome; presentation is none; Roles: a component the code has no markup for is said not checked on the style guide (its stand-in is marked); a plain element counts as presentation; Keyboard: an option a composite reaches by its arrow keys (one Tab stop for the group) is reachable; Docs: roles read in their own section on the style guide, stand-ins not checked, one Tab stop per group; Tests run the same on every machine: no machine-wide TypeScript where a test expects none, and the font-dependent share of a visual diff left out of the golden (E14); States heard on a part: the contract's heardOn names the part and its state per option; the style guide sets it with the look and the state check counts it (E13); Edit check: a colour written as rgb(), hsl(), oklch() or a CSS name is read too. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `726e490bd92f` · Project measured: `13d811a9d668`
+
+| Haiku, engine a1ca3dd | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.054 |
+| Input a run | 98k | 94k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 94k a run against 98k. Records: `records/2026-10-10-states-heard-on-a-part-colours`.
+
 ## 2026-10: Accessibility and parity readings: text as drawn, focus rings, ARIA states, edges in every mode, box and text facts (continuous evaluation)
 
 What changed since the entry below (engine 6706b73): Text contrast: oklch colours read, see-through text blended, text in a disabled control exempt; Focus: a ring that only takes a colour on focus counts, a ring on ::before/::after is measured, a two-tone shadow passes on its clearer tone; WCAG checks: placeholder text measured, a field named only by its placeholder found, required ARIA states and values, publishing and graphics roles, a spinner is not a flash, edges in oklch read; Parity: a % line height and letter spacing from Figma's font size; colours equal within a rounding step; a variant's opacity read on its own state; Parity: a text part with its own colour is compared in every mode; Parity: a mode the code draws and Figma has no value for is said, not skipped; Parity: padding, radius and gap Figma sets with no variable are compared on the default variant; Parity at breakpoints: every side of the padding, every corner, and a vertical stack's row gap; Gate 16 auto heights: only a height Figma fixes, never one that hugs or fills; Docs: what the accessibility and parity checks now read; Parity: Figma's font size for a % line height is the default variant's, where the refresh records it; Accessibility: a control edge is read in every colour mode, one finding with the modes it fades in; Parity: min and max width, alignment, wrap and a dashed stroke compared with the box Figma records; Parity: text decoration, italic and text alignment of the first text, recorded in Figma and compared; Docs: the deeper facts the refresh records and compares; edges in every mode. The guide changed in `cookbook/refresh-figma.md`.
