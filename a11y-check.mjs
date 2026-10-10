@@ -1307,7 +1307,7 @@ async function main() {
   const cleanup = () => { try { browser?.kill(); } catch {} try { stopServer?.(); } catch {} };
   process.on('exit', cleanup);
   // A component looked for by a class no element in the code has would be waited for on every page: said at once.
-  if (roots && !cliUrls.length && !cfg.a11y?.urls?.length) {
+  if (roots && components.length && !cliUrls.length && !cfg.a11y?.urls?.length) {
     const { componentSourceFiles, textReader } = await import('./component-source.mjs');
     const read = textReader();
     const code = componentSourceFiles(ROOT, cfg).map(read).join('\n') + [cfg.paths?.themeCSS].flat().filter(Boolean).map((f) => read(join(ROOT, f))).join('\n');
