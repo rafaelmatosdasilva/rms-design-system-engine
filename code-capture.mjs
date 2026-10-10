@@ -31,7 +31,7 @@ import { allModes } from './mode-resolver.mjs';
 import { loadCssSources, rootTokens, resolveVars, canonValue } from './css-source.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './cdp.mjs';
 import { captureComponents, staticComponentReading } from './component-capture.mjs';
-import { createLocator, loadLocator } from './component-locator.mjs';
+import { createLocator, loadLocator, codeClassesIn } from './component-locator.mjs';
 import { apiReaderFor, captureApis, captureIcons, captureMarkup, renderedNesting, sourceNesting, mergeNesting, structureInputFiles, markupInputKey } from './structure-capture.mjs';
 import { conceptOf } from './state-concepts.mjs';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
@@ -253,7 +253,7 @@ export async function componentSpecs(ROOT, cfg) {
   const cp = resolve(ROOT, cfg.paths?.structureContract ?? 'structure-contract.mjs');
   if (existsSync(cp)) { try { contract = await import(pathToFileURL(cp).href); } catch { /* optional */ } }
   const CONTRACT = contract.CONTRACT ?? {}, SELECTORS = contract.COMPONENT_CSS_SELECTORS ?? {};
-  const locator = createLocator(cfg, { contractSelectors: SELECTORS });
+  const locator = createLocator(cfg, { contractSelectors: SELECTORS, codeClasses: codeClassesIn(ROOT, cfg) });
   let snapNames = [], snap = {};
   try { snap = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {}; snapNames = Object.keys(snap); } catch { /* optional */ }
   const maxCombos = Number.isFinite(cfg.codeReading?.maxCombinations) ? cfg.codeReading.maxCombinations : 12;

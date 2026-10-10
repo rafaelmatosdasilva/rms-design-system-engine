@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Browser accessibility on a Vue project with no Figma: its pages, its classes, and what it could not check (continuous evaluation)
+
+What changed since the entry below (engine d33715c): Accessibility from the code: seconds instead of hours, and a scoped run about its component; Browser accessibility: an empty style guide is not the page checked, and a coloured server address is read; A component's class from its own code, and the pages of a Vue router; Browser accessibility: a class no element has is said at once, and a stopped check says so; Browser accessibility: the class check runs only for named components. The guide changed in `cookbook/full-audit.md`, `reference/usage.md`.
+
+Guide set measured: `a04961c645bb` · Project measured: `13d811a9d668`
+
+| Haiku, engine fe00df6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.052 | $0.052 |
+| Input a run | 98k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 98k. Measured with main merged in (setup reads the project, #93), so the guide set is the one that merges. Records: `records/2026-10-10-a11y-vue-pages-classes`.
+
 ## 2026-10: Setup reads what the project already says (continuous evaluation)
 
 What changed since the entry below (engine 3b42506): First-time setup reads the naming the token CSS follows (iconText kept, camelCase split), every Figma snapshot beside it, the system's own scripts, the products checked out beside it and the frames and screens a captured screen snapshot names; set up with no Figma link, committed snapshots are compared as they are and their age is said, never a failure; a token file or folder named in the request is where the code is. The guide changed in `reference/config.md` and `cookbook/first-setup.md`. The guide changed in `cookbook/first-setup.md`, `reference/config.md`.
