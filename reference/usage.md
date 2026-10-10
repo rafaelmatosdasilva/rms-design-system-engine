@@ -960,7 +960,7 @@ names the kind of difference (radius, height, width, padding, gap, colour, props
 A mechanical, agnostic accessibility pass (`a11y-check.mjs`) that reuses the Gate 22 CDP/headless-Chrome
 flow. It reports **WCAG AA contrast** per theme (computed `color` vs the effective composited background),
 **accessible name + role** (interactive nodes from the accessibility tree — a component that never exposes
-aria), **visible focus** (a computed style change when focused **and** that change actually visible — the focus ring's colour has ≥ 3:1 contrast against its background, WCAG 1.4.11), **state exposure** (an element whose state
+aria), **visible focus** (a computed style change when focused **and** that change actually visible — the focus ring's colour has ≥ 3:1 contrast against its background, WCAG 1.4.11; a field whose frame shows its focus (`:focus-within` on the box around it, when it holds only that control) passes, its frame's ring measured the same way, as does a part beside it in that box (a radio's circle, a switch's track); a native checkbox or radio hidden under such a part is judged by it, a control that takes no focus (inside an inert thumbnail) is not judged, and a style that eases in or out is read where its transition ends), **state exposure** (an element whose state
 is shown only by a CSS class — `.selected` / `.checked` / `.disabled` / `.invalid` / … — with no matching
 `aria-*` or native state, so assistive tech never hears it; the state-class→aria map is common-English by
 default, extend via `a11y.stateClasses`), and **keyboard reachability** (an interactive control that cannot
@@ -1039,7 +1039,9 @@ there, never a failure.
 - **Dialogs and Escape** — an open dialog that does not close on Escape. Each control that opens a dialog, a
   menu or a list (`aria-haspopup`, or `aria-expanded` with `aria-controls`; up to 8 a page) is opened, Escape
   is pressed, and what it opened must close and give the focus back to that control. A link does not navigate
-  and a form does not submit while it runs.
+  and a form does not submit while it runs. A dialog already open as the page loads is judged when it lies over
+  the page (in the top layer, or fixed); one drawn in the page's flow with nothing that opened it (a specimen on a
+  style guide) is listed as not judged (`notJudged` in `--json`), never failed.
 - **One main heading** — an app page (a `--url` page or a route found on its own, not the styleguide or a
   story) has one `h1`, which a screen reader jumps to. The code part flags a page file with text and no `h1`,
   or several.
