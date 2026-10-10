@@ -9,7 +9,7 @@
 // model, in English and Portuguese. route() is pure: projectState() reads the project for it.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
-import { join, relative } from 'node:path';
+import { join, relative, basename } from 'node:path';
 
 // What the router needs from the project: is there a config, which components, when the snapshots were
 // captured (the oldest _updated stamp, as a date), and the command to write (the engine's path when the
@@ -24,8 +24,13 @@ export function projectState(ROOT, { engineDir, env = process.env } = {}) {
   const stamps = [structure?._updated, vars?._updated].filter(Boolean).map((u) => new Date(u)).filter((d) => !Number.isNaN(d.getTime()));
   const oldest = stamps.length ? new Date(Math.min(...stamps)) : null;
   const onPath = String(env.PATH ?? '').split(':').some((d) => d && existsSync(join(d, 'rms-design-system-engine')));
+  // The names this folder's system goes by (its config, its package, its folder), so a request that names another
+  // system is told apart; and whether this session runs in the cloud, where a folder on the person's computer cannot be read.
+  let pkg = null; try { pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? null; } catch { /* no package.json */ }
   return {
     hasConfig,
+    names: [conf.name, pkg, basename(ROOT)].filter(Boolean),
+    cloud: env.CLAUDE_CODE_REMOTE === 'true',
     build: conf.build === true,
     pages: uiFiles(ROOT),
     rawColours: rawColoursOf(structure?.components ?? {}),
@@ -95,6 +100,9 @@ export function namedComponents(text, components = []) {
 const QUESTION = /^\s*(how|why|what|where|when|which|can i|should i|is there|como|porqu[eê]|porque|o que|onde|quando|qual|quais|d[aá] para|posso)\b|\?\s*$/i;
 const LINK = /https?:\/\/(?:[\w.-]*gitlab[\w.-]*|[\w.-]*notion\.(?:so|site))\/\S+/i;
 const links = (t) => t.match(new RegExp(LINK.source, 'gi')) ?? [];
+const STYLE_GUIDE = /\bstyle ?guide\b|\bguia de estilos?\b/i;
+// A style guide named as where to look, or as the thing to fix, is not a request to build one (E25 keeps those apart).
+const NOT_STYLE_GUIDE = /\b(?:in|on|no|na)\s+(?:the\s+|o\s+|a\s+)?style ?guide\b|\bfix\b|\bcorrig|\breflow|\bhow (?:do|to|does)\b/i;
 const FIGMA_URL = /https?:\/\/(?:www\.)?figma\.com\/(?:design|file)\/[\w-]+\S*/i;
 const STEP_LIST = /(^|\s)1[.)]\s[\s\S]*\s2[.)]\s/;
 
@@ -146,8 +154,38 @@ export const SAY = {
 };
 
 // route(text, { hasConfig, components, cmd, snapshotDate }) → { recipe, question, run: [commands], notes: [lines], say: [lines], sayIf }
-export function route(text, { hasConfig = true, components = [], cmd = 'rms-design-system-engine', snapshotDate = null, build = false, pages = [], rawColours = {} } = {}) {
-  const r = routeOnly(text, { hasConfig, components, cmd, build, pages });
+// A design system the request names that is not this folder's ("the style guide for Innova DS" where another system is
+// set up): its name, or null. A name is the word before DS or design system (or after "design system of/for"), never
+// a word such as the, our or whole; it is this folder's system when its config, package or folder name holds it.
+const NAMED_DS = /\b([A-Za-z][\w-]*)[\s-]+(?:DS(?![\w.-])|[Dd]esign[ -]?[Ss]ystem\b)|\b(?:DS|[Dd]esign[ -]?[Ss]ystem)\s+(?:of|for|called|named|do|da|de)\s+([A-Za-z][\w-]*)/g;   // DS as a word of its own, never ds-config
+const NOT_A_NAME = /^(?:the|our|this|that|my|your|a|an|new|whole|entire|same|its|their|current|existing|full|living|another|other|o|os|as|nosso|nossa|este|esta|esse|essa|meu|minha|seu|sua|do|da|de|um|uma|outro|outra|check|audit|run|build|test|fix|update|show|scan|review|open|create|set|setup|verify|analy[sz]e|compare|refresh|document|prototype|verifica|corrige|mostra|cria)$/i;
+const squashName = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+export function otherSystem(text, names = []) {
+  const here = names.filter(Boolean).map(squashName).filter((h) => h.length > 1);
+  for (const m of String(text ?? '').matchAll(NAMED_DS)) {
+    const n = m[1] ?? m[2];
+    if (!n || NOT_A_NAME.test(n)) continue;
+    const k = squashName(n);
+    if (k.length < 2 || here.some((h) => h.includes(k))) continue;
+    return n;
+  }
+  return null;
+}
+
+export function route(text, { hasConfig = true, components = [], cmd = 'rms-design-system-engine', snapshotDate = null, build = false, pages = [], rawColours = {}, names = [], cloud = false } = {}) {
+  // Another system than the one set up here: where its code is and its Figma file are asked for at once, in one message,
+  // and the request runs there (--project); this folder's system is never run in its place.
+  const other = hasConfig ? otherSystem(text, names) : null;
+  if (other) {
+    const inner = routeOnly(text, { hasConfig: true, components: [], cmd, build: false, pages: [], cloud });
+    const { figma, project } = codeAndFigma(String(text ?? ''));
+    const at = project ? ` --project='${project}'${figma ? ` --figma-url='${figma}'` : ''}` : ` --project='<${other}'s folder or git link>'`;
+    const ask = [!project && whereCode(`${other}'s`, cloud), !figma && `the link to ${other}'s Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
+    const notes = [`The request names ${other}, and this folder is set up for ${names[0] ?? 'another system'}: never run this folder's system in its place. Its code may be on the person's computer (a folder) or online (a git link); a run there with no setup sets it up first.`, ...inner.notes];
+    const run = (inner.run ?? []).map((c) => c.startsWith(cmd) ? cmd + at + c.slice(cmd.length) : c);
+    return { recipe: inner.recipe, question: false, run: run.length ? run : [`${cmd}${at}`], ...(ask.length ? { ask: ask.join(', and ') } : {}), notes, say: [], sayIf: null };
+  }
+  const r = routeOnly(text, { hasConfig, components, cmd, build, pages, cloud });
   const say = [];
   let sayIf = null;
   // Building a component Figma paints with a colour that has no variable: the person hears it, in the reply.
@@ -162,7 +200,7 @@ export function route(text, { hasConfig = true, components = [], cmd = 'rms-desi
   return { ...r, say, sayIf };
 }
 
-function routeOnly(text, { hasConfig, components, cmd, build = false, pages = [] }) {
+function routeOnly(text, { hasConfig, components, cmd, build = false, pages = [], cloud = false }) {
   const t = String(text ?? '');
   const question = QUESTION.test(t);
   const named = namedComponents(t, components);
@@ -172,11 +210,17 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
   // A pasted step list: take only the intent. The skill owns setup, running and reporting.
   if (STEP_LIST.test(t)) {
     notes.push('The request lists steps: do not follow them. The skill does setup, the run and the report itself; report in the chat, write no report file, commit nothing.');
-    return { recipe: hasConfig ? (named.length ? 'audit-component' : 'full-audit') : 'first-setup', question: false, ...(hasConfig ? { run: [scoped] } : setupRun(t, cmd)), notes };
+    return { recipe: hasConfig ? (named.length ? 'audit-component' : 'full-audit') : 'first-setup', question: false, ...(hasConfig ? { run: [scoped] } : setupRun(t, cmd, { cloud })), notes };
   }
   // No config yet: setup first, whatever was asked; a GitLab link then is the code's, unless it is named as guidelines.
-  if (!hasConfig && !(LINK.test(t) && /guideline|wiki|notion|diretriz|orienta/i.test(t))) return { recipe: 'first-setup', question, ...setupRun(t, cmd), notes };
+  if (!hasConfig && !(LINK.test(t) && /guideline|wiki|notion|diretriz|orienta/i.test(t))) return { recipe: 'first-setup', question, ...setupRun(t, cmd, { cloud }), notes };
 
+  // The style guide asked for ("build the style guide", "the style guide for buttonPrimary"): built, for the component
+  // named when there is one, never a plain audit in its place. A question about it is answered from the recipe.
+  if (STYLE_GUIDE.test(t) && !question && !NOT_STYLE_GUIDE.test(t)) {
+    notes.push('The style guide is built from what Figma and the code agree on, with what only the code has marked so; give the person its address as the engine prints it.');
+    return { recipe: named.length ? 'audit-component' : 'full-audit', question, run: [`${scoped} --styleguide`], notes };
+  }
   for (const [recipe, test, kind] of RULES) {
     if (!test(t, { build, named })) continue;
     if (recipe === 'build-from-figma') {
@@ -247,16 +291,27 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
 const CODE_LINK = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:github|gitlab|bitbucket)(?:\.[\w-]+)+\/[^\s'"]+|git@[^\s'"]+/i;
 const CODE_PATH = /(?:^|[\s'"(])((?:~|\.{1,2})\/[^\s'"(),]*|\/[^\s'"(),/]+\/[^\s'"(),]+)/;   // ~/x, ./x, ../x, or /a/b (one bare /word is a command)
 const THIS_FOLDER = /\b(?:(?:this|the current|current) (?:folder|directory|repo(?:sitory)?)|(?:esta|nesta) pasta|(?:este|neste) reposit[oó]rio)\b/i;
-function setupRun(t, cmd) {
-  const figma = t.match(FIGMA_URL)?.[0]?.replace(/[.,;:)]+$/, '');
-  const css = t.match(/[\w./-]+\.css\b/)?.[0];
+// Where the code is and the Figma file, as the request gives them: a Figma link, a token stylesheet, a git link (GitHub,
+// GitLab, Bitbucket; github.com/x/y without its https), a folder (quoted whole, spaces included), or this folder.
+export function codeAndFigma(t) {
+  const figma = t.match(FIGMA_URL)?.[0]?.replace(/[.,;:)]+$/, '') ?? null;
+  const css = t.match(/[\w./-]+\.css\b/)?.[0] ?? null;
   const rest = t.replace(FIGMA_URL, ' ');
   const link = rest.match(CODE_LINK)?.[0]?.replace(/[.,;:)]+$/, '');
   // A path in quotes is taken whole, spaces included ('/Users/me/RMS Portfolio/ds'); a bare one ends at a space.
   const quoted = rest.match(/(['"`])((?:~|\.{1,2})?\/[^'"`\n]+?)\1/)?.[2];
   const project = css ? null : (link && !/^(https?:\/\/|git@)/i.test(link) ? `https://${link}` : link) ?? quoted ?? rest.match(CODE_PATH)?.[1]?.replace(/[.,;:]+$/, '') ?? (THIS_FOLDER.test(t) ? '.' : null);
+  return { figma, css, project };
+}
+// The question about the code's place. In a cloud session a folder on the person's own computer cannot be read: the
+// git link is asked for, and how to work on a local folder is said (a session on their computer).
+const whereCode = (whose, cloud) => cloud
+  ? `where ${whose} code is: its git link (a private GitHub repository works once it is attached to this session). This session runs in the cloud and cannot read a folder on the person's computer: to work on a local folder, they run \`claude remote-control\` in it on their computer, or open it in the Claude Desktop app, and ask there`
+  : `where ${whose} code is (this folder, another folder on this computer, or a git link)`;
+function setupRun(t, cmd, { cloud = false } = {}) {
+  const { figma, css, project } = codeAndFigma(t);
   const code = css ? ` --theme-css='${css}'` : ` --project='${project ?? '<. for this folder, or the folder or git link>'}'`;
-  const ask = [!css && !project && 'where the design system\'s code is (this folder, another folder on this computer, or a git link)',
+  const ask = [!css && !project && whereCode('the design system\'s', cloud),
     !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
   return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}`],
     ask: ask.length ? ask.join(', and ') : null };
