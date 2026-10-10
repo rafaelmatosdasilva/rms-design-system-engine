@@ -1021,6 +1021,14 @@ whatever surface the project serves, in this order:
    A component whose class no element in the code has is said at once, with the classes that hold its name
    (`.modal-wrapper` for modal), never waited for on every page. The check's time grows with its pages and
    modes (`a11y.timeoutSec` sets it), and a check stopped by it says how many pages it reached.
+   **A component shown only after an action** (a modal behind its "Show modal" button, a menu kept hidden until
+   its trigger is pressed, a popover, a toast): when the scoped component is not seen on a page after two seconds,
+   the controls that may open it are pressed in turn, up to 8: those whose words name it first, then those that say
+   they open something (`aria-haspopup`, `aria-expanded`, `aria-controls`), then the rest. Never one inside it, one
+   that submits a form, or one whose words delete, send, save or sign out (unless they name it); a link does not
+   navigate, a press that leaves the page is undone by loading it again, and Escape closes what a press opened that
+   was not it. Once it shows, it is checked open, Escape included, and the report says what opened it (`opened` in
+   `--json`). One no press showed is said, never clean (`notRead`).
    Override the base with `a11y.baseUrl`, delay the sweep for SPA hydration with
    `a11y.waitFor`, or turn the whole thing off with `a11y.discover: false`.
 4. **Ask (last resort)** — only when auto-discovery finds nothing does the skill ask the user for the one
