@@ -37,4 +37,4 @@ test/skill-evals/results/build/*.jsonl
 test/skill-evals/results/prototype/*.jsonl
 test/skill-evals/results/prototype/transcripts/
 # The Vue build tools the Vue harness tests use (npm install --prefix test/.vue-tools, as CI does)
-test/.vue-tools/
+test/.vue-tools

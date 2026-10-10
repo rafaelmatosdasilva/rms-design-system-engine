@@ -33,6 +33,17 @@ shared rule) belongs to the scope when its file mentions a component in scope. T
 of a scoped run counts only its components. Set a default in `ds-config.json → scopeComponents: ["ButtonPrimary"]` if a repo
 should always run scoped. Omit the flag to audit the whole DS.
 
+**A name the system does not have.** A component asked for that is in neither the Figma data nor the code (no file
+named for it, no element with its class) is said: "nothing about it was checked", in the report and the summary
+(**Nothing checked**), and the NEXT line asks the person which component they mean, never a pass. The router knows the
+components only the code has (a file whose first element carries a class of its own) as well as Figma's, and before
+any is known (no snapshot yet) it still scopes to a name written as one (`buttonPrimary`, "the card component").
+
+**No Figma data captured yet.** With a Figma file set up and no snapshot readable, nothing was compared with Figma:
+the summary says so (**No Figma data captured yet, so nothing was compared with Figma**, and **Nothing compared with
+Figma yet** in place of In parity when the code's own checks pass), and the NEXT line is the capture
+(`--recipe refresh-figma`), then the same run again.
+
 **Only part of the run.** `--only` runs the part asked for and nothing else; the report and the summary say what ran,
 so a part never reads as the whole system passing:
 ```bash
@@ -48,7 +59,7 @@ accessibility" or "only the token values gate" into the right `--only`.
 **Utility flags (no full audit - run the terminal command directly):**
 ```bash
 rms-design-system-engine --init                          # first-time setup only: asks where the code is and for the Figma link (optional), scaffolds config files, then exits
-rms-design-system-engine --init --project=<. | folder | git link> --figma-url=<url>   # non-interactive setup (for agents/CI): --project required (or --theme-css=<path>), --figma-url and --figma-source-url=<url> optional
+rms-design-system-engine --init --project=<. | folder | git link> --figma-url=<url>   # non-interactive setup (for agents/CI): --project required (or --theme-css=<path>), --figma-url and --figma-source-url=<url> optional; --then='<request>' routes the request that led to setup once it is done
 rms-design-system-engine --version                       # am I on the latest? compares local vs remote (a normal run also nudges once/day)
 rms-design-system-engine --update                        # update to the latest - no re-download
 rms-design-system-engine --link-command                  # (re)point the /rms-design-system-engine command at the install via symlink

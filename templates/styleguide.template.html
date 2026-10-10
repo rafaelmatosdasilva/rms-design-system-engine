@@ -159,7 +159,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-card > h3 + p { margin: 0; padding: 0 var(--sg-space-l) var(--sg-space-m); background: var(--sg-bg-2); }   /* the line under the name, aligned with it, on its background */
 .sg-card > :last-child:not(.sg-thumb):not(.pg-shot) { flex-grow: 1; }   /* that background down to the card's edge */
 .sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; padding: var(--sg-space-m) var(--sg-space-l); background: var(--sg-bg-2); border-top: var(--sg-line); }
-.sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-l); }
+.sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--sg-space-l); }
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
 .sg-screen img { display: block; width: 100%; height: auto; }
 .sg-screen figcaption { padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); border-top: var(--sg-line); }
@@ -223,7 +223,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-areas.is-stuck > .pg-areas-name { display: inline; }
 /* On a narrow screen the areas scroll sideways inside the bar, never wrap or squeeze: the system's segmented control
    keeps its own size, and the area chosen scrolls into view. */
-.pg-areas-scroll { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.pg-areas-scroll { position: relative; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scrollbar-width: thin; }
 .pg-areas-scroll > * { width: max-content; max-width: none; flex-wrap: nowrap; }
 .pg-areas-scroll > .sg-tabs { min-width: 100%; }   /* the line under the tabs across the whole width, longer when they scroll */
 /* Every bar that stays at the top as a page scrolls (a component's areas, a page's title, a foundation's size switch)
@@ -290,19 +290,23 @@ a.pg-usage-name { color: var(--sg-text); }
   .pg-a11y .pg-par-type { min-width: 0; }
 }
 /* Where it is used: each product's own page pictured, the component marked on it. */
-.pg-usedin { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.pg-usedin { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
 .pg-shot { position: relative; overflow: hidden; border-radius: var(--sg-radius); border: var(--sg-line); background: var(--sg-bg-2); }
 .pg-shot img { display: block; width: 100%; height: auto; }
 .pg-mark { position: absolute; border: 2px solid var(--sg-accent); border-radius: var(--sg-radius-s); pointer-events: none; }
 /* The code a product writes for what the playground shows, with the system's button to copy it. */
-.pg-code-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sg-space-m); align-items: start; }
+.pg-code-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--sg-space-m); align-items: start; }
 .pg-code { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; min-width: 0; display: flex; flex-direction: column; box-shadow: var(--sg-shadow); }
 .pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-code pre { flex: 1; min-height: 0; margin: 0; padding: var(--sg-space-m); overflow: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
 .pg-code pre, .pg-code code { font-family: inherit; white-space: pre; }
 /* Words for a screen reader only (a mark's meaning, a copy confirmed). */
-.sg-hidden-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* A title that is one long word (segmentedControl) breaks where it must on a narrow screen, never widens the page. */
+.sg-hero > h1, .sg-section > h2, .pg-head > h2, .sg-section > h3, .sg-overview-group > h3 { overflow-wrap: anywhere; min-width: 0; }
+/* Read out, never seen; at the corner of the box that holds it, so text hidden in a bar that scrolls sideways never
+   widens the page (WCAG 1.4.10). */
+.sg-hidden-text { position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pg-req { color: var(--sg-text); font-weight: var(--sg-heading-weight); }
 .pg-legend { font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-xs) var(--sg-space-m); border-top: var(--sg-line); }
 .pg-wcag { display: block; font-size: var(--sg-s); color: var(--sg-muted); }
@@ -327,7 +331,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-meta > * { margin: 0; }
 .pg-stage { display: flex; flex-direction: column; gap: var(--sg-space-l); container-type: inline-size; }
 /* The stage never narrower than a phone screen and its margins: with less room the controls go below it, never beside a squeezed stage. */
-.pg-preview-card { --sg-stage-min: 400px; display: grid; grid-template-columns: minmax(min(100%, var(--sg-stage-min)), 1fr) minmax(240px, 340px); gap: 0; align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: 0; overflow: clip; background: var(--sg-bg); box-shadow: var(--sg-shadow); }   /* one card: the stage fills its left side to the edges, the controls on its right */
+.pg-preview-card { --sg-stage-min: 400px; display: grid; grid-template-columns: minmax(min(100%, var(--sg-stage-min)), 1fr) minmax(min(240px, 100%), 340px); gap: 0; align-items: stretch; border: var(--sg-line); border-radius: var(--sg-radius-l); padding: 0; overflow: clip; background: var(--sg-bg); box-shadow: var(--sg-shadow); }   /* one card: the stage fills its left side to the edges, the controls on its right */
 .pg-preview-card > .pg-preview-col { border-right: var(--sg-line); }
 .pg-preview { min-width: 0; min-height: 140px; overflow: auto; padding: var(--sg-space-xl); display: flex; align-items: safe center; align-content: safe center; justify-content: safe center; gap: var(--sg-space-m); flex-wrap: wrap; position: relative; isolation: isolate; }   /* a component wider than the stage scrolls inside it, never over the controls */
 /* A transparency checkerboard over the system's own page surface: a transparent component shows it, an opaque one covers it. */
@@ -351,7 +355,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-anat-stage { position: relative; flex: none; }
 /* Variants: one option per row, its name, the component as drawn with it, and Try it to set it in the Playground. */
 .pg-variants { display: flex; flex-direction: column; gap: var(--sg-space-l); }
-.pg-variant-row { display: grid; grid-template-columns: minmax(120px, 1fr) 3fr auto; gap: var(--sg-space-m); align-items: center; padding: var(--sg-space-m); border-bottom: var(--sg-line); }
+.pg-variant-row { display: grid; grid-template-columns: minmax(min(120px, 100%), 1fr) 3fr auto; gap: var(--sg-space-m); align-items: center; padding: var(--sg-space-m); border-bottom: var(--sg-line); }
 .pg-variant-row:last-child { border-bottom: none; }
 .pg-variant-stage { display: flex; align-items: center; min-width: 0; overflow: auto; }
 @container (max-width: 720px) { .pg-preview-card { grid-template-columns: minmax(0, 1fr); } .pg-preview-card > .pg-preview-col { border-right: 0; border-bottom: var(--sg-line); } .pg-panel { min-width: 0; } }
@@ -423,7 +427,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect .pg-par-val { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-size: var(--sg-s); }   /* what a change did, under it */
 .pg-missing { font-style: italic; }
 .pg-doc > .pg-from { margin-top: var(--sg-space-s); }
-.pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sg-space-m); align-items: start; }
+.pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: var(--sg-space-m); align-items: start; }
 .pg-inspect-grid.pg-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* Parity: two columns */
 .sg-seg-icon { width: var(--sg-icon); height: var(--sg-icon); flex: none; color: var(--sg-warning); vertical-align: middle; margin-right: var(--sg-space-xxs); }
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; box-shadow: var(--sg-shadow); }

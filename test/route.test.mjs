@@ -74,8 +74,8 @@ test('guidelines links, setup and refresh', () => {
   const setup = r('set up the parity. Figma is https://www.figma.com/design/AbC123/Tidepool and tokens are in src/theme.css', { hasConfig: false, components: [] });
   assert.deepEqual([setup.recipe, setup.run], ['first-setup', ["rms-design-system-engine --init --figma-url='https://www.figma.com/design/AbC123/Tidepool' --theme-css='src/theme.css'"]]);
   const noUrl = r('audit the chip', { hasConfig: false, components: [] });
-  assert.equal(noUrl.recipe, 'first-setup');   // no config yet: setup comes first, whatever was asked
-  assert.deepEqual(noUrl.run, ["rms-design-system-engine --init --figma-url='<the Figma link; left out when there is none>' --project='<. for this folder, or the folder or git link>'"]);
+  assert.equal(noUrl.recipe, 'first-setup');   // no config yet: setup comes first, whatever was asked, and the request after it (E21)
+  assert.deepEqual(noUrl.run, ["rms-design-system-engine --init --figma-url='<the Figma link; left out when there is none>' --project='<. for this folder, or the folder or git link>' --then='audit the chip'"]);
   assert.equal(noUrl.ask, "where the design system's code is (this folder, another folder on this computer, or a git link), and the link to its Figma file, if they have one (optional: without it only the code is checked)");
   assert.match(routeText(noUrl, '', 'rms-design-system-engine'), /\nNEXT: before running anything, ask the person, in one message: where the design system's code is/);
   const refresh = route('refresh the Figma snapshots, the design changed yesterday', { ...P, snapshotDate: '2026-03-02' });
@@ -171,7 +171,7 @@ test('a request for the style guide builds it, scoped to the component it names'
 test('another design system than the one set up here: its code and Figma link are asked for, then it runs there', () => {
   const names = ['Harbor Design System', '@harbor/ui', 'harbor-ds'];
   const ask = route('build the style guide for buttonPrimary of the Innova DS', { names, components: ['buttonPrimary'] });
-  assert.equal(ask.run[0], "rms-design-system-engine --project='<Innova's folder or git link>' --styleguide");
+  assert.equal(ask.run[0], "rms-design-system-engine --project='<Innova's folder or git link>' --component buttonPrimary --styleguide", 'its component, named as one, is scoped there too');
   assert.match(ask.ask, /^where Innova's code is \(this folder, another folder on this computer, or a git link\), and the link to Innova's Figma file/);
   assert.match(ask.notes[0], /never run this folder's system in its place/);
   const given = route("build the style guide for innova DS: the code is in '/Users/me/Work/innova ds', Figma https://www.figma.com/design/AbC123/Innova", { names });
