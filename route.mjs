@@ -124,6 +124,8 @@ const STYLE_GUIDE = /\bstyle ?guide\b|\bguia de estilos?\b/i;
 // A request that names the style guide gets the style guide, accessibility named or not ("the accessibility of
 // buttonPrimary in the style guide", E25); one that asks to fix it, or how it works, does not build it.
 const NOT_STYLE_GUIDE = /\bfix\b|\bcorrig|\breflow|\bhow (?:do|to|does)\b/i;
+// The style guide shared with the team, rebuilt on every push (G7): the CI job that publishes it is written.
+const PUBLISH_STYLE_GUIDE = /\b(?:publish|share|host|deploy|put)\w*\b[^.\n]{0,40}\bstyle ?guide\b|\bstyle ?guide\b[^.\n]{0,40}\b(?:online|link|url|the (?:whole )?team|everyone|pages|published|shared)\b|\b(?:publica|partilha|compartilha)\w*\b[^.\n]{0,30}\bguia de estilos?\b/i;
 const FIGMA_URL = /https?:\/\/(?:www\.)?figma\.com\/(?:design|file)\/[\w-]+\S*/i;
 const STEP_LIST = /(^|\s)1[.)]\s[\s\S]*\s2[.)]\s/;
 
@@ -239,6 +241,10 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
   // No config yet: setup first, whatever was asked; a GitLab link then is the code's, unless it is named as guidelines.
   if (!hasConfig && !(LINK.test(t) && /guideline|wiki|notion|diretriz|orienta/i.test(t))) return { recipe: 'first-setup', question, ...setupRun(t, cmd, { cloud }), notes };
 
+  if (PUBLISH_STYLE_GUIDE.test(t) && !NOT_STYLE_GUIDE.test(t)) {
+    notes.push('The style guide the team shares is published by the project\'s CI on every push; the engine writes that job (GitHub Pages or GitLab Pages, from the git remote) and never commits it. Tell the person what its lines say to do once, and who can open the page.');
+    return { recipe: 'publish-styleguide', question: false, run: [`${cmd} --publish-styleguide`], notes };
+  }
   // The style guide asked for ("build the style guide", "the style guide for buttonPrimary"): built, for the component
   // named when there is one, never a plain audit in its place. A question about it is answered from the recipe.
   if (STYLE_GUIDE.test(t) && !question && !NOT_STYLE_GUIDE.test(t)) {

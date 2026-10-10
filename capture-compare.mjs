@@ -375,13 +375,17 @@ export function compareComponents(code, structure, vars, cfg, maps) {
         if (['WRAP', 'NO_WRAP'].includes(f.box.wrap) && fw) settle((f.box.wrap === 'WRAP') === /^wrap/.test(String(fw.value).trim()), { component: name, field: 'wrap', figma: f.box.wrap === 'WRAP' ? 'wrap' : 'nowrap', code: fw.value, rule: fw.rule, at: fw.at, confidence: fw.confidence });
       }
     }
-    // Stroke weight per side, when Figma records it: each side's width, not only whether it draws.
+    // Stroke weight per side, when Figma records it: each side's width, not only whether it draws. An inside stroke
+    // drawn as an inset ring (box-shadow: inset 0 0 0 1.5px), with no border, has the ring's width on every side.
     if (Array.isArray(f.stroke?.weights) && !low && c.props?.borderTopWidth && !drawsNothing) {
+      const ring = insetRingOf(c.props?.boxShadow?.drawn) ?? insetRingOf(c.props?.boxShadow?.value);
       ['Top', 'Right', 'Bottom', 'Left'].forEach((s, i) => {
         const want = f.stroke.weights[i], got = c.props?.[`border${s}Width`];
         if (typeof want !== 'number' || !got) return;
         const drawnPx = toNum(got.drawn ?? got.value), declPx = toNum(got.value);
-        settle(Math.abs(declPx - want) < 0.01 || Math.abs(drawnPx - want) < 0.01, { component: name, field: `border ${s.toLowerCase()} width`, figma: want, code: got.value, rule: got.rule, at: got.at });
+        const byRing = ring && !(drawnPx > 0) && !(declPx > 0);
+        if (byRing) settle(Math.abs(ring.width - want) < 0.01, { component: name, field: `border ${s.toLowerCase()} width`, figma: want, code: `${ring.width}px (an inset ring)`, rule: c.props.boxShadow.rule, at: c.props.boxShadow.at });
+        else settle(Math.abs(declPx - want) < 0.01 || Math.abs(drawnPx - want) < 0.01, { component: name, field: `border ${s.toLowerCase()} width`, figma: want, code: got.value, rule: got.rule, at: got.at });
       });
     }
     // Root opacity.
@@ -483,7 +487,8 @@ export function compareComponents(code, structure, vars, cfg, maps) {
         ['fill', 'background', (col) => (c.fill === 'before' ? col.beforeBackground : col.backgroundColor), c.props?.backgroundColor],
         // A text part with its own colour rule is read on the part in every mode (its colours per mode, from the capture).
         ['text', 'text colour', (col, m) => (m === firstMode && !suffix ? textFact?.value : textInherits ? col.color : !suffix ? partColors?.[m]?.color ?? null : null), textFact],
-        ['stroke', 'border colour', (col) => col[strokeKey] ?? col.borderTopColor, c.props?.[strokeKey]],
+        // A stroke drawn as an inset ring, with no border of its own, is the ring's colour (its border-color is the text's).
+        ['stroke', 'border colour', (col) => { const ring = insetRingOf(col.boxShadow); return ring && !(toNum(c.props?.borderTopWidth?.drawn ?? c.props?.borderTopWidth?.value) > 0) ? ring.color : col[strokeKey] ?? col.borderTopColor; }, c.props?.[strokeKey]],
       ];
       for (const [slot, field, pick, fact] of slots) {
         const paint = paints?.[slot];

@@ -92,6 +92,7 @@ reference it points to say, never from memory or from this table alone.
 | Figma brought in line with what the code already states (a component's role), or the prototypes' gaps sent to Figma as a to do list, applied once the person says yes | `figma-edits` |
 | a component's props and values, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
+| the style guide published for the team, one link rebuilt on every push (GitHub Pages or GitLab Pages) | `publish-styleguide` |
 
 Reference (`rms-design-system-engine --reference <name>`): `usage` (every command, option and output), `config`
 (`ds-config.json`, snapshot files, naming), `gates` (gate-specific rules), `maintainers` (changing the engine

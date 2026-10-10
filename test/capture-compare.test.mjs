@@ -288,6 +288,24 @@ test('components: a bottom-only stroke is read on its bottom, never through the 
   assert.deepEqual(r.differ.map((d) => d.field), [], JSON.stringify(r.differ));
 });
 
+test('components: an inside stroke drawn as an inset ring has the ring\'s width on every side, as Figma\'s stroke does', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.tip' });
+  const ring = (w) => ({ components: { tip: { confidence: 'high', instance: { hasText: true },
+    props: { borderTopWidth: v('0px'), borderRightWidth: v('0px'), borderBottomWidth: v('0px'), borderLeftWidth: v('0px'), boxShadow: v(`rgb(51, 51, 51) 0px 0px 0px ${w}px inset`), backgroundColor: v('rgb(0, 0, 0)') } } } });
+  const figma = { tip: { stroke: { weights: [1.5, 1.5, 1.5, 1.5], align: 'INSIDE' } } };
+  assert.deepEqual(compareComponents(ring(1.5), figma, {}, cfg, maps()).differ.filter((d) => /border .* width/.test(d.field)), []);
+  const wrong = compareComponents(ring(1), figma, {}, cfg, maps()).differ.filter((d) => /border .* width/.test(d.field));
+  assert.deepEqual(wrong.map((d) => `${d.field}: ${d.figma} / ${d.code}`), ['border top width: 1.5 / 1px (an inset ring)', 'border right width: 1.5 / 1px (an inset ring)', 'border bottom width: 1.5 / 1px (an inset ring)', 'border left width: 1.5 / 1px (an inset ring)']);
+  // Its colour is the ring's in every mode, never the border colour that follows the text.
+  const coloured = ring(1.5);
+  coloured.components.tip.colors = { light: { borderTopColor: 'rgb(64, 64, 64)', boxShadow: 'rgb(232, 232, 232) 0px 0px 0px 1.5px inset' }, dark: { borderTopColor: 'rgb(191, 191, 191)', boxShadow: 'rgb(43, 43, 43) 0px 0px 0px 1.5px inset' } };
+  const paint = { tip: { strokeOnDefault: true, stroke: { weights: [1.5, 1.5, 1.5, 1.5], align: 'INSIDE' }, colors: { stroke: { token: 'tip/border/color', hex: '#e8e8e8', opacity: 1 } } } };
+  const vars = { color: { light: { 'tip/border/color': '#e8e8e8' }, dark: { 'tip/border/color': '#2b2b2b' } } };
+  assert.deepEqual(compareComponents(coloured, paint, vars, cfg, maps()).differ.filter((d) => /border colour/.test(d.field)), []);
+  coloured.components.tip.colors.dark.boxShadow = 'rgb(255, 0, 0) 0px 0px 0px 1.5px inset';
+  assert.deepEqual(compareComponents(coloured, paint, vars, cfg, maps()).differ.filter((d) => /border colour/.test(d.field)).map((d) => d.field), ['border colour [dark]']);
+});
+
 test('components: a width the page gives (width: 100%) is not the component\'s to compare', () => {
   const code = { components: { divider: { confidence: 'high', instance: { hasText: false }, size: { width: 600 },
     props: { width: { value: '600px', declared: '100%', confidence: 'single-source', rule: '.divider' } } } } };
