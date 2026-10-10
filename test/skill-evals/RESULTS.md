@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: A style guide request builds it, accessibility named or not; a component's own style guide page (continuous evaluation)
+
+What changed since the entry below (engine 7cc7815): Router: another design system's code and Figma link asked for at once; a style guide request builds it; A style guide request builds it, accessibility named or not; a component's own style guide page. The guide changed in `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `1d17e071130c` · Project measured: `13d811a9d668`
+
+| Haiku, engine 58d7ee7 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.055 |
+| Input a run | 107k | 93k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 107k. Records: `records/2026-10-10-a-style-guide-request-builds`.
+
 ## 2026-10: Focus as a keyboard user sees it, Escape on dialogs over the page, and what only the code has in the style guide (continuous evaluation)
 
 What changed since the entry below (engine fe00df6): Accessibility: a field whose frame shows its focus passes, a style that eases in is read where it ends, a part beside the control (a radio's circle) shows its focus, a control that takes no focus is not judged, and Escape is judged on a dialog over the page, not one drawn in its flow. The style guide lists the components only the code has, marked so, and draws a Vue component from its template. The guide changed in `reference/usage.md`. The guide changed in `reference/usage.md`.
