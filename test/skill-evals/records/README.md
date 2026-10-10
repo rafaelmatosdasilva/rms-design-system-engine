@@ -63,5 +63,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-09-colours-by-variable-freshness-by-content` | The 21 guide tasks on Haiku (engine 6706b73) | "Colours named by their Figma variable; freshness by content; edges read at rest; paired variables; deeper facts on the right side" |
 | `2026-10-09-accessibility-parity-readings` | The 21 guide tasks on Haiku (engine af1bcf1) | "Accessibility and parity readings: text as drawn, focus rings, ARIA states, edges in every mode, box and text facts" |
 | `2026-10-10-states-heard-on-a-part-colours` | The 21 guide tasks on Haiku (engine a1ca3dd) | "States heard on a part (heardOn); colours in any notation in the edit check" |
+| `2026-10-10-prototype-quality` | The 21 guide tasks on Haiku (engine d8e021e) | "Prototype quality on a real system" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
