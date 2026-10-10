@@ -45,7 +45,7 @@ test('setup takes every hosted mode file it is given, writes them to one local f
   writeFileSync(join(dir, 'src', 'app.js'), SIX.map(([c, s]) => `// ${base}/${c}-${s}.css`).join('\n'));
   writeFileSync(join(dir, 'package.json'), '{"name":"p"}');
   const init = (args) => new Promise((resolve) => {
-    const p = spawn(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X', '--no-hooks', ...args], { cwd: dir, env: { ...process.env, NO_COLOR: '1', NO_PROXY: '127.0.0.1', no_proxy: '127.0.0.1' } });
+    const p = spawn(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X', '--project=.', '--no-hooks', ...args], { cwd: dir, env: { ...process.env, NO_COLOR: '1', NO_PROXY: '127.0.0.1', no_proxy: '127.0.0.1' } });
     let text = ''; p.stdout.on('data', (d) => { text += d; }); p.stderr.on('data', (d) => { text += d; });
     p.on('close', (code) => resolve({ code, text }));
   });

@@ -75,7 +75,9 @@ test('guidelines links, setup and refresh', () => {
   assert.deepEqual([setup.recipe, setup.run], ['first-setup', ["rms-design-system-engine --init --figma-url='https://www.figma.com/design/AbC123/Tidepool' --theme-css='src/theme.css'"]]);
   const noUrl = r('audit the chip', { hasConfig: false, components: [] });
   assert.equal(noUrl.recipe, 'first-setup');   // no config yet: setup comes first, whatever was asked
-  assert.match(noUrl.notes.join(' '), /Ask the person for the Figma file URL/);
+  assert.deepEqual(noUrl.run, ["rms-design-system-engine --init --figma-url='<the Figma link; left out when there is none>' --project='<. for this folder, or the folder or git link>'"]);
+  assert.equal(noUrl.ask, "where the design system's code is (this folder, another folder on this computer, or a git link), and the link to its Figma file, if they have one (optional: without it only the code is checked)");
+  assert.match(routeText(noUrl, '', 'rms-design-system-engine'), /\nNEXT: before running anything, ask the person, in one message: where the design system's code is/);
   const refresh = route('refresh the Figma snapshots, the design changed yesterday', { ...P, snapshotDate: '2026-03-02' });
   assert.equal(refresh.recipe, 'refresh-figma');
   assert.equal(refresh.sayIf, 'when there is no Figma tool in this session');
@@ -83,6 +85,23 @@ test('guidelines links, setup and refresh', () => {
   assert.match(refresh.say[0], /set FIGMA_TOKEN in the project's \.env file; never paste a token in the chat\.$/);   // how to give access, so the agent never improvises "share a token"
   assert.match(refresh.notes.join(' '), /Without it, do not offer a refresh and never edit a snapshot/);
   assert.equal(r('o design mudou, atualiza os dados do Figma').recipe, 'refresh-figma');
+});
+
+test('setup takes where the code is and the Figma link from the request, and asks for what it leaves out', () => {
+  const none = { hasConfig: false, components: [] };
+  const F = "https://www.figma.com/design/AbC123/T";
+  const run = (text) => r(text, none).run[0];
+  assert.equal(run(`set up. Figma ${F}, the code is in ~/dev/ui-kit`), `rms-design-system-engine --init --figma-url='${F}' --project='~/dev/ui-kit'`, 'a trailing comma is not part of the link');
+  assert.equal(run(`set up ${F}. The code is /Users/me/dev/ds.`), `rms-design-system-engine --init --figma-url='${F}' --project='/Users/me/dev/ds'`);
+  assert.equal(run(`set up ${F}, the code is github.com/acme/ui-kit.git`), `rms-design-system-engine --init --figma-url='${F}' --project='https://github.com/acme/ui-kit.git'`);
+  assert.equal(run(`set up ${F}, our code is at https://gitlab.example.com/team/ds`), `rms-design-system-engine --init --figma-url='${F}' --project='https://gitlab.example.com/team/ds'`, 'a GitLab link before setup is the code, not guidelines');
+  assert.equal(run(`configura a paridade ${F}, o código está nesta pasta`), `rms-design-system-engine --init --figma-url='${F}' --project='.'`);
+  assert.equal(r(`set up this folder. Figma: ${F}?node-id=1-2`, none).ask, null, 'both given: nothing to ask');
+  for (const text of ['set up the parity', 'set up this project', '/rms-design-system-engine check the accessibility of the buttonPrimary', `aqui está o figma ${F}`]) {
+    assert.match(r(text, none).ask, /^where the design system's code is/, `asked where the code is: ${text}`);
+  }
+  assert.doesNotMatch(r(`aqui está o figma ${F}`, none).ask, /Figma/, 'a Figma link given is not asked again');
+  assert.equal(r('set up the parity for this folder', none).ask, "the link to the design system's Figma file, if they have one (optional: without it only the code is checked)");
 });
 
 test('what --route prints: the route, the commands, one NEXT line, and the recipe', () => {

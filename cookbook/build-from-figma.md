@@ -4,7 +4,7 @@
 
 ## Steps
 
-1. No `ds-config.json` yet: set up first (`rms-design-system-engine --recipe first-setup`). A project with no CSS at all starts in build mode by itself. In a project that already has code, build mode is set only when the person asks (setup with `--build`, or `"build": true` in `ds-config.json`).
+1. No `ds-config.json` yet: set up first (`rms-design-system-engine --recipe first-setup`). A code folder with no design tokens yet starts in build mode by itself. In a project that already has its tokens, build mode is set only when the person asks (setup with `--build`, or `"build": true` in `ds-config.json`). Building needs the Figma file.
 2. Refresh the Figma data (`rms-design-system-engine --recipe refresh-figma`). Build only from the engine's Figma facts, never from memory or a screenshot alone.
 3. Run `rms-design-system-engine`. It lists what is left to build (`🧱 TO BUILD`), tokens first, and its NEXT line names the next item with its commands.
 4. Tokens: copy the declarations the engine wrote in `.design-system-engine-out/handback/tokens-to-build.css` into the theme file it names, exactly as written, then run the engine again.
