@@ -334,7 +334,17 @@ export const FIT_EXPRESSION = (state, pseudo, phone) => `(async () => {
     for (const t of canvas.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=tab], [role=switch], [role=checkbox], [role=radio], [role=option], [role=link]')) {
       const b = t.getBoundingClientRect(); if (!b.width || !b.height) continue;
       const lab = t.closest('label'); const lb = lab && canvas.contains(lab) ? lab.getBoundingClientRect() : null;
-      const w = Math.max(b.width, lb ? lb.width : 0), h = Math.max(b.height, lb ? lb.height : 0);
+      // What a click lands on: the control, its label, and a ::before or ::after it lays over a bigger box (a list row's
+      // button that covers the row).
+      const hit = [lb, ...['::before', '::after'].map((ps) => {
+        const cs = getComputedStyle(t, ps); if (cs.content === 'none' || cs.position !== 'absolute' || cs.pointerEvents === 'none') return null;
+        let cb = t; while (cb && cb !== document.body && getComputedStyle(cb).position === 'static') cb = cb.parentElement;
+        if (!cb) return null; const r = cb.getBoundingClientRect(), px = (v) => (/px$/.test(v) ? parseFloat(v) : null);
+        const top = px(cs.top), right = px(cs.right), bottom = px(cs.bottom), left = px(cs.left);
+        if ([top, right, bottom, left].some((v) => v == null)) return null;
+        return { width: r.width - left - right, height: r.height - top - bottom };
+      })].filter(Boolean);
+      const w = Math.max(b.width, ...hit.map((x) => x.width)), h = Math.max(b.height, ...hit.map((x) => x.height));
       if (w < 24 || h < 24) out.push({ kind: 'target', ...where(t), text: (t.getAttribute('aria-label') || t.textContent || t.getAttribute('placeholder') || '').trim().replace(/\\s+/g, ' ').slice(0, 40), w: Math.round(w), h: Math.round(h) });
     }
   }
@@ -343,9 +353,14 @@ export const FIT_EXPRESSION = (state, pseudo, phone) => `(async () => {
 })()`;
 
 // The screen widths a prototype is tried at: Figma's breakpoints, else a phone's, a tablet's and a desktop's.
-export function screenWidths(breakpoints = []) {
+// own: the width the page gives itself (a window a product opens at that size), tried too, and the one its states are
+// pictured at.
+export function screenWidths(breakpoints = [], { own = null } = {}) {
   const list = (breakpoints ?? []).filter((b) => Number.isFinite(b.px) && b.px >= 240).map((b) => ({ name: b.name, px: Math.round(b.px) }));
-  return (list.length ? list : [{ name: 'Phone', px: 375 }, { name: 'Tablet', px: 768 }, { name: 'Desktop', px: 1280 }]).sort((a, b) => a.px - b.px);
+  const out = list.length ? list : [{ name: 'Phone', px: 375 }, { name: 'Tablet', px: 768 }, { name: 'Desktop', px: 1280 }];
+  const w = Math.round(Number(own));
+  if (Number.isFinite(w) && w >= 240) { const same = out.find((x) => x.px === w); if (same) same.own = true; else out.push({ name: 'Its own', px: w, own: true }); }
+  return out.sort((a, b) => a.px - b.px);
 }
 
 // Everything found across states, widths and text lengths, one line per problem with where it happens.
@@ -440,7 +455,7 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
             runs.push({ state: st, width: w.name, longer, issues });
           }
           if (st === 'default') await shoot(join(dir, `${name}@${slugOf(w.name)}.png`));
-          else if (w === widths[widths.length - 1]) await shoot(join(dir, `${name}.${slugOf(st)}.png`));
+          else if (w === (widths.find((x) => x.own) ?? widths[widths.length - 1])) await shoot(join(dir, `${name}.${slugOf(st)}.png`));
         }
       }
       await cdp.send('Runtime.evaluate', { expression: 'window.__ptShow && window.__ptShow("default")', returnByValue: true }, sessionId).catch(() => null);

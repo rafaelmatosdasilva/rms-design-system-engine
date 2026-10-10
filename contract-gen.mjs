@@ -141,7 +141,8 @@ function buildTokens(vars, modes) {
 }
 
 // ── Component contract pieces ─────────────────────────────────────────────────
-const FIGMA_KIND_TO_TYPE = { VARIANT: 'enum', BOOLEAN: 'boolean', TEXT: 'text', INSTANCE_SWAP: 'instance' };
+// A SLOT is a place in the component for other components (its children), not words.
+const FIGMA_KIND_TO_TYPE = { VARIANT: 'enum', BOOLEAN: 'boolean', TEXT: 'text', INSTANCE_SWAP: 'instance', SLOT: 'children' };
 
 function buildProps(props, propDescriptions = {}) {
   const properties = props?.properties || {};
@@ -157,6 +158,8 @@ function buildProps(props, propDescriptions = {}) {
         code: null,                                   // AUTHORED — filled by hand, preserved
       },
     };
+    // A slot that takes only the components Figma lists for it (none listed: it takes any).
+    if (def.type === 'SLOT' && def.slotSettings?.allowPreferredValuesOnly && (def.preferredValues ?? []).length) p.slot = { preferredOnly: true, preferred: def.preferredValues.length };
     // Figma component-property definitions carry no per-prop description, so this is authored
     // (contract.authored.json → components[name].propDescriptions), with a forward-compat capture path.
     const desc = def.description ?? propDescriptions[name];
