@@ -4167,7 +4167,34 @@ function reportFull(label, items, shown) {
   if (cfg.a11yStatic !== false) {
     try {
       const { staticA11y } = await import('./a11y-static.mjs');
-      const { findings, files } = staticA11y(ROOT);
+      const whole = staticA11y(ROOT);
+      const { files } = whole;
+      // Scoped to components: only the findings about them. A finding is the component's when the element or rule it
+      // points at carries the component's class (class="button-primary", .button-primary {), or when it is inside the
+      // component's own file, the one whose first element carries that class. A page that only uses the component, or
+      // styles it among other things, keeps its other findings (a scoped run once listed every page's as the component's).
+      const ownFiles = new Set();
+      let _isScopeFinding = () => true;
+      if (_scopeForms.length) {
+        const texts = new Map();
+        const textOf = (rel) => { if (!texts.has(rel)) { let t = ''; try { t = readFileSync(join(ROOT, rel), 'utf8'); } catch { /* unreadable */ } texts.set(rel, t); } return texts.get(rel); };
+        const classesIn = (str) => {
+          const out = new Set();
+          for (const m of String(str).matchAll(/\bclass(?:Name)?\s*=\s*["'`]([^"'`]*)["'`]/g)) for (const c of m[1].split(/\s+/)) out.add(_norm(c));
+          for (const m of String(str).matchAll(/(?:^|[\s,>+~(])\.(-?[A-Za-z_][\w-]*)/gm)) out.add(_norm(m[1]));
+          return out;
+        };
+        const isScope = (cls) => _scopeForms.some((f) => cls.has(f.nameNorm) || cls.has(f.selNorm));
+        // The opening tag or rule head a finding points at: from its line to the first > or {.
+        const at = (rel, line) => { const rest = textOf(rel).split('\n').slice(Math.max(0, line - 1), line + 11).join('\n'); return rest.slice(0, (rest.search(/[>{]/) + 1) || rest.length); };
+        for (const rel of new Set(whole.findings.map((f) => f.file))) {
+          const first = /^\s*(?:<template[^>]*>\s*)?(<[A-Za-z][^>]*>)/.exec(textOf(rel).replace(/<!--[\s\S]*?-->/g, ''));
+          if (first && isScope(classesIn(first[1]))) ownFiles.add(rel);
+        }
+        _isScopeFinding = (f) => ownFiles.has(f.file) || isScope(classesIn(at(f.file, f.line))) || _mentionsIn(f.desc).some((c) => _scopeNames.includes(c));
+      }
+      const findings = whole.findings.filter(_isScopeFinding);
+      const outside = whole.findings.length - findings.length;
       _a11yCount.static = findings.length;
       if (findings.length) {
         const count = (k) => findings.filter((f) => f.kind === k).length;
@@ -4179,8 +4206,11 @@ function reportFull(label, items, shown) {
         for (const f of findings.slice(0, all ? findings.length : 15)) console.log(C.yellow(`     ${f.file}:${f.line}  ${f.desc}`));
         if (!all && findings.length > 15) console.log(`     and ${findings.length - 15} more; run with --a11y to list them all.`);
       } else if (files.markup || files.styles) {
-        console.log(C.green(`\n♿ Accessibility from the code (no browser needed): nothing found in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'}.`));
+        console.log(_scopeForms.length
+          ? C.green(`\n♿ Accessibility from the code (no browser needed): nothing found for ${_scopeNames.join(', ')} in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'}.`)
+          : C.green(`\n♿ Accessibility from the code (no browser needed): nothing found in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'}.`));
       }
+      if (outside) console.log(C.dim(`   … ${outside} finding(s) outside ${_scopeNames.join(', ')} - not audited in this scoped run`));
     } catch (e) { console.log(C.dim(`ℹ️  Accessibility from the code not checked: ${e.message}`)); }
   }
 
@@ -4514,7 +4544,7 @@ function reportFull(label, items, shown) {
     const data = NO_FIGMA ? null : dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, noLink: cfg.figmaFileKey === '', snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
     let a11yIssues = null;
     try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
-    const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), noFigma: NO_FIGMA, a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues } : null } : null;
+    const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), noFigma: NO_FIGMA, a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues, why: (rA11y?.stdout ?? '').match(/⏭\s+\[a11y\]\s+(.+)/)?.[1]?.replace(/\.$/, '') ?? null } : null } : null;
     let summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine });
     mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
     // Where every difference is listed (written by a full audit above), so the chat always says where to look.

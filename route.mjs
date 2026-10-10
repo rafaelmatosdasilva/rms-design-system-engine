@@ -252,7 +252,9 @@ function setupRun(t, cmd) {
   const css = t.match(/[\w./-]+\.css\b/)?.[0];
   const rest = t.replace(FIGMA_URL, ' ');
   const link = rest.match(CODE_LINK)?.[0]?.replace(/[.,;:)]+$/, '');
-  const project = css ? null : (link && !/^(https?:\/\/|git@)/i.test(link) ? `https://${link}` : link) ?? rest.match(CODE_PATH)?.[1]?.replace(/[.,;:]+$/, '') ?? (THIS_FOLDER.test(t) ? '.' : null);
+  // A path in quotes is taken whole, spaces included ('/Users/me/RMS Portfolio/ds'); a bare one ends at a space.
+  const quoted = rest.match(/(['"`])((?:~|\.{1,2})?\/[^'"`\n]+?)\1/)?.[2];
+  const project = css ? null : (link && !/^(https?:\/\/|git@)/i.test(link) ? `https://${link}` : link) ?? quoted ?? rest.match(CODE_PATH)?.[1]?.replace(/[.,;:]+$/, '') ?? (THIS_FOLDER.test(t) ? '.' : null);
   const code = css ? ` --theme-css='${css}'` : ` --project='${project ?? '<. for this folder, or the folder or git link>'}'`;
   const ask = [!css && !project && 'where the design system\'s code is (this folder, another folder on this computer, or a git link)',
     !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);

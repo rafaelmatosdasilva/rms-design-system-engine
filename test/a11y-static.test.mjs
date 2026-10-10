@@ -111,3 +111,37 @@ test('a name written after a spread replaces the one the caller passes; before i
   for (const ok of ['<input aria-label={label} {...inputProps} />', '<input {...rest} aria-label={label ?? rest["aria-label"]} />', '<input {...rest} aria-label="Search" />'])
     assert.deepEqual(markupFindings(ok).filter((x) => /after \{\.\.\./.test(x.desc)), [], ok);
 });
+
+test('a long stretch with no brace (a blanked inline image) is read in one pass, and the project\'s styles once', async () => {
+  const { focusIndex } = await import('../a11y-static.mjs');
+  const blank = `${' '.repeat(300000)}\n.btn { outline: none; }`;
+  const t = Date.now();
+  assert.deepEqual(kinds(cssFindings(blank)), [[2, 'focus']]);
+  assert.ok(Date.now() - t < 2000, 'linear: a pattern took minutes here');
+  // The index of what puts focus back answers as the text it is read from.
+  const all = '.btn { outline: none; }\n.btn:focus-visible { box-shadow: 0 0 0 2px blue; }\n.field__in { outline: 0; }\n.field:focus-within { border-color: blue; }';
+  for (const part of ['.btn { outline: none; }', '.field__in { outline: 0; }', '.other { outline: none; }']) {
+    assert.deepEqual(cssFindings(part, focusIndex(all)), cssFindings(part, all));
+  }
+});
+
+test('a scoped run lists only the findings about the component: its own file, or an element that carries its class', { timeout: 120000 }, async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
+  const dir = makeFixture({
+    'ds-config.json': { paths: { themeCSS: 'theme.css' }, codeReading: { capture: 'off' } },
+    'theme.css': ':root { --a: #fff; }',
+    // The component's own file: its first element carries its class; the icon inside has no alt.
+    'src/buttons/Primary.vue': '<template>\n  <button class="button-primary">\n    <img src="icon.svg">\n  </button>\n</template>\n',
+    // A page that uses it, and hand-styles one: only the hand-built one is about the component.
+    'src/pages/Login.vue': '<template>\n  <main>\n    <div @click="go">Go</div>\n    <button\n      class="button-primary"><svg/></button>\n  </main>\n</template>\n',
+  });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'ButtonPrimary', '--only', 'accessibility'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, timeout: 100000 });
+  const out = r.stdout + r.stderr;
+  assert.match(out, /src\/buttons\/Primary\.vue:3 {2}an image with no alt/, out.slice(-2500));
+  assert.match(out, /src\/pages\/Login\.vue:4 {2}a button with only an icon inside/, 'a hand-built one carries the class: it is about the component');
+  assert.doesNotMatch(out, /Login\.vue:3 {2}a clickable <div>/, 'the page\'s own div is the page\'s');
+  assert.match(out, /… 1 finding\(s\) outside ButtonPrimary - not audited in this scoped run/);
+});

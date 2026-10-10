@@ -15,7 +15,7 @@ The easiest way is to ask in Claude Code, in your own words, after `/rms-design-
 | Run one check (a gate) | `/rms-design-system-engine run only the token values check` | `rms-design-system-engine --only 3` |
 | Ask what the design system has | `/rms-design-system-engine which props does the badge take?` | `rms-design-system-engine --query badge` |
 
-You can mix them. `rms-design-system-engine --component button --only accessibility` checks only the accessibility of the button.
+You can mix them. `rms-design-system-engine --component button --only accessibility` checks only the accessibility of the button. Scoped to a component, what the code's accessibility finds is listed only when it is about that component: in its own file, or on an element or rule that carries its class. A page that only uses it keeps its findings to itself. The browser part needs the project's packages installed; when they are not, the run says so (install them, then run again).
 
 **Every difference in one list.** Each full check writes `.design-system-engine-out/differences.md`: every difference between Figma and the code, grouped by component, with what is new since the last check. It is written whether or not you have a style guide, and the summary of every check says where it is. It also names each check that did not run, so a gap is never mistaken for a pass.
 
