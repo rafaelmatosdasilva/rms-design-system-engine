@@ -24,14 +24,29 @@ export function systemFamily(cssText = '') {
   const vars = new Map();
   for (const m of String(cssText).matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) if (!vars.has(m[1])) vars.set(m[1], m[2].trim());
   const resolve = (f) => f.replace(/^var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)/, (all, v) => { const x = vars.get(v); return x && !/var\(/.test(x) ? x : all; });
-  for (const m of String(cssText).matchAll(/font-family\s*:\s*([^;}]+)/g)) { const f = resolve(m[1].trim()); if (!/^var\(/.test(f) && f !== 'inherit') count.set(f, (count.get(f) ?? 0) + 1); }
+  for (const m of String(cssText).matchAll(/(?<![\w-])font-family\s*:\s*([^;}]+)/g)) { const f = resolve(m[1].trim()); if (!/^var\(/.test(f) && f !== 'inherit') count.set(f, (count.get(f) ?? 0) + 1); }
   for (const m of String(cssText).matchAll(/(?<![\w-])font\s*:[^;}]*?(?<![\w.])[\d.]+(?:px|rem|em|%)(?:\s*\/\s*[\d.]+(?:px|rem|em|%)?)?\s+([^;}]+)/g)) { const f = resolve(m[1].trim()); if (!/^var\(/.test(f)) count.set(f, (count.get(f) ?? 0) + 1); }
   return [...count].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
 
+// A family as the page sets it: the design's family first, then the stack the system's CSS falls back on, so the page
+// draws in the system's own fonts while the design's loads, or when it never does (a machine without network).
+// A name that is not one word is quoted; a stack with no generic family ends in sans-serif.
+const GENERIC_FAMILY = /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-[\w-]+|math|emoji|inherit)$/i;
+export function fontStack(family, cssStack = null) {
+  const names = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  const bare = (x) => x.replace(/^["']|["']$/g, '');
+  const own = names(family);
+  if (!own.length) return family ?? null;
+  const all = [...own, ...names(cssStack).filter((x) => !own.some((o) => bare(o).toLowerCase() === bare(x).toLowerCase()))];
+  if (!all.some((x) => GENERIC_FAMILY.test(bare(x)))) all.push('sans-serif');
+  return all.map((x) => (/^["']/.test(x) || GENERIC_FAMILY.test(x) || /^-?[A-Za-z_][\w-]*$/.test(x) || /^var\(/.test(x) ? x : `"${x}"`)).join(', ');
+}
+
 export function systemScales(view = {}, figmaVars = {}, cssText = '') {
   const spacing = (view.tokens?.spacing ?? []).map((t) => ({ name: t.figma, var: t.var, value: t.value }));
-  const text = Object.entries(figmaVars.typography ?? {}).map(([name, t]) => ({ name, size: t.size, weight: t.weight, lh: t.lh, family: t.family }));
+  const cssStack = systemFamily(cssText);
+  const text = Object.entries(figmaVars.typography ?? {}).map(([name, t]) => ({ name, size: t.size, weight: t.weight, lh: t.lh, family: t.family ? fontStack(t.family, cssStack) : t.family }));
   // The page's own colours, when the system names them: its page surface and its primary text.
   // A component's own colour (buttonSecondary/background) is never the page's: only system-wide names count.
   const own = new Set((view.components ?? []).map((c) => String(c.name).toLowerCase().replace(/^[._]+/, '')));
@@ -41,7 +56,7 @@ export function systemScales(view = {}, figmaVars = {}, cssText = '') {
   const ink = best(colours, (n) => (/(^|\/)(text|content|foreground|ink)\//.test(n) ? 1 : 0) && ((/primary|default|base/.test(n) ? 2 : 0) + 1));
   // Every colour token, for a surface or a text colour the screen binds to one of them.
   const colors = (view.tokens?.colors ?? []).flatMap((g) => g.items).map((t) => ({ name: t.figma, var: t.var }));
-  return { spacing, text, colors, surface: surface?.var ?? null, ink: ink?.var ?? null, family: text.find((t) => t.family)?.family ?? systemFamily(cssText) };
+  return { spacing, text, colors, surface: surface?.var ?? null, ink: ink?.var ?? null, family: text.find((t) => t.family)?.family ?? fontStack(cssStack, cssStack) };
 }
 
 // The engine's pieces as catalog entries, so one checker reads them with the system's components. A piece whose name

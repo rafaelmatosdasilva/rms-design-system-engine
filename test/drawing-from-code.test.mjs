@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { scriptMarkups, instanceMarkups, fullestMarkup, agreedView } from '../styleguide-data.mjs';
 import { modifierFor, systemFamily, checkPrototype } from '../prototype-pieces.mjs';
-import { prototypePage, fontLinks, codeColours } from '../prototype.mjs';
+import { prototypePage, fontLoader, codeColours } from '../prototype.mjs';
 import { screenToPrototype } from '../screen-layout.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
 
@@ -57,15 +57,15 @@ test('an option is turned on by the class the theme gives it, or by the class co
   assert.equal(modifierFor(css, 'badge', 'positive'), null);
 });
 
-test('the design\'s font: written through a variable, loaded on the page unless it is a system font or turned off', () => {
+test('the design\'s font: written through a variable, found on the page unless it is a system font; Google asked unless turned off', () => {
   assert.match(systemFamily(':root { --font-family: Inter; } body { font-family: var(--font-family), ui-sans-serif, sans-serif; }'), /^Inter\b/);
   assert.match(systemFamily('body { font-family: var(--brand-font), sans-serif; } :root { --brand-font: "Söhne"; }'), /^"Söhne", sans-serif$/);
-  assert.match(fontLinks({ family: 'Inter, ui-sans-serif, sans-serif', text: [] }), /fonts\.googleapis\.com\/css2\?family=Inter:/);
-  assert.equal(fontLinks({ family: 'system-ui, sans-serif', text: [{ family: 'Arial' }] }), '');
+  assert.match(fontLoader({ family: 'Inter, ui-sans-serif, sans-serif', text: [] }), /\(\[\{"family":"Inter"\}\], true\);<\/script>/);
+  assert.equal(fontLoader({ family: 'system-ui, sans-serif', text: [{ family: 'Arial' }] }), '');
   const parts = { view: { components: [] }, themeCSS: '', componentCSS: '', iconSheet: '' };
   const tree = { component: 'Page', props: {}, children: [] };
-  assert.match(prototypePage({ name: 'p', tree, parts, scales: { family: 'Inter', text: [], spacing: [] }, gaps: [] }), /data-pt-font/);
-  assert.doesNotMatch(prototypePage({ name: 'p', tree, parts, scales: { family: 'Inter', text: [], spacing: [] }, gaps: [], fonts: false }), /data-pt-font/);
+  assert.match(prototypePage({ name: 'p', tree, parts, scales: { family: 'Inter', text: [], spacing: [] }, gaps: [] }), /data-pt-fonts>[\s\S]*\], true\);/);
+  assert.match(prototypePage({ name: 'p', tree, parts, scales: { family: 'Inter', text: [], spacing: [] }, gaps: [], fonts: false }), /data-pt-fonts>[\s\S]*\], false\);/, 'still looked for on the machine, never asked of Google');
 });
 
 test('a Figma colour is drawn with the variable the naming rule gives it, else the one whose comment names it, else the one Figma makes it from', () => {
