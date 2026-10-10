@@ -69,7 +69,8 @@ test('page: target size, a positive tabindex, Escape, reduced motion, forced col
     <button class="shadow">Shadow focus</button>
     <div class="box">Fits now</div>
     <div class="chip">Chip that is not a button</div>
-    <div role="dialog" aria-label="d"><button>Inside</button></div>
+    <div role="dialog" aria-label="d" style="position: fixed; bottom: 8px; right: 8px; background: #fff"><button>Inside</button></div>
+    <div role="dialog" aria-label="specimen" id="specimen"><button>A dialog drawn in the page</button></div>
   </body></html>`;
   const dir = makeFixture({ 'page.html': page, 'contract.authored.json': { components: { Chip: { semantics: { element: 'button' } } } }, 'ds-config.json': { componentSelectors: { Chip: '.chip' } } });
   let out = '';
@@ -79,7 +80,9 @@ test('page: target size, a positive tabindex, Escape, reduced motion, forced col
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
   assert.equal(kinds('target').length, 2, out);                               // both 16×16 buttons, 16px apart
   assert.ok(kinds('tabindex').some((s) => s.startsWith('button')), out);
-  assert.ok(kinds('escape').length === 1, out);
+  assert.ok(kinds('escape').length === 1, out);                               // the dialog over the page (E18)
+  assert.ok(!kinds('escape').some((x) => /specimen/.test(x)), out);
+  assert.ok((d.notJudged ?? []).some((n) => /^Escape on div#specimen .*drawn open in the page with nothing that opened it/.test(n)), out);   // a picture of a dialog: said, never judged
   assert.ok(kinds('motion').some((s) => /spin/.test(s)), out);
   assert.ok(kinds('forcedfocus').some((s) => /button/.test(s)), out);           // a shadow-only focus ring
   assert.ok(kinds('spacing').some((s) => /box/.test(s)), out);
@@ -477,6 +480,35 @@ test('page: focus by outline colour alone, a faint ring on ::after, and a two-to
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();
   assert.deepEqual(kinds('focus'), [], out);
   assert.deepEqual(kinds('focuscontrast'), ['button#pseudo'], out);
+});
+
+// E19: a field whose frame shows its focus (WCAG 2.4.7 takes an indicator around the control), even when the frame's
+// border eases in, passes; the frame's ring is measured like a ring on the control (1.4.11, its thickness for 2.4.13); a
+// radio whose circle beside it shows the focus passes too; a control inside an inert thumbnail takes no focus to judge;
+// a field with no focus style anywhere is still found.
+test('page: a field whose frame shows its focus with an easing border passes, and its ring is measured', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
+    .wrap { display: inline-flex; border: 2px solid #8a8a8a; padding: 4px; margin: 8px; transition: border-color 0.15s ease; }
+    .wrap input { border: none; outline: none; background: transparent; font: inherit; }
+    .wrap.good:focus-within { border-color: #0050c8; } .wrap.faint:focus-within { border-color: #e6e6e6; }
+    .wrap.thin { border-width: 1px; } .bare { border: 1px solid #555; outline: none; margin: 8px; font: inherit; }
+    .pick { position: relative; display: inline-flex; gap: 6px; margin: 8px; } .pick input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+    .dot { width: 14px; height: 14px; border: 2px solid #333; border-radius: 50%; } .pick input:focus-visible + .dot { outline: 2px solid #0050c8; outline-offset: 2px; }</style></head><body><main><h1>Fields</h1>
+    <label class="wrap good">Name <input id="good"></label><label class="wrap faint">Code <input id="faint"></label>
+    <label class="wrap good thin">City <input id="thin"></label><label>Note <input id="bare" class="bare"></label>
+    <label class="pick"><input type="radio" name="f" id="dotted"><span class="dot"></span>PDF</label>
+    <label class="pick plain"><input type="checkbox" id="plain"><span class="dot"></span>Bleed</label>
+    <div inert><label class="wrap">Thumb <input id="thumb"></label></div>
+  </main></body></html>`.replace('.pick input:focus-visible + .dot', '.pick:not(.plain) input:focus-visible + .dot');
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();
+  assert.deepEqual(kinds('focus'), ['input#bare', 'input#plain'], out);   // the radio's circle shows its focus; the inert thumbnail takes none to judge
+  assert.deepEqual(kinds('focuscontrast'), ['input#faint'], out);
+  assert.deepEqual(kinds('focusthin'), ['input#thin'], out);
 });
 
 // A5: a control edge is read in every colour mode: a field whose border holds in light but fades into the dark
