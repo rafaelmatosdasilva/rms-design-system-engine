@@ -1,5 +1,116 @@
 # Skill evaluation results
 
+## 2026-10: Prototype fonts that never wait, and stand-ins shown on the page (continuous evaluation)
+
+What changed since the entry below (engine 224d490): Prototypes: the design's font is found on the machine, in the system's @font-face or on Google Fonts in the background, and the page never waits for it (a font found nowhere is a 🔤 line); a stand-in is marked on the page, counted on its bar, and each gap on the page's list shows its parts; a stand-in for a component the system has is a ⚠️ line. The guide changed in `reference/usage.md` and `cookbook/prototype.md`. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `c991a1f1338c` · Project measured: `13d811a9d668`
+
+| Haiku, engine b06a027 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.052 | $0.058 |
+| Input a run | 96k | 110k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken. Runs read 110k a run against 96k from more turns, not a
+longer guide: a turn reads about what it did (27k), one `new-ui-saved` run took 26 turns, and `refresh-no-figma` took 2
+to 4 turns where it took 1. An earlier run of this change, stopped when the engine moved under it, had one miss that was
+the scorer's: "once you … provide a Figma token, the engine will compare …" read as asking for the token in chat; the
+rule now leaves a token the engine reads alone (b06a027). Records: `records/2026-10-10-prototype-fonts-standins`.
+
+On the design system the engine was built against, a scan history drawn with a field standing in for a date range
+picker: the page draws at once, marks the field "Stand-in for date range picker" and counts it on its bar, its gaps list
+scrolls to it and flashes it, and the engine's picture of the page has no marks. The page's own accessibility findings
+are unchanged, and its bar's buttons no longer fail on their focus ring.
+
+## 2026-10: Prototype quality: a file that is not one page in a flow (continuous evaluation)
+
+What changed since the entry below (engine d8e021e): Flows: a file in prototypes/ that is not one page is a ❌ line, never a page of the flow. The guide changed in `reference/usage.md`.
+
+Guide set measured: `7e55ec6bbcf8` · Project measured: `13d811a9d668`
+
+| Haiku, engine 224d490 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.052 |
+| Input a run | 101k | 96k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 101k. Records: `records/2026-10-10-prototype-quality-flows`.
+
+### Prototypes, Claude alone against Claude with the skill
+
+Twelve requests on Tidepool, each asked in the same words on both sides: the eleven of 6 October and a new one, a notes
+toolbar whose pin chip shows only its icon, scored on the name a screen reader says for it (a composition's `name`, an
+`aria-label` in markup, or the need said as a Missing box). Claude alone was measured on the new request; its rows on
+the eleven do not depend on the engine and are the 6 October ones. The scorer does not use the engine.
+
+| Prototypes that pass | Claude alone | With the skill |
+|---|---|---|
+| Opus, 12 tasks × 3 runs | 17/36 (the new request 0/3, $0.81) | 36/36 · $11.20 · 9.0 turns a run (engine 224d490) |
+| Haiku, 12 tasks × 3 runs | 3/36 (the new request 0/3, $0.29) | 35/36 · $3.81 · 10.8 turns a run (engine d8e021e); the sign-up flow again on 224d490: 3/3 |
+
+**Reading.** Claude alone named the pin chip in all six runs (an `aria-label`), and every one of them still invented a
+look of its own (colours, a font, sizes the system does not have); with the skill nothing was invented, and Opus named
+the chip groups too. The one Haiku miss left a draft holding several pages in one file beside the pages it drew one by
+one: `--flow` counted it as a page and said the flow held, and its old words read as another page's. `--flow` now says
+such a file is not one page (224d490), and the flow task passed 3/3 on that engine. Two Opus misses were the scorer's,
+fixed and every row rescored: a starting point the engine read from the designed screen counted as what the run made
+(its tag broke the "no tag" rule), and a pin chip said as a Missing box counted as an unnamed one.
+
+On the design system the engine was built against (its components copied from its products' pages), two prototypes
+drawn before and after this change: a scan history went from 42 accessibility findings (40 a doubled icon sheet) to the
+system's own 2, from a segmented control drawn as nested copies with no labels to the control with its segments, and
+its rows and actions to the page's width; an export screen went from a panel showing a product's own head and nothing of
+the prototype to its heading, radio group, card of switches, checkboxes and field, with the status bar holding only the
+prototype's parts. Both score 10/10 in the design review and work as in a product.
+
+## 2026-10: Prototype quality on a real system (continuous evaluation)
+
+What changed since the entry below (engine a1ca3dd): Style guide findings that were the engine's: unnamed switches, states said by their role, content that covers nothing; Prototype quality on a real system: drawn as the system draws it, working as the product does, from every source of intent. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `687e1c0f97a9` · Project measured: `13d811a9d668`
+
+| Haiku, engine d8e021e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.053 |
+| Input a run | 94k | 101k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 94k. Records: `records/2026-10-10-prototype-quality`.
+
+## 2026-10: States heard on a part (heardOn); colours in any notation in the edit check (continuous evaluation)
+
+What changed since the entry below (engine af1bcf1): States: Current is owed aria-current; an error on a message is announced (role or aria-live), on a field aria-invalid (E11, E12); States: an error the option announces itself is heard, whatever the component's role; Docs: the words each state is heard in; neutral names in the state test; Roles on the style guide are read in the component's own section, never on the page's chrome; presentation is none; Roles: a component the code has no markup for is said not checked on the style guide (its stand-in is marked); a plain element counts as presentation; Keyboard: an option a composite reaches by its arrow keys (one Tab stop for the group) is reachable; Docs: roles read in their own section on the style guide, stand-ins not checked, one Tab stop per group; Tests run the same on every machine: no machine-wide TypeScript where a test expects none, and the font-dependent share of a visual diff left out of the golden (E14); States heard on a part: the contract's heardOn names the part and its state per option; the style guide sets it with the look and the state check counts it (E13); Edit check: a colour written as rgb(), hsl(), oklch() or a CSS name is read too. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `726e490bd92f` · Project measured: `13d811a9d668`
+
+| Haiku, engine a1ca3dd | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.054 |
+| Input a run | 98k | 94k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 94k a run against 98k. Records: `records/2026-10-10-states-heard-on-a-part-colours`.
+
+## 2026-10: Accessibility and parity readings: text as drawn, focus rings, ARIA states, edges in every mode, box and text facts (continuous evaluation)
+
+What changed since the entry below (engine 6706b73): Text contrast: oklch colours read, see-through text blended, text in a disabled control exempt; Focus: a ring that only takes a colour on focus counts, a ring on ::before/::after is measured, a two-tone shadow passes on its clearer tone; WCAG checks: placeholder text measured, a field named only by its placeholder found, required ARIA states and values, publishing and graphics roles, a spinner is not a flash, edges in oklch read; Parity: a % line height and letter spacing from Figma's font size; colours equal within a rounding step; a variant's opacity read on its own state; Parity: a text part with its own colour is compared in every mode; Parity: a mode the code draws and Figma has no value for is said, not skipped; Parity: padding, radius and gap Figma sets with no variable are compared on the default variant; Parity at breakpoints: every side of the padding, every corner, and a vertical stack's row gap; Gate 16 auto heights: only a height Figma fixes, never one that hugs or fills; Docs: what the accessibility and parity checks now read; Parity: Figma's font size for a % line height is the default variant's, where the refresh records it; Accessibility: a control edge is read in every colour mode, one finding with the modes it fades in; Parity: min and max width, alignment, wrap and a dashed stroke compared with the box Figma records; Parity: text decoration, italic and text alignment of the first text, recorded in Figma and compared; Docs: the deeper facts the refresh records and compares; edges in every mode. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `26f7ea4081e5` · Project measured: `13d811a9d668`
+
+| Haiku, engine af1bcf1 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.057 |
+| Input a run | 92k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 92k. Records: `records/2026-10-09-accessibility-parity-readings`.
+
 ## 2026-10: Colours named by their Figma variable; freshness by content; edges read at rest; paired variables; deeper facts on the right side (continuous evaluation)
 
 What changed since the entry below (engine 67f75ee): Roles: a role the tree leaves out is read on the element that declares it (E2 follow-up); Accessibility: an edge is read at rest, never halfway back from focus (E8); Build freshness: a newer date is stale only when the content changed (E7); Deeper facts: the side a stroke is drawn on, the component's own width, one radius, the text drawn (E10); Parity: a variable the token check found but did not compare is one pair (E9); Rendered assertions: a colour named by its Figma variable never goes stale (E4). The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`.

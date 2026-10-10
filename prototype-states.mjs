@@ -63,7 +63,8 @@ export function normaliseValues(raw, catalog = { components: {} }) {
     seen.add(o);
     if (Array.isArray(o)) { o.forEach((x) => walk(x)); return; }
     const name = typeof o.component === 'string' ? o.component : key != null && o.props ? byId.get(String(key)) : null;
-    const def = name ? catalog.components?.[name] : null;
+    // The engine's own pieces take their on/off options written as words too ("clip": "true").
+    const def = name ? (catalog.components?.[name] ?? (/^(Page|Stack|Row|Columns)$/.test(name) ? { props: Object.fromEntries(['grow', 'stretch', 'clip', 'wrap'].map((k) => [k, { type: 'boolean' }])) } : null)) : null;
     if (def && o.props && typeof o.props === 'object') {
       for (const [k, v] of Object.entries(o.props)) {
         const p = def.props?.[k] ?? Object.entries(def.props ?? {}).find(([, e]) => e.codeName === k)?.[1];
@@ -111,6 +112,9 @@ export function applyState(ui, overrides = {}) {
 // The states the page owes, from what it shows, what was asked and what the team wrote.
 // ctx: prototype-context's view (components with role, purpose, guidelines; rules). → [{ state, why }]
 const LISTY = /\b(list|table|grid|feed|gallery|results?|rows?|items?|cards?|lista|tabela|resultados)\b/i;
+// By its name or role: one card, one item is not a list; a list, a table or its row is.
+const LISTY_NAME = /\b(list|table|grid|feed|gallery|results?|rows?|lista|tabela|resultados)\b/i;
+const LISTY_PURPOSE = /\b(list|lists|table|feed|gallery|results|lista|tabela|resultados)\b/i;
 const FIELD = /\b(field|input|textbox|textarea|text ?area|select|dropdown|combobox|search|campo)\b/i;
 export function statesOwed(ui, { context = null, request = null, catalog = { components: {} } } = {}) {
   const { nodes } = nodesOf(ui);
@@ -138,11 +142,16 @@ export function statesOwed(ui, { context = null, request = null, catalog = { com
     if (alike) { owe('empty', `it shows a list: ${alike[1]} ${alike[0].split('(')[0]}s alike${n.id ? ` in ${n.id}` : ''}`); break; }
   }
   if (request && /\b(list|lists|table|feed|inbox|results|catalog(ue)?|gallery|history|lista|tabela)\b/i.test(request)) owe('empty', 'the request asks for a list');
-  const listy = nodes.find((n) => own(n) && LISTY.test(about(n).replace(/([a-z])([A-Z])/g, '$1 $2')));
+  // Made for a list: by its name or role (a list row, a table row), or a purpose that says list, table or feed. A row of
+  // choices (a radio group) is laid out in a row and shows the same choices whatever the data: never a list.
+  const roleOf = (n) => String(context?.components?.[n.component]?.role ?? '');
+  const listy = nodes.find((n) => own(n) && !control(n) && !/^(radiogroup|tablist|toolbar|menubar)$/i.test(roleOf(n))
+    && (LISTY_NAME.test(`${n.component} ${roleOf(n)}`.replace(/([a-z])([A-Z])/g, '$1 $2')) || LISTY_PURPOSE.test(String(context?.components?.[n.component]?.purpose ?? ''))));
   if (listy) owe('empty', `it shows ${listy.component}, made for a list`);
   // Input: a field and something that sends it.
   const field = nodes.find((n) => own(n) && (/^(textbox|textinput|textfield|searchbox|combobox)$/i.test(context?.components?.[n.component]?.role ?? '') || FIELD.test(n.component.replace(/([a-z])([A-Z])/g, '$1 $2'))));
-  const action = nodes.find((n) => own(n) && (/^button$/i.test(context?.components?.[n.component]?.role ?? '') || /button/i.test(n.component)));
+  // What sends it: a button by its role (a radio button is a choice, not a send), by its name only when no role is known.
+  const action = nodes.find((n) => own(n) && (roleOf(n) ? /^button$/i.test(roleOf(n)) : /button/i.test(n.component)));
   if (field && action) owe('error', `it takes input (${field.component}) and sends it (${action.component})`);
   // What the request names, and what the team's guidelines ask of this page or of a component it uses.
   for (const [kind, re] of STATE_KINDS) {

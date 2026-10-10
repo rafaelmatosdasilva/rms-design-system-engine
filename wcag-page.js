@@ -17,13 +17,27 @@
     'contentinfo definition deletion dialog directory document emphasis feed figure form generic grid gridcell group heading img image insertion link list ' +
     'listbox listitem log main marquee math menu menubar menuitem menuitemcheckbox menuitemradio meter navigation none note option paragraph ' +
     'presentation progressbar radio radiogroup region row rowgroup rowheader scrollbar search searchbox separator slider spinbutton status ' +
-    'strong subscript superscript switch tab table tablist tabpanel term textbox time timer toolbar tooltip tree treegrid treeitem').split(' ');
+    'strong subscript superscript switch tab table tablist tabpanel term textbox time timer toolbar tooltip tree treegrid treeitem').split(' ').concat(
+    // The roles of the ARIA modules for digital publishing (doc-*) and graphics (graphics-*), valid on the web too.
+    ('doc-abstract doc-acknowledgments doc-afterword doc-appendix doc-backlink doc-biblioentry doc-bibliography doc-biblioref doc-chapter doc-colophon ' +
+    'doc-conclusion doc-cover doc-credit doc-credits doc-dedication doc-endnote doc-endnotes doc-epigraph doc-epilogue doc-errata doc-example doc-footnote ' +
+    'doc-foreword doc-glossary doc-glossref doc-index doc-introduction doc-noteref doc-notice doc-pagebreak doc-pagefooter doc-pageheader doc-pagelist ' +
+    'doc-part doc-preface doc-prologue doc-pullquote doc-qna doc-subtitle doc-tip doc-toc graphics-document graphics-object graphics-symbol').split(' '));
   var ARIA = ('activedescendant atomic autocomplete braillelabel brailleroledescription busy checked colcount colindex colindextext colspan controls current ' +
     'describedby description details disabled dropeffect errormessage expanded flowto grabbed haspopup hidden invalid keyshortcuts label labelledby ' +
     'level live modal multiline multiselectable orientation owns placeholder posinset pressed readonly relevant required roledescription rowcount ' +
     'rowindex rowindextext rowspan selected setsize sort valuemax valuemin valuenow valuetext').split(' ');
   var BOOL = { atomic: 1, busy: 1, disabled: 1, expanded: 1, hidden: 1, modal: 1, multiline: 1, multiselectable: 1, readonly: 1, required: 1, selected: 1 };
   var TRI = { checked: 1, pressed: 1 };
+  // The values an enumerated ARIA attribute takes.
+  var TOKEN_VALUES = { live: 'off polite assertive', current: 'page step location date time true false', haspopup: 'false true menu listbox tree grid dialog',
+    sort: 'ascending descending none other', orientation: 'horizontal vertical undefined', autocomplete: 'inline list both none', relevant: 'additions removals text all' };
+  // The states a role must carry (ARIA 1.2, required states and properties), when the role is written on an element that
+  // does not give them natively (a <input type=checkbox> carries its checked state; a <div role=checkbox> must say it).
+  var REQUIRED = { checkbox: ['checked'], radio: ['checked'], switch: ['checked'], menuitemcheckbox: ['checked'], menuitemradio: ['checked'],
+    slider: ['valuenow'], scrollbar: ['valuenow', 'controls'], combobox: ['expanded'], heading: ['level'], meter: ['valuenow'] };
+  var NATIVE = { checkbox: 'input[type=checkbox]', radio: 'input[type=radio]', switch: 'input[type=checkbox]', slider: 'input[type=range]',
+    combobox: 'select,input:not([type])[list],input[type=text][list],input[type=search][list]', heading: 'h1,h2,h3,h4,h5,h6', meter: 'meter' };
   var IDREFS = ['labelledby', 'describedby', 'controls', 'owns', 'activedescendant', 'errormessage', 'details', 'flowto'];
   // A role that has to sit inside another (WCAG 1.3.1, ARIA's required context).
   var CONTEXT = { tab: '[role=tablist]', option: '[role=listbox],[role=group],[role=combobox],select,datalist', menuitem: '[role=menu],[role=menubar],[role=group]',
@@ -82,7 +96,18 @@
   var norm = function (s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); };
 
   // ── Colour, for a control's boundary (WCAG 1.4.11) ──
-  function rgba(s) { var m = String(s).match(/rgba?\(([^)]+)\)/); if (!m) return null; var p = m[1].split(/[ ,/]+/).filter(Boolean).map(parseFloat); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; }
+  var paint = null;
+  function rgba(s) {
+    var m = String(s).match(/rgba?\(([^)]+)\)/);
+    if (m) { var p = m[1].split(/[ ,/]+/).filter(Boolean).map(parseFloat); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; }
+    // Chrome keeps oklch(), lab() and color() as written: the browser paints one pixel of it and that pixel is read.
+    var fn = String(s).match(/(?:oklch|oklab|lab|lch|color|hsla?|hwb)\([^)]*\)/); if (!fn) return null;
+    try {
+      if (!paint) { var cv = document.createElement('canvas'); cv.width = cv.height = 1; paint = cv.getContext('2d', { willReadFrequently: true }); }
+      paint.clearRect(0, 0, 1, 1); paint.fillStyle = '#000'; paint.fillStyle = fn[0]; paint.fillRect(0, 0, 1, 1);
+      var d = paint.getImageData(0, 0, 1, 1).data; return { r: d[0], g: d[1], b: d[2], a: Math.round(d[3] / 255 * 1000) / 1000 };
+    } catch (e) { return null; }
+  }
   function over(f, b) { return { r: f.r * f.a + b.r * (1 - f.a), g: f.g * f.a + b.g * (1 - f.a), b: f.b * f.a + b.b * (1 - f.a), a: 1 }; }
   function behind(el) {
     var layers = [];
@@ -208,8 +233,9 @@
       var d = secs(s.animationDuration), n = s.animationIterationCount === 'infinite' ? Infinity : Math.max.apply(null, String(s.animationIterationCount).split(',').map(parseFloat));
       if (!(d > 0)) return;
       seen('moving');
-      if (n === Infinity && d < 0.34) push('flash', '2.3.1', el, 'repeats ' + Math.round(1 / d) + ' times a second');
       var loading = el.closest(LOADING) || STATUSY.test((typeof el.className === 'string' ? el.className : '') + ' ' + (el.parentElement && typeof el.parentElement.className === 'string' ? el.parentElement.className : ''));
+      // A loading indicator that turns fast is a spinner, not a flash: only one inside role=progressbar or role=status is let go.
+      if (n === Infinity && d < 0.34 && !el.closest(LOADING)) push('flash', '2.3.1', el, 'repeats ' + Math.round(1 / d) + ' times a second');
       if (d * n > 5 && !loading && s.animationPlayState !== 'paused') push('pause', '2.2.2', el, 'moves for more than 5 seconds with no way to stop it');
     });
 
@@ -220,6 +246,13 @@
       var n = name(el);
       if (!n) push('link', '2.4.4', el, 'no words');
       else if (VAGUE.test(n.trim()) && !el.getAttribute('aria-describedby')) push('link', '2.4.4', el, '"' + n.trim() + '" says nothing about where it goes');
+    });
+
+    // 3.3.2 Labels or instructions: a field's placeholder is not its label (it goes once typing starts, and is often faint).
+    shown.forEach(function (el) {
+      if (!el.matches('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not([type=image]):not([type=range]):not([type=color]),textarea') || !el.getAttribute('placeholder')) return;
+      seen('placeholderlabel');
+      if (!labelled(el) && !(el.labels && el.labels.length && text(el.labels[0])) && !(el.getAttribute('title') || '').trim()) push('placeholderlabel', '3.3.2', el, 'named only by its placeholder "' + el.getAttribute('placeholder').slice(0, 30) + '", which goes once typing starts');
     });
 
     // 2.4.6 Headings and labels: none is empty.
@@ -242,7 +275,17 @@
     all.forEach(function (el) {
       if (el.id) { seen('aria'); if (!twice[el.id] && document.querySelectorAll('[id="' + el.id.replace(/"/g, '\\"') + '"]').length > 1) { twice[el.id] = 1; push('dupid', '4.1.1', el, 'id="' + el.id + '" is used more than once'); } }
       var role = el.getAttribute('role');
-      if (role) { seen('aria'); role.split(/\s+/).filter(Boolean).forEach(function (r) { if (ROLES.indexOf(r) < 0) push('aria', '4.1.2', el, 'role="' + r + '" is not an ARIA role'); }); }
+      if (role) {
+        seen('aria');
+        var roles = role.split(/\s+/).filter(Boolean);
+        roles.forEach(function (r) { if (ROLES.indexOf(r) < 0) push('aria', '4.1.2', el, 'role="' + r + '" is not an ARIA role'); });
+        // The first role ARIA knows is the one used: a screen reader cannot tell its state when a required one is missing.
+        var used = roles.filter(function (r) { return ROLES.indexOf(r) >= 0; })[0];
+        if (used && REQUIRED[used] && !(NATIVE[used] && el.matches(NATIVE[used]))) {
+          var missing = REQUIRED[used].filter(function (k) { return !el.hasAttribute('aria-' + k); });
+          if (missing.length) push('aria', '4.1.2', el, 'role="' + used + '" without ' + missing.map(function (k) { return 'aria-' + k; }).join(' and '));
+        }
+      }
       Array.prototype.forEach.call(el.attributes, function (at) {
         if (at.name.indexOf('aria-') !== 0) return;
         seen('aria');
@@ -251,6 +294,7 @@
         if (BOOL[k] && !/^(true|false|undefined)$/.test(v)) push('aria', '4.1.2', el, at.name + '="' + v + '" takes true or false');
         if (TRI[k] && !/^(true|false|mixed|undefined)$/.test(v)) push('aria', '4.1.2', el, at.name + '="' + v + '" takes true, false or mixed');
         if (k === 'invalid' && !/^(true|false|grammar|spelling)$/.test(v)) push('aria', '4.1.2', el, at.name + '="' + v + '" takes true, false, grammar or spelling');
+        if (TOKEN_VALUES[k] && (k === 'relevant' ? v.split(/\s+/) : [v]).some(function (t) { return TOKEN_VALUES[k].split(' ').indexOf(t) < 0; })) push('aria', '4.1.2', el, at.name + '="' + v + '" takes ' + TOKEN_VALUES[k].split(' ').join(', '));
         if (IDREFS.indexOf(k) >= 0 && v && byIds(v).some(function (n) { return !n; })) push('aria', '4.1.2', el, at.name + ' points to an id that is not on the page');
       });
       if (el.getAttribute('aria-hidden') === 'true') {
@@ -281,6 +325,17 @@
     el.dispatchEvent(new E(type, o));
   };
   var showing = function () { return Array.prototype.filter.call(document.body.querySelectorAll('*'), vis); };
+  // What appeared covers or replaces something that showed before (1.4.13 asks Escape only of that): it lies over another
+  // element, or one that showed is gone. A button that appears in the room it makes (a row's action on hover) covers nothing.
+  var covers = function (pop, before) {
+    var r = pop.getBoundingClientRect();
+    return before.some(function (n) {
+      if (n === pop || n.contains(pop) || pop.contains(n)) return false;
+      if (!n.isConnected || !vis(n)) return true;
+      var q = n.getBoundingClientRect();
+      return q.width > 0 && q.height > 0 && r.left < q.right - 1 && q.left < r.right - 1 && r.top < q.bottom - 1 && q.top < r.bottom - 1;
+    });
+  };
   // Another page: the path changed, a page was pushed on the history, or a window opened. A page that only writes its
   // own state into its address (replaceState, a query or a hash, as the style guide does for the props) has not moved.
   var nav = { pushed: 0, opened: 0 };
@@ -318,8 +373,9 @@
         // What shows when it is hovered or focused: the outermost element that was not showing before. A trigger that says
         // it has a tip (data-tip, aria-describedby) is given longer, as a tooltip often waits a second before it shows.
         var patient = el.hasAttribute('data-tip') || el.hasAttribute('aria-describedby') || el.hasAttribute('data-tooltip');
+        var before = [];
         var appear = async function () {
-          var before = showing(), until = Date.now() + (patient ? Math.max(wait, 1600) : wait), found = null;
+          before = showing(); var until = Date.now() + (patient ? Math.max(wait, 1600) : wait), found = null;
           on();
           while (!found && Date.now() < until) {
             await sleep(50);
@@ -338,7 +394,7 @@
           fire(document.activeElement || document.body, 'keydown', { key: 'Escape', code: 'Escape' }); fire(document, 'keydown', { key: 'Escape', code: 'Escape' });
           // Given time to fade out (a transition of a few tenths of a second) before it is said to stay.
           for (var tEsc = 0; tEsc < 12 && pop.isConnected && vis(pop); tEsc++) await sleep(50);
-          if (pop.isConnected && vis(pop)) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') does not close with Escape');
+          if (pop.isConnected && vis(pop) && covers(pop, before)) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') does not close with Escape');
           await leave();
           pop = await appear();
           if (pop) {

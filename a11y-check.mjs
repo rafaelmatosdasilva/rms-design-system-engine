@@ -55,11 +55,10 @@
 // come from measured pixels and the accessibility tree, not from any presumed token/tier model.
 //
 // NOT yet (v2, by design):
-//   - Non-text / component contrast (WCAG 1.4.11, >= 3:1): the focus ring (check 3) and icons (check 7)
-//     are checked natively; the rest (control borders, graphics) comes from --axe.
-//   - Live pseudo-class states (:hover / :active) — the styleguide target below renders every
-//     variant state (disabled / checked / selected / error) as its OWN instance, so those are
-//     covered in the resting DOM; forcing true interaction pseudo-states is the remaining step.
+//   - Non-text contrast (WCAG 1.4.11, >= 3:1): the focus ring (check 3), icons (check 7) and control edges
+//     (wcag-page.js) are checked natively, control edges in the first mode only; graphics come from --axe.
+//   - Live pseudo-class states: :hover text contrast is forced with --states (first mode); :focus and :active
+//     text, and edges in those states, are not measured yet.
 //   - Reading order, skip links, landmark completeness — and anything the render cannot reveal:
 //     only when the project declares it in ds-config.json, never imposed (No-imposed-structure).
 
@@ -78,6 +77,7 @@ import { loadModes } from './mode-resolver.mjs';
 import { modeSwitch } from './code-capture.mjs';
 import { codeSnapshotPath, OUT_DIR } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
+import { parseColor as parseCssColor } from './css-values.mjs';
 import { WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from './wcag21.mjs';
 import { loadCategories, requirementEntry, noteKind, isRequirement } from './annotation-categories.mjs';
 import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
@@ -89,12 +89,42 @@ import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, m
 // (a button whose text colour transitions and whose background does not reads 1:1 for a moment).
 export const SETTLE_TRANSITIONS = `document.getAnimations().forEach((a) => { if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) { try { a.finish(); } catch (e) {} } })`;
 
+// State-class → the aria/native state it must also expose. A common-English default (extend or override per project via
+// ds-config.json → a11y.stateClasses). Curated words only, so a plain decorative class never trips it; the check only
+// fires on interactive / roled elements. A state is said the way the element's role says it, so each word takes every
+// attribute that can say it: a selected radio is aria-checked, a selected toggle aria-pressed, a selected step or page
+// aria-current (any value but false), a selected tab or option aria-selected.
+export const STATE_CLASSES = {
+  selected:      { attr: ['aria-selected', 'aria-checked', 'aria-pressed', 'aria-current'], val: 'true' },
+  checked:       { attr: ['aria-checked', 'checked'], val: 'true' },
+  expanded:      { attr: 'aria-expanded', val: 'true' },
+  open:          { attr: ['aria-expanded', 'open'], val: 'true' },
+  pressed:       { attr: 'aria-pressed',  val: 'true' },
+  disabled:      { attr: 'disabled',      val: 'true' },
+  invalid:       { attr: 'aria-invalid',  val: 'true' },
+  error:         { attr: 'aria-invalid',  val: 'true' },
+  current:       { attr: 'aria-current',  val: 'true' },
+  indeterminate: { attr: 'aria-checked',  val: 'mixed' },
+};
+// Does the element say the state the class draws? Runs in the page (its source is put in the sweep) and here in tests.
+export function stateHeard(el, spec) {
+  return [].concat(spec.attr).some(function (a) {
+    if (a === 'disabled') return el.disabled === true || el.getAttribute('aria-disabled') === 'true';
+    if (a === 'checked') return el.checked === true;
+    if (a === 'open') return el.hasAttribute('open');
+    var v = el.getAttribute(a);
+    return v === spec.val || (a === 'aria-current' && v !== null && v !== 'false');
+  });
+}
+
 export function parseColor(s) {
   if (typeof s !== 'string') return null;
   if (s === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
   const m = s.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+))?\s*\)$/i);
-  if (!m) return null;
-  return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+  if (m) return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+  // Chrome keeps oklch(), oklab() and color(srgb …) as written (Tailwind v4 colours are oklch): read them too.
+  const c = /^(oklch|oklab|color|hsla?)\(/i.test(s) ? parseCssColor(s) : null;
+  return c ? { r: c[0], g: c[1], b: c[2], a: c[3] } : null;
 }
 
 // Composite a translucent foreground over an opaque background (both {r,g,b}, fg has a).
@@ -148,10 +178,14 @@ export function contrastFindings(textEls, theme) {
   const out = [];
   for (const el of textEls) {
     if (el.bgImage) { out.push({ kind: 'contrast', theme, desc: el.desc, text: el.text, cannotCompute: 'background-image/gradient' }); continue; }
+    // A colour in a space not converted (display-p3 …) is said, never skipped as if it passed.
+    const unread = [el.color, ...(el.bgLayers ?? [])].find((c) => typeof c === 'string' && !parseColor(c));
+    if (unread) { out.push({ kind: 'contrast', theme, desc: el.desc, text: el.text, cannotCompute: `colour space not read (${unread.slice(0, 40)})` }); continue; }
     const fg = parseColor(el.color);
-    if (!fg) continue;
+    if (fg.a === 0) continue;
     const bg = effectiveBg(el.bgLayers);
-    const ratio = contrastRatio(fg, bg);
+    // See-through text draws as its blend over the background: measured as drawn, not as its solid colour.
+    const ratio = contrastRatio(fg.a < 1 ? over(fg, bg) : fg, bg);
     const threshold = aaThreshold(el.fontSize, el.fontWeight);
     if (ratio + 1e-9 < threshold) {
       out.push({ kind: 'contrast', theme, desc: el.desc, text: el.text, ratio: Math.round(ratio * 100) / 100, threshold });
@@ -489,7 +523,8 @@ function sweepExpression(roots, doFocus, stateMap) {
     const textEls = [];
     for (const el of scope) {
       if (seen.has(el)) continue; seen.add(el);
-      if (!vis(el) || disabled(el)) continue;
+      // Text in a disabled control is exempt (WCAG 1.4.3) wherever in the control it sits: <button disabled><span>.
+      if (!vis(el) || disabled(el) || el.closest(':disabled,[aria-disabled="true"]')) continue;
       const hasText = [...el.childNodes].some(n => n.nodeType===3 && n.textContent.trim());
       if (!hasText) continue;
       const cs = getComputedStyle(el);
@@ -510,6 +545,16 @@ function sweepExpression(roots, doFocus, stateMap) {
         fontSize: parseFloat(cs.fontSize) || 16, fontWeight: cs.fontWeight,
         bgImage: !!(cs.backgroundImage && cs.backgroundImage !== 'none'),
       });
+    }
+    // A placeholder on show is text (WCAG 1.4.3): its own colour against the field.
+    for (const el of scope) {
+      if (!el.matches || !el.matches('input[placeholder],textarea[placeholder]') || !el.getAttribute('placeholder').trim() || el.value || !vis(el) || el.closest(':disabled,[aria-disabled="true"]')) continue;
+      const ps = getComputedStyle(el, '::placeholder'), cs = getComputedStyle(el);
+      const layers = []; let node = el;
+      while (node && node.nodeType===1) { const b = getComputedStyle(node).backgroundColor; layers.push(b); const mm = b.match(/^rgba?\\(([^)]+)\\)/); const parts = mm ? mm[1].split(',') : null; if ((parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0) === 1) break; node = node.parentElement; }
+      const cls = (el.className && typeof el.className==='string') ? '.'+el.className.trim().split(/\\s+/).join('.') : '';
+      textEls.push({ desc: (el.tagName.toLowerCase() + (el.id?('#'+el.id):'') + cls).slice(0,80) + '::placeholder' + ownerOf(el), text: el.getAttribute('placeholder').trim().slice(0,40),
+        color: ps.color, bgLayers: layers, fontSize: parseFloat(ps.fontSize || cs.fontSize) || 16, fontWeight: ps.fontWeight || cs.fontWeight, bgImage: !!(cs.backgroundImage && cs.backgroundImage !== 'none') });
     }
     // Icons that carry meaning: the only content of a control, or named themselves (role="img", aria-label, a <title>).
     // Their colour: an svg's painted fill or stroke, a masked icon's background, an icon font's text colour.
@@ -559,6 +604,7 @@ function sweepExpression(roots, doFocus, stateMap) {
     if (${doFocus ? 'true' : 'false'}) {
       const STATE_MAP = ${JSON.stringify(stateMap || {})};
       const stateWords = Object.keys(STATE_MAP);
+      const stateHeard = ${stateHeard.toString()};
       const INTERACTIVE = 'a[href],button,input:not([type=hidden]),select,textarea,[tabindex],[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=tab],[role=menuitem],[role=option],[role=combobox],[role=slider]';
       const NATIVE_FOCUSABLE = 'a[href],button,input:not([type=hidden]),select,textarea';
       const IROLES = ['button','link','checkbox','radio','switch','tab','menuitem','option','combobox','slider'];
@@ -571,11 +617,14 @@ function sweepExpression(roots, doFocus, stateMap) {
         if (!disabled(el) && el.matches('a[href],button,input:not([type=hidden]),select,textarea,[tabindex],[role=button],[role=link]')) {
           // A focus style may be an outline, a shadow, a border, a background change, an underline,
           // or drawn on ::before / ::after: every one of those counts as a visible change.
-          const look = (s, pb, pa) => [s.outlineStyle, s.outlineWidth, s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor, s.textDecorationLine,
-            pb.outlineStyle, pb.boxShadow, pb.borderColor, pb.backgroundColor, pb.opacity, pa.outlineStyle, pa.boxShadow, pa.borderColor, pa.backgroundColor, pa.opacity].join('|');
+          // An outline's colour counts only while an outline is drawn (a ring kept transparent at rest that takes a colour on focus).
+          const ring = (x) => (x.outlineStyle !== 'none' && parseFloat(x.outlineWidth) > 0 ? x.outlineColor : '');
+          const look = (s, pb, pa) => [s.outlineStyle, s.outlineWidth, ring(s), s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor, s.textDecorationLine,
+            pb.outlineStyle, ring(pb), pb.boxShadow, pb.borderColor, pb.backgroundColor, pb.opacity, pa.outlineStyle, ring(pa), pa.boxShadow, pa.borderColor, pa.backgroundColor, pa.opacity].join('|');
           // The element the keyboard is already on (the page's first Tab) is let go first, so its look before is its rest.
           if (document.activeElement === el) { try { el.blur(); } catch(e){} }
-          const b = getComputedStyle(el); const before = look(b, getComputedStyle(el, '::before'), getComputedStyle(el, '::after'));
+          const b = getComputedStyle(el); const pseudoAt = (s) => ['::before', '::after'].map((w) => { const p = getComputedStyle(el, w); return { w, outline: p.outlineStyle !== 'none' && parseFloat(p.outlineWidth) > 0 ? p.outlineColor : null, border: p.borderTopColor, shadow: p.boxShadow, bg: p.backgroundColor }; });
+          const before = look(b, getComputedStyle(el, '::before'), getComputedStyle(el, '::after')); const pseudoBefore = pseudoAt();
           // The box that holds only this control (a field's frame around its borderless input) may show the focus
           // for it (:focus-within): up to two levels up, while no other control is inside.
           const boxes = []; for (let p = el.parentElement, i = 0; p && i < 2 && p.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[tabindex]').length === 1; p = p.parentElement, i++) boxes.push(p);
@@ -590,9 +639,24 @@ function sweepExpression(roots, doFocus, stateMap) {
             // check it is perceivable (WCAG 1.4.11, >= 3:1). A ring that "changes" but is nearly the
             // same colour as its background is still invisible to a keyboard user.
             let ind = null, outside = false, px = null;
-            if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0) { ind = a.outlineColor; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
-            else if (a.boxShadow !== b.boxShadow && a.boxShadow !== 'none') { const m = a.boxShadow.match(/rgba?\\([^)]+\\)/); ind = m ? m[0] : null; outside = !/inset/.test(a.boxShadow); const lens = a.boxShadow.replace(/rgba?\\([^)]+\\)/g, '').match(/-?[\\d.]+px/g) || []; px = Math.max(parseFloat(lens[2] || '0'), parseFloat(lens[3] || '0')); }
-            else if (a.borderColor !== b.borderColor) { ind = a.borderColor; px = parseFloat(a.borderTopWidth); }
+            // A shadow ring may have several layers (a white gap, then a coloured ring): each colour is kept, and the
+            // ring counts as seen when one of them stands out.
+            const shadowLayers = (v) => v.split(/,(?![^(]*\\))/).map((l) => { const m = l.match(/(?:rgba?|oklch|oklab|color|hsla?)\\([^)]+\\)/); const lens = l.replace(/[a-z]+\\([^)]+\\)/g, '').match(/-?[\\d.]+px/g) || []; return { color: m ? m[0] : null, px: Math.max(parseFloat(lens[2] || '0'), parseFloat(lens[3] || '0')) }; }).filter((l) => l.color);
+            if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0 && (a.outlineColor !== b.outlineColor || a.outlineStyle !== b.outlineStyle || a.outlineWidth !== b.outlineWidth)) { ind = [a.outlineColor]; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
+            else if (a.boxShadow !== b.boxShadow && a.boxShadow !== 'none') { const ls = shadowLayers(a.boxShadow); ind = ls.length ? ls.map((l) => l.color) : null; outside = !/inset/.test(a.boxShadow); px = ls.length ? Math.max(...ls.map((l) => l.px)) : null; }
+            else if (a.borderColor !== b.borderColor) { ind = [a.borderColor]; px = parseFloat(a.borderTopWidth); }
+            else if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0) { ind = [a.outlineColor]; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
+            else {
+              // A ring drawn on ::before / ::after: the part of it that changed is measured, against the element.
+              const now = pseudoAt();
+              for (let i = 0; i < 2 && !ind; i++) {
+                const was = pseudoBefore[i], is = now[i];
+                if (is.outline && is.outline !== was.outline) ind = [is.outline];
+                else if (is.shadow !== was.shadow && is.shadow !== 'none') ind = shadowLayers(is.shadow).map((l) => l.color);
+                else if (is.border !== was.border) ind = [is.border];
+                else if (is.bg !== was.bg) ind = [is.bg];
+              }
+            }
             // WCAG 2.4.13 (AAA, advisory): a focus indicator at least 2 CSS pixels thick.
             // The browser's own ring (outline-style: auto) is drawn by the browser, not by this width.
             if (px != null && px < 2 && a.outlineStyle !== 'auto') thinFocus.push({ desc, px: Math.round(px * 10) / 10 });
@@ -606,7 +670,7 @@ function sweepExpression(roots, doFocus, stateMap) {
                 const al = parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0;
                 if (al === 1) break; node = node.parentElement;
               }
-              faintFocus.push({ desc, color: ind, bgLayers: layers });
+              faintFocus.push({ desc, colors: ind, bgLayers: layers });
             }
           }
           try { el.blur(); } catch(e){}
@@ -617,18 +681,19 @@ function sweepExpression(roots, doFocus, stateMap) {
           const tokens = ((el.className && typeof el.className==='string') ? el.className.toLowerCase() : '').split(/[\\s_-]+/).filter(Boolean);
           for (const w of stateWords) {
             if (!tokens.includes(w)) continue;
-            const spec = STATE_MAP[w];
-            const got = spec.attr==='disabled'
-              ? (el.disabled===true || el.getAttribute('aria-disabled')==='true')
-              : (el.getAttribute(spec.attr)===spec.val || (spec.val==='true' && el.getAttribute(spec.attr)==='true'));
-            if (!got) { ariaState.push((desc+' .'+w).slice(0,70)); break; }
+            if (!stateHeard(el, STATE_MAP[w])) { ariaState.push((desc+' .'+w).slice(0,70)); break; }
           }
         }
         // 5. Keyboard reachability — an interactive control that cannot be reached by keyboard.
         const interactiveRole = role && IROLES.includes(role);
         if ((interactiveRole || isInteractive) && !disabled(el)) {
           const ti = el.getAttribute('tabindex');
-          const focusable = el.matches(NATIVE_FOCUSABLE) ? ti !== '-1' : (ti !== null && Number(ti) >= 0);
+          const tabStop = (n) => (n.matches(NATIVE_FOCUSABLE) ? n.getAttribute('tabindex') !== '-1' : (n.getAttribute('tabindex') !== null && Number(n.getAttribute('tabindex')) >= 0));
+          // A composite (a radio group, a tab list, a menu) has one Tab stop and its arrow keys for the rest: an option
+          // left out of the Tab order there is reached through the group, when the group has a stop at all.
+          const group = el.closest('[role=radiogroup],[role=tablist],[role=listbox],[role=menu],[role=menubar],[role=tree],[role=grid],[role=treegrid],[role=toolbar]');
+          const roving = !!group && group !== el && [...group.querySelectorAll('[role]')].some((n) => n !== el && n.getAttribute('role') === role && tabStop(n));
+          const focusable = tabStop(el) || roving;
           if (!focusable) notKeyboard.push((desc+(role?('[role='+role+']'):'')).slice(0,70));
         }
       }
@@ -758,7 +823,10 @@ export function makeStep(findings, unfinished, label) {
 }
 
 // Chrome's accessibility tree names a few roles differently from ARIA.
-export const sameRole = (got, want) => got === want || (want === 'img' && got === 'image') || (want === 'textbox' && got === 'searchbox');
+// presentation and none are one role (ARIA 1.1 named it none); Chrome reports either as "none", and a plain element
+// with no role of its own (generic) holds no meaning either, as presentation asks.
+export const sameRole = (got, want) => got === want || (want === 'img' && got === 'image') || (want === 'textbox' && got === 'searchbox')
+  || (/^(presentation|none)$/.test(want) && /^(presentation|none|generic)$/.test(got));   // a plain element means nothing either
 // The same equivalences, to look a role up in Chrome's tree (Accessibility.queryAXTree) by the name an annotation uses.
 const AX_ROLE_ALIASES = { img: ['image'], textbox: ['searchbox'] };
 // The controls a wrapper can hold, for a note that names no role (a name, a heading level, a pressed state).
@@ -1165,21 +1233,7 @@ async function main() {
   if (!targets.length) skip(`no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.${harnessWhy ? ` The components were not rendered from their code either: ${harnessWhy}.` : ''}`);
   const waitFor = cfg.a11y?.waitFor ?? null;   // optional selector to await before the sweep (SPA hydration)
 
-  // State-class → the aria/native state it must also expose. A common-English default (extend or
-  // override per project via ds-config.json → a11y.stateClasses). Curated words only, so a plain
-  // decorative class never trips it; the check only fires on interactive / roled elements.
-  const STATE_MAP = Object.assign({
-    selected:      { attr: 'aria-selected', val: 'true' },
-    checked:       { attr: 'aria-checked',  val: 'true' },
-    expanded:      { attr: 'aria-expanded', val: 'true' },
-    open:          { attr: 'aria-expanded', val: 'true' },
-    pressed:       { attr: 'aria-pressed',  val: 'true' },
-    disabled:      { attr: 'disabled',      val: 'true' },
-    invalid:       { attr: 'aria-invalid',  val: 'true' },
-    error:         { attr: 'aria-invalid',  val: 'true' },
-    current:       { attr: 'aria-current',  val: 'true' },
-    indeterminate: { attr: 'aria-checked',  val: 'mixed' },
-  }, cfg.a11y?.stateClasses ?? {});
+  const STATE_MAP = Object.assign({}, STATE_CLASSES, cfg.a11y?.stateClasses ?? {});
 
   const CHROME = findChrome();
   if (!CHROME) skip('Chrome not found (set CHROME_PATH to enable)');
@@ -1305,10 +1359,11 @@ async function main() {
       for (const desc of noFocus) note('focus', desc, mode.name);
       // Focus indicator visible? (WCAG 1.4.11 for the focus ring — computed in Node)
       for (const f of faintFocus) {
-        const raw = parseColor(f.color); if (!raw) continue;
         const bg = effectiveBg(f.bgLayers);
-        const fg = raw.a < 1 ? over(raw, bg) : raw;
-        const ratio = contrastRatio(fg, bg);
+        // The ring is seen when its clearest tone stands out (a two-tone ring is built that way).
+        const ratios = (f.colors ?? [f.color]).map(parseColor).filter((c) => c && c.a > 0).map((raw) => contrastRatio(raw.a < 1 ? over(raw, bg) : raw, bg));
+        if (!ratios.length) continue;
+        const ratio = Math.max(...ratios);
         if (ratio + 1e-9 < 3) note('focuscontrast', f.desc, mode.name, { ratio: Math.round(ratio * 100) / 100, threshold: 3 });
       }
       if (first) {
@@ -1345,6 +1400,9 @@ async function main() {
     //    forced colours, text spacing, reflow (opt-in a11y.reflow), and semantics against the contract.
     //    Each one is isolated: a failure in one never stops the others or the check as a whole.
     const evalv = async (expr) => (await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true }, sessionId)).result?.value;
+    // On the style guide a component is read where it is drawn, in its own section's playground: the page's own chrome
+    // (a navigation card, a hidden menu button) shares the system's classes and is never the component.
+    const ownSection = (comp, sel) => (target.styleguide && sel ? `#c-${String(comp).replace(/[^\w-]+/g, '-')} .pg-preview :is(${sel})` : sel);
     const media0 = modes[0].sw.media;
     const step = makeStep(findings, unfinished, label);
     await step(async () => {
@@ -1354,36 +1412,63 @@ async function main() {
     // tables, reading order, input purpose, control edges, moving and flashing content, link words, empty headings,
     // label in name, valid ARIA, status messages; then what it does when used (hover content, focus, input, press).
     // The first few of each component on the page; findings say the component they sit in.
+    // The checks on the first few of each component, at rest; `edgesOnly` keeps the control edges (1.4.11), which
+    // depend on the colour mode and are read again in every other mode.
+    const wcagRun = (sel, edgesOnly) => evalv(`(async () => {
+      const sel = ${JSON.stringify(sel)};
+      const all = sel ? [...document.querySelectorAll(sel)] : [document.body];
+      const seen = [], out = [];
+      for (const el of all) {
+        if (seen.length >= 3) break;
+        if (seen.some((s) => s.contains(el)) || !el.getClientRects().length) continue;
+        seen.push(el);
+        // Read at rest: the focus the checks above gave a field is taken away and every transition it starts
+        // jumps to its end, so an edge never reads halfway back from its focus look (a pass in one run, a fail in the next).
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        ${SETTLE_TRANSITIONS};
+        out.push(...window.__wcag21.check(el, { name: sel || '' }).findings.filter((f) => !${edgesOnly} || f.kind === 'boundary'));
+        if (!${edgesOnly} && seen.length === 1) out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings);
+      }
+      return out;
+    })()`);
+    // A control edge is one finding per element, with every mode it is too faint in.
+    const edgeOf = new Map();
+    const edgeKey = (sel, f) => `${String(f.desc).replace(/ \(.*$/, '')}|${sel ?? ''}`;
     await step(async () => {
       await evalv(WCAG_PAGE_SOURCE + '; true');
       const sels = roots ?? [null];
       for (const sel of sels) {
-        const res = await evalv(`(async () => {
-          const sel = ${JSON.stringify(sel)};
-          const all = sel ? [...document.querySelectorAll(sel)] : [document.body];
-          const seen = [], out = [];
-          for (const el of all) {
-            if (seen.length >= 3) break;
-            if (seen.some((s) => s.contains(el)) || !el.getClientRects().length) continue;
-            seen.push(el);
-            // Read at rest: the focus the checks above gave a field is taken away and every transition it starts
-            // jumps to its end, so an edge never reads halfway back from its focus look (a pass in one run, a fail in the next).
-            if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-            ${SETTLE_TRANSITIONS};
-            out.push(...window.__wcag21.check(el, { name: sel || '' }).findings);
-            if (seen.length === 1) out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings);
-          }
-          return out;
-        })()`);
+        const res = await wcagRun(sel, false);
         const once = new Set();
         for (const f of res ?? []) {
           const desc = sel ? `${f.desc} in ${sel}` : f.desc;
           if (once.has(f.kind + desc)) continue;
           once.add(f.kind + desc);
-          findings.push({ kind: f.kind, plugin: label, desc });
+          const nf = { kind: f.kind, plugin: label, desc, ...(f.kind === 'boundary' && modes.length > 1 ? { modes: [modes[0].name] } : {}) };
+          if (f.kind === 'boundary') edgeOf.set(edgeKey(sel, f), nf);
+          findings.push(nf);
         }
       }
       ranChecks.add('wcag21');
+    });
+    // WCAG 1.4.11 in every other colour mode: a field edge that holds in light can fade into a dark background.
+    if (modes.length > 1) await step(async () => {
+      for (const mode of modes.slice(1)) {
+        await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
+        if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
+        try {
+          for (const sel of roots ?? [null]) {
+            for (const f of (await wcagRun(sel, true)) ?? []) {
+              const k = edgeKey(sel, f), had = edgeOf.get(k);
+              if (had) { if (!had.modes.includes(mode.name)) had.modes.push(mode.name); continue; }
+              const nf = { kind: 'boundary', plugin: label, desc: sel ? `${f.desc} in ${sel}` : f.desc, modes: [mode.name] };
+              edgeOf.set(k, nf); findings.push(nf);
+            }
+          }
+        } finally { if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); }
+      }
+      await send('Emulation.setEmulatedMedia', { features: modes[0].sw.media }, sessionId);
+      if (modes[0].sw.apply) await send('Runtime.evaluate', { expression: modes[0].sw.apply }, sessionId);
     });
     await step(async () => {
       // Positive tabindex, then a real walk: Tab through the page and watch where the focus goes.
@@ -1521,7 +1606,13 @@ async function main() {
       for (const [comp, { facts: f, layers }] of Object.entries(facts)) {
         if (components.length && !components.includes(comp)) continue;
         if (Object.keys(f).length) {
-          const got = await axOf(selOf(comp), f.role ? String(f.role).toLowerCase() : null);
+          // A component the code has no markup for is drawn as a stand-in on the style guide: there is nothing of the
+          // code's to read, so it is said not checked.
+          if (target.styleguide && await evalv(`!!document.querySelector(${JSON.stringify(ownSection(comp, selOf(comp)))})?.matches('[data-sg-standin]')`)) {
+            findings.push({ kind: 'annotation', plugin: label, desc: `${comp}: not checked, the code has no markup for it (the style guide draws a stand-in)` });
+            continue;
+          }
+          const got = await axOf(ownSection(comp, selOf(comp)), f.role ? String(f.role).toLowerCase() : null);
           if (got) for (const d of annotationMismatches(f, got)) findings.push({ kind: 'annotation', plugin: label, desc: `${comp}: ${d}` });
         }
         // A note on an inner layer is checked on the part the contract names the same way.
@@ -1529,7 +1620,7 @@ async function main() {
           if (lf.part && !lf.role && !lf.name && !lf.level) continue;   // a part role: the part-role step below checks it
           const part = (contract[comp]?.children ?? []).find((c) => String(c.name ?? '').toLowerCase() === String(layer).toLowerCase());
           if (!part?.cssSelector) { findings.push({ kind: 'annotation', plugin: label, desc: `${comp} › ${layer}: not checked, the contract has no part named "${layer}" (add it to children with its cssSelector)` }); continue; }
-          const got = await axOf(part.cssSelector);
+          const got = await axOf(ownSection(comp, part.cssSelector));
           if (got) for (const d of annotationMismatches(lf, got)) findings.push({ kind: 'annotation', plugin: label, desc: `${comp} › ${layer}: ${d}` });
         }
       }
@@ -1541,7 +1632,7 @@ async function main() {
       for (const [c, { facts: f }] of Object.entries(annotationFactsFor(ROOT, cfg))) if (f.role) roles[c] = { role: f.role, pressed: !!f.pressed };
       for (const [comp, r] of Object.entries(roles)) {
         if (components.length && !components.includes(comp)) continue;
-        const sel = selOf(comp);
+        const sel = ownSection(comp, selOf(comp));
         if (!sel) continue;
         for (const problem of (await evalv(roleContractExpression(sel, r.role, { pressed: r.pressed }))) ?? []) findings.push({ kind: 'rolecontract', plugin: label, desc: `${comp} (${r.pressed ? 'toggle button' : r.role}): ${problem}` });
       }

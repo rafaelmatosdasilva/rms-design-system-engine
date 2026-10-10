@@ -22,6 +22,7 @@ import { join, resolve, dirname, extname, relative } from 'node:path';
 import { createRequire } from 'node:module';
 import { norm, SKIP_DIR, componentSourceFiles, textReader, resolveComponentFile, textComponentApi } from './component-source.mjs';
 import { parseCodeConnect, normalizeNodeId } from './codeconnect-check.mjs';
+import { projectTypeScriptOnly, withinProject } from './project-typescript.mjs';
 
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const unq = (s) => String(s ?? '').trim().replace(/^['"`]|['"`]$/g, '');
@@ -158,7 +159,10 @@ function codeConnectFiles(ROOT) {
 export function loadTypeScript(ROOT) {
   try {
     const req = createRequire(join(ROOT, 'package.json'));
-    return req(req.resolve('typescript'));
+    const at = req.resolve('typescript');
+    // Only the project's own when DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project (never one NODE_PATH reaches).
+    if (projectTypeScriptOnly() && !withinProject(ROOT, at)) return null;
+    return req(at);
   } catch { return null; }
 }
 // Read the Props type of one component by syntax. Returns the api shape, or null when no Props

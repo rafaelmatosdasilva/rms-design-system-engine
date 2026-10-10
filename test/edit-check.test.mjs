@@ -32,6 +32,26 @@ test('flags a colour written by hand, with the token that has it, and one the sy
   assert.deepEqual(find(['<rect fill="#e8eef9" />']), ['#e8eef9 is written by hand; use var(--chip-background)']);
 });
 
+test('a colour written another way: rgb(), hsl(), oklch() or a CSS name, where a style uses it', () => {
+  const none = (c) => `${c} is not a design-system colour; use one of its colour tokens`;
+  assert.deepEqual(find(['<span class="chip" style="background-color: green; color: white;">Saved</span>']), [none('green'), none('white')]);
+  assert.deepEqual(find(['.card { color: rgb(27, 36, 51); }'], { sheet: true }), ['rgb(27, 36, 51) is written by hand; use var(--text-primary) (or var(--chip-text))']);
+  assert.deepEqual(find(['.card { border: 1px solid hsl(140 60% 40%); }'], { sheet: true }), [none('hsl(140 60% 40%)')]);
+  assert.deepEqual(find(['<div style={{ background: "oklch(0.7 0.15 150)" }}>']), [none('oklch(0.7 0.15 150)')]);
+  assert.deepEqual(find(['  color: Tomato;'], { sheet: true }), [none('Tomato')]);
+  assert.deepEqual(find(['  .saved { color: green; }'], { sheet: true, isTheme: true }), [none('green')]);
+  assert.deepEqual(find(['<rect fill="white" />', "el.style.backgroundColor = 'lime';", '<Box sx={{ color: "red" }} />']), [none('white'), none('lime'), none('red')]);
+});
+
+test('silent on a colour name or function that is not a colour of its own: classes, keywords, props, prose, tokens', () => {
+  assert.deepEqual(find(['.green { white-space: nowrap; }', '.x { color: currentColor; background: transparent; outline: 2px solid Highlight; }'], { sheet: true }), []);
+  assert.deepEqual(find(['.x { animation: fade-white 1s; border-color: var(--text-primary, white); }'], { sheet: true }), []);
+  assert.deepEqual(find(['.x { color: rgb(var(--text-primary) / 0.5); background: rgb(from var(--text-primary) r g b / 50%); }'], { sheet: true }), []);
+  assert.deepEqual(find(['.x { border-color: var(--text-primary, rgb(0 0 0)); }'], { sheet: true }), []);
+  assert.deepEqual(find(['<p>Text color: red means an error</p>', '<Badge color="green">Saved</Badge>', '<Box colorScheme="green" />', '<div className="bg-white text-green-600">']), []);
+  assert.deepEqual(find(["ctx.fillStyle = 'white';", "ctx.strokeStyle = 'rgb(0, 0, 0)';"]), []);
+});
+
 test('in the theme file, a colour Figma has nowhere is flagged (a page rule written there)', () => {
   assert.deepEqual(find(['.saved { color: #22c55e; }'], { sheet: true, isTheme: true }), ['#22c55e is not a design-system colour; use one of its colour tokens']);
 });

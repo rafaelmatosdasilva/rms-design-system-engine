@@ -193,6 +193,9 @@ if (cfg.rendered?.auto) {
       let added = 0;
       for (const [name, c] of Object.entries(comps)) {
         if (name === '_updated' || skip.has(name) || typeof c?.h !== 'number') continue;
+        // Only a height Figma fixes: one that hugs its content or fills its parent is no height of the component's own,
+        // and an empty probe has neither content nor parent to measure it by.
+        if (c.sizingV === 'HUG' || c.sizingV === 'FILL') continue;
         const sel = selectors[name] ?? ('.' + name.charAt(0).toLowerCase() + name.slice(1));
         const cls = /^\.([A-Za-z][\w-]*)$/.exec(sel)?.[1];   // only class selectors get a bare probe
         for (const plugin of plugins) {

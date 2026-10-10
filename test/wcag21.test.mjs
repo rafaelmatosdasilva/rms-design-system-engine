@@ -105,6 +105,13 @@ test('page: each WCAG 2.1 problem the page breaks once is found, and the part th
     assert.ok(of('hovercontent').some((d) => /does not close with Escape/.test(d)));
     assert.ok(of('hovercontent').some((d) => /goes away when the pointer moves onto it/.test(d)));
     assert.ok(of('pointerdown').some((d) => /^button\.presser \(/.test(d)));       // named as it was before the press
+    // A field named only by its placeholder (gone once typing starts); a role without the state it requires; a value ARIA
+    // does not allow; an edge drawn in oklch, read rather than skipped.
+    assert.ok(of('placeholderlabel').some((d) => /placeholder-only/.test(d)), JSON.stringify(bad));
+    assert.ok(of('aria').some((d) => /bare-slider.*aria-valuenow/.test(d)), JSON.stringify(of('aria')));
+    assert.ok(of('aria').some((d) => /bare-combo.*aria-expanded/.test(d)), JSON.stringify(of('aria')));
+    assert.ok(of('aria').some((d) => /aria-live="loud"/.test(d)), JSON.stringify(of('aria')));
+    assert.ok(of('boundary').some((d) => /faint-ok/.test(d)), JSON.stringify(of('boundary')));
     for (const f of bad) assert.ok(WCAG21.find((c) => c.sc === f.sc)?.kinds.includes(f.kind), `${f.kind} fails ${f.sc}`);
   });
 });

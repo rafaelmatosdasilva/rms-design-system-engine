@@ -372,3 +372,25 @@ browserTest('components: a bottom border\'s own colour, a relative width as writ
   assert.equal(rule.props.width.declared, '100%');
   assert.equal(snapshot.components.sw.parts.text.props.fontSize.value, '12px');   // the drawn label, not the clipped name
 });
+
+// B8, B9: the capture reads the box's min and max width, alignment and wrap, every side's border style, and the first
+// text's decoration, italic and alignment, each traced to its rule.
+browserTest('components: min and max width, alignment, wrap, border style, and the text\'s decoration, italic and alignment', async () => {
+  const theme = `.row { display: flex; min-width: 80px; max-width: 320px; justify-content: space-between; align-items: center; flex-wrap: wrap; border: 1px dashed #333; }
+.row .t { text-decoration: underline; font-style: italic; text-align: center; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body><div class="row"><span class="t">Read more</span></div></body></html>`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'struct.json': { components: { row: {} } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const row = snapshot.components.row;
+  assert.equal(row.props.minWidth.value, '80px');
+  assert.equal(row.props.maxWidth.value, '320px');
+  assert.equal(row.props.justifyContent.value, 'space-between');
+  assert.equal(row.props.alignItems.value, 'center');
+  assert.equal(row.props.flexWrap.value, 'wrap');
+  assert.equal(row.layout.borderStyles.Bottom, 'dashed');
+  const t = row.parts.text.props;
+  assert.equal(t.textDecorationLine.value, 'underline');
+  assert.equal(t.fontStyle.value, 'italic');
+  assert.equal(t.textAlign.value, 'center');
+});

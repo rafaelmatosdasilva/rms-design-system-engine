@@ -99,4 +99,10 @@ test('--prototype --flow holds the pages of a flow to each other: the frame, the
   r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /✅ the flow holds/);
+  // A draft of several pages in one file, left behind, is not part of the flow and is said until it goes.
+  writeFileSync(join(dir, 'prototypes', 'signup.json'), JSON.stringify({ account: step('padding/m', 'Your account', [['Next', 'plan']]), plan: step('padding/m', 'Choose a plan', [['Next', 'payment']]) }));
+  r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stdout, /❌ prototypes\/signup\.json is not one page \(no "component" at its root\): one page per file, so make it one or remove it/);
+  assert.match(r.stdout, /🔗 FLOWS {2}4 page\(s\)/, 'never counted as a page');
 });
