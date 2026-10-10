@@ -392,6 +392,22 @@ export function fitLines(list = [], { states = ['default'] } = {}) {
 
 // Open the drawn page, measure it, save its picture, and compare the picture with the Figma image of the screen when
 // one is at hand, and try how it works. Returns { rendered, picture, visual, interactions } or { why } when Chrome is missing or the page did not draw.
+// The design's fonts, as the page ended with them: each family's state once nothing is loading any more and the faces
+// in use have loaded, or after 3s (a family still loading then: Google did not answer). A face that failed to load
+// leaves its family missing (broken, for one the system's @font-face ships).
+export const FONTS_IN = `Promise.race([new Promise((r) => setTimeout(r, 3000)), (async () => {
+  while (Object.values(window.PT_FONTS || {}).includes('loading')) await new Promise((r) => setTimeout(r, 50));
+  void document.body.offsetHeight;
+  await document.fonts.ready;
+})()]).then(() => {
+  const st = Object.assign({}, window.PT_FONTS || {});
+  for (const f of document.fonts) {
+    const n = Object.keys(st).find((k) => k.toLowerCase() === f.family.replace(/^["']|["']$/g, '').toLowerCase());
+    if (n && f.status === 'error' && st[n] !== 'installed') st[n] = st[n] === 'system' ? 'broken' : 'missing';
+  }
+  return st;
+})`;
+
 export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mode = 'sibling', chromePath = findChrome({ playwright: true }), outDir = OUT_DIR, token, fetchImpl, widths = screenWidths(), textStyles = [] } = {}) {
   if (!chromePath || typeof WebSocket === 'undefined') return { why: 'Chrome not found' };
   const chrome = await launchChrome(chromePath, { tmpPrefix: 'prototype-render-' });
@@ -406,8 +422,11 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
       await cdp.send('Page.enable', {}, sessionId);
       await cdp.send('Page.navigate', { url: pathToFileURL(page).href }, sessionId);
       if (!(await waitForTrue(cdp.send, sessionId, `${FILE_PAGE_LOADED} && !!document.querySelector('[data-pt-path="0"]')`, { tolerateErrors: true }))) return { why: `the page did not draw${errors.length ? `: ${errors[0]}` : ''}` };
-      // The design's fonts, when the page loads them: measured once they are in (or after 3s without them).
-      await cdp.send('Runtime.evaluate', { expression: `Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 3000))]).then(() => true)`, awaitPromise: true, returnByValue: true }, sessionId).catch(() => null);
+      // The design's fonts, wherever the page finds them: measured once they are in (or after 3s without them, drawn in
+      // the system's own stack).
+      const fonts = (await cdp.send('Runtime.evaluate', { expression: FONTS_IN, awaitPromise: true, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? {};
+      // Measured and pictured as it will be: without the page's marks on its stand-ins.
+      await cdp.send('Runtime.evaluate', { expression: 'window.PT_MARKS && window.PT_MARKS(false)' }, sessionId).catch(() => null);
       const rendered = (await cdp.send('Runtime.evaluate', { expression: RENDER_EXPRESSION, returnByValue: true }, sessionId)).result?.value ?? [];
       // A design review of the page as drawn: alignment, spacing, one main action, hierarchy, line length.
       const review = visualFindings((await cdp.send('Runtime.evaluate', { expression: VISUAL_EXPRESSION, returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? null, { textStyles });
@@ -460,7 +479,7 @@ export async function renderPrototype(ROOT, cfg, page, { name, screen = null, mo
       }
       await cdp.send('Runtime.evaluate', { expression: 'window.__ptShow && window.__ptShow("default")', returnByValue: true }, sessionId).catch(() => null);
       const fit = { widths: widths.map((w) => `${w.name} ${w.px}`), states, findings: fitFindings(runs), pictures };
-      return { rendered, picture, visual, interactions, fit, review };
+      return { rendered, picture, visual, interactions, fit, review, fonts };
     } finally { cdp.close(); }
   } finally { chrome.kill(); }
 }

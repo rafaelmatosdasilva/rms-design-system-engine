@@ -725,7 +725,12 @@ take; the format; and the prototypes already in `prototypes/`.
 `rms-design-system-engine --prototype prototypes/<name>.json` checks a composition (the format `--check-ui` reads, nested
 or flat) and, when it holds, draws it as one page under `.design-system-engine-out/prototypes/<name>.html`: each
 component from its own markup (the contract's probe, a page instance, or its React source) with the project's CSS, in
-every mode the system has, with a switch for the colour modes and one that outlines the engine's pieces and stand-ins.
+every mode the system has, with a switch for the colour modes and one that outlines the engine's pieces.
+The page is set in the design's font: one installed on the machine is used as it is, one the system's CSS ships with
+`@font-face` comes from it, and any other is asked of Google Fonts after the page has loaded (never with
+`prototypeFonts: false` in `ds-config.json`). The page never waits for it: it draws at once in the system's own font
+stack, the design's family first, and a font found nowhere (not installed, not one of Google's, no network) is said on
+the page's bar and as a 🔤 line, the page and its pictures set in the system's fallback.
 The rules are `--check-ui`'s, plus:
 - **The engine's pieces** (Page, Stack, Row, Columns, Text) exist only where the system has no component of that name.
   They carry no colour, border or font of their own: `gap` and `padding` take a spacing token, `Text.style` a text
@@ -745,7 +750,11 @@ The rules are `--check-ui`'s, plus:
   slot it names with `"inSlot": "<slot>"`, else in the main one. Words given to a slot (`"Slot": "…"`) are what it
   holds when no child fills it.
 - **A need nothing fits** is `{ "component": "Missing", "props": { "need": "…", "kind": "…", "closest": "…" } }`, drawn
-  as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`.
+  as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`: the page
+  marks it where it is drawn (a dashed box and "Stand-in for <the need>", on a layer of its own so the component is
+  untouched), counts the stand-ins on its bar ("Stand-ins (2)", which turns the marks off and on), and leaves the
+  marks out of its pictures. A stand-in for a component the system has (`"standInFor": "date picker"` where it has
+  datePicker) is a ⚠️ line: the system's own is used.
 - **An option Figma and the code do not share by name** is drawn on the part its name points to: a text option
   (`TitleContent`) writes the element whose class says title, or the one holding Figma's default text, or the
   component's own text for a label; an on/off option (`Show Description`) set off removes the part it names. A page
@@ -762,7 +771,10 @@ The rules are `--check-ui`'s, plus:
   composition does not choose, is a ⚠️ line.
 - **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
   `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
-  needed first. The Stop hook holds the reply to the gaps of the prototype just drawn.
+  needed first. The Stop hook holds the reply to the gaps of the prototype just drawn. The page lists its own gaps
+  (Gaps on its bar), each marked stand-in, missing or by its kind, with "Show on the page": it scrolls to the parts the
+  gap comes from and flashes them (the layout gap turns on the engine's outline); a part that is not drawn now (in
+  another state, or inside what a click opens) is said so.
 - **It works as in the product.** The system's own scripts (`systemScripts`) run on the page, a click moves a
   selection (tabs, a segmented control, a list), a field takes typing, and a link stays on the page. A part that opens
   another carries `"opens": "<id>"` and the part it opens has that `"id"`: it is drawn closed and opens on a click, as

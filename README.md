@@ -10,7 +10,7 @@ It works inside Claude Code. It keeps your code matching your Figma design, and 
 
 - **High quality.** Every colour, size, font and state in your code is checked against Figma, with the fix in plain words. A product that builds a component by hand where its Figma screen uses the real one is found, and anything the check could not look at is said, never shown as passed.
 - **A living style guide.** One page with every token and component, built from your system, never written by hand. Try each component, see its specs and every variant and how it stands with Figma and accessibility, and read one To do list of everything still open, by component.
-- **Prototypes from your real system.** Describe a screen in your own words and get it made only of your components, following your guidelines and Do and Don't, with every state and screen size checked, pages you can click through, a design review before you see it, and working as your product does.
+- **Prototypes from your real system.** Describe a screen in your own words and get it made only of your components, following your guidelines and Do and Don't, with every state and screen size checked, pages you can click through, a design review before you see it, and working as your product does. What your system lacks is marked on the page and listed for your design team.
 - **Accessibility tested.** Each component is tried in a real browser against WCAG 2.1 at level A and AA, every criterion listed with where it stands, and every problem comes with its fix.
 - **Build from Figma.** Only have the design? Claude builds it in code, piece by piece, each piece checked.
 - **You stay in control.** Nothing in your design or code changes unless you ask.

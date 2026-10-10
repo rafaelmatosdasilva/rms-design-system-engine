@@ -10,7 +10,7 @@
 //
 // Pure: no I/O. prototype.mjs is the command.
 import { checkUi } from './ui-catalog.mjs';
-import { ruledOut, requestFindings } from './prototype-context.mjs';
+import { ruledOut, requestFindings, wordsOf } from './prototype-context.mjs';
 
 export const PIECES = ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'];
 export const GAP_KINDS = ['component', 'option', 'token', 'icon', 'layout', 'pattern'];
@@ -24,14 +24,29 @@ export function systemFamily(cssText = '') {
   const vars = new Map();
   for (const m of String(cssText).matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) if (!vars.has(m[1])) vars.set(m[1], m[2].trim());
   const resolve = (f) => f.replace(/^var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)/, (all, v) => { const x = vars.get(v); return x && !/var\(/.test(x) ? x : all; });
-  for (const m of String(cssText).matchAll(/font-family\s*:\s*([^;}]+)/g)) { const f = resolve(m[1].trim()); if (!/^var\(/.test(f) && f !== 'inherit') count.set(f, (count.get(f) ?? 0) + 1); }
+  for (const m of String(cssText).matchAll(/(?<![\w-])font-family\s*:\s*([^;}]+)/g)) { const f = resolve(m[1].trim()); if (!/^var\(/.test(f) && f !== 'inherit') count.set(f, (count.get(f) ?? 0) + 1); }
   for (const m of String(cssText).matchAll(/(?<![\w-])font\s*:[^;}]*?(?<![\w.])[\d.]+(?:px|rem|em|%)(?:\s*\/\s*[\d.]+(?:px|rem|em|%)?)?\s+([^;}]+)/g)) { const f = resolve(m[1].trim()); if (!/^var\(/.test(f)) count.set(f, (count.get(f) ?? 0) + 1); }
   return [...count].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
 
+// A family as the page sets it: the design's family first, then the stack the system's CSS falls back on, so the page
+// draws in the system's own fonts while the design's loads, or when it never does (a machine without network).
+// A name that is not one word is quoted; a stack with no generic family ends in sans-serif.
+const GENERIC_FAMILY = /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-[\w-]+|math|emoji|inherit)$/i;
+export function fontStack(family, cssStack = null) {
+  const names = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  const bare = (x) => x.replace(/^["']|["']$/g, '');
+  const own = names(family);
+  if (!own.length) return family ?? null;
+  const all = [...own, ...names(cssStack).filter((x) => !own.some((o) => bare(o).toLowerCase() === bare(x).toLowerCase()))];
+  if (!all.some((x) => GENERIC_FAMILY.test(bare(x)))) all.push('sans-serif');
+  return all.map((x) => (/^["']/.test(x) || GENERIC_FAMILY.test(x) || /^-?[A-Za-z_][\w-]*$/.test(x) || /^var\(/.test(x) ? x : `"${x}"`)).join(', ');
+}
+
 export function systemScales(view = {}, figmaVars = {}, cssText = '') {
   const spacing = (view.tokens?.spacing ?? []).map((t) => ({ name: t.figma, var: t.var, value: t.value }));
-  const text = Object.entries(figmaVars.typography ?? {}).map(([name, t]) => ({ name, size: t.size, weight: t.weight, lh: t.lh, family: t.family }));
+  const cssStack = systemFamily(cssText);
+  const text = Object.entries(figmaVars.typography ?? {}).map(([name, t]) => ({ name, size: t.size, weight: t.weight, lh: t.lh, family: t.family ? fontStack(t.family, cssStack) : t.family }));
   // The page's own colours, when the system names them: its page surface and its primary text.
   // A component's own colour (buttonSecondary/background) is never the page's: only system-wide names count.
   const own = new Set((view.components ?? []).map((c) => String(c.name).toLowerCase().replace(/^[._]+/, '')));
@@ -41,7 +56,7 @@ export function systemScales(view = {}, figmaVars = {}, cssText = '') {
   const ink = best(colours, (n) => (/(^|\/)(text|content|foreground|ink)\//.test(n) ? 1 : 0) && ((/primary|default|base/.test(n) ? 2 : 0) + 1));
   // Every colour token, for a surface or a text colour the screen binds to one of them.
   const colors = (view.tokens?.colors ?? []).flatMap((g) => g.items).map((t) => ({ name: t.figma, var: t.var }));
-  return { spacing, text, colors, surface: surface?.var ?? null, ink: ink?.var ?? null, family: text.find((t) => t.family)?.family ?? systemFamily(cssText) };
+  return { spacing, text, colors, surface: surface?.var ?? null, ink: ink?.var ?? null, family: text.find((t) => t.family)?.family ?? fontStack(cssStack, cssStack) };
 }
 
 // The engine's pieces as catalog entries, so one checker reads them with the system's components. A piece whose name
@@ -111,6 +126,7 @@ function withoutNotes(ui) {
 export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [], limits = [], breakpoints = [], context = null, request = null, css = '' } = {}) {
   const systemNames = Object.keys(catalog.components ?? {});
   const pieces = pieceCatalog(scales, systemNames);
+  const systemHas = (need, self) => { const w = wordsOf(need).sort().join(' '); return w ? systemNames.find((n) => n !== self && wordsOf(n.replace(/^[._]+/, '')).sort().join(' ') === w) ?? null : null; };
   const r = checkUi(withoutNotes(ui), { ...catalog, components: { ...catalog.components, ...pieces } });
   // A component the catalog does not have is never made up: it is a Missing box with the need written on it.
   const findings = r.findings.map((f) => (f.rule === 1 && f.level === 'error' && pieces.Missing ? { ...f, message: `${f.message}; if the system has nothing for it, write a Missing box with the need instead` } : f));
@@ -143,6 +159,9 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     }
     if (node.component === 'Columns' && pieces.Columns && p.minWidth != null && !/^\d{2,4}$/.test(String(p.minWidth))) findings.push({ rule: 2, level: 'error', id: node.id, message: `Columns.minWidth is the narrowest a column may be, in px (like "240"), not ${JSON.stringify(p.minWidth)}` });
     if (node.component === 'Page' && pieces.Page && p.width != null && !/^\d{2,4}$/.test(String(p.width))) findings.push({ rule: 2, level: 'error', id: node.id, message: `Page.width is the screen's width in px (like "820"), not ${JSON.stringify(p.width)}` });
+    // A stand-in for what the system has (a "date picker" where it has datePicker) is no gap: the system's own is used.
+    const own = p.standInFor ? systemHas(String(p.standInFor), node.component) : null;
+    if (own) findings.push({ rule: null, level: 'warning', id: node.id, message: `${node.component} stands in for "${p.standInFor}", and the system has ${own}: use ${own} itself, without "standInFor"` });
     // A stand-in is a gap whatever stands in, the engine's own Text included.
     if (pieces[node.component] && p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: null, used: `the engine's ${node.component}`, prototype: name, node: node.id });
     if (pieces[node.component]) { if (node.component !== 'Text') (used[node.component] ??= []).push(node.id); continue; }
@@ -293,6 +312,15 @@ export function groupLayout(gaps = []) {
   const one = { kind: 'layout', need: `${list} layout components`, used: "the engine's own", closest: null, note: null, ...(prototypes.length ? { prototypes } : {}) };
   const at = gaps.indexOf(layout[0]);
   return [...gaps.slice(0, at).filter((g) => !layout.includes(g)), one, ...gaps.slice(at).filter((g) => !layout.includes(g))];
+}
+
+// The gaps as the prototype's page lists them: one line each, with the parts of the composition it comes from, so the
+// page shows them where they are drawn. The engine's layout pieces are one line, shown by the page's layout outline.
+export function pageGaps(gaps = []) {
+  return groupLayout(mergeGaps({ page: gaps })).map(({ prototypes, ...g }) => {
+    const same = g.kind === 'layout' ? [] : gaps.filter((x) => x.kind === g.kind && String(x.need).toLowerCase() === String(g.need).toLowerCase());
+    return { line: gapLine(g), kind: g.kind, need: g.need, nodes: [...new Set(same.flatMap((x) => String(x.node ?? '').split(', ').filter(Boolean)))] };
+  });
 }
 
 // One line per gap, for the summary and the reply.
