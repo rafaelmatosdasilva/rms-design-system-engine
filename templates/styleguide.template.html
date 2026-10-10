@@ -771,6 +771,8 @@ a.pg-usage-name { color: var(--sg-text); }
   var ov = document.getElementById('overview');
   document.getElementById('sg-hero-title').textContent = DATA.title || 'Design system';
   if ((DATA.links || []).length) ov.insertAdjacentHTML('beforeend', linksHTML(DATA.links));
+  // A page for some components only (--component X --styleguide): which ones, what they nest, and where the rest is.
+  if (DATA.scope) { var sc = DATA.scope, sp = document.createElement('div'); sp.className = 'sg-pending sg-scope'; sp.innerHTML = '<b>This page shows ' + esc(sc.asked.join(', ')) + (sc.nested.length ? ' and the components ' + (sc.asked.length > 1 ? 'they nest' : 'it nests') + ': ' + esc(sc.nested.join(', ')) : '') + '.</b> The whole system\'s style guide: <code>rms-design-system-engine --styleguide</code>'; ov.appendChild(sp); }
   // What the page could not take from the system, in one note: each control it lacks and the stand-in it uses instead.
   var GAPS = (DATA.ui && DATA.ui.gaps) || [];
   if (GAPS.length) { var gp = document.createElement('div'); gp.className = 'sg-pending sg-gap'; gp.innerHTML = '<b>Stand-ins on this page</b><ul>' + GAPS.map(function (g) { return '<li>' + esc(g.say) + '</li>'; }).join('') + '</ul>'; ov.appendChild(gp); }
