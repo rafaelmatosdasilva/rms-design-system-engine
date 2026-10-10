@@ -1,5 +1,47 @@
 # Skill evaluation results
 
+## 2026-10: Prototype quality: a file that is not one page in a flow (continuous evaluation)
+
+What changed since the entry below (engine d8e021e): Flows: a file in prototypes/ that is not one page is a ❌ line, never a page of the flow. The guide changed in `reference/usage.md`.
+
+Guide set measured: `7e55ec6bbcf8` · Project measured: `13d811a9d668`
+
+| Haiku, engine 224d490 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.052 |
+| Input a run | 101k | 96k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 101k. Records: `records/2026-10-10-prototype-quality-flows`.
+
+### Prototypes, Claude alone against Claude with the skill
+
+Twelve requests on Tidepool, each asked in the same words on both sides: the eleven of 6 October and a new one, a notes
+toolbar whose pin chip shows only its icon, scored on the name a screen reader says for it (a composition's `name`, an
+`aria-label` in markup, or the need said as a Missing box). Claude alone was measured on the new request; its rows on
+the eleven do not depend on the engine and are the 6 October ones. The scorer does not use the engine.
+
+| Prototypes that pass | Claude alone | With the skill |
+|---|---|---|
+| Opus, 12 tasks × 3 runs | 17/36 (the new request 0/3, $0.81) | 36/36 · $11.20 · 9.0 turns a run (engine 224d490) |
+| Haiku, 12 tasks × 3 runs | 3/36 (the new request 0/3, $0.29) | 35/36 · $3.81 · 10.8 turns a run (engine d8e021e); the sign-up flow again on 224d490: 3/3 |
+
+**Reading.** Claude alone named the pin chip in all six runs (an `aria-label`), and every one of them still invented a
+look of its own (colours, a font, sizes the system does not have); with the skill nothing was invented, and Opus named
+the chip groups too. The one Haiku miss left a draft holding several pages in one file beside the pages it drew one by
+one: `--flow` counted it as a page and said the flow held, and its old words read as another page's. `--flow` now says
+such a file is not one page (224d490), and the flow task passed 3/3 on that engine. Two Opus misses were the scorer's,
+fixed and every row rescored: a starting point the engine read from the designed screen counted as what the run made
+(its tag broke the "no tag" rule), and a pin chip said as a Missing box counted as an unnamed one.
+
+On the design system the engine was built against (its components copied from its products' pages), two prototypes
+drawn before and after this change: a scan history went from 42 accessibility findings (40 a doubled icon sheet) to the
+system's own 2, from a segmented control drawn as nested copies with no labels to the control with its segments, and
+its rows and actions to the page's width; an export screen went from a panel showing a product's own head and nothing of
+the prototype to its heading, radio group, card of switches, checkboxes and field, with the status bar holding only the
+prototype's parts. Both score 10/10 in the design review and work as in a product.
+
 ## 2026-10: Prototype quality on a real system (continuous evaluation)
 
 What changed since the entry below (engine a1ca3dd): Style guide findings that were the engine's: unnamed switches, states said by their role, content that covers nothing; Prototype quality on a real system: drawn as the system draws it, working as the product does, from every source of intent. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
