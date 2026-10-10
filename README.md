@@ -84,7 +84,7 @@ You need [Claude Code](https://claude.com/claude-code), [Node.js](https://nodejs
 Install the rms-design-system-engine skill for me by running curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.sh | bash and tell me when it is done.
 ```
 
-**2. Connect your project, once per project.** It asks for your Figma link and finds the rest on its own.
+**2. Connect your project, once per project.** It asks where your code is and for your Figma link (optional), and finds the rest on its own.
 
 ```
 /rms-design-system-engine set up this project

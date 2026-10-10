@@ -52,6 +52,8 @@ function arg(flag) { const hit = process.argv.slice(2).filter((a) => a === flag 
 // The effect: move to the project before the engine reads its folder.
 export const PROJECT_FROM = process.cwd();
 const asked = arg('--project');
+// Whether the person has said where the code is: told now (--project, `.` for this folder) or remembered from before.
+export let PROJECT_GIVEN = Boolean(asked);
 if (asked) {
   const p = projectFor(asked, PROJECT_FROM);
   if (!p.dir || !existsSync(p.dir)) { console.error(`❌ No project at ${asked}${p.error ? `: ${p.error}` : ''}.\nNEXT: ask the person where their code is (a folder on this computer or a git link), then run again with --project=<it>`); process.exit(2); }
@@ -60,5 +62,5 @@ if (asked) {
   process.chdir(p.dir);
 } else if (!existsSync(join(PROJECT_FROM, 'ds-config.json')) && existsSync(join(PROJECT_FROM, POINTER))) {
   const dir = readFileSync(join(PROJECT_FROM, POINTER), 'utf8').trim();
-  if (dir && existsSync(dir)) { process.chdir(dir); console.error(`📁 Project: ${dir}`); }
+  if (dir && existsSync(dir)) { process.chdir(dir); PROJECT_GIVEN = true; console.error(`📁 Project: ${dir}`); }
 }

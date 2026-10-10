@@ -47,8 +47,8 @@ accessibility" or "only the token values gate" into the right `--only`.
 
 **Utility flags (no full audit - run the terminal command directly):**
 ```bash
-rms-design-system-engine --init                          # first-time setup only: scaffold config files, then exit
-rms-design-system-engine --init --figma-url=<url> --theme-css=<path>   # non-interactive setup (for agents/CI; --figma-source-url=<url> optional)
+rms-design-system-engine --init                          # first-time setup only: asks where the code is and for the Figma link (optional), scaffolds config files, then exits
+rms-design-system-engine --init --project=<. | folder | git link> --figma-url=<url>   # non-interactive setup (for agents/CI): --project required (or --theme-css=<path>), --figma-url and --figma-source-url=<url> optional
 rms-design-system-engine --version                       # am I on the latest? compares local vs remote (a normal run also nudges once/day)
 rms-design-system-engine --update                        # update to the latest - no re-download
 rms-design-system-engine --link-command                  # (re)point the /rms-design-system-engine command at the install via symlink
@@ -85,8 +85,8 @@ node ~/.claude/skills/rms-design-system-engine/setup-webhook.mjs --list         
 
 ### Build mode
 
-A project that has only Figma starts in **build mode** (`ds-config.json` → `"build": true`): setup chooses it when the
-project has no CSS at all, or when it runs with `--build`. The engine still writes no code; it says what to build and
+A project whose code has no design tokens yet starts in **build mode** (`ds-config.json` → `"build": true`): setup
+chooses it when the code's folder has no stylesheet of tokens and a Figma file is given, or when it runs with `--build`. The engine still writes no code; it says what to build and
 checks each piece once it exists.
 
 - **What is left to build, in order.** The report ends with a `🧱 TO BUILD` line: the tokens first, then each component
