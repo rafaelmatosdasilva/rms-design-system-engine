@@ -245,3 +245,50 @@ test('a project whose packages are not installed is told so, not "auto-discovery
   assert.equal(r.status, 0);
   assert.match(r.stdout, /the project's packages are not installed \(no node_modules\)|Chrome not found/, r.stdout);
 });
+
+test('a style guide that draws no component is not the page checked: the project\'s own pages are', () => {
+  const sgPath = '/proj/.design-system-engine-out/styleguide/index.html';
+  const page = (components) => `<script type="application/json" id="sg-data">${JSON.stringify({ components })}</script>`;
+  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => page([])), null);
+  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => page([{ name: 'chip' }])).styleguide, true);
+  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => '<html>a page of its own</html>').styleguide, true, 'a list it cannot read: taken as it is');
+});
+
+test('a dev server that prints its address in colour (Vite\'s bold port) is read without the colour codes', { timeout: 30000 }, async () => {
+  const { startDevServer } = await import('../a11y-check.mjs');
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join: j } = await import('node:path');
+  const dir = mkdtempSync(j(tmpdir(), 'a11y-serve-'));
+  writeFileSync(j(dir, 'serve.mjs'), "process.stdout.write('  \\x1b[32m➜\\x1b[39m  Local:   \\x1b[36mhttp://localhost:\\x1b[1m5173\\x1b[22m/\\x1b[39m\\n'); setInterval(() => {}, 1000);");
+  const srv = startDevServer(`${process.execPath} serve.mjs`, dir);
+  try { assert.equal(await srv.url, 'http://localhost:5173'); } finally { srv.stop(); }
+});
+
+test('pages from a router in modules with hash history; scoped, the pages that use the component, its own first', async () => {
+  const { discoverRoutes } = await import('../a11y-check.mjs');
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join: j, dirname: d } = await import('node:path');
+  const dir = mkdtempSync(j(tmpdir(), 'routes-'));
+  const put = (rel, text) => { mkdirSync(d(j(dir, rel)), { recursive: true }); writeFileSync(j(dir, rel), text); };
+  put('src/router/router.js', "import { createRouter, createWebHashHistory } from 'vue-router'\nimport buttons from './modules/buttons.js'\nexport default createRouter({ history: createWebHashHistory(), routes: [{ path: '/', component: () => import('@/views/Home.vue') }, ...buttons] })\n");
+  put('src/router/modules/buttons.js', "import ButtonsPrimary from '@/views/buttons/Primary.vue'\nimport ButtonsLink from '@/views/buttons/Link.vue'\nexport default [\n  { path: '/components/buttons/link', name: 'link', component: ButtonsLink },\n  { path: '/components/buttons/primary', name: 'primary', component: ButtonsPrimary },\n  { path: '/components/:id', component: ButtonsLink },\n]\n");
+  put('src/views/Home.vue', '<template><main>home</main></template>');
+  put('src/views/buttons/Primary.vue', '<template><button-primary label="Go" /></template>');
+  put('src/views/buttons/Link.vue', '<template><div><button-link /><button-primary label="Back" /></div></template>');
+  assert.deepEqual(discoverRoutes(dir, 'http://localhost:8080/').sort(), ['http://localhost:8080/#/', 'http://localhost:8080/#/components/buttons/link', 'http://localhost:8080/#/components/buttons/primary'], 'the parameter route left out');
+  assert.deepEqual(discoverRoutes(dir, 'http://localhost:8080', { prefer: ['ButtonPrimary', '.button-primary'] }), ['http://localhost:8080/#/components/buttons/primary', 'http://localhost:8080/#/components/buttons/link']);
+  assert.equal(discoverRoutes(dir, 'http://localhost:8080', { prefer: ['nothingLikeIt'] }).length, 3, 'no page uses it: every page');
+});
+
+test('a component looked for by a class the code never gives an element is said at once, with the classes that hold its name', async () => {
+  const { classInCode, classesLike } = await import('../a11y-check.mjs');
+  const code = '<!-- the modal opens here -->\n<div :class="{ \'modal-overlay\': open }"><div class="modal-wrapper x"><p class="modal-title"></p></div></div>\n<div class="modal-wrapper"></div>\n.card .button-primary { color: red }';
+  assert.equal(classInCode(code, '.modal'), false, 'a word in a comment and a longer class are not .modal');
+  assert.equal(classInCode(code, '.modal-overlay'), true, 'a quoted class a binding adds');
+  assert.equal(classInCode(code, '.modal-wrapper'), true);
+  assert.equal(classInCode(code, '.button-primary'), true, 'a CSS selector');
+  assert.equal(classInCode(code, '.segmented button'), true, 'not one plain class: taken as present');
+  assert.deepEqual(classesLike(code, ['modal']), ['.modal-wrapper', '.modal-title']);
+});
