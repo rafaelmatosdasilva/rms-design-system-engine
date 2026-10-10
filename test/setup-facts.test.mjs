@@ -88,10 +88,49 @@ test('setup writes what the project says into ds-config.json', () => {
   assert.deepEqual(cfg.pluginDirs, { harbor: '../tidal-harbor' });
   assert.ok(cfg.paths.pluginCSS.includes('../tidal-harbor/ui.src.html'));
   assert.deepEqual([cfg.frames.map((f) => f.name), cfg.screens.map((s) => s.name)], [['Harbor'], ['Harbor — Export']]);
+  assert.equal(cfg.webhook, undefined, 'no webhook placeholder until one is set up (E33)');
 });
 
 test('with no Figma link the summary says the snapshots cannot be refreshed, and what the checks compared with', () => {
   const line = dataStateLine({ noLink: true, snapshots: [{ file: 'src/figma-vars.snapshot.json', ageHours: 80 }] });
   assert.equal(line, '**No Figma link, so the Figma data cannot be refreshed.** The checks against Figma compared the code with the committed snapshots (the oldest, src/figma-vars.snapshot.json, 3 days old), as they are. Add the Figma file\'s link (figmaFileKey in ds-config.json) to refresh them.');
   assert.match(dataStateLine({ snapshots: [{ file: 'a', ageHours: 80 }] }), /^\*\*Figma data was not refreshed in this run\.\*\*/);
+});
+
+test('the installer\'s last words set up with where the code is, never --init alone (E32)', () => {
+  const text = readFileSync(join(ENGINE, 'install.sh'), 'utf8');
+  assert.match(text, /rms-design-system-engine --init --project=\. +# first-time setup/);
+  assert.match(text, /\/rms-design-system-engine set up this project/);
+  assert.doesNotMatch(text, /rms-design-system-engine --init +#/);
+});
+
+test('setup reached from another request routes that request again once it is done, never a generic first run (E21)', async () => {
+  const { route } = await import('../route.mjs');
+  const r = route("check buttonPrimary's accessibility", { hasConfig: false });
+  assert.equal(r.recipe, 'first-setup');
+  assert.match(r.run[0], / --then='check buttonPrimary'\\''s accessibility'$/);
+  assert.doesNotMatch(route('set up this project', { hasConfig: false }).run[0], /--then/);
+  const dir = mkdtempSync(join(tmpdir(), 'setup-then-'));
+  put(dir, 'src/theme.css', ':root { --button-background: #fff }');
+  const out = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--project=.', '--no-hooks', "--then=check buttonPrimary's accessibility"], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
+  assert.equal(out.status, 0, out.stdout + out.stderr);
+  assert.match(out.stdout, /NEXT: the person asked: "check buttonPrimary's accessibility"\. Setup is done; route that request now: rms-design-system-engine --route 'check buttonPrimary'\\''s accessibility', and follow what it prints\./);
+  assert.doesNotMatch(out.stdout, /NEXT: rms-design-system-engine {3}\(the first run/);
+});
+
+test('a Figma file set up and nothing captured from it: the run says nothing was compared, never parity, and capturing comes first (E22)', async () => {
+  const { nextStep, buildSummary, dataStateLine } = await import('../next-step.mjs');
+  assert.match(nextStep({ noSnapshot: true, scope: ['buttonPrimary'] }), /^NEXT: no Figma data is captured yet, so nothing was compared with Figma\. Capture it first: follow rms-design-system-engine --recipe refresh-figma .* then run rms-design-system-engine --component buttonPrimary again/);
+  assert.match(buildSummary({ verdict: 'pass', gates: [{ label: '[3] Token values', pass: true }], noSnapshot: true }), /\*\*Nothing compared with Figma yet\.\*\* No Figma data is captured/);
+  assert.doesNotMatch(buildSummary({ verdict: 'pass', gates: [], noSnapshot: true }), /In parity/);
+  assert.equal(dataStateLine({ snapshots: [{ file: 'src/figma-vars.snapshot.json', ageHours: null, readable: false }] }), '**No Figma data captured yet, so nothing was compared with Figma.** Not readable: src/figma-vars.snapshot.json. To capture it: rms-design-system-engine --recipe refresh-figma.');
+  assert.match(dataStateLine({ snapshots: [{ file: 'a', ageHours: null, readable: true }] }), /^\*\*Figma data was not refreshed in this run\.\*\*/, 'a snapshot with no date is still data');
+  const dir = mkdtempSync(join(tmpdir(), 'no-snapshot-'));
+  put(dir, 'src/theme.css', ':root { --button-background: #fff; }\n.button { background: var(--button-background); }\n');
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--project=.', '--figma-url=https://www.figma.com/design/AbC123def/Demo', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button'], { cwd: dir, encoding: 'utf8', timeout: 240000, env: { ...process.env, FIGMA_TOKEN: '', NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });
+  const summary = readFileSync(join(dir, '.design-system-engine-out', 'summary.md'), 'utf8');
+  assert.match(summary, /\*\*No Figma data captured yet, so nothing was compared with Figma\.\*\*/);
+  assert.match(summary, /\nNEXT: no Figma data is captured yet/);
+  assert.doesNotMatch(summary, /Parity holds/);
 });

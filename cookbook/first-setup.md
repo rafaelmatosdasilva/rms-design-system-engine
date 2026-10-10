@@ -9,7 +9,7 @@
 3. A code folder with no design tokens yet starts in build mode from Figma, with the tokens to go in `src/styles/tokens.css`; then follow `rms-design-system-engine --recipe build-from-figma`. A folder with no code at all: setup stops and asks whether the code is elsewhere or starts there (`--build`).
 4. Token values loaded from hosted stylesheets, one per mode: setup takes every one it finds into `src/styles/tokens.hosted.css`, each mode in its own block. When the code builds the address from parts, pass every combination it allows in `--theme-css` (comma separated URLs). Never ask the person which to take: all of them, always.
 5. No Figma file: setup goes on, and each run checks the code alone and says nothing was compared with Figma.
-6. It also installs the project's hooks. Then follow its NEXT line (the first run).
+6. It also installs the project's hooks. Then follow its NEXT line: the first run, or, when setup came from another request (the router adds `--then='<the request>'`, as "check buttonPrimary's accessibility"), that request routed again, so it is done, never dropped.
 
 Ask the person only where the code is and for the Figma link, and what setup's NEXT line asks. Every other choice takes the option that keeps the most of the system (every mode, every file), without a question.
 

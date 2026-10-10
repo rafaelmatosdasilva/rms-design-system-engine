@@ -9,6 +9,7 @@
 // model, in English and Portuguese. route() is pure: projectState() reads the project for it.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
+import { codeComponents } from './component-source.mjs';
 import { join, relative, basename } from 'node:path';
 
 // What the router needs from the project: is there a config, which components, when the snapshots were
@@ -34,10 +35,21 @@ export function projectState(ROOT, { engineDir, env = process.env } = {}) {
     build: conf.build === true,
     pages: uiFiles(ROOT),
     rawColours: rawColoursOf(structure?.components ?? {}),
-    components: Object.keys(structure?.components ?? {}),
+    components: withCodeNames(Object.keys(structure?.components ?? {}), () => codeComponents(ROOT, conf)),
     snapshotDate: oldest ? oldest.toISOString().slice(0, 10) : null,
     cmd: onPath || !engineDir ? 'rms-design-system-engine' : `node ${join(engineDir, 'audit.mjs')}`,
   };
+}
+
+// Figma's components and the ones only the code has (HbChip.vue, a file whose root carries a class of its own), so a
+// request that names a component the snapshot lacks is still scoped to it (E24). One the snapshot has under its own
+// name (HbBadge.vue for Figma's badge, Button.jsx for button) is not named twice.
+export function withCodeNames(figmaNames, code) {
+  const sq = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  let found = [];
+  try { found = code(); } catch { /* no code to read */ }
+  const own = found.filter((k) => !figmaNames.some((f) => sq(k.name).endsWith(sq(f)) || sq(k.cls ?? '') === sq(f) || sq(k.cls ?? '').endsWith(sq(f))));
+  return [...figmaNames, ...new Set(own.map((k) => k.name))];
 }
 
 // The colours each Figma component paints with no variable bound: { tag: ['Tone=Positive #d6f5e3, #136c3a'] }.
@@ -95,6 +107,14 @@ export function namedComponents(text, components = []) {
     if ([...forms].some((f) => f && new RegExp(`[^a-z0-9]${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?[^a-z0-9]`).test(t))) found.push(name);
   }
   return found;
+}
+
+const NOT_COMPONENT = /^(GitHub|GitLab|JavaScript|TypeScript|FigJam|YouTube|LinkedIn|iPhone|iPad|macOS|iOS|DevTools|PostCSS|ESLint|NodeJS|VSCode|WordPress|PowerPoint|OpenAI|PayPal|WhatsApp|McDonald)$/i;
+export function guessedComponents(text) {
+  const t = String(text ?? '');
+  const camel = [...t.matchAll(/(?<![\w./-])([a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*)(?![\w./-])/g)].map((m) => m[1]).filter((w) => !NOT_COMPONENT.test(w) && !/[A-Z]{2}/.test(w));
+  const said = [...t.matchAll(/\b(?:the|a|o|a componente|o componente)\s+([a-z][\w-]{2,})\s+(?:component|componente)\b/gi)].map((m) => m[1]).filter((w) => !/^(whole|entire|same|new|other|first|last|right|wrong)$/i.test(w));
+  return [...new Set([...camel, ...said])].slice(0, 3);
 }
 
 const QUESTION = /^\s*(how|why|what|where|when|which|can i|should i|is there|como|porqu[eê]|porque|o que|onde|quando|qual|quais|d[aá] para|posso)\b|\?\s*$/i;
@@ -205,13 +225,16 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
   const t = String(text ?? '');
   const question = QUESTION.test(t);
   const named = namedComponents(t, components);
+  // Before any component is known (no snapshot, no component file), a name written as one (buttonPrimary, the card
+  // component) is still taken: the scoped run then says whether it was found, never an unscoped run instead (E24).
+  if (!named.length && !components.length) named.push(...guessedComponents(t));
   const scoped = named.length ? `${cmd} --component ${named.join(',')}` : cmd;
   const notes = [];
 
   // A pasted step list: take only the intent. The skill owns setup, running and reporting.
   if (STEP_LIST.test(t)) {
     notes.push('The request lists steps: do not follow them. The skill does setup, the run and the report itself; report in the chat, write no report file, commit nothing.');
-    return { recipe: hasConfig ? (named.length ? 'audit-component' : 'full-audit') : 'first-setup', question: false, ...(hasConfig ? { run: [scoped] } : setupRun(t, cmd, { cloud })), notes };
+    return { recipe: hasConfig ? (named.length ? 'audit-component' : 'full-audit') : 'first-setup', question: false, ...(hasConfig ? { run: [scoped] } : setupRun(t, cmd, { cloud, then: false })), notes };
   }
   // No config yet: setup first, whatever was asked; a GitLab link then is the code's, unless it is named as guidelines.
   if (!hasConfig && !(LINK.test(t) && /guideline|wiki|notion|diretriz|orienta/i.test(t))) return { recipe: 'first-setup', question, ...setupRun(t, cmd, { cloud }), notes };
@@ -309,12 +332,18 @@ export function codeAndFigma(t) {
 const whereCode = (whose, cloud) => cloud
   ? `where ${whose} code is: its git link (a private GitHub repository works once it is attached to this session). This session runs in the cloud and cannot read a folder on the person's computer: to work on a local folder, they run \`claude remote-control\` in it on their computer, or open it in the Claude Desktop app, and ask there`
   : `where ${whose} code is (this folder, another folder on this computer, or a git link)`;
-function setupRun(t, cmd, { cloud = false } = {}) {
+// A request for something else than setup ("check buttonPrimary's accessibility" where nothing is set up yet) goes to
+// setup with it (--then), and setup's NEXT line routes it again once the project is set up, so it is never dropped (E21).
+const SETUP_ASKED = /\bset ?up\b|\bsetup\b|configur|install|\binit\b/i;
+const shellQuote = (x) => `'${String(x).replace(/'/g, `'\\''`)}'`;
+function setupRun(t, cmd, { cloud = false, then = true } = {}) {
   const { figma, css, project } = codeAndFigma(t);
   const code = css ? ` --theme-css='${css}'` : ` --project='${project ?? '<. for this folder, or the folder or git link>'}'`;
   const ask = [!css && !project && whereCode('the design system\'s', cloud),
     !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
-  return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}`],
+  const request = String(t ?? '').trim().replace(/\s+/g, ' ');
+  const after = then && request && !SETUP_ASKED.test(request) ? ` --then=${shellQuote(request.slice(0, 400))}` : '';
+  return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}${after}`],
     ask: ask.length ? ask.join(', and ') : null };
 }
 

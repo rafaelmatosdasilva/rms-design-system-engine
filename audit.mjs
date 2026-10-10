@@ -120,6 +120,10 @@ function _argValue(flag) { const v = _argValues(flag); return v.length ? v[v.len
 const INIT_FIGMA_URL      = _argValue('--figma-url') ?? _argValue('--figma-key');
 const INIT_THEME_CSS      = _argValue('--theme-css');
 const INIT_SOURCE_URL     = _argValue('--figma-source-url');
+// The request setup was reached from (--then='check the button'): carried through setup's questions, and routed again
+// as its last NEXT line, so it is never dropped for a generic first run (E21).
+const INIT_THEN           = _argValue('--then');
+const thenArg             = INIT_THEN ? ` --then='${INIT_THEN.replace(/'/g, `'\\''`)}'` : '';
 // Build mode: the code's folder has no design tokens yet, so they are built from Figma. Asked with --build, or chosen
 // when the code's folder has no stylesheet of tokens and a Figma file is given.
 const INIT_BUILD          = process.argv.includes('--build');
@@ -1260,13 +1264,13 @@ async function bootstrapConfig() {
   if (INIT_NONINTERACTIVE && !INIT_CODE_GIVEN) {
     console.log(C.yellow('  ⚠️  Setup needs to know where the code is first. Nothing was written.'));
     console.log(C.dim(`  This folder (${ROOT}) ${holds()}.`));
-    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a git link${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or git link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}.`);
+    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a git link${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or git link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}${thenArg}.`);
     process.exit(2);
   }
   // Told the code is in a folder that has none: the code is somewhere else, or it starts here from Figma. One question.
   if (INIT_NONINTERACTIVE && !INIT_BUILD && !INIT_THEME_CSS && !hasCode(ROOT)) {
     console.log(C.yellow(`  ⚠️  This folder has no code: ${ROOT}. Nothing was written.`));
-    console.log(`NEXT: ask the person one question: is the code somewhere else (a folder on this computer or a git link), or should it start here, built from Figma? Then run rms-design-system-engine --init --project='<their folder or link>'${figmaArg}, or add --build to start it in this folder from Figma${INIT_FIGMA_URL ? '' : ' (with --figma-url=<the Figma link>, which building needs)'}.`);
+    console.log(`NEXT: ask the person one question: is the code somewhere else (a folder on this computer or a git link), or should it start here, built from Figma? Then run rms-design-system-engine --init --project='<their folder or link>'${figmaArg}${thenArg}, or add --build to start it in this folder from Figma${INIT_FIGMA_URL ? '' : ' (with --figma-url=<the Figma link>, which building needs)'}.`);
     process.exit(2);
   }
   if (INIT_BUILD && !INIT_FIGMA_URL) {
@@ -1439,7 +1443,7 @@ async function bootstrapConfig() {
     ...(facts.products.length ? { pluginDirs: Object.fromEntries(facts.products.map((p) => [p.key, p.dir])) } : {}),
     ...(facts.scripts.length ? { systemScripts: facts.scripts } : {}),
     visualRefs: newPath('refs'),
-    webhook: { port: 3456, secret: 'YOUR_WEBHOOK_SECRET' },
+    // No webhook until one is set up (setup-webhook.mjs): a placeholder secret is a setting nobody asked for (E33).
     knownUnusedVars: [],
     knownHardcodedExceptions: [],
     ...(buildMode ? { build: true } : {}),
@@ -1508,7 +1512,9 @@ async function bootstrapConfig() {
       console.log(C.green(`✅ Hooks installed in ${relative(ROOT, r.file)}`) + C.dim(' (never edit a Figma snapshot by hand; ask before commit, push, applying the hand-back or editing ds-config.json; route each /rms-design-system-engine request). Off: --remove-hooks.'));
     } catch (e) { console.log(C.yellow(`⚠️  Hooks not installed: ${e.message}`)); }
   }
-  console.log(buildMode
+  // The request setup was reached from comes back first: routed now, as the person asked it.
+  if (INIT_THEN) console.log(`NEXT: the person asked: "${INIT_THEN}". Setup is done; route that request now: rms-design-system-engine --route '${INIT_THEN.replace(/'/g, `'\\''`)}', and follow what it prints.\n`);
+  else console.log(buildMode
     ? 'NEXT: rms-design-system-engine   (the first run: it refreshes the Figma data when it can, then lists what to build, tokens first)\n'
     : 'NEXT: rms-design-system-engine   (the first run: it refreshes the Figma data when it can, then audits)\n');
 
@@ -2950,6 +2956,28 @@ function reportFull(label, items, shown) {
       for (const c of children.get(queue.shift()) ?? []) if (!inScope.has(c)) { inScope.add(c); _autoAdded.push(c); queue.push(c); }
     }
     _scopeNames.length = 0; _scopeNames.push(...inScope);
+  }
+  // A component asked for that is in neither the Figma data nor the code (no file named for it, no element with its
+  // class): nothing about it can be checked, and the run says so rather than passing it (E24).
+  const _foundNowhere = [];
+  if (_chosenNames.length) {
+    const known = new Set();
+    for (const f of [SNAP_STRUCT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json']) {
+      try { const j = JSON.parse(readFileSync(join(ROOT, f), 'utf8')); for (const k of Object.keys(j.components ?? j)) if (!k.startsWith('_')) known.add(_norm(k)); } catch { /* not captured */ }
+    }
+    const files = allSourceFiles();
+    const bases = files.map((f) => { const parts = relative(ROOT, f).replace(/\\/g, '/').split('/'); let b = parts.at(-1).replace(/\.[^.]+$/, ''); if (/^index$/i.test(b) && parts.length > 1) b = parts.at(-2); return _norm(b); });
+    let classes = null;
+    const classSet = () => classes ??= new Set([...files, ...[cfg.paths?.themeCSS].flat().filter((p) => p && !/^https?:/.test(p)).map((p) => join(ROOT, p))].flatMap((f) => {
+      let t = ''; try { t = readFileSync(f, 'utf8'); } catch { return []; }
+      return [...t.matchAll(/(?:^|[\s,{>+~(])\.(-?[A-Za-z_][\w-]*)|class(?:Name)?\s*=\s*["'`]([^"'`]*)["'`]/g)].flatMap((m) => (m[1] ? [m[1]] : m[2].split(/\s+/)));
+    }).map(_norm));
+    for (const n of _chosenNames) {
+      const k = _norm(n);
+      if (known.has(k) || cfg.componentSelectors?.[n] || cfg.componentFiles?.[n] || (k.length >= 3 && bases.some((b) => b.endsWith(k))) || classSet().has(k) || classSet().has(_norm(_selOf(n)))) continue;
+      _foundNowhere.push(n);
+    }
+    if (_foundNowhere.length) console.log(C.yellow(`\n⚠️  ${_foundNowhere.join(', ')}: in neither the Figma data nor the code (no file named for ${_foundNowhere.length === 1 ? 'it' : 'them'}, no element with ${_foundNowhere.length === 1 ? 'its' : 'their'} class), so nothing about ${_foundNowhere.length === 1 ? 'it' : 'them'} was checked.`));
   }
   const _scopeForms = _scopeNames.map(name => ({
     name,
@@ -4552,15 +4580,19 @@ function reportFull(label, items, shown) {
     }
     let a11yFound = null;
     try { a11yFound = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
-    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true, a11y: a11yFound, measured: measuredLines(gates).length, noFigma: NO_FIGMA });
+    // A Figma file set up, and no Figma data readable (nothing captured yet): nothing was compared with Figma, so the
+    // run never reads as parity, and the capture comes first (E22).
+    const readable = (file) => { try { JSON.parse(readFileSync(join(ROOT, file), 'utf8')); return true; } catch { return false; } };
+    const noSnapshot = !NO_FIGMA && !_figmaCliRead && ![SNAP_VARS, SNAP_STRUCT, cfg.paths?.compPropsSnapshot].filter(Boolean).some(readable);
+    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true, a11y: a11yFound, measured: measuredLines(gates).length, noFigma: NO_FIGMA, noSnapshot, foundNowhere: _foundNowhere });
     const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
     const { dataStateLine } = await import('./next-step.mjs');
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
-    const data = NO_FIGMA ? null : dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, noLink: cfg.figmaFileKey === '', snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
+    const data = NO_FIGMA ? null : dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, noLink: cfg.figmaFileKey === '', snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file), readable: readable(file) })) });
     let a11yIssues = null;
     try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
     const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), noFigma: NO_FIGMA, a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues, why: (rA11y?.stdout ?? '').match(/⏭\s+\[a11y\]\s+(.+)/)?.[1]?.replace(/\.$/, '') ?? null } : null } : null;
-    let summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine });
+    let summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine, noSnapshot, foundNowhere: _foundNowhere });
     mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
     // Where every difference is listed (written by a full audit above), so the chat always says where to look.
     let diffLine = '';
