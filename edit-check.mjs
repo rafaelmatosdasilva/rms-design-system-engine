@@ -6,7 +6,8 @@
 // guard), after an Edit, MultiEdit or Write on a UI file this reads only what the edit ADDED and returns what in
 // it the design system does not have, with the right name:
 //   • var(--x) that is declared nowhere (not in the theme, not in the file itself);
-//   • a colour written as a literal: the token that has that value when one does, or "not a design-system colour";
+//   • a colour written as a literal (#hex, rgb(), hsl(), oklch(), a CSS name like green): the token that has that
+//     value when one does, or "not a design-system colour";
 //   • on a design-system component's tag, a prop value it does not take or a prop name written another way
 //     (the catalog and the code API, exactly as the steering check reads them);
 //   • in a Tailwind project, a class with a value in brackets (rounded-[4px]): the theme's utility when a theme
@@ -32,6 +33,7 @@ import { usesTailwind, themeValues, arbitraryFindings } from './tailwind-check.m
 import { primitiveTable, projectClassRules, primitiveFindings, primitiveTag } from './primitives.mjs';
 import { markupFindings, cssFindings, styleOnly, projectStyleText } from './a11y-static.mjs';
 import { codeSnapshotPath } from './names.mjs';
+import { colorHex, COLOUR_NAMES } from './css-values.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
 const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.design-system-engine-out|\.design-system-engine-refs)\//;
@@ -42,6 +44,17 @@ const NOT_COLOUR = /(href|to|src|action|xlink:href)\s*=\s*\{?\s*["'`]$|url\(\s*[
 // data table or a comment is data.
 const STYLE_PROP = /(colou?r|background|border|fill|stroke|shadow|outline|caret|accent|decoration)[\w-]*["'`]?\s*[:=]\s*\{?\s*[^;:=]*$/i;
 const COMMENT = /^\s*(\/\/|\/?\*|<!--)/;
+// A colour written another way than hex: a colour function, or one of the 148 CSS colour names. A name counts only as
+// a whole word (not .green, white-space, --red or bg-white), and transparent, currentColor and the system colours
+// (Canvas, Highlight) are no colour of the page's own.
+const FUNC_COLOUR = /\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\((?:[^()]|\([^()]*\))*\)/gi;
+const NAMED_COLOUR = new RegExp(`(?<![\\w#.$@/-])(${[...COLOUR_NAMES].sort((a, b) => b.length - a.length).join('|')})(?![\\w(-])`, 'gi');
+const VAR_SPAN = /var\((?:[^()]|\([^()]*\))*\)/g;
+// An SVG paint attribute takes a colour (fill="white"); any other attribute (color="green" on a component) is a prop.
+const PAINT_ATTR = /^(fill|stroke|stop-color|flood-color|lighting-color)$/i;
+// Outside a style sheet, a colour name is styling only in a style: a style attribute or object (style=, sx=, css=,
+// .style.), or a declaration that starts its line (a <style> block, a styled template, a style object's key).
+const STYLE_PLACE = /\bstyle\b|\bsx\s*=|\bcss\b|^\s*["'`]?[\w-]+["'`]?\s*:/i;
 // A directive starts its comment (// eslint-disable-next-line, /* stylelint-disable */, {/* @ts-ignore */}); the
 // same words later in a comment are prose about it.
 const SILENCER = /(?:\/\/+|\/\*+|<!--)\s*(eslint-disable(?:-next-line|-line)?|stylelint-disable(?:-next-line|-line)?|oxlint-disable(?:-next-line|-line)?|biome-ignore(?:-all|-start)?|@ts-(?:ignore|expect-error|nocheck))(?![\w-])/;
@@ -148,8 +161,10 @@ export function editTruth(ROOT, cfg = {}) {
   const theme = [...themePaths.map(read), cfg.build === true ? read(TOKENS_TO_BUILD) : ''].join('\n');
   const cssVars = [...new Set([...theme.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))];
   const tokenByValue = new Map();
-  for (const m of theme.matchAll(/(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\b/g)) {
-    const k = normHex(m[2]);
+  for (const m of theme.matchAll(/(--[\w-]+)\s*:\s*([^;}\n]+)/g)) {
+    // A token's colour, however the theme writes it (#hex, rgb(), oklch(), a name), keyed as hex.
+    const v = m[2].trim(), k = /^#[0-9a-fA-F]{3,8}$/.test(v) ? normHex(v) : colorHex(v);
+    if (!k) continue;
     const list = tokenByValue.get(k) ?? [];
     if (!list.includes(m[1])) list.push(m[1]);
     tokenByValue.set(k, list);
@@ -245,6 +260,33 @@ export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = 
       push(line, tokens.length
         ? `${m[0]} is written by hand; use var(${tokens[0]})${tokens.length > 1 ? ` (or ${tokens.slice(1, 3).map((t) => `var(${t})`).join(', ')})` : ''}`
         : `${m[0]} is not a design-system colour; use one of its colour tokens`);
+    }
+    // A colour written another way: rgb(), hsl(), oklch() and the rest, or a CSS name (green, white). One built on a
+    // token (rgb(var(--x) / .5), rgb(from var(--x) …)) or a token's fallback (var(--x, white)) goes through the token.
+    const decl = l.replace(/--[\w-]+\s*:[^;}]*/g, (x) => ' '.repeat(x.length)).replace(/&#x?[0-9a-fA-F]+;/g, (x) => ' '.repeat(x.length));
+    const inVar = [...decl.matchAll(VAR_SPAN)].map((v) => [v.index, v.index + v[0].length]);
+    const colour = (raw) => {
+      const hex = colorHex(raw), tokens = hex ? tokenByValue.get(hex) ?? [] : [];
+      if (!tokens.length && hex && figmaRaw.has(hex)) return;   // Figma paints it raw: reported, not invented
+      if (isTheme && (tokens.length || (hex && figmaValues.has(hex)))) return;
+      push(line, tokens.length
+        ? `${raw} is written by hand; use var(${tokens[0]})${tokens.length > 1 ? ` (or ${tokens.slice(1, 3).map((t) => `var(${t})`).join(', ')})` : ''}`
+        : `${raw} is not a design-system colour; use one of its colour tokens`);
+    };
+    const canvas = (before) => /\.(fill|stroke|shadow)(Style|Color)\s*=\s*[^;]*$/.test(before);
+    for (const m of decl.matchAll(FUNC_COLOUR)) {
+      if (/var\(|\bfrom\b|calc\(/i.test(m[0]) || inVar.some(([a, b]) => m.index >= a && m.index < b)) continue;
+      const before = decl.slice(0, m.index);
+      if ((!sheet && !STYLE_PROP.test(before)) || canvas(before)) continue;
+      colour(m[0]);
+    }
+    const words = decl.replace(VAR_SPAN, (x) => ' '.repeat(x.length)).replace(FUNC_COLOUR, (x) => ' '.repeat(x.length));
+    for (const m of words.matchAll(NAMED_COLOUR)) {
+      const before = words.slice(0, m.index);
+      const at = before.match(/(\.style\.)?([\w-]+)["'`]?\s*([:=])\s*\{?\s*[^;:=]*$/);
+      if (!at || !STYLE_PROP.test(before) || canvas(before)) continue;
+      if (at[3] === '=' ? !at[1] && !PAINT_ATTR.test(at[2]) : !sheet && !STYLE_PLACE.test(l)) continue;
+      colour(m[1]);
     }
     if (sizes && !isTheme) for (const f of sizeFindings(scan, sizes, { styled: /\bstyle\s*=/.test(l) })) push(line, f);   // MUI's sx={{ padding: 2 }} is a theme step, not 2px
   }

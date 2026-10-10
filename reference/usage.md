@@ -240,6 +240,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15] (Component props match Figma)
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
+  When an option's look is drawn on the component but a screen reader hears it on a part (a field's wrapper takes
+  `.field--disabled` while the field itself is disabled), the contract's `heardOn` names the part and its state per
+  option (`heardOn: { Disabled: { True: '.field__input:disabled' } }`): the option sets both, and the state check
+  counts what the part says.
   An HTML and CSS system has no code props to pair, so a Figma prop is a control when the code realizes it: the
   contract's `propertyMap` (found by its options when the contract spells the prop another way), `htmlRealizations`,
   a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. The system's
