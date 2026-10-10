@@ -10,7 +10,7 @@
 //
 // Pure: no I/O. prototype.mjs is the command.
 import { checkUi } from './ui-catalog.mjs';
-import { ruledOut, requestFindings } from './prototype-context.mjs';
+import { ruledOut, requestFindings, wordsOf } from './prototype-context.mjs';
 
 export const PIECES = ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'];
 export const GAP_KINDS = ['component', 'option', 'token', 'icon', 'layout', 'pattern'];
@@ -126,6 +126,7 @@ function withoutNotes(ui) {
 export function checkPrototype(ui, { catalog = { components: {} }, view = { components: [] }, scales = { spacing: [], text: [] }, name = 'prototype', declared = [], limits = [], breakpoints = [], context = null, request = null, css = '' } = {}) {
   const systemNames = Object.keys(catalog.components ?? {});
   const pieces = pieceCatalog(scales, systemNames);
+  const systemHas = (need, self) => { const w = wordsOf(need).sort().join(' '); return w ? systemNames.find((n) => n !== self && wordsOf(n.replace(/^[._]+/, '')).sort().join(' ') === w) ?? null : null; };
   const r = checkUi(withoutNotes(ui), { ...catalog, components: { ...catalog.components, ...pieces } });
   // A component the catalog does not have is never made up: it is a Missing box with the need written on it.
   const findings = r.findings.map((f) => (f.rule === 1 && f.level === 'error' && pieces.Missing ? { ...f, message: `${f.message}; if the system has nothing for it, write a Missing box with the need instead` } : f));
@@ -158,6 +159,9 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     }
     if (node.component === 'Columns' && pieces.Columns && p.minWidth != null && !/^\d{2,4}$/.test(String(p.minWidth))) findings.push({ rule: 2, level: 'error', id: node.id, message: `Columns.minWidth is the narrowest a column may be, in px (like "240"), not ${JSON.stringify(p.minWidth)}` });
     if (node.component === 'Page' && pieces.Page && p.width != null && !/^\d{2,4}$/.test(String(p.width))) findings.push({ rule: 2, level: 'error', id: node.id, message: `Page.width is the screen's width in px (like "820"), not ${JSON.stringify(p.width)}` });
+    // A stand-in for what the system has (a "date picker" where it has datePicker) is no gap: the system's own is used.
+    const own = p.standInFor ? systemHas(String(p.standInFor), node.component) : null;
+    if (own) findings.push({ rule: null, level: 'warning', id: node.id, message: `${node.component} stands in for "${p.standInFor}", and the system has ${own}: use ${own} itself, without "standInFor"` });
     // A stand-in is a gap whatever stands in, the engine's own Text included.
     if (pieces[node.component] && p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: null, used: `the engine's ${node.component}`, prototype: name, node: node.id });
     if (pieces[node.component]) { if (node.component !== 'Text') (used[node.component] ??= []).push(node.id); continue; }
@@ -308,6 +312,15 @@ export function groupLayout(gaps = []) {
   const one = { kind: 'layout', need: `${list} layout components`, used: "the engine's own", closest: null, note: null, ...(prototypes.length ? { prototypes } : {}) };
   const at = gaps.indexOf(layout[0]);
   return [...gaps.slice(0, at).filter((g) => !layout.includes(g)), one, ...gaps.slice(at).filter((g) => !layout.includes(g))];
+}
+
+// The gaps as the prototype's page lists them: one line each, with the parts of the composition it comes from, so the
+// page shows them where they are drawn. The engine's layout pieces are one line, shown by the page's layout outline.
+export function pageGaps(gaps = []) {
+  return groupLayout(mergeGaps({ page: gaps })).map(({ prototypes, ...g }) => {
+    const same = g.kind === 'layout' ? [] : gaps.filter((x) => x.kind === g.kind && String(x.need).toLowerCase() === String(g.need).toLowerCase());
+    return { line: gapLine(g), kind: g.kind, need: g.need, nodes: [...new Set(same.flatMap((x) => String(x.node ?? '').split(', ').filter(Boolean)))] };
+  });
 }
 
 // One line per gap, for the summary and the reply.

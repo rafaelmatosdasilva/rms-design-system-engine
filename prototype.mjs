@@ -15,7 +15,7 @@ import { join, resolve, basename, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
-import { checkPrototype, systemScales, nodesOf, mergeGaps, groupLayout, gapLine, pieceCatalog } from './prototype-pieces.mjs';
+import { checkPrototype, systemScales, nodesOf, mergeGaps, groupLayout, gapLine, pageGaps, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
 import { loadContext, purposeLines, ruleLines, usesAgainstPurpose, requestFocus, focusLines, cut, screenUses } from './prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from './product-conventions.mjs';
@@ -286,7 +286,7 @@ function drawOne(ROOT, name, raw, sys) {
     mkdirSync(outDir, { recursive: true });
     writeFileSync(gapsFile, JSON.stringify({ $description: `What the design system lacks, from every prototype drawn with ${CLI} --prototype. Generated; the design team decides each one.`, byPrototype: store.byPrototype, merged: mergeGaps(store.byPrototype) }, null, 2) + '\n');
     page = join(outDir, `${name}.html`);
-    const mine = mergeGaps({ [name]: r.gaps }).map(gapLine);
+    const mine = pageGaps(r.gaps);
     // What the reply owes the person: every gap of the prototype just drawn (the Stop hook holds the reply to it).
     writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name, pending: true, gaps: [...mergeGaps({ [name]: r.gaps }).map((g) => ({ need: g.need, kind: g.kind, line: gapLine(g) })), ...differs.map((d) => ({ need: `${d.what} ${d.product}`, kind: 'consistency', line: consistencyLine(d) })), ...r.findings.filter((f) => f.kind === 'request').map((f) => ({ need: f.message.replace(/^the request asks for /, '').split(' and ')[0], kind: 'request', line: f.message })), ...r.findings.filter((f) => f.kind === 'state').map((f) => ({ need: `${f.state} state`, kind: 'state', line: f.message })), ...r.findings.filter((f) => f.kind === 'flow').map((f) => ({ need: f.need, kind: 'flow', line: f.message }))] }, null, 2) + '\n');
     writeFileSync(page, prototypePage({ name, tree: treeOf(ui), states, parts: sys.parts, scales: sys.scales, gaps: mine, catalog: sys.catalog, fonts: sys.fonts !== false, note: `${r.counts.components} parts · only the design system's own components${r.gaps.some((g) => g.kind === 'layout') ? ', with the engine\'s neutral layout' : ''}` }));
@@ -419,7 +419,7 @@ export function prototypeA11y(ROOT, page, used = null) {
     const d = JSON.parse(out.slice(at));
     if (d.notChecked) return null;
     // Only what is on the page: a note that a component the page does not use was not checked is not about it.
-    return (d.issues ?? []).filter((i) => !/(^|[#. ])pt-(bar|outline|gaps|modes|title|note|seg)/.test(String(i.selector ?? '')) && !/no instance shows its .*not checked/.test(String(i.selector ?? ''))
+    return (d.issues ?? []).filter((i) => !/(^|[#. ])pt-(bar|outline|gaps|gap-show|chip|modes|title|note|font-note|seg|standins|marks?|mark-box)/.test(String(i.selector ?? '')) && !/no instance shows its .*not checked/.test(String(i.selector ?? ''))
       && !(used && /^([\w-]+): /.test(String(i.selector ?? '')) && !used.has(/^([\w-]+): /.exec(String(i.selector))[1]))).map((i) => {
       // A control or a group with no name is the page's to name: the composition gives it "name".
       const named = i.issue === 'name' || i.issue === 'group';
