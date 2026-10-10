@@ -65,5 +65,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-10-states-heard-on-a-part-colours` | The 21 guide tasks on Haiku (engine a1ca3dd) | "States heard on a part (heardOn); colours in any notation in the edit check" |
 | `2026-10-10-prototype-quality` | The 21 guide tasks on Haiku (engine d8e021e) | "Prototype quality on a real system" |
 | `2026-10-10-prototype-quality-flows` | The 21 guide tasks on Haiku (engine 224d490) | "Prototype quality: a file that is not one page in a flow" |
+| `2026-10-10-prototype-fonts-standins` | The 21 guide tasks on Haiku (engine b06a027) | "Prototype fonts that never wait, and stand-ins shown on the page" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
