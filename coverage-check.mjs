@@ -12,7 +12,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { loadModes } from './mode-resolver.mjs';
-import { createLocator } from './component-locator.mjs';
+import { createLocator, codeClassesIn } from './component-locator.mjs';
 import { existsSync } from 'fs';
 import { readFreshSnapshot, nestingLabel } from './code-capture.mjs';
 import { pathToFileURL } from 'url';
@@ -45,7 +45,7 @@ try {
 const UNIMPL = await inProgressNames(ROOT, cfg);
 
 // A component's CSS class, from the one shared component finder (component-locator.mjs).
-const LOCATOR = createLocator(cfg, { contractSelectors: SELECTORS });
+const LOCATOR = createLocator(cfg, { contractSelectors: SELECTORS, codeClasses: codeClassesIn(ROOT, cfg) });
 const classOf = (comp) => LOCATOR.classFor(comp);
 // Does any entry's selector reference this component's class?
 const refsClass = (entries, keyer, cls) => entries.some(e => (keyer(e) ?? '').includes(cls));

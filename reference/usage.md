@@ -1006,7 +1006,14 @@ whatever surface the project serves, in this order:
 3. **Auto-discovery (the default when nothing is configured)** — it reads `package.json`, **starts the
    project's dev server** (`storybook` / `dev` / `serve` / `start` / `preview`, or `a11y.serve`), reads the
    URL it prints, and **enumerates the pages itself**: Storybook stories → else static router routes → else
-   the base page. Override the base with `a11y.baseUrl`, delay the sweep for SPA hydration with
+   the base page. The routes are read from the usual router file and every file under `src/router` or
+   `src/routes` (route modules included), as `/#/…` addresses when the router uses hash history. Scoped to a
+   component, it opens only the pages whose view uses it, the component's own page first. A project whose
+   packages are not installed is told so, and a generated style guide that draws no component is not used.
+   A component whose class no element in the code has is said at once, with the classes that hold its name
+   (`.modal-wrapper` for modal), never waited for on every page. The check's time grows with its pages and
+   modes (`a11y.timeoutSec` sets it), and a check stopped by it says how many pages it reached.
+   Override the base with `a11y.baseUrl`, delay the sweep for SPA hydration with
    `a11y.waitFor`, or turn the whole thing off with `a11y.discover: false`.
 4. **Ask (last resort)** — only when auto-discovery finds nothing does the skill ask the user for the one
    render URL. It **never fabricates a config or crawls the repo**; with no target it skips cleanly and says

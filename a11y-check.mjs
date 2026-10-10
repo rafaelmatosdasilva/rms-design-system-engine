@@ -64,7 +64,7 @@
 
 import { appDir } from './code-roots.mjs';
 import './stdio-sync.mjs';   // the whole report reaches a pipe before process.exit
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { gunzipSync } from 'zlib';
@@ -440,14 +440,15 @@ function detectServeCmd(ROOT, cfg) {
   for (const name of ['storybook', 'dev', 'serve', 'start', 'preview']) if (s[name]) return 'npm run ' + name;
   return null;
 }
-function startDevServer(cmd, ROOT) {
+export function startDevServer(cmd, ROOT) {
   const parts = cmd.split(/\s+/);
-  const proc = spawn(parts[0], parts.slice(1), { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none', FORCE_COLOR: '0' } });
+  const proc = spawn(parts[0], parts.slice(1), { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none', FORCE_COLOR: '0', NO_COLOR: '1' } });
   const stop = () => { try { process.kill(-proc.pid, 'SIGTERM'); } catch { try { proc.kill('SIGTERM'); } catch {} } };
   const url = new Promise((res) => {
     let buf = '', done = false;
     const finish = (v) => { if (!done) { done = true; res(v); } };
-    const scan = (d) => { buf += d.toString(); const m = buf.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?[^\s'"]*/i); if (m) finish(m[0].replace(/\/+$/, '')); };
+    // A server that prints its address in colour (Vite puts the port in bold) is read without the colour codes.
+    const scan = (d) => { buf += d.toString().replace(/\x1b\[[0-9;]*m/g, ''); const m = buf.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?[^\s'"]*/i); if (m) finish(m[0].replace(/\/+$/, '')); };
     proc.stdout.on('data', scan); proc.stderr.on('data', scan);
     proc.on('exit', () => finish(null));
     setTimeout(() => finish(null), 40000);   // give the server up to 40s to print a URL
@@ -464,18 +465,73 @@ async function discoverStorybook(base) {
   }
   return null;
 }
-function discoverRoutes(ROOT, base) {
-  const files = ['src/router/index.ts', 'src/router/index.js', 'src/router.ts', 'src/router.js', 'src/routes.ts', 'src/routes.js', 'src/App.tsx', 'src/App.jsx'];
-  const out = new Set();
-  for (const rel of files) {
-    let txt; try { txt = readFileSync(join(ROOT, rel), 'utf8'); } catch { continue; }
-    for (const m of txt.matchAll(/\bpath\s*:\s*['"`]([^'"`]+)['"`]/g)) {
-      const p = m[1];
-      if (p.startsWith('/') && !p.includes(':') && !p.includes('*')) out.add(p);   // static routes only (no params/wildcards)
+// The project's own pages, from its router: every static path in its router files (the usual single files, and every
+// file under src/router or src/routes, its modules included), as hash URLs when the router uses hash history
+// (/#/components/buttons/primary). Scoped to components (prefer: their names and selectors), only the pages whose view
+// uses one of them, the component's own page first (its folder and name in the path); every page when none does.
+const squashName = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+export function discoverRoutes(ROOT, base, { prefer = [], read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return ''; } } } = {}) {
+  const files = new Set(['src/router/index.ts', 'src/router/index.js', 'src/router.ts', 'src/router.js', 'src/routes.ts', 'src/routes.js', 'src/App.tsx', 'src/App.jsx'].map((r) => join(ROOT, r)).filter((f) => existsSync(f)));
+  const walk = (dir, depth = 0) => {
+    let names = []; try { names = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of names) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) { if (depth < 4 && !e.name.startsWith('.') && e.name !== 'node_modules') walk(p, depth + 1); }
+      else if (/\.(m?[jt]sx?)$/.test(e.name) && !/\.(test|spec)\./.test(e.name)) files.add(p);
     }
+  };
+  for (const d of ['src/router', 'src/routes', 'src/routing']) walk(join(ROOT, d));
+  // A module path as the router writes it (@/views/x.vue, ./x, ~/x) → the file, or null.
+  const fileOf = (from, spec) => {
+    const raw = /^[@~]\//.test(spec) ? join(ROOT, 'src', spec.slice(2)) : spec.startsWith('.') ? join(dirname(from), spec) : null;
+    if (!raw) return null;
+    for (const x of ['', '.vue', '.js', '.ts', '.jsx', '.tsx', '.svelte', '/index.vue', '/index.js', '/index.ts', '/index.tsx']) if (existsSync(raw + x) && !/\/$/.test(raw + x)) { try { if (statSync(raw + x).isFile()) return raw + x; } catch { /* not a file */ } }
+    return null;
+  };
+  const routes = new Map();
+  let hash = false;
+  for (const f of files) {
+    const txt = read(f);
+    if (/\bcreate(?:Web)?HashHistory\s*\(|<HashRouter\b|\bcreateHashRouter\s*\(/.test(txt)) hash = true;
+    const imports = new Map([...txt.matchAll(/import\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/g)].map((m) => [m[1], m[2]]));
+    const found = [...txt.matchAll(/\bpath\s*:\s*['"`]([^'"`]+)['"`]/g)];
+    found.forEach((m, i) => {
+      const p = m[1];
+      if (!p.startsWith('/') || p.includes(':') || p.includes('*') || routes.has(p)) return;   // static routes only (no params/wildcards)
+      const chunk = txt.slice(m.index, found[i + 1]?.index ?? m.index + 600);
+      const c = /\bcomponent\s*:\s*(?:\(\s*\)\s*=>\s*import\(\s*['"]([^'"]+)['"]\s*\)|([A-Za-z_$][\w$]*)\b)/.exec(chunk);
+      const spec = c ? (c[1] ?? imports.get(c[2])) : null;
+      routes.set(p, spec ? fileOf(f, spec) : null);
+    });
   }
-  const b = base.replace(/\/$/, '');
-  return out.size ? [...out].map((p) => b + p) : null;
+  let list = [...routes];
+  const keys = [...new Set(prefer.map(squashName).filter((k) => k.length >= 3))];
+  if (keys.length) {
+    const uses = ([, view]) => view && keys.some((k) => squashName(read(view)).includes(k));
+    // Its own page: the path's last two segments spell it (/components/buttons/primary is buttonPrimary).
+    const own = ([p]) => { const seg = p.split('/').filter(Boolean).slice(-2).map(squashName); return seg.length === 2 && keys.some((k) => k === seg[0] + seg[1] || k === seg[0].replace(/(?<=...)s$/, '') + seg[1]); };
+    const hit = list.filter((r) => uses(r) || own(r));
+    if (hit.length) list = [...hit.filter(own), ...hit.filter((r) => !own(r))];
+  }
+  const b = base.replace(/\/$/, '') + (hash ? '/#' : '');
+  return list.length ? list.map(([p]) => b + p) : null;
+}
+
+// A class the code gives an element: in a class attribute, as a quoted name a binding adds (:class, clsx), or as a CSS
+// selector. A word in a comment is not one. A selector that is not one plain class is taken as present.
+export function classInCode(code, sel) {
+  const c = /^\.(-?[A-Za-z_][\w-]*)$/.exec(String(sel).trim())?.[1];
+  if (!c) return true;
+  const e = c.replace(/-/g, '\\-');
+  return new RegExp(`class(?:Name)?\\s*=\\s*["'\`](?:[^"'\`]*\\s)?${e}(?=[\\s"'\`])|["'\`]${e}["'\`]|(?:^|[\\s,{>+~(&])\\.${e}(?![\\w-])`, 'm').test(String(code));
+}
+
+// The classes in the code that hold a name (modal-overlay for modal), most used first: the likely answer.
+export function classesLike(code, names, max = 4) {
+  const counts = new Map();
+  for (const m of String(code).matchAll(/class(?:Name)?\s*=\s*["'`]([^"'`]+)["'`]/g)) for (const c of m[1].split(/\s+/)) if (/^-?[A-Za-z_][\w-]*$/.test(c)) counts.set(c, (counts.get(c) ?? 0) + 1);
+  const sq = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  return [...counts].filter(([c]) => names.some((n) => sq(c).includes(sq(n)))).sort((a, b) => b[1] - a[1]).slice(0, max).map(([c]) => '.' + c);
 }
 
 // ── CLI arg helpers ─────────────────────────────────────────────────────────────
@@ -493,12 +549,17 @@ function argValues(flag, argv) {
 // file:// a11y target it is deterministic, complete and needs no dev server — and because
 // each state is its own instance in the resting DOM, the existing sweep gets per-state
 // coverage for free. Returns the target or null (missing, or opted out via a11y.styleguide:false).
-export function styleguideTarget(cfg, ROOT, exists = existsSync) {
+export function styleguideTarget(cfg, ROOT, exists = existsSync, read = (f) => readFileSync(f, 'utf8')) {
   if (cfg?.a11y?.styleguide === false) return null;
+  // A guide that draws no component (built before any was agreed, or with no Figma data) has nothing to try: the
+  // project's own pages are checked instead. One whose list cannot be read is taken as it is.
+  const draws = (abs) => {
+    try { const m = /<script[^>]*\bid=["']sg-data["'][^>]*>([\s\S]*?)<\/script>/.exec(read(abs)); return !m || (JSON.parse(m[1]).components ?? [1]).length > 0; } catch { return true; }
+  };
   // Where the style guide is written: the configured place, else the project's own template's, else the engine's.
   for (const rel of [cfg?.styleguide?.out, 'apps/styleguide/index.html', `${OUT_DIR}/styleguide/index.html`].filter(Boolean)) {
     const abs = join(ROOT, rel);
-    if (exists(abs)) return { label: rel, url: pathToFileURL(abs).href + '?all', styleguide: true };   // every view drawn at once
+    if (exists(abs) && draws(abs)) return { label: rel, url: pathToFileURL(abs).href + '?all', styleguide: true };   // every view drawn at once
   }
   // Not built by the project yet: the code capture keeps its own copy, built from the same template.
   const cap = join(ROOT, dirname(codeSnapshotPath(cfg)), 'styleguide.html');
@@ -1225,7 +1286,7 @@ async function main() {
     }
     if (base) {
       const stories = await discoverStorybook(base);
-      const found = stories || discoverRoutes(ROOT, base) || [base];
+      const found = stories || discoverRoutes(ROOT, base, { prefer: components.flatMap((c) => [c, selOf(c)]) }) || [base];
       const capped = found.slice(0, 40);
       targets = capped.map((u) => ({ label: u.startsWith(base) ? (u.slice(base.length) || '/') : u, url: u, page: !stories }));
       console.log(`ℹ️  [a11y] ${found.length === 1 ? 'checking the base page' : `${found.length} page(s) found — checking ${capped.length}`} via ${base}`);
@@ -1245,7 +1306,24 @@ async function main() {
   let browser = null;
   const cleanup = () => { try { browser?.kill(); } catch {} try { stopServer?.(); } catch {} };
   process.on('exit', cleanup);
-  const killTimer = setTimeout(() => { console.error('❌ [a11y] timed out (120s)'); cleanup(); process.exit(STRICT ? 1 : 0); }, 120000); killTimer.unref();
+  // A component looked for by a class no element in the code has would be waited for on every page: said at once.
+  if (roots && components.length && !cliUrls.length && !cfg.a11y?.urls?.length) {
+    const { componentSourceFiles, textReader } = await import('./component-source.mjs');
+    const read = textReader();
+    const code = componentSourceFiles(ROOT, cfg).map(read).join('\n') + [cfg.paths?.themeCSS].flat().filter(Boolean).map((f) => read(join(ROOT, f))).join('\n');
+    const has = (sel) => classInCode(code, sel);
+    const missing = components.filter((c) => !has(selOf(c)));
+    if (missing.length === components.length) {
+      const like = classesLike(code, missing);
+      skip(`nothing to check for ${missing.join(', ')}: no element in the code has the class ${missing.map(selOf).join(', ')}, the one taken for ${missing.length === 1 ? 'it' : 'them'} by the naming rule.${like.length ? ` Classes in the code that hold the name: ${like.join(', ')}.` : ''} Name the component's class in ds-config.json → componentSelectors (for example "${missing[0]}": "${like[0] ?? '.its-class'}"), or check a page that shows it with --url.`);
+    }
+  }
+
+  // The time the check may take grows with its pages and colour modes (a fixed two minutes stopped a scoped check of
+  // 23 pages halfway, and said so only where the audit never showed it); a11y.timeoutSec sets it.
+  const limitSec = Number(cfg.a11y?.timeoutSec) || Math.min(900, Math.max(120, targets.length * Math.max(1, modes.length) * 12));
+  let pagesDone = 0;
+  const killTimer = setTimeout(() => { console.log(`⏭  [a11y] stopped after ${limitSec}s, with ${Math.max(0, pagesDone - 1)} of ${targets.length} page(s) checked: what they found is not reported. Give it longer with ds-config.json → a11y.timeoutSec, or check fewer pages (--url).`); cleanup(); process.exit(STRICT ? 1 : 0); }, limitSec * 1000); killTimer.unref();
 
   // A cold Chrome on a busy machine can take longer than one start allows: try once more before giving up.
   let launchError = null;
@@ -1268,6 +1346,7 @@ async function main() {
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
   for (const target of targets) {
+    pagesDone++;
     const label = target.label;
     const { targetId, sessionId } = await openPage(send, target.url);
     // up to ~10s — a dev server / SPA can be slower than a file://
