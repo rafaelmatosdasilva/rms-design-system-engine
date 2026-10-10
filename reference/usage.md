@@ -714,7 +714,13 @@ take; the format; and the prototypes already in `prototypes/`.
   warning.
 - **Designed screens.** The screen capture (`paths.screenLayout`, or `figma-screen-layout.snapshot.json` beside the
   Figma snapshots) is read even before `--from-screens` brings it into `prototypes/`: its screens count as the product's
-  pages and as places to start from.
+  pages and as places to start from. The product's screens the audit records with the components each uses
+  (`paths.snapshotScreenComponents`, `figma-screen-components.snapshot.json`) are listed in the catalog, the most used
+  first; a request that names a product or a screen gets that screen in view (what a new page for it is made of), and a
+  product's name never points to a component whose note mentions it.
+- **What each component is for** is what a designer reads: the engine's own placeholder description, Figma node ids,
+  the class a component maps to, a build stamp, a banner, a CSS sentence (`::before`, `h=32`, `CSS:`) and a bare list of
+  tokens are left out, and a note that only repeats the description is not repeated.
 
 `rms-design-system-engine --prototype prototypes/<name>.json` checks a composition (the format `--check-ui` reads, nested
 or flat) and, when it holds, draws it as one page under `.design-system-engine-out/prototypes/<name>.html`: each
@@ -725,7 +731,19 @@ The rules are `--check-ui`'s, plus:
   They carry no colour, border or font of their own: `gap` and `padding` take a spacing token, `Text.style` a text
   style, `Page.width` the screen's width in px; `grow` takes the room a parent leaves. The page takes the system's own
   page surface, text colour and font family. Each piece used is a layout gap, the pieces of one prototype said in one
-  line ("Row, Stack and Page layout components").
+  line ("Row, Stack and Page layout components"). The engine's on/off options take `"true"` and `"false"` written as
+  words, as a component's do.
+- **Filling the container.** Figma's fill container belongs to the instance, so any part takes `"stretch": true` (as
+  wide, or as high in a row, as what holds it) or `"grow": true` (the room left). A component the system makes fill its
+  container (Figma sizes it to fill across, or its CSS gives its own class `width: 100%` or `flex: 1`) fills the
+  arrangement it is in, and an arrangement holding one fills its own, up to the page; one Figma sizes to fill down (a
+  panel) takes the height left in a column. A Row that lines its parts up at the end, the centre or apart takes the
+  width to do it.
+- **Slots.** A Figma slot is a place for other components, shown in the catalog as `<its children>`: it takes any
+  component unless Figma lists the few it takes. A component given children is drawn from the plainest copy with a part
+  for each of its slots (a panel's head and main), each slot emptied of what the product put in it; a child goes in the
+  slot it names with `"inSlot": "<slot>"`, else in the main one. Words given to a slot (`"Slot": "…"`) are what it
+  holds when no child fills it.
 - **A need nothing fits** is `{ "component": "Missing", "props": { "need": "…", "kind": "…", "closest": "…" } }`, drawn
   as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`.
 - **An option Figma and the code do not share by name** is drawn on the part its name points to: a text option
@@ -733,6 +751,15 @@ The rules are `--check-ui`'s, plus:
   component's own text for a label; an on/off option (`Show Description`) set off removes the part it names. A page
   instance's own state (a `hidden` class, a position on its page) is taken off. An option with no such part is drawn
   without it, with a warning once per component.
+- **Copies from the products' pages.** A component that is one part of another's markup (a segment of a segmented
+  control) is drawn as that part, inside its parent, which keeps its own pieces (the pill) and takes the children in
+  place of its own. A copy of a component the system's CSS styles keeps the classes the system's own CSS knows and those
+  its options point at; the product's own (its panel's width) stay in the product, and so does the name the page gave
+  it (`aria-label`). Each copy keeps its ids to itself. An option is set as the style guide sets it: on its part (a
+  switch's checkbox), on and off, with the state a part is heard in (`heardOn`). A field's value option sets its value;
+  words for a part the copy lacks go nowhere, and Figma's default words never go through a guessed part. Figma's
+  default that leaves a component inert or alarming (a field `Disabled=True`, a `State` of Error), drawn because the
+  composition does not choose, is a ⚠️ line.
 - **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
   `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
   needed first. The Stop hook holds the reply to the gaps of the prototype just drawn.
@@ -751,7 +778,14 @@ The rules are `--check-ui`'s, plus:
   (`aria-expanded` with `aria-controls`) must show and hide it; what does not is a ⚠️ line under 🖱. The page does what
   a product would where the system's own scripts do not: a click moves the selection in a group, flips a toggle (its
   `aria-pressed` or `aria-checked` and the class the system's CSS turns on for it), and shows or hides what a part
-  controls; a component the system defines by id (a tooltip, `#tt`) is one element in the page, for its script.
+  controls; a component the system defines by id (a tooltip, `#tt`) is one element in the page, for its script. A
+  toggle button (`aria-pressed`) is on or off on its own beside others like it, never one of a pick-one group; once a
+  selection moves, the system's script is told the window changed, so what follows the selection (a sliding pill) moves
+  with it. A modal it opens keeps the focus inside it while Tab moves, a radio group one stop. A part that shows no
+  words or groups others carries `"name": "<what it is for>"`, what a screen reader says; a part with a tooltip carries
+  `"tip": "<its words>"`, set where the tooltip is carried so the system's script shows it. The drawn page's own
+  accessibility findings (a control or group with no name, a heading, a text's contrast) are ⚠️ lines with their fix;
+  what the system's components do themselves is one line for the audit.
 - **Every state.** A composition names its other states beside it, `"states": { "<name>": { "<id>": { …that part in
   this state… } } }` (in the composition, or beside `"prototype"` in the file), each naming by `id` only the parts that
   differ; `null` leaves a part out, and a part with no `component` keeps its own with the `props` given over its own.
@@ -770,9 +804,11 @@ The rules are `--check-ui`'s, plus:
   system's media query decides), with the words as written and 40% longer, as a translation makes them. What runs past
   the screen's edge (measured part by part, since a system often hides the page's overflow), a text cut by a box or an
   ellipsis, a text that runs out of its component, a control's label on two lines, and on a phone a target under 24px
-  (WCAG 2.5.8) are ⚠️ lines under 📱, each with the widths and states it happens at; the ones that happen with the words
-  as written are owed in the reply. A picture is saved for each width (`<name>@<width>.png`) and each state
-  (`<name>.<state>.png`). Row `wrap` and Columns `minWidth` (the narrowest a column may be, in px) let a layout fit a
+  (WCAG 2.5.8; what a click lands on, a label or a `::after` laid over a bigger box included) are ⚠️ lines under 📱,
+  each with the widths and states it happens at; the ones that happen with the words as written are owed in the reply.
+  A system component that is under 24px at its own size is one line for the audit. A page that gives itself a width
+  (`Page.width`) is tried at it too ("Its own"). A picture is saved for each width (`<name>@<width>.png`) and each state
+  (`<name>.<state>.png`, at the page's own width when it has one). Row `wrap` and Columns `minWidth` (the narrowest a column may be, in px) let a layout fit a
   narrow screen.
 - **Flows.** A part that leads to another page carries `"goesTo": "<prototype name>"` (`"<name>#<state>"` for one of
   its states); a click on the drawn page opens it, and a link to a page not drawn yet is a ⚠️ line the reply owes.
@@ -789,8 +825,9 @@ The rules are `--check-ui`'s, plus:
   of 10 under 🎨: the parts of a column start on one line (a component's own margin that pushes one in is named), one
   arrangement keeps one spacing and the page a few, one part styled as the primary action is in view (the system's
   primary component, or a class or option that says primary), the main heading is the largest text and each heading
-  smaller than the one above it and larger or heavier than its text, and a line of text runs under about 90
-  characters. Each ⚠️ line says what to change; the reply owes the ones it keeps. A heading already in the system's
+  smaller than the one above it and larger or heavier than its text, a line of text runs under about 90
+  characters, and two parts of an arrangement never touch, unless both are system components with a surface of their
+  own (a background or a border: a panel on a status bar), drawn to meet. Each ⚠️ line says what to change; the reply owes the ones it keeps. A heading already in the system's
   largest text style, the same as its body text, cannot be made larger: an ℹ️ line and a gap the reply names (no
   heading style), never taken off the score.
 - **A retired component** (status deprecated) is an error that names its replacement.
