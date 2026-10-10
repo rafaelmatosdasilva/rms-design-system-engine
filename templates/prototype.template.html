@@ -16,9 +16,12 @@ html, body { margin: 0; }
 .pt-bar .pt-name { font-size: 14px; margin: 0 8px 0 0; font-weight: 600; }
 .pt-bar button { font: inherit; padding: 4px 10px; border: 1px solid #c7c7cc; border-radius: 6px; background: #fff; color: inherit; cursor: pointer; }
 .pt-bar button[aria-pressed="true"] { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+.pt-bar button:focus-visible, .pt-gaps button:focus-visible { outline: 2px solid #0058d0; outline-offset: 2px; }
 .pt-seg { display: inline-flex; gap: 4px; }
 .pt-seg[hidden] { display: none; }
 .pt-note { color: #6e6e73; }
+.pt-font-note { color: #8a5300; }
+.pt-font-note[hidden] { display: none; }
 .pt-gaps { font: 13px/1.5 system-ui, sans-serif; color: #1d1d1f; background: #fffbe6; border-bottom: 1px solid #e8d97a; padding: 10px 16px; }
 .pt-gaps h2 { font-size: 13px; margin: 0 0 4px; }
 .pt-gaps ul { margin: 0; padding-left: 18px; }
@@ -26,7 +29,21 @@ html, body { margin: 0; }
 /* The engine's neutral pieces: arrangement only. Outlined only when asked, so the prototype looks as it will. */
 .pt-engine { box-sizing: border-box; }
 .pt-show .pt-engine { outline: 1px dashed #8e8e93; outline-offset: -1px; }
-.pt-show [data-pt-standin] { outline: 2px solid #ff9f0a; outline-offset: 2px; }
+/* A system component standing in for one the system lacks: marked on a layer of its own, above the page and below the
+   bar, so nothing of the component itself changes (its own focus ring, its layout). Shown unless turned off. */
+#pt-marks { position: fixed; left: 0; right: 0; bottom: 0; top: 0; z-index: 2147483000; overflow: hidden; pointer-events: none; }
+.pt-mark-box { position: absolute; box-sizing: border-box; border: 2px dashed #ff9f0a; border-radius: 3px; }
+.pt-mark-box.pt-flash { border: 3px solid #ff9f0a; box-shadow: 0 0 0 4px rgba(255,159,10,.35); }
+.pt-mark { position: absolute; transform: translateY(-100%); font: 11px/1.4 system-ui, sans-serif; color: #fff; background: #8a4b00; padding: 1px 6px; border-radius: 4px 4px 0 0; white-space: nowrap; }
+.pt-mark.pt-mark-in { transform: none; border-radius: 0 0 4px 0; }
+.pt-bar #pt-standins { border-color: #ff9f0a; }
+.pt-bar #pt-standins[aria-pressed="true"] { background: #ffe1b0; color: #1d1d1f; border-color: #ff9f0a; }
+.pt-bar #pt-standins[hidden] { display: none; }
+.pt-gaps li { margin: 2px 0; }
+.pt-gaps .pt-chip { display: inline-block; font-size: 11px; line-height: 16px; padding: 0 6px; margin-right: 6px; border-radius: 4px; background: #ececf0; }
+.pt-gaps .pt-chip-standin { background: #ffe1b0; }
+.pt-gaps .pt-gap-show { font: inherit; font-size: 12px; margin-left: 6px; padding: 0 6px; border: 1px solid #c7c7cc; border-radius: 4px; background: #fff; color: inherit; cursor: pointer; }
+.pt-gaps .pt-gap-gone { color: #6e6e73; font-size: 12px; margin-left: 6px; }
 .pt-missing-box { display: flex !important; flex-direction: column; align-items: stretch !important; justify-content: flex-start !important; gap: 4px; }
 .pt-missing-cap { font: 11px/1.4 system-ui, sans-serif; color: #6e6e73; }
 /* A component Figma has and the code has not built: what the screen put inside it, outlined only when asked. */
@@ -44,9 +61,11 @@ html, body { margin: 0; }
   <strong class="pt-name" id="pt-title">Prototype</strong>
   <span class="pt-seg" id="pt-modes"></span>
   <span class="pt-seg" id="pt-states" role="group" aria-label="State" hidden></span>
-  <button type="button" id="pt-outline" aria-pressed="false">Show engine layout and stand-ins</button>
+  <button type="button" id="pt-outline" aria-pressed="false">Show engine layout</button>
+  <button type="button" id="pt-standins" aria-pressed="true" hidden>Stand-ins</button>
   <button type="button" id="pt-gaps-toggle" aria-pressed="false">Gaps</button>
   <span class="pt-note" id="pt-note"></span>
+  <span class="pt-note pt-font-note" id="pt-font-note" role="status" hidden></span>
 </div>
 <section class="pt-gaps" id="pt-gaps" hidden><h2>What the design system would need</h2><ul></ul></section>
 <main id="pt-canvas"></main>
@@ -313,7 +332,6 @@ html, body { margin: 0; }
     });
     // The designed instance shows no words (an icon-only button): none are drawn.
     if (p.textless) Array.prototype.slice.call(e.querySelectorAll('*')).concat([e]).forEach(function (x) { if (!x.closest('svg')) Array.prototype.forEach.call(x.childNodes, function (n) { if (n.nodeType === 3) n.textContent = ''; }); });
-    if (p.standInFor) { e.setAttribute('data-pt-standin', ''); e.title = 'Stand-in for ' + p.standInFor; }
     // What a screen reader says for it, when it shows no words or groups others (an icon button, a segmented control).
     if (p.name) e.setAttribute('aria-label', String(p.name));
     // The words its tooltip shows: on the part that carries one (data-tip, else the part named tooltip), so the system's
@@ -385,8 +403,11 @@ html, body { margin: 0; }
     if (!isPiece && truthy((node.props || {}).grow)) { e.style.flex = '1 1 0'; e.style.minWidth = '0'; e.style.minHeight = '0'; }
     if (!isPiece && truthy((node.props || {}).stretch)) e.style.alignSelf = 'stretch';
     e.setAttribute('data-pt-path', path);
+    if (node.id) e.setAttribute('data-pt-id', node.id);
     if (!isPiece) e.setAttribute('data-pt-component', node.component);
     var np = node.props || {};
+    // A part standing in for something the system lacks (a system component, or the engine's own Text): marked on the page.
+    if (np.standInFor) { e.setAttribute('data-pt-standin', String(np.standInFor)); if (!e.title) e.title = 'Stand-in for ' + np.standInFor; }
     // A part that leads to another page of the flow: a click opens it (one of its states when named after #).
     if (np.goesTo) { var to = String(np.goesTo).split('#'); e.setAttribute('data-pt-goes', np.goesTo); e.addEventListener('click', function (ev) { ev.preventDefault(); location.href = encodeURIComponent(to[0].trim()) + '.html' + (to[1] ? '#state=' + encodeURIComponent(to[1].replace(/^state=/, '').trim()) : ''); }); }
     if (np.opens) { e.setAttribute('data-pt-opens', np.opens); e.setAttribute('aria-haspopup', 'dialog'); e.setAttribute('aria-expanded', 'false'); e.addEventListener('click', function (ev) { ev.preventDefault(); openOverlay(np.opens, e); }); }
@@ -521,6 +542,8 @@ html, body { margin: 0; }
   // The system's script places what follows a selection (a sliding pill) when the window changes size, as the style
   // guide nudges it: told once the selection has moved.
   function relayout() { requestAnimationFrame(function () { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }); }
+  // The design's font arrives after the page drew in the system's own stack: what the system's script measured is placed again.
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', relayout);
   document.addEventListener('click', function (ev) {
     var box = ev.target.closest && ev.target.closest('#pt-canvas, .pt-open-layer'); if (!box) return;
     if (ev.target.closest('a[href^="#"], a[href=""]')) ev.preventDefault();   // a link in a prototype stays on the page
@@ -623,11 +646,73 @@ html, body { margin: 0; }
   if (wanted.length) Array.prototype.forEach.call(document.querySelectorAll('#pt-modes button'), function (b) { if (wanted.indexOf(b.textContent.trim().toLowerCase()) >= 0) b.click(); });
   var outline = document.getElementById('pt-outline');
   outline.addEventListener('click', function () { var on = outline.getAttribute('aria-pressed') !== 'true'; outline.setAttribute('aria-pressed', String(on)); canvas.classList.toggle('pt-show', on); });
-  var gaps = D.gaps || [], panel = document.getElementById('pt-gaps'), gt = document.getElementById('pt-gaps-toggle');
-  panel.querySelector('ul').innerHTML = gaps.length ? gaps.map(function (g) { return '<li>' + esc(g) + '</li>'; }).join('') : '<li>Nothing: everything here is the design system\'s own.</li>';
+  // Stand-ins, marked where they are drawn: a dashed box and what each stands in for, kept in place as the page moves.
+  var marks = document.createElement('div'); marks.id = 'pt-marks'; marks.setAttribute('aria-hidden', 'true'); document.body.appendChild(marks);
+  var standinsBtn = document.getElementById('pt-standins'), marksOn = true, flashing = [], placing = 0;
+  var standInCount = (function count(n) { return n ? ((n.props || {}).standInFor ? 1 : 0) + (n.children || []).reduce(function (a, k) { return a + count(k); }, 0) : 0; })(D.tree);
+  function placeMarks() {
+    placing = 0;
+    var bar = document.querySelector('.pt-bar'), top = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    marks.style.top = top + 'px'; marks.innerHTML = '';
+    var boxes = marksOn ? Array.prototype.slice.call(document.querySelectorAll('[data-pt-standin]')) : [];
+    boxes.concat(flashing.filter(function (e) { return boxes.indexOf(e) < 0; })).forEach(function (e) {
+      var r = e.getBoundingClientRect(); if (!r.width && !r.height) return;
+      var b = document.createElement('div'); b.className = 'pt-mark-box' + (flashing.indexOf(e) >= 0 ? ' pt-flash' : '');
+      b.style.left = (r.left - 3) + 'px'; b.style.top = (r.top - top - 3) + 'px'; b.style.width = (r.width + 6) + 'px'; b.style.height = (r.height + 6) + 'px'; marks.appendChild(b);
+      if (!e.hasAttribute('data-pt-standin') || !marksOn) return;
+      var m = document.createElement('span'); m.className = 'pt-mark'; m.textContent = 'Stand-in for ' + e.getAttribute('data-pt-standin');
+      if (r.top - top < 22) m.className += ' pt-mark-in';   // no room above it: inside its box
+      m.style.left = (r.left - 3) + 'px'; m.style.top = (r.top - top - 3) + 'px'; marks.appendChild(m);
+    });
+  }
+  function later() { if (!placing) placing = requestAnimationFrame(placeMarks); }
+  function showMarks(on) { marksOn = !!on; standinsBtn.setAttribute('aria-pressed', String(marksOn)); placeMarks(); }
+  window.PT_MARKS = showMarks;
+  if (standInCount) { standinsBtn.hidden = false; standinsBtn.textContent = 'Stand-ins (' + standInCount + ')'; standinsBtn.title = 'Parts standing in for something the design system lacks'; }
+  standinsBtn.addEventListener('click', function () { showMarks(standinsBtn.getAttribute('aria-pressed') !== 'true'); });
+  ['scroll', 'resize', 'pt-fonts'].forEach(function (t) { window.addEventListener(t, later, true); });
+  new MutationObserver(function (list) { if (list.some(function (r) { return !marks.contains(r.target) && r.target !== marks; })) later(); }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  later();
+  // What the design system would need, each with the parts it comes from: shown on the page from the list.
+  var gaps = (D.gaps || []).map(function (g) { return typeof g === 'string' ? { line: g } : g; }), panel = document.getElementById('pt-gaps'), gt = document.getElementById('pt-gaps-toggle');
+  function partsOfGap(g) { return (g.nodes || []).map(function (id) { return document.querySelector('[data-pt-id="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]'); }).filter(Boolean); }
+  function showGap(g, li) {
+    if (g.kind === 'layout' && outline.getAttribute('aria-pressed') !== 'true') outline.click();
+    var els = partsOfGap(g), gone = li.querySelector('.pt-gap-gone');
+    if (!els.length) { if (!gone) { gone = document.createElement('span'); gone.className = 'pt-gap-gone'; gone.textContent = 'not drawn now (in another state, or inside what a click opens)'; li.appendChild(gone); } return; }
+    if (gone) gone.remove();
+    if (els.some(function (e) { return e.hasAttribute('data-pt-standin'); }) && !marksOn) showMarks(true);
+    els[0].scrollIntoView({ block: 'center' });
+    flashing = els; placeMarks();
+    setTimeout(function () { if (flashing === els) { flashing = []; placeMarks(); } }, 1800);
+  }
+  var ul = panel.querySelector('ul');
+  if (!gaps.length) ul.innerHTML = '<li>Nothing: everything here is the design system\'s own.</li>';
+  gaps.forEach(function (g) {
+    var li = document.createElement('li'), standIn = (g.nodes || []).some(function (id) { return (function find(n) { return n && ((n.id === id && (n.props || {}).standInFor) || (n.children || []).some(find)); })(D.tree); });
+    var missing = !standIn && (g.nodes || []).some(function (id) { return (function find(n) { return n && ((n.id === id && n.component === 'Missing') || (n.children || []).some(find)); })(D.tree); });
+    var chip = document.createElement('span'); chip.className = 'pt-chip' + (standIn ? ' pt-chip-standin' : ''); chip.textContent = standIn ? 'stand-in' : missing ? 'missing' : (g.kind || 'gap');
+    li.appendChild(chip); li.appendChild(document.createTextNode(g.line));
+    if ((g.nodes || []).length || g.kind === 'layout') {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'pt-gap-show'; b.textContent = 'Show on the page';
+      b.setAttribute('aria-label', 'Show on the page: ' + (g.need || g.line));
+      b.addEventListener('click', function () { showGap(g, li); });
+      li.appendChild(b);
+    }
+    ul.appendChild(li);
+  });
   gt.textContent = 'Gaps (' + gaps.length + ')';
   gt.addEventListener('click', function () { var on = panel.hidden; panel.hidden = !on; gt.setAttribute('aria-pressed', String(on)); });
   document.getElementById('pt-note').textContent = D.note || '';
+  // A design font the page could not find (not installed here, not loaded from Google Fonts): said, so the page is not
+  // read as set in it.
+  var fontNote = document.getElementById('pt-font-note');
+  function fontsSaid() {
+    var st = window.PT_FONTS || {}, out = Object.keys(st).filter(function (f) { return st[f] === 'missing'; });
+    fontNote.hidden = !out.length;
+    fontNote.textContent = out.length ? out.join(', ') + (out.length > 1 ? ' are' : ' is') + ' not installed here and could not be loaded: set in the system\'s fallback fonts' : '';
+  }
+  fontsSaid(); window.addEventListener('pt-fonts', fontsSaid);
 })();
 </script>
 <!--{{SYSTEM_SCRIPTS}}-->

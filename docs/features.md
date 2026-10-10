@@ -82,7 +82,7 @@ Measured on a small design system in Figma (tokens, four components and a screen
 
 ## Prototype with your design system
 
-A prototype here is made only of your design system's own components, with their own options. Nothing is invented and nothing in the system changes. When a screen needs something the system does not have, the prototype shows a labelled box and you get a list of what the system would need, for your design team to decide.
+A prototype here is made only of your design system's own components, with their own options. Nothing is invented and nothing in the system changes. When a screen needs something the system does not have, the prototype shows a labelled box, or marks the component standing in for it, and you get a list of what the system would need, for your design team to decide; each item on the list shows you its place on the page. The page draws at once even without the internet, in your system's own fonts until the design's font is found.
 
 Measured on twelve prototype requests, Claude alone made 17 of 36 right with Opus and 3 of 36 with Haiku; with the skill, 36 of 36 and 35 of 36 ([case study](../CASE-STUDY.md)).
 
