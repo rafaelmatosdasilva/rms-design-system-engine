@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Setup asks where the code is; the Figma link is optional (continuous evaluation)
+
+What changed since the entry below (engine b06a027): First-time setup must know where the code is (--project, `.` for this folder, or --theme-css) and writes nothing until it does; the Figma link is optional (without it each run checks the code alone and says nothing was compared with Figma); the router takes both from the request and asks for what is missing before running; --build needs the Figma file. The guide changed in `rms-design-system-engine.md`, `cookbook/first-setup.md`, `cookbook/build-from-figma.md`, `reference/config.md` and `reference/usage.md`. The guide changed in `cookbook/build-from-figma.md`, `cookbook/first-setup.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `2543232cdce8` · Project measured: `13d811a9d668`
+
+| Haiku, engine 3b42506 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.053 |
+| Input a run | 110k | 86k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 110k (the entry below had runs that took more turns). Measured on the change with main merged in (prototype fonts and stand-ins, #90), so the guide set is the one that merges. Records: `records/2026-10-10-setup-asks-where-the-code-is`.
+
 ## 2026-10: Prototype fonts that never wait, and stand-ins shown on the page (continuous evaluation)
 
 What changed since the entry below (engine 224d490): Prototypes: the design's font is found on the machine, in the system's @font-face or on Google Fonts in the background, and the page never waits for it (a font found nowhere is a 🔤 line); a stand-in is marked on the page, counted on its bar, and each gap on the page's list shows its parts; a stand-in for a component the system has is a ⚠️ line. The guide changed in `reference/usage.md` and `cookbook/prototype.md`. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.

@@ -39,10 +39,11 @@ export function measuredLines(gates) {
 
 // state: { failing: [gate], scope: [names], handback: { code, figma }, burndownNext, baselineWritten: { count, file },
 //         toBuild: { tokens, file, theme, components } (build mode), cmd }
+// noFigma: set up without a Figma file, so nothing was compared with Figma.
 // a11y: how many accessibility findings the browser check listed for this run (null when it did not run).
 // measured: how many differences the browser measured (they are advisory, so the summary lists them under their own
 // heading and the NEXT line names them, or a relay that keeps only the failing gates leaves them out).
-export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, toBuild = null, build = false, a11y = null, measured = 0, cmd = 'rms-design-system-engine' } = {}) {
+export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, toBuild = null, build = false, a11y = null, measured = 0, noFigma = false, cmd = 'rms-design-system-engine' } = {}) {
   const rerun = scope.length ? `${cmd} --component ${scope.join(',')}` : cmd;
   if (baselineWritten) return `NEXT: tell the user ${baselineWritten.file} now holds the accepted debt; commit it only when they ask.`;
   // Build mode, one component checked: it is being built from Figma, so a failure is part of building it, not a
@@ -70,6 +71,8 @@ export function nextStep({ failing = [], scope = [], handback = {}, burndownNext
     return `NEXT: what is built matches Figma. If the person asked for ${c} (or for every component), build it: run ${cmd} --query ${c} for what it needs, write it with those names, then run ${cmd} --component ${c} until it passes. Otherwise stop here and tell them what is built and what is still to build (${left}).`;
   }
   if (burndownNext && !scope.length) return `NEXT: ${cmd} --component ${burndownNext}`;
+  // No Figma file: nothing was compared, so "parity holds" would claim what was never checked.
+  if (noFigma) return 'NEXT: nothing to do in the code. To compare it with Figma, ask the person for the link to the design system\'s Figma file and add it to ds-config.json as figmaFileKey (only when they ask).';
   return 'NEXT: nothing to do. Parity holds for what was checked.';
 }
 
@@ -89,7 +92,7 @@ export function dataStateLine({ refreshedFromApi = false, fromFigmaCli = null, s
   return `**Figma data was not refreshed in this run.** The audit used ${used}.${gap} To refresh them: ${cmd} --recipe refresh-figma.`;
 }
 
-// only: { words, a11y: { static, browser } | null } when the run was --only: the summary says what ran, so a part
+// only: { words, noFigma, a11y: { static, browser } | null } when the run was --only (or had no Figma file): the summary says what ran, so a part
 // never reads as the whole system.
 export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null, toBuild = null } = {}) {
   const lines = [];
@@ -103,7 +106,8 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
       : toBuild ? `**What is built matches Figma.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}; the rest is still to build.`
       : `**In parity.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}.`);
   if (only) {
-    lines.push('', `Only ${only.words} ran in this run; nothing else was checked.`);
+    lines.push('', only.noFigma ? `Only ${only.words} ran: there is no Figma file yet (figmaFileKey in ds-config.json), so nothing was compared with Figma.`
+      : `Only ${only.words} ran in this run; nothing else was checked.`);
     if (only.a11y) {
       const n = (x) => (x == null ? null : `${x} finding${x === 1 ? '' : 's'}`);
       const parts = [only.a11y.static != null ? `${n(only.a11y.static)} from the code` : null, only.a11y.browser != null ? `${n(only.a11y.browser)} in the browser` : 'the browser part did not run (no page or no Chrome)'].filter(Boolean);

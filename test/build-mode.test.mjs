@@ -88,20 +88,24 @@ test('the next step builds the tokens first, then a component only when the pers
   assert.equal(buildLine({ tokens: 0, components: [] }), null);
 });
 
-test('setup in a folder with no code asks where the code is; told there is only Figma, it starts in build mode', { timeout: 120000 }, () => {
+test('setup asks where the code is before it writes anything; told it starts here from Figma, it is in build mode', { timeout: 120000 }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'build-init-'));
   execFileSync('git', ['init', '-q'], { cwd: dir });
   const init = (...more) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool', '--no-hooks', ...more], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   const asked = init();
-  assert.equal(asked.status, 2, 'never build mode by a guess');
-  assert.match(asked.stdout, /This folder has no code.*\nNEXT: ask the person one question: where is your code \(a folder on this computer or a git link\), or do you only have Figma\?/s);
+  assert.equal(asked.status, 2, 'never set up by a guess');
+  assert.match(asked.stdout, /Setup needs to know where the code is first\. Nothing was written\.\n.*has no code\.\nNEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a git link\. Then run rms-design-system-engine --init --project='<\. for this folder, or the folder or git link>' --figma-url='https:\/\/www\.figma\.com\/design\/AbCdEf123456XyZ\/Tidepool'/s);
+  const here = init('--project=.');
+  assert.equal(here.status, 2, 'told the code is in a folder with none: asked again');
+  assert.match(here.stdout, /This folder has no code: .*\nNEXT: ask the person one question: is the code somewhere else \(a folder on this computer or a git link\), or should it start here, built from Figma\?/s);
+  assert.equal(init('--build').status, 2, '--build alone does not say where the code is');
   assert.ok(!existsSync(join(dir, 'ds-config.json')));
-  const r = init('--build');
+  const r = init('--project=.', '--build');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const cfg = cfgOf(dir);
   assert.equal(cfg.build, true);
   assert.equal(cfg.paths.themeCSS, 'src/styles/tokens.css');
-  assert.match(r.stdout, /Build mode/);
+  assert.match(r.stdout, /Build mode: this project starts from Figma/);
   assert.ok(!existsSync(join(dir, 'src/styles/tokens.css')), 'the engine writes no theme itself');
 });
 

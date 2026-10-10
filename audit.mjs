@@ -19,7 +19,7 @@
 //              gates (freshness, CSS hygiene) are computed on the main thread.
 
 import './stdio-sync.mjs';   // first: a report read through a pipe is never cut off at exit
-import { hasCode }                                              from './project-dir.mjs';   // second: moves to the project (--project, or the one remembered) before anything reads the folder
+import { hasCode, PROJECT_GIVEN, PROJECT_FROM }                 from './project-dir.mjs';  // second: moves to the project (--project, or the one remembered) before anything reads the folder
 import readline                                                  from 'readline';
 import { spawn, spawnSync }                                      from 'child_process';
 import { existsSync, readdirSync, readFileSync, statSync,
@@ -94,8 +94,9 @@ const SCOPE_COMPONENTS = [..._argValues('--component'), ..._argValues('--compone
 // What was not asked is neither shown nor counted (only.mjs). A run that records the whole system (--baseline)
 // needs the whole run.
 const ONLY_GIVEN = process.argv.some((a) => a === '--only' || a.startsWith('--only='));
-const ONLY_LABELS = ONLY_GIVEN ? readGateLabels(join(SCRIPT_DIR, 'audit.mjs')) : [];
-const ONLY = ONLY_GIVEN ? parseOnly(_argValues('--only'), ONLY_LABELS) : null;
+let ONLY_LABELS = ONLY_GIVEN ? readGateLabels(join(SCRIPT_DIR, 'audit.mjs')) : [];
+let ONLY = ONLY_GIVEN ? parseOnly(_argValues('--only'), ONLY_LABELS) : null;
+let NO_FIGMA = false;   // set up without a Figma file: only the checks of the code alone run (see the config load)
 if (ONLY && (ONLY.unknown.length || (!ONLY.a11y && !ONLY.gates.size))) {
   console.log(onlyHelp(ONLY.unknown.length ? ONLY.unknown : ['(nothing named)'], ONLY_LABELS));
   process.exit(2);
@@ -109,17 +110,21 @@ if (ONLY && process.argv.includes('--baseline')) {
 // First-time setup normally prompts on stdin, which an agent turn or CI job cannot
 // drive reliably. Supply the answers as flags instead and setup runs without any
 // prompt:
-//   --figma-url=<url|key>   --theme-css=a.css,b.css   --figma-source-url=<url>
-// When --figma-url is present, setup is non-interactive; a missing --theme-css
-// falls back to auto-detected token CSS, and if none is detected setup exits with
-// a clear error instead of writing a broken (empty themeCSS) config.
+//   --project=<folder|git link>   --figma-url=<url|key>   --theme-css=a.css,b.css   --figma-source-url=<url>
+// Where the code is must be known before anything is written: --project (`.` for this
+// folder), or --theme-css naming its token file here. Without it setup stops and its
+// NEXT line asks the person. The Figma link is optional: without it the checks that
+// need Figma wait until it is added. Any of these flags (or a project remembered from
+// before), or a stdin that is not a terminal, makes setup non-interactive.
 function _argValue(flag) { const v = _argValues(flag); return v.length ? v[v.length - 1] : null; }
 const INIT_FIGMA_URL      = _argValue('--figma-url') ?? _argValue('--figma-key');
 const INIT_THEME_CSS      = _argValue('--theme-css');
 const INIT_SOURCE_URL     = _argValue('--figma-source-url');
-const INIT_NONINTERACTIVE = INIT_FIGMA_URL != null;
-// Build mode: a project that has only Figma (no token CSS yet). Asked with --build, or chosen when the project has no CSS at all.
+// Build mode: the code's folder has no design tokens yet, so they are built from Figma. Asked with --build, or chosen
+// when the code's folder has no stylesheet of tokens and a Figma file is given.
 const INIT_BUILD          = process.argv.includes('--build');
+const INIT_CODE_GIVEN     = PROJECT_GIVEN || INIT_THEME_CSS != null;
+const INIT_NONINTERACTIVE = INIT_FIGMA_URL != null || INIT_CODE_GIVEN || INIT_BUILD || !process.stdin.isTTY;
 const BUILD_THEME_DEFAULT = 'src/styles/tokens.css';
 
 // ── Easy updates: link the command to this folder, and pull latest ────────────
@@ -1229,10 +1234,29 @@ async function bootstrapConfig() {
     return null;
   };
 
-  // A folder with no code at all: the code is somewhere else, or there is only Figma. Never guessed: one question.
-  if (!INIT_BUILD && !INIT_THEME_CSS && !hasCode(ROOT)) {
-    console.log(C.yellow(`  ⚠️  This folder has no code: ${ROOT}`));
-    console.log('NEXT: ask the person one question: where is your code (a folder on this computer or a git link), or do you only have Figma? Then run rms-design-system-engine --init --figma-url=<the Figma link> --project=<their folder or link>, or add --build to start from Figma in this folder.');
+  // Where the code is, before anything is written: never guessed (a run in a folder of other code took it for the
+  // design system and set it up there). The Figma link is optional. In a terminal setup asks; an agent or a script
+  // is stopped, told what this folder holds, and its NEXT line asks the person.
+  const holds = () => !hasCode(ROOT) ? 'has no code'
+    : unique.length ? `has code, with design tokens in ${unique.join(', ')}`
+    : takeableUrls(runtimeHints).length ? 'has code that loads its design tokens from hosted stylesheets'
+    : 'has code, but no stylesheet that declares design tokens';
+  const figmaArg = INIT_FIGMA_URL ? ` --figma-url='${INIT_FIGMA_URL}'` : '';
+  if (INIT_NONINTERACTIVE && !INIT_CODE_GIVEN) {
+    console.log(C.yellow('  ⚠️  Setup needs to know where the code is first. Nothing was written.'));
+    console.log(C.dim(`  This folder (${ROOT}) ${holds()}.`));
+    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a git link${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or git link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}.`);
+    process.exit(2);
+  }
+  // Told the code is in a folder that has none: the code is somewhere else, or it starts here from Figma. One question.
+  if (INIT_NONINTERACTIVE && !INIT_BUILD && !INIT_THEME_CSS && !hasCode(ROOT)) {
+    console.log(C.yellow(`  ⚠️  This folder has no code: ${ROOT}. Nothing was written.`));
+    console.log(`NEXT: ask the person one question: is the code somewhere else (a folder on this computer or a git link), or should it start here, built from Figma? Then run rms-design-system-engine --init --project='<their folder or link>'${figmaArg}, or add --build to start it in this folder from Figma${INIT_FIGMA_URL ? '' : ' (with --figma-url=<the Figma link>, which building needs)'}.`);
+    process.exit(2);
+  }
+  if (INIT_BUILD && !INIT_FIGMA_URL) {
+    console.log(C.yellow('  ⚠️  Building from Figma needs the Figma file. Nothing was written.'));
+    console.log(`NEXT: ask the person for the link to the design system's Figma file, then run the same command with --figma-url='<the Figma link>'.`);
     process.exit(2);
   }
   let figmaRaw, themeCSS, figmaSourceKey = '', buildMode = INIT_BUILD;
@@ -1261,6 +1285,11 @@ async function bootstrapConfig() {
     figmaRaw = INIT_FIGMA_URL || '';
     themeCSS = await takeHosted(resolveTheme(INIT_THEME_CSS));
     if (INIT_SOURCE_URL) figmaSourceKey = parseKey(INIT_SOURCE_URL);
+    if (themeCSS == null && !figmaRaw && !runtimeHints.length) {
+      console.log(C.yellow(`  ⚠️  No stylesheet that declares design tokens in ${ROOT}, and no Figma file to build them from. Nothing was written.`));
+      console.log(`NEXT: ask the person which file holds the design tokens (then run the same command with --theme-css=<that file>), or for the link to the design system's Figma file to build them from (--figma-url=<the link>).`);
+      process.exit(2);
+    }
     if (themeCSS == null && (INIT_BUILD || !runtimeHints.length)) { themeCSS = BUILD_THEME_DEFAULT; buildMode = true; }
     if (themeCSS == null) {
       console.error(C.red('\n❌ No token CSS file: pass --theme-css=<path[,path]> (none was auto-detected).'));
@@ -1276,18 +1305,31 @@ async function bootstrapConfig() {
     const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
     const ask = q => new Promise(res => rl.question(q, res));
 
-    figmaRaw = (await ask('Figma file URL: ')).trim();
+    figmaRaw = (await ask('Figma file URL (optional, Enter to skip): ')).trim();
+    if (figmaRaw) {
+      const isConsumer = (await ask('Is this a Figma consumer file that uses an external DS library? (y/N): ')).trim().toLowerCase();
+      if (isConsumer === 'y' || isConsumer === 'yes') {
+        const srcUrl = (await ask('DS source Figma URL: ')).trim();
+        if (srcUrl) figmaSourceKey = parseKey(srcUrl);
+      }
+    }
+    if (!INIT_CODE_GIVEN) {
+      console.log(C.dim(`  This folder (${ROOT}) ${holds()}.`));
+      const where = (await ask('Where is your code? Enter for this folder, or another folder or a git link: ')).trim();
+      if (where && resolve(ROOT, where.replace(/^~(?=\/|$)/, HOME)) !== ROOT) {
+        // The code is elsewhere: setup runs there, with the answers already given.
+        rl.close();
+        const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'audit.mjs'), '--init', `--project=${where}`, ...(figmaRaw ? [`--figma-url=${figmaRaw}`] : []),
+          ...(figmaSourceKey ? [`--figma-source-url=${figmaSourceKey}`] : []), ...(process.argv.includes('--no-hooks') ? ['--no-hooks'] : [])],
+          { stdio: 'inherit', cwd: PROJECT_FROM, env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+        process.exit(r.status ?? 1);
+      }
+    }
     const themeAns = defaultHint
       ? ((await ask(`Token CSS file(s) [${defaultHint}]: `)).trim() || defaultHint)
-      : (await ask(`Token CSS file(s) (e.g. src/styles/theme.css; leave empty if you only have Figma and want to build from it): `)).trim();
+      : (await ask(`Token CSS file(s) (e.g. src/styles/theme.css${figmaRaw ? '; leave empty to build them from Figma' : ''}): `)).trim();
     themeCSS = await takeHosted(resolveTheme(themeAns));
-    if (themeCSS == null && (INIT_BUILD || !runtimeHints.length)) { themeCSS = BUILD_THEME_DEFAULT; buildMode = true; }
-
-    const isConsumer = (await ask('Is this a Figma consumer file that uses an external DS library? (y/N): ')).trim().toLowerCase();
-    if (isConsumer === 'y' || isConsumer === 'yes') {
-      const srcUrl = (await ask('DS source Figma URL: ')).trim();
-      if (srcUrl) figmaSourceKey = parseKey(srcUrl);
-    }
+    if (themeCSS == null && figmaRaw && (INIT_BUILD || !runtimeHints.length)) { themeCSS = BUILD_THEME_DEFAULT; buildMode = true; }
 
     rl.close();
     if (themeCSS == null) {
@@ -1369,7 +1411,8 @@ async function bootstrapConfig() {
 
   writeFileSync(join(ROOT, 'ds-config.json'), JSON.stringify(generated, null, 2) + '\n');
   console.log(C.green('✅ ds-config.json written'));
-  if (buildMode) console.log(C.green(`✅ Build mode: this project starts from Figma. What Figma has and the code does not yet is listed as to build, never as a failure, and the tokens go in ${firstTheme}.`));
+  if (buildMode) console.log(C.green(`✅ Build mode: ${INIT_BUILD ? 'this project' : `no stylesheet declares design tokens in ${ROOT}, so it`} starts from Figma. What Figma has and the code does not yet is listed as to build, never as a failure, and the tokens go in ${firstTheme}.`));
+  if (!figmaFileKey) console.log(C.yellow('  ⚠️  No Figma file: the checks of the code alone run; the checks against Figma wait until its link is added (figmaFileKey in ds-config.json).'));
 
   // ── Save FIGMA_TOKEN to .env ──────────────────────────────────────────────────
   // (The `!envContent.includes('FIGMA_TOKEN')` guard below already prevents a duplicate, so no
@@ -1470,6 +1513,17 @@ async function bootstrapConfig() {
     const { upgradeHooks } = await import('./hooks-install.mjs');
     if (upgradeHooks(ROOT, cfg)) console.log(C.dim('ℹ️  Hooks updated: each /rms-design-system-engine request is now routed by the engine (.claude/settings.local.json). Off: --remove-hooks.'));
   } catch { /* never blocks a run */ }
+
+  // Set up without a Figma file (setup writes figmaFileKey "" then), and no Figma data captured: every gate compares
+  // the code with Figma, so only the accessibility check of the code runs, and the run says the rest waits for the
+  // Figma link. A config with no figmaFileKey at all keeps its Figma data elsewhere and is audited as it always was.
+  const figmaData = [cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json', cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json', cfg.paths?.compPropsSnapshot].filter(Boolean);
+  if (!ONLY && cfg.figmaFileKey === '' && !cfg.figmaSourceKey && !figmaData.some((f) => existsSync(join(ROOT, f)))) {
+    ONLY_LABELS = readGateLabels(join(SCRIPT_DIR, 'audit.mjs'));
+    ONLY = parseOnly(['accessibility'], ONLY_LABELS);
+    NO_FIGMA = true;
+    console.log(C.yellow('ℹ️  No Figma file in ds-config.json (figmaFileKey): only the accessibility check of the code runs. The checks against Figma wait until its link is added.'));
+  }
 
   // Build mode: a component built into its own stylesheet is read from then on (build-list.mjs).
   try {
@@ -4425,14 +4479,14 @@ function reportFull(label, items, shown) {
     }
     let a11yFound = null;
     try { a11yFound = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
-    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true, a11y: a11yFound, measured: measuredLines(gates).length });
+    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true, a11y: a11yFound, measured: measuredLines(gates).length, noFigma: NO_FIGMA });
     const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
     const { dataStateLine } = await import('./next-step.mjs');
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
-    const data = dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
+    const data = NO_FIGMA ? null : dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
     let a11yIssues = null;
     try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
-    const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues } : null } : null;
+    const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), noFigma: NO_FIGMA, a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues } : null } : null;
     let summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine });
     mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
     // Where every difference is listed (written by a full audit above), so the chat always says where to look.
