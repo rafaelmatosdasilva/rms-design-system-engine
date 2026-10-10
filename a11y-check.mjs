@@ -89,6 +89,34 @@ import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, m
 // (a button whose text colour transitions and whose background does not reads 1:1 for a moment).
 export const SETTLE_TRANSITIONS = `document.getAnimations().forEach((a) => { if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) { try { a.finish(); } catch (e) {} } })`;
 
+// State-class → the aria/native state it must also expose. A common-English default (extend or override per project via
+// ds-config.json → a11y.stateClasses). Curated words only, so a plain decorative class never trips it; the check only
+// fires on interactive / roled elements. A state is said the way the element's role says it, so each word takes every
+// attribute that can say it: a selected radio is aria-checked, a selected toggle aria-pressed, a selected step or page
+// aria-current (any value but false), a selected tab or option aria-selected.
+export const STATE_CLASSES = {
+  selected:      { attr: ['aria-selected', 'aria-checked', 'aria-pressed', 'aria-current'], val: 'true' },
+  checked:       { attr: ['aria-checked', 'checked'], val: 'true' },
+  expanded:      { attr: 'aria-expanded', val: 'true' },
+  open:          { attr: ['aria-expanded', 'open'], val: 'true' },
+  pressed:       { attr: 'aria-pressed',  val: 'true' },
+  disabled:      { attr: 'disabled',      val: 'true' },
+  invalid:       { attr: 'aria-invalid',  val: 'true' },
+  error:         { attr: 'aria-invalid',  val: 'true' },
+  current:       { attr: 'aria-current',  val: 'true' },
+  indeterminate: { attr: 'aria-checked',  val: 'mixed' },
+};
+// Does the element say the state the class draws? Runs in the page (its source is put in the sweep) and here in tests.
+export function stateHeard(el, spec) {
+  return [].concat(spec.attr).some(function (a) {
+    if (a === 'disabled') return el.disabled === true || el.getAttribute('aria-disabled') === 'true';
+    if (a === 'checked') return el.checked === true;
+    if (a === 'open') return el.hasAttribute('open');
+    var v = el.getAttribute(a);
+    return v === spec.val || (a === 'aria-current' && v !== null && v !== 'false');
+  });
+}
+
 export function parseColor(s) {
   if (typeof s !== 'string') return null;
   if (s === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
@@ -576,6 +604,7 @@ function sweepExpression(roots, doFocus, stateMap) {
     if (${doFocus ? 'true' : 'false'}) {
       const STATE_MAP = ${JSON.stringify(stateMap || {})};
       const stateWords = Object.keys(STATE_MAP);
+      const stateHeard = ${stateHeard.toString()};
       const INTERACTIVE = 'a[href],button,input:not([type=hidden]),select,textarea,[tabindex],[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=tab],[role=menuitem],[role=option],[role=combobox],[role=slider]';
       const NATIVE_FOCUSABLE = 'a[href],button,input:not([type=hidden]),select,textarea';
       const IROLES = ['button','link','checkbox','radio','switch','tab','menuitem','option','combobox','slider'];
@@ -652,11 +681,7 @@ function sweepExpression(roots, doFocus, stateMap) {
           const tokens = ((el.className && typeof el.className==='string') ? el.className.toLowerCase() : '').split(/[\\s_-]+/).filter(Boolean);
           for (const w of stateWords) {
             if (!tokens.includes(w)) continue;
-            const spec = STATE_MAP[w];
-            const got = spec.attr==='disabled'
-              ? (el.disabled===true || el.getAttribute('aria-disabled')==='true')
-              : (el.getAttribute(spec.attr)===spec.val || (spec.val==='true' && el.getAttribute(spec.attr)==='true'));
-            if (!got) { ariaState.push((desc+' .'+w).slice(0,70)); break; }
+            if (!stateHeard(el, STATE_MAP[w])) { ariaState.push((desc+' .'+w).slice(0,70)); break; }
           }
         }
         // 5. Keyboard reachability — an interactive control that cannot be reached by keyboard.
@@ -1208,21 +1233,7 @@ async function main() {
   if (!targets.length) skip(`no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.${harnessWhy ? ` The components were not rendered from their code either: ${harnessWhy}.` : ''}`);
   const waitFor = cfg.a11y?.waitFor ?? null;   // optional selector to await before the sweep (SPA hydration)
 
-  // State-class → the aria/native state it must also expose. A common-English default (extend or
-  // override per project via ds-config.json → a11y.stateClasses). Curated words only, so a plain
-  // decorative class never trips it; the check only fires on interactive / roled elements.
-  const STATE_MAP = Object.assign({
-    selected:      { attr: 'aria-selected', val: 'true' },
-    checked:       { attr: 'aria-checked',  val: 'true' },
-    expanded:      { attr: 'aria-expanded', val: 'true' },
-    open:          { attr: 'aria-expanded', val: 'true' },
-    pressed:       { attr: 'aria-pressed',  val: 'true' },
-    disabled:      { attr: 'disabled',      val: 'true' },
-    invalid:       { attr: 'aria-invalid',  val: 'true' },
-    error:         { attr: 'aria-invalid',  val: 'true' },
-    current:       { attr: 'aria-current',  val: 'true' },
-    indeterminate: { attr: 'aria-checked',  val: 'mixed' },
-  }, cfg.a11y?.stateClasses ?? {});
+  const STATE_MAP = Object.assign({}, STATE_CLASSES, cfg.a11y?.stateClasses ?? {});
 
   const CHROME = findChrome();
   if (!CHROME) skip('Chrome not found (set CHROME_PATH to enable)');

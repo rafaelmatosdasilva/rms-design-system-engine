@@ -325,6 +325,17 @@
     el.dispatchEvent(new E(type, o));
   };
   var showing = function () { return Array.prototype.filter.call(document.body.querySelectorAll('*'), vis); };
+  // What appeared covers or replaces something that showed before (1.4.13 asks Escape only of that): it lies over another
+  // element, or one that showed is gone. A button that appears in the room it makes (a row's action on hover) covers nothing.
+  var covers = function (pop, before) {
+    var r = pop.getBoundingClientRect();
+    return before.some(function (n) {
+      if (n === pop || n.contains(pop) || pop.contains(n)) return false;
+      if (!n.isConnected || !vis(n)) return true;
+      var q = n.getBoundingClientRect();
+      return q.width > 0 && q.height > 0 && r.left < q.right - 1 && q.left < r.right - 1 && r.top < q.bottom - 1 && q.top < r.bottom - 1;
+    });
+  };
   // Another page: the path changed, a page was pushed on the history, or a window opened. A page that only writes its
   // own state into its address (replaceState, a query or a hash, as the style guide does for the props) has not moved.
   var nav = { pushed: 0, opened: 0 };
@@ -362,8 +373,9 @@
         // What shows when it is hovered or focused: the outermost element that was not showing before. A trigger that says
         // it has a tip (data-tip, aria-describedby) is given longer, as a tooltip often waits a second before it shows.
         var patient = el.hasAttribute('data-tip') || el.hasAttribute('aria-describedby') || el.hasAttribute('data-tooltip');
+        var before = [];
         var appear = async function () {
-          var before = showing(), until = Date.now() + (patient ? Math.max(wait, 1600) : wait), found = null;
+          before = showing(); var until = Date.now() + (patient ? Math.max(wait, 1600) : wait), found = null;
           on();
           while (!found && Date.now() < until) {
             await sleep(50);
@@ -382,7 +394,7 @@
           fire(document.activeElement || document.body, 'keydown', { key: 'Escape', code: 'Escape' }); fire(document, 'keydown', { key: 'Escape', code: 'Escape' });
           // Given time to fade out (a transition of a few tenths of a second) before it is said to stay.
           for (var tEsc = 0; tEsc < 12 && pop.isConnected && vis(pop); tEsc++) await sleep(50);
-          if (pop.isConnected && vis(pop)) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') does not close with Escape');
+          if (pop.isConnected && vis(pop) && covers(pop, before)) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') does not close with Escape');
           await leave();
           pop = await appear();
           if (pop) {
