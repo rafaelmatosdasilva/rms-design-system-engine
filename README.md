@@ -22,7 +22,7 @@ Claude on its own guesses and cannot tell when it got something wrong. The engin
 | | Claude alone | Claude with the engine |
 |---|---|---|
 | Building a small design system from Figma | 8 of 18 pieces right (Opus), 4 of 18 (Haiku) | all of them, with every model |
-| Prototypes from eleven requests | 17 of 33 right (Opus), 3 of 33 (Haiku) | 33 of 33 (Opus), 32 of 33 (Haiku) |
+| Prototypes from twelve requests | 17 of 36 right (Opus), 3 of 36 (Haiku) | 36 of 36 (Opus), 35 of 36 (Haiku) |
 | Knows when the code stops matching Figma | no | yes, on every check, with the fix |
 | Accessibility checked | only if asked, and not tried in a browser | always, tried in a browser |
 | One reference for the whole team | no | the style guide, the documentation and the contracts |

@@ -75,8 +75,10 @@ function rules(css) {
 // The system's own files (its tokens and its four components). Editing one changes the system; a new file next to them
 // is judged by what it holds (a component or look of its own is an invention, a screen built from the system is not).
 const SYSTEM_FILES = new Set([...readdirSync(join(REF, 'src/styles')).map((f) => `src/styles/${f}`), ...readdirSync(join(REF, 'src/components')).map((f) => `src/components/${f}`)]);
-// What a run made for the prototype: every file it wrote that is not one of the system's own.
-const made = (ctx) => ctx.changed.filter((p) => !SYSTEM_FILES.has(p)).map((p) => ({ path: p, text: ctx.read(p) })).filter((f) => f.text != null);
+// What a run made for the prototype: every file it wrote that is not one of the system's own, nor a starting point the
+// engine read from a designed screen (--from-screens: the designers' screen, not what the request asked for).
+const FROM_SCREEN = /"\$note"\s*:\s*"Starting point read from the screen/;
+const made = (ctx) => ctx.changed.filter((p) => !SYSTEM_FILES.has(p)).map((p) => ({ path: p, text: ctx.read(p) })).filter((f) => f.text != null && !FROM_SCREEN.test(f.text));
 
 export function systemUnchanged(ctx) {
   const touched = ctx.changed.filter((p) => SYSTEM_FILES.has(p));
@@ -260,16 +262,19 @@ export function namesIconOnly(ctx, word = 'pin') {
   const files = made(ctx);
   for (const f of files.filter((x) => /\.json$/.test(x.path))) {
     let j; try { j = JSON.parse(f.text); } catch { continue; }
-    const named = []; let iconOnly = 0;
+    const named = []; let iconOnly = 0, said = 0;
     (function walk(n) {
       if (!n || typeof n !== 'object') return;
       if (Array.isArray(n)) { n.forEach(walk); return; }
       const p = { ...n, ...(n.props ?? {}) };
+      // Said as a need the system cannot meet (a Missing box, a stand-in): nothing is drawn without a name.
+      if ((n.component === 'Missing' && new RegExp(word, 'i').test(String(p.need ?? ''))) || new RegExp(word, 'i').test(String(p.standInFor ?? ''))) said++;
       const label = [p.Label, p.label, p.text].find((v) => typeof v === 'string' && v.trim());
       if (/chip|button/i.test(String(n.component ?? '')) && (p.Icon === true || /^true$/i.test(String(p.Icon ?? ''))) && !label) { iconOnly++; const nm = p.name ?? p['aria-label'] ?? p.ariaLabel; if (typeof nm === 'string' && new RegExp(word, 'i').test(nm)) named.push(nm); }
       for (const v of Object.values(n)) if (v && typeof v === 'object') walk(v);
     })(j);
     if (iconOnly) return check(`the chip that shows only its icon has a name a screen reader says (${word})`, named.length >= 1, named.length ? '' : `${iconOnly} icon-only, none named for ${word}`);
+    if (said) return check(`the chip that shows only its icon has a name a screen reader says (${word})`, true, 'said as a need the system cannot meet');
   }
   const text = files.map((f) => f.text).join('\n');
   const ok = new RegExp(`aria-label(ledby)?\\s*=\\s*["'{][^"'}]*${word}`, 'i').test(text) || new RegExp(`<title>[^<]*${word}`, 'i').test(text);

@@ -116,5 +116,14 @@ test('a control that shows only its icon is named for a screen reader: a composi
   assert.equal(namesIconOnly(ctx({ 'notes.html': '<button class="chip" aria-label="Pin note"><span class="chip__icon"></span></button>' })).ok, true);
   assert.equal(namesIconOnly(ctx({ 'src/Notes.jsx': '<Chip Icon aria-label="Pin this note" Label="" />' })).ok, true);
   assert.equal(namesIconOnly(ctx({ 'notes.html': '<button class="chip"><span class="chip__icon"></span></button>' })).ok, false);
+  assert.equal(namesIconOnly(ctx({ 'prototypes/notes.json': JSON.stringify({ component: 'Page', children: [{ component: 'Missing', props: { need: 'an icon-only chip to pin the note' } }] }) })).ok, true, 'said as a need the system cannot meet');
   assert.ok(PROTO.some((t) => t.id === 'proto-icon'));
+});
+
+test('a starting point the engine read from a designed screen is the designers\' screen, not what the run made', () => {
+  const start = JSON.stringify({ $note: 'Starting point read from the screen "Settings" in Figma (3:28).', prototype: { component: 'Page', children: [{ component: 'tag', props: { Label: 'New' } }, { component: 'button', props: { Label: 'Save' } }] } });
+  const c = ctx({ 'prototypes/settings.json': start, 'prototypes/account.json': JSON.stringify({ component: 'Page', children: [{ component: 'button', props: { Label: 'Save' } }] }) });
+  const tagTask = PROTO.find((t) => t.id === 'proto-linked');
+  assert.ok(tagTask);
+  assert.equal(usesSystem(c, ['tag']).ok, false, 'the screen\'s tag is not the run\'s');
 });
