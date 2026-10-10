@@ -19,6 +19,8 @@ html, body { margin: 0; }
 .pt-seg { display: inline-flex; gap: 4px; }
 .pt-seg[hidden] { display: none; }
 .pt-note { color: #6e6e73; }
+.pt-font-note { color: #8a5300; }
+.pt-font-note[hidden] { display: none; }
 .pt-gaps { font: 13px/1.5 system-ui, sans-serif; color: #1d1d1f; background: #fffbe6; border-bottom: 1px solid #e8d97a; padding: 10px 16px; }
 .pt-gaps h2 { font-size: 13px; margin: 0 0 4px; }
 .pt-gaps ul { margin: 0; padding-left: 18px; }
@@ -47,6 +49,7 @@ html, body { margin: 0; }
   <button type="button" id="pt-outline" aria-pressed="false">Show engine layout and stand-ins</button>
   <button type="button" id="pt-gaps-toggle" aria-pressed="false">Gaps</button>
   <span class="pt-note" id="pt-note"></span>
+  <span class="pt-note pt-font-note" id="pt-font-note" role="status" hidden></span>
 </div>
 <section class="pt-gaps" id="pt-gaps" hidden><h2>What the design system would need</h2><ul></ul></section>
 <main id="pt-canvas"></main>
@@ -521,6 +524,8 @@ html, body { margin: 0; }
   // The system's script places what follows a selection (a sliding pill) when the window changes size, as the style
   // guide nudges it: told once the selection has moved.
   function relayout() { requestAnimationFrame(function () { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }); }
+  // The design's font arrives after the page drew in the system's own stack: what the system's script measured is placed again.
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', relayout);
   document.addEventListener('click', function (ev) {
     var box = ev.target.closest && ev.target.closest('#pt-canvas, .pt-open-layer'); if (!box) return;
     if (ev.target.closest('a[href^="#"], a[href=""]')) ev.preventDefault();   // a link in a prototype stays on the page
@@ -628,6 +633,15 @@ html, body { margin: 0; }
   gt.textContent = 'Gaps (' + gaps.length + ')';
   gt.addEventListener('click', function () { var on = panel.hidden; panel.hidden = !on; gt.setAttribute('aria-pressed', String(on)); });
   document.getElementById('pt-note').textContent = D.note || '';
+  // A design font the page could not find (not installed here, not loaded from Google Fonts): said, so the page is not
+  // read as set in it.
+  var fontNote = document.getElementById('pt-font-note');
+  function fontsSaid() {
+    var st = window.PT_FONTS || {}, out = Object.keys(st).filter(function (f) { return st[f] === 'missing'; });
+    fontNote.hidden = !out.length;
+    fontNote.textContent = out.length ? out.join(', ') + (out.length > 1 ? ' are' : ' is') + ' not installed here and could not be loaded: set in the system\'s fallback fonts' : '';
+  }
+  fontsSaid(); window.addEventListener('pt-fonts', fontsSaid);
 })();
 </script>
 <!--{{SYSTEM_SCRIPTS}}-->
