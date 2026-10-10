@@ -230,3 +230,18 @@ test('[modes] after a mode switch the colours are read settled, never halfway th
     close();
   } finally { browser.kill(); }
 });
+
+test('a project whose packages are not installed is told so, not "auto-discovery found nothing"', { timeout: 60000 }, async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join: j, dirname: d } = await import('node:path');
+  const { fileURLToPath: f } = await import('node:url');
+  const dir = mkdtempSync(j(tmpdir(), 'a11y-nopkg-'));
+  writeFileSync(j(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'theme.css' } }));
+  writeFileSync(j(dir, 'theme.css'), ':root { --a: #fff; }');
+  writeFileSync(j(dir, 'package.json'), JSON.stringify({ name: 'p', scripts: { serve: 'vite' } }));
+  const r = spawnSync(process.execPath, [j(d(d(f(import.meta.url))), 'a11y-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /the project's packages are not installed \(no node_modules\)|Chrome not found/, r.stdout);
+});

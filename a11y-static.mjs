@@ -169,14 +169,27 @@ function jsxOpenTags(src) {
   return out;
 }
 
-// CSS rules as { selectors:[...], decls, index }, from plain CSS or a <style> block, nested @-rules flattened.
+// CSS rules as { selectors:[...], decls, index }, from plain CSS or a <style> block, nested @-rules flattened. One pass,
+// linear in the text: a head (the text since the last {, } or ;) then a block with no brace inside. A pattern did this
+// before and backtracked over every long stretch with no brace (a blanked inline image): minutes on one file.
 function cssRules(text) {
   const css = String(text ?? '').replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
   const rules = [];
-  for (const m of css.matchAll(/([^{};]+)\{([^{}]*)\}/g)) {
-    const head = m[1].trim();
-    if (!head || head.startsWith('@')) continue;
-    rules.push({ selectors: head.split(',').map((s) => s.trim()).filter(Boolean), decls: m[2], index: m.index + (m[1].length - m[1].trimStart().length) });
+  const stop = (c) => c === '{' || c === '}' || c === ';';
+  let s = 0;
+  while (s < css.length) {
+    let i = s; while (i < css.length && !stop(css[i])) i++;
+    if (i === css.length) break;
+    if (css[i] === '{' && i > s) {
+      let j = i + 1; while (j < css.length && css[j] !== '{' && css[j] !== '}') j++;
+      if (css[j] === '}') {
+        const raw = css.slice(s, i), head = raw.trim();
+        if (head && !head.startsWith('@')) rules.push({ selectors: head.split(',').map((x) => x.trim()).filter(Boolean), decls: css.slice(i + 1, j), index: s + (raw.length - raw.trimStart().length) });
+        s = j + 1;
+        continue;
+      }
+    }
+    s = i + 1;
   }
   return { css, rules };
 }
@@ -192,12 +205,27 @@ const sameFamily = (a, b) => {
 };
 const base = (sel) => sel.replace(/:(focus-visible|focus-within|focus|hover|active)\b/g, '').replace(/::?[\w-]+(\([^)]*\))?$/, '').trim();
 
+// What puts focus back, read once from the text of every style file: for each element (its selector without the
+// state), the focus selectors that show focus on it, and the :focus-within wrappers that show it. Read once for the
+// whole project, not once per file (392 files read 2.7 MB each: hours).
+export function focusIndex(all) {
+  const byBase = new Map(), within = [];
+  for (const x of cssRules(all).rules) {
+    if (!showsFocus(x.decls)) continue;
+    for (const s of x.selectors) {
+      if (/:focus/.test(s)) { const b = base(s); if (!byBase.has(b)) byBase.set(b, new Set()); byBase.get(b).add(s); }
+      if (/:focus-within/.test(s)) within.push(base(s));
+    }
+  }
+  return { byBase, within };
+}
+
 // Styles: every rule that removes the focus outline must have a focus style for the same element somewhere.
-// `all` holds the text of every style file, so a restore in another file counts. → [{ line, kind, desc }]
+// `all` holds the text of every style file (or its focusIndex), so a restore in another file counts. → [{ line, kind, desc }]
 export function cssFindings(text, all = text) {
   const out = [];
   const { css, rules } = cssRules(text);
-  const every = cssRules(all).rules;
+  const idx = typeof all === 'string' ? focusIndex(all) : all;
   for (const r of rules) {
     if (!removesOutline(r.decls)) continue;
     for (const sel of r.selectors) {
@@ -205,8 +233,7 @@ export function cssFindings(text, all = text) {
       if (!onFocus && /:(hover|active|disabled|checked|visited)\b|\[disabled\]|\[aria-disabled/.test(sel)) continue;   // another state, not focus
       const b = base(sel);
       if (onFocus && showsFocus(r.decls.replace(/outline[^;]*;?/gi, ''))) continue;   // replaced in the same rule
-      const restored = every.some((x) => x.selectors.some((s) => /:focus/.test(s) && base(s) === b && (s !== sel)) && showsFocus(x.decls))
-        || every.some((x) => x.selectors.some((s) => /:focus-within/.test(s) && sameFamily(b, base(s)) && base(s) !== b) && showsFocus(x.decls));
+      const restored = [...(idx.byBase.get(b) ?? [])].some((s) => s !== sel) || idx.within.some((w) => sameFamily(b, w) && w !== b);
       if (!restored) out.push({ line: lineAt(css, r.index), kind: 'focus', desc: `${sel} removes the focus outline and no focus style puts one back`, fix: `add a ${b || sel}:focus-visible style that shows where focus is` });
     }
   }
@@ -323,7 +350,8 @@ export function staticA11y(ROOT) {
   for (const f of markup) for (const x of markupFindings(read(f))) findings.push({ file: relative(ROOT, f), ...x });
   const styleText = new Map(styles.map((f) => [f, ['.vue', '.svelte'].includes(extname(f)) ? styleOnly(read(f)) : read(f)]));
   const all = [...styleText.values()].join('\n');
-  for (const [f, text] of styleText) for (const x of cssFindings(text, all)) findings.push({ file: relative(ROOT, f), ...x });
+  const focus = focusIndex(all);
+  for (const [f, text] of styleText) for (const x of cssFindings(text, focus)) findings.push({ file: relative(ROOT, f), ...x });
   // Animations with no reduced-motion alternative anywhere: reported once, at the first animation.
   const scripts = walk(ROOT, new Set(['.js', '.mjs', '.ts']));
   // What the scripts do (WCAG 2.1): shortcuts, timers, gestures, device motion.
