@@ -517,6 +517,23 @@ export function discoverRoutes(ROOT, base, { prefer = [], read = (f) => { try { 
   return list.length ? list.map(([p]) => b + p) : null;
 }
 
+// A class the code gives an element: in a class attribute, as a quoted name a binding adds (:class, clsx), or as a CSS
+// selector. A word in a comment is not one. A selector that is not one plain class is taken as present.
+export function classInCode(code, sel) {
+  const c = /^\.(-?[A-Za-z_][\w-]*)$/.exec(String(sel).trim())?.[1];
+  if (!c) return true;
+  const e = c.replace(/-/g, '\\-');
+  return new RegExp(`class(?:Name)?\\s*=\\s*["'\`](?:[^"'\`]*\\s)?${e}(?=[\\s"'\`])|["'\`]${e}["'\`]|(?:^|[\\s,{>+~(&])\\.${e}(?![\\w-])`, 'm').test(String(code));
+}
+
+// The classes in the code that hold a name (modal-overlay for modal), most used first: the likely answer.
+export function classesLike(code, names, max = 4) {
+  const counts = new Map();
+  for (const m of String(code).matchAll(/class(?:Name)?\s*=\s*["'`]([^"'`]+)["'`]/g)) for (const c of m[1].split(/\s+/)) if (/^-?[A-Za-z_][\w-]*$/.test(c)) counts.set(c, (counts.get(c) ?? 0) + 1);
+  const sq = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  return [...counts].filter(([c]) => names.some((n) => sq(c).includes(sq(n)))).sort((a, b) => b[1] - a[1]).slice(0, max).map(([c]) => '.' + c);
+}
+
 // ── CLI arg helpers ─────────────────────────────────────────────────────────────
 function argValues(flag, argv) {
   const out = [];
@@ -1289,7 +1306,24 @@ async function main() {
   let browser = null;
   const cleanup = () => { try { browser?.kill(); } catch {} try { stopServer?.(); } catch {} };
   process.on('exit', cleanup);
-  const killTimer = setTimeout(() => { console.error('❌ [a11y] timed out (120s)'); cleanup(); process.exit(STRICT ? 1 : 0); }, 120000); killTimer.unref();
+  // A component looked for by a class no element in the code has would be waited for on every page: said at once.
+  if (roots && !cliUrls.length && !cfg.a11y?.urls?.length) {
+    const { componentSourceFiles, textReader } = await import('./component-source.mjs');
+    const read = textReader();
+    const code = componentSourceFiles(ROOT, cfg).map(read).join('\n') + [cfg.paths?.themeCSS].flat().filter(Boolean).map((f) => read(join(ROOT, f))).join('\n');
+    const has = (sel) => classInCode(code, sel);
+    const missing = components.filter((c) => !has(selOf(c)));
+    if (missing.length === components.length) {
+      const like = classesLike(code, missing);
+      skip(`nothing to check for ${missing.join(', ')}: no element in the code has the class ${missing.map(selOf).join(', ')}, the one taken for ${missing.length === 1 ? 'it' : 'them'} by the naming rule.${like.length ? ` Classes in the code that hold the name: ${like.join(', ')}.` : ''} Name the component's class in ds-config.json → componentSelectors (for example "${missing[0]}": "${like[0] ?? '.its-class'}"), or check a page that shows it with --url.`);
+    }
+  }
+
+  // The time the check may take grows with its pages and colour modes (a fixed two minutes stopped a scoped check of
+  // 23 pages halfway, and said so only where the audit never showed it); a11y.timeoutSec sets it.
+  const limitSec = Number(cfg.a11y?.timeoutSec) || Math.min(900, Math.max(120, targets.length * Math.max(1, modes.length) * 12));
+  let pagesDone = 0;
+  const killTimer = setTimeout(() => { console.log(`⏭  [a11y] stopped after ${limitSec}s, with ${Math.max(0, pagesDone - 1)} of ${targets.length} page(s) checked: what they found is not reported. Give it longer with ds-config.json → a11y.timeoutSec, or check fewer pages (--url).`); cleanup(); process.exit(STRICT ? 1 : 0); }, limitSec * 1000); killTimer.unref();
 
   // A cold Chrome on a busy machine can take longer than one start allows: try once more before giving up.
   let launchError = null;
@@ -1312,6 +1346,7 @@ async function main() {
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
   for (const target of targets) {
+    pagesDone++;
     const label = target.label;
     const { targetId, sessionId } = await openPage(send, target.url);
     // up to ~10s — a dev server / SPA can be slower than a file://

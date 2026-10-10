@@ -1010,6 +1010,9 @@ whatever surface the project serves, in this order:
    `src/routes` (route modules included), as `/#/…` addresses when the router uses hash history. Scoped to a
    component, it opens only the pages whose view uses it, the component's own page first. A project whose
    packages are not installed is told so, and a generated style guide that draws no component is not used.
+   A component whose class no element in the code has is said at once, with the classes that hold its name
+   (`.modal-wrapper` for modal), never waited for on every page. The check's time grows with its pages and
+   modes (`a11y.timeoutSec` sets it), and a check stopped by it says how many pages it reached.
    Override the base with `a11y.baseUrl`, delay the sweep for SPA hydration with
    `a11y.waitFor`, or turn the whole thing off with `a11y.discover: false`.
 4. **Ask (last resort)** — only when auto-discovery finds nothing does the skill ask the user for the one

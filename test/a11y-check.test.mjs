@@ -281,3 +281,14 @@ test('pages from a router in modules with hash history; scoped, the pages that u
   assert.deepEqual(discoverRoutes(dir, 'http://localhost:8080', { prefer: ['ButtonPrimary', '.button-primary'] }), ['http://localhost:8080/#/components/buttons/primary', 'http://localhost:8080/#/components/buttons/link']);
   assert.equal(discoverRoutes(dir, 'http://localhost:8080', { prefer: ['nothingLikeIt'] }).length, 3, 'no page uses it: every page');
 });
+
+test('a component looked for by a class the code never gives an element is said at once, with the classes that hold its name', async () => {
+  const { classInCode, classesLike } = await import('../a11y-check.mjs');
+  const code = '<!-- the modal opens here -->\n<div :class="{ \'modal-overlay\': open }"><div class="modal-wrapper x"><p class="modal-title"></p></div></div>\n<div class="modal-wrapper"></div>\n.card .button-primary { color: red }';
+  assert.equal(classInCode(code, '.modal'), false, 'a word in a comment and a longer class are not .modal');
+  assert.equal(classInCode(code, '.modal-overlay'), true, 'a quoted class a binding adds');
+  assert.equal(classInCode(code, '.modal-wrapper'), true);
+  assert.equal(classInCode(code, '.button-primary'), true, 'a CSS selector');
+  assert.equal(classInCode(code, '.segmented button'), true, 'not one plain class: taken as present');
+  assert.deepEqual(classesLike(code, ['modal']), ['.modal-wrapper', '.modal-title']);
+});
