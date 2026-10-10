@@ -1,5 +1,29 @@
 # Skill evaluation results
 
+## 2026-10: Prototype fonts that never wait, and stand-ins shown on the page (continuous evaluation)
+
+What changed since the entry below (engine 224d490): Prototypes: the design's font is found on the machine, in the system's @font-face or on Google Fonts in the background, and the page never waits for it (a font found nowhere is a 🔤 line); a stand-in is marked on the page, counted on its bar, and each gap on the page's list shows its parts; a stand-in for a component the system has is a ⚠️ line. The guide changed in `reference/usage.md` and `cookbook/prototype.md`. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `c991a1f1338c` · Project measured: `13d811a9d668`
+
+| Haiku, engine b06a027 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.052 | $0.058 |
+| Input a run | 96k | 110k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken. Runs read 110k a run against 96k from more turns, not a
+longer guide: a turn reads about what it did (27k), one `new-ui-saved` run took 26 turns, and `refresh-no-figma` took 2
+to 4 turns where it took 1. An earlier run of this change, stopped when the engine moved under it, had one miss that was
+the scorer's: "once you … provide a Figma token, the engine will compare …" read as asking for the token in chat; the
+rule now leaves a token the engine reads alone (b06a027). Records: `records/2026-10-10-prototype-fonts-standins`.
+
+On the design system the engine was built against, a scan history drawn with a field standing in for a date range
+picker: the page draws at once, marks the field "Stand-in for date range picker" and counts it on its bar, its gaps list
+scrolls to it and flashes it, and the engine's picture of the page has no marks. The page's own accessibility findings
+are unchanged, and its bar's buttons no longer fail on their focus ring.
+
 ## 2026-10: Prototype quality: a file that is not one page in a flow (continuous evaluation)
 
 What changed since the entry below (engine d8e021e): Flows: a file in prototypes/ that is not one page is a ❌ line, never a page of the flow. The guide changed in `reference/usage.md`.
