@@ -523,6 +523,27 @@ if (process.argv.includes('--styleguide-check')) {
   catch (e) { console.error(`❌ style guide not checked: ${e.message}`); process.exit(1); }
 }
 
+// ── --publish-styleguide: the CI job that publishes the style guide, one link the team shares (publish-job.mjs) ──
+// GitHub Pages or GitLab Pages, as the project's git remote says (--host github|gitlab to choose); --print shows the
+// job without writing it. Never overwrites a job that is there, never commits.
+if (process.argv.includes('--publish-styleguide')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { writePublishJob, githubJob, gitlabJob, hostOf, productRepos } = await import('./publish-job.mjs');
+  const host = _argValue('--host') ?? null;
+  if (host && !/^(github|gitlab)$/.test(host)) { console.error('❌ --host is github or gitlab.'); process.exit(1); }
+  if (process.argv.includes('--print')) {
+    const h = host ?? hostOf(ROOT) ?? 'github';
+    const out = pcfg.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html';
+    console.log((h === 'gitlab' ? gitlabJob : githubJob)({ out, products: productRepos(ROOT) }));
+    process.exit(0);
+  }
+  const r = writePublishJob(ROOT, pcfg, { host });
+  for (const l of r.lines) console.log(l);
+  console.log(r.wrote ? `NEXT: tell the person the job is written (${r.file}) and what the lines above say to do once; commit it only when they ask.` : r.file ? 'NEXT: tell the person what the line above says; change nothing.' : 'NEXT: ask the person whether the project is on GitHub or GitLab, then run this again with --host.');
+  process.exit(r.file || r.wrote ? 0 : 1);
+}
+
 // ── --figma-edits: the Figma side of the hand-back, written by the engine, applied only when a person says yes ──
 if (process.argv.includes('--figma-edits')) {
   let feConfig = {};
