@@ -96,6 +96,7 @@ test('setup takes where the code is and the Figma link from the request, and ask
   assert.equal(run(`set up ${F}, the code is github.com/acme/ui-kit.git`), `rms-design-system-engine --init --figma-url='${F}' --project='https://github.com/acme/ui-kit.git'`);
   assert.equal(run(`set up ${F}, our code is at https://gitlab.example.com/team/ds`), `rms-design-system-engine --init --figma-url='${F}' --project='https://gitlab.example.com/team/ds'`, 'a GitLab link before setup is the code, not guidelines');
   assert.equal(run(`configura a paridade ${F}, o código está nesta pasta`), `rms-design-system-engine --init --figma-url='${F}' --project='.'`);
+  assert.equal(run(`set up ${F}, code: '/Users/me/Documents/RMS Portfolio/2026 DS/lib'`), `rms-design-system-engine --init --figma-url='${F}' --project='/Users/me/Documents/RMS Portfolio/2026 DS/lib'`, 'a quoted path keeps its spaces');
   assert.equal(r(`set up this folder. Figma: ${F}?node-id=1-2`, none).ask, null, 'both given: nothing to ask');
   for (const text of ['set up the parity', 'set up this project', '/rms-design-system-engine check the accessibility of the buttonPrimary', `aqui está o figma ${F}`]) {
     assert.match(r(text, none).ask, /^where the design system's code is/, `asked where the code is: ${text}`);
