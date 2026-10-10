@@ -23,9 +23,12 @@ export const VISUAL_EXPRESSION = `(() => {
     const cs = getComputedStyle(e);
     const row = cs.display.includes('flex') && cs.flexDirection.startsWith('row');
     const grid = cs.display.includes('grid');
-    const boxes = kids.map((k) => { const r = k.getBoundingClientRect(); return { path: k.getAttribute('data-pt-path'), name: nameOf(k), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom) }; });
+    // A system component with a surface of its own (a background, a border): two of them meet edge to edge by design (a
+    // panel on a status bar), never parts left without room.
+    const surface = (k) => { if (!k.hasAttribute('data-pt-component')) return false; const s = getComputedStyle(k); const bg = !/^(transparent|rgba\(0, 0, 0, 0\))$/.test(s.backgroundColor); const edge = ['Top', 'Right', 'Bottom', 'Left'].some((x) => parseFloat(s['border' + x + 'Width']) > 0 && s['border' + x + 'Style'] !== 'none'); return bg || edge; };
+    const boxes = kids.map((k) => { const r = k.getBoundingClientRect(); return { path: k.getAttribute('data-pt-path'), name: nameOf(k), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), surface: surface(k) }; });
     const gaps = [];
-    if (!grid) for (let i = 1; i < boxes.length; i++) { const a = boxes[i - 1], b = boxes[i]; const same = row ? Math.abs(a.top - b.top) < (b.bottom - b.top) : true; if (same) gaps.push(row ? b.left - a.right : b.top - a.bottom); }
+    if (!grid) for (let i = 1; i < boxes.length; i++) { const a = boxes[i - 1], b = boxes[i]; const same = row ? Math.abs(a.top - b.top) < (b.bottom - b.top) : true; if (same && !(a.surface && b.surface)) gaps.push(row ? b.left - a.right : b.top - a.bottom); }
     containers.push({ path: e.getAttribute('data-pt-path'), name: nameOf(e), engine: e.hasAttribute('data-engine'), row, grid, align: cs.alignItems, kids: boxes, gaps });
   }
   const texts = [];

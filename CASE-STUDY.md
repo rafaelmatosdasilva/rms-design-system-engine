@@ -35,14 +35,14 @@ The designer asks for a screen. The rule is to use only the system's components,
 
 | Model | Claude alone | With the skill |
 |---|---|---|
-| Opus, eleven tasks | 17 of 33 | 33 of 33 |
-| Haiku, eleven tasks | 3 of 33 | 32 of 33 |
+| Opus, twelve tasks | 17 of 36 | 36 of 36 |
+| Haiku, twelve tasks | 3 of 36 | 35 of 36 |
 | Sonnet, three tasks (an earlier version) | 2 of 15 | 6 of 6 |
 
-- **Without the skill, most failures were inventions.** Opus built its own Switch component, drew its own illustration, and wrote colours and sizes the system does not have (10 of its 33 runs, Haiku 29). Two Sonnet runs changed the system's own tokens file. Neither model alone showed a list when it is empty or a form sent with a mistake.
-- **A page has every state and holds to the others.** Five of the eleven tasks ask for what a finished design owes: a list's empty state, a form's error state, the team's four-step sign-up flow with its pages deciding alike, a page at phone width, and a button that opens a confirmation. The skill draws each state, tries every screen width and each click in the browser, and holds the pages of a flow to one wording and one layout.
+- **Without the skill, most failures were inventions.** Opus built its own Switch component, drew its own illustration, and wrote colours and sizes the system does not have (13 of its 36 runs, Haiku 32). On the twelfth task, a chip that shows only its icon, both models alone named it for a screen reader every time and still gave the page a look of its own every time. Two Sonnet runs changed the system's own tokens file. Neither model alone showed a list when it is empty or a form sent with a mistake.
+- **A page has every state and holds to the others.** Five of the twelve tasks ask for what a finished design owes: a list's empty state, a form's error state, the team's four-step sign-up flow with its pages deciding alike, a page at phone width, and a button that opens a confirmation. The skill draws each state, tries every screen width and each click in the browser, and holds the pages of a flow to one wording and one layout.
 - **With the skill nothing is invented.** A need the system cannot meet becomes a labelled box on the page and a line on the gap list for the design team, for example "on/off switch, closest in the system is the chip".
-- **Documentation and consistency.** Two of the eleven tasks follow the team's written guidelines (one button per screen, a tag is never a confirmation, including guidelines fetched from GitLab and Notion). One keeps a new page consistent with the designed Settings screen. Opus alone passed these when the documentation sat in plain view in the repository. The skill also makes them checks. A prototype that breaks a written limit is not drawn, and a component the documentation rules out cannot stand in.
+- **Documentation and consistency.** Two of the twelve tasks follow the team's written guidelines (one button per screen, a tag is never a confirmation, including guidelines fetched from GitLab and Notion). One keeps a new page consistent with the designed Settings screen. Opus alone passed these when the documentation sat in plain view in the repository. The skill also makes them checks. A prototype that breaks a written limit is not drawn, and a component the documentation rules out cannot stand in.
 
 ### 3. The skill's own efficiency
 
@@ -62,7 +62,7 @@ A rule violation is changing code nobody asked for, committing unasked, writing 
 2. **Nothing is invented, and gaps become visible.** Claude uses only what exists. Everything it needed and could not find goes on one list, counted across screens, so the design team sees the most needed missing pieces first.
 3. **The team's knowledge is used every time.** Figma descriptions and annotations, code notes, recorded decisions, and guidelines from Notion, GitLab or the repository are put in front of Claude for each request. The rules that can be checked are checked.
 4. **Pages of one product stay consistent.** A new page is compared with the designed screens and the pages already made.
-5. **A cheaper model does the job.** Haiku with the skill beat Opus alone at building from Figma (18 of 18 against 8 of 18, for $1.93 against $2.49) and at prototyping (32 of 33 against 17 of 33, for $3.65 against $7.09).
+5. **A cheaper model does the job.** Haiku with the skill beat Opus alone at building from Figma (18 of 18 against 8 of 18, for $1.93 against $2.49) and at prototyping (35 of 36 against 17 of 36).
 6. **It is safe to hand to anyone.** The system's files are never changed unasked. A commit, an accepted difference or a silenced check asks a person first. A secret is never asked for in the chat.
 7. **Every claim is checked.** The same scorers run on every version. Every run is saved, and a result can be summarized again from the records at any time.
 
