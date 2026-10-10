@@ -43,9 +43,15 @@ export function measuredLines(gates) {
 // a11y: how many accessibility findings the browser check listed for this run (null when it did not run).
 // measured: how many differences the browser measured (they are advisory, so the summary lists them under their own
 // heading and the NEXT line names them, or a relay that keeps only the failing gates leaves them out).
-export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, toBuild = null, build = false, a11y = null, measured = 0, noFigma = false, cmd = 'rms-design-system-engine' } = {}) {
+// noSnapshot: a Figma file is set up but no Figma data is readable (nothing captured yet), so nothing was compared.
+// foundNowhere: the components asked for that are in neither the Figma data nor the code, so nothing of them was checked.
+export function nextStep({ failing = [], scope = [], handback = {}, burndownNext = null, baselineWritten = null, toBuild = null, build = false, a11y = null, measured = 0, noFigma = false, noSnapshot = false, foundNowhere = [], cmd = 'rms-design-system-engine' } = {}) {
   const rerun = scope.length ? `${cmd} --component ${scope.join(',')}` : cmd;
   if (baselineWritten) return `NEXT: tell the user ${baselineWritten.file} now holds the accepted debt; commit it only when they ask.`;
+  // Nothing captured from Figma yet: every check against Figma had nothing to compare, so the capture comes first (E22).
+  // A name that is no component the system has: the person is asked which one they mean, never told it passed (E24).
+  if (foundNowhere.length && !noSnapshot) return `NEXT: tell the person nothing was checked for ${foundNowhere.join(', ')}: ${foundNowhere.length === 1 ? 'it is' : 'they are'} in neither the Figma data nor the code. Ask which component they mean, or which file it is in; ${cmd} --query <a word of its name> lists the system's components that hold it.`;
+  if (noSnapshot) return `NEXT: no Figma data is captured yet, so nothing was compared with Figma. Capture it first: follow ${cmd} --recipe refresh-figma (read the variables and components with the Figma tool of this session, or set FIGMA_TOKEN in the project's .env file), then run ${rerun} again: a gate that fails now fails for want of that data.`;
   // Build mode, one component checked: it is being built from Figma, so a failure is part of building it, not a
   // difference for the person to decide (a build run reported its tag's wrong height instead of fixing it).
   if (failing.length && build && scope.length) {
@@ -79,7 +85,8 @@ export function nextStep({ failing = [], scope = [], handback = {}, burndownNext
 // The plain summary. verdict: 'failed' | 'debt' | 'pass' | 'baseline' (the run wrote the baseline).
 // The state of the Figma data, said once, so no one has to infer it (idea I56): whether this run refreshed anything
 // from the Figma API, and how old the committed snapshots it used are. An agent relays it; it never claims a
-// refresh the engine did not make. snapshots: [{ file, ageHours }] (ageHours null when unreadable).
+// refresh the engine did not make. snapshots: [{ file, ageHours, readable }] (ageHours null when unreadable or not
+// stamped; readable false when the file cannot be read at all).
 // noLink: set up with no Figma link, so nothing can refresh the snapshots committed in the project: the line says the
 // checks against Figma compared the code with them as they are, and that the link is what refreshes them.
 export function dataStateLine({ refreshedFromApi = false, fromFigmaCli = null, snapshots = [], cmd = 'rms-design-system-engine', noLink = false } = {}) {
@@ -91,13 +98,15 @@ export function dataStateLine({ refreshedFromApi = false, fromFigmaCli = null, s
   const used = oldest ? `the committed snapshots (the oldest, ${oldest.file}, ${age(oldest.ageHours)})` : 'no readable snapshot';
   const gap = missing.length ? ` Not readable: ${missing.join(', ')}.` : '';
   if (refreshedFromApi) return `**Figma data.** Component properties and values were refreshed from the Figma API in this run; variables and structure come from ${used}.${gap}`;
+  // Nothing readable at all: said as what it means, nothing compared (E22).
+  if (snapshots.length && snapshots.every((s) => s.readable === false) && !noLink) return `**No Figma data captured yet, so nothing was compared with Figma.** Not readable: ${missing.join(', ')}. To capture it: ${cmd} --recipe refresh-figma.`;
   if (noLink) return `**No Figma link, so the Figma data cannot be refreshed.** The checks against Figma compared the code with ${used}, as they are.${gap} Add the Figma file's link (figmaFileKey in ds-config.json) to refresh them.`;
   return `**Figma data was not refreshed in this run.** The audit used ${used}.${gap} To refresh them: ${cmd} --recipe refresh-figma.`;
 }
 
 // only: { words, noFigma, a11y: { static, browser } | null } when the run was --only (or had no Figma file): the summary says what ran, so a part
 // never reads as the whole system.
-export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null, toBuild = null } = {}) {
+export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null, toBuild = null, noSnapshot = false, foundNowhere = [] } = {}) {
   const lines = [];
   const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
   const debt = gates.filter((g) => g.baselined);
@@ -106,6 +115,8 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
     : verdict === 'failed' ? `**Not in parity.** ${failing.length} of ${gates.length} gate${gates.length === 1 ? ' fails' : 's fail'}.`
     : verdict === 'debt' ? `**No regressions.** ${debt.length} gate${debt.length === 1 ? '' : 's'} carry accepted debt.`
       : only && !gates.length ? '**Accessibility checked.** Its findings are advice: the report lists each with its fix.'
+      : foundNowhere.length && scope.length && scope.every((n) => foundNowhere.includes(n)) ? `**Nothing checked.** ${foundNowhere.join(', ')} ${foundNowhere.length === 1 ? 'is' : 'are'} in neither the Figma data nor the code.`
+      : noSnapshot ? `**Nothing compared with Figma yet.** No Figma data is captured, so the checks against Figma had nothing to compare; the checks of the code alone pass${notRun ? ` (${notRun} not verified)` : ''}.`
       : toBuild ? `**What is built matches Figma.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}; the rest is still to build.`
       : `**In parity.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}.`);
   if (only) {
@@ -117,6 +128,7 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
       lines.push(`Accessibility: ${parts.join(', ')}.`);
     }
   }
+  if (foundNowhere.length && !(scope.length && scope.every((n) => foundNowhere.includes(n)))) lines.push('', `**Nothing checked for ${foundNowhere.join(', ')}**: in neither the Figma data nor the code.`);
   if (data) lines.push('', data);
   for (const g of verdict === 'baseline' ? [] : failing) {
     const f = failLines(g);
