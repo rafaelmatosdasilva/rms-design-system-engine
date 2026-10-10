@@ -64,7 +64,7 @@
 
 import { appDir } from './code-roots.mjs';
 import './stdio-sync.mjs';   // the whole report reaches a pipe before process.exit
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { gunzipSync } from 'zlib';
@@ -465,18 +465,56 @@ async function discoverStorybook(base) {
   }
   return null;
 }
-function discoverRoutes(ROOT, base) {
-  const files = ['src/router/index.ts', 'src/router/index.js', 'src/router.ts', 'src/router.js', 'src/routes.ts', 'src/routes.js', 'src/App.tsx', 'src/App.jsx'];
-  const out = new Set();
-  for (const rel of files) {
-    let txt; try { txt = readFileSync(join(ROOT, rel), 'utf8'); } catch { continue; }
-    for (const m of txt.matchAll(/\bpath\s*:\s*['"`]([^'"`]+)['"`]/g)) {
-      const p = m[1];
-      if (p.startsWith('/') && !p.includes(':') && !p.includes('*')) out.add(p);   // static routes only (no params/wildcards)
+// The project's own pages, from its router: every static path in its router files (the usual single files, and every
+// file under src/router or src/routes, its modules included), as hash URLs when the router uses hash history
+// (/#/components/buttons/primary). Scoped to components (prefer: their names and selectors), only the pages whose view
+// uses one of them, the component's own page first (its folder and name in the path); every page when none does.
+const squashName = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+export function discoverRoutes(ROOT, base, { prefer = [], read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return ''; } } } = {}) {
+  const files = new Set(['src/router/index.ts', 'src/router/index.js', 'src/router.ts', 'src/router.js', 'src/routes.ts', 'src/routes.js', 'src/App.tsx', 'src/App.jsx'].map((r) => join(ROOT, r)).filter((f) => existsSync(f)));
+  const walk = (dir, depth = 0) => {
+    let names = []; try { names = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of names) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) { if (depth < 4 && !e.name.startsWith('.') && e.name !== 'node_modules') walk(p, depth + 1); }
+      else if (/\.(m?[jt]sx?)$/.test(e.name) && !/\.(test|spec)\./.test(e.name)) files.add(p);
     }
+  };
+  for (const d of ['src/router', 'src/routes', 'src/routing']) walk(join(ROOT, d));
+  // A module path as the router writes it (@/views/x.vue, ./x, ~/x) → the file, or null.
+  const fileOf = (from, spec) => {
+    const raw = /^[@~]\//.test(spec) ? join(ROOT, 'src', spec.slice(2)) : spec.startsWith('.') ? join(dirname(from), spec) : null;
+    if (!raw) return null;
+    for (const x of ['', '.vue', '.js', '.ts', '.jsx', '.tsx', '.svelte', '/index.vue', '/index.js', '/index.ts', '/index.tsx']) if (existsSync(raw + x) && !/\/$/.test(raw + x)) { try { if (statSync(raw + x).isFile()) return raw + x; } catch { /* not a file */ } }
+    return null;
+  };
+  const routes = new Map();
+  let hash = false;
+  for (const f of files) {
+    const txt = read(f);
+    if (/\bcreate(?:Web)?HashHistory\s*\(|<HashRouter\b|\bcreateHashRouter\s*\(/.test(txt)) hash = true;
+    const imports = new Map([...txt.matchAll(/import\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/g)].map((m) => [m[1], m[2]]));
+    const found = [...txt.matchAll(/\bpath\s*:\s*['"`]([^'"`]+)['"`]/g)];
+    found.forEach((m, i) => {
+      const p = m[1];
+      if (!p.startsWith('/') || p.includes(':') || p.includes('*') || routes.has(p)) return;   // static routes only (no params/wildcards)
+      const chunk = txt.slice(m.index, found[i + 1]?.index ?? m.index + 600);
+      const c = /\bcomponent\s*:\s*(?:\(\s*\)\s*=>\s*import\(\s*['"]([^'"]+)['"]\s*\)|([A-Za-z_$][\w$]*)\b)/.exec(chunk);
+      const spec = c ? (c[1] ?? imports.get(c[2])) : null;
+      routes.set(p, spec ? fileOf(f, spec) : null);
+    });
   }
-  const b = base.replace(/\/$/, '');
-  return out.size ? [...out].map((p) => b + p) : null;
+  let list = [...routes];
+  const keys = [...new Set(prefer.map(squashName).filter((k) => k.length >= 3))];
+  if (keys.length) {
+    const uses = ([, view]) => view && keys.some((k) => squashName(read(view)).includes(k));
+    // Its own page: the path's last two segments spell it (/components/buttons/primary is buttonPrimary).
+    const own = ([p]) => { const seg = p.split('/').filter(Boolean).slice(-2).map(squashName); return seg.length === 2 && keys.some((k) => k === seg[0] + seg[1] || k === seg[0].replace(/(?<=...)s$/, '') + seg[1]); };
+    const hit = list.filter((r) => uses(r) || own(r));
+    if (hit.length) list = [...hit.filter(own), ...hit.filter((r) => !own(r))];
+  }
+  const b = base.replace(/\/$/, '') + (hash ? '/#' : '');
+  return list.length ? list.map(([p]) => b + p) : null;
 }
 
 // ── CLI arg helpers ─────────────────────────────────────────────────────────────
@@ -1231,7 +1269,7 @@ async function main() {
     }
     if (base) {
       const stories = await discoverStorybook(base);
-      const found = stories || discoverRoutes(ROOT, base) || [base];
+      const found = stories || discoverRoutes(ROOT, base, { prefer: components.flatMap((c) => [c, selOf(c)]) }) || [base];
       const capped = found.slice(0, 40);
       targets = capped.map((u) => ({ label: u.startsWith(base) ? (u.slice(base.length) || '/') : u, url: u, page: !stories }));
       console.log(`ℹ️  [a11y] ${found.length === 1 ? 'checking the base page' : `${found.length} page(s) found — checking ${capped.length}`} via ${base}`);
