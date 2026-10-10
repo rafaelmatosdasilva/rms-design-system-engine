@@ -20,7 +20,7 @@ import { join, dirname, resolve as resolvePath } from 'path';
 import { loadCssSources, walkCss, styleBlocksOf, blankComments } from './css-source.mjs';
 import { rawGapMatches } from './raw-gap.mjs';
 import { resolveNamingSpec, tokenToVar, withTextScaleKeys } from './naming-convention.mjs';
-import { createLocator } from './component-locator.mjs';
+import { createLocator, codeClassesIn } from './component-locator.mjs';
 import { pathToFileURL } from 'url';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
 import { codeSnapshotPath, projectPath } from './names.mjs';
@@ -61,7 +61,7 @@ try {
 // project's own entries always win.
 if (cfg.build === true) {
   const { projectDerivedContract } = await import('./build-list.mjs');
-  const loc = createLocator(cfg, { contractSelectors: COMPONENT_CSS_SELECTORS });
+  const loc = createLocator(cfg, { contractSelectors: COMPONENT_CSS_SELECTORS, codeClasses: codeClassesIn(ROOT, cfg) });
   const naming = resolveNamingSpec(cfg);
   const d = projectDerivedContract(ROOT, cfg, (n) => loc.classFor(n), (t) => tokenToVar(t, naming));
   const unbuilt = await inProgressNames(ROOT, cfg);   // still to build: nothing to compare yet
@@ -583,7 +583,7 @@ const STANDARD_STATE_MODIFIER = {
 
 // The one shared component finder (component-locator.mjs): componentSelectors, then the
 // contract's COMPONENT_CSS_SELECTORS main, then the naming convention.
-const LOCATOR = createLocator(cfg, { contractSelectors: COMPONENT_CSS_SELECTORS });
+const LOCATOR = createLocator(cfg, { contractSelectors: COMPONENT_CSS_SELECTORS, codeClasses: codeClassesIn(ROOT, cfg) });
 const componentToBaseSelector = (name) => LOCATOR.selectorFor(name);
 
 function variantToModifier(props) {
