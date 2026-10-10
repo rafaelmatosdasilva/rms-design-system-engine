@@ -156,7 +156,8 @@ guessed; the Figma link is optional (without it only the code's own checks run, 
 compared with Figma). The router asks what the request leaves out, in one message; a setup run
 that does not know where the code is writes nothing, and its NEXT line asks. Pass the answer as
 `--project=<folder or link>` (`.` for this folder; a link is cloned beside the folder, `owner/repo`
-means GitHub), or name the token file with `--theme-css`. Every other choice takes the option that
+means GitHub), or name the token file with `--theme-css`. A request for something else that sent the
+person to setup is passed along with `--then='<the request>'`; setup's NEXT line routes it again. Every other choice takes the option that
 keeps the most of the system, without asking. `--theme-css` may be omitted when the engine
 auto-detects a single token CSS file. A code folder with no design tokens yet starts in build mode
 from Figma (`--recipe build-from-figma`), or with `--build`. The project is remembered in the folder it ran from, so
