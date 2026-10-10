@@ -1387,6 +1387,36 @@ async function main() {
     }
   }
 
+  // A Vue design system's components, rendered with the project's own Vite in each of their variants (Figma's, else
+  // the code's props), beside whatever pages are checked: every variant, every run, wherever its pages show it or not
+  // (E28). Scoped to the components asked for; a11y.harness:false turns it off.
+  if (!urlList.length && !harness && cfg.a11y?.harness !== false && findChrome()) {   // without Chrome nothing is tried
+    try {
+      const { componentSourceFiles, resolveComponentFile, textReader, codeComponents } = await import('./component-source.mjs');
+      const files = componentSourceFiles(ROOT, cfg).filter((f) => /\.vue$/.test(f));
+      if (files.length) {
+        const { startVueHarness } = await import('./vue-harness.mjs');
+        let propsSnap = {};
+        try { propsSnap = JSON.parse(readFileSync(join(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8')); } catch { /* none */ }
+        const read = textReader();
+        // Every component: Figma's, and the ones only the code has (a .vue file whose root carries a class of its own).
+        const figmaNames = [...new Set([...locator.names(), ...Object.keys(propsSnap).filter((n) => !n.startsWith('_'))])];
+        const locate = (n) => resolveComponentFile(n, { ROOT, cfg, files, read, classFor: (x) => locator.classFor(x) }).file;
+        const seen = new Set(figmaNames.map(locate).filter(Boolean).map((f) => resolve(ROOT, f)));
+        const own = codeComponents(ROOT, cfg, read).filter((k) => /\.vue$/.test(k.file) && !seen.has(resolve(ROOT, k.file)));
+        const ownFile = new Map(own.map((k) => [k.name, resolve(ROOT, k.file)]));
+        const names = components.length ? components : [...figmaNames, ...own.map((k) => k.name)];
+        const v = await startVueHarness(ROOT, cfg, names, { propsSnap, read, locate: (n) => ownFile.get(n) ?? locate(n) });
+        if (v.url) {
+          const before = stopServer; stopServer = () => { before?.(); v.close(); };
+          targets.push({ label: 'the Vue components, rendered with the project\'s own Vite', url: v.url, ready: 'window.__dseHarnessReady === true', harness: true });
+          console.log(`ℹ️  [a11y] target: ${v.groups.length} Vue component(s) rendered with the project's own Vite in each variant (${v.groups.map((g) => `${g.name}: ${g.cases.length} from ${g.from === 'figma' ? 'Figma' : 'its props'}`).join(', ')})`);
+          for (const m of v.missing) console.log(`ℹ️  [a11y] not rendered: ${m}`);
+        } else if (v.why) console.log(`ℹ️  [a11y] the Vue components were not rendered from their code: ${v.why}.`);
+      }
+    } catch (e) { console.log(`ℹ️  [a11y] the Vue components were not rendered from their code: ${String(e?.message ?? e).split('\n')[0]}.`); }
+  }
+
   if (!targets.length && noPackages) skip('the project\'s packages are not installed (no node_modules), so neither its dev server nor its components can run in a browser: install them (npm install, or the project\'s package manager), then run again.');
   if (!targets.length) skip(`no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.${harnessWhy ? ` The components were not rendered from their code either: ${harnessWhy}.` : ''}`);
   const waitFor = cfg.a11y?.waitFor ?? null;   // optional selector to await before the sweep (SPA hydration)
@@ -2104,7 +2134,7 @@ async function main() {
   }
 
   // ── Smart nudge: how to get deeper results (only when a styleguide wasn't the target) ──
-  if (!sg && !harness && cfg.a11y?.styleguide !== false) {
+  if (!sg && !harness && !targets.every((t) => t.harness) && cfg.a11y?.styleguide !== false) {
     const sgOut = cfg.styleguide?.out ?? 'apps/styleguide/index.html';
     if (cfg.styleguide?.template && !existsSync(join(ROOT, sgOut))) {
       console.log(`\nTip for a deeper check: you have a styleguide set up but it isn't built yet. Build it (run the parity with --docs) and this check will use it on its own — that is the most thorough result: every component in every state (normal, disabled, error, focused), all on one page.`);
