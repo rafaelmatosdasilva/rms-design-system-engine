@@ -432,11 +432,14 @@ function flowReport(ROOT, sys) {
   const dir = join(ROOT, 'prototypes');
   let files = [];
   try { files = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'conventions.json'); } catch { /* none yet */ }
-  const pages = {};
+  const pages = {}, notPages = [];
   for (const f of files) {
     try {
       const ui = splitStates(JSON.parse(readFileSync(join(dir, f), 'utf8'))).ui;
       const tree = treeOf(ui);
+      // A file in prototypes/ that is not one page (several pages in one file, a draft left behind) is not part of any
+      // flow, and its words would read as another page's.
+      if (!tree?.component) { notPages.push(f); continue; }
       const head = (function find(n) { if (!n) return null; if (n.component === 'Text' && /^h[12]$/.test(n.props?.as ?? '')) return n.props.text; for (const k of n.children ?? []) { const h = find(k); if (h) return h; } return null; })(tree);
       pages[f.replace(/\.json$/, '')] = { ui, heading: head };
     } catch { /* not a composition */ }
@@ -444,6 +447,7 @@ function flowReport(ROOT, sys) {
   const g = flowGraph(Object.fromEntries(Object.entries(pages).map(([n, p]) => [n, p.ui])));
   const flows = teamFlows(sys.context?.rules ?? []);
   const findings = flowFindings(pages, flows);
+  for (const f of notPages) findings.push({ level: 'error', kind: 'flow', need: f, message: `prototypes/${f} is not one page (no "component" at its root): one page per file, so make it one or remove it` });
   console.log(`\n🔗 FLOWS  ${g.names.length} page(s) in prototypes/, ${g.links.length} link(s)`);
   for (const l of g.links) console.log(`   ${l.from} → ${l.to}${l.state ? ` (its ${l.state} state)` : ''}  by "${l.label}"`);
   if (g.starts.length) console.log(`   starts: ${g.starts.join(', ')}`);
