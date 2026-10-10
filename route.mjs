@@ -101,8 +101,9 @@ const QUESTION = /^\s*(how|why|what|where|when|which|can i|should i|is there|com
 const LINK = /https?:\/\/(?:[\w.-]*gitlab[\w.-]*|[\w.-]*notion\.(?:so|site))\/\S+/i;
 const links = (t) => t.match(new RegExp(LINK.source, 'gi')) ?? [];
 const STYLE_GUIDE = /\bstyle ?guide\b|\bguia de estilos?\b/i;
-// A style guide named as where to look, or as the thing to fix, is not a request to build one (E25 keeps those apart).
-const NOT_STYLE_GUIDE = /\b(?:in|on|no|na)\s+(?:the\s+|o\s+|a\s+)?style ?guide\b|\bfix\b|\bcorrig|\breflow|\bhow (?:do|to|does)\b/i;
+// A request that names the style guide gets the style guide, accessibility named or not ("the accessibility of
+// buttonPrimary in the style guide", E25); one that asks to fix it, or how it works, does not build it.
+const NOT_STYLE_GUIDE = /\bfix\b|\bcorrig|\breflow|\bhow (?:do|to|does)\b/i;
 const FIGMA_URL = /https?:\/\/(?:www\.)?figma\.com\/(?:design|file)\/[\w-]+\S*/i;
 const STEP_LIST = /(^|\s)1[.)]\s[\s\S]*\s2[.)]\s/;
 
@@ -158,7 +159,7 @@ export const SAY = {
 // set up): its name, or null. A name is the word before DS or design system (or after "design system of/for"), never
 // a word such as the, our or whole; it is this folder's system when its config, package or folder name holds it.
 const NAMED_DS = /\b([A-Za-z][\w-]*)[\s-]+(?:DS(?![\w.-])|[Dd]esign[ -]?[Ss]ystem\b)|\b(?:DS|[Dd]esign[ -]?[Ss]ystem)\s+(?:of|for|called|named|do|da|de)\s+([A-Za-z][\w-]*)/g;   // DS as a word of its own, never ds-config
-const NOT_A_NAME = /^(?:the|our|this|that|my|your|a|an|new|whole|entire|same|its|their|current|existing|full|living|another|other|o|os|as|nosso|nossa|este|esta|esse|essa|meu|minha|seu|sua|do|da|de|um|uma|outro|outra|check|audit|run|build|test|fix|update|show|scan|review|open|create|set|setup|verify|analy[sz]e|compare|refresh|document|prototype|verifica|corrige|mostra|cria)$/i;
+const NOT_A_NAME = /^(?:the|our|this|that|my|your|a|an|new|whole|entire|same|its|their|current|existing|full|living|another|other|o|os|as|nosso|nossa|este|esta|esse|essa|meu|minha|seu|sua|do|da|de|um|uma|outro|outra|check|audit|run|build|test|fix|update|show|scan|review|open|create|set|setup|verify|analy[sz]e|compare|refresh|document|prototype|verifica|corrige|mostra|cria|figma|code|c[oó]digo|react|vue|angular|svelte|html|css|web|ui|mobile|ios|android|team|company|equipa|empresa)$/i;   // a tool or a platform names no system
 const squashName = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
 export function otherSystem(text, names = []) {
   const here = names.filter(Boolean).map(squashName).filter((h) => h.length > 1);

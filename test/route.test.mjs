@@ -1,7 +1,7 @@
 // route.mjs: the request routed to a recipe and the exact command by the engine (I56), the same on any model.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { route, routeText, namedComponents } from '../route.mjs';
+import { route, routeText, namedComponents, otherSystem } from '../route.mjs';
 
 const P = { hasConfig: true, components: ['button', 'chip', 'field', 'statusBar'] };
 const r = (text, p = P) => route(text, p);
@@ -161,7 +161,9 @@ test('a request for the style guide builds it, scoped to the component it names'
   const comps = ['buttonPrimary', 'modal'];
   assert.deepEqual(route('build the style guide', { components: comps }).run, ['rms-design-system-engine --styleguide']);
   assert.deepEqual(route('build the style guide for buttonprimary', { components: comps }).run, ['rms-design-system-engine --component buttonPrimary --styleguide']);
-  assert.deepEqual(route('show the accessibility of buttonPrimary in the styleguide', { components: comps }).run, ['rms-design-system-engine --component buttonPrimary --only accessibility'], 'a style guide named as where to look');
+  assert.deepEqual(route('show the accessibility of buttonPrimary in the styleguide', { components: comps }).run, ['rms-design-system-engine --component buttonPrimary --styleguide'], 'a request that names the style guide gets it (E25)');
+  assert.deepEqual(route('check the accessibility of buttonPrimary', { components: comps }).run, ['rms-design-system-engine --component buttonPrimary --only accessibility'], 'accessibility alone stays in the chat');
+  assert.equal(route('fix the focus ring in the style guide', { components: comps }).recipe, 'fix-a-difference');
 });
 
 // A design system the request names that is not this folder's: where its code is (a folder on this computer or a
@@ -181,5 +183,7 @@ test('another design system than the one set up here: its code and Figma link ar
   const cloud = route('check the innova design system', { names, cloud: true });
   assert.match(cloud.ask, /its git link \(a private GitHub repository works once it is attached to this session\)\. This session runs in the cloud and cannot read a folder on the person's computer: to work on a local folder, they run `claude remote-control` in it/);
   // This folder's own system, however it is named, and words that are no name, are not another system.
+  assert.equal(otherSystem('build the tag from our Figma design system as a React component', names), null, 'Figma is a tool, not a system');
+  assert.equal(otherSystem('check the React DS components', names), null);
   for (const t of ['build the Harbor DS style guide', 'check our design system', 'audit the whole DS', 'check the harbor design system', 'check DS', 'write ds-config.json by hand']) assert.ok(!route(t, { names }).ask, t);
 });

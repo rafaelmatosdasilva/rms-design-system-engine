@@ -208,6 +208,17 @@ Route by intent:
   > hiding exactly the change you were asked to check.
 - **The whole design system:** run `rms-design-system-engine` in the terminal (or `/rms-design-system-engine` in Claude Code),
   then follow the `full-audit` recipe (`rms-design-system-engine --recipe full-audit`).
+- **The style guide:** a request that names it gets it, accessibility named or not ("show the
+  accessibility of buttonPrimary in the style guide"): `--styleguide`, with `--component <name>` when
+  it names one. That page holds the component and the ones it nests only, written beside the whole
+  system's page (`styleguide/<name>.html`), never in its place. Accessibility asked for alone stays
+  in the chat (`--only accessibility`) and builds no page.
+- **Another design system than this folder's:** when the request names a system this folder is not
+  set up for ("the style guide for Innova DS"), the router asks for that system's code (a folder or
+  a git link) and its Figma link at once, in one message, and the request runs there with
+  `--project`. Never run this folder's system in its place. A cloud session cannot read a folder on
+  the person's computer: ask for the git link, and say that to work on a local folder they run
+  `claude remote-control` in it, or open it in the Claude Desktop app.
 
 **Running the command means running the WHOLE thing - Phase 1 included - whenever Phase 1
 CAN run.** An unscoped invocation is a request for a full audit, not a Phase-2-only pass over
