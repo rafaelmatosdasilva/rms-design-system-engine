@@ -67,5 +67,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-10-prototype-quality-flows` | The 21 guide tasks on Haiku (engine 224d490) | "Prototype quality: a file that is not one page in a flow" |
 | `2026-10-10-prototype-fonts-standins` | The 21 guide tasks on Haiku (engine b06a027) | "Prototype fonts that never wait, and stand-ins shown on the page" |
 | `2026-10-10-setup-asks-where-the-code-is` | The 21 guide tasks on Haiku (engine 3b42506) | "Setup asks where the code is; the Figma link is optional" |
+| `2026-10-10-setup-reads-the-project` | The 21 guide tasks on Haiku (engine d33715c) | "Setup reads what the project already says" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

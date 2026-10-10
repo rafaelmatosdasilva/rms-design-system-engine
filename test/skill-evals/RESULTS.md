@@ -1,5 +1,30 @@
 # Skill evaluation results
 
+## 2026-10: Setup reads what the project already says (continuous evaluation)
+
+What changed since the entry below (engine 3b42506): First-time setup reads the naming the token CSS follows (iconText kept, camelCase split), every Figma snapshot beside it, the system's own scripts, the products checked out beside it and the frames and screens a captured screen snapshot names; set up with no Figma link, committed snapshots are compared as they are and their age is said, never a failure; a token file or folder named in the request is where the code is. The guide changed in `reference/config.md` and `cookbook/first-setup.md`. The guide changed in `cookbook/first-setup.md`, `reference/config.md`.
+
+Guide set measured: `831a618ad5fe` · Project measured: `13d811a9d668`
+
+| Haiku, engine d33715c | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.052 |
+| Input a run | 86k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 86k. A first run of this change
+had two misses, neither from it: asked to set up with "the tokens are in src/theme.css", one run still asked where the
+code was (the recipe now says a token file or folder named in the request is where the code is), and one refusal gave
+its reason in an earlier message of the reply, which the scorer did not read (it reads every message now, as the person
+does). Records: `records/2026-10-10-setup-reads-the-project`.
+
+A dry run on the design system the engine was built against, a fresh copy without its setup files beside its three
+products: setup now writes the naming the CSS keeps (185 of its 194 Figma tokens found that way, where the default found
+the rest as missing), every snapshot path, the system's script and its icons, the three products and the frames and
+screens already captured. Token values went from 24 failures to 16, each one a decision the team's own config records
+(Figma's window chrome, canvas sizes, orphan tokens); the icons check now passes; 207 open differences against 243.
+
 ## 2026-10: Setup asks where the code is; the Figma link is optional (continuous evaluation)
 
 What changed since the entry below (engine b06a027): First-time setup must know where the code is (--project, `.` for this folder, or --theme-css) and writes nothing until it does; the Figma link is optional (without it each run checks the code alone and says nothing was compared with Figma); the router takes both from the request and asks for what is missing before running; --build needs the Figma file. The guide changed in `rms-design-system-engine.md`, `cookbook/first-setup.md`, `cookbook/build-from-figma.md`, `reference/config.md` and `reference/usage.md`. The guide changed in `cookbook/build-from-figma.md`, `cookbook/first-setup.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
