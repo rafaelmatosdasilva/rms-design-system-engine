@@ -254,6 +254,28 @@ export function opensConfirmation(ctx) {
   return check('the Delete project button opens the confirmation (shown on a click, closed again)', ok);
 }
 
+// A control that shows only its icon has a name a screen reader says (WCAG 4.1.2): in a composition its "name", in
+// markup an aria-label or aria-labelledby; here, the chip that pins the note, named for pinning.
+export function namesIconOnly(ctx, word = 'pin') {
+  const files = made(ctx);
+  for (const f of files.filter((x) => /\.json$/.test(x.path))) {
+    let j; try { j = JSON.parse(f.text); } catch { continue; }
+    const named = []; let iconOnly = 0;
+    (function walk(n) {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      const p = { ...n, ...(n.props ?? {}) };
+      const label = [p.Label, p.label, p.text].find((v) => typeof v === 'string' && v.trim());
+      if (/chip|button/i.test(String(n.component ?? '')) && (p.Icon === true || /^true$/i.test(String(p.Icon ?? ''))) && !label) { iconOnly++; const nm = p.name ?? p['aria-label'] ?? p.ariaLabel; if (typeof nm === 'string' && new RegExp(word, 'i').test(nm)) named.push(nm); }
+      for (const v of Object.values(n)) if (v && typeof v === 'object') walk(v);
+    })(j);
+    if (iconOnly) return check(`the chip that shows only its icon has a name a screen reader says (${word})`, named.length >= 1, named.length ? '' : `${iconOnly} icon-only, none named for ${word}`);
+  }
+  const text = files.map((f) => f.text).join('\n');
+  const ok = new RegExp(`aria-label(ledby)?\\s*=\\s*["'{][^"'}]*${word}`, 'i').test(text) || new RegExp(`<title>[^<]*${word}`, 'i').test(text);
+  return check(`the chip that shows only its icon has a name a screen reader says (${word})`, ok);
+}
+
 // The team's guidelines with its sign-up flow written down.
 const withFlowGuidelines = (dir) => {
   withSystem(dir);
@@ -321,6 +343,12 @@ export const PROTO = [
     ...base, id: 'proto-phone',
     prompt: 'prototype a notification preferences page for a phone with our design system: a heading, filter chips for "Every notification by email", "Weekly summary of your account" and "Product news and updates", and a Save button.',
     score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['chip', 'button']), fitsPhone(ctx)],
+  },
+  {
+    // A control with only its icon, named for a screen reader.
+    ...base, id: 'proto-icon',
+    prompt: 'prototype a notes toolbar with our design system: filter chips for All, Mine and Shared, a search field, and a chip that shows only its icon to pin the note.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['chip', 'field']), namesIconOnly(ctx)],
   },
   {
     ...base, id: 'proto-confirm',

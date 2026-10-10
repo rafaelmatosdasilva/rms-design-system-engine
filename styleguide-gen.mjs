@@ -794,7 +794,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     try { return `<script data-system-script="${String(p).replace(/"/g, '')}">\n${readFileSync(resolve(ROOT, p), 'utf8').replace(/<\/script/gi, '<\\/script')}\n</script>`; } catch { return `<!-- systemScripts: ${String(p).replace(/--/g, '')} not found -->`; }
   }).join('\n');
   // opts.partsOnly: what the page is made of, without writing it (a prototype draws with the same parts).
-  if (opts.partsOnly) return { themeCSS: themeCSS(), componentCSS: await componentCSS(), view: JSON.parse(await agreed()), iconSheet: iconSheet(), scripts: systemScripts() };
+  if (opts.partsOnly) {
+    const componentCss = await componentCSS();
+    // The system's own CSS (its theme and the sheets in its repository), apart from the products' pages it also reads:
+    // what a prototype's copy of a component may keep.
+    const systemCss = [...new Set([...themeFiles, ...((await context()).componentSheets ?? [])])].filter((f) => !String(f).startsWith('..') && existsSync(resolve(ROOT, f))).map((f) => (/\.html?$/i.test(f) ? styleBlocks(readText(f)) : readText(f))).join('\n');
+    return { themeCSS: themeCSS(), componentCSS: componentCss, systemCSS: systemCss, view: JSON.parse(await agreed()), iconSheet: iconSheet(), scripts: systemScripts() };
+  }
   const fills = {
     THEME_CSS: () => themeCSS(),
     COMPONENT_CSS: () => componentCSS(),

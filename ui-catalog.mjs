@@ -17,7 +17,7 @@
 import { rejectedNames, rightFor } from './prop-vocabulary.mjs';
 
 const STATE_PROP = /^(state|states|interaction)$/i;
-const TYPE = { enum: 'enum', boolean: 'boolean', text: 'text', instance: 'slot' };
+const TYPE = { enum: 'enum', boolean: 'boolean', text: 'text', instance: 'slot', children: 'children' };
 
 // built: [{ name, contract }] (contract-gen). code: the code snapshot (optional, fresh only).
 // selectorFor: (name) → the component's selector (optional).
@@ -32,7 +32,8 @@ export function buildCatalog(built, { code = null, selectorFor = null } = {}) {
       if (STATE_PROP.test(p.name)) continue;   // interaction states are the component's, not a generator's choice
       const e = { type: TYPE[p.type] ?? 'text' };
       if (Array.isArray(p.options) && p.options.length) e.values = p.options;
-      if (p.default != null && p.default !== '' && e.type !== 'slot') e.default = p.default;   // a slot's default is a Figma node id
+      if (p.default != null && p.default !== '' && e.type !== 'slot' && e.type !== 'children') e.default = p.default;   // a slot's default is a Figma node id
+      if (p.slot) e.slot = p.slot;
       if (p.description) e.description = p.description;
       const bound = p.bindings?.code?.attribute;
       const codeName = typeof bound === 'string' ? bound : (api?.codeConnect?.[p.name] ?? codeNames.get(p.name.toLowerCase().replace(/[^a-z0-9]/g, '')));
@@ -105,13 +106,13 @@ export const RULES = [
 export function catalogTable(catalog) {
   const rows = Object.entries(catalog.components).map(([name, c]) => {
     const props = Object.entries(c.props).map(([p, e]) =>
-      `${p}=${e.type === 'enum' ? (e.values ?? []).join('|') : e.type === 'boolean' ? 'true|false' : e.type}`).join('  ');
+      `${p}=${e.type === 'enum' ? (e.values ?? []).join('|') : e.type === 'boolean' ? 'true|false' : e.type === 'children' ? '<its children>' : e.type}`).join('  ');
     const tail = [c.children?.length ? `contains ${c.children.join(', ')}` : null, c.status ? `[${c.status}${c.useInstead?.length ? ` → ${c.useInstead.join(', ')}` : ''}]` : null].filter(Boolean).join('  ');
     return [name, props || '-', tail];
   });
+  // The names line up; the props are as long as they are (padding them all to the longest buried the notes).
   const w0 = Math.max(9, ...rows.map((r) => r[0].length));
-  const w1 = Math.max(5, ...rows.map((r) => r[1].length));
-  const line = (a, b, c) => `${a.padEnd(w0)}  ${b.padEnd(w1)}  ${c}`.trimEnd();
+  const line = (a, b, c) => `${a.padEnd(w0)}  ${b}${c ? `  ${c}` : ''}`.trimEnd();
   return ['```', line('component', 'props', 'notes'), ...rows.map((r) => line(...r)), '```'].join('\n');
 }
 
@@ -186,7 +187,9 @@ export function checkUi(ui, catalog) {
       parents.set(kidId, node.id);
       const child = byId.get(kidId);
       if (def && child && def.neverCombineWith?.includes(child.component)) add(5, 'error', node.id, `${node.component} must never contain ${child.component}`);
-      if (def && child && comps[child.component] && def.children?.length && !def.children.includes(child.component))
+      // What a component holds in Figma is not all it may hold: a slot takes any component unless Figma lists the few it takes.
+      const open = Object.values(def?.props ?? {}).some((e) => e.type === 'children' && !e.slot?.preferredOnly);
+      if (def && child && comps[child.component] && def.children?.length && !def.children.includes(child.component) && !open)
         add(5, 'warning', node.id, `the design system never puts ${child.component} inside ${node.component}: put it beside ${node.component}, not inside it`);
     }
   }

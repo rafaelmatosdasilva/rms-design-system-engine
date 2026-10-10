@@ -88,10 +88,12 @@ function withoutNotes(ui) {
   const strip = (o) => {
     // Notes the check reads and the drawing uses, never options: standInFor, purpose, content (the words a designed
     // instance shows), box (its size on the screen) and, on a component the code has not built, the surface the screen
-    // gives it, figmaState (the state a designed screen shows it in) and opens (the id of the part a click opens).
-    const { standInFor, purpose, content, box, textless, figmaState, opens, goesTo, ...rest } = o;
+    // gives it, figmaState (the state a designed screen shows it in), opens (the id of the part a click opens), name
+    // (what a screen reader says for it), inSlot (which of its parent's slots it goes in) and, on a system component,
+    // grow and stretch (Figma's fill container, which is the instance's).
+    const { standInFor, purpose, content, box, textless, figmaState, opens, goesTo, name: nm, inSlot, tip, ...rest } = o;
     for (const k of ['width', 'height']) if (typeof rest[k] === 'number') rest[k] = String(rest[k]);
-    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, goesTo: g2, ...p } = rest.props; if (!PIECES.includes(rest.component)) delete p.surface; rest.props = p; for (const k of ['width', 'height', 'count', 'minWidth']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
+    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, goesTo: g2, name: n2, inSlot: i2, tip: t3, ...p } = rest.props; if (!PIECES.includes(rest.component)) { delete p.surface; delete p.grow; delete p.stretch; } rest.props = p; for (const k of ['width', 'height', 'count', 'minWidth']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
     if (typeof rest.count === 'number') rest.count = String(rest.count);
     return rest;
   };
@@ -154,6 +156,15 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     if (!catalog.components?.[node.component]) continue;   // checkUi already said so
     // A component the team has retired is never put in a new screen: its replacement is.
     const def = catalog.components[node.component];
+    // Figma's default for an option that leaves the component inert or alarming (a field Disabled, a State of Error):
+    // drawn so when the composition does not say, which is seldom what the page means.
+    for (const [k, e] of Object.entries(def.props ?? {})) {
+      if (Object.prototype.hasOwnProperty.call(p, k) || (e.codeName && Object.prototype.hasOwnProperty.call(p, e.codeName))) continue;
+      const d = String(e.default ?? '');
+      const inert = (e.type === 'boolean' || (e.type === 'enum' && /^(true|false)$/i.test((e.values ?? []).join('|').split('|')[0] ?? ''))) ? /^(disabled|loading|error|invalid|readonly|read only)$/i.test(k.trim()) && /^true$/i.test(d)
+        : e.type === 'enum' && /^(disabled|loading|error|invalid)$/i.test(d);
+      if (inert) findings.push({ rule: null, source: 'Figma', level: 'warning', id: node.id, message: `${node.component} is drawn ${k}=${d}, Figma's default for it: give it "${k}" ${JSON.stringify(e.type === 'enum' && !/^(true|false)$/i.test(d) ? ((e.values ?? []).find((x) => /^(default|rest|normal|enabled)$/i.test(String(x))) ?? e.values?.[0] ?? '') : /^True$/.test(d) ? 'False' : false)} unless the page shows it so` });
+    }
     if (/^(deprecated|removed|obsolete)$/i.test(def.status ?? '')) findings.push({ rule: 1, level: 'error', id: node.id, message: `${node.component} is ${def.status}${def.useInstead?.length ? `: use ${def.useInstead.join(' or ')} instead` : ': the team retired it, so it is not used in a new screen'}` });
     const v = drawable[node.component];
     if (!v) {
@@ -164,7 +175,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const agreed = new Set((v.controls ?? []).flatMap((c) => [c.label, c.prop]));
     const optDefs = catalog.components[node.component]?.props ?? {};
     for (const k of Object.keys(p)) {
-      if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState', 'opens', 'goesTo'].includes(k) || agreed.has(k)) continue;
+      if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState', 'opens', 'goesTo', 'name', 'inSlot', 'tip', 'grow', 'stretch'].includes(k) || agreed.has(k)) continue;
       // A value of a choice turns on the class the system's CSS adds for it (.node.node-selected); a default value
       // needs none. One the CSS has no class for is drawn without it, and said.
       if (optDefs[k]?.type === 'enum') {
@@ -174,6 +185,8 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
         if (!findings.some((f) => f.said === saidV)) findings.push({ rule: null, source: 'the code', level: 'warning', id: node.id, said: saidV, message: `${saidV}: the system's CSS has no class for it: drawn without it` });
         continue;
       }
+      // A slot given words holds them (the page writes them in it); what else goes in a slot is its children.
+      if (optDefs[k]?.type === 'children') continue;
       // A text or on/off option the code has no prop for is drawn on the part its name points to (prototype page).
       if (['text', 'boolean'].includes(optDefs[k]?.type) && drawnByName(k, optDefs[k], v.markup)) continue;
       if (optDefs[k]?.type === 'boolean' && (p[k] === true || /^true$/i.test(String(p[k])))) continue;   // shown, as it is drawn
