@@ -22,6 +22,24 @@ import { projectPath } from './names.mjs';
 import { resolve, dirname, join } from 'node:path';
 
 const clean = (s) => String(s ?? '').replace(/@(deprecated|experimental|status|use-?instead|superseded-?by|replaced-?by|since|why|rationale)\b[ \t]*:?[^\n@]*/gi, ' ').replace(/\s+/g, ' ').trim();
+// What a description or a note says a component is for, without what is there for whoever builds it: the engine's own
+// placeholder ("captured from Figma"), Figma node ids, the class it maps to, a build stamp, a banner, a CSS sentence, a
+// bare list of tokens. → the words left, or '' when nothing is left.
+export function intentText(s) {
+  let t = clean(s)
+    .replace(/(^|\s)[\w/-]+ — captured from Figma by rms-design-system-engine\.?/gi, ' ')
+    .replace(/─+\s*[^─]*?\s*─+|─+/g, ' ')
+    .replace(/\(\s*(?:DS\s+)?(?:node\s+)?\d+[:-](?:\d+|…)(?:[^)]*)\)/gi, ' ')
+    .replace(/\b(?:DS\s+)?node\s+\d+[:-]\d+\b|\bDS\s+\d+[:-]\d+\b/gi, ' ')
+    .replace(/\s*→\s*\.[\w-]+/g, ' ')
+    .replace(/\bBuilt base \.[\w-]+(?:\s*\([^)]*\))?\.?/gi, ' ')
+    .replace(/\bbuilt base \.[\w-]+(?:\s*\([^)]*\))?/gi, ' ');
+  const sentences = t.split(/(?<=[.;])\s+/).map((x) => x.trim()).filter(Boolean)
+    .filter((x) => !/::|var\(--|\b[a-z][a-zA-Z-]*=[\w.%-]+|\bCSS:|strokeSides/.test(x) && (x.match(/\d+(?:\.\d+)?px\b/g) ?? []).length < 2)
+    .map((x) => x.replace(/:?\s*(?:[\w-]+\/[\w-]+(?:\/[\w-]+)*\s*,\s*){1,}[\w-]+\/[\w-]+(?:\/[\w-]+)*\s*\.?$/, '.'));
+  const out = sentences.join(' ').replace(/\(\s*\)/g, ' ').replace(/\s+([.,;:])(?=\s|$)/g, '$1').replace(/([.;:,])\1+/g, '$1').replace(/^[\s.,;:]+|[\s,;:]+$/g, '').replace(/\s+/g, ' ').trim();
+  return out.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length > 1 ? out : '';   // a bare name ("Input") says nothing
+}
 export const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : s);
 const LAYERS = ['system', 'foundations', 'patterns', 'templates', 'pages', 'flows'];
 const STOP = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'from', 'each', 'some', 'like', 'one', 'our', 'your', 'their', 'use', 'using', 'used', 'make', 'made', 'page', 'screen', 'prototype', 'prototyp', 'mock', 'wireframe', 'design', 'system', 'component', 'components', 'into', 'onto', 'when', 'what', 'which', 'there', 'them', 'they', 'then', 'than', 'have', 'has', 'are', 'was', 'were', 'will', 'can', 'not', 'all', 'any', 'only', 'also', 'its', 'it', 'a', 'an', 'to', 'of', 'on', 'in', 'or', 'is', 'be', 'by', 'as', 'at', 'up', 'new', 'show', 'shows', 'once', 'after', 'before', 'more', 'other']);
@@ -95,6 +113,11 @@ export async function loadContext(ROOT, cfg = {}, catalog = { components: {} }, 
   const screensFile = [cfg.paths?.screenLayout, join(figmaDir, 'figma-screen-layout.snapshot.json'), 'figma-screen-layout.snapshot.json'].filter(Boolean).map((p) => resolve(ROOT, p)).find(existsSync) ?? null;
   const screens = screensFile ? (readJSON(screensFile)?.screens ?? []) : [];
   if (screens.length) sources.push({ what: 'Figma', detail: `${screens.length} designed screen${screens.length === 1 ? '' : 's'} (${screensFile.replace(ROOT + '/', '')})` });
+  // The product's screens designed in Figma, and the system's components each one uses (how many times): a new page for
+  // a product is made of what its screens are made of.
+  const screenCompsFile = [cfg.paths?.snapshotScreenComponents, join(figmaDir, 'figma-screen-components.snapshot.json'), 'figma-screen-components.snapshot.json'].filter(Boolean).map((p) => resolve(ROOT, p)).find(existsSync) ?? null;
+  const productScreens = productScreensOf(screenCompsFile ? readJSON(screenCompsFile) : null, catalog);
+  if (productScreens.length) sources.push({ what: 'Figma', detail: `${productScreens.length} designed product screen${productScreens.length === 1 ? '' : 's'} and the components each uses (${screenCompsFile.replace(ROOT + '/', '')})` });
   if (Object.keys(catalog.components ?? {}).length) sources.push({ what: 'the code', detail: `${Object.keys(catalog.components).length} components, what each holds, notes beside them` });
   const authoredFile = cfg.contracts?.authored ? resolve(ROOT, cfg.contracts.authored) : join(ROOT, 'contract.authored.json');
   const authoredJson = existsSync(authoredFile) ? readJSON(authoredFile) : null;
@@ -131,8 +154,19 @@ export async function loadContext(ROOT, cfg = {}, catalog = { components: {} }, 
   for (const n of linkNotes.filter((x) => x.status === 'not fetched yet')) sources.push({ what: 'guidelines', detail: `${n.provider} link ${n.url}: not fetched yet (its token goes in .env; the engine names it when it runs)`, missing: true });
 
   const ctx = contextFrom(catalog, intent, sections, { authored: authoredJson, examples });
-  return { ...ctx, sources, templates, screens, screensFile, breakpoints: breakpointsOf(vars), linkNotes };
+  return { ...ctx, sources, templates, screens, screensFile, productScreens, breakpoints: breakpointsOf(vars), linkNotes };
 }
+
+// The screens a product's designers made, from the components snapshot (figma-screen-components.snapshot.json): each
+// screen's name, its product, and the system's components it uses, the most used first (icons and frames left out).
+export function productScreensOf(snap, catalog = { components: {} }) {
+  const known = new Set(Object.keys(catalog.components ?? {}));
+  return Object.values(snap?.screens ?? {}).filter((s) => s?.name).map((s) => ({
+    name: s.name, product: s.plugin ?? null,
+    components: Object.entries(s.components ?? {}).filter(([n]) => known.has(n)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+  })).filter((s) => s.components.length);
+}
+export const screenUses = (s) => s.components.map(([n, c]) => (c > 1 ? `${n} ×${c}` : n)).join(', ');
 
 // The system's screen widths: { name, px } from the Figma breakpoints.
 export function breakpointsOf(vars = {}) {
@@ -159,7 +193,10 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     const i = intent?.components?.[name] ?? {};
     const annotations = (i.design?.annotations ?? []).map((a) => clean(a?.label ?? a)).filter(Boolean);
     const role = annotations.map((a) => a.match(/^role\s*:\s*(.+)$/i)?.[1]).find(Boolean) ?? null;
-    const notes = [...annotations.filter((a) => !/^role\s*:/i.test(a)), clean(i.code?.note), clean(i.code?.cssComment), clean(i.authored)].filter(Boolean);
+    const purpose = intentText(c.description) || intentText(i.design?.description) || null;
+    // Notes say what the component is for; one that only repeats its description, or says how it is built, is left out.
+    const same = (a, b) => { const k = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); return !!k(a) && !!k(b) && (k(a).includes(k(b)) || k(b).includes(k(a))); };
+    const notes = [...annotations.filter((a) => !/^role\s*:/i.test(a)), i.code?.note, i.code?.cssComment, i.authored].map(intentText).filter(Boolean).filter((n, x, all) => !same(n, purpose) && all.findIndex((o) => same(o, n)) === x);
     const options = Object.entries(c.props ?? {}).filter(([, e]) => e.description).map(([p, e]) => `${p}: ${clean(e.description)}`);
     const guidelines = clean(own.has(name) ? own.get(name).join(' ') : i.guidelines) || null;
     // Its usage, as the style guide shows it (When to use, When not to use, Common mistakes, Limitations).
@@ -175,7 +212,7 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
       never: [...neverOf([guidelines, ...notes].filter(Boolean).join(' '), notFor),
         ...mistakes.map((m) => ({ sentence: `Common mistake: ${m}`, clause: m, min: 2 })), ...donts.map((d) => ({ sentence: `Don't: ${d}`, clause: d, min: 2 }))],
       whenToUse, mistakes, limitations, dos, donts,
-      purpose: clean(c.description) || clean(i.design?.description) || null,
+      purpose,
       role,
       notes: [...new Set(notes)],
       options,
@@ -287,6 +324,8 @@ export function requestFocus(ctx, request, pages = []) {
   // A word many components' notes share (the product's name) points to none of them.
   const docs = Object.entries(ctx.components).map(([name, k]) => [name, hit(positive(k))]);
   const common = new Set(words.filter((w) => docs.filter(([, m]) => m.includes(w)).length > Math.max(2, docs.length / 4)));
+  // A product's or a screen's name points to its designed screen, never to a component whose note mentions the product.
+  for (const s of ctx.productScreens ?? []) for (const w of wordsOf(`${s.name} ${s.product ?? ''}`)) if (words.includes(w)) common.add(w);
   // Ranked: a component the request names first, then one whose documentation shares two of its words or more.
   const components = docs.map(([name, m]) => {
     const byName = words.filter((w) => name.toLowerCase().includes(w) || (name.length >= 3 && w.includes(name.toLowerCase())));
@@ -296,7 +335,9 @@ export function requestFocus(ctx, request, pages = []) {
   }).filter((c) => c.score >= 2).sort((a, b) => b.score - a.score).slice(0, 6);
   const out = Object.entries(ctx.components).flatMap(([name, k]) => ruledOut(k, request, name).map((r) => ({ name, ...r })));
   const scored = pages.map((p) => ({ ...p, matched: [...new Set([...hit(p.name), ...hit(p.text ?? '')])] })).filter((p) => p.matched.length).sort((a, b) => b.matched.length - a.matched.length || b.designed - a.designed);
-  return { request: String(request).trim(), words, sections, components, ruledOut: out, pages: scored.slice(0, 3), lacking: kindsLacking(ctx, request) };
+  // The designed screens the request names (the product, or the screen itself): what a new page for it is made of.
+  const screens = (ctx.productScreens ?? []).map((s) => ({ ...s, matched: hit(s.name) })).filter((s) => s.matched.length && s.matched.length >= Math.min(2, wordsOf(s.name).length)).sort((a, b) => b.matched.length - a.matched.length).slice(0, 2);
+  return { request: String(request).trim(), words, sections, components, ruledOut: out, pages: scored.slice(0, 3), lacking: kindsLacking(ctx, request), screens };
 }
 
 // The lines the catalog prints for a request.
@@ -304,6 +345,7 @@ export function focusLines(f) {
   if (!f) return [];
   const out = ['', `FOR THIS REQUEST  "${cut(f.request.replace(/\s+/g, ' '), 160)}"`];
   if (f.pages.length) out.push(`  start from: ${f.pages.map((p) => `${p.label}${p.file ? ` (${p.file})` : ''}`).join('; ')}`);
+  for (const s of f.screens ?? []) out.push(`  the designed screen for it: ${s.name} (Figma), made of ${screenUses(s)}: a new page for it is made of the same, in the same frame`);
   if (f.components.length) out.push(`  components its words point to: ${f.components.map((c) => `${c.name} (${c.matched.join(', ')}${c.purpose ? `: ${cut(c.purpose, 80)}` : ''})`).join('; ')}`);
   for (const k of f.lacking ?? []) out.push(`  the system has no ${k}: a Missing box, or the closest component with "standInFor": "${k}"; the reply says the system has no ${k}`);
   for (const r of f.ruledOut ?? []) out.push(`  ruled out by the documentation for "${r.words.join(', ')}": ${r.name}, "${cut(r.sentence, 200)}"; what the request needs there is a Missing box unless another component is for it`);

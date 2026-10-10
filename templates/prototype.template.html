@@ -16,9 +16,12 @@ html, body { margin: 0; }
 .pt-bar .pt-name { font-size: 14px; margin: 0 8px 0 0; font-weight: 600; }
 .pt-bar button { font: inherit; padding: 4px 10px; border: 1px solid #c7c7cc; border-radius: 6px; background: #fff; color: inherit; cursor: pointer; }
 .pt-bar button[aria-pressed="true"] { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+.pt-bar button:focus-visible, .pt-gaps button:focus-visible { outline: 2px solid #0058d0; outline-offset: 2px; }
 .pt-seg { display: inline-flex; gap: 4px; }
 .pt-seg[hidden] { display: none; }
 .pt-note { color: #6e6e73; }
+.pt-font-note { color: #8a5300; }
+.pt-font-note[hidden] { display: none; }
 .pt-gaps { font: 13px/1.5 system-ui, sans-serif; color: #1d1d1f; background: #fffbe6; border-bottom: 1px solid #e8d97a; padding: 10px 16px; }
 .pt-gaps h2 { font-size: 13px; margin: 0 0 4px; }
 .pt-gaps ul { margin: 0; padding-left: 18px; }
@@ -26,7 +29,21 @@ html, body { margin: 0; }
 /* The engine's neutral pieces: arrangement only. Outlined only when asked, so the prototype looks as it will. */
 .pt-engine { box-sizing: border-box; }
 .pt-show .pt-engine { outline: 1px dashed #8e8e93; outline-offset: -1px; }
-.pt-show [data-pt-standin] { outline: 2px solid #ff9f0a; outline-offset: 2px; }
+/* A system component standing in for one the system lacks: marked on a layer of its own, above the page and below the
+   bar, so nothing of the component itself changes (its own focus ring, its layout). Shown unless turned off. */
+#pt-marks { position: fixed; left: 0; right: 0; bottom: 0; top: 0; z-index: 2147483000; overflow: hidden; pointer-events: none; }
+.pt-mark-box { position: absolute; box-sizing: border-box; border: 2px dashed #ff9f0a; border-radius: 3px; }
+.pt-mark-box.pt-flash { border: 3px solid #ff9f0a; box-shadow: 0 0 0 4px rgba(255,159,10,.35); }
+.pt-mark { position: absolute; transform: translateY(-100%); font: 11px/1.4 system-ui, sans-serif; color: #fff; background: #8a4b00; padding: 1px 6px; border-radius: 4px 4px 0 0; white-space: nowrap; }
+.pt-mark.pt-mark-in { transform: none; border-radius: 0 0 4px 0; }
+.pt-bar #pt-standins { border-color: #ff9f0a; }
+.pt-bar #pt-standins[aria-pressed="true"] { background: #ffe1b0; color: #1d1d1f; border-color: #ff9f0a; }
+.pt-bar #pt-standins[hidden] { display: none; }
+.pt-gaps li { margin: 2px 0; }
+.pt-gaps .pt-chip { display: inline-block; font-size: 11px; line-height: 16px; padding: 0 6px; margin-right: 6px; border-radius: 4px; background: #ececf0; }
+.pt-gaps .pt-chip-standin { background: #ffe1b0; }
+.pt-gaps .pt-gap-show { font: inherit; font-size: 12px; margin-left: 6px; padding: 0 6px; border: 1px solid #c7c7cc; border-radius: 4px; background: #fff; color: inherit; cursor: pointer; }
+.pt-gaps .pt-gap-gone { color: #6e6e73; font-size: 12px; margin-left: 6px; }
 .pt-missing-box { display: flex !important; flex-direction: column; align-items: stretch !important; justify-content: flex-start !important; gap: 4px; }
 .pt-missing-cap { font: 11px/1.4 system-ui, sans-serif; color: #6e6e73; }
 /* A component Figma has and the code has not built: what the screen put inside it, outlined only when asked. */
@@ -44,9 +61,11 @@ html, body { margin: 0; }
   <strong class="pt-name" id="pt-title">Prototype</strong>
   <span class="pt-seg" id="pt-modes"></span>
   <span class="pt-seg" id="pt-states" role="group" aria-label="State" hidden></span>
-  <button type="button" id="pt-outline" aria-pressed="false">Show engine layout and stand-ins</button>
+  <button type="button" id="pt-outline" aria-pressed="false">Show engine layout</button>
+  <button type="button" id="pt-standins" aria-pressed="true" hidden>Stand-ins</button>
   <button type="button" id="pt-gaps-toggle" aria-pressed="false">Gaps</button>
   <span class="pt-note" id="pt-note"></span>
+  <span class="pt-note pt-font-note" id="pt-font-note" role="status" hidden></span>
 </div>
 <section class="pt-gaps" id="pt-gaps" hidden><h2>What the design system would need</h2><ul></ul></section>
 <main id="pt-canvas"></main>
@@ -93,10 +112,31 @@ html, body { margin: 0; }
     if (e.tagName !== 'INPUT') e.textContent = c.name;
     return e;
   }
+  // As the style guide sets it: on the part the state is set on (a switch's checkbox), else the component itself; a class
+  // that names one of its own parts is that part, not a state; the live state with the attribute; and the state a part
+  // is heard in, set with the look (heardOn: the field disabled inside its wrapper).
+  // Of the markups the code shows for a component that holds others, the one with a part for each of its slots (a panel's
+  // head and main), the plainest of those: a product's copy may lack a slot or bring its own content.
+  function slottedElement(c) {
+    var best = null, score = -1, size = Infinity;
+    (c.markups && c.markups.length ? c.markups : [c.markup]).forEach(function (m) {
+      var e = m && parse(m); if (!e) return;
+      var n = c.slots.filter(function (nm) { var w = keyWord(nm); var el = w === 'slot' ? e.querySelector('[class*="slot" i]') : partFor(e, w); return el && el !== e; }).length;
+      var len = e.querySelectorAll('*').length;
+      if (n > score || (n === score && len < size)) { best = e; score = n; size = len; }
+    });
+    return best;
+  }
   function applyEffect(e, effect, on) {
     if (!effect) return;
-    (effect.add || []).forEach(function (k) { e.classList.toggle(k, on); });
-    Object.keys(effect.attrs || {}).forEach(function (a) { if (on) e.setAttribute(a, effect.attrs[a]); else e.removeAttribute(a); });
+    var t = effect.target ? (e.matches(effect.target) ? e : e.querySelector(effect.target)) : e;
+    if (!t) return;
+    (effect.add || []).forEach(function (k) { if (!effect.target && e.querySelector('.' + k)) return; t.classList.toggle(k, on); });
+    Object.keys(effect.attrs || {}).forEach(function (a) {
+      if (on) t.setAttribute(a, effect.attrs[a]); else t.removeAttribute(a);
+      if (a === 'checked' || a === 'disabled' || a === 'indeterminate') t[a] = on;
+    });
+    (effect.also || []).forEach(function (x) { applyEffect(e, x, on); });
   }
   function partsOf(e, sel) { try { return sel ? Array.prototype.slice.call(e.querySelectorAll(sel)) : []; } catch (x) { return []; } }
   function textLeaf(e, sel) {
@@ -137,7 +177,32 @@ html, body { margin: 0; }
     while ((n = w.nextNode())) if (n.textContent.trim() && !n.parentNode.closest('svg')) return n.parentNode;
     return null;
   }
-  function cleanInstance(e) {
+  // Each instance keeps its ids to itself (two dialogs each named by their own title): an id the markup copies is made
+  // unique, and what inside points at it (aria-labelledby, aria-describedby, aria-controls, for) follows.
+  var IDS = 0;
+  function uniqueIds(e) {
+    var map = {};
+    [e].concat(Array.prototype.slice.call(e.querySelectorAll('[id]'))).forEach(function (x) { if (!x.id || x.closest('svg')) return; var to = x.id + '-pt' + (++IDS); map[x.id] = to; x.id = to; });
+    if (!Object.keys(map).length) return;
+    [e].concat(Array.prototype.slice.call(e.querySelectorAll('*'))).forEach(function (x) {
+      ['aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-owns', 'for'].forEach(function (a) { var v = x.getAttribute(a); if (v) x.setAttribute(a, v.split(/\s+/).map(function (id) { return map[id] || id; }).join(' ')); });
+    });
+  }
+  // The classes the system's own CSS styles (null: it does not say, and every class stays).
+  var SYS = D.sysClasses ? D.sysClasses.reduce(function (o, k) { o[k] = 1; return o; }, {}) : null;
+  function cleanInstance(e, c) {
+    // The name a product page gave its copy ("Browse") is that page's words: the prototype names its own ("name").
+    e.removeAttribute('aria-label');
+    // A copy taken from a product's page keeps the classes the system styles; the product's own (its panel's width, its
+    // rows' layout) stay in the product. A component the system's CSS does not style keeps all of its classes.
+    // The classes its own options point at (a label part, the field a state is set on) stay too, styled or not.
+    var keep = {};
+    if (SYS && c) (c.controls || []).forEach(function (ctl) { [ctl.part, ctl.on && ctl.on.target, ctl.off && ctl.off.target].concat(((ctl.on && ctl.on.also) || []).map(function (x) { return x.target; })).concat((ctl.options || []).map(function (o) { return o.target; })).concat([c.only]).forEach(function (sel) { String(sel || '').replace(/\.(-?[_a-zA-Z][\w-]*)/g, function (m, k) { keep[k] = 1; return m; }); }); });
+    if (SYS && c && c.cls && SYS[c.cls]) [e].concat(Array.prototype.slice.call(e.querySelectorAll('[class]'))).forEach(function (x) {
+      if (x.closest('svg')) return;
+      Array.prototype.slice.call(x.classList).forEach(function (k) { if (!SYS[k] && !keep[k]) x.classList.remove(k); });
+      if (!x.classList.length) x.removeAttribute('class');
+    });
     Array.prototype.slice.call(e.classList).forEach(function (k) { if (/^(hidden|is-hidden|d-none|invisible)$/.test(k)) e.classList.remove(k); });
     e.removeAttribute('hidden');
     ['position', 'inset', 'top', 'left', 'right', 'bottom'].forEach(function (k) { e.style[k] = ''; });
@@ -225,8 +290,12 @@ html, body { margin: 0; }
       if ((node.children || []).length) { var box = document.createElement('div'); box.className = 'pt-unbuilt'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', node.component + ' (not built in the code yet)'); var cap = document.createElement('div'); cap.className = 'pt-missing-cap'; cap.textContent = node.component + ' (not built in the code yet)'; box.appendChild(cap); box.setAttribute('data-pt-unbuilt', ''); if ((node.props || {}).surface) box.style.background = colour(node.props.surface); return box; }
       return missing(node.component + ' (not built in the code yet)');
     }
-    var p = node.props || {}, e = baseElement(c, p.textless ? 0 : (Array.isArray(p.content) && p.content.length ? p.content.length : null)), done = {};
-    if (c.markup) cleanInstance(e);
+    var p = node.props || {}, e = (node.children || []).length && (c.slots || []).length ? slottedElement(c) : null, done = {};
+    if (!e) e = baseElement(c, p.textless ? 0 : (Array.isArray(p.content) && p.content.length ? p.content.length : null));
+    // A component that is one part of another's markup (a segment, inside its segmented control) is drawn as that part:
+    // its parent component holds it, as in the product.
+    if (c.only && e.matches && !e.matches(c.only)) { var part = e.querySelector(c.only); if (part) { part.remove(); e = part; } }
+    if (c.markup) { cleanInstance(e, c); uniqueIds(e); }
     else { var words = Object.keys(c.textProps || {}).map(function (k) { return p[k]; }).filter(function (v) { return v != null && v !== ''; }); if (words.length) e.textContent = words.join(' · '); }
     (c.controls || []).forEach(function (ctl) {
       done[ctl.label] = 1; done[ctl.prop] = 1;
@@ -234,14 +303,45 @@ html, body { margin: 0; }
       var v = has === undefined ? ctl.default : has;
       if (ctl.type === 'VARIANT') (ctl.options || []).forEach(function (o) { applyEffect(e, o, o.label === String(v)); });
       else if (ctl.type === 'BOOLEAN') {
-        if (ctl.on) applyEffect(e, ctl.on, truthy(v));
+        if (ctl.on || ctl.off) { applyEffect(e, ctl.on, truthy(v)); applyEffect(e, ctl.off, !truthy(v)); }
         else if (ctl.part && !truthy(v)) partsOf(e, ctl.part).forEach(function (k) { if (k !== e) k.remove(); });
-      } else if (ctl.type === 'TEXT' && v != null && v !== '') { var leaf = textLeaf(e, ctl.part); if (leaf.tagName === 'INPUT' || leaf.tagName === 'TEXTAREA') leaf.placeholder = v; else leaf.textContent = v; }
+      } else if (ctl.type === 'TEXT' && has === '') {
+        // No words, said on purpose (an icon-only chip): its words go, its icon stays.
+        var none = partsOf(e, ctl.part).find(function (k) { return !k.closest('svg') && k.textContent.trim(); }) || (ctl.part ? null : firstWords(e));
+        if (none && none !== e) none.textContent = ''; else if (none === e) Array.prototype.forEach.call(e.childNodes, function (n) { if (n.nodeType === 3) n.textContent = ''; });
+      } else if (ctl.type === 'TEXT' && v != null && v !== '') {
+        // Words for a part this markup does not have (a segment's number, with none drawn) go nowhere, never over its label.
+        if (ctl.part && !partsOf(e, ctl.part).length && !(e.matches && e.matches(ctl.part))) return;
+        // Figma's default words through a part found by a guess (a label, a text, a span) could land on another part: the
+        // markup's own words stay.
+        if (has === undefined && /\[class\*=/.test(ctl.part || '')) return;
+        // A field part takes the words as its value when the option is its value, else as its placeholder.
+        var field = partsOf(e, ctl.part).find(function (k) { return k.tagName === 'INPUT' || k.tagName === 'TEXTAREA'; }) || ((e.tagName === 'INPUT' || e.tagName === 'TEXTAREA') ? e : null);
+        var leaf = field || textLeaf(e, ctl.part);
+        if (leaf.tagName === 'INPUT' || leaf.tagName === 'TEXTAREA') { if (/value/i.test(ctl.label)) { leaf.value = v; leaf.setAttribute('value', v); } else leaf.placeholder = v; }
+        else leaf.textContent = v;
+      }
     });
     if (c.markup) { byName(e, c, p, done); writeWords(e, p.content, WRITTEN); swapIcons(e, c, p); if (p.figmaState) modifier(e, c, 'State', p.figmaState); }
+    // Words given to a slot ("Slot": "The three scans are removed.") are what it holds, unless children fill it.
+    if (!(node.children || []).length) (c.slotWords || []).forEach(function (k) {
+      if (typeof p[k] !== 'string' || !p[k].trim()) return;
+      var w = keyWord(k), part = w === 'slot' ? e.querySelector('[class*="slot" i]') : partFor(e, w);
+      if (!part || part === e) return;
+      part.innerHTML = ''; var t = document.createElement('span'); t.textContent = p[k]; part.appendChild(t);
+    });
     // The designed instance shows no words (an icon-only button): none are drawn.
     if (p.textless) Array.prototype.slice.call(e.querySelectorAll('*')).concat([e]).forEach(function (x) { if (!x.closest('svg')) Array.prototype.forEach.call(x.childNodes, function (n) { if (n.nodeType === 3) n.textContent = ''; }); });
-    if (p.standInFor) { e.setAttribute('data-pt-standin', ''); e.title = 'Stand-in for ' + p.standInFor; }
+    // What a screen reader says for it, when it shows no words or groups others (an icon button, a segmented control).
+    if (p.name) e.setAttribute('aria-label', String(p.name));
+    // The words its tooltip shows: on the part that carries one (data-tip, else the part named tooltip), so the system's
+    // own tooltip script shows them on hover and focus, and a screen reader says them.
+    if (p.tip) {
+      var tipAt = (e.hasAttribute('data-tip') ? e : e.querySelector('[data-tip]')) || (/tooltip/i.test(e.getAttribute('class') || '') ? e : e.querySelector('[class*="tooltip" i]')) || e;
+      tipAt.setAttribute('data-tip', String(p.tip));
+      if (!tipAt.getAttribute('aria-label') && tipAt !== e) tipAt.setAttribute('aria-label', String(p.tip));
+      if (tipAt.tagName !== 'BUTTON' && !tipAt.hasAttribute('tabindex') && tipAt !== e) tipAt.setAttribute('tabindex', '0');
+    }
     return e;
   }
   function missing(need) { var m = document.createElement('div'); m.className = 'pt-missing'; m.setAttribute('role', 'note'); m.textContent = 'Missing: ' + need; return m; }
@@ -266,6 +366,8 @@ html, body { margin: 0; }
     }
     e = document.createElement(node.component === 'Page' ? 'div' : 'div');
     e.className = 'pt-engine'; e.setAttribute('data-engine', node.component);
+    // A named arrangement is a group of the choices it holds, said by its name.
+    if (p.name && node.component !== 'Page') { e.setAttribute('role', 'group'); e.setAttribute('aria-label', String(p.name)); }
     if (truthy(p.grow)) { e.style.flex = '1 1 0'; e.style.minWidth = '0'; e.style.minHeight = '0'; }
     if (truthy(p.stretch)) e.style.alignSelf = 'stretch';
     if (p.surface) e.style.background = colour(p.surface);
@@ -296,16 +398,39 @@ html, body { margin: 0; }
     var isPiece = (D.pieces || []).indexOf(node.component) >= 0;
     var e = isPiece ? piece(node) : systemComponent(node);
     if (!isPiece) sized(e, node.props || {}, row, e.hasAttribute('data-pt-unbuilt'));
+    // Figma's fill container is the instance's, not the component's: a part told to grow takes the room left, one told to
+    // stretch the width (or height) of what holds it.
+    if (!isPiece && truthy((node.props || {}).grow)) { e.style.flex = '1 1 0'; e.style.minWidth = '0'; e.style.minHeight = '0'; }
+    if (!isPiece && truthy((node.props || {}).stretch)) e.style.alignSelf = 'stretch';
     e.setAttribute('data-pt-path', path);
+    if (node.id) e.setAttribute('data-pt-id', node.id);
     if (!isPiece) e.setAttribute('data-pt-component', node.component);
     var np = node.props || {};
+    // A part standing in for something the system lacks (a system component, or the engine's own Text): marked on the page.
+    if (np.standInFor) { e.setAttribute('data-pt-standin', String(np.standInFor)); if (!e.title) e.title = 'Stand-in for ' + np.standInFor; }
     // A part that leads to another page of the flow: a click opens it (one of its states when named after #).
     if (np.goesTo) { var to = String(np.goesTo).split('#'); e.setAttribute('data-pt-goes', np.goesTo); e.addEventListener('click', function (ev) { ev.preventDefault(); location.href = encodeURIComponent(to[0].trim()) + '.html' + (to[1] ? '#state=' + encodeURIComponent(to[1].replace(/^state=/, '').trim()) : ''); }); }
     if (np.opens) { e.setAttribute('data-pt-opens', np.opens); e.setAttribute('aria-haspopup', 'dialog'); e.setAttribute('aria-expanded', 'false'); e.addEventListener('click', function (ev) { ev.preventDefault(); openOverlay(np.opens, e); }); }
     // A system component's children go in its slot: the part its markup names slot, content or body, else itself.
-    var into = e;
-    // With no slot part, what the composition puts inside replaces the copy's own page content.
-    if (!isPiece && (node.children || []).length) { var slot = e.querySelector('[class*="slot" i], [class*="content" i], [class*="body" i], [class*="main" i]'); if (slot) { slot.innerHTML = ''; into = slot; } else e.innerHTML = ''; }
+    var into = e, before = null, slotFor = null;
+    if (!isPiece && (node.children || []).length) {
+      // Children that are parts of this component (its segments) take the place of the ones its markup shows, and the
+      // rest of it stays (the pill that marks the chosen one).
+      var own = [];
+      (node.children || []).forEach(function (k) { var kc = COMP[k.component]; if (kc && kc.only && kc.cls === c0(node)) partsOf(e, kc.only).forEach(function (x) { if (own.indexOf(x) < 0 && x.parentNode) own.push(x); }); });
+      var slots = own.length ? [] : slotsOf(e, c0c(node));
+      if (own.length) { into = own[0].parentNode; before = own[own.length - 1].nextSibling; own.forEach(function (x) { x.remove(); }); }
+      else if (slots) {
+        // Figma's slots: each one emptied of what the product put in it, and each child put in the slot it names
+        // ("inSlot"), else in the main one.
+        slots.list.forEach(function (sl) { sl.el.innerHTML = ''; });
+        into = slots.main; slotFor = function (k) { var want = ((k.props || {}).inSlot || '').toLowerCase(); var hit = slots.list.find(function (sl) { return sl.name.toLowerCase() === want; }); return hit ? hit.el : slots.main; };
+      }
+      else {
+        // Else they go in its slot: the part its markup names slot, content or body; with none, they replace its content.
+        var slot = e.querySelector('[class*="slot" i], [class*="content" i], [class*="body" i], [class*="main" i]'); if (slot) { slot.innerHTML = ''; into = slot; } else e.innerHTML = '';
+      }
+    }
     var rowInside = isPiece ? node.component === 'Row' : getComputedStyle(into).flexDirection === 'row';
     (node.children || []).forEach(function (k, i) {
       var kid = draw(k, path + '.' + i, rowInside);
@@ -314,9 +439,47 @@ html, body { margin: 0; }
       if (isPiece && (D.pieces || []).indexOf(k.component) < 0) kid.style.margin = '0';
       // What another part opens waits closed, out of the page, until that part is used.
       if (k.id && OPENED[k.id]) { OVERLAYS[k.id] = { el: kid, node: k }; kid.setAttribute('data-pt-overlay', k.id); return; }
-      into.appendChild(kid);
+      // What fills its container (a list row made full width, a row that spreads its parts) fills the arrangement it is
+      // in, up to the page, as Figma's fill container does: a column stretches it, a row gives it the room left.
+      if (kid.hasAttribute('data-pt-fills')) { if (rowInside) { kid.style.flex = '1 1 0'; kid.style.minWidth = '0'; } else if (!kid.style.width) kid.style.alignSelf = 'stretch'; }
+      // What Figma makes fill its parent's height (a panel in a window) takes the room left down a column, and the full
+      // height across a row.
+      if (kid.hasAttribute('data-pt-grows')) { if (rowInside) kid.style.alignSelf = 'stretch'; else if (!kid.style.height) { kid.style.flex = '1 1 0'; kid.style.minHeight = '0'; } }
+      (slotFor ? slotFor(k) : into).insertBefore(kid, slotFor ? null : before);
     });
+    if (fills(node, e)) e.setAttribute('data-pt-fills', '');
+    if (grows(node, e)) e.setAttribute('data-pt-grows', '');
     return e;
+  }
+  function c0(node) { var c = COMP[node.component]; return c && c.cls; }
+  function c0c(node) { return COMP[node.component]; }
+  function grows(node, e) {
+    if ((D.pieces || []).indexOf(node.component) < 0) { var c = COMP[node.component]; return !!(c && c.grows) && !e.style.height; }
+    if (!/^(Stack|Row)$/.test(node.component)) return false;
+    return Array.prototype.some.call(e.children, function (k) { return k.hasAttribute('data-pt-grows'); });
+  }
+  // The places a component holds others (Figma's slots), found by their names (Head Content: the part that says head);
+  // with none found, the component itself, its own parts kept (a card's title) and the product's content taken out.
+  // → { list: [{ name, el }], main } or null for a component with no slot.
+  function slotsOf(e, c) {
+    if (!c || !(c.slots || []).length) return null;
+    var list = c.slots.map(function (nm) { var w = keyWord(nm); var el = w === 'slot' ? e.querySelector('[class*="slot" i]') : partFor(e, w); return el && el !== e ? { name: nm, el: el } : null; }).filter(Boolean);
+    if (!list.length) {
+      var keep = (c.controls || []).map(function (ctl) { return ctl.part; }).filter(Boolean).join(', ');
+      Array.prototype.slice.call(e.children).forEach(function (k) { var mine = false; try { mine = !!keep && (k.matches(keep) || !!k.querySelector(keep)); } catch (x) {} if (!mine) k.remove(); });
+      return { list: [], main: e };
+    }
+    var main = list.find(function (sl) { return /^(main|content|body|slot)$/.test(keyWord(sl.name)); }) || list[0];
+    return { list: list, main: main.el };
+  }
+  // Fills its container: a system component its CSS makes full width; an arrangement holding one, or a row that spreads
+  // or grows its parts (it needs the width to do so). One the composition sizes itself keeps that size.
+  function fills(node, e) {
+    var p = node.props || {};
+    if ((D.pieces || []).indexOf(node.component) < 0) { var c = COMP[node.component]; return !!(c && c.fills) && !e.style.width; }
+    if (node.component === 'Page' || node.component === 'Text' || node.component === 'Missing') return false;
+    if (node.component === 'Row' && (/^(end|center|between)$/.test(p.justify || '') || Array.prototype.some.call(e.children, function (k) { return k.style.flexGrow === '1' || k.hasAttribute('data-pt-fills'); }))) return true;
+    return Array.prototype.some.call(e.children, function (k) { return k.hasAttribute('data-pt-fills'); });
   }
   // ── It works as in a product ──────────────────────────────────────────────────────────────────────────────────────
   // A part that says "opens": "<id>" opens the part of that id: an overlay the system's CSS shows over the window (a
@@ -344,7 +507,17 @@ html, body { margin: 0; }
     wrap.appendChild(el); document.body.appendChild(wrap);
     o.wrap = wrap; trigger.setAttribute('aria-expanded', 'true');
     var closing = false;
-    function key(e) { if (e.key === 'Escape' && OVERLAYS[id].wrap === wrap && wrap === lastLayer()) { e.stopPropagation(); close(); } }
+    function key(e) {
+      if (OVERLAYS[id].wrap !== wrap || wrap !== lastLayer()) return;
+      if (e.key === 'Escape') { e.stopPropagation(); close(); return; }
+      // A modal keeps the focus inside it while Tab moves, as the system's own modal does (a radio group is one stop).
+      if (e.key !== 'Tab' || !mv) return;
+      var stops = Array.prototype.filter.call(el.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'), function (k) { return !k.disabled && k.getClientRects().length && getComputedStyle(k).visibility !== 'hidden' && !(k.type === 'radio' && k.name && !k.checked && el.querySelector('input[type=radio][name="' + k.name + '"]:checked')); });
+      if (!stops.length) { e.preventDefault(); return; }
+      var first = stops[0], last = stops[stops.length - 1], at = document.activeElement;
+      if (e.shiftKey && (at === first || !el.contains(at))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (at === last || !el.contains(at))) { e.preventDefault(); first.focus(); }
+    }
     function outside(e) { if (!wrap.contains(e.target) && !trigger.contains(e.target) && wrap === lastLayer()) close(); }
     function close() {
       if (closing) return; closing = true;
@@ -366,20 +539,29 @@ html, body { margin: 0; }
   // A group of items one of which is selected (tabs, a segmented control, a list): a click moves the selection, as the
   // product's own code would. Native inputs (a radio, a checkbox, a field) already work, and the system's scripts run.
   var MARK = /^(is-)?(selected|active|current|checked|on)$/i;
+  // The system's script places what follows a selection (a sliding pill) when the window changes size, as the style
+  // guide nudges it: told once the selection has moved.
+  function relayout() { requestAnimationFrame(function () { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }); }
+  // The design's font arrives after the page drew in the system's own stack: what the system's script measured is placed again.
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', relayout);
   document.addEventListener('click', function (ev) {
     var box = ev.target.closest && ev.target.closest('#pt-canvas, .pt-open-layer'); if (!box) return;
     if (ev.target.closest('a[href^="#"], a[href=""]')) ev.preventDefault();   // a link in a prototype stays on the page
-    for (var n = ev.target; n && n !== box; n = n.parentElement) {
+    // A toggle button (aria-pressed) is on or off on its own, beside others like it (filter chips, list rows): it is
+    // never one of a pick-one group, which says its choice with aria-selected or aria-checked (tabs, a radio group).
+    var pressed = ev.target.closest('[aria-pressed]');
+    for (var n = pressed && box.contains(pressed) ? null : ev.target; n && n !== box; n = n.parentElement) {
       var p = n.parentElement; if (!p || !box.contains(p)) break;
       // Items of one group: the same element and, when drawn from the system, the same component (a chip beside a button
       // is not a group).
       var sibs = Array.prototype.filter.call(p.children, function (k) { return k.tagName === n.tagName && k.getAttribute('data-pt-component') === n.getAttribute('data-pt-component'); });
       if (sibs.length < 2) continue;
-      var marked = sibs.find(function (k) { return Array.prototype.some.call(k.classList, function (x) { return MARK.test(x); }) || /true/.test(k.getAttribute('aria-selected') || k.getAttribute('aria-pressed') || k.getAttribute('aria-checked') || ''); });
+      var marked = sibs.find(function (k) { return Array.prototype.some.call(k.classList, function (x) { return MARK.test(x); }) || /true/.test(k.getAttribute('aria-selected') || k.getAttribute('aria-checked') || ''); });
       if (!marked) continue;
       if (n.disabled || n.getAttribute('aria-disabled') === 'true' || marked === n) return;
       var cls = Array.prototype.filter.call(marked.classList, function (x) { return MARK.test(x); });
-      sibs.forEach(function (k) { cls.forEach(function (x) { k.classList.toggle(x, k === n); }); ['aria-selected', 'aria-pressed', 'aria-checked'].forEach(function (a) { if (marked.hasAttribute(a)) k.setAttribute(a, k === n ? 'true' : 'false'); }); });
+      sibs.forEach(function (k) { cls.forEach(function (x) { k.classList.toggle(x, k === n); }); ['aria-selected', 'aria-checked'].forEach(function (a) { if (marked.hasAttribute(a)) k.setAttribute(a, k === n ? 'true' : 'false'); }); });
+      relayout();
       return;
     }
     // One toggle on its own (a switch, a toggle button, a checkbox the system draws): a click flips it, its state for a
@@ -393,6 +575,7 @@ html, body { margin: 0; }
         var comp = t.closest('[data-pt-component]'), c = comp && COMP[comp.getAttribute('data-pt-component')];
         var mark = ((c && c.mods) || []).filter(function (x) { return MARK.test(x); })[0];
         if (mark) comp.classList.toggle(mark, on);
+        relayout();
       }, 0);
       return;
     }
@@ -444,8 +627,12 @@ html, body { margin: 0; }
   // The system's own modes (colour and size), as in the style guide.
   (D.modes || []).forEach(function (axis) {
     var box = document.getElementById('pt-modes');
-    axis.values.forEach(function (v, i) {
-      var b = document.createElement('button'); b.type = 'button'; b.textContent = v.label; b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+    // The mode the page is drawn in: the one set on the page, else the one the device's setting gives, else its rest.
+    var now = axis.classes ? (axis.values.find(function (v) { return v.value && html.classList.contains(v.value); }) || {}).value
+      : (html.getAttribute(axis.attr) || (axis.media && window.matchMedia && window.matchMedia(axis.media).matches ? axis.mediaValue : axis.restValue));
+    if (now == null || !axis.values.some(function (v) { return v.value === now; })) now = (axis.values.find(function (v) { return !v.value; }) || axis.values[0] || {}).value;
+    axis.values.forEach(function (v) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = v.label; b.setAttribute('aria-pressed', v.value === now ? 'true' : 'false');
       b.addEventListener('click', function () {
         if (axis.classes) { axis.values.forEach(function (x) { if (x.value) html.classList.remove(x.value); }); if (v.value) html.classList.add(v.value); }
         else if (!v.value) html.removeAttribute(axis.attr); else html.setAttribute(axis.attr, v.value);
@@ -459,13 +646,82 @@ html, body { margin: 0; }
   if (wanted.length) Array.prototype.forEach.call(document.querySelectorAll('#pt-modes button'), function (b) { if (wanted.indexOf(b.textContent.trim().toLowerCase()) >= 0) b.click(); });
   var outline = document.getElementById('pt-outline');
   outline.addEventListener('click', function () { var on = outline.getAttribute('aria-pressed') !== 'true'; outline.setAttribute('aria-pressed', String(on)); canvas.classList.toggle('pt-show', on); });
-  var gaps = D.gaps || [], panel = document.getElementById('pt-gaps'), gt = document.getElementById('pt-gaps-toggle');
-  panel.querySelector('ul').innerHTML = gaps.length ? gaps.map(function (g) { return '<li>' + esc(g) + '</li>'; }).join('') : '<li>Nothing: everything here is the design system\'s own.</li>';
+  // Stand-ins, marked where they are drawn: a dashed box and what each stands in for, kept in place as the page moves.
+  var marks = document.createElement('div'); marks.id = 'pt-marks'; marks.setAttribute('aria-hidden', 'true'); document.body.appendChild(marks);
+  var standinsBtn = document.getElementById('pt-standins'), marksOn = true, flashing = [], placing = 0;
+  var standInCount = (function count(n) { return n ? ((n.props || {}).standInFor ? 1 : 0) + (n.children || []).reduce(function (a, k) { return a + count(k); }, 0) : 0; })(D.tree);
+  function placeMarks() {
+    placing = 0;
+    var bar = document.querySelector('.pt-bar'), top = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    marks.style.top = top + 'px'; marks.innerHTML = '';
+    var boxes = marksOn ? Array.prototype.slice.call(document.querySelectorAll('[data-pt-standin]')) : [];
+    boxes.concat(flashing.filter(function (e) { return boxes.indexOf(e) < 0; })).forEach(function (e) {
+      var r = e.getBoundingClientRect(); if (!r.width && !r.height) return;
+      var b = document.createElement('div'); b.className = 'pt-mark-box' + (flashing.indexOf(e) >= 0 ? ' pt-flash' : '');
+      b.style.left = (r.left - 3) + 'px'; b.style.top = (r.top - top - 3) + 'px'; b.style.width = (r.width + 6) + 'px'; b.style.height = (r.height + 6) + 'px'; marks.appendChild(b);
+      if (!e.hasAttribute('data-pt-standin') || !marksOn) return;
+      var m = document.createElement('span'); m.className = 'pt-mark'; m.textContent = 'Stand-in for ' + e.getAttribute('data-pt-standin');
+      if (r.top - top < 22) m.className += ' pt-mark-in';   // no room above it: inside its box
+      m.style.left = (r.left - 3) + 'px'; m.style.top = (r.top - top - 3) + 'px'; marks.appendChild(m);
+    });
+  }
+  function later() { if (!placing) placing = requestAnimationFrame(placeMarks); }
+  function showMarks(on) { marksOn = !!on; standinsBtn.setAttribute('aria-pressed', String(marksOn)); placeMarks(); }
+  window.PT_MARKS = showMarks;
+  if (standInCount) { standinsBtn.hidden = false; standinsBtn.textContent = 'Stand-ins (' + standInCount + ')'; standinsBtn.title = 'Parts standing in for something the design system lacks'; }
+  standinsBtn.addEventListener('click', function () { showMarks(standinsBtn.getAttribute('aria-pressed') !== 'true'); });
+  ['scroll', 'resize', 'pt-fonts'].forEach(function (t) { window.addEventListener(t, later, true); });
+  new MutationObserver(function (list) { if (list.some(function (r) { return !marks.contains(r.target) && r.target !== marks; })) later(); }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  later();
+  // What the design system would need, each with the parts it comes from: shown on the page from the list.
+  var gaps = (D.gaps || []).map(function (g) { return typeof g === 'string' ? { line: g } : g; }), panel = document.getElementById('pt-gaps'), gt = document.getElementById('pt-gaps-toggle');
+  function partsOfGap(g) { return (g.nodes || []).map(function (id) { return document.querySelector('[data-pt-id="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]'); }).filter(Boolean); }
+  function showGap(g, li) {
+    if (g.kind === 'layout' && outline.getAttribute('aria-pressed') !== 'true') outline.click();
+    var els = partsOfGap(g), gone = li.querySelector('.pt-gap-gone');
+    if (!els.length) { if (!gone) { gone = document.createElement('span'); gone.className = 'pt-gap-gone'; gone.textContent = 'not drawn now (in another state, or inside what a click opens)'; li.appendChild(gone); } return; }
+    if (gone) gone.remove();
+    if (els.some(function (e) { return e.hasAttribute('data-pt-standin'); }) && !marksOn) showMarks(true);
+    els[0].scrollIntoView({ block: 'center' });
+    flashing = els; placeMarks();
+    setTimeout(function () { if (flashing === els) { flashing = []; placeMarks(); } }, 1800);
+  }
+  var ul = panel.querySelector('ul');
+  if (!gaps.length) ul.innerHTML = '<li>Nothing: everything here is the design system\'s own.</li>';
+  gaps.forEach(function (g) {
+    var li = document.createElement('li'), standIn = (g.nodes || []).some(function (id) { return (function find(n) { return n && ((n.id === id && (n.props || {}).standInFor) || (n.children || []).some(find)); })(D.tree); });
+    var missing = !standIn && (g.nodes || []).some(function (id) { return (function find(n) { return n && ((n.id === id && n.component === 'Missing') || (n.children || []).some(find)); })(D.tree); });
+    var chip = document.createElement('span'); chip.className = 'pt-chip' + (standIn ? ' pt-chip-standin' : ''); chip.textContent = standIn ? 'stand-in' : missing ? 'missing' : (g.kind || 'gap');
+    li.appendChild(chip); li.appendChild(document.createTextNode(g.line));
+    if ((g.nodes || []).length || g.kind === 'layout') {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'pt-gap-show'; b.textContent = 'Show on the page';
+      b.setAttribute('aria-label', 'Show on the page: ' + (g.need || g.line));
+      b.addEventListener('click', function () { showGap(g, li); });
+      li.appendChild(b);
+    }
+    ul.appendChild(li);
+  });
   gt.textContent = 'Gaps (' + gaps.length + ')';
   gt.addEventListener('click', function () { var on = panel.hidden; panel.hidden = !on; gt.setAttribute('aria-pressed', String(on)); });
   document.getElementById('pt-note').textContent = D.note || '';
+  // A design font the page could not find (not installed here, not loaded from Google Fonts): said, so the page is not
+  // read as set in it.
+  var fontNote = document.getElementById('pt-font-note');
+  function fontsSaid() {
+    var st = window.PT_FONTS || {}, out = Object.keys(st).filter(function (f) { return st[f] === 'missing'; });
+    fontNote.hidden = !out.length;
+    fontNote.textContent = out.length ? out.join(', ') + (out.length > 1 ? ' are' : ' is') + ' not installed here and could not be loaded: set in the system\'s fallback fonts' : '';
+  }
+  fontsSaid(); window.addEventListener('pt-fonts', fontsSaid);
 })();
 </script>
 <!--{{SYSTEM_SCRIPTS}}-->
+<script>
+/* One copy of each icon: the system's script may add the sheet the page already has, and an id is the page's once. */
+(function () {
+  function dedupe() { var seen = {}; Array.prototype.forEach.call(document.querySelectorAll('symbol[id]'), function (s) { if (seen[s.id]) s.remove(); else seen[s.id] = 1; }); }
+  dedupe(); document.addEventListener('DOMContentLoaded', dedupe); window.addEventListener('load', dedupe);
+})();
+</script>
 </body>
 </html>

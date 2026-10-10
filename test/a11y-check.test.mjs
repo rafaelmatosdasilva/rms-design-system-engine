@@ -7,7 +7,7 @@ import {
   parseColor, over, effectiveBg, relLuminance, contrastRatio,
   isLargeText, aaThreshold, contrastFindings, INTERACTIVE_ROLES,
   styleguideTarget, A11Y_GUIDE, a11yItemLine, a11yFindingRecord, summarizeAxe,
-  iconContrastFindings, namedByTitleOnly, SETTLE_TRANSITIONS,
+  iconContrastFindings, namedByTitleOnly, SETTLE_TRANSITIONS, STATE_CLASSES, stateHeard,
 } from '../a11y-check.mjs';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,6 +25,23 @@ test('[axe] summarizeAxe collapses per-node rows into one per rule, busiest firs
   assert.equal(s[0].id, 'color-contrast');
   assert.equal(s[0].count, 5);
   assert.deepEqual(s[0].targets, ['.a', '.b', '.c']);
+});
+
+test('a state drawn with a class is heard the way the role says it: a selected radio is aria-checked, a step aria-current', () => {
+  const el = (attrs = {}, props = {}) => ({ getAttribute: (a) => (a in attrs ? attrs[a] : null), hasAttribute: (a) => a in attrs, ...props });
+  const sel = STATE_CLASSES.selected;
+  assert.ok(stateHeard(el({ role: 'radio', 'aria-checked': 'true' }), sel), 'a selected radio says checked');
+  assert.ok(stateHeard(el({ 'aria-pressed': 'true' }), sel), 'a selected toggle says pressed');
+  assert.ok(stateHeard(el({ role: 'tab', 'aria-selected': 'true' }), sel));
+  assert.ok(stateHeard(el({ 'aria-current': 'step' }), sel), 'a selected step says current, with any value but false');
+  assert.ok(!stateHeard(el({ 'aria-checked': 'false' }), sel), 'a radio that says it is not checked is not heard as selected');
+  assert.ok(!stateHeard(el({ 'aria-current': 'false' }), sel));
+  assert.ok(!stateHeard(el(), sel), 'nothing said');
+  assert.ok(stateHeard(el({ 'aria-current': 'page' }), STATE_CLASSES.current));
+  assert.ok(stateHeard(el({}, { checked: true }), STATE_CLASSES.checked), 'a checked input');
+  assert.ok(stateHeard(el({ open: '' }), STATE_CLASSES.open), 'an open details or dialog');
+  assert.ok(stateHeard(el({ 'aria-disabled': 'true' }), STATE_CLASSES.disabled) && stateHeard(el({}, { disabled: true }), STATE_CLASSES.disabled));
+  assert.ok(stateHeard(el({ 'aria-checked': 'mixed' }), STATE_CLASSES.indeterminate) && !stateHeard(el({ 'aria-checked': 'true' }), STATE_CLASSES.indeterminate));
 });
 
 // ── Plain-language reporting + machine record ──
@@ -91,12 +108,36 @@ test('contrastRatio: black on white is 21, white on white is 1', () => {
   assert.ok(approx(contrastRatio({ r: 255, g: 255, b: 255 }, { r: 255, g: 255, b: 255 }), 1));
 });
 
-test('parseColor handles rgb / rgba / transparent, rejects keywords', () => {
+test('parseColor handles rgb / rgba / transparent, and the spaces Chrome keeps (oklch, oklab, color(srgb))', () => {
   assert.deepEqual(parseColor('rgb(0, 0, 0)'), { r: 0, g: 0, b: 0, a: 1 });
   assert.deepEqual(parseColor('rgba(10, 20, 30, 0.5)'), { r: 10, g: 20, b: 30, a: 0.5 });
   assert.equal(parseColor('transparent').a, 0);
-  assert.equal(parseColor('red'), null);            // keyword / non-rgb → cannot compute
-  assert.equal(parseColor('color(display-p3 1 0 0)'), null);
+  // Chrome reports an oklch() colour as written (Tailwind v4's default): white and black, read, not skipped.
+  const w = parseColor('oklch(1 0 0)'), k = parseColor('oklch(0 0 0 / 0.5)');
+  assert.ok(approx(w.r, 255, 1) && approx(w.g, 255, 1) && approx(w.b, 255, 1) && w.a === 1);
+  assert.ok(approx(k.r, 0, 1) && k.a === 0.5);
+  assert.ok(approx(parseColor('color(srgb 1 0 0)').r, 255, 0.5));
+  assert.equal(parseColor('color(display-p3 1 0 0)'), null);   // not converted → cannot compute
+});
+
+test('contrastFindings reads an oklch text colour and background, and says so when a colour space cannot be read', () => {
+  const grey = contrastFindings([{ desc: 'span', text: 'Hi', color: 'oklch(0.7 0 0)', bgLayers: ['oklch(1 0 0)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light');
+  assert.equal(grey.length, 1, 'light grey on white fails 4.5:1');
+  assert.ok(grey[0].ratio < 4.5);
+  const p3 = contrastFindings([{ desc: 'span', text: 'Hi', color: 'color(display-p3 0 0 0)', bgLayers: ['rgb(255,255,255)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light');
+  assert.equal(p3.length, 1);
+  assert.match(p3[0].cannotCompute, /colour space/);
+  const p3bg = contrastFindings([{ desc: 'span', text: 'Hi', color: 'rgb(0,0,0)', bgLayers: ['color(display-p3 1 1 1)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light');
+  assert.match(p3bg[0]?.cannotCompute ?? '', /colour space/);
+});
+
+test('contrastFindings blends see-through text over its background before measuring', () => {
+  // Black at 30% on white draws a light grey (about 2.2:1): it must fail, not read as black's 21:1.
+  const out = contrastFindings([{ desc: 'span.hint', text: 'Hi', color: 'rgba(0, 0, 0, 0.3)', bgLayers: ['rgb(255,255,255)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light');
+  assert.equal(out.length, 1);
+  assert.ok(out[0].ratio < 3);
+  // Fully transparent text draws nothing: no finding.
+  assert.equal(contrastFindings([{ desc: 'span', text: 'x', color: 'rgba(0,0,0,0)', bgLayers: ['rgb(255,255,255)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light').length, 0);
 });
 
 test('effectiveBg composites a translucent element bg over its opaque ancestor', () => {

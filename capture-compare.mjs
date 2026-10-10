@@ -258,6 +258,28 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       const bad = [r, ...others].find((x) => x && x.confidence !== 'not-read' && x.confidence !== 'uncertain' && !(x.var === extra.expectedVar || valueMatch(extra.figmaValue, x.value) === true));
       push(name, 'radius', f.innerRadiusVar, bad ?? r, extra);
     }
+    // Padding, radius and gap Figma sets with no variable: the default variant's own pixels, compared as each variant's
+    // are (a value with a variable is compared above, by its variable).
+    const rawDef = f.variants?.[f.defaultVariant] ?? f;
+    if (!low && !iconOnly) {
+      const raw = (fig, fact, field) => {
+        if (typeof fig !== 'number' || !fact || fact.confidence === 'not-read' || fact.confidence === 'uncertain' || fact.confidence === 'default') return;
+        settle(Math.abs(toNum(fact.value) - fig) < 0.5, { component: name, field, figma: fig, code: fact.value, rule: fact.rule, at: fact.at, confidence: fact.confidence });
+      };
+      const pp = rawDef.paddingPx;
+      if (Array.isArray(pp)) {
+        if (!f.paddingVar?.tb) [['paddingTop', 0], ['paddingBottom', 2]].forEach(([k, i]) => raw(pp[i], c.props?.[k], k.replace('padding', 'padding ').toLowerCase()));
+        if (!f.paddingVar?.lr) [['paddingRight', 1], ['paddingLeft', 3]].forEach(([k, i]) => raw(pp[i], c.props?.[k], k.replace('padding', 'padding ').toLowerCase()));
+      }
+      // One radius, however many corners set it: the first corner that differs stands for the rest.
+      if (!f.innerRadiusVar && Array.isArray(rawDef.radiusPx) && f.fillStructure !== 'before') {
+        const corners = ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'].map((k, i) => [rawDef.radiusPx[i], (c.parts?.radius?.props ?? c.props)?.[k]]).filter(([fig, fact]) => typeof fig === 'number' && fact);
+        const wrong = corners.find(([fig, fact]) => !(Math.abs(toNum(fact.value) - fig) < 0.5));
+        if (corners.length) raw(...(wrong ?? corners[0]), 'radius');
+      }
+      // A vertical stack's gap is between rows.
+      if (!f.gapVar && typeof rawDef.gapPx === 'number') raw(rawDef.gapPx, (c.parts?.gap?.props ?? c.props)?.[(f.layout ?? f.box?.layout) === 'VERTICAL' ? 'rowGap' : 'columnGap'], 'gap');
+    }
     const ty = (k) => vars.typography?.[k] ?? null;
     // Font: Figma's font fields describe the component's first TEXT node, so the code side is the
     // contract's fontSel part, else the first element holding text, else the root.
@@ -268,8 +290,11 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     if (f.fontWeightVar && ty(f.fontWeightVar)) push(name, 'font weight', f.fontWeightVar, fp?.fontWeight, { figmaValue: ty(f.fontWeightVar).weight });
     // Line height from the same text style (a unitless line height is a multiple of the font size).
     const lhText = f.text?.lineHeight;   // { unit: 'PIXELS' | 'PERCENT' | 'AUTO', value } from the extended capture
+    // A share in % is of Figma's font size: a wrong font size in the code must not carry the expectation with it.
+    // Figma's font size of the first text: the default variant's (the refresh records it per variant), else the text style's.
+    const figFs = toNum((f.variants?.[f.defaultVariant] ?? f).fontSize) || toNum(f.fontSizeVar ? ty(f.fontSizeVar)?.size : null) || toNum(fp?.fontSize?.value);
     const lhFig = lhText && lhText.unit !== 'AUTO'
-      ? (lhText.unit === 'PERCENT' ? `${(lhText.value / 100) * toNum(fp?.fontSize?.value)}px` : `${lhText.value}px`)
+      ? (lhText.unit === 'PERCENT' ? `${+((lhText.value / 100) * figFs).toFixed(2)}px` : `${lhText.value}px`)
       : (f.fontSizeVar ? ty(f.fontSizeVar)?.lh : null);
     // A line height inherited from a page-level rule (html, body, :root, *) is the page's, not the
     // component's, so it is not compared.
@@ -295,6 +320,12 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     const figmaSides = Array.isArray(f.stroke?.weights) ? SIDES.filter((s, i) => f.stroke.weights[i] > 0) : [];
     const strokeSide = figmaSides.find((s) => codeSides.includes(s)) ?? codeSides[0] ?? 'Top';
     const strokeKey = c.props?.[`border${strokeSide}Color`] ? `border${strokeSide}Color` : 'borderTopColor';   // a capture from before every side was read
+    // A dashed stroke, on the side the stroke is read on (dotted counts: Figma draws both as a dash pattern).
+    const styleOf = c.layout?.borderStyles?.[strokeSide];
+    if (typeof f.stroke?.dashed === 'boolean' && styleOf && codeSides.includes(strokeSide) && !low) {
+      const wf = c.props?.[`border${strokeSide}Width`];
+      settle(f.stroke.dashed === /^(dashed|dotted)$/.test(styleOf), { component: name, field: 'stroke style', figma: f.stroke.dashed ? 'dashed' : 'solid', code: styleOf, rule: wf?.rule, at: wf?.at });
+    }
     if (f.strokeOnDefault === true && !low && c.props?.borderTopWidth && !c.before && drawsNothing) {
       out.notComparable.push({ component: name, field: 'stroke', figma: 'draws a border', why: 'the code root draws nothing (a wrapper); name the part that draws the box in componentSelectors or the contract' });
     } else if (f.strokeOnDefault === true && !low && c.props?.borderTopWidth && !c.before) {
@@ -318,6 +349,32 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       else if (RELATIVE_SIZE.test(String(w.declared ?? ''))) out.notComparable.push({ component: name, field: 'width', figma: f.box.width, why: `the code width follows its container (${w.declared})` });
       else settle(Math.abs((c.size?.width ?? toNum(w.value)) - f.box.width) < 0.5, { component: name, field: 'width', figma: f.box.width, code: c.size?.width ?? toNum(w.value), rule: w.rule, at: w.at });
     }
+    // The rest of the box Figma records: min and max width, how auto layout lines its children up, and whether it wraps.
+    // A capture from before these were read has none of them: not compared.
+    if (f.box && !low) {
+      for (const [k, field] of [['minWidth', 'min width'], ['maxWidth', 'max width']]) {
+        const fig = f.box[k], fact = c.props?.[k];
+        if (typeof fig !== 'number' || !(fig > 0) || !Number.isFinite(fig) || !fact) continue;
+        if (fact.rule && RELATIVE_SIZE.test(String(fact.declared ?? ''))) { out.notComparable.push({ component: name, field, figma: fig, why: `the code ${field} follows its container (${fact.declared})` }); continue; }
+        const unset = fact.confidence === 'default' || /^(none|auto|0px|0)$/.test(String(fact.value).trim());
+        settle(!unset && Math.abs(toNum(fact.value) - fig) < 0.5, { component: name, field, figma: fig, code: fact.value, rule: fact.rule, at: fact.at, confidence: fact.confidence });
+      }
+      const flex = /flex$/.test(String(c.layout?.display ?? '')) && ['HORIZONTAL', 'VERTICAL'].includes(f.box.layout ?? f.layout);
+      if (flex) {
+        const MAIN = { MIN: ['flex-start', 'start', 'normal', 'left'], CENTER: ['center'], MAX: ['flex-end', 'end', 'right'], SPACE_BETWEEN: ['space-between'] };
+        const CROSS = { MIN: ['flex-start', 'start', 'self-start'], CENTER: ['center'], MAX: ['flex-end', 'end', 'self-end'], BASELINE: ['baseline', 'first baseline'] };
+        const word = (x) => ({ MIN: 'start', MAX: 'end', SPACE_BETWEEN: 'space-between' }[x] ?? String(x).toLowerCase());
+        const jc = c.props?.justifyContent, ai = c.props?.alignItems, a = f.box.align ?? {};
+        if (MAIN[a.primary] && jc) settle(MAIN[a.primary].includes(String(jc.value).trim()), { component: name, field: 'alignment (main axis)', figma: word(a.primary), code: jc.value, rule: jc.rule, at: jc.at, confidence: jc.confidence });
+        if (CROSS[a.counter] && ai) {
+          // Stretched children against children lined up at the start: the same until one is smaller than the row.
+          if (a.counter === 'MIN' && /^(normal|stretch)$/.test(String(ai.value).trim())) out.notComparable.push({ component: name, field: 'alignment (cross axis)', figma: word(a.counter), code: ai.value, why: 'the code stretches its children; Figma lines them up at the start, which shows only when one is smaller than the row' });
+          else settle(CROSS[a.counter].includes(String(ai.value).trim()), { component: name, field: 'alignment (cross axis)', figma: word(a.counter), code: ai.value, rule: ai.rule, at: ai.at, confidence: ai.confidence });
+        }
+        const fw = c.props?.flexWrap;
+        if (['WRAP', 'NO_WRAP'].includes(f.box.wrap) && fw) settle((f.box.wrap === 'WRAP') === /^wrap/.test(String(fw.value).trim()), { component: name, field: 'wrap', figma: f.box.wrap === 'WRAP' ? 'wrap' : 'nowrap', code: fw.value, rule: fw.rule, at: fw.at, confidence: fw.confidence });
+      }
+    }
     // Stroke weight per side, when Figma records it: each side's width, not only whether it draws.
     if (Array.isArray(f.stroke?.weights) && !low && c.props?.borderTopWidth && !drawsNothing) {
       ['Top', 'Right', 'Bottom', 'Left'].forEach((s, i) => {
@@ -338,7 +395,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       }
       const ls = f.text.letterSpacing;
       if (ls && fp.letterSpacing && fs) {
-        const want = ls.unit === 'PERCENT' ? (ls.value / 100) * fs : ls.value;
+        const want = ls.unit === 'PERCENT' ? (ls.value / 100) * figFs : ls.value;
         const got = /normal/i.test(fp.letterSpacing.value) ? 0 : toNum(fp.letterSpacing.value);
         settle(Math.abs(got - want) < 0.05, { component: name, field: 'letter spacing', figma: `${+want.toFixed(2)}px`, code: fp.letterSpacing.value, rule: fp.letterSpacing.rule, at: fp.letterSpacing.at });
       }
@@ -346,6 +403,19 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       if (f.text.textCase && CASE[f.text.textCase] && fp.textTransform) {
         settle(String(fp.textTransform.value) === CASE[f.text.textCase], { component: name, field: 'text case', figma: CASE[f.text.textCase], code: fp.textTransform.value, rule: fp.textTransform.rule, at: fp.textTransform.at });
       }
+      // Decoration, italic and alignment of the first text (a capture from before they were read has none: not compared).
+      const DECO = { UNDERLINE: 'underline', STRIKETHROUGH: 'line-through', NONE: 'none' };
+      const td = fp.textDecorationLine;
+      if (DECO[f.text.textDecoration] && td) {
+        const lines = String(td.value).split(/\s+/);
+        settle(f.text.textDecoration === 'NONE' ? lines.every((l) => l === 'none') : lines.includes(DECO[f.text.textDecoration]), { component: name, field: 'text decoration', figma: DECO[f.text.textDecoration], code: td.value, rule: td.rule, at: td.at });
+      }
+      const fst = fp.fontStyle;
+      if (typeof f.text.italic === 'boolean' && fst) settle(f.text.italic === /^(italic|oblique)/.test(String(fst.value)), { component: name, field: 'italic', figma: f.text.italic ? 'italic' : 'normal', code: fst.value, rule: fst.rule, at: fst.at });
+      // Left is where a left-to-right page starts; justified is justify.
+      const ALIGN = { LEFT: ['left', 'start', '-webkit-left'], CENTER: ['center', '-webkit-center'], RIGHT: ['right', 'end', '-webkit-right'], JUSTIFIED: ['justify'] };
+      const ta = fp.textAlign;
+      if (ALIGN[f.text.textAlign] && ta) settle(ALIGN[f.text.textAlign].includes(String(ta.value).trim()), { component: name, field: 'text alignment', figma: f.text.textAlign === 'JUSTIFIED' ? 'justify' : f.text.textAlign.toLowerCase(), code: ta.value, rule: ta.rule, at: ta.at });
     }
 
     // Per state: height, stroke and opacity Figma records for each variant, against the state the
@@ -390,7 +460,11 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       }
     }
     for (const [variant, op] of Object.entries(f.variantOpacity ?? {})) {
-      const st = Object.entries(states).find(([k]) => k.includes(key(variant)))?.[1];
+      // The state named exactly, or one of whose axes has that value (or axis=value, or a boolean axis of that name set
+      // on, as Disabled=true): never a name that only contains it.
+      const want = key(variant);
+      const st = (Object.entries(states).find(([k]) => key(k) === want)
+        ?? Object.entries(states).find(([k]) => Object.entries(axesOf(k)).some(([ax, val]) => key(val) === want || key(`${ax}=${val}`) === want || (key(ax) === want && /^(true|yes|on)$/.test(val)))))?.[1];
       const o = st?.changed?.opacity ?? null;
       if (!st || typeof op !== 'number') continue;
       const got = o ? toNum(o.value) : toNum(c.props?.opacity?.value ?? 1);
@@ -403,10 +477,12 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     const textFact = c.parts?.text?.props?.color ?? c.props?.color;
     const firstMode = Object.keys(c.colors ?? {})[0];
     const textInherits = !c.parts?.text?.props?.color || c.parts.text.props.color.value === c.colors?.[firstMode]?.color;
+    const partColors = c.parts?.text?.colors ?? (c.parts?.text ? null : c.parts?.font?.colors);
     const colourChecks = (label, paints, perMode, suffix = '', changed = {}) => {
       const slots = [
         ['fill', 'background', (col) => (c.fill === 'before' ? col.beforeBackground : col.backgroundColor), c.props?.backgroundColor],
-        ['text', 'text colour', (col, m) => (m === firstMode && !suffix ? textFact?.value : textInherits ? col.color : null), textFact],
+        // A text part with its own colour rule is read on the part in every mode (its colours per mode, from the capture).
+        ['text', 'text colour', (col, m) => (m === firstMode && !suffix ? textFact?.value : textInherits ? col.color : !suffix ? partColors?.[m]?.color ?? null : null), textFact],
         ['stroke', 'border colour', (col) => col[strokeKey] ?? col.borderTopColor, c.props?.[strokeKey]],
       ];
       for (const [slot, field, pick, fact] of slots) {
@@ -416,6 +492,8 @@ export function compareComponents(code, structure, vars, cfg, maps) {
         if (slot === 'stroke' && drawsNothing) continue;                                          // drawing at all is the stroke check's job
         for (const [mode, col] of Object.entries(perMode ?? {})) {
           const want = paintIn(vars, mode, paint), got = col && pick(col, mode);
+          // A mode the code draws that Figma gives no value for is said, never skipped as if it matched.
+          if (!want && got && paint.token) { out.notComparable.push({ component: name, field: `${field}${suffix} [${mode}]`, figma: paint.token, code: got, why: 'Figma has no value for this mode' }); continue; }
           if (!want || !got) continue;
           const expectedVar = paint.token && !suffix ? colorVarOf(paint.token, spec, maps) : undefined;
           const src = changed[{ fill: 'backgroundColor', text: 'color', stroke: strokeKey }[slot]] ?? fact;
@@ -514,9 +592,13 @@ export function compareBreakpoints(code, structure, vars) {
   for (const [name, f] of Object.entries(structure ?? {})) {
     const c = code.components?.[name];
     if (!c?.breakpoints) continue;
+    // Every side and every corner (a component padded or rounded on one side only at a width is a difference); a vertical
+    // stack's gap is between rows. A capture from before every side was measured has none of the new ones: not compared.
     const fields = [
-      ['padding (top)', f.paddingVar?.tb, 'paddingTop'], ['padding (left)', f.paddingVar?.lr, 'paddingLeft'],
-      ['gap', f.gapVar, 'columnGap'], ['radius', f.innerRadiusVar, 'borderTopLeftRadius'],
+      ['padding (top)', f.paddingVar?.tb, 'paddingTop'], ['padding (bottom)', f.paddingVar?.tb, 'paddingBottom'],
+      ['padding (left)', f.paddingVar?.lr, 'paddingLeft'], ['padding (right)', f.paddingVar?.lr, 'paddingRight'],
+      ['gap', f.gapVar, (f.layout ?? f.box?.layout) === 'VERTICAL' ? 'rowGap' : 'columnGap'], ['radius', f.innerRadiusVar, 'borderTopLeftRadius'],
+      ['radius (top right)', f.innerRadiusVar, 'borderTopRightRadius'], ['radius (bottom right)', f.innerRadiusVar, 'borderBottomRightRadius'], ['radius (bottom left)', f.innerRadiusVar, 'borderBottomLeftRadius'],
     ];
     for (const [mode, tokens] of Object.entries(bp)) {
       const at = c.breakpoints[mode];

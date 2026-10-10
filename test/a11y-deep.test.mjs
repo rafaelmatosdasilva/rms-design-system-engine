@@ -438,3 +438,112 @@ test('page: a field edge is read at rest, never halfway back from its focus look
   const d = pageResult(out);
   assert.deepEqual(d.issues.filter((i) => i.issue === 'boundary').map((i) => i.selector.split(' ')[0]).sort(), ['input#a', 'input#b', 'input#c'], out);
 });
+
+// Text contrast in the browser: a colour Chrome reports as oklch() is read, see-through text is measured as drawn,
+// and text inside a disabled control is exempt (WCAG 1.4.3), wherever in the control it sits.
+test('page: oklch and see-through text are measured as drawn; text inside a disabled control is left alone', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
+    .ok-l { color: oklch(0.75 0 0); } .ghost { color: rgba(0, 0, 0, 0.3); } button { color: #ccc; background: #fff; border: 1px solid #000; }</style></head><body><main><h1>Text</h1>
+    <p class="ok-l">Grey in oklch</p>
+    <p class="ghost">Faded black</p>
+    <p class="fine">Plain black</p>
+    <button disabled><span class="inner">Save</span></button>
+    <input class="hint" aria-label="Search" placeholder="Faint hint"><input class="clear" aria-label="Name" placeholder="Clear hint"><input class="typed" aria-label="City" placeholder="Hidden once typed" value="Lisbon">
+  </main></body></html>`.replace('</style>', '.hint::placeholder { color: #cccccc; } .clear::placeholder, .typed::placeholder { color: #595959; } input { border: 1px solid #000; background: #fff; }</style>');
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const contrast = d.issues.filter((i) => i.issue === 'contrast').map((i) => i.selector).sort();
+  assert.deepEqual(contrast, ['input.hint::placeholder', 'p.ghost', 'p.ok-l'], out);   // a placeholder shown is text too (1.4.3)
+});
+
+// Focus (WCAG 2.4.7, 1.4.11): a ring kept transparent at rest that only takes a colour on focus is a focus style (the
+// advice the check itself gives); a ring drawn on ::after is measured; a two-tone ring passes when one of its tones shows.
+test('page: focus by outline colour alone, a faint ring on ::after, and a two-tone shadow ring', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
+    button { background: #fff; color: #000; border: 1px solid #000; margin: 8px; outline: none; position: relative; }
+    .tint { outline: 2px solid transparent; outline-offset: 2px; } .tint:focus { outline-color: #0050c8; }
+    .pseudo::after { content: ''; position: absolute; inset: -4px; border: 2px solid transparent; } .pseudo:focus::after { border-color: #eeeeee; }
+    .duo:focus { box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #0050c8; }</style></head><body><main><h1>Focus</h1>
+    <button id="tint">Tint</button><button id="pseudo">Pseudo</button><button id="duo">Duo</button>
+  </main></body></html>`.replace('id="tint"', 'id="tint" class="tint"').replace('id="pseudo"', 'id="pseudo" class="pseudo"').replace('id="duo"', 'id="duo" class="duo"');
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();
+  assert.deepEqual(kinds('focus'), [], out);
+  assert.deepEqual(kinds('focuscontrast'), ['button#pseudo'], out);
+});
+
+// A5: a control edge is read in every colour mode: a field whose border holds in light but fades into the dark
+// background is found in Dark, and named with that mode; one that holds in both is left alone.
+test('page: a control edge too faint only in the dark mode is found, with its mode', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
+    input { border: 1px solid #555; background: #fff; color: #000; padding: 4px; margin: 4px; }
+    @media (prefers-color-scheme: dark) { body { background: #111; color: #eee; } input { background: #111; color: #eee; } .fades { border-color: #222; } .holds { border-color: #aaa; } }</style></head>
+    <body><main><h1>Fields</h1><label>Name <input class="fades"></label><label>City <input class="holds"></label></main></body></html>`;
+  const LIGHT_DARK = [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }, { name: 'Dark', snapshotKey: 'dark', cssSelector: 'dark-media' }];
+  const dir = makeFixture({ 'page.html': page, 'ds-config.json': { figma: { modes: LIGHT_DARK } } });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const edges = d.issues.filter((i) => i.issue === 'boundary');
+  assert.equal(edges.length, 1, out);
+  assert.match(edges[0].selector, /input\.fades/, out);
+  assert.deepEqual(edges[0].modes, ['Dark'], out);
+});
+
+// On the style guide, a component's role is read on the component drawn in its own section, never on the page's own
+// chrome that shares its class (a navigation card, a hidden menu button). A role Figma names "presentation" is the
+// role the browser calls "none".
+test('annotations on the style guide: read in the component\'s own section; presentation is none', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><body><main><h1>Style guide</h1>
+    <nav><a class="tile" href="#c-tile">tile</a><button class="act" hidden>Menu</button></nav>
+    <section id="c-tile"><div class="pg-preview"><div class="tile" role="article"><p>Story</p></div></div></section>
+    <section id="c-act"><div class="pg-preview"><div class="act"><button>Go</button></div></div></section>
+    <section id="c-veil"><div class="pg-preview"><div class="veil" role="presentation"></div></div></section>
+    <section id="c-scrim"><div class="pg-preview"><div class="scrim"></div></div></section>
+    <section id="c-ghost"><div class="pg-preview"><span class="ghost" data-sg-standin="">Ghost</span></div></section>
+  </main></body></html>`;
+  const dir = makeFixture({
+    'sg/index.html': page,
+    'figma-component-props.snapshot.json': {
+      tile: { nodeId: '1:1', annotations: [{ label: 'Role: article' }] },
+      act: { nodeId: '1:2', annotations: [{ label: 'Role: button' }] },
+      veil: { nodeId: '1:3', annotations: [{ label: 'Role: presentation' }] },
+      scrim: { nodeId: '1:4', annotations: [{ label: 'Role: presentation' }] },
+      ghost: { nodeId: '1:5', annotations: [{ label: 'Role: group' }] },
+    },
+    'ds-config.json': { styleguide: { out: 'sg/index.html' }, componentSelectors: { tile: '.tile', act: '.act', veil: '.veil', scrim: '.scrim', ghost: '.ghost' } },
+  });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  assert.equal(d.usedStyleguide, true, out);
+  // A plain element with no role (generic) holds no meaning, as presentation asks; a component the code has no markup
+  // for is drawn as a stand-in, and its role is said not checked, never read on the stand-in.
+  assert.deepEqual(d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector), ['ghost: not checked, the code has no markup for it (the style guide draws a stand-in)'], out);
+});
+
+// A composite widget has one Tab stop and the arrow keys for the rest (a radio group, a tab list, a menu): an option
+// left out of the Tab order there is reached, while one in no such group, or a group with no stop at all, is not.
+test('keyboard: an option a composite reaches by its arrow keys is reachable; a group with no Tab stop is not', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><body><main><h1>Keys</h1>
+    <div role="radiogroup" aria-label="View" class="rg"><button role="radio" aria-checked="true">A</button><button role="radio" aria-checked="false" tabindex="-1">B</button></div>
+    <div role="tablist" aria-label="Tabs" class="tl"><div role="tab" aria-selected="true" tabindex="0">One</div><div role="tab" aria-selected="false" tabindex="-1">Two</div></div>
+    <div role="radiogroup" aria-label="Dead" class="dead"><span role="radio" aria-checked="false" tabindex="-1">X</span><span role="radio" aria-checked="false" tabindex="-1">Y</span></div>
+    <span role="button" class="lone" tabindex="-1">Lone</span>
+  </main></body></html>`;
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  assert.deepEqual(d.issues.filter((i) => i.issue === 'keyboard').map((i) => i.selector).sort(), ['span[role=button]', 'span[role=radio]', 'span[role=radio]'], out);   // each option of the group with no stop
+});

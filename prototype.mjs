@@ -15,9 +15,9 @@ import { join, resolve, basename, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
-import { checkPrototype, systemScales, nodesOf, mergeGaps, groupLayout, gapLine, pieceCatalog } from './prototype-pieces.mjs';
+import { checkPrototype, systemScales, nodesOf, mergeGaps, groupLayout, gapLine, pageGaps, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
-import { loadContext, purposeLines, ruleLines, usesAgainstPurpose, requestFocus, focusLines, cut } from './prototype-context.mjs';
+import { loadContext, purposeLines, ruleLines, usesAgainstPurpose, requestFocus, focusLines, cut, screenUses } from './prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from './product-conventions.mjs';
 import { splitStates, applyState, statesOwed, stateFindings, normaliseValues } from './prototype-states.mjs';
 import { linksOf, flowGraph, teamFlows, flowFindings } from './prototype-flows.mjs';
@@ -38,17 +38,79 @@ export function treeOf(ui) {
 // The page itself: the engine's template filled with the system's CSS, its icons and the prototype.
 // catalog: each component's text and on/off options, drawn by the part their name points to when the code has no prop
 // of that name.
-// The families the design sets its text in (Figma's text styles, else the system's own), when the machine may not
-// have them: loaded from Google Fonts, so the drawing reads as the design does. A generic or system family is skipped;
-// ds-config.json → prototypeFonts: false turns it off (an offline machine falls back to the system's stack).
+// The families the design sets its text in (Figma's text styles, else the system's own), first names only; a generic or
+// system family is skipped.
 const GENERIC = /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-[\w-]+|-apple-system|blinkmacsystemfont|segoe ui|roboto|helvetica( neue)?|arial|sf pro[\w ]*|inherit|initial)$/i;
-export function fontLinks(scales = {}) {
-  const fams = new Set();
+export function designFamilies(scales = {}) {
+  const fams = new Map();
   for (const f of [scales.family, ...(scales.text ?? []).map((t) => t.family)]) {
     const first = String(f ?? '').split(',')[0].trim().replace(/^["']|["']$/g, '');
-    if (first && !/^var\(/.test(first) && !GENERIC.test(first)) fams.add(first);
+    if (first && !/^var\(/.test(first) && !GENERIC.test(first) && !fams.has(first.toLowerCase())) fams.set(first.toLowerCase(), first);
   }
-  return [...fams].slice(0, 3).map((f) => `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@300;400;500;600;700&amp;display=swap" data-pt-font>`).join('\n');
+  return [...fams.values()].slice(0, 3);
+}
+
+// The families the system's own CSS ships with @font-face: its files, never another copy.
+export function shippedFamilies(css = '') {
+  return [...String(css).replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/@font-face\s*\{[^}]*?font-family\s*:\s*([^;}]+)/g)].map((m) => m[1].trim().replace(/^["']|["']$/g, ''));
+}
+
+// Where the page finds each design family, without ever holding the page up: a family installed on the machine is used as
+// it is (a canvas measures it against two generic families, no network); one the system's CSS ships comes from its
+// @font-face; any other is asked of Google Fonts, in the background. Until it arrives, or when it never does (not one of
+// Google's fonts, a machine without network), the page is set in the system's own stack, and says so. window.PT_FONTS
+// holds each family's state: installed, system, loading, google or missing (broken: the system's @font-face files did
+// not load); a "pt-fonts" event says it changed.
+// ds-config.json → prototypeFonts: false never asks Google.
+const FONT_LOADER = `function (fams, google) {
+  var st = window.PT_FONTS = {}, asked = [], ctx = document.createElement('canvas').getContext('2d'), probe = 'mmmmmmmmmmlli1WQ@#';
+  function told() { try { window.dispatchEvent(new Event('pt-fonts')); } catch (e) {} }
+  function wide(f) { ctx.font = '72px ' + f; return ctx.measureText(probe).width; }
+  fams.forEach(function (x) {
+    var f = x.family, q = '"' + f.replace(/"/g, '') + '"';
+    if (x.shipped) { st[f] = 'system'; return; }
+    if (wide(q + ', monospace') !== wide('monospace') || wide(q + ', serif') !== wide('serif')) { st[f] = 'installed'; return; }
+    if (!google) { st[f] = 'missing'; return; }
+    st[f] = 'loading';
+    asked.push(f);
+  });
+  // Asked once the page has loaded: a sheet that never answers then holds up nothing, not even the page's load event.
+  function ask() {
+    asked.forEach(function (f) {
+      var l = document.createElement('link');
+      l.rel = 'stylesheet'; l.setAttribute('data-pt-font', f);
+      l.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@300;400;500;600;700&display=swap';
+      l.onload = function () { st[f] = 'google'; told(); };
+      l.onerror = function () { st[f] = 'missing'; told(); };
+      document.head.appendChild(l);
+    });
+  }
+  if (asked.length) { if (document.readyState === 'complete') ask(); else window.addEventListener('load', ask); }
+}`;
+export function fontLoader(scales = {}, { google = true, css = '' } = {}) {
+  const fams = designFamilies(scales);
+  if (!fams.length) return '';
+  const shipped = new Set(shippedFamilies(css).map((f) => f.toLowerCase()));
+  return `<script data-pt-fonts>(${FONT_LOADER})(${JSON.stringify(fams.map((family) => ({ family, ...(shipped.has(family.toLowerCase()) ? { shipped: true } : {}) }))).replace(/</g, '\\u003c')}, ${google ? 'true' : 'false'});</script>`;
+}
+
+// What the engine says of a design family the page could not set its text in, from the states the page ended with.
+export function fontLines(states = {}, { family = '', google = true } = {}) {
+  const fams = Object.keys(states);
+  const rest = String(family ?? '').split(',').map((x) => x.trim()).filter((x) => x && !fams.some((f) => x.replace(/^["']|["']$/g, '').toLowerCase() === f.toLowerCase()));
+  const why = { missing: google ? 'is not installed on this machine, and Google Fonts did not serve it (not one of its fonts, or no network)' : 'is not installed on this machine (prototypeFonts: false, so Google Fonts is not asked)', loading: 'is not installed on this machine, and Google Fonts did not answer within 3s', broken: 'is shipped by the system\'s @font-face, whose files did not load from the page' };
+  return fams.filter((f) => why[states[f]]).map((f) => `🔤 ${f} ${why[states[f]]}: the page and its picture are set in the system's fallback${rest.length ? ` (${rest.join(', ')})` : ''}. Install it to see the page in it.`);
+}
+
+// A component its CSS makes fill its container (width: 100%, or flex: 1 that grows it into the room left, on its own
+// class): it fills the arrangement it is in, as a component Figma sizes to fill its container.
+export function fillsWidth(css, cls) {
+  if (!cls || !/^[\w-]+$/.test(cls)) return false;
+  for (const r of String(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!r[1].split(',').some((sel) => sel.trim() === `.${cls}`)) continue;
+    if (/(^|;)\s*width\s*:\s*100%/.test(r[2]) || /(^|;)\s*flex(-grow)?\s*:\s*[1-9]/.test(r[2])) return true;
+  }
+  return false;
 }
 
 export function prototypePage({ name, tree, states = [], parts, scales, gaps, note = '', catalog = { components: {} }, fonts = true }) {
@@ -60,15 +122,18 @@ export function prototypePage({ name, tree, states = [], parts, scales, gaps, no
   // The variables each of those classes' rules use (.badge.high { color: var(--semantic-negative) }): an option whose
   // value names none of the classes can still name the colour one of them uses.
   const modVarsOf = (cls, mods) => Object.fromEntries(mods.map((k) => { const vars = new Set(); const sel = new RegExp(`\\.${cls.replace(/[^\w-]/g, '')}\\.${k.replace(/[^\w-]/g, '')}(?![\\w-])`); for (const r of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) if (sel.test(r[1])) for (const v of r[2].matchAll(/var\(\s*(--[\w-]+)/g)) vars.add(v[1]); return [k, [...vars]]; }).filter(([, v]) => v.length));
-  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => { const mods = modsOf(c.cls); return [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, markups: c.markups, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean'), enumProps: opts(c.name, 'enum'), slotProps: opts(c.name, 'slot'), mods, modVars: modVarsOf(c.cls ?? '', mods), ...(c.motion ? { motion: c.motion } : {}) }]; }));
-  const data = { name, tree, states, components: drawable, scales, modes: parts.view.modes ?? [], pieces: ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'].filter((p) => !drawable[p]), gaps, note };
+  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => { const mods = modsOf(c.cls); return [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, markups: c.markups, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean'), enumProps: opts(c.name, 'enum'), slotProps: opts(c.name, 'slot'), mods, modVars: modVarsOf(c.cls ?? '', mods), ...(c.only ? { only: c.only } : {}), ...(fillsWidth(css, c.cls) || parts.sizing?.[c.name]?.h === 'FILL' ? { fills: true } : {}), ...(parts.sizing?.[c.name]?.v === 'FILL' ? { grows: true } : {}), ...(c.slots?.length ? { slots: c.slots.map((x) => x.name) } : {}), ...(Object.keys(opts(c.name, 'children')).length ? { slotWords: Object.keys(opts(c.name, 'children')) } : {}), ...(c.motion ? { motion: c.motion } : {}) }]; }));
+  // The classes the system's own CSS styles: a copy taken from a product's page keeps only these, so the product's own
+  // layout (its panel's width, its rows' spacing) stays in the product.
+  const sysClasses = parts.systemCSS ? [...new Set([...String(parts.systemCSS).replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1]))] : null;
+  const data = { name, tree, states, components: drawable, scales, modes: parts.view.modes ?? [], pieces: ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'].filter((p) => !drawable[p]), gaps, note, sysClasses };
   return readFileSync(PROTOTYPE_TEMPLATE, 'utf8')
     .split('/*{{THEME_CSS}}*/').join(parts.themeCSS ?? '')
     .split('/*{{COMPONENT_CSS}}*/').join(parts.componentCSS ?? '')
     .split('<!--{{ICON_SHEET}}-->').join(parts.iconSheet ?? '')
     .split('/*{{PROTOTYPE}}*/').join(JSON.stringify(data).replace(/</g, '\\u003c'))
     .split('<!--{{SYSTEM_SCRIPTS}}-->').join(parts.scripts ?? '')
-    .replace('</head>', `${fonts ? fontLinks(scales) : ''}\n</head>`);
+    .replace('</head>', () => `${fontLoader(scales, { google: fonts, css })}\n</head>`);
 }
 
 // Every Figma colour the code has a variable for, added to the colour scale, so a surface or a text colour a designed
@@ -109,6 +174,9 @@ async function systemFor(ROOT, cfg) {
   const catalog = JSON.parse(readFileSync(join(contractsDir, 'catalog.json'), 'utf8'));
   const { generateStyleguide } = await import('./styleguide-gen.mjs');
   const parts = await generateStyleguide(ROOT, cfg, { partsOnly: true, names: Object.keys(catalog.components ?? {}) });
+  // How Figma sizes each component in its parent (fill or fixed, across and down): a list row that fills its column, a
+  // panel that fills the window's height.
+  try { parts.sizing = Object.fromEntries(Object.entries(JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {}).map(([n, c]) => [n, c?.box?.sizing ?? { v: c?.sizingV }])); } catch { parts.sizing = {}; }
   let figmaVars = {};
   try { figmaVars = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { /* no text styles */ }
   const scales = systemScales(parts.view, figmaVars, `${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`);
@@ -218,7 +286,7 @@ function drawOne(ROOT, name, raw, sys) {
     mkdirSync(outDir, { recursive: true });
     writeFileSync(gapsFile, JSON.stringify({ $description: `What the design system lacks, from every prototype drawn with ${CLI} --prototype. Generated; the design team decides each one.`, byPrototype: store.byPrototype, merged: mergeGaps(store.byPrototype) }, null, 2) + '\n');
     page = join(outDir, `${name}.html`);
-    const mine = mergeGaps({ [name]: r.gaps }).map(gapLine);
+    const mine = pageGaps(r.gaps);
     // What the reply owes the person: every gap of the prototype just drawn (the Stop hook holds the reply to it).
     writeFileSync(join(outDir, 'last.json'), JSON.stringify({ at: new Date().toISOString(), name, pending: true, gaps: [...mergeGaps({ [name]: r.gaps }).map((g) => ({ need: g.need, kind: g.kind, line: gapLine(g) })), ...differs.map((d) => ({ need: `${d.what} ${d.product}`, kind: 'consistency', line: consistencyLine(d) })), ...r.findings.filter((f) => f.kind === 'request').map((f) => ({ need: f.message.replace(/^the request asks for /, '').split(' and ')[0], kind: 'request', line: f.message })), ...r.findings.filter((f) => f.kind === 'state').map((f) => ({ need: `${f.state} state`, kind: 'state', line: f.message })), ...r.findings.filter((f) => f.kind === 'flow').map((f) => ({ need: f.need, kind: 'flow', line: f.message }))] }, null, 2) + '\n');
     writeFileSync(page, prototypePage({ name, tree: treeOf(ui), states, parts: sys.parts, scales: sys.scales, gaps: mine, catalog: sys.catalog, fonts: sys.fonts !== false, note: `${r.counts.components} parts · only the design system's own components${r.gaps.some((g) => g.kind === 'layout') ? ', with the engine\'s neutral layout' : ''}` }));
@@ -268,6 +336,7 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
     ...(() => { const l = ruleLines(sys.context ?? { components: {}, rules: [] }); return l.length ? ['', 'The team\'s rules for the product:', ...l] : []; })(),
     ...((sys.context?.limits ?? []).length ? ['', 'Rules the check holds every prototype to (read from the guidelines):', ...sys.context.limits.map((l) => `  at most ${l.max} ${l.component} per ${l.per}: "${cut(l.sentence, 160)}" (${l.from})`)] : []),
     ...((sys.context?.templates ?? []).length ? ['', 'Templates in Figma (the components each composes, in order):', ...sys.context.templates.map((t) => `  ${t.name}: ${t.components.join(', ')}`)] : []),
+    ...((sys.context?.productScreens ?? []).length ? ['', 'The product\'s screens in Figma (the components each one uses, the most used first; a new page for a product is made of the same):', ...sys.context.productScreens.map((s) => `  ${s.name}: ${screenUses(s)}`)] : []),
     ...conventionLines(conventions),
     '',
     'The engine\'s pieces (only where the system has none of its own):',
@@ -279,7 +348,7 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
     'Format: { "component": "Page", "props": { "padding": "<spacing token>" }, "children": [ { "component": "<name>", "props": { "<option>": "<value>" } } ] }',
     'A system component used for a need it does not quite meet carries "standInFor": "<the need>" in its props; a need nothing fits is { "component": "Missing", "props": { "need": "…" } }.',
     `A flow is one prototype per page, linked: a part that leads to the next page carries "goesTo": "<prototype name>" ("<name>#<state>" for one of its states); ${cmd} --prototype --flow checks the links against the flows the team wrote down.`,
-    'It works as in the product (the system\'s scripts run, a selection moves, a field takes typing). A part that opens another (a dialog, a menu, a popover) carries "opens": "<id>" in its props, and the part it opens has that "id": it is drawn closed and opens on a click.',
+    'It works as in the product (the system\'s scripts run, a selection moves, a field takes typing). A part that opens another (a dialog, a menu, a popover) carries "opens": "<id>" in its props, and the part it opens has that "id": it is drawn closed and opens on a click. A part that shows no words or holds a group of choices (an icon button, a segmented control) carries "name": "<what it is for>": what a screen reader says. A part with a tooltip carries "tip": "<its words>". A part that fills its parent carries "stretch": true (across) or "grow": true (the room left), as Figma\'s fill container; one of several slots goes in the one it names with "inSlot": "<slot>".',
     'Its other states go beside it: "states": { "empty": { "<id>": { …that part in this state… } }, "error": { … }, "loading": { … } }, each naming by "id" only the parts that differ (null leaves one out). A page with a list owes an empty state, one that takes input an error state, and each state the request or the guidelines name.',
     'It is reviewed as drawn: the parts of a column start on one line, one spacing per arrangement, one primary action in view, the main heading the largest text and each heading above its text, lines under 90 characters.',
     'It is tried at every screen width, in every state, with the words as written and 40% longer: nothing may run past the screen, be cut or spill, a control\'s label stays on one line, and on a phone every target is 24px or more. Row "wrap" and Columns "minWidth" let a layout fit a narrow screen.',
@@ -298,10 +367,10 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
   if (!browser || !page) return null;
   const tree = treeOf(splitStates(raw).ui);
   const pick = screenFor(name, raw, tree, screens ?? sys.context.screens ?? [], sys.catalog, slug);
-  const r = await renderPrototype(ROOT, cfg, page, { name, screen: pick?.screen ?? null, mode: pick?.mode ?? 'sibling', widths: screenWidths(sys.context.breakpoints), textStyles: sys.scales?.text ?? [] }).catch((e) => ({ why: String(e?.message ?? e).split('\n')[0] }));
+  const r = await renderPrototype(ROOT, cfg, page, { name, screen: pick?.screen ?? null, mode: pick?.mode ?? 'sibling', widths: screenWidths(sys.context.breakpoints, { own: /^\d+$/.test(String(tree?.props?.width ?? '')) ? Number(tree.props.width) : null }), textStyles: sys.scales?.text ?? [] }).catch((e) => ({ why: String(e?.message ?? e).split('\n')[0] }));
   if (r.why) return { why: r.why };
   // What does not fit at some width, in some state, is owed in the reply as the words are written; with longer words, listed.
-  const fitOwed = (r.fit?.findings ?? []).filter((f) => f.asWritten);
+  const fitOwed = (r.fit?.findings ?? []).filter((f) => f.asWritten && !systemTarget(f));
   if (fitOwed.length) {
     const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
     const lines = fitLines(fitOwed, { states: r.fit.states });
@@ -317,7 +386,7 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
     const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
     try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...r.review.limits.map((l) => ({ need: l.need, kind: 'text style', line: l.message }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
   }
-  if (!pick) return { picture: r.picture, cmp: [], a11y: prototypeA11y(ROOT, page, usedIn(tree)), interactions: r.interactions, fit: r.fit, review: r.review };
+  if (!pick) return { picture: r.picture, cmp: [], a11y: prototypeA11y(ROOT, page, usedIn(tree)), interactions: r.interactions, fit: r.fit, review: r.review, fonts: r.fonts };
   const cmp = compareWithScreen(tree, r.rendered, pick.screen, { mode: pick.mode, catalog: sys.catalog, drawn: new Set((sys.parts.view.components ?? []).map((c) => c.name)) });
   const owed = owedFromScreen(cmp);
   if (owed.length) {
@@ -330,9 +399,11 @@ async function againstScreens(ROOT, cfg, name, raw, sys, page, { browser = true,
     const file = join(ROOT, OUT_DIR, 'prototypes', 'last.json');
     try { const last = JSON.parse(readFileSync(file, 'utf8')); if (last.name === name) writeFileSync(file, JSON.stringify({ ...last, gaps: [...(last.gaps ?? []), ...ownA11y.map((i) => ({ need: `accessibility ${i.issue}`, kind: 'a11y', line: `${i.issue}: ${i.selector} (${i.fix})` }))] }, null, 2) + '\n'); } catch { /* drawn without a record */ }
   }
-  return { ...pick, cmp, picture: r.picture, visual: r.visual, a11y, interactions: r.interactions, fit: r.fit, review: r.review };
+  return { ...pick, cmp, picture: r.picture, visual: r.visual, a11y, interactions: r.interactions, fit: r.fit, review: r.review, fonts: r.fonts };
 }
 
+// A target too small to tap that is a system component's own size (its checkbox, its radio), not this page's doing.
+const systemTarget = (f) => f.kind === 'target' && !!f.component;
 // The components a composition uses, by name.
 const usedIn = (tree) => { const out = new Set(); const walk = (n) => { if (!n) return; if (n.component) out.add(n.component); (n.children ?? []).forEach(walk); }; walk(tree); return out; };
 // The drawn page through the accessibility check: contrast in every mode, names, one main heading, the keyboard. The
@@ -348,14 +419,23 @@ export function prototypeA11y(ROOT, page, used = null) {
     const d = JSON.parse(out.slice(at));
     if (d.notChecked) return null;
     // Only what is on the page: a note that a component the page does not use was not checked is not about it.
-    return (d.issues ?? []).filter((i) => !/(^|[#. ])pt-(bar|outline|gaps|modes|title|note|seg)/.test(String(i.selector ?? '')) && !/no instance shows its .*not checked/.test(String(i.selector ?? ''))
-      && !(used && /^([\w-]+): /.test(String(i.selector ?? '')) && !used.has(/^([\w-]+): /.exec(String(i.selector))[1]))).map((i) => ({ issue: i.issue, selector: String(i.selector ?? ''), fix: i.fix, own: i.issue === 'heading' || (i.issue === 'contrast' && /pt-text/.test(String(i.selector ?? ''))) }));
+    return (d.issues ?? []).filter((i) => !/(^|[#. ])pt-(bar|outline|gaps|gap-show|chip|modes|title|note|font-note|seg|standins|marks?|mark-box)/.test(String(i.selector ?? '')) && !/no instance shows its .*not checked/.test(String(i.selector ?? ''))
+      && !(used && /^([\w-]+): /.test(String(i.selector ?? '')) && !used.has(/^([\w-]+): /.exec(String(i.selector))[1]))).map((i) => {
+      // A control or a group with no name is the page's to name: the composition gives it "name".
+      const named = i.issue === 'name' || i.issue === 'group';
+      return { issue: i.issue, selector: String(i.selector ?? ''), fix: named ? 'give it "name": "<what it is for>" in its props' : i.fix, own: named || i.issue === 'heading' || (i.issue === 'contrast' && /pt-text/.test(String(i.selector ?? ''))) };
+    });
   } catch { return null; }
 }
 export function a11yLines(list) {
   if (!list) return [];
   if (!list.length) return ['♿ ACCESSIBILITY OF THE DRAWN PAGE: nothing found'];
-  return [`♿ ACCESSIBILITY OF THE DRAWN PAGE: ${list.length} issue(s)`, ...list.slice(0, 10).map((i) => `   ${i.own ? '⚠️ ' : '•'} ${i.issue}: ${i.selector}${i.own ? ` (the page's own: ${i.fix})` : ' (a system component: for the audit)'}`), ...(list.length > 10 ? [`   … ${list.length - 10} more`] : [])];
+  // The page's own, each with its fix; what the system's components do themselves, one line for the audit.
+  const own = list.filter((i) => i.own), sys = list.filter((i) => !i.own);
+  const kinds = [...sys.reduce((m, i) => m.set(i.issue, (m.get(i.issue) ?? 0) + 1), new Map())].map(([k, n]) => (n > 1 ? `${k} ×${n}` : k)).join(', ');
+  return [`♿ ACCESSIBILITY OF THE DRAWN PAGE: ${own.length ? `${own.length} the page's own` : 'nothing of the page\'s own'}${sys.length ? `, ${sys.length} about the system's components` : ''}`,
+    ...own.slice(0, 10).map((i) => `   ⚠️  ${i.issue}: ${i.selector} (${i.fix})`), ...(own.length > 10 ? [`   … ${own.length - 10} more`] : []),
+    ...(sys.length ? [`   • the system's components themselves (${kinds}): for the audit (rms-design-system-engine --a11y), not this page`] : [])];
 }
 
 // --from-screens <capture.json>: each designed screen becomes a starting point in prototypes/, drawn at once.
@@ -403,11 +483,14 @@ function flowReport(ROOT, sys) {
   const dir = join(ROOT, 'prototypes');
   let files = [];
   try { files = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'conventions.json'); } catch { /* none yet */ }
-  const pages = {};
+  const pages = {}, notPages = [];
   for (const f of files) {
     try {
       const ui = splitStates(JSON.parse(readFileSync(join(dir, f), 'utf8'))).ui;
       const tree = treeOf(ui);
+      // A file in prototypes/ that is not one page (several pages in one file, a draft left behind) is not part of any
+      // flow, and its words would read as another page's.
+      if (!tree?.component) { notPages.push(f); continue; }
       const head = (function find(n) { if (!n) return null; if (n.component === 'Text' && /^h[12]$/.test(n.props?.as ?? '')) return n.props.text; for (const k of n.children ?? []) { const h = find(k); if (h) return h; } return null; })(tree);
       pages[f.replace(/\.json$/, '')] = { ui, heading: head };
     } catch { /* not a composition */ }
@@ -415,6 +498,7 @@ function flowReport(ROOT, sys) {
   const g = flowGraph(Object.fromEntries(Object.entries(pages).map(([n, p]) => [n, p.ui])));
   const flows = teamFlows(sys.context?.rules ?? []);
   const findings = flowFindings(pages, flows);
+  for (const f of notPages) findings.push({ level: 'error', kind: 'flow', need: f, message: `prototypes/${f} is not one page (no "component" at its root): one page per file, so make it one or remove it` });
   console.log(`\n🔗 FLOWS  ${g.names.length} page(s) in prototypes/, ${g.links.length} link(s)`);
   for (const l of g.links) console.log(`   ${l.from} → ${l.to}${l.state ? ` (its ${l.state} state)` : ''}  by "${l.label}"`);
   if (g.starts.length) console.log(`   starts: ${g.starts.join(', ')}`);
@@ -509,7 +593,7 @@ export async function runPrototype(ROOT, argv) {
   const page = r.page;
   const used = r.used;
   const seen = r.ok ? await againstScreens(ROOT, cfg, name, raw, sys, page, { browser: !args.includes('--no-browser') }) : null;
-  if (JSON_MODE) { process.stdout.write(JSON.stringify({ ok: r.ok, page: page && page.replace(ROOT + '/', ''), findings: r.findings, counts: r.counts, gaps: r.gaps, used, screen: seen?.screen ? { name: seen.screen.name, mode: seen.mode, differences: seen.cmp, picture: seen.picture.replace(ROOT + '/', ''), visual: seen.visual } : null, picture: seen?.picture ? seen.picture.replace(ROOT + '/', '') : null }, null, 2) + '\n'); return r.ok ? 0 : 1; }
+  if (JSON_MODE) { process.stdout.write(JSON.stringify({ ok: r.ok, page: page && page.replace(ROOT + '/', ''), findings: r.findings, counts: r.counts, gaps: r.gaps, used, screen: seen?.screen ? { name: seen.screen.name, mode: seen.mode, differences: seen.cmp, picture: seen.picture.replace(ROOT + '/', ''), visual: seen.visual } : null, picture: seen?.picture ? seen.picture.replace(ROOT + '/', '') : null, fonts: seen?.fonts ?? null }, null, 2) + '\n'); return r.ok ? 0 : 1; }
 
   console.log(`\nPrototype  ·  ${name}  ·  ${r.counts.components} part(s)`);
   // The same line for several parts (three tags, each experimental) is said once, with how many.
@@ -534,6 +618,7 @@ export async function runPrototype(ROOT, argv) {
   }
   if (seen?.screen) { console.log(''); for (const l of screenLines(seen.cmp, { ...seen, root: ROOT })) console.log(l); }
   else if (seen?.picture) console.log(`\n   picture of the page: ${seen.picture.replace(ROOT + '/', '')}`);
+  for (const l of fontLines(seen?.fonts, { family: sys.scales?.family, google: sys.fonts !== false })) console.log(`   ${l}`);
   if (seen?.a11y) { console.log(''); for (const l of a11yLines(seen.a11y)) console.log(l); }
   else if (seen?.why) console.log(`\n   ⏭  not measured in the browser (${seen.why})`);
   if (seen?.review && seen.review.score != null) {
@@ -542,9 +627,13 @@ export async function runPrototype(ROOT, argv) {
     for (const l of visualLines(v)) console.log(`   ${l}`);
   }
   if (seen?.fit) {
-    const f = seen.fit, lines = fitLines(f.findings, { states: f.states });
+    // A system component smaller than a finger at a phone's width is its own size, the same on every page: one line for
+    // the audit, apart from what this page's composition can change.
+    const f = seen.fit, own = f.findings.filter((x) => !systemTarget(x)), small = f.findings.filter(systemTarget);
+    const lines = fitLines(own, { states: f.states });
     console.log(`\n📱 EVERY SIZE AND STATE  ${f.widths.join(', ')} · ${f.states.length} state${f.states.length === 1 ? '' : 's'} (${f.states.join(', ')}) · the words as written and 40% longer${lines.length ? `: ${lines.length} problem(s)` : ', all fit'}`);
     for (const l of lines) console.log(`   ${l}`);
+    if (small.length) console.log(`   • the system's ${[...new Map(small.map((x) => [x.component, `${x.component} (${x.w}×${x.h}px)`])).values()].join(', ')} under 24px to tap on a phone: the component's own size, for the audit`);
     if (f.pictures.length) console.log(`   pictures: ${f.pictures.map((p) => p.replace(ROOT + '/', '')).join(', ')}`);
   }
   const works = interactionLines(seen?.interactions ?? []);
@@ -561,9 +650,9 @@ export async function runPrototype(ROOT, argv) {
     r.uses.length ? 'Check each use above against what its component is for: a use the documentation rules out gets "standInFor" with the need, or a Missing box, and the prototype is drawn again.' : null,
     r.differs.length ? 'Make each 📐 line match the other pages, or tell the person why this page differs.' : null,
     placed.length ? `Make each ⚠️ line under 📏 match "${seen.screen.name}", or tell the person why this page differs from it.` : null,
-    (seen?.a11y ?? []).some((i) => i.own) ? 'Fix each ⚠️ line under ♿ in the composition (one main heading: a Text with as h1; a text colour that reads on its surface), or tell the person.' : null,
+    (seen?.a11y ?? []).some((i) => i.own) ? 'Fix each ⚠️ line under ♿ in the composition (a part or group with no name gets "name"; one main heading: a Text with as h1; a text colour that reads on its surface), or tell the person.' : null,
     (seen?.review?.findings ?? []).length ? 'Fix each ⚠️ line under 🎨 in the composition (one primary action, one spacing per arrangement, a heading style above its text, a narrower column) and draw it again until it scores 10, or tell the person why a line stays.' : null,
-    (seen?.fit?.findings ?? []).length ? 'Fix each ⚠️ line under 📱 in the composition (a shorter label, Row wrap, Columns minWidth, fewer parts in a row) and draw it again, or tell the person; a line that happens only with longer words is for a translated product: tell the person.' : null,
+    (seen?.fit?.findings ?? []).filter((x) => !systemTarget(x)).length ? 'Fix each ⚠️ line under 📱 in the composition (a shorter label, Row wrap, Columns minWidth, fewer parts in a row) and draw it again, or tell the person; a line that happens only with longer words is for a translated product: tell the person.' : null,
     works.length ? 'Fix each ⚠️ line under 🖱 in the composition ("opens" names the "id" of the part it opens), or tell the person.' : null,
     seen?.picture ? `Look at ${seen.picture.replace(ROOT + '/', '')} before you answer.` : null,
     gaps.length ? `Tell the person each gap above as it is written: the design team decides them; never build one. Offer to send them to Figma as the design team's to do list (${CLI} --figma-edits writes it; applied only after a yes).` : null,

@@ -1,7 +1,7 @@
 // The prototype evaluation's scorer: it judges what a run made without the engine, the same for both sides.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { systemUnchanged, inventsNothing, usesSystem, namesGap, PROTO } from './skill-evals/proto-tasks.mjs';
+import { systemUnchanged, inventsNothing, usesSystem, namesGap, namesIconOnly, PROTO } from './skill-evals/proto-tasks.mjs';
 
 const ctx = (files) => ({ changed: Object.keys(files), read: (p) => files[p] ?? null });
 
@@ -58,8 +58,8 @@ test('a gap is named when the thing and a word saying it is not there are close'
   assert.equal(namesGap('## Summary\n\nThe page shows a confirmation message once saved.', 'toasts?|banners?|confirmation (message|component)'), false);
 });
 
-test('eleven prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
-  assert.deepEqual(PROTO.map((t) => t.id), ['proto-settings', 'proto-search', 'proto-empty', 'proto-profile', 'proto-dialog', 'proto-linked', 'proto-list', 'proto-signin', 'proto-flow', 'proto-phone', 'proto-confirm']);
+test('twelve prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
+  assert.deepEqual(PROTO.map((t) => t.id), ['proto-settings', 'proto-search', 'proto-empty', 'proto-profile', 'proto-dialog', 'proto-linked', 'proto-list', 'proto-signin', 'proto-flow', 'proto-phone', 'proto-icon', 'proto-confirm']);
   assert.ok(PROTO.every((t) => t.mayWriteHtml && t.mayChangeAll && typeof t.setup === 'function'));
 });
 
@@ -106,4 +106,24 @@ test('the pages of a flow match: one wording for going on, one page padding', as
   assert.equal(consistentFlow(ctx({ 'prototypes/a.json': page('padding/m', 'Continue'), 'prototypes/b.json': page('padding/m', 'Continue') })).ok, true);
   assert.match(consistentFlow(ctx({ 'prototypes/a.json': page('padding/m', 'Continue'), 'prototypes/b.json': page('padding/s', 'Next') })).detail, /going on is continue \/ next; padding padding\/m \/ padding\/s/);
   assert.equal(consistentFlow(ctx({ 'a.html': '<button>Next</button>', 'b.html': '<button>Continue</button>' })).ok, false);
+});
+
+test('a control that shows only its icon is named for a screen reader: a composition\'s name, markup\'s aria-label', () => {
+  const comp = (props) => ctx({ 'prototypes/notes.json': JSON.stringify({ component: 'Page', children: [{ component: 'Row', children: [{ component: 'chip', props: { Label: 'All' } }, { component: 'chip', props }] }] }) });
+  assert.equal(namesIconOnly(comp({ Icon: true, Label: '', name: 'Pin the note' })).ok, true);
+  assert.equal(namesIconOnly(comp({ Icon: 'true' })).ok, false, 'an icon-only chip with no name');
+  assert.match(namesIconOnly(comp({ Icon: true, name: 'Star' })).detail, /none named for pin/);
+  assert.equal(namesIconOnly(ctx({ 'notes.html': '<button class="chip" aria-label="Pin note"><span class="chip__icon"></span></button>' })).ok, true);
+  assert.equal(namesIconOnly(ctx({ 'src/Notes.jsx': '<Chip Icon aria-label="Pin this note" Label="" />' })).ok, true);
+  assert.equal(namesIconOnly(ctx({ 'notes.html': '<button class="chip"><span class="chip__icon"></span></button>' })).ok, false);
+  assert.equal(namesIconOnly(ctx({ 'prototypes/notes.json': JSON.stringify({ component: 'Page', children: [{ component: 'Missing', props: { need: 'an icon-only chip to pin the note' } }] }) })).ok, true, 'said as a need the system cannot meet');
+  assert.ok(PROTO.some((t) => t.id === 'proto-icon'));
+});
+
+test('a starting point the engine read from a designed screen is the designers\' screen, not what the run made', () => {
+  const start = JSON.stringify({ $note: 'Starting point read from the screen "Settings" in Figma (3:28).', prototype: { component: 'Page', children: [{ component: 'tag', props: { Label: 'New' } }, { component: 'button', props: { Label: 'Save' } }] } });
+  const c = ctx({ 'prototypes/settings.json': start, 'prototypes/account.json': JSON.stringify({ component: 'Page', children: [{ component: 'button', props: { Label: 'Save' } }] }) });
+  const tagTask = PROTO.find((t) => t.id === 'proto-linked');
+  assert.ok(tagTask);
+  assert.equal(usesSystem(c, ['tag']).ok, false, 'the screen\'s tag is not the run\'s');
 });

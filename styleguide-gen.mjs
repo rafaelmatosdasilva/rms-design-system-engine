@@ -333,6 +333,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: [...new Set([...(opts.names ?? []), ...structNames])], themeCss: themeFiles.map(readText).join('\n'),
       // A contract entry named apart from its Figma component (figmaName) maps that component's props too.
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).flatMap(([n, c]) => [[n, c.propertyMap], ...(c.figmaName && c.figmaName !== n && !contract.CONTRACT[c.figmaName]?.propertyMap ? [[c.figmaName, c.propertyMap]] : [])])),
+      // An option heard on a part (heardOn: the field disabled inside its wrapper), set with the option's look.
+      heardOn: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.heardOn).flatMap(([n, c]) => [[n, c.heardOn], ...(c.figmaName && c.figmaName !== n ? [[c.figmaName, c.heardOn]] : [])])),
       parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
     // "In use": the approved pictures of the system's own frames (Gate [2]'s references), embedded, six at most.
     const refsDir = resolve(ROOT, cfg.visualRefs ?? '.design-system-engine-refs');
@@ -792,7 +794,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     try { return `<script data-system-script="${String(p).replace(/"/g, '')}">\n${readFileSync(resolve(ROOT, p), 'utf8').replace(/<\/script/gi, '<\\/script')}\n</script>`; } catch { return `<!-- systemScripts: ${String(p).replace(/--/g, '')} not found -->`; }
   }).join('\n');
   // opts.partsOnly: what the page is made of, without writing it (a prototype draws with the same parts).
-  if (opts.partsOnly) return { themeCSS: themeCSS(), componentCSS: await componentCSS(), view: JSON.parse(await agreed()), iconSheet: iconSheet(), scripts: systemScripts() };
+  if (opts.partsOnly) {
+    const componentCss = await componentCSS();
+    // The system's own CSS (its theme and the sheets in its repository), apart from the products' pages it also reads:
+    // what a prototype's copy of a component may keep.
+    const systemCss = [...new Set([...themeFiles, ...((await context()).componentSheets ?? [])])].filter((f) => !String(f).startsWith('..') && existsSync(resolve(ROOT, f))).map((f) => (/\.html?$/i.test(f) ? styleBlocks(readText(f)) : readText(f))).join('\n');
+    return { themeCSS: themeCSS(), componentCSS: componentCss, systemCSS: systemCss, view: JSON.parse(await agreed()), iconSheet: iconSheet(), scripts: systemScripts() };
+  }
   const fills = {
     THEME_CSS: () => themeCSS(),
     COMPONENT_CSS: () => componentCSS(),

@@ -628,9 +628,13 @@ a.pg-usage-name { color: var(--sg-text); }
   var SEG = DATA.ui && DATA.ui.segmented, RADIO = SEG && SEG.item.radio, RADIO_NO = 0;
   // The system's own icon for a warning (its name says so), else none: the count is still said.
   var ALERT_ICON = (DATA.icons || []).find(function (i) { return /warn|alert|caution|attention|exclam/i.test(i); }) || (DATA.icons || []).find(function (i) { return /error|danger/i.test(i); }) || null;
-  function segHTML(items) {
+  // name: what the switch chooses. The group says it (WCAG 1.3.1, 4.1.2): the page's own row is a named group, and the
+  // system's control carries the name itself, so the role its script gives it (a radio group) has its name.
+  function segHTML(items, name) {
     var tag = SEG ? SEG.item.tag : 'button', cls = SEG ? SEG.item.classes.join(' ') : '', group = 'sg-r' + (++RADIO_NO);
-    return (SEG ? SEG.open : '<div class="sg-seg">') + items.map(function (o) {
+    var open = SEG ? SEG.open : '<div class="sg-seg" role="group">';
+    if (name && !/\saria-label(ledby)?=/.test(open.slice(0, open.indexOf('>')))) open = open.replace(/^<([\w-]+)/, '<$1 aria-label="' + esc(name) + '"');
+    return open + items.map(function (o) {
       var text = SEG && SEG.item.label ? '<span class="' + esc(SEG.item.label) + '">' + esc(o.label) + '</span>' : esc(o.label);
       // A mark beside the words (the system's alert icon on Parity while something differs), with what it means said.
       if (o.icon) text = '<svg class="sg-seg-icon" aria-hidden="true"><use href="#' + esc(o.icon) + '"/></svg>' + text;
@@ -687,14 +691,14 @@ a.pg-usage-name { color: var(--sg-text); }
       return (a && a.getAttribute(axis.attr)) || base(axis);
     }
     function control(axis, scope, onChange) {
-      var wrap = document.createElement('div'); wrap.className = 'sg-mode-ctl'; wrap.setAttribute('role', 'group'); wrap.setAttribute('aria-label', axis.label);
+      var wrap = document.createElement('div'); wrap.className = 'sg-mode-ctl';
       // On the page's own switch, a mode the device's setting decides comes first as Auto: it follows the device and names
       // the mode it found (Auto (Dark)). Each component's switch shows the mode it is in.
       var auto = scope === html && !!axis.media && !axis.classes;
       var items = axis.values.map(function (v) { return { v: v.value, label: v.label, off: !!v.notInCode, title: v.notInCode ? v.label + ' is in Figma, not in the code yet' : '' }; });
       if (auto) items.unshift({ v: '__auto', label: 'Auto', title: 'Follows this device\'s setting' });
-      // The page's own switch in the menu has no word over it (its group is still named for a screen reader).
-      wrap.innerHTML = (scope === html ? '' : '<span class="sg-mode-label">' + esc(axis.label) + '</span>') + segHTML(items);
+      // The page's own switch in the menu has no word over it (the switch is still named for a screen reader).
+      wrap.innerHTML = (scope === html ? '' : '<span class="sg-mode-label">' + esc(axis.label) + '</span>') + segHTML(items, axis.label);
       // On the page's own switch, what the chosen mode changes in the code (axis.changes, from the theme's own values).
       var diff = null;
       if (scope === html && axis.changes) { diff = document.createElement('p'); diff.className = 'sg-mode-diff'; diff.setAttribute('aria-live', 'polite'); wrap.appendChild(diff); }
@@ -1153,6 +1157,8 @@ a.pg-usage-name { color: var(--sg-text); }
       case 'link': e = document.createElement('a'); e.href = '#'; break;
       default: e = document.createElement('span');
     }
+    // A stand-in, not the code's markup: the accessibility check says it is not checked instead of reading it.
+    e.setAttribute('data-sg-standin', '');
     if (c.cls) e.classList.add(clsName(c));
     // Its name as the words only when no text prop fills it.
     if (e.tagName !== 'INPUT' && !(c.controls || []).some(function (k) { return k.type === 'TEXT'; })) e.textContent = c.name.charAt(0).toUpperCase() + c.name.slice(1);
@@ -1209,6 +1215,8 @@ a.pg-usage-name { color: var(--sg-text); }
       if (on) t.setAttribute(a, effect.attrs[a]); else t.removeAttribute(a);
       if (a === 'checked' || a === 'disabled' || a === 'indeterminate') t[a] = on;   // the live state, not only the attribute
     });
+    // The state a part is heard in, set with the look (heardOn: the field disabled inside its wrapper).
+    (effect.also || []).forEach(function (x) { applyEffect(e, x, on); });
   }
   // Whether an option's look is what the component shows now: true or false, or null when the page cannot read it
   // (a live state such as hover, or an option that sets nothing).
@@ -1566,7 +1574,7 @@ a.pg-usage-name { color: var(--sg-text); }
     }).join('');
     var sum = [['match', n.match + ' the same'], ['differs', n.differs + ' differ'], ['figma', n.figma + ' only in Figma'], ['code', n.code + ' only in code']].concat(n.paired ? [['paired', n.paired + ' in both, not compared']] : [])
       .map(function (x) { return '<span class="pg-par-status pg-par--' + x[0] + '"><span class="pg-par-sign" aria-hidden="true">' + PAR[x[0]][0] + '</span>' + esc(x[1]) + '</span>'; }).join('');
-    var filter = types.length > 1 ? '<div class="pg-par-filter">' + segHTML([{ label: 'All (' + rows.length + ')', v: 'all' }].concat(types.map(function (t) { return { label: plural[t] + ' (' + rows.filter(function (r) { return r.type === t; }).length + ')', v: t }; }))) + '</div>' : '';
+    var filter = types.length > 1 ? '<div class="pg-par-filter">' + segHTML([{ label: 'All (' + rows.length + ')', v: 'all' }].concat(types.map(function (t) { return { label: plural[t] + ' (' + rows.filter(function (r) { return r.type === t; }).length + ')', v: t }; })), 'Show') + '</div>' : '';
     return '<div class="pg-doc pg-par"><div class="pg-par-sum">' + sum + '</div>' + filter +
       '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Type</th><th>Figma</th><th>Code</th><th>Status</th><th>Updated</th></tr></thead><tbody>' + body + '</tbody></table></div></div>' +
       differencesHTML(c) + '</div>';
@@ -2082,9 +2090,9 @@ a.pg-usage-name { color: var(--sg-text); }
       // Playground: the component drawn, its controls, the tokens behind what is drawn and its code.
       '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card"><div class="pg-preview-col"><div class="pg-stage-bar pg-stage-bar--top"><div class="pg-stage-mode"></div><div class="pg-stage-tools"></div></div><div class="pg-preview"></div><div class="pg-frame" hidden></div><div class="pg-anatomy" hidden></div><div class="pg-stage-bar pg-stage-bar--bottom"><div class="pg-actions"></div><p class="pg-anat-line" hidden></p><div class="pg-stage-mode"></div></div></div><div class="pg-panel">' +
-        (ALL ? '' : '<div class="pg-ctl pg-width"><div class="pg-ctl-label">Width</div>' + segHTML(WIDTHS.map(function (w) { return { v: w[0], label: w[1] }; })) + '</div>') +
+        (ALL ? '' : '<div class="pg-ctl pg-width"><div class="pg-ctl-label">Width</div>' + segHTML(WIDTHS.map(function (w) { return { v: w[0], label: w[1] }; }), 'Width') + '</div>') +
         '<div class="pg-controls"></div></div></div>' +
-        (ALL || !(c.figmaShots || []).length ? '' : '<div class="pg-inspect pg-compare" hidden><div class="pg-inspect-head">Figma beside the code</div><div class="pg-compare-bar">' + segHTML([{ v: 'side', label: 'Side by side' }, { v: 'over', label: 'Over' }]) +
+        (ALL || !(c.figmaShots || []).length ? '' : '<div class="pg-inspect pg-compare" hidden><div class="pg-inspect-head">Figma beside the code</div><div class="pg-compare-bar">' + segHTML([{ v: 'side', label: 'Side by side' }, { v: 'over', label: 'Over' }], 'Figma beside the code') +
           '<label class="pg-ctl-label pg-compare-amount">How much of Figma shows <input type="range" min="0" max="100" value="50"></label></div><div class="pg-compare-body"></div></div>') +
         // The tokens behind what is drawn now, following every change made here, its code on their right. Every token the
         // component has is in Parity.
@@ -3013,7 +3021,7 @@ a.pg-usage-name { color: var(--sg-text); }
       } else {
         var opts = p.type === 'VARIANT' ? (p.options || []).map(function (o) { return { v: o.label, off: o.unbuilt || (o.live && !o.state && !(o.add || []).length && !Object.keys(o.attrs || {}).length), unbuilt: o.unbuilt }; })
           : [{ v: 'false' }, { v: 'true', off: !p.on && !p.off && !p.part, drawn: p.part && !hasPart(c, p.part) }];   // a part no instance holds is drawn from the code's CSS
-        ctl.innerHTML = label + segHTML(opts.map(function (o) { return { v: o.v, label: o.v, off: o.off, title: o.drawn ? 'No instance in the products has this part: drawn from the code\'s own CSS for it' : o.unbuilt ? 'Figma has this option; the code does not build it yet' : o.off ? 'Shown live, not as a style the page can set' : '' }; }));
+        ctl.innerHTML = label + segHTML(opts.map(function (o) { return { v: o.v, label: o.v, off: o.off, title: o.drawn ? 'No instance in the products has this part: drawn from the code\'s own CSS for it' : o.unbuilt ? 'Figma has this option; the code does not build it yet' : o.off ? 'Shown live, not as a style the page can set' : '' }; }), p.label);
         var sync = function () { segItems(ctl).forEach(function (b) { segSelect(b, b.dataset.v === String(state[p.label])); }); nudge(); };
         syncs[p.label] = sync;
         segItems(ctl).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; var next = p.type === 'VARIANT' ? b.dataset.v : b.dataset.v === 'true'; if (next === state[p.label]) return; state[p.label] = next; sync(); refresh(); }); });   // the option already set changes nothing
@@ -3024,7 +3032,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // Figma's props the code does not build yet: listed with the rest, offered but not drawn.
     (c.unbuilt || []).forEach(function (u) {
       var ctl = document.createElement('div'); ctl.className = 'pg-ctl'; if (u.at != null) ctl.dataset.at = u.at;
-      ctl.innerHTML = '<div class="pg-ctl-label">' + esc(u.label) + '</div>' + segHTML([{ v: '', label: 'Not in the code yet', off: true, title: 'Figma has this prop; the code does not build it yet' }]);
+      ctl.innerHTML = '<div class="pg-ctl-label">' + esc(u.label) + '</div>' + segHTML([{ v: '', label: 'Not in the code yet', off: true, title: 'Figma has this prop; the code does not build it yet' }], u.label);
       controlsEl.appendChild(ctl);
     });
     // In Figma's order (its panel's: variants first, then the rest as Figma lists them), built or not.
