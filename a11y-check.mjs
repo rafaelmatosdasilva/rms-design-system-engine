@@ -1210,9 +1210,11 @@ async function main() {
   // Nothing configured or built → be as automatic as possible: start the project's dev server
   // and discover pages (Storybook stories, else static router routes, else the base page). This
   // is what lets a non-plugin DS (SPA/Storybook) run with zero config and zero questions.
+  // A project whose packages are not installed can run neither its dev server nor its components: said, not tried.
+  const noPackages = existsSync(join(ROOT, 'package.json')) && !existsSync(join(ROOT, 'node_modules'));
   if (!targets.length && cfg.a11y?.discover !== false) {
     let base = cfg.a11y?.baseUrl || null;
-    if (!base) {
+    if (!base && !noPackages) {
       const cmd = detectServeCmd(ROOT, cfg);
       if (cmd) {
         console.log(`ℹ️  [a11y] no target configured — starting the dev server (${cmd}) to discover pages…`);
@@ -1230,6 +1232,7 @@ async function main() {
     }
   }
 
+  if (!targets.length && noPackages) skip('the project\'s packages are not installed (no node_modules), so neither its dev server nor its components can run in a browser: install them (npm install, or the project\'s package manager), then run again.');
   if (!targets.length) skip(`no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.${harnessWhy ? ` The components were not rendered from their code either: ${harnessWhy}.` : ''}`);
   const waitFor = cfg.a11y?.waitFor ?? null;   // optional selector to await before the sweep (SPA hydration)
 

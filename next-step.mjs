@@ -113,7 +113,7 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
       : `Only ${only.words} ran in this run; nothing else was checked.`);
     if (only.a11y) {
       const n = (x) => (x == null ? null : `${x} finding${x === 1 ? '' : 's'}`);
-      const parts = [only.a11y.static != null ? `${n(only.a11y.static)} from the code` : null, only.a11y.browser != null ? `${n(only.a11y.browser)} in the browser` : 'the browser part did not run (no page or no Chrome)'].filter(Boolean);
+      const parts = [only.a11y.static != null ? `${n(only.a11y.static)} from the code` : null, only.a11y.browser != null ? `${n(only.a11y.browser)} in the browser` : `the browser part did not run (${only.a11y.why ?? 'no page or no Chrome'})`].filter(Boolean);
       lines.push(`Accessibility: ${parts.join(', ')}.`);
     }
   }
