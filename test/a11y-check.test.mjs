@@ -245,3 +245,22 @@ test('a project whose packages are not installed is told so, not "auto-discovery
   assert.equal(r.status, 0);
   assert.match(r.stdout, /the project's packages are not installed \(no node_modules\)|Chrome not found/, r.stdout);
 });
+
+test('a style guide that draws no component is not the page checked: the project\'s own pages are', () => {
+  const sgPath = '/proj/.design-system-engine-out/styleguide/index.html';
+  const page = (components) => `<script type="application/json" id="sg-data">${JSON.stringify({ components })}</script>`;
+  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => page([])), null);
+  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => page([{ name: 'chip' }])).styleguide, true);
+  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => '<html>a page of its own</html>').styleguide, true, 'a list it cannot read: taken as it is');
+});
+
+test('a dev server that prints its address in colour (Vite\'s bold port) is read without the colour codes', { timeout: 30000 }, async () => {
+  const { startDevServer } = await import('../a11y-check.mjs');
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join: j } = await import('node:path');
+  const dir = mkdtempSync(j(tmpdir(), 'a11y-serve-'));
+  writeFileSync(j(dir, 'serve.mjs'), "process.stdout.write('  \\x1b[32m➜\\x1b[39m  Local:   \\x1b[36mhttp://localhost:\\x1b[1m5173\\x1b[22m/\\x1b[39m\\n'); setInterval(() => {}, 1000);");
+  const srv = startDevServer(`${process.execPath} serve.mjs`, dir);
+  try { assert.equal(await srv.url, 'http://localhost:5173'); } finally { srv.stop(); }
+});

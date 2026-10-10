@@ -440,14 +440,15 @@ function detectServeCmd(ROOT, cfg) {
   for (const name of ['storybook', 'dev', 'serve', 'start', 'preview']) if (s[name]) return 'npm run ' + name;
   return null;
 }
-function startDevServer(cmd, ROOT) {
+export function startDevServer(cmd, ROOT) {
   const parts = cmd.split(/\s+/);
-  const proc = spawn(parts[0], parts.slice(1), { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none', FORCE_COLOR: '0' } });
+  const proc = spawn(parts[0], parts.slice(1), { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none', FORCE_COLOR: '0', NO_COLOR: '1' } });
   const stop = () => { try { process.kill(-proc.pid, 'SIGTERM'); } catch { try { proc.kill('SIGTERM'); } catch {} } };
   const url = new Promise((res) => {
     let buf = '', done = false;
     const finish = (v) => { if (!done) { done = true; res(v); } };
-    const scan = (d) => { buf += d.toString(); const m = buf.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?[^\s'"]*/i); if (m) finish(m[0].replace(/\/+$/, '')); };
+    // A server that prints its address in colour (Vite puts the port in bold) is read without the colour codes.
+    const scan = (d) => { buf += d.toString().replace(/\x1b\[[0-9;]*m/g, ''); const m = buf.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?[^\s'"]*/i); if (m) finish(m[0].replace(/\/+$/, '')); };
     proc.stdout.on('data', scan); proc.stderr.on('data', scan);
     proc.on('exit', () => finish(null));
     setTimeout(() => finish(null), 40000);   // give the server up to 40s to print a URL
@@ -493,12 +494,17 @@ function argValues(flag, argv) {
 // file:// a11y target it is deterministic, complete and needs no dev server — and because
 // each state is its own instance in the resting DOM, the existing sweep gets per-state
 // coverage for free. Returns the target or null (missing, or opted out via a11y.styleguide:false).
-export function styleguideTarget(cfg, ROOT, exists = existsSync) {
+export function styleguideTarget(cfg, ROOT, exists = existsSync, read = (f) => readFileSync(f, 'utf8')) {
   if (cfg?.a11y?.styleguide === false) return null;
+  // A guide that draws no component (built before any was agreed, or with no Figma data) has nothing to try: the
+  // project's own pages are checked instead. One whose list cannot be read is taken as it is.
+  const draws = (abs) => {
+    try { const m = /<script[^>]*\bid=["']sg-data["'][^>]*>([\s\S]*?)<\/script>/.exec(read(abs)); return !m || (JSON.parse(m[1]).components ?? [1]).length > 0; } catch { return true; }
+  };
   // Where the style guide is written: the configured place, else the project's own template's, else the engine's.
   for (const rel of [cfg?.styleguide?.out, 'apps/styleguide/index.html', `${OUT_DIR}/styleguide/index.html`].filter(Boolean)) {
     const abs = join(ROOT, rel);
-    if (exists(abs)) return { label: rel, url: pathToFileURL(abs).href + '?all', styleguide: true };   // every view drawn at once
+    if (exists(abs) && draws(abs)) return { label: rel, url: pathToFileURL(abs).href + '?all', styleguide: true };   // every view drawn at once
   }
   // Not built by the project yet: the code capture keeps its own copy, built from the same template.
   const cap = join(ROOT, dirname(codeSnapshotPath(cfg)), 'styleguide.html');
