@@ -12,6 +12,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { projectTypeScriptOnly, withinProject } from './project-typescript.mjs';
+import { textComponentApi } from './component-source.mjs';
 
 // ── The React stand-in: enough for a presentational component, nothing more ──────────────────────────────────
 export const REACT_SHIM = `
@@ -182,8 +183,8 @@ export function propsOf(figma) {
   return out;
 }
 // entry: the component-props snapshot's entry. → [{ label, props }], the default first, then each other value of each
-// variant prop and each on/off prop flipped, at most `max`.
-export function harnessCases(entry = {}, max = 8) {
+// variant prop and each on/off prop flipped, at most `max` (ds-config.json → a11y.maxVariants, 16 by default).
+export function harnessCases(entry = {}, max = 16) {
   const defs = Object.entries(entry.properties ?? {});
   const base = {};
   for (const [k, d] of defs) if (d.type !== 'INSTANCE_SWAP') base[k] = d.defaultValue;
@@ -191,6 +192,28 @@ export function harnessCases(entry = {}, max = 8) {
   for (const [k, d] of defs) {
     if (d.type === 'VARIANT') for (const o of d.variantOptions ?? []) { if (String(o) !== String(d.defaultValue) && !INTERACTION.test(o)) cases.push({ label: `${clean(k)}=${o}`, props: propsOf({ ...base, [k]: o }) }); }
     else if (d.type === 'BOOLEAN') cases.push({ label: `${clean(k)}=${!d.defaultValue}`, props: propsOf({ ...base, [k]: !d.defaultValue }) });
+  }
+  return cases.slice(0, max);
+}
+
+// ── What to render when Figma has no variants: the code's own props ─────────────────────────────────────────────────
+// api: textComponentApi(file, text) → { props: { name: { default, options } } }; text: the component's source.
+// → [{ label, props }]: the default first, then each other value of each option, each on/off prop flipped, each text
+// emptied (or set, when it starts empty), each icon set and emptied, at most `max`.
+const TEXTY = /^(label|title|text|content|caption|heading|description|placeholder|message|helper(text)?|hint|subtitle|name)$/i;
+export function variantsFromCode(api = {}, text = '', max = 16) {
+  const props = Object.entries(api.props ?? {});
+  const typed = (p, t) => new RegExp(`\\b${p}\\??\\s*:\\s*(?:${t})\\b|\\b${p}\\s*:\\s*\\{[^}]*type\\s*:\\s*(?:${t})\\b|\\b${p}\\s*:\\s*(?:${t[0].toUpperCase() + t.slice(1)})\\b`, 'i').test(text);
+  const isBool = (p, d) => d.default === 'true' || d.default === 'false' || d.default === true || d.default === false || typed(p, 'boolean');
+  const value = (p, d) => (isBool(p, d) ? d.default === true || d.default === 'true' : d.default != null ? String(d.default).replace(/^['"`]|['"`]$/g, '') : undefined);
+  const base = {};
+  for (const [p, d] of props) { const v = value(p, d); if (v !== undefined) base[p] = v; }
+  const cases = [{ label: 'default', props: { ...base } }];
+  for (const [p, d] of props) {
+    if (d.options?.length) { for (const o of d.options) if (String(o) !== String(base[p])) cases.push({ label: `${p}=${o}`, props: { ...base, [p]: o } }); continue; }
+    if (isBool(p, d)) { cases.push({ label: `${p}=${!base[p]}`, props: { ...base, [p]: !base[p] } }); continue; }
+    if (/icon/i.test(p)) { if (base[p]) cases.push({ label: `${p}=""`, props: { ...base, [p]: '' } }); continue; }
+    if (TEXTY.test(p) || typed(p, 'string')) cases.push(base[p] ? { label: `${p}=""`, props: { ...base, [p]: '' } } : { label: `${p}="${p}"`, props: { ...base, [p]: p.charAt(0).toUpperCase() + p.slice(1) } });
   }
   return cases.slice(0, max);
 }
@@ -265,7 +288,7 @@ window.__dseHarnessReady = true;
 
 // The harness for a project: its React components (a .jsx or .tsx file each) with their Figma variants, served.
 // names: the components to render. → { url, close, groups, missing: [why] } or null when nothing can be rendered.
-export async function startHarness(ROOT, cfg, names, { propsSnap = {}, locate } = {}) {
+export async function startHarness(ROOT, cfg, names, { propsSnap = {}, locate, max = cfg.a11y?.maxVariants ?? 16 } = {}) {
   const ts = loadTypeScript(ROOT);
   if (!ts) return { url: null, why: 'no TypeScript to read the components\' JSX (the project\'s own, or a global one: npm i -g typescript)' };
   const groups = [], missing = [];
@@ -278,7 +301,10 @@ export async function startHarness(ROOT, cfg, names, { propsSnap = {}, locate } 
     const role = String((propsSnap[name]?.annotations ?? []).map((a) => a?.label ?? '').join(' ').match(/\brole\s*[:=]\s*["']?([a-z][\w-]*)/i)?.[1] ?? '').toLowerCase();
     const named = /^(textbox|textfield|textinput|input|field|searchbox|spinbutton|stepper|numberinput|slider|combobox|listbox|select)$/.test(role);
     const label = name.charAt(0).toUpperCase() + name.slice(1);
-    const cases = harnessCases(propsSnap[name]).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
+    // Figma's variants when it has the component, else the code's own props: every variant, every run (E28).
+    let text = ''; try { text = readFileSync(file, 'utf8'); } catch { /* unreadable: the default only */ }
+    const fromFigma = Object.keys(propsSnap[name]?.properties ?? {}).length > 0;
+    const cases = (fromFigma ? harnessCases(propsSnap[name], max) : variantsFromCode(textComponentApi(file, text), text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
     groups.push({ name, file: '/' + relative(ROOT, file), exportName: label, role, cases });
   }
   if (!groups.length) return { url: null, why: 'no React component file (.jsx or .tsx) for the design system\'s components' };

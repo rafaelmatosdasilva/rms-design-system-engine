@@ -15,6 +15,10 @@ jobs:
       # The build scorer and the component harness read JSX with TypeScript, from the project or a global install.
       - name: Install TypeScript
         run: npm install -g typescript@6
+      # The Vue harness renders a Vue project's components with that project's own Vite: its tests lay the build tools a
+      # Vue project has in a folder of their own (test/vue-harness.test.mjs).
+      - name: Install the Vue build tools the Vue tests use
+        run: npm install --prefix test/.vue-tools --no-audit --no-fund vite@6 @vitejs/plugin-vue@5 vue@3 sass@1
       # The browser tests use the runner's Chrome (found on PATH); one that skips without it fails the run.
       # Each failing test is also written as an annotation, so its name and first error lines show on the check.
       - name: Run the test suite
