@@ -71,5 +71,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-10-a11y-vue-pages-classes` | The 21 guide tasks on Haiku (engine fe00df6) | "Browser accessibility on a Vue project with no Figma: its pages, its classes, and what it could not check" |
 | `2026-10-10-focus-escape-code-only` | The 21 guide tasks on Haiku (engine 7cc7815) | "Focus as a keyboard user sees it, Escape on dialogs over the page, and what only the code has in the style guide" |
 | `2026-10-10-a-style-guide-request-builds` | The 21 guide tasks on Haiku (engine 58d7ee7) | "A style guide request builds it, accessibility named or not; a component's own style guide page" |
+| `2026-10-10-every-variant-of-a-component` | The 21 guide tasks on Haiku (engine 8f8b5ed) | "Every variant of a component checked, every run; Vue components drawn and tried from their code" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
