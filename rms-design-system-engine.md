@@ -143,18 +143,23 @@ answers as flags and setup completes in one non-interactive command:
 
 ```bash
 node <install-dir>/audit.mjs --init \
+  --project='.' \
   --figma-url='<DS file URL or key>' \
   --theme-css='src/styles/theme.css'        # comma-separate multiple files
-  # --figma-source-url='<upstream DS URL>'   # optional: consumer/branded-fork files
+  # --project: where the code is (. for this folder, another folder or a git link), required
+  # --figma-url: optional; --figma-source-url='<upstream DS URL>': optional, consumer/branded-fork files
 ```
 
-`--theme-css` may be omitted when the engine auto-detects a single token CSS file. A project
-with no CSS at all has only Figma: setup starts it in build mode (`--recipe build-from-figma`).
-**Setup asks the person only for the Figma link; every other choice takes the option that keeps
-the most of the system, without asking.** The one exception is a folder with no code: setup stops
-and its NEXT line asks where the code is (a folder or a git link) or whether there is only Figma.
-Pass the answer as `--project=<folder or link>` (a link is cloned beside the folder, `owner/repo`
-means GitHub), or `--build` for only Figma. The project is remembered in the folder it ran from, so
+**Setup asks the person two things before it writes anything: where the code is (this folder,
+another folder or a git link) and the link to the Figma file.** The code is required and never
+guessed; the Figma link is optional (without it only the code's own checks run, and nothing is
+compared with Figma). The router asks what the request leaves out, in one message; a setup run
+that does not know where the code is writes nothing, and its NEXT line asks. Pass the answer as
+`--project=<folder or link>` (`.` for this folder; a link is cloned beside the folder, `owner/repo`
+means GitHub), or name the token file with `--theme-css`. Every other choice takes the option that
+keeps the most of the system, without asking. `--theme-css` may be omitted when the engine
+auto-detects a single token CSS file. A code folder with no design tokens yet starts in build mode
+from Figma (`--recipe build-from-figma`), or with `--build`. The project is remembered in the folder it ran from, so
 later runs there go to it without `--project`. Token values loaded from hosted stylesheets (one per
 mode, such as light and dark × desktop, laptop, tablet) are all taken: setup takes every full
 stylesheet address it finds in the code, or the ones `--theme-css` lists (URLs and local files mixed), and writes them

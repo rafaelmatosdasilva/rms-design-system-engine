@@ -172,9 +172,10 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
   // A pasted step list: take only the intent. The skill owns setup, running and reporting.
   if (STEP_LIST.test(t)) {
     notes.push('The request lists steps: do not follow them. The skill does setup, the run and the report itself; report in the chat, write no report file, commit nothing.');
-    return { recipe: hasConfig ? (named.length ? 'audit-component' : 'full-audit') : 'first-setup', question: false, run: hasConfig ? [scoped] : setupRun(t, cmd, notes), notes };
+    return { recipe: hasConfig ? (named.length ? 'audit-component' : 'full-audit') : 'first-setup', question: false, ...(hasConfig ? { run: [scoped] } : setupRun(t, cmd)), notes };
   }
-  if (!hasConfig && !LINK.test(t)) return { recipe: 'first-setup', question, run: setupRun(t, cmd, notes), notes };
+  // No config yet: setup first, whatever was asked; a GitLab link then is the code's, unless it is named as guidelines.
+  if (!hasConfig && !(LINK.test(t) && /guideline|wiki|notion|diretriz|orienta/i.test(t))) return { recipe: 'first-setup', question, ...setupRun(t, cmd), notes };
 
   for (const [recipe, test, kind] of RULES) {
     if (!test(t, { build, named })) continue;
@@ -240,11 +241,23 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
   return named.length ? { recipe: 'audit-component', question, run: [scoped], notes } : { recipe: 'full-audit', question, run: [cmd], notes };
 }
 
-function setupRun(t, cmd, notes) {
-  const figma = t.match(FIGMA_URL)?.[0];
+// Setup needs to know where the code is (never guessed) and asks for the Figma link, which is optional. Both are taken
+// from the request when it gives them: a token stylesheet or a folder or git link for the code, a Figma link. What
+// the request leaves out is asked first, in one message.
+const CODE_LINK = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:github|gitlab|bitbucket)(?:\.[\w-]+)+\/[^\s'"]+|git@[^\s'"]+/i;
+const CODE_PATH = /(?:^|[\s'"(])((?:~|\.{1,2})\/[^\s'"(),]*|\/[^\s'"(),/]+\/[^\s'"(),]+)/;   // ~/x, ./x, ../x, or /a/b (one bare /word is a command)
+const THIS_FOLDER = /\b(?:(?:this|the current|current) (?:folder|directory|repo(?:sitory)?)|(?:esta|nesta) pasta|(?:este|neste) reposit[oó]rio)\b/i;
+function setupRun(t, cmd) {
+  const figma = t.match(FIGMA_URL)?.[0]?.replace(/[.,;:)]+$/, '');
   const css = t.match(/[\w./-]+\.css\b/)?.[0];
-  if (!figma) notes.push('Ask the person for the Figma file URL (and the token CSS file if the setup cannot find it), then run the command with it.');
-  return [`${cmd} --init --figma-url='${figma ?? '<Figma file URL>'}'${css ? ` --theme-css='${css}'` : ''}`];
+  const rest = t.replace(FIGMA_URL, ' ');
+  const link = rest.match(CODE_LINK)?.[0]?.replace(/[.,;:)]+$/, '');
+  const project = css ? null : (link && !/^(https?:\/\/|git@)/i.test(link) ? `https://${link}` : link) ?? rest.match(CODE_PATH)?.[1]?.replace(/[.,;:]+$/, '') ?? (THIS_FOLDER.test(t) ? '.' : null);
+  const code = css ? ` --theme-css='${css}'` : ` --project='${project ?? '<. for this folder, or the folder or git link>'}'`;
+  const ask = [!css && !project && 'where the design system\'s code is (this folder, another folder on this computer, or a git link)',
+    !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
+  return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}`],
+    ask: ask.length ? ask.join(', and ') : null };
 }
 
 // A request for only part of the run → the --only value, or null. Accessibility asked for alone (or with "only"),
@@ -303,7 +316,9 @@ export function routeText(r, recipeText, cmd = 'rms-design-system-engine', { max
   for (const n of r.notes) lines.push(`NOTE: ${n}`);
   for (const s of r.say ?? []) lines.push(`SAY${r.sayIf ? ` (${r.sayIf})` : ''}: ${s}`);
   const say = r.say?.length ? ` Put the SAY line${r.say.length > 1 ? 's' : ''} in your final reply, word for word${r.sayIf ? `, ${r.sayIf}` : ''}.` : '';
-  lines.push(r.run.length
+  lines.push(r.ask
+    ? `NEXT: before running anything, ask the person, in one message: ${r.ask}. Then run the command above with their answers (--project=. when it is this folder; --figma-url left out when there is no Figma file) and follow its NEXT line.${say}`
+    : r.run.length
     ? r.recipe === 'ask-the-system'
       ? `NEXT: run the command above and answer from what it prints, with the names exactly as written there.${say}`
       : `NEXT: run ${r.run.length > 1 ? 'these commands' : 'the command'} above, relay its SUMMARY as it is, and follow its NEXT line.${say}`

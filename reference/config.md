@@ -13,17 +13,20 @@ At the start of every run, read `./ds-config.json` from the project root.
 interview** - you do not conduct it or write `ds-config.json` by hand. It needs these
 inputs (auto-detecting what it can):
 
-1. **Main Design System Figma file** - the full browser URL of the DS file. The engine extracts the file key (path segment after `/design/` or `/file/`). Pass the URL, never a raw key.
-2. **Theme CSS path** - relative path to the token CSS file(s). Auto-scanned; a single detected file becomes the default.
-3. **Figma personal access token** *(optional)* - needed for collection auto-detection and Gates [2], [20] (visual regression + icon freshness). Read from `.env` if present. Never stored in `ds-config.json`.
-4. **DS source file for cross-checking** *(optional)* - if the project's snapshot is taken from a downstream file (e.g. a branded fork), the upstream DS Figma URL parses `figmaSourceKey`. Enables `⏳ PENDING FIGMA SYNC` in Gate [3] (Token values) - mismatches where code matches the upstream source are flagged as pending rather than failures.
+1. **Where the code is** *(required)* - this folder (`--project=.`), another folder or a git link (`--project=<it>`), or the token file here (`--theme-css`). Never guessed: without it setup writes nothing and its NEXT line asks the person.
+2. **Main Design System Figma file** *(optional)* - the full browser URL of the DS file. The engine extracts the file key (path segment after `/design/` or `/file/`). Pass the URL, never a raw key. Without it `figmaFileKey` is empty, each run checks the code alone (the accessibility check) and says nothing was compared with Figma; add the key to compare.
+3. **Theme CSS path** - relative path to the token CSS file(s). Auto-scanned; a single detected file becomes the default.
+4. **Figma personal access token** *(optional)* - needed for collection auto-detection and Gates [2], [20] (visual regression + icon freshness). Read from `.env` if present. Never stored in `ds-config.json`.
+5. **DS source file for cross-checking** *(optional)* - if the project's snapshot is taken from a downstream file (e.g. a branded fork), the upstream DS Figma URL parses `figmaSourceKey`. Enables `⏳ PENDING FIGMA SYNC` in Gate [3] (Token values) - mismatches where code matches the upstream source are flagged as pending rather than failures.
 
 Because the interview reads stdin, **drive it non-interactively with flags** (an agent turn
-or CI cannot answer live prompts). Ask the user only for the Figma URL; find the token CSS
-yourself (local files, else every hosted stylesheet the code loads), then run:
+or CI cannot answer live prompts). Ask the user where the code is and for the Figma URL (optional),
+in one message; find the token CSS yourself (local files, else every hosted stylesheet the code
+loads), then run:
 
 ```bash
 node <install-dir>/audit.mjs --init \
+  --project='.' \
   --figma-url='<DS file URL>' \
   --theme-css='src/styles/theme.css'          # omit if one file is auto-detected
   # --figma-source-url='<upstream DS URL>'     # optional consumer-file cross-check
@@ -46,9 +49,10 @@ silently; it is never prompted for and never required.
 **Where the project is.** The engine works on the folder it runs in. `--project=<folder>` or
 `--project=<git link>` (cloned beside that folder once; `owner/repo` means GitHub) points it at
 another, on any command, and is remembered in the folder it ran from (`.design-system-engine-project`),
-so later runs there need no flag (it says `📁 Project: <folder>` on stderr). In a folder with no code
-(no manifest, stylesheet, page or script) setup does not guess: it exits with a NEXT line asking
-where the code is or whether there is only Figma (`--build`).
+so later runs there need no flag (it says `📁 Project: <folder>` on stderr). Setup never takes the
+folder it runs in for the code by a guess: told nothing, it says what the folder holds and exits
+with a NEXT line asking where the code is. Told the code is in a folder with none (no manifest,
+stylesheet, page or script), it asks whether the code is elsewhere or starts there (`--build`).
 
 **Do not ask for frame node IDs, collection names, or primitive prefixes** - these are either auto-detected or added later.
 
@@ -147,7 +151,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 - `primitives` - the library owner's table from styling to a primitive component, never inferred: `[{ "component": "Text", "props": { "size": "medium", "color": "secondary" }, "when": { "font": "var(--body-medium)", "color": "var(--text-secondary)" } }]`. `when` lists CSS properties with their value (a variable matches with or without a fallback), and `"class": [...]` for utility classes. A plain element (`div`, `span`, `p` and the like) whose own style, JSX style object or class rules meet every condition is that component written by hand: the `🧩 Primitives written by hand` block lists each with its file and line and the tag to write, the edit check hands it back when an edit adds one, and `llms.txt` carries the table so generators compose the component. The entry with the most conditions wins. Components' own sources (`componentFiles`) and `scanExcludeDirs` are skipped.
 - `tailwind: false` - turns off the `🎯 Tailwind arbitrary values` block and its part of the edit check (a class with a value in brackets, `rounded-[4px]`, compared with the project's `@theme`: the utility to write when a theme value is the same, or "not a design-system value"). `--tailwind` lists every one.
 - `figmaCli.designJson` *(optional, default `design.json`)* - where figma-cli's `figma-cli snapshot` writes the file `--refresh-figma` and `--from-figma-cli` read. A design.json newer than the vars snapshot is read at the start of an audit; what it does not hold (text styles, other variants, descriptions, annotations) is kept. `FIGMA_PORT` (default 9222) is the port figma-cli reaches Figma Desktop on, as figma-cli reads it.
-- `build: true` - build mode, for a project that starts from Figma: what Figma has and the code does not yet is listed as to build, never as a failure (`rms-design-system-engine --reference usage`, *Build mode*). Setup sets it when the project has no CSS at all, or with `--build`. Each audit adds a stylesheet that holds a Figma component's rules to `paths.themeCSS`, after the token file, so a component built into its own file is checked.
+- `build: true` - build mode, for a project that starts from Figma: what Figma has and the code does not yet is listed as to build, never as a failure (`rms-design-system-engine --reference usage`, *Build mode*). Setup sets it when the code's folder has no stylesheet of design tokens and a Figma file is given, or with `--build`. Each audit adds a stylesheet that holds a Figma component's rules to `paths.themeCSS`, after the token file, so a component built into its own file is checked.
 - `designA11y: false` - turns off the `♿ Accessibility in the Figma file` block: an interactive component with no focus state, an error state that adds no message (an error shown by colour alone), a control under 24px tall, read from the props and structure snapshots for whoever keeps the Figma file. Never a code finding; the build sheet says what to write meanwhile (a focus ring on `:focus-visible`) and what to leave to the person (an error message's words).
 - `a11y.harness: false` - the accessibility check never renders the components from their own code (`component-harness.mjs`; used in build mode or when there is no page to open).
 - `figmaHygiene: false` - turns off the `🎨 Figma file hygiene` block (values with no variable or style, detached instances, variants with no auto layout, components with no description, read from `component-values.snapshot.json`). `--hygiene` lists every finding.
