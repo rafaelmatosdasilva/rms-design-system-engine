@@ -816,7 +816,8 @@ The rules are `--check-ui`'s, plus:
   flow starts and where it ends, and the team's flows: steps joined by arrows ("Sign-up: Account → Plan → Welcome") in
   the guidelines or the design intent's flows layer, or a numbered or bulleted list under a heading that says flow,
   journey or funnel. Each step is matched to the prototype whose name or main heading shares its words; a step with no
-  prototype, and two steps in a row whose pages do not link, are ❌ lines. A link whose words go back (Back, Previous)
+  prototype, and two steps in a row whose pages do not link, are ❌ lines, and so is a file in `prototypes/` that is not
+  one page (several pages in one file, a draft left behind). A link whose words go back (Back, Previous)
   is a way back, not a step. The pages of a flow are held to each other as the product's pages are, every page of it
   voting and the flow's own order breaking a tie, and when one page after the first has a way back, every one must.
   A flow with a ❌ line exits 1 and is not done: each one is fixed in the page it names and the flow run again until
