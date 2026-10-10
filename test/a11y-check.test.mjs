@@ -7,7 +7,7 @@ import {
   parseColor, over, effectiveBg, relLuminance, contrastRatio,
   isLargeText, aaThreshold, contrastFindings, INTERACTIVE_ROLES,
   styleguideTarget, A11Y_GUIDE, a11yItemLine, a11yFindingRecord, summarizeAxe,
-  iconContrastFindings, namedByTitleOnly, SETTLE_TRANSITIONS,
+  iconContrastFindings, namedByTitleOnly, SETTLE_TRANSITIONS, STATE_CLASSES, stateHeard,
 } from '../a11y-check.mjs';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,6 +25,23 @@ test('[axe] summarizeAxe collapses per-node rows into one per rule, busiest firs
   assert.equal(s[0].id, 'color-contrast');
   assert.equal(s[0].count, 5);
   assert.deepEqual(s[0].targets, ['.a', '.b', '.c']);
+});
+
+test('a state drawn with a class is heard the way the role says it: a selected radio is aria-checked, a step aria-current', () => {
+  const el = (attrs = {}, props = {}) => ({ getAttribute: (a) => (a in attrs ? attrs[a] : null), hasAttribute: (a) => a in attrs, ...props });
+  const sel = STATE_CLASSES.selected;
+  assert.ok(stateHeard(el({ role: 'radio', 'aria-checked': 'true' }), sel), 'a selected radio says checked');
+  assert.ok(stateHeard(el({ 'aria-pressed': 'true' }), sel), 'a selected toggle says pressed');
+  assert.ok(stateHeard(el({ role: 'tab', 'aria-selected': 'true' }), sel));
+  assert.ok(stateHeard(el({ 'aria-current': 'step' }), sel), 'a selected step says current, with any value but false');
+  assert.ok(!stateHeard(el({ 'aria-checked': 'false' }), sel), 'a radio that says it is not checked is not heard as selected');
+  assert.ok(!stateHeard(el({ 'aria-current': 'false' }), sel));
+  assert.ok(!stateHeard(el(), sel), 'nothing said');
+  assert.ok(stateHeard(el({ 'aria-current': 'page' }), STATE_CLASSES.current));
+  assert.ok(stateHeard(el({}, { checked: true }), STATE_CLASSES.checked), 'a checked input');
+  assert.ok(stateHeard(el({ open: '' }), STATE_CLASSES.open), 'an open details or dialog');
+  assert.ok(stateHeard(el({ 'aria-disabled': 'true' }), STATE_CLASSES.disabled) && stateHeard(el({}, { disabled: true }), STATE_CLASSES.disabled));
+  assert.ok(stateHeard(el({ 'aria-checked': 'mixed' }), STATE_CLASSES.indeterminate) && !stateHeard(el({ 'aria-checked': 'true' }), STATE_CLASSES.indeterminate));
 });
 
 // ── Plain-language reporting + machine record ──

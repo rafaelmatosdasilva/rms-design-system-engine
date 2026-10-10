@@ -774,6 +774,9 @@ test('a control the system lacks: its stand-in draws the switch, and the page sa
   const run = (ui) => new Function('DATA', 'esc', 'nudge', src + 'return { segHTML: segHTML, segSelect: segSelect };')({ ui }, esc, () => {});
   const b = run({ segmented: btn });
   assert.equal(b.segHTML([{ v: 'a', label: 'A' }]), '<div class="sg-seg"><button type="button" class="bSecondary" data-v="a"><span class="label">A</span></button></div>');
+  // A switch says what it chooses, on the control itself (WCAG 1.3.1): the role a script gives it then has its name.
+  assert.match(b.segHTML([{ v: 'a', label: 'A' }], 'Width'), /^<div aria-label="Width" class="sg-seg">/);
+  assert.doesNotMatch(tpl, /segHTML\((?:[^;]*?)\)\s*\+\s*'<\/div>'\s*:\s*''|segHTML\(\[\{ v: '', label: 'Not in the code yet'[^;]*\]\);/, 'every switch on the page is named');
   const cls = new Set(['bSecondary']), attrs = {};
   const el = { classList: { toggle: (k, on) => (on ? cls.add(k) : cls.delete(k)) }, setAttribute: (a, v) => { attrs[a] = v; }, removeAttribute: (a) => { delete attrs[a]; }, querySelector: () => null, dataset: {} };
   b.segSelect(el, true);
@@ -782,6 +785,7 @@ test('a control the system lacks: its stand-in draws the switch, and the page sa
   assert.match(r.segHTML([{ v: 'a', label: 'A' }, { v: 'b', label: 'B', off: true }]), /^<div class="sg-seg" role="radiogroup"><label class="radio" data-v="a"><input type="radio" name="sg-r1" class="radio-input"><span class="radio-label">A<\/span><\/label><label class="radio" data-v="b" aria-disabled="true" title=""><input type="radio" name="sg-r1" class="radio-input" disabled>/);
   const input = { checked: false }, lab = { classList: { toggle() {} }, setAttribute: (a) => { throw new Error('no aria-pressed on a radio label: ' + a); }, removeAttribute() {}, querySelector: () => input, dataset: {} };
   r.segSelect(lab, true);
+  assert.match(r.segHTML([{ v: 'a', label: 'A' }], 'Mode'), /^<div aria-label="Mode" class="sg-seg" role="radiogroup">/);
   assert.deepEqual([input.checked, lab.dataset.on], [true, '1']);
   assert.match(tpl, /\(\(DATA\.ui && DATA\.ui\.gaps\) \|\| \[\]\)\.forEach\(function \(g\) \{ TODO\.push\(\{ who: 'both', comp: null, say: g\.say, todo: g\.todo \}\); \}\);/);
   assert.match(tpl, /gp\.className = 'sg-pending sg-gap'; gp\.innerHTML = '<b>Stand-ins on this page<\/b><ul>' \+ GAPS\.map\(function \(g\) \{ return '<li>' \+ esc\(g\.say\) \+ '<\/li>'; \}\)/);

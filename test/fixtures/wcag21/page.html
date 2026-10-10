@@ -15,6 +15,11 @@
   .ok-field { border: 1px solid oklch(0.45 0 0); padding: 4px; }
   .faint-ok { border: 1px solid oklch(0.95 0 0); padding: 4px; background: #fff; }
   .tip { position: absolute; background: #222; color: #fff; padding: 2px; }
+  /* A row whose action shows on hover or focus in the room the row makes for it: it covers nothing. */
+  .row { display: flex; width: 200px; gap: 4px; }
+  .row-main { flex: 1; }
+  .row-action { display: none; width: 24px; height: 24px; }
+  .row:hover .row-action, .row:focus-within .row-action { display: inline-block; }
   .check-box { display: inline-block; width: 14px; height: 14px; border: 1px solid #f2f2f2; }
   .check input { opacity: 0; position: absolute; }
 </style></head>
@@ -22,6 +27,7 @@
 <h1>Fixture</h1>
 <!-- Each root passes or fails on purpose; the test names what each one owes. -->
 <div id="good">
+  <div class="row"><button class="row-main">Row</button><button class="row-action" aria-label="Focus on canvas"></button></div>
   <label for="e1">Email</label><input id="e1" class="field" type="email" autocomplete="email">
   <fieldset><legend>Size</legend><label><input type="radio" name="s1"> S</label><label><input type="radio" name="s1"> L</label></fieldset>
   <button aria-label="Save draft">Save draft</button>
@@ -64,9 +70,9 @@
   <input class="faint-ok" type="text" aria-label="Code">
 </div>
 <script>
-  // A tooltip that ignores Escape and hides as the pointer leaves the trigger.
+  // A tooltip that ignores Escape and hides as the pointer leaves the trigger. It lies over the button beside it.
   var tip = null;
-  document.querySelector('.tipper2').addEventListener('mouseenter', function (e) { tip = document.createElement('div'); tip.className = 'tip'; tip.textContent = 'Help'; document.body.appendChild(tip); });
+  document.querySelector('.tipper2').addEventListener('mouseenter', function (e) { var r = e.currentTarget.getBoundingClientRect(); tip = document.createElement('div'); tip.className = 'tip'; tip.textContent = 'Help'; tip.style.left = (r.right + window.scrollX) + 'px'; tip.style.top = (r.top + window.scrollY) + 'px'; document.body.appendChild(tip); });
   document.querySelector('.tipper2').addEventListener('mouseleave', function () { if (tip) tip.remove(); tip = null; });
   // A tooltip that behaves: Escape closes it, it stays while hovered, it leaves when the pointer leaves both.
   var good = null, overTip = false;
