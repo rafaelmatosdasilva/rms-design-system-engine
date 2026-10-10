@@ -15,6 +15,7 @@
 // Exit 0 = all checks pass. Exit 1 = any failure.
 // Exit 2 = cannot verify: no compiled component CSS configured (setup gap, not a parity fail).
 
+import { splitSelectors, withoutHeardState } from './selector-list.mjs';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname, resolve as resolvePath } from 'path';
 import { loadCssSources, walkCss, styleBlocksOf, blankComments } from './css-source.mjs';
@@ -602,7 +603,7 @@ function partColor(css, base) {
   const esc = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const part = new RegExp(`^${esc}(__|-)[\\w-]+$|^${esc}\\s+[^,]+$`);
   for (const m of String(css).replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
-    if (!m[1].split(',').map((x) => x.trim()).some((sel) => part.test(sel))) continue;
+    if (!splitSelectors(m[1]).some((sel) => part.test(sel))) continue;
     const v = extractPropVarWithFallback(m[2], 'color');
     if (v) return v;
   }
@@ -1383,7 +1384,11 @@ for (const [comp, contract] of Object.entries(CONTRACT)) {
     for (const [state, selector] of pairs) {
       if (!selector) continue;
       const label = state ? `${comp}/${propName}=${state}` : `${comp}/${propName}`;
-      const found = findBlock(allCss, selector, allIndex) !== null || allCss.includes(selector) || modifierFound(selector);
+      // A state written with what a screen reader hears ([aria-disabled="true"]) is built by a rule for the rest of it;
+      // the attribute is the markup's duty, which the accessibility check reads.
+      const bare = withoutHeardState(selector);
+      const foundAs = (sel) => findBlock(allCss, sel, allIndex) !== null || allCss.includes(sel) || modifierFound(sel);
+      const found = foundAs(selector) || (bare && bare !== selector && foundAs(bare));
       if (found) CPROP_PASS.push(label);
       else CPROP_FAIL.push(`${label}: "${selector}" not found in CSS: write a rule for ${selector} with what this option changes, and put the class on the element when ${propName} is ${state || 'on'}`);
     }
