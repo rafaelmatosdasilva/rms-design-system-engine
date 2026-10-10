@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Focus as a keyboard user sees it, Escape on dialogs over the page, and what only the code has in the style guide (continuous evaluation)
+
+What changed since the entry below (engine fe00df6): Accessibility: a field whose frame shows its focus passes, a style that eases in is read where it ends, a part beside the control (a radio's circle) shows its focus, a control that takes no focus is not judged, and Escape is judged on a dialog over the page, not one drawn in its flow. The style guide lists the components only the code has, marked so, and draws a Vue component from its template. The guide changed in `reference/usage.md`. The guide changed in `reference/usage.md`.
+
+Guide set measured: `dd2250c5657b` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7cc7815 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.052 | $0.054 |
+| Input a run | 103k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 107k a run against 103k. On the design system the engine was built against, its style guide's accessibility check went from 6 fields and 27 buttons with no visible focus (inert overview thumbnails, and frames whose border eases in) and an Escape failure on its modal specimen to none: the modal is listed as not judged, and its 1px rings are said too thin for 2.4.13 (advice). On a fictional Vue system, a component only its code has is listed with its file and props and drawn from its template, and with no Figma data the run says `3 only in the code`. Records: `records/2026-10-10-focus-escape-code-only`.
+
 ## 2026-10: Browser accessibility on a Vue project with no Figma: its pages, its classes, and what it could not check (continuous evaluation)
 
 What changed since the entry below (engine d33715c): Accessibility from the code: seconds instead of hours, and a scoped run about its component; Browser accessibility: an empty style guide is not the page checked, and a coloured server address is read; A component's class from its own code, and the pages of a Vue router; Browser accessibility: a class no element has is said at once, and a stopped check says so; Browser accessibility: the class check runs only for named components. The guide changed in `cookbook/full-audit.md`, `reference/usage.md`.
