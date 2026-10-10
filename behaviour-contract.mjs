@@ -278,7 +278,8 @@ export function stateFindings(components = []) {
       for (const [word, effect, value] of pairs) {
         const want = expectedFor(word, c.role);
         if (!want || !effect) continue;
-        const attrs = Object.keys(effect.attrs ?? {});
+        // What it sets on the component, and on a part it is heard on (heardOn: a field disabled inside its wrapper).
+        const attrs = [...Object.keys(effect.attrs ?? {}), ...(effect.also ?? []).flatMap((x) => Object.keys(x.attrs ?? {}))];
         if (!(effect.add ?? []).length && !attrs.length) continue;   // the option changes nothing that is drawn
         if (attrs.some((a) => want.includes(a))) continue;
         // An error the option itself announces (role="alert" or "status", aria-live) is heard, whatever the role is.

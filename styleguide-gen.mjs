@@ -333,6 +333,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: [...new Set([...(opts.names ?? []), ...structNames])], themeCss: themeFiles.map(readText).join('\n'),
       // A contract entry named apart from its Figma component (figmaName) maps that component's props too.
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).flatMap(([n, c]) => [[n, c.propertyMap], ...(c.figmaName && c.figmaName !== n && !contract.CONTRACT[c.figmaName]?.propertyMap ? [[c.figmaName, c.propertyMap]] : [])])),
+      // An option heard on a part (heardOn: the field disabled inside its wrapper), set with the option's look.
+      heardOn: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.heardOn).flatMap(([n, c]) => [[n, c.heardOn], ...(c.figmaName && c.figmaName !== n ? [[c.figmaName, c.heardOn]] : [])])),
       parts: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).map(([n, c]) => [n, (c?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string').map((k) => ({ name: k.name, selector: k.cssSelector }))])) });
     // "In use": the approved pictures of the system's own frames (Gate [2]'s references), embedded, six at most.
     const refsDir = resolve(ROOT, cfg.visualRefs ?? '.design-system-engine-refs');
