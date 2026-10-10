@@ -14,7 +14,7 @@ interview** - you do not conduct it or write `ds-config.json` by hand. It needs 
 inputs (auto-detecting what it can):
 
 1. **Where the code is** *(required)* - this folder (`--project=.`), another folder or a git link (`--project=<it>`), or the token file here (`--theme-css`). Never guessed: without it setup writes nothing and its NEXT line asks the person.
-2. **Main Design System Figma file** *(optional)* - the full browser URL of the DS file. The engine extracts the file key (path segment after `/design/` or `/file/`). Pass the URL, never a raw key. Without it `figmaFileKey` is empty, each run checks the code alone (the accessibility check) and says nothing was compared with Figma; add the key to compare.
+2. **Main Design System Figma file** *(optional)* - the full browser URL of the DS file. The engine extracts the file key (path segment after `/design/` or `/file/`). Pass the URL, never a raw key. Without it `figmaFileKey` is empty, each run checks the code alone (the accessibility check) and says nothing was compared with Figma; add the key to compare. A project that already has Figma snapshots committed is still compared with them, as they are: nothing can refresh them without the link, so their age is said (Gate [1]) and never a failure, and the summary says the link is what refreshes them.
 3. **Theme CSS path** - relative path to the token CSS file(s). Auto-scanned; a single detected file becomes the default.
 4. **Figma personal access token** *(optional)* - needed for collection auto-detection and Gates [2], [20] (visual regression + icon freshness). Read from `.env` if present. Never stored in `ds-config.json`.
 5. **DS source file for cross-checking** *(optional)* - if the project's snapshot is taken from a downstream file (e.g. a branded fork), the upstream DS Figma URL parses `figmaSourceKey`. Enables `⏳ PENDING FIGMA SYNC` in Gate [3] (Token values) - mismatches where code matches the upstream source are flagged as pending rather than failures.
@@ -57,12 +57,14 @@ stylesheet, page or script), it asks whether the code is elsewhere or starts the
 **Do not ask for frame node IDs, collection names, or primitive prefixes** - these are either auto-detected or added later.
 
 Then auto-detect and write `ds-config.json`:
-- `snapshotVars` / `snapshotStructure` → sibling files next to theme CSS
-- `pluginCSS` → scan `apps/*/ui.src.html` and `src/ui.src.html`
-- `plugins` → derived from pluginCSS paths
+- every Figma snapshot path (`snapshotVars`, `snapshotStructure`, `compPropsSnapshot`, `snapshotFrameGeometry`, `snapshotIcons`, `snapshotScreenComponents`) → beside the theme CSS, so captures write where every check reads
+- `figma.namingConvention` → the naming the theme CSS follows, read from it: each way (the default, `iconText` kept, camelCase split) is tried on the Figma tokens a committed snapshot has, and the one that finds the most declared is written; the default when it fits as well
+- `pluginCSS` → scan `apps/*/ui.src.html` and `src/ui.src.html`, and the `ui.src.html` of each product checked out beside the system
+- `plugins` / `pluginDirs` → derived from pluginCSS paths; a product beside the system is a folder next to it whose `package.json` depends on the system's package (by its name or its repository), keyed by its folder's name without the prefix the product folders share (or the product a captured screen names). A product `products.json` lists that is not beside it is said, so it can be cloned there
+- `systemScripts` / `paths.sharedIconSources` → a plain script beside the theme CSS that reaches the page (`document`, `addEventListener`), never a test, a config or a React component; the one that holds `<symbol>` icons is where the icons are defined
 - `figma.colorCollection` / `sizingCollection` / `primitivePrefix` → the DS variable collections parity reads. Set them in `ds-config.json`: the collection holding your colour tokens, the one holding your sizing tokens, and the path prefix of primitive variables. Defaults: `"Color"` / `null` / `"primitives/"`.
 - `figma.modes` → Light (`:root`) + Dark (`dark-media`) (default - edit if your DS has more modes)
-- `frames` → `[]` (add frame node IDs manually after setup)
+- `frames` / `screens` → from a screen snapshot already captured (each product's whole screen a frame, its finer views screens), else `[]` (add frame node IDs after setup)
 
 Also:
 - Scaffold `design-system-engine-map.mjs` from `design-system-engine-map.example.mjs` if not present
@@ -97,7 +99,7 @@ Once `ds-config.json` exists, extract:
 - `figma.namingConvention` *(optional)* - overrides for how Figma token paths are converted to CSS var names:
   - `dropSegments` - array of path segments to strip from the end of a token path before deriving the var name. Default: `["color", "default"]`. Set to `[]` to preserve all segments (e.g. when CSS vars end in `-color`).
   - `preset: "tailwind"` - Tailwind v4 `@theme` names: colour tokens under `--color-` (`surface/base/color` → `--color-surface-base`) and the first segment renamed `space` → `spacing`, `radii` → `radius` (`space/2` → `--spacing-2`). A theme variable used through its utility (`bg-action-primary`, `rounded-control`, `p-2`) counts as used. The same by hand: `colorNamespace` (the segment colour tokens go under) and `namespaces` (`{ "space": "spacing" }`, first segment renames for every token).
-  - `iconTextAlias` - when `true` (default), `/iconText/` in a token path is normalised to `/text/`. Set to `false` when the codebase keeps `iconText` as-is.
+  - `iconTextAlias` - when `true` (default), `/iconText/` in a token path is normalised to `/text/`. Set to `false` when the codebase keeps `iconText` as-is; setup sets it when the theme CSS does.
   - `aliases` - per-segment renames (`{ figmaSegment: cssSegment }`). `iconTextAlias` is shorthand for `{ iconText: "text" }`; use `aliases` for any other rename the DS needs.
   - `separator` - what joins the path segments in the CSS var. Default `"-"` (e.g. `--node-border-selected`); set to `"_"` if the DS uses underscores.
   - `prefix` - the CSS custom-property prefix. Default `"--"`.

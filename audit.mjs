@@ -1393,15 +1393,36 @@ async function bootstrapConfig() {
     figmaCfg.namingConvention = { ...(figmaCfg.namingConvention ?? {}), preset: 'tailwind' };
     console.log(C.green('  ✓ Tailwind theme found: token names are matched as Tailwind writes them (figma.namingConvention.preset "tailwind").'));
   }
+  // What the project's own files already say (setup-facts.mjs): the naming its token CSS follows, every Figma snapshot
+  // beside it, the system's own scripts, the products checked out beside it, and the frames and screens a captured
+  // screen snapshot names. So the first run checks what is there, never setup's guesses.
+  const { repoFacts } = await import('./setup-facts.mjs');
+  const facts = repoFacts(ROOT, { themeCSS, naming: figmaCfg.namingConvention ?? {} });
+  if (Object.keys(facts.naming.naming).length) {
+    figmaCfg.namingConvention = { ...(figmaCfg.namingConvention ?? {}), ...facts.naming.naming };
+    const how = [facts.naming.naming.iconTextAlias === false ? 'keeps Figma\'s iconText' : null, facts.naming.naming.case === 'kebab' ? 'splits camelCase with hyphens' : null].filter(Boolean).join(' and ');
+    console.log(C.green(`  ✅ Token names: the CSS ${how} (${facts.naming.found} of ${facts.naming.of} Figma tokens found that way; figma.namingConvention)`));
+  }
+  for (const p of facts.products) {
+    if (p.ui && !pluginCSS.includes(p.ui)) pluginCSS.push(p.ui);
+    if (!plugins.includes(p.key)) plugins.push(p.key);
+  }
+  if (facts.products.length) console.log(C.green(`  ✅ Products beside it that use the system: ${facts.products.map((p) => `${p.key} (${p.dir})`).join(', ')}: their code is read with the system's`));
+  if (facts.missing.length) console.log(C.yellow(`  ⚠️  products.json lists ${facts.missing.join(', ')}, not checked out beside this folder: clone ${facts.missing.length === 1 ? 'it' : 'them'} next to it and run setup again, so their code is checked too`));
+  if (facts.scripts.length) console.log(C.green(`  ✅ The system's own script${facts.scripts.length === 1 ? '' : 's'}: ${facts.scripts.join(', ')}${facts.iconSources.length ? ` (its icons are defined in ${facts.iconSources.join(', ')})` : ''}`));
+  if (facts.frames.length || facts.screens.length) console.log(C.green(`  ✅ From the screens already captured: ${facts.frames.length} frame${facts.frames.length === 1 ? '' : 's'} and ${facts.screens.length} screen${facts.screens.length === 1 ? '' : 's'} (${facts.snapshots.snapshotScreenComponents})`));
   const generated = {
     figmaFileKey:  figmaFileKey || '',
     ...(figmaSourceKey ? { figmaSourceKey } : {}),
-    frames: [],
+    frames: facts.frames,
+    ...(facts.screens.length ? { screens: facts.screens } : {}),
     figma: {
       ...figmaCfg,
       modes: detected.modes,
     },
-    paths: { themeCSS, snapshotVars, snapshotStructure, pluginCSS, plugins },
+    paths: { themeCSS, ...facts.snapshots, snapshotVars, snapshotStructure, pluginCSS, plugins, ...(facts.iconSources.length ? { sharedIconSources: facts.iconSources } : {}) },
+    ...(facts.products.length ? { pluginDirs: Object.fromEntries(facts.products.map((p) => [p.key, p.dir])) } : {}),
+    ...(facts.scripts.length ? { systemScripts: facts.scripts } : {}),
     visualRefs: newPath('refs'),
     webhook: { port: 3456, secret: 'YOUR_WEBHOOK_SECRET' },
     knownUnusedVars: [],
@@ -1951,6 +1972,7 @@ function reportFull(label, items, shown) {
       lines.push(C.dim('component inventory not checked (component list not fetched)'));
     }
 
+    const warnBeforeAge = warn;   // what fails before the snapshots' age (the component inventory) fails with or without a Figma link
     // Snapshots refreshed by the Phase 1 Plugin API capture (works on ANY plan). Staleness is an
     // advisory here; a hard fail comes only from the maxSnapshotAgeDays ceiling below. Parity never
     // so there is no plan-specific special case - the refresh path is the same everywhere.
@@ -2066,6 +2088,12 @@ function reportFull(label, items, shown) {
     if (cfg.versionLockStrict && versionMismatch) {
       lines.push(C.red('❌ versionLockStrict: DS file version differs from the snapshot - re-run Phase 1 to reconcile'));
       warn = true;
+    }
+    // Set up with no Figma link: nothing can refresh the snapshots, so their age is said, never a failure with no way
+    // out; the checks against Figma compare the code with them as they are.
+    if (cfg.figmaFileKey === '' && warn && !warnBeforeAge) {
+      lines.push(C.yellow('⚠️  No Figma link (figmaFileKey in ds-config.json): nothing can refresh these snapshots, so their age is not a failure. The checks against Figma compare the code with them as they are; add the link to refresh them.'));
+      warn = false;
     }
 
     return { pass: !warn, planLimited: false, lines };
@@ -4513,7 +4541,7 @@ function reportFull(label, items, shown) {
     const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
     const { dataStateLine } = await import('./next-step.mjs');
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
-    const data = NO_FIGMA ? null : dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
+    const data = NO_FIGMA ? null : dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, noLink: cfg.figmaFileKey === '', snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file) })) });
     let a11yIssues = null;
     try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
     const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), noFigma: NO_FIGMA, a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues, why: (rA11y?.stdout ?? '').match(/⏭\s+\[a11y\]\s+(.+)/)?.[1]?.replace(/\.$/, '') ?? null } : null } : null;
