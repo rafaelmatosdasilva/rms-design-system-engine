@@ -80,7 +80,9 @@ export function nextStep({ failing = [], scope = [], handback = {}, burndownNext
 // The state of the Figma data, said once, so no one has to infer it (idea I56): whether this run refreshed anything
 // from the Figma API, and how old the committed snapshots it used are. An agent relays it; it never claims a
 // refresh the engine did not make. snapshots: [{ file, ageHours }] (ageHours null when unreadable).
-export function dataStateLine({ refreshedFromApi = false, fromFigmaCli = null, snapshots = [], cmd = 'rms-design-system-engine' } = {}) {
+// noLink: set up with no Figma link, so nothing can refresh the snapshots committed in the project: the line says the
+// checks against Figma compared the code with them as they are, and that the link is what refreshes them.
+export function dataStateLine({ refreshedFromApi = false, fromFigmaCli = null, snapshots = [], cmd = 'rms-design-system-engine', noLink = false } = {}) {
   if (fromFigmaCli) return `**Figma data.** Variables, component props and structure were read from ${fromFigmaCli.file}${fromFigmaCli.source ? ` (${fromFigmaCli.source})` : ''}, written by figma-cli, in this run.`;
   const known = snapshots.filter((s) => Number.isFinite(s.ageHours));
   const age = (h) => (h < 24 ? 'updated today' : `${Math.floor(h / 24)} day${Math.floor(h / 24) === 1 ? '' : 's'} old`);
@@ -89,6 +91,7 @@ export function dataStateLine({ refreshedFromApi = false, fromFigmaCli = null, s
   const used = oldest ? `the committed snapshots (the oldest, ${oldest.file}, ${age(oldest.ageHours)})` : 'no readable snapshot';
   const gap = missing.length ? ` Not readable: ${missing.join(', ')}.` : '';
   if (refreshedFromApi) return `**Figma data.** Component properties and values were refreshed from the Figma API in this run; variables and structure come from ${used}.${gap}`;
+  if (noLink) return `**No Figma link, so the Figma data cannot be refreshed.** The checks against Figma compared the code with ${used}, as they are.${gap} Add the Figma file's link (figmaFileKey in ds-config.json) to refresh them.`;
   return `**Figma data was not refreshed in this run.** The audit used ${used}.${gap} To refresh them: ${cmd} --recipe refresh-figma.`;
 }
 
