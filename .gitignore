@@ -5,7 +5,7 @@ design-system-engine-history.json
 design-system-engine-check-result.json
 component-prop-result.json
 .design-system-engine-refs/
-node_modules/
+node_modules
 .DS_Store
 
 # private parity plans/roadmap (local-only, never published)
