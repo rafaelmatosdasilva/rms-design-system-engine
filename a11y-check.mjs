@@ -670,7 +670,11 @@ function sweepExpression(roots, doFocus, stateMap) {
       const NATIVE_FOCUSABLE = 'a[href],button,input:not([type=hidden]),select,textarea';
       const IROLES = ['button','link','checkbox','radio','switch','tab','menuitem','option','combobox','slider'];
       for (const el of scope) {
-        if (!vis(el)) continue;
+        // A native checkbox or radio hidden under the part that draws it (opacity 0, beside its circle or track) is still
+        // the control the keyboard reaches: its focus is judged by that part.
+        const shown = vis(el);
+        const hiddenNative = !shown && el.matches('input[type=checkbox],input[type=radio]') && (() => { const st = getComputedStyle(el); return st.display !== 'none' && st.visibility !== 'hidden' && !!el.parentElement && vis(el.parentElement); })();
+        if (!shown && !hiddenNative) continue;
         const desc = (el.tagName.toLowerCase()+(el.id?('#'+el.id):'')).slice(0,60);
         const role = el.getAttribute('role');
         const isInteractive = el.matches(INTERACTIVE);
@@ -682,27 +686,72 @@ function sweepExpression(roots, doFocus, stateMap) {
           const ring = (x) => (x.outlineStyle !== 'none' && parseFloat(x.outlineWidth) > 0 ? x.outlineColor : '');
           const look = (s, pb, pa) => [s.outlineStyle, s.outlineWidth, ring(s), s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor, s.textDecorationLine,
             pb.outlineStyle, ring(pb), pb.boxShadow, pb.borderColor, pb.backgroundColor, pb.opacity, pa.outlineStyle, ring(pa), pa.boxShadow, pa.borderColor, pa.backgroundColor, pa.opacity].join('|');
-          // The element the keyboard is already on (the page's first Tab) is let go first, so its look before is its rest.
-          if (document.activeElement === el) { try { el.blur(); } catch(e){} }
-          const b = getComputedStyle(el); const pseudoAt = (s) => ['::before', '::after'].map((w) => { const p = getComputedStyle(el, w); return { w, outline: p.outlineStyle !== 'none' && parseFloat(p.outlineWidth) > 0 ? p.outlineColor : null, border: p.borderTopColor, shadow: p.boxShadow, bg: p.backgroundColor }; });
-          const before = look(b, getComputedStyle(el, '::before'), getComputedStyle(el, '::after')); const pseudoBefore = pseudoAt();
           // The box that holds only this control (a field's frame around its borderless input) may show the focus
           // for it (:focus-within): up to two levels up, while no other control is inside.
           const boxes = []; for (let p = el.parentElement, i = 0; p && i < 2 && p.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[tabindex]').length === 1; p = p.parentElement, i++) boxes.push(p);
-          const boxLook = () => boxes.map((p) => { const s = getComputedStyle(p); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.backgroundColor].join('|'); }).join('/');
-          const boxBefore = boxLook();
+          const boxState = (p) => { const s = getComputedStyle(p); return { key: [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.backgroundColor].join('|'), outline: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0 ? s.outlineColor : '', ow: parseFloat(s.outlineWidth) || 0, shadow: s.boxShadow, border: s.borderTopColor, bw: parseFloat(s.borderTopWidth) || 0, bg: s.backgroundColor }; };
+          // A focus style that eases in (a frame whose border colour takes 0.15s) is read where it ends, as a keyboard
+          // user sees it once it has drawn, and its rest where the easing back ends: the transitions a focus or a blur
+          // starts, on the control and its frame, are finished before either is read.
+          const settle = () => { for (const x of [el, ...boxes]) { try { for (const an of x.getAnimations({ subtree: x === el })) if (typeof CSSTransition !== 'undefined' && an instanceof CSSTransition) an.finish(); } catch (e) {} } };
+          // The element the keyboard is already on (the page's first Tab) is let go first, so its look before is its rest;
+          // a control let go before (by focusing another) may still be easing back: settled too.
+          if (document.activeElement === el) { try { el.blur(); } catch(e){} }
+          settle();
+          const b = getComputedStyle(el); const pseudoAt = (s) => ['::before', '::after'].map((w) => { const p = getComputedStyle(el, w); return { w, outline: p.outlineStyle !== 'none' && parseFloat(p.outlineWidth) > 0 ? p.outlineColor : null, border: p.borderTopColor, shadow: p.boxShadow, bg: p.backgroundColor }; });
+          const before = look(b, getComputedStyle(el, '::before'), getComputedStyle(el, '::after')); const pseudoBefore = pseudoAt();
+          const boxBefore = boxes.map(boxState);
+          // The parts beside it in the box that holds only this control (a radio's circle, a switch's track, drawn next to
+          // the native input they stand for): what shows its focus may be one of them (input:focus-visible + .circle).
+          const parts = boxes.length ? Array.prototype.filter.call(boxes[boxes.length - 1].querySelectorAll('*'), (k) => k !== el && !el.contains(k) && !k.contains(el)).slice(0, 30) : [];
+          const partState = (k) => { const x = boxState(k); const pa = getComputedStyle(k, '::after'), pb = getComputedStyle(k, '::before'); x.key += '|' + [pb.outlineStyle, pb.outlineColor, pb.boxShadow, pb.borderColor, pa.outlineStyle, pa.outlineColor, pa.boxShadow, pa.borderColor].join('|'); x.offset = parseFloat(getComputedStyle(k).outlineOffset || '0'); return x; };
+          const partBefore = parts.map(partState);
           try { el.focus(); } catch(e){}
+          settle(); for (const k of parts) { try { for (const an of k.getAnimations()) if (typeof CSSTransition !== 'undefined' && an instanceof CSSTransition) an.finish(); } catch (e) {} }
+          // A control that does not take the focus here (inside an inert thumbnail) shows none to judge.
+          const took = document.activeElement === el;
           const a = getComputedStyle(el); const after = look(a, getComputedStyle(el, '::before'), getComputedStyle(el, '::after'));
-          if (before === after && boxBefore !== boxLook()) { /* its frame shows the focus */ }
-          else if (before === after) { noFocus.push(desc); }
+          const boxAfter = boxes.map(boxState);
+          const changedBox = boxAfter.findIndex((x, i) => x.key !== boxBefore[i].key);
+          const partAfter = parts.map(partState);
+          const changedPart = partAfter.findIndex((x, i) => x.key !== partBefore[i].key);
+          // A hidden control's own ring is never seen: only what changes around it counts.
+          const same = before === after || !shown;
+          // A shadow ring may have several layers (a white gap, then a coloured ring): each colour is kept, and the
+          // ring counts as seen when one of them stands out.
+          const shadowLayers = (v) => v.split(/,(?![^(]*\\))/).map((l) => { const m = l.match(/(?:rgba?|oklch|oklab|color|hsla?)\\([^)]+\\)/); const lens = l.replace(/[a-z]+\\([^)]+\\)/g, '').match(/-?[\\d.]+px/g) || []; return { color: m ? m[0] : null, px: Math.max(parseFloat(lens[2] || '0'), parseFloat(lens[3] || '0')) }; }).filter((l) => l.color);
+          // What surrounds a box: the first opaque background from it up (its own, or its parent's for a ring outside it).
+          const layersFrom = (node) => { const out = []; while (node && node.nodeType===1) { const bg = getComputedStyle(node).backgroundColor; out.push(bg); const mm = bg.match(/^rgba?\\(([^)]+)\\)/); const parts = mm ? mm[1].split(',') : null; const al = parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0; if (al === 1) break; node = node.parentElement; } return out; };
+          if (!took) { /* nothing to judge */ }
+          else if (same && changedBox < 0 && changedPart >= 0) {
+            // A part beside it shows the focus (its circle, its track): measured as a ring on the control is.
+            const was = partBefore[changedPart], is = partAfter[changedPart], part = parts[changedPart];
+            let ind = null, px = null, outside = false;
+            if (is.outline && is.outline !== was.outline) { ind = [is.outline]; px = is.ow; outside = is.offset >= 0; }
+            else if (is.shadow !== was.shadow && is.shadow !== 'none') { const ls = shadowLayers(is.shadow); ind = ls.length ? ls.map((l) => l.color) : null; px = ls.length ? Math.max(...ls.map((l) => l.px)) : null; outside = !/inset/.test(is.shadow); }
+            else if (is.border !== was.border) { ind = [is.border]; px = is.bw; }
+            else if (is.bg !== was.bg) { ind = [is.bg]; }
+            if (px != null && px < 2) thinFocus.push({ desc, px: Math.round(px * 10) / 10 });
+            if (ind) faintFocus.push({ desc, colors: ind, bgLayers: layersFrom(outside && part.parentElement ? part.parentElement : part) });
+          }
+          else if (same && changedBox >= 0) {
+            // Its frame shows the focus (WCAG 2.4.7 takes an indicator around the control): what changed on the frame is
+            // measured as a ring on the control is, against what surrounds the frame (1.4.11) and for its thickness.
+            const was = boxBefore[changedBox], is = boxAfter[changedBox], frame = boxes[changedBox];
+            let ind = null, px = null;
+            if (is.outline && is.outline !== was.outline) { ind = [is.outline]; px = is.ow; }
+            else if (is.shadow !== was.shadow && is.shadow !== 'none') { const ls = shadowLayers(is.shadow); ind = ls.length ? ls.map((l) => l.color) : null; px = ls.length ? Math.max(...ls.map((l) => l.px)) : null; }
+            else if (is.border !== was.border) { ind = [is.border]; px = is.bw; }
+            else if (is.bg !== was.bg) { ind = [is.bg]; }
+            if (px != null && px < 2) thinFocus.push({ desc, px: Math.round(px * 10) / 10 });
+            if (ind) faintFocus.push({ desc, colors: ind, bgLayers: layersFrom(frame.parentElement || frame) });
+          }
+          else if (same) { noFocus.push(desc); }
           else {
             // Something changed — capture the focus-indicator colour + its background so Node can
             // check it is perceivable (WCAG 1.4.11, >= 3:1). A ring that "changes" but is nearly the
             // same colour as its background is still invisible to a keyboard user.
             let ind = null, outside = false, px = null;
-            // A shadow ring may have several layers (a white gap, then a coloured ring): each colour is kept, and the
-            // ring counts as seen when one of them stands out.
-            const shadowLayers = (v) => v.split(/,(?![^(]*\\))/).map((l) => { const m = l.match(/(?:rgba?|oklch|oklab|color|hsla?)\\([^)]+\\)/); const lens = l.replace(/[a-z]+\\([^)]+\\)/g, '').match(/-?[\\d.]+px/g) || []; return { color: m ? m[0] : null, px: Math.max(parseFloat(lens[2] || '0'), parseFloat(lens[3] || '0')) }; }).filter((l) => l.color);
             if (a.outlineStyle !== 'none' && parseFloat(a.outlineWidth) > 0 && (a.outlineColor !== b.outlineColor || a.outlineStyle !== b.outlineStyle || a.outlineWidth !== b.outlineWidth)) { ind = [a.outlineColor]; outside = parseFloat(a.outlineOffset || '0') >= 0; px = parseFloat(a.outlineWidth); }
             else if (a.boxShadow !== b.boxShadow && a.boxShadow !== 'none') { const ls = shadowLayers(a.boxShadow); ind = ls.length ? ls.map((l) => l.color) : null; outside = !/inset/.test(a.boxShadow); px = ls.length ? Math.max(...ls.map((l) => l.px)) : null; }
             else if (a.borderColor !== b.borderColor) { ind = [a.borderColor]; px = parseFloat(a.borderTopWidth); }
@@ -722,19 +771,11 @@ function sweepExpression(roots, doFocus, stateMap) {
             // The browser's own ring (outline-style: auto) is drawn by the browser, not by this width.
             if (px != null && px < 2 && a.outlineStyle !== 'auto') thinFocus.push({ desc, px: Math.round(px * 10) / 10 });
             // The browser's own ring (outline-style: auto) is drawn in two tones so it shows on any background.
-            if (ind && a.outlineStyle !== 'auto') {
-              // A ring drawn outside the element sits on what surrounds it: measure against the parent.
-              const layers = []; let node = outside && el.parentElement ? el.parentElement : el;
-              while (node && node.nodeType===1) {
-                const bg = getComputedStyle(node).backgroundColor; layers.push(bg);
-                const mm = bg.match(/^rgba?\\(([^)]+)\\)/); const parts = mm ? mm[1].split(',') : null;
-                const al = parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0;
-                if (al === 1) break; node = node.parentElement;
-              }
-              faintFocus.push({ desc, colors: ind, bgLayers: layers });
-            }
+            // A ring drawn outside the element sits on what surrounds it: measure against the parent.
+            if (ind && a.outlineStyle !== 'auto') faintFocus.push({ desc, colors: ind, bgLayers: layersFrom(outside && el.parentElement ? el.parentElement : el) });
           }
           try { el.blur(); } catch(e){}
+          settle();
         }
         // 4. State communicated ONLY by a CSS class — a state word in the class list with no
         //    matching aria/native state, so assistive tech never hears the state.
@@ -1086,6 +1127,14 @@ export function deepSweepExpression(roots, what) {
     }
     if (what === 'reflow') return { scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth };
     if (what === 'dialogs') return [...document.querySelectorAll('dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true]')].filter(vis).map(desc);
+    // A dialog open on the page as it loads, and whether it lies over the page (in the top layer, or fixed by itself or a
+    // box around it) as a dialog that was opened does; one drawn in the page's flow is a picture of a dialog (a
+    // specimen on a style guide), with nothing that opened it.
+    if (what === 'dialogsAt') return [...document.querySelectorAll('dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true]')].filter(vis).map((d) => {
+      let over = false; try { over = d.matches(':modal'); } catch (e) {}
+      for (let n = d; n && n !== document.body && !over; n = n.parentElement) { const pos = getComputedStyle(n).position; if (pos === 'fixed' || pos === 'sticky') over = true; }
+      return { desc: desc(d), over };
+    });
     if (what === 'openers') {
       // Controls that open a dialog, a menu or a list (I78): each is marked so Node can open it and press Escape.
       const SEL = '[aria-haspopup]:not([aria-haspopup=false]),[aria-expanded=false][aria-controls]';
@@ -1342,7 +1391,7 @@ async function main() {
     if (!axeSource) console.log('ℹ️  [a11y] --axe: could not load axe-core (offline or blocked) — the broader scan was skipped; the core checks still ran.');
   }
 
-  const unrendered = [], unread = [], unfinished = [];
+  const unrendered = [], unread = [], unfinished = [], notJudged = [];
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
   for (const target of targets) {
@@ -1574,7 +1623,11 @@ async function main() {
       ranChecks.add('tabtrap');
     });
     await step(async () => {
-      const open = (await evalv(deepSweepExpression(null, 'dialogs'))) ?? [];
+      // Escape is judged on a dialog that lies over the page; one drawn open in its flow, with nothing that opened it,
+      // is said not judged here (where a control opens it, the opener check below judges it).
+      const at = (await evalv(deepSweepExpression(null, 'dialogsAt'))) ?? [];
+      for (const d of at.filter((x) => !x.over)) notJudged.push(`Escape on ${d.desc} (${label}): drawn open in the page with nothing that opened it, so it is judged only where a control opens it`);
+      const open = at.filter((x) => x.over).map((x) => x.desc);
       if (!open.length) return;
       await evalv(`(() => { const d = document.querySelector('dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true]'); const f = d && d.querySelector('button,a[href],input,select,textarea,[tabindex]'); (f || d)?.focus?.(); })()`);
       await pressKey('Escape', 'Escape', 27);
@@ -1844,6 +1897,7 @@ async function main() {
   if (unrendered.length) console.log(`⚠️  [a11y] not checked: ${unrendered.join(', ')} showed none of the design system's components within 10s`);
   if (unread.length) console.log(`⚠️  [a11y] partly not checked: the page could not be read in ${unread.join(', ')}; those results are missing, not clean`);
   if (unfinished.length) console.log(`⚠️  [a11y] partly not checked: ${unfinished.join('; ')}; those results are missing, not clean`);
+  for (const n of notJudged) console.log(`⏭  [a11y] ${n}`);
   if (behavioursNotChecked.size) console.log(`ℹ️  [a11y] behaviours not checked for ${[...behavioursNotChecked].join(', ')}: the style guide draws markup without the components' script. List the system's scripts in ds-config.json → systemScripts, or point a11y.urls (or --url) at a page that runs them (Storybook, the app), to check them.`);
 
   // ── Report ────────────────────────────────────────────────────────────────────
@@ -1907,6 +1961,8 @@ async function main() {
     issues: buckets.flatMap(([kind, list]) => list.map((f) => { const r = a11yFindingRecord(kind, f); const n = ownerName(f.desc); if (n) r.component = n; const u = figmaOf(f.desc); if (u) r.figma = u; return r; })),
     // What could not be read, rendered or finished: never a clean result, so an agent or CI can tell.
     ...(unread.length || unrendered.length || unfinished.length ? { notRead: [...unread, ...unrendered.map((u) => `${u} (not rendered)`), ...unfinished] } : {}),
+    // What a check left alone on purpose, with why (a dialog drawn as a picture): neither a finding nor clean.
+    ...(notJudged.length ? { notJudged } : {}),
     ...(RUN_AXE ? { axe, severeAxe } : {}),
   });
   if (JSON_OUT) { try { mkdirSync(dirname(resolve(JSON_OUT)), { recursive: true }); writeFileSync(resolve(JSON_OUT), JSON.stringify(machine(), null, 2) + '\n'); } catch { /* the file is a convenience */ } }

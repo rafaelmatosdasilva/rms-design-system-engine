@@ -237,7 +237,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   and room below it, changes only the samples and their values, never the page around them); icons from the icon sheet. The
   colours sit six a row, each as wide as the room, so its Figma name and variable read whole (three on a phone).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
-  own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15] (Component props match Figma)
+  own pages, else what its source renders: a React component's return, a Vue component's template with its props'
+  default words, else the element its Figma role asks for) with its own CSS. The components the code has that Figma
+  does not list (each file whose first element carries a class of its own, in its `components` folder when it has
+  one) are shown too, with their file and the props their code declares, marked **Only in the code** and compared with
+  nothing in Figma; each is a To do for Figma while Figma has components of its own. Before Figma's data is captured,
+  every component is listed that way, and the run says so (`3 only in the code`) instead of counting them agreed. Its controls are the props Gate [15] (Component props match Figma)
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   When an option's look is drawn on the component but a screen reader hears it on a part (a field's wrapper takes
@@ -960,7 +965,7 @@ names the kind of difference (radius, height, width, padding, gap, colour, props
 A mechanical, agnostic accessibility pass (`a11y-check.mjs`) that reuses the Gate 22 CDP/headless-Chrome
 flow. It reports **WCAG AA contrast** per theme (computed `color` vs the effective composited background),
 **accessible name + role** (interactive nodes from the accessibility tree — a component that never exposes
-aria), **visible focus** (a computed style change when focused **and** that change actually visible — the focus ring's colour has ≥ 3:1 contrast against its background, WCAG 1.4.11), **state exposure** (an element whose state
+aria), **visible focus** (a computed style change when focused **and** that change actually visible — the focus ring's colour has ≥ 3:1 contrast against its background, WCAG 1.4.11; a field whose frame shows its focus (`:focus-within` on the box around it, when it holds only that control) passes, its frame's ring measured the same way, as does a part beside it in that box (a radio's circle, a switch's track); a native checkbox or radio hidden under such a part is judged by it, a control that takes no focus (inside an inert thumbnail) is not judged, and a style that eases in or out is read where its transition ends), **state exposure** (an element whose state
 is shown only by a CSS class — `.selected` / `.checked` / `.disabled` / `.invalid` / … — with no matching
 `aria-*` or native state, so assistive tech never hears it; the state-class→aria map is common-English by
 default, extend via `a11y.stateClasses`), and **keyboard reachability** (an interactive control that cannot
@@ -1046,7 +1051,9 @@ there, never a failure.
 - **Dialogs and Escape** — an open dialog that does not close on Escape. Each control that opens a dialog, a
   menu or a list (`aria-haspopup`, or `aria-expanded` with `aria-controls`; up to 8 a page) is opened, Escape
   is pressed, and what it opened must close and give the focus back to that control. A link does not navigate
-  and a form does not submit while it runs.
+  and a form does not submit while it runs. A dialog already open as the page loads is judged when it lies over
+  the page (in the top layer, or fixed); one drawn in the page's flow with nothing that opened it (a specimen on a
+  style guide) is listed as not judged (`notJudged` in `--json`), never failed.
 - **One main heading** — an app page (a `--url` page or a route found on its own, not the styleguide or a
   story) has one `h1`, which a screen reader jumps to. The code part flags a page file with text and no `h1`,
   or several.
