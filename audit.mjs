@@ -498,6 +498,8 @@ if (process.argv.includes('--styleguide')) {
       console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${counted} · ${tpl})`);
       if (r.notAgreed) console.log(`   ${r.notAgreed}`);
     }
+    // Its Vue components: drawn from what the project's own Vite renders, or from their templates, and why (E28).
+    if (r.vue) console.log(r.vue.rendered ? `   ${r.vue.rendered} of ${r.vue.of} Vue component${r.vue.of === 1 ? '' : 's'} drawn as the project's own Vite renders ${r.vue.of === 1 ? 'it' : 'them'}${r.vue.rendered < r.vue.of ? `; the rest from their templates${r.vue.failed?.length ? ` (${r.vue.failed.map((f) => `${f.name}: ${f.why}`).join('; ')})` : ''}` : ''}.` : `   Vue components drawn from their templates: ${r.vue.why ?? 'none rendered'}.`);
     for (const name of r.scope?.asked ?? SCOPE_COMPONENTS) console.log(`   ${name}: ${relative(ROOT, r.out)}#c-${name}  (its Accessibility and Parity areas)`);
     // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
     const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');

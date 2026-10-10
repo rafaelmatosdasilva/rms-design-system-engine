@@ -1047,6 +1047,51 @@ export function openerExpression(i, phase) {
   })()`;
 }
 
+// A component shown only after an action (a modal opened by a "Show modal" button, a dropdown, a popover, a toast) is
+// opened before it is checked (E31), in four phases: 'list' marks the controls that may open it, those whose words
+// name the component first, then the ones that say they open something (aria-haspopup, aria-expanded, aria-controls),
+// then the rest, never one inside the component, one that submits a form, or one whose words delete, send, save or
+// sign out (unless they name the component); 'press' presses one (a link does not navigate, a form does not submit);
+// 'shown' says the component the press showed; 'done' takes the guards away.
+export function revealWords(names = []) {
+  return names.map((n) => String(n).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_.]+/g, ' ').toLowerCase().trim().split(/\s+/).filter(Boolean)).filter((w) => w.length);
+}
+export function revealExpression(roots, words, phase, k = 0) {
+  return `(() => {
+    const roots = ${JSON.stringify(roots ?? [])}, words = ${JSON.stringify(words ?? [])}, phase = ${JSON.stringify(phase)}, w = window;
+    const vis = (el) => { const s = getComputedStyle(el); if (s.display==='none'||s.visibility==='hidden'||+s.opacity===0) return false; const r = el.getBoundingClientRect(); return r.width>0 && r.height>0; };
+    const q = (s) => { try { return [...document.querySelectorAll(s)]; } catch { return []; } };
+    const label = (el) => (el.getAttribute('aria-label') || el.textContent || el.value || el.title || '').trim().replace(/\\s+/g, ' ').slice(0, 60);
+    if (phase === 'shown') { const el = roots.flatMap(q).find(vis); return el ? (el.getAttribute('role') || el.tagName.toLowerCase()) : null; }
+    if (phase === 'list') {
+      const inside = (el) => roots.some((s) => { try { return !!el.closest(s); } catch { return false; } });
+      const RISKY = /\\b(delete|remove|log ?out|sign ?out|submit|save|send|pay|buy|purchase|reset|clear|discard|cancel|close|dismiss|apagar|eliminar|remover|sair|enviar|guardar|cancelar|fechar)\\b/i;
+      const names = (t) => words.some((ws) => ws.every((x) => t.includes(x))) ? 4 : words.some((ws) => t.includes(ws[ws.length - 1])) ? 3 : 0;
+      const opens = (el) => el.hasAttribute('aria-haspopup') || el.hasAttribute('aria-controls') || el.getAttribute('aria-expanded') === 'false' ? 2 : 0;
+      const list = [...new Set(q('button, [role=button], [aria-haspopup], [aria-expanded=false], summary, input[type=button], a[href^="#"]'))]
+        .filter((el) => vis(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true' && !inside(el) && !(el.type === 'submit' && el.form))
+        .map((el, i) => { const t = label(el).toLowerCase(); return { el, t, s: names(t) + opens(el) + (/\\b(show|open|view|toggle|more|menu|mostrar|abrir|ver)\\b/.test(t) ? 1 : 0), i }; })
+        .filter((c) => c.s >= 3 || !RISKY.test(c.t))
+        .sort((a, b) => b.s - a.s || a.i - b.i).slice(0, 8);
+      q('[data-design-system-engine-reveal]').forEach((e) => e.removeAttribute('data-design-system-engine-reveal'));
+      return list.map((c, n) => { c.el.setAttribute('data-design-system-engine-reveal', String(n)); return label(c.el) || c.el.tagName.toLowerCase(); });
+    }
+    if (phase === 'press') {
+      const el = document.querySelector('[data-design-system-engine-reveal="${Number(k) || 0}"]');
+      if (!el) return false;
+      if (!w.__dseRevealNav) {
+        w.__dseRevealNav = (e) => { if (e.target && e.target.closest && e.target.closest('a[href]:not([href^="#"])')) e.preventDefault(); };
+        w.__dseRevealSubmit = (e) => e.preventDefault();
+        w.addEventListener('click', w.__dseRevealNav, true); document.addEventListener('submit', w.__dseRevealSubmit, true);
+      }
+      el.focus(); el.click();
+      return true;
+    }
+    if (phase === 'done' && w.__dseRevealNav) { w.removeEventListener('click', w.__dseRevealNav, true); document.removeEventListener('submit', w.__dseRevealSubmit, true); w.__dseRevealNav = null; }
+    return true;
+  })()`;
+}
+
 export function deepSweepExpression(roots, what) {
   return `(() => {
     const roots = ${JSON.stringify(roots)};
@@ -1342,6 +1387,36 @@ async function main() {
     }
   }
 
+  // A Vue design system's components, rendered with the project's own Vite in each of their variants (Figma's, else
+  // the code's props), beside whatever pages are checked: every variant, every run, wherever its pages show it or not
+  // (E28). Scoped to the components asked for; a11y.harness:false turns it off.
+  if (!urlList.length && !harness && cfg.a11y?.harness !== false && findChrome()) {   // without Chrome nothing is tried
+    try {
+      const { componentSourceFiles, resolveComponentFile, textReader, codeComponents } = await import('./component-source.mjs');
+      const files = componentSourceFiles(ROOT, cfg).filter((f) => /\.vue$/.test(f));
+      if (files.length) {
+        const { startVueHarness } = await import('./vue-harness.mjs');
+        let propsSnap = {};
+        try { propsSnap = JSON.parse(readFileSync(join(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8')); } catch { /* none */ }
+        const read = textReader();
+        // Every component: Figma's, and the ones only the code has (a .vue file whose root carries a class of its own).
+        const figmaNames = [...new Set([...locator.names(), ...Object.keys(propsSnap).filter((n) => !n.startsWith('_'))])];
+        const locate = (n) => resolveComponentFile(n, { ROOT, cfg, files, read, classFor: (x) => locator.classFor(x) }).file;
+        const seen = new Set(figmaNames.map(locate).filter(Boolean).map((f) => resolve(ROOT, f)));
+        const own = codeComponents(ROOT, cfg, read).filter((k) => /\.vue$/.test(k.file) && !seen.has(resolve(ROOT, k.file)));
+        const ownFile = new Map(own.map((k) => [k.name, resolve(ROOT, k.file)]));
+        const names = components.length ? components : [...figmaNames, ...own.map((k) => k.name)];
+        const v = await startVueHarness(ROOT, cfg, names, { propsSnap, read, locate: (n) => ownFile.get(n) ?? locate(n) });
+        if (v.url) {
+          const before = stopServer; stopServer = () => { before?.(); v.close(); };
+          targets.push({ label: 'the Vue components, rendered with the project\'s own Vite', url: v.url, ready: 'window.__dseHarnessReady === true', harness: true });
+          console.log(`ℹ️  [a11y] target: ${v.groups.length} Vue component(s) rendered with the project's own Vite in each variant (${v.groups.map((g) => `${g.name}: ${g.cases.length} from ${g.from === 'figma' ? 'Figma' : 'its props'}`).join(', ')})`);
+          for (const m of v.missing) console.log(`ℹ️  [a11y] not rendered: ${m}`);
+        } else if (v.why) console.log(`ℹ️  [a11y] the Vue components were not rendered from their code: ${v.why}.`);
+      }
+    } catch (e) { console.log(`ℹ️  [a11y] the Vue components were not rendered from their code: ${String(e?.message ?? e).split('\n')[0]}.`); }
+  }
+
   if (!targets.length && noPackages) skip('the project\'s packages are not installed (no node_modules), so neither its dev server nor its components can run in a browser: install them (npm install, or the project\'s package manager), then run again.');
   if (!targets.length) skip(`no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing.${harnessWhy ? ` The components were not rendered from their code either: ${harnessWhy}.` : ''}`);
   const waitFor = cfg.a11y?.waitFor ?? null;   // optional selector to await before the sweep (SPA hydration)
@@ -1392,6 +1467,7 @@ async function main() {
   }
 
   const unrendered = [], unread = [], unfinished = [], notJudged = [];
+  const opened = [], notOpened = [];   // a component opened by a press before it was checked, or one no press showed (E31)
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
   for (const target of targets) {
@@ -1418,7 +1494,39 @@ async function main() {
     // never "nothing to fix".
     const shows = async () => ((await send('Runtime.evaluate', { expression: `(${JSON.stringify(roots)} ?? ['body']).some((s) => { try { return !!document.querySelector(s); } catch { return false; } })`, returnByValue: true }, sessionId)).result?.value) === true;
     let shown = await shows();
-    for (let i = 0; !shown && i < 20; i++) { await new Promise((res) => setTimeout(res, 500)); shown = await shows(); }
+    // A component asked for that is not on the page, or not seen there (a closed modal, a dropdown's menu, a toast), may
+    // open after an action: after two seconds its likely openers are pressed in turn until it shows, and it is checked
+    // open (E31). What opened it is said; a press that leaves the page is undone by loading the page again.
+    const reveal = components.length > 0 && !target.harness && roots?.length;
+    for (let i = 0; !shown && i < (reveal ? 4 : 20); i++) { await new Promise((res) => setTimeout(res, 500)); shown = await shows(); }
+    let pressed = false, revealedBy = null;   // a press that opened the component on this page (E31)
+    const evalIn = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId).catch(() => null))?.result?.value;
+    if (reveal && !(await evalIn(revealExpression(roots, [], 'shown')))) {
+      const words = revealWords(components);
+      const at = await evalIn('location.href');
+      let tried = await evalIn(revealExpression(roots, words, 'list')) ?? [];
+      pressed = tried.length > 0;
+      for (let k = 0; k < tried.length; k++) {
+        if (!(await evalIn(revealExpression(roots, words, 'press', k)))) continue;
+        let what = null;
+        for (let n = 0; n < 10 && !what; n++) { await new Promise((res) => setTimeout(res, 100)); what = await evalIn(revealExpression(roots, words, 'shown')); }
+        if (what) { opened.push(`${components.join(', ')} on ${label}: opened by pressing "${tried[k]}"`); revealedBy = tried[k]; shown = true; break; }
+        // Nothing showed: whatever the press opened is closed (Escape); a page it left is loaded again, its controls listed anew.
+        await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId).catch(() => {});
+        await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId).catch(() => {});
+        if ((await evalIn('location.href')) !== at || (await evalIn('document.querySelector("[data-design-system-engine-reveal]") === null'))) {
+          await send('Page.navigate', { url: target.url }, sessionId).catch(() => {});
+          await waitForTrue(send, sessionId, pageLoadedExpression(waitFor), { attempts: 200, intervalMs: 50, tolerateErrors: true });
+          await new Promise((res) => setTimeout(res, 300));
+          tried = await evalIn(revealExpression(roots, words, 'list')) ?? tried;
+        }
+      }
+      await evalIn(revealExpression(roots, words, 'done'));
+      if (!shown) notOpened.push(`${components.join(', ')} on ${label} (${tried.length ? `none of its ${tried.length} likely openers showed it: ${tried.slice(0, 4).map((t) => `"${t}"`).join(', ')}${tried.length > 4 ? '…' : ''}` : 'no control on the page could open it'})`);
+    }
+    // The rest of the ten seconds a page is given to render, when no press was tried (they took that time).
+    for (let i = 4; !shown && reveal && !pressed && i < 20; i++) { await new Promise((res) => setTimeout(res, 500)); shown = await shows(); }
+    if (!shown && reveal) shown = await shows();
     if (!shown) { unrendered.push(label); await send('Target.closeTarget', { targetId }); continue; }
     sweptPlugins++;
     // A keyboard user's page: one real Tab first, so the browser shows focus as it does for the keyboard
@@ -1624,10 +1732,11 @@ async function main() {
     });
     await step(async () => {
       // Escape is judged on a dialog that lies over the page; one drawn open in its flow, with nothing that opened it,
-      // is said not judged here (where a control opens it, the opener check below judges it).
+      // is said not judged here (where a control opens it, the opener check below judges it). One a press opened before
+      // the check (E31) was opened by a control, so it is judged wherever it lies.
       const at = (await evalv(deepSweepExpression(null, 'dialogsAt'))) ?? [];
-      for (const d of at.filter((x) => !x.over)) notJudged.push(`Escape on ${d.desc} (${label}): drawn open in the page with nothing that opened it, so it is judged only where a control opens it`);
-      const open = at.filter((x) => x.over).map((x) => x.desc);
+      if (!revealedBy) for (const d of at.filter((x) => !x.over)) notJudged.push(`Escape on ${d.desc} (${label}): drawn open in the page with nothing that opened it, so it is judged only where a control opens it`);
+      const open = at.filter((x) => x.over || revealedBy).map((x) => x.desc);
       if (!open.length) return;
       await evalv(`(() => { const d = document.querySelector('dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true]'); const f = d && d.querySelector('button,a[href],input,select,textarea,[tabindex]'); (f || d)?.focus?.(); })()`);
       await pressKey('Escape', 'Escape', 27);
@@ -1893,7 +2002,10 @@ async function main() {
 
   closeCDP(); cleanup(); clearTimeout(killTimer);
 
-  if (!sweptPlugins) skip(unrendered.length ? `nothing rendered to check — ${unrendered.join(', ')} showed none of the design system's components within 10s` : 'nothing rendered to check — a --url/dev-server page did not load, or the plugin UIs are not built');
+  const notOpenedLine = notOpened.length ? ` Not opened by any press: ${notOpened.join('; ')}.` : '';
+  if (!sweptPlugins) skip(unrendered.length ? `nothing rendered to check — ${unrendered.join(', ')} showed none of the design system's components within 10s.${notOpenedLine}` : 'nothing rendered to check — a --url/dev-server page did not load, or the plugin UIs are not built');
+  for (const o of opened) console.log(`ℹ️  [a11y] ${o}, then checked open`);
+  for (const o of notOpened) console.log(`⚠️  [a11y] not opened: ${o}; not checked open, so not clean`);
   if (unrendered.length) console.log(`⚠️  [a11y] not checked: ${unrendered.join(', ')} showed none of the design system's components within 10s`);
   if (unread.length) console.log(`⚠️  [a11y] partly not checked: the page could not be read in ${unread.join(', ')}; those results are missing, not clean`);
   if (unfinished.length) console.log(`⚠️  [a11y] partly not checked: ${unfinished.join('; ')}; those results are missing, not clean`);
@@ -1960,7 +2072,9 @@ async function main() {
     ran: [...ranChecks],
     issues: buckets.flatMap(([kind, list]) => list.map((f) => { const r = a11yFindingRecord(kind, f); const n = ownerName(f.desc); if (n) r.component = n; const u = figmaOf(f.desc); if (u) r.figma = u; return r; })),
     // What could not be read, rendered or finished: never a clean result, so an agent or CI can tell.
-    ...(unread.length || unrendered.length || unfinished.length ? { notRead: [...unread, ...unrendered.map((u) => `${u} (not rendered)`), ...unfinished] } : {}),
+    ...(unread.length || unrendered.length || unfinished.length || notOpened.length ? { notRead: [...unread, ...unrendered.map((u) => `${u} (not rendered)`), ...notOpened.map((u) => `${u} (not opened)`), ...unfinished] } : {}),
+    // A component opened by a press before it was checked (a modal behind its "Show" button), and by which (E31).
+    ...(opened.length ? { opened } : {}),
     // What a check left alone on purpose, with why (a dialog drawn as a picture): neither a finding nor clean.
     ...(notJudged.length ? { notJudged } : {}),
     ...(RUN_AXE ? { axe, severeAxe } : {}),
@@ -1973,7 +2087,7 @@ async function main() {
 
   // ── Human lane (default): plain language, no jargon ──
   console.log(`\n─── Accessibility check ${STRICT ? '(must pass)' : components.length ? `(${components.join(', ')}: each line is part of building it, unless it says to send it back to Figma)` : '(advisory — never blocks the build)'} ───\n`);
-  if (!total && (unread.length || unrendered.length || unfinished.length)) {
+  if (!total && (unread.length || unrendered.length || unfinished.length || notOpened.length)) {
     console.log(`Nothing found in what could be read${inThemes}, but part of it was not checked (see ⚠️ above): not a clean result.`);
   } else if (!total) {
     console.log(`Good news: nothing to fix here${inThemes}.`);
@@ -2020,7 +2134,7 @@ async function main() {
   }
 
   // ── Smart nudge: how to get deeper results (only when a styleguide wasn't the target) ──
-  if (!sg && !harness && cfg.a11y?.styleguide !== false) {
+  if (!sg && !harness && !targets.every((t) => t.harness) && cfg.a11y?.styleguide !== false) {
     const sgOut = cfg.styleguide?.out ?? 'apps/styleguide/index.html';
     if (cfg.styleguide?.template && !existsSync(join(ROOT, sgOut))) {
       console.log(`\nTip for a deeper check: you have a styleguide set up but it isn't built yet. Build it (run the parity with --docs) and this check will use it on its own — that is the most thorough result: every component in every state (normal, disabled, error, focused), all on one page.`);

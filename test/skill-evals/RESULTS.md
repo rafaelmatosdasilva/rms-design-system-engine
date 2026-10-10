@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Every variant of a component checked, every run; Vue components drawn and tried from their code (continuous evaluation)
+
+What changed since the entry below (engine 58d7ee7): A component shown only after an action is opened before it is checked; Every variant of a component checked, every run; Vue components drawn and tried from their code. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `464aef4566b6` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8f8b5ed | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.056 |
+| Input a run | 93k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 93k. Records: `records/2026-10-10-every-variant-of-a-component`.
+
 ## 2026-10: A style guide request builds it, accessibility named or not; a component's own style guide page (continuous evaluation)
 
 What changed since the entry below (engine 7cc7815): Router: another design system's code and Figma link asked for at once; a style guide request builds it; A style guide request builds it, accessibility named or not; a component's own style guide page. The guide changed in `reference/usage.md`, `rms-design-system-engine.md`.

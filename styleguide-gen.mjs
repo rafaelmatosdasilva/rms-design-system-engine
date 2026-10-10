@@ -177,6 +177,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   }
 
   const themeFiles = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();
+  // What the project's own build renders for its Vue components (vue-harness.mjs renderedVue): their CSS, and how many.
+  let vueCss = '', vueRender = null;
+  const VUE_CSS_MARK = '/*design-system-engine:vue-css*/';
   const pluginCSS = (cfg.paths?.pluginCSS ?? []).flat();
   const pluginHTML = (cfg.paths?.plugins ?? []).flat();
 
@@ -311,10 +314,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const sourceMarkup = (file, cls) => { try { const m = /\.vue$/.test(file) ? vueMarkup(read(file), cls) : jsxMarkup(read(file), cls); return m && /^<[a-z]/.test(m) ? m : null; } catch { return null; } };
       const files = componentSourceFiles(ROOT, cfg).filter((f) => /\.(jsx|tsx|js|vue)$/.test(f));
       const covered = new Set();
+      const vueFiles = {};   // a Vue component's file, to draw it from what the project's own build renders (E28)
       for (const name of drawNames) {
         if (name.startsWith('_')) continue;
         const { file } = resolveComponentFile(name, { ROOT, cfg, files, read, classFor: locator.classFor });
         if (file) { covered.add(resolve(file)); fileOf[name] = file; }
+        if (file && /\.vue$/.test(file) && !probes[name]) vueFiles[name] = resolve(ROOT, file);
         if (probes[name] || !file || !/\.(jsx|tsx|js|vue)$/.test(file)) continue;
         const m = sourceMarkup(file, locator.classFor(name));
         if (m) jsx[name] = m;
@@ -329,6 +334,22 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const props = Object.entries(api?.props ?? {}).map(([prop, d]) => ({ name: prop, ...(d.default != null ? { default: String(d.default) } : {}), ...(d.options ? { options: [...d.options] } : {}), ...(d.required ? { required: true } : {}) }));
         codeOnly.push({ ...k, props, markup: sourceMarkup(abs, k.cls), from: /\.vue$/.test(k.file) ? 'vue' : 'jsx' });
         fileOf[k.name] = abs;
+        if (/\.vue$/.test(k.file)) vueFiles[k.name] = abs;
+      }
+      // A Vue component drawn from what the project's own Vite renders, its SCSS compiled (vue-harness.mjs), once its
+      // packages are installed; the markup read from its template stays when it cannot be rendered.
+      // ds-config.json → styleguide.renderVue: false keeps the template read.
+      if (Object.keys(vueFiles).length && cfg.styleguide?.renderVue !== false) {
+        const { renderedVue } = await import('./vue-harness.mjs');
+        const r = await renderedVue(ROOT, cfg, Object.keys(vueFiles), { propsSnap, read, locate: (n) => vueFiles[n] ?? null });
+        const holds = (m, cls) => !cls || new RegExp(`class="[^"]*(?<![\\w-])${String(cls).replace(/^\./, '').replace(/[^\w-]/g, '')}(?![\\w-])`).test(m.slice(0, m.indexOf('>') + 1));
+        for (const [name, m] of Object.entries(r.markup)) {
+          const own = codeOnly.find((k) => k.name === name);
+          if (own) { if (holds(m, own.cls)) { own.markup = m; own.from = 'vue-build'; } }
+          else if (holds(m, locator.classFor(name))) jsx[name] = m;
+        }
+        vueCss = r.css;
+        vueRender = { rendered: Object.keys(r.markup).length, of: Object.keys(vueFiles).length, why: r.why ?? null, failed: r.failed };
       }
     } catch { /* no component sources */ }
     // The token check's own result: each token equal to Figma, with its CSS variable. Run it, read it, tidy up.
@@ -797,8 +818,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   // The component rules outside the theme files: compiled component CSS and each component's own stylesheet.
   // An app page listed as a stylesheet (pluginCSS: ui.src.html) gives only its <style> blocks: its markup and scripts
   // must never land inside the page's <style>.
+  // The CSS the project's build gives its Vue components (their <style> blocks) goes where VUE_CSS_MARK is, once the
+  // components are drawn: the page's component CSS is filled before its data.
   async function componentCSS() {
-    return (await context()).componentSheets.map((p) => (/\.html?$/i.test(p) ? styleBlocks(readText(p)) : readText(p))).join('\n\n');
+    return (await context()).componentSheets.map((p) => (/\.html?$/i.test(p) ? styleBlocks(readText(p)) : readText(p))).join('\n\n') + `\n${VUE_CSS_MARK}`;
   }
 
   // ── Fill the template ───────────────────────────────────────────────────────────
@@ -832,7 +855,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // The system's own CSS (its theme and the sheets in its repository), apart from the products' pages it also reads:
     // what a prototype's copy of a component may keep.
     const systemCss = [...new Set([...themeFiles, ...((await context()).componentSheets ?? [])])].filter((f) => !String(f).startsWith('..') && existsSync(resolve(ROOT, f))).map((f) => (/\.html?$/i.test(f) ? styleBlocks(readText(f)) : readText(f))).join('\n');
-    return { themeCSS: themeCSS(), componentCSS: componentCss, systemCSS: systemCss, view: JSON.parse(await agreed()), iconSheet: iconSheet(), scripts: systemScripts() };
+    const view = JSON.parse(await agreed());
+    return { themeCSS: themeCSS(), componentCSS: componentCss.split(VUE_CSS_MARK).join(vueCss), systemCSS: systemCss, view, iconSheet: iconSheet(), scripts: systemScripts() };
   }
   const fills = {
     THEME_CSS: () => themeCSS(),
@@ -858,7 +882,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     if (hit) filled.push(key);
   }
 
+  html = html.split(VUE_CSS_MARK).join(vueCss);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html);
-  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
+  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
 }
