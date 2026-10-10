@@ -359,7 +359,7 @@ export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}
 // from the contract's children. · jsx: { name: the markup a React component's own JSX returns (jsx-markup.mjs) }, used
 // when neither the contract nor a page has it.
 export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, classFor = () => null, cssText = '', probes = {}, probeList = [], unbuilt = [], cfg = {},
-  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, heardOn = {}, parts = {}, jsx = {}, alsoNames = [], themeCss = '', cats = null } = {}) {
+  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, heardOn = {}, parts = {}, jsx = {}, alsoNames = [], themeCss = '', cats = null, codeOnly = [] } = {}) {
   const byComponent = new Map();
   for (const r of rows) { if (!byComponent.has(r.component)) byComponent.set(r.component, []); byComponent.get(r.component).push(r); }
   const components = [], waiting = [];
@@ -442,6 +442,19 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     components.push({ name, cls, role: roleWord(requirementEntry(entry, cats, cfg).annotations), description: entry.description ?? '', note: notes[name.toLowerCase()] ?? notes[name] ?? '',
       markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls, ...(propsNotBuilt.length ? { unbuilt: propsNotBuilt } : {}) });
   }
+  // The components the code has that Figma does not list (every one, before Figma's data is captured): shown with
+  // their file and the props their code declares, each said to be compared with nothing in Figma. Drawn from an
+  // instance in the project's pages, else their own source (a Vue template, a React return), else a stand-in.
+  const figmaHas = Object.keys(propsSnap).some((n) => !n.startsWith('_'));
+  for (const k of codeOnly) {
+    if (components.some((c) => c.name === k.name)) continue;
+    const cls = k.cls ? String(k.cls).replace(/^\./, '') : null;
+    const candidates = [...(cls ? pages.flatMap((h) => instanceMarkups(h, cls)).map((markup) => ({ markup, from: 'page' })) : []), ...(k.markup ? [{ markup: k.markup, from: k.from ?? 'source' }] : [])];
+    const shown = candidates.filter((c) => !hiddenAtRest(c.markup, cls, cssText));
+    const chosen = candidates.length ? fullestMarkup(shown.length ? shown : candidates) : null;
+    components.push({ name: k.name, cls, role: null, description: '', note: notes[k.name.toLowerCase()] ?? notes[k.name] ?? '', markup: chosen?.markup ?? null, markupFrom: chosen?.from ?? 'role',
+      usage: usage[k.name] ?? [], tokens: cls ? componentTokens(cssText, cls) : [], controls: [], codeOnly: { file: k.file, props: k.props ?? [], figma: figmaHas } });
+  }
   // A recorded value that moved on one side since it was agreed is not agreed any more.
   for (const f of Object.values(agreedRecord.facts ?? {})) if (f && f.figma !== undefined && f.code !== undefined && String(f.figma) !== String(f.code)) undecided++;
   const tokens = check ? agreedTokens(check, figmaVars) : null;
@@ -451,7 +464,11 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
   if (unrealized) said.push(`${unrealized} Figma propert${unrealized === 1 ? 'y' : 'ies'} the code does not build yet`);
   if (waiting.length) said.push(`${waiting.length} component${waiting.length === 1 ? '' : 's'} the code does not have yet (${waiting.map((w) => w.replace(/ \(not built yet\)$/, '')).join(', ')})`);
   const line = said.length ? `Left off this page until Figma and the code agree: ${said.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Each one is in the To do list, with who does it and what to do.` : 'Figma and the code agree on everything this page shows.';
-  return { title, components, tokens, icons, notAgreed: { differences: undecided, unrealized, waiting, line }, modes: modeAxes(cfg, figmaVars, themeCss), widths: viewportWidths(figmaVars) };
+  const onlyCode = components.filter((c) => c.codeOnly).length;
+  // Before Figma's data is captured, every component is the code's alone: said so, never "Figma and the code agree".
+  const shownLine = !figmaHas && onlyCode ? `No Figma data yet: these are the ${onlyCode} component${onlyCode === 1 ? '' : 's'} the code has, compared with nothing in Figma. Capture Figma's data (rms-design-system-engine --recipe refresh-figma) to compare them.`
+    : onlyCode ? `${line} ${onlyCode} component${onlyCode === 1 ? ' the code has is' : 's the code has are'} not in Figma: shown, marked as compared with nothing.` : line;
+  return { title, components, tokens, icons, notAgreed: { differences: undecided, unrealized, waiting, line: shownLine }, codeOnly: onlyCode, figmaComponents: figmaHas, modes: modeAxes(cfg, figmaVars, themeCss), widths: viewportWidths(figmaVars) };
 }
 
 // The primitive colours (Figma's primitives/… ramp) the theme declares with Figma's value in every mode, for the ramp

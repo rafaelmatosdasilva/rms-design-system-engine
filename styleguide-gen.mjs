@@ -295,18 +295,37 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const structNames = Object.keys(readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {});
     const drawNames = [...new Set([...Object.keys(propsSnap), ...(opts.names ?? []), ...structNames])];
     for (const name of drawNames) { const sel = locator.selectorFor(name); const p = sel && probeBySelector.get(String(sel).replace(/\s+/g, ' ').trim()); if (p) probes[name] = p; }
-    // A React component the pages do not show: the markup its own JSX returns, as the code capture draws it.
+    // A component the pages do not show: the markup its own source renders, as the code capture draws it (what a React
+    // component returns, a Vue component's template).
     const jsx = {};
+    // The components the code has that Figma does not list (every one, before Figma's data is captured): each with its
+    // file, the props its code declares and the markup its source renders (codeComponents, E26).
+    const codeOnly = [];
     try {
-      const { componentSourceFiles, resolveComponentFile, textReader } = await import('./component-source.mjs');
+      const { componentSourceFiles, resolveComponentFile, textReader, codeComponents, textComponentApi } = await import('./component-source.mjs');
       const { jsxMarkup } = await import('./jsx-markup.mjs');
+      const { vueMarkup } = await import('./vue-markup.mjs');
       const read = textReader();
-      const files = componentSourceFiles(ROOT, cfg).filter((f) => /\.(jsx|tsx|js)$/.test(f));
+      const sourceMarkup = (file, cls) => { try { const m = /\.vue$/.test(file) ? vueMarkup(read(file), cls) : jsxMarkup(read(file), cls); return m && /^<[a-z]/.test(m) ? m : null; } catch { return null; } };
+      const files = componentSourceFiles(ROOT, cfg).filter((f) => /\.(jsx|tsx|js|vue)$/.test(f));
+      const covered = new Set();
       for (const name of drawNames) {
-        if (name.startsWith('_') || probes[name]) continue;
+        if (name.startsWith('_')) continue;
         const { file } = resolveComponentFile(name, { ROOT, cfg, files, read, classFor: locator.classFor });
-        if (!file || !/\.(jsx|tsx|js)$/.test(file)) continue;
-        try { const m = jsxMarkup(read(file), locator.classFor(name)); if (m && /^<[a-z]/.test(m)) jsx[name] = m; } catch { /* not readable as JSX */ }
+        if (file) covered.add(resolve(file));
+        if (probes[name] || !file || !/\.(jsx|tsx|js|vue)$/.test(file)) continue;
+        const m = sourceMarkup(file, locator.classFor(name));
+        if (m) jsx[name] = m;
+      }
+      const squash = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const figmaClasses = new Set(drawNames.map((n) => String(locator.classFor(n) ?? '').replace(/^\./, '')).filter(Boolean));
+      const figmaNames = new Set(drawNames.map(squash));
+      for (const k of codeComponents(ROOT, cfg, read)) {
+        const abs = resolve(ROOT, k.file);
+        if (covered.has(abs) || figmaClasses.has(k.cls) || figmaNames.has(squash(k.name))) continue;
+        const api = textComponentApi(abs, read(abs));
+        const props = Object.entries(api?.props ?? {}).map(([prop, d]) => ({ name: prop, ...(d.default != null ? { default: String(d.default) } : {}), ...(d.options ? { options: [...d.options] } : {}), ...(d.required ? { required: true } : {}) }));
+        codeOnly.push({ ...k, props, markup: sourceMarkup(abs, k.cls), from: /\.vue$/.test(k.file) ? 'vue' : 'jsx' });
       }
     } catch { /* no component sources */ }
     // The token check's own result: each token equal to Figma, with its CSS variable. Run it, read it, tidy up.
@@ -330,7 +349,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const { loadCategories, requirementEntry, noteIsTodo } = await import('./annotation-categories.mjs');
     const cats = loadCategories(ROOT, cfg);
     const view = agreedView({ cats, propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, probeList, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
-      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, alsoNames: [...new Set([...(opts.names ?? []), ...structNames])], themeCss: themeFiles.map(readText).join('\n'),
+      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, codeOnly, alsoNames: [...new Set([...(opts.names ?? []), ...structNames])], themeCss: themeFiles.map(readText).join('\n'),
       // A contract entry named apart from its Figma component (figmaName) maps that component's props too.
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).flatMap(([n, c]) => [[n, c.propertyMap], ...(c.figmaName && c.figmaName !== n && !contract.CONTRACT[c.figmaName]?.propertyMap ? [[c.figmaName, c.propertyMap]] : [])])),
       // An option heard on a part (heardOn: the field disabled inside its wrapper), set with the option's look.
@@ -758,7 +777,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       } catch { /* no pictures: the cards show the names */ }
     }
     lastView = view;
-    agreedSummary = { components: view.components.length, line: view.notAgreed.line };
+    agreedSummary = { components: view.components.length, codeOnly: view.codeOnly ?? 0, line: view.notAgreed.line };
     return JSON.stringify(view).replace(/</g, '\\u003c');
   }
   // The component rules outside the theme files: compiled component CSS and each component's own stylesheet.
@@ -827,5 +846,5 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
 
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html);
-  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
+  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
 }

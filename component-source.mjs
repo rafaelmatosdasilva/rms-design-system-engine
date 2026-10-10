@@ -46,6 +46,49 @@ export function componentSourceFiles(ROOT, cfg = {}) {
   return out;
 }
 
+// The class a component file gives its first element: a Vue or Svelte file's first element in its template (its static
+// class, else the first string of a bound :class), a React file's first className. null when it carries none.
+export function rootClassOf(file, text) {
+  const ext = extname(file).toLowerCase();
+  const t = String(text ?? '').replace(/<!--[\s\S]*?-->/g, '');
+  let attrs = null;
+  if (ext === '.vue' || ext === '.svelte') {
+    const tpl = ext === '.vue' ? (/<template[^>]*>([\s\S]*)<\/template>/.exec(t)?.[1] ?? '') : t.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '');
+    attrs = /<[a-z][\w-]*\b([^>]*)>/.exec(tpl)?.[1] ?? null;
+    if (attrs == null) return null;
+    const value = (re) => { const m = re.exec(attrs); return m ? m[1] ?? m[2] : null; };
+    const own = value(/(?:^|\s)class\s*=\s*(?:"([^"]*)"|'([^']*)')/);
+    const bound = value(/(?:^|\s)(?::|v-bind:)class\s*=\s*(?:"([^"]*)"|'([^']*)')/);
+    const first = (own ?? '').split(/\s+/).find(Boolean) ?? (bound ? /['"`]([A-Za-z_-][\w-]*)/.exec(bound.replace(/\{[^}]*\}/g, ' '))?.[1] : null);
+    return first && /^-?[A-Za-z_][\w-]*$/.test(first) ? first : null;
+  }
+  if (ext === '.jsx' || ext === '.tsx') {
+    const c = /\bclassName\s*=\s*(?:["']([^"']+)["']|\{\s*["'`]([^"'`$]+)["'`]\s*\})/.exec(t)?.slice(1).find(Boolean);
+    const first = String(c ?? '').split(/\s+/).find(Boolean);
+    return first && /^-?[A-Za-z_][\w-]*$/.test(first) ? first : null;
+  }
+  return null;
+}
+
+// The components the code has: each component file (a Vue or Svelte file, or a React file named in PascalCase) whose
+// first element carries a class of its own, named by its file. In a project that keeps them in a components folder,
+// only those; else every one but the app's own pages, views, layouts and routes. → [{ name, file, cls }]
+export function codeComponents(ROOT, cfg = {}, read = textReader()) {
+  const rel = (f) => f.slice(ROOT.length + 1).replace(/\\/g, '/');
+  const all = componentSourceFiles(ROOT, cfg).filter((f) => /\.(vue|svelte)$/i.test(f) || (/\.(jsx|tsx)$/i.test(f) && /^[A-Z]/.test(basename(f))));
+  const inFolder = all.filter((f) => rel(f).split('/').slice(0, -1).some((d) => /^components?$/i.test(d)));
+  const files = inFolder.length ? inFolder : all.filter((f) => !rel(f).split('/').slice(0, -1).some((d) => /^(views?|pages?|layouts?|screens?|routes?|router)$/i.test(d)) && !/^App\./.test(basename(f)));
+  const out = [], seen = new Set();
+  for (const f of files.sort()) {
+    const cls = rootClassOf(f, read(f));
+    const name = basename(f).replace(/\.[^.]+$/, '');
+    if (!cls || name === 'index' || seen.has(name)) continue;
+    seen.add(name);
+    out.push({ name, file: rel(f), cls });
+  }
+  return out;
+}
+
 // A cached text reader (one read per file per run).
 export function textReader() {
   const cache = new Map();
