@@ -268,6 +268,30 @@ export function ownSelector(cls, sel) {
   const classes = (sel.match(/\.[\w-]+/g) ?? []).map((k) => k.slice(1));
   return !classes.length || classes.some((k) => k === cls || k.startsWith(`${cls}-`));
 }
+// A state a screen reader hears on a part while the look is drawn on the component (a field's wrapper takes a class,
+// the field itself is disabled): the contract's heardOn says it per option ({ Disabled: { True: '.field:disabled' } }).
+// '.field:disabled' → { target: '.field', attrs: { disabled: '' } }; null when it sets nothing.
+export function heardEffect(sel) {
+  if (typeof sel !== 'string' || !sel.trim()) return null;
+  const attrs = {};
+  for (const m of sel.matchAll(/\[([\w-]+)(?:=["']?([^"'\]]*)["']?)?\]/g)) attrs[m[1]] = m[2] ?? '';
+  for (const m of sel.matchAll(/:(disabled|checked|indeterminate|required|invalid)\b/g)) attrs[m[1] === 'invalid' ? 'aria-invalid' : m[1]] = m[1] === 'invalid' ? 'true' : '';
+  const target = sel.replace(/\[[^\]]*\]|:(disabled|checked|indeterminate|required|invalid)\b/g, '').trim();
+  return target && Object.keys(attrs).length ? { target, attrs } : null;
+}
+// Every option heardOn names gets its part's state too (effect.also), so the style guide sets it with the look and the
+// state check counts it.
+export function addHeard(controls, heardOn) {
+  if (!heardOn) return controls;
+  const add = (effect, sel) => { const h = heardEffect(sel); if (effect && h) (effect.also ??= []).push(h); };
+  for (const k of controls) {
+    const byOption = heardOn[k.label];
+    if (!byOption) continue;
+    if (k.type === 'BOOLEAN') add(k.on, byOption.True ?? byOption.true);
+    for (const o of k.options ?? []) add(o, byOption[o.label]);
+  }
+  return controls;
+}
 export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}, realizations = {}, cssText = '', parts = [] }) {
   const base = cls ? `.${cls}` : '';
   const controls = [], unrealized = [];
@@ -330,11 +354,12 @@ export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}
 // Figma has and the code does not yet.
 // check: parity-check.mjs --json result · figmaVars: the vars snapshot · pages: the project's own HTML (text) ·
 // usage: { name: [app labels] } · notes: { name: the code's own note } · icons: the icon ids · title: the system's name.
-// propertyMaps: { name: the contract's propertyMap (Figma prop → option → selector) } · parts: { name: [{ name, selector }] }
+// propertyMaps: { name: the contract's propertyMap (Figma prop → option → selector) } · heardOn: { name: { prop: { option: selector } } }
+// (the part a state is heard on) · parts: { name: [{ name, selector }] }
 // from the contract's children. · jsx: { name: the markup a React component's own JSX returns (jsx-markup.mjs) }, used
 // when neither the contract nor a page has it.
 export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, classFor = () => null, cssText = '', probes = {}, probeList = [], unbuilt = [], cfg = {},
-  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, parts = {}, jsx = {}, alsoNames = [], themeCss = '', cats = null } = {}) {
+  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, heardOn = {}, parts = {}, jsx = {}, alsoNames = [], themeCss = '', cats = null } = {}) {
   const byComponent = new Map();
   for (const r of rows) { if (!byComponent.has(r.component)) byComponent.set(r.component, []); byComponent.get(r.component).push(r); }
   const components = [], waiting = [];
@@ -413,6 +438,7 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     if (entry.noProps && !markup) continue;
     // Its role as a Figma note states it: only a note that is a requirement (annotation-categories.mjs), never one
     // in a design-intent category.
+    addHeard(controls, heardOn[name]);
     components.push({ name, cls, role: roleWord(requirementEntry(entry, cats, cfg).annotations), description: entry.description ?? '', note: notes[name.toLowerCase()] ?? notes[name] ?? '',
       markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls, ...(propsNotBuilt.length ? { unbuilt: propsNotBuilt } : {}) });
   }

@@ -1211,6 +1211,8 @@ a.pg-usage-name { color: var(--sg-text); }
       if (on) t.setAttribute(a, effect.attrs[a]); else t.removeAttribute(a);
       if (a === 'checked' || a === 'disabled' || a === 'indeterminate') t[a] = on;   // the live state, not only the attribute
     });
+    // The state a part is heard in, set with the look (heardOn: the field disabled inside its wrapper).
+    (effect.also || []).forEach(function (x) { applyEffect(e, x, on); });
   }
   // Whether an option's look is what the component shows now: true or false, or null when the page cannot read it
   // (a live state such as hover, or an option that sets nothing).

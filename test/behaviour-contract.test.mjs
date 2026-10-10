@@ -102,3 +102,25 @@ test('states: Current is aria-current; an error on a message is announced, on a 
   // A component whose role is not known: an error the option itself announces (role="alert") is heard.
   assert.deepEqual(want(comp('notice', undefined, 'Error', { add: ['notice--error'], attrs: { role: 'alert' } })), []);
 });
+
+// E13: a state whose look is drawn on the component (a class on a field's wrapper) while it is heard on a part (the
+// field itself disabled): the contract's heardOn names the part and its state, the option sets both, and the state
+// check counts what the part says.
+test('states: an option heard on a part (heardOn) sets the part\'s state and counts as heard', async () => {
+  const { stateFindings } = await import('../behaviour-contract.mjs');
+  const { heardEffect, addHeard } = await import('../styleguide-data.mjs');
+  assert.deepEqual(heardEffect('.field__input:disabled'), { target: '.field__input', attrs: { disabled: '' } });
+  assert.deepEqual(heardEffect('.field__input[aria-invalid="true"]'), { target: '.field__input', attrs: { 'aria-invalid': 'true' } });
+  const controls = [
+    { label: 'Disabled', type: 'BOOLEAN', on: { add: ['field--disabled'], attrs: {} } },
+    { label: 'State', type: 'VARIANT', options: [{ label: 'Error', add: ['field--error'], attrs: {} }, { label: 'Default', add: [], attrs: {} }] },
+  ];
+  addHeard(controls, { Disabled: { True: '.field__input:disabled' }, State: { Error: '.field__input[aria-invalid="true"]' } });
+  assert.deepEqual(controls[0].on.also, [{ target: '.field__input', attrs: { disabled: '' } }]);
+  assert.deepEqual(controls[1].options[0].also, [{ target: '.field__input', attrs: { 'aria-invalid': 'true' } }]);
+  assert.equal(controls[1].options[1].also, undefined);
+  assert.deepEqual(stateFindings([{ name: 'field', role: 'textbox', controls }]), []);
+  // Without heardOn the class alone is still a state nobody hears.
+  const bare = [{ label: 'Disabled', type: 'BOOLEAN', on: { add: ['field--disabled'], attrs: {} } }];
+  assert.equal(stateFindings([{ name: 'field', role: 'textbox', controls: bare }]).length, 1);
+});
