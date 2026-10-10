@@ -237,7 +237,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   and room below it, changes only the samples and their values, never the page around them); icons from the icon sheet. The
   colours sit six a row, each as wide as the room, so its Figma name and variable read whole (three on a phone).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
-  own pages, else what its React source returns, else the element its Figma role asks for) with its own CSS. Its controls are the props Gate [15] (Component props match Figma)
+  own pages, else what its source renders: a React component's return, a Vue component's template with its props'
+  default words, else the element its Figma role asks for) with its own CSS. The components the code has that Figma
+  does not list (each file whose first element carries a class of its own, in its `components` folder when it has
+  one) are shown too, with their file and the props their code declares, marked **Only in the code** and compared with
+  nothing in Figma; each is a To do for Figma while Figma has components of its own. Before Figma's data is captured,
+  every component is listed that way, and the run says so (`3 only in the code`) instead of counting them agreed. Its controls are the props Gate [15] (Component props match Figma)
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   When an option's look is drawn on the component but a screen reader hears it on a part (a field's wrapper takes
