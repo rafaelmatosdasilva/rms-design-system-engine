@@ -126,6 +126,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-status { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-s-weight); color: var(--sg-text); background: color-mix(in srgb, var(--sg-muted) 14%, transparent); vertical-align: middle; }
 .sg-status--beta { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }
 .sg-status--deprecated { background: color-mix(in srgb, var(--sg-warning) 24%, transparent); }
+.sg-status--code-only { background: color-mix(in srgb, var(--sg-text-2) 16%, transparent); }
 .pg-status { display: flex; align-items: center; gap: var(--sg-space-s); flex-wrap: wrap; margin: var(--sg-space-xs) 0 0; font-size: var(--sg-s); color: var(--sg-text-2); }
 /* What a component's page says first, and its overview card under its name: its version, when it last changed, how it
    stands with Figma and with accessibility, and where it is used. A fact that needs work is marked, never coloured alone. */
@@ -751,6 +752,8 @@ a.pg-usage-name { color: var(--sg-text); }
     (c.differences || []).forEach(function (x) { TODO.push({ kind: 'parity', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.a11yFindings || []).forEach(function (x) { TODO.push({ kind: 'a11y', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.unbuilt || []).forEach(function (u) { TODO.push({ kind: 'parity', who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell Claude to do it.' }); });
+    // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
+    if (c.codeOnly && c.codeOnly.figma) TODO.push({ kind: 'parity', who: 'figma', comp: c.name, say: 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it.', todo: 'Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.' });
   });
   // A control the page needs and the system lacks: drawn with a stand-in until the system has one.
   ((DATA.ui && DATA.ui.gaps) || []).forEach(function (g) { TODO.push({ who: 'both', comp: null, say: g.say, todo: g.todo }); });
@@ -2070,12 +2073,18 @@ a.pg-usage-name { color: var(--sg-text); }
         var count = sl.min && sl.max ? ', ' + sl.min + ' to ' + sl.max + ' items' : sl.min ? ', at least ' + sl.min + (sl.min === 1 ? ' item' : ' items') : sl.max ? ', at most ' + sl.max + ' items' : '';
         return '<p><b>' + esc(sl.name) + '</b> ' + esc(what + count + '.' + (sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
       }).join('') + '</dd></div>' : '') +
-      (c.note ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '');
+      (c.note ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '') +
+      // Its file and the props its code declares, for a component only the code has (no Figma props to show them by).
+      (c.codeOnly ? '<div><dt>In the code</dt><dd><p><code>' + esc(c.codeOnly.file) + '</code></p>' + ((c.codeOnly.props || []).length ? '<ul class="pg-code-props">' + c.codeOnly.props.map(function (p) {
+        return '<li><code>' + esc(p.name) + '</code>' + (p.options ? ' ' + esc(p.options.join(' | ')) : '') + (p.default != null ? ', ' + esc('default ' + p.default) : '') + (p.required ? ', required' : '') + '</li>';
+      }).join('') + '</ul>' : '<p>No props declared.</p>') + '</dd></div>' : '');
     sec.innerHTML =
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         // Its name, and at its top right where else it lives (its Figma node, its code, the team's pages).
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2>' + headLinksHTML(c.links) + '</div>' +
         (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') +
+        // A component only the code has: said at its top, so nothing on its page reads as agreed with Figma.
+        (c.codeOnly ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">Only in the code</span><span>' + (c.codeOnly.figma ? 'Figma has no component for it: compared with nothing in Figma.' : 'No Figma data yet: compared with nothing in Figma.') + '</span></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
         // Its version, when it last changed and how to import it: one line, wrapping only when the room runs out.
         '<div class="pg-meta">' + (ALL ? '' : factsHTML(c)) + importHTML(c) + '</div>' +
@@ -3039,7 +3048,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var ordered = Array.prototype.slice.call(controlsEl.children).map(function (k, i) { return { k: k, at: k.dataset.at === undefined ? 1e6 + i : +k.dataset.at }; })
       .sort(function (a, b) { return a.at - b.at; }).map(function (x) { return x.k; });
     showFirst(ordered, function (k) { return k._prop; }).forEach(function (k) { controlsEl.appendChild(k); });
-    if (!props.length && !(c.unbuilt || []).length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = 'No agreed props yet.'; controlsEl.appendChild(none); }
+    if (!props.length && !(c.unbuilt || []).length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = c.codeOnly ? 'Only in the code: its props are under Documentation, compared with nothing in Figma.' : 'No agreed props yet.'; controlsEl.appendChild(none); }
     return sec;
   }
 

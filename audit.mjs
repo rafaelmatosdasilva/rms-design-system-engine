@@ -483,7 +483,10 @@ if (process.argv.includes('--styleguide')) {
   try {
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
     const r = await generateStyleguide(ROOT, sgConfig, {});
-    console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${r.components} component${r.components === 1 ? '' : 's'} agreed · ${r.template === 'engine' ? "the engine's template" : "the project's template"})`);
+    // What agrees with Figma and what only the code has (shown, compared with nothing), never one count called agreed.
+    const agreedN = r.components - (r.codeOnly ?? 0);
+    const counted = [agreedN || !r.codeOnly ? `${agreedN} component${agreedN === 1 ? '' : 's'} agreed` : null, r.codeOnly ? `${r.codeOnly} only in the code` : null].filter(Boolean).join(', ');
+    console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${counted} · ${r.template === 'engine' ? "the engine's template" : "the project's template"})`);
     if (r.notAgreed) console.log(`   ${r.notAgreed}`);
     for (const name of SCOPE_COMPONENTS) console.log(`   ${name}: ${relative(ROOT, r.out)}#c-${name}  (its Accessibility and Parity areas)`);
     // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
