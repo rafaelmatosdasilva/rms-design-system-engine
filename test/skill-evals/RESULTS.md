@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: An order of authority, written down (continuous evaluation)
+
+What changed since the entry below (engine b27d0fd): When sources disagree the higher one decides (the users' goal, research, documented standards, past decisions, heuristics), in the main guide and in llms.txt with the system's own sources; each finding's record says its level. The guide changed in `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `29a7fc7c47aa` · Project measured: `13d811a9d668`
+
+| Haiku, engine fd564b2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.056 |
+| Input a run | 100k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 100k. Records: `records/2026-10-11-order-of-authority`.
+
 ## 2026-10: Aliases to a removed token, in Figma and in the code (continuous evaluation)
 
 What changed since the entry below (engine baae26a): The Figma capture records a variable that points at one no longer in the file; the audit and the style guide's To do list it, and a token in the code that points at one declared nowhere, with the commit that removed it. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
