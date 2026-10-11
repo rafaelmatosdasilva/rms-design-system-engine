@@ -2,18 +2,22 @@
 
 **Your design system, kept true in code, for your whole team and the AI tools they use.**
 
-It works inside Claude Code. It keeps your code matching your Figma design, and gives your team a living style guide, prototypes made of your real components and accessibility checks.
-
-**[See a style guide it built](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)**
+It works inside Claude Code. It keeps your code matching your Figma design, and gives your team a [living style guide](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/), prototypes made of your real components and accessibility checks.
 
 ## What you get
 
 - **High quality.** Every colour, size, font and state in your code is checked against Figma, with the fix in plain words. A product that builds a component by hand where its Figma screen uses the real one is found, and anything the check could not look at is said, never shown as passed.
-- **A living style guide.** One page with every token and component, built from your system, never written by hand. Try each component, see its specs and every variant and how it stands with Figma and accessibility, read one To do list of everything still open, by component, and see where what the team has written about each component is thin. Every component's accessibility is tried in a browser while the page is built, so it opens with the final results.
+- **A living style guide** ([see one it built](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)). One page with every token and component, built from your system, never written by hand. Try each component, see its specs and every variant and how it stands with Figma and accessibility, read one To do list of everything still open, by component, and see where what the team has written about each component is thin. Every component's accessibility is tried in a browser while the page is built, so it opens with the final results.
 - **Prototypes from your real system.** Describe a screen in your own words and get it made only of your components, following your guidelines and Do and Don't, with every state and screen size checked, pages you can click through, a design review before you see it, and working as your product does. What your system lacks is marked on the page and listed for your design team.
 - **Accessibility tested.** Each component is tried in a real browser against WCAG 2.2 at level A and AA, with axe-core's rules in the same run, in every state and colour mode, and every problem comes with its fix. Nothing else to run.
 - **Build from Figma.** Only have the design? Claude builds it in code, piece by piece, each piece checked.
 - **You stay in control.** Nothing in your design or code changes unless you ask.
+
+## Learn more
+
+- **[Everything it does](docs/features.md)**, in plain words.
+- **[Technical details](docs/details.md)**, for developers.
+- **[Case study](CASE-STUDY.md)** and **[every measurement](test/skill-evals/RESULTS.md)**, how it was tested against Claude alone.
 
 ## Why not just Claude with your code?
 
@@ -21,58 +25,20 @@ Claude on its own guesses and cannot tell when it got something wrong. The engin
 
 | | Claude alone | Claude with the engine |
 |---|---|---|
-| Building a small design system from Figma | 8 of 18 pieces right (Opus), 4 of 18 (Haiku) | all of them, with every model |
-| Prototypes from twelve requests | 17 of 36 right (Opus), 3 of 36 (Haiku) | 36 of 36 (Opus), 35 of 36 (Haiku) |
-| Knows when the code stops matching Figma | no | yes, on every check, with the fix |
-| Accessibility checked | only if asked, and not tried in a browser | always, tried in a browser |
-| One reference for the whole team | no | the style guide, the documentation and the contracts |
+| Builds a design system from Figma | 8 of 18 pieces right | 18 of 18 |
+| Makes prototypes from your components | 17 of 36 right | 36 of 36 |
+| Knows when the code stops matching Figma | No | Yes, with the fix |
+| Tries accessibility in a browser | No | Always |
 
-The [case study](CASE-STUDY.md) tells the full story.
+Measured with Claude Opus. The [case study](CASE-STUDY.md) has every model and the full story.
 
 ## How it works
 
-A short view of the flow. The detailed flow is on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1) (Ctrl or Cmd click to open it in a new tab).
+1. **It reads your Figma file**, its tokens, components, props and notes.
+2. **It compares your code with it**, value by value and in a real browser, with the fix for each difference.
+3. **It shares one truth with everyone**, the style guide, one To do list, prototypes made of your components, and the facts your AI tools read.
 
-```mermaid
-%%{init: {"themeCSS": "[id*=L_P1_P3], [id*=L-P1-P3], [id*=L_CODE_AI], [id*=L-CODE-AI], [id*=L_PROTO_AI], [id*=L-PROTO-AI] { marker-end: none !important; }"}}%%
-flowchart LR
-    WHEN["<b>WHEN IT RUNS</b>"]
-    subgraph P1["PHASE 1 - CAPTURE"]
-        direction TB
-        FIG["<b>FIGMA</b>"] --> CAP["<b>CAPTURE</b>"] --> SNAP["<b>SNAPSHOT</b>"]
-    end
-    subgraph P2["PHASE 2 - COMPARE"]
-        direction TB
-        CODE["<b>CODE</b>"] --> ENG["<b>PARITY ENGINE</b>"]
-        ENG -.-> CODE
-        RULES["<b>MATCHING RULES</b>"] --> ENG
-    end
-    subgraph P3["PHASE 3 - OUTPUTS"]
-        direction TB
-        RES["<b>VERDICT + ADVISORIES</b>"]
-        CON["<b>CONTRACTS</b>"]
-        INT["<b>INTENT</b>"]
-        SG["<b>STYLE GUIDE</b>"]
-        PROTO["<b>PROTOTYPES</b>"]
-    end
-    A11Y["<b>ACCESSIBILITY</b>"]
-    HOOKS["<b>SKILL AND GUARD HOOKS</b>"]
-    AI["<b>AI CODING AGENT</b>"]
-    HUM["<b>HUMANS</b>"]
-    EV["<b>EVALS</b>"]
-    WHEN --> P2
-    P1 --> P2 --> P3
-    P1 <-.-> P3
-    P2 --> A11Y
-    P3 --> A11Y
-    P3 --> AI
-    P3 --> HUM
-    P3 --> EV
-    HOOKS --> AI
-    CODE <--> AI
-    PROTO <--> AI
-    AI -.-> EV
-```
+The whole flow, step by step, is on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1).
 
 ## Get started
 
@@ -102,12 +68,6 @@ Install the rms-design-system-engine skill for me by running curl -fsSL https://
 ```
 
 It updates itself once a day, so you never install it again.
-
-## Learn more
-
-- **[Everything it does](docs/features.md)**, in plain words.
-- **[Technical details](docs/details.md)**, for developers.
-- **[Case study](CASE-STUDY.md)** and **[every measurement](test/skill-evals/RESULTS.md)**, how it was tested against Claude alone.
 
 ## License
 
