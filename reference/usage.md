@@ -299,8 +299,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   compared, New in the last audit when the last audit found it first, and when it last held). Each difference the audit found is merged into
   the row it is about (`parityIssueRows`); what it found beyond those rows, a prop Figma has that the code does not build
   and a component only the code has are rows of their own. The To do page holds the open rows of every component in
-  that table, one card per component, with a filter by area (Parity, Accessibility, and the page's own items when it has
-  any) that hides the cards left empty. Open rows first, a count of each status above it, a filter by type (props, variables, values, other), its head kept in
+  that table, one card per component, with a filter by area (Parity, Accessibility, System and the page's own items when
+  it has any) that hides the cards left empty. Under The system, what the tokens owe (`tokenTodos`, area System): the
+  semantic tokens with no description in Figma (You in Figma), the same value written by hand in two tokens and the
+  tokens one component uses, read from the contracts the last audit wrote (You decide), each one row with its first names. Open rows first, a count of each status above it, a filter by type (props, variables, values, other), its head kept in
   view under the areas as the rows scroll by (on a phone the table scrolls sideways instead); in the Playground's card
   table. The code is as tall as
   what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
@@ -580,8 +582,9 @@ never imposes a tier model, zero config = does not run); and an **AI-readiness s
 measure across gate health, coverage, documentation and guidance, aggregated from the signals above,
 never a grade and never blocking); and **prune candidates** (a leaner library is cheaper for an agent
 to read and mis-picks less: surfaces deprecated tokens still present, variant axes that do not vary
-(a "variant" prop with one option), components used in exactly one place, and the token budget: semantic
-colour tokens equal to another in every mode (one name would do, unless they are meant to part later) and
+(a "variant" prop with one option), components used in exactly one place, and the token budget: the same
+colour written by hand in two tokens, with no alias (two primitives for one colour, a token that repeats a primitive
+instead of pointing at it; tokens that point at the same one share its value by design and are never listed) and
 tokens only one component uses (a candidate to keep inside it) — each a QUESTION, never
 a verdict; totals each run, full list with `--prune`). One more **opt-in, project-declared** advisory:
 **list duplication** (`ds-config.json → duplication: { surfaces: ["AGENTS.md", ".cursorrules", …], minCluster? }`) —
