@@ -80,3 +80,25 @@ test('the To do rows for the tokens: descriptions for Figma, then two decisions,
   assert.deepEqual(tokenTodos({ vars: { color: { light: { 'e/color': '#000' } }, tokenMeta: { 'e/color': { description: 'Body text' } } } }), []);
   assert.equal(tokenTodos({ vars }).length, 2);
 });
+
+test('aliases to a removed token: a Figma variable the capture found pointing nowhere, a code token showing only its fallback', async () => {
+  const { brokenFigmaAliases, danglingCodeAliases, tokenTodos } = await import('../system-advice.mjs');
+  assert.deepEqual(brokenFigmaAliases({ brokenAliases: [{ name: 'chip/bg', mode: 'Light', target: 'VariableID:1:2' }, { mode: 'Dark' }] }), [{ name: 'chip/bg', mode: 'Light', target: 'VariableID:1:2' }]);
+  assert.deepEqual(brokenFigmaAliases({}), []);
+  const files = [
+    { file: 'theme.css', text: ':root { --surface: #fff;\n  --chip-bg: var(--surface-raised, #fff);\n  --ok: var(--surface);\n  /* --gone: var(--nothing, red); */ }' },
+    { file: 'app.css', text: '.x { color: var(--old-text, #333); background: var(--hook, red); border-color: var(--set-by-js, red); }' },
+    { file: 'app.js', text: "el.style.setProperty('--set-by-js', '#000');" },
+  ];
+  const removed = (t) => (t === '--old-text' ? { sha: 'abc123', date: '2026-09-30' } : null);
+  // A token's own definition always counts; a use elsewhere only when the history shows the token was declared once (a
+  // theming hook nobody declares is left alone); one set from a script, a comment and a declared token are not listed.
+  assert.deepEqual(danglingCodeAliases(files, { removed }), [
+    { file: 'theme.css', line: 2, token: '--chip-bg', target: '--surface-raised', removed: null },
+    { file: 'app.css', line: 1, token: null, target: '--old-text', removed: { sha: 'abc123', date: '2026-09-30' } },
+  ]);
+  const rows = tokenTodos({ vars: { brokenAliases: [{ name: 'chip/bg', mode: 'Light', target: 'surface/raised' }] }, dangling: danglingCodeAliases(files, { removed }) });
+  assert.deepEqual(rows.map((r) => [r.kind, r.who]), [['Broken alias', 'figma'], ['Broken alias', 'code']]);
+  assert.match(rows[0].say, /^1 Figma variable points at a variable that is no longer in the file \(chip\/bg to surface\/raised\)\.$/);
+  assert.match(rows[1].say, /^2 tokens in the code point at a token declared nowhere, so they show only their fallback \(--chip-bg to --surface-raised; app\.css:1 to --old-text, removed in abc123\)\.$/);
+});
