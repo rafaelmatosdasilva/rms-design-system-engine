@@ -77,6 +77,7 @@ rms-design-system-engine --refresh-figma                 # read Figma the best w
 rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then a page of it and the components it nests (styleguide/modal.html), its address printed
+rms-design-system-engine --styleguide --no-a11y-bake     # the page without its accessibility tried while it is built (a page only measured, as a CI's first build is)
 rms-design-system-engine --publish-styleguide            # write the CI job that publishes the style guide on every push (GitHub Pages or GitLab Pages, from the git remote; --host github|gitlab, --print to only show it)
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
@@ -289,10 +290,17 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   marks something (a row that differs, one only in Figma or only in code, a prop not built), and Accessibility while a
   problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Usage, Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
-  component has, whatever the Playground shows (each prop, each variable, each value the audit compares): its type,
-  Figma's name and value, the code's, a status as a sign and the system's colour (the same, differs, only in Figma, only
-  in code) and when it last held, with a filter by type above it, its head kept in view under the areas as the rows
-  scroll by (on a phone the table scrolls sideways instead), and what differs below it, a row each naming the component or part, who acts and what to do; both in the Playground's card tables. The code is as tall as
+  component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
+  table as the Accessibility area's and the To do page's (`issueTableHTML`): Issue nr (the To do page's number, open rows
+  only), Area (Parity, with the type under it), Figma (its name and value), Code (its name and value, and where in the
+  code a difference is), What to do (who acts above it) and Status (a sign and the system's colour, To fix, To check,
+  Done or Not compared, with what it is under it, the same, differs from Figma, only in Figma, only in code, New in the
+  last audit when the last audit found it first, and when it last held). Each difference the audit found is merged into
+  the row it is about (`parityIssueRows`); what it found beyond those rows, a prop Figma has that the code does not build
+  and a component only the code has are rows of their own. Open rows first, a count of each status and of what is the
+  same, differs or is only on one side above it, a filter by type (props, variables, values, other), its head kept in
+  view under the areas as the rows scroll by (on a phone the table scrolls sideways instead); in the Playground's card
+  table. The code is as tall as
   what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
   (`showFirst`: Show Text and Text Content, or both on the same part). **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
   classes its markup holds, or the tags and imports of its file), each the overview's card with its own preview.
@@ -377,7 +385,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   HTML and CSS system a slot or component swap is the markup's content, with code props a slot is `children`) and
   per code prop Figma lacks; per CSS variable its rules use (the token check's values in each mode, the same or differs;
   no Figma variable, only in code) and per Figma variable named after it with no CSS variable; per value the agreed
-  record has seen (the same since both sides agreed, or differs since it last moved). Its open differences, with who acts.
+  record has seen (the same since both sides agreed, or differs since it last moved). Each open difference is in its row, with who acts and what to do.
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
   (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
@@ -415,20 +423,23 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Accessibility**, one table by WCAG criterion (`a11yRows`), in the same card as the Playground's tables (and so is
-  Parity's): WCAG (the criterion and its level; a click, a key or the pointer resting on it opens what it means in plain
-  words and how it is checked, the token panel's own pop-up, Escape closing it), What was found (each finding or duty on
-  its own line with its sign, naming the component, its variant or its part: "On badge, its Label part, a person checks
-  that…", `onWhat`), Source (where each is read from: a Figma annotation, `contract.authored.json`, its code, the style
-  guide in the browser, the last audit or the audit's code capture, a person) and Status (✕ To fix, ! To check, ✓ Done,
-  a sign and the system's colour). Only what applies to the component is listed: a criterion of the page that uses it (a
+- **Accessibility**, one table by WCAG criterion (`a11yIssueRows`), the same table as Parity's and the To do page's, in
+  the same card as the Playground's tables: Issue nr (open rows only), Area (Accessibility, with the criterion and its
+  level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
+  panel's own pop-up, Escape closing it), Figma (what Figma's annotations state for it), Code (what was found, each
+  finding or duty on its own line with its sign, naming the component, its variant or its part, `onWhat`, and what
+  passed and where), What to do (who acts above it; each finding's own fix, what a person checks, "On badge, its Label
+  part, a person checks that…", or what has still to run, else what the criterion asks) and Status (✕ To fix, ! To
+  check, ✓ Done, a sign and the system's colour, with New in the last audit, when it was last tried and where each
+  finding is read from under it: a Figma annotation, `contract.authored.json`, its code, the style guide in the
+  browser, the last audit or the audit's code capture, a person). Only what applies to the component is listed: a criterion of the page that uses it (a
   title, a skip link, orientation, consistent navigation), video and sound it does not play, what it has nothing for
   (no link for 2.4.4), and what asks of controls or fields on a component with none in any variant (keyboard,
   focus, labels, errors) are left out. To fix first, then to check, then done; a WCAG 2.2 or AAA criterion a check
   stands for (target size, motion from interactions) comes last as advisory and is not counted. Above it a count of
   each status, and when the audit last ran (or that it has not), with what is excused (`behaviourExceptions`).
   Under each criterion: what the audit found on it that is about accessibility rather than Figma (a text's contrast
-  in one variant and mode, `splitFindings`, with who acts and its To do number); the last browser check's findings
+  in one variant and mode, `splitFindings`, with who acts and what to do); the last browser check's findings
   from `.design-system-engine-out/a11y.json`; what its code does (`a11y-static.mjs` findings given to it by
   `wcagStatics`); its role's duties and Figma's notes (`role-markup.mjs`, `behaviour-contract.mjs`: element, name,
   keys, part roles), to fix only when the audit found that kind of problem; and what this page finds trying every
@@ -441,12 +452,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   its check ran and found nothing (the page's run, `ran` in the last audit's `a11y.json` for zoom, spacing, reflow
   and a keyboard trap, the code read for the rest) and to check when only a person can judge it, with what to look
   at.
-- **What no check reads** (`a11yView().sources`, built in `styleguide-gen.mjs`), a card table under it shown only when
-  there is something: each Figma annotation on it and on its layers that no check reads (`annotationUses` in
+- **What no check reads** (`a11yView().sources`, built in `styleguide-gen.mjs`, `unreadRows`), rows of the same table,
+  each with its status (To check when it states accessibility in a way a check could read, else Not needed, read by
+  the agents): each Figma annotation on it and on its layers that no check reads (`annotationUses` in
   `a11y-check.mjs` gives it no use: a sizing note, a usage note), with how to write it so one does (its own wording when
   the engine can tell what it means, `annotationWording`, which `--figma-edits` also lists in Figma), and the team's
   guidelines (`guidelines.sources`, the Notion and GitLab pages fetched into files), the section named after the
-  component, read by the agents as design intent and by no check. What a check reads is in the Source column.
+  component, read by the agents as design intent and by no check. Where each row is read from is under its status.
 - **In use**: the approved pictures of `frames[]` (Gate [2] (Figma frame unchanged)'s references in `visualRefs`), six at most.
 - **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
   and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,
@@ -461,6 +473,17 @@ A project's own template is filled through markers:
 - `{{USAGE}}` ← which plugins reference each component's class (scanned from plugin source).
 - `{{DOCS}}` / `{{DOCS_CODE}}` ← Figma descriptions and code notes, from the design-intent JSON (hardcoded pixel dimensions are stripped — docs describe with tokens).
 - `{{THEME_CSS}}` ← the token CSS inlined verbatim, with its `@media (prefers-color-scheme: dark)` guarded to `:root:not([data-color])` so the manual light/dark toggle wins; `{{COMPONENT_CSS}}` ← the component stylesheets outside the theme.
+
+**Its accessibility is tried while it is built.** After writing the page, `--styleguide` opens it in Chrome
+(`styleguide-bake.mjs`, four pages at once, each trying a share of the components, `#todo?bake=1/4`) and has it try
+every variant of every component as its Accessibility area does, then keeps what each found in the page
+(`<script id="sg-a11y-baked">`, with when it ran and each component's signature). Whoever opens the page reads those
+results at once on the To do page and in every Accessibility area, the final ones, with nothing running in their
+browser; a component's area never tries again on its own. A component the build could not try (no Chrome there, its
+signature changed) is tried in the viewer's browser and kept there (`localStorage`), and Try again in this browser,
+on the To do page, tries every component afresh. `--no-a11y-bake` (or `styleguide.bakeA11y: false`) builds the page
+without it; without Chrome it is skipped and said, and a script error the page throws while trying is printed
+under the count.
 
 **The page is checked against the system it shows.** After building it, `--styleguide` checks the page's own CSS
 (every `<style>` but the system's, which the template marks `data-system`): a colour, font, text size, weight, line

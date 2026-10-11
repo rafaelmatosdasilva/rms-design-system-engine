@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The style guide opens with its accessibility already tried; one issue table for To do, Parity and Accessibility (continuous evaluation)
+
+What changed since the entry below (engine 293d460): The style guide's To do page, Parity and Accessibility areas share one issue table (issue number, area, Figma, code, what to do with who acts, status with when), and --styleguide tries every component's accessibility in a browser while it builds the page and keeps the results in it, so the page opens with its final results. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `f266dfff35ed` · Project measured: `13d811a9d668`
+
+| Haiku, engine e645170 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.058 |
+| Input a run | 106k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 107k a run against 106k. Records: `records/2026-10-11-style-guide-accessibility-tried-while`.
+
 ## 2026-10: Accessibility findings say how sure they are, with one verdict line; a removed focus outline a stronger rule puts back is not reported (continuous evaluation)
 
 What changed since the entry below (engine 06a82d2): Accessibility findings say how sure they are, with one verdict line; a removed focus outline a stronger rule puts back is not reported. The guide changed in `cookbook/a11y-notes.md`, `reference/usage.md`.
