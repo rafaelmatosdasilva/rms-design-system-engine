@@ -423,7 +423,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Accessibility**, one table by WCAG criterion (`a11yIssueRows`), the same table as Parity's and the To do page's, in
+- **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as Parity's and the To do page's, in
   the same card as the Playground's tables: Issue nr (open rows only), Area (Accessibility, with the criterion and its
   level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
   panel's own pop-up, Escape closing it), Figma (what Figma's annotations state for it), Code (what was found, each
@@ -435,8 +435,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   browser, the last audit or the audit's code capture, a person). Only what applies to the component is listed: a criterion of the page that uses it (a
   title, a skip link, orientation, consistent navigation), video and sound it does not play, what it has nothing for
   (no link for 2.4.4), and what asks of controls or fields on a component with none in any variant (keyboard,
-  focus, labels, errors) are left out. To fix first, then to check, then done; a WCAG 2.2 or AAA criterion a check
-  stands for (target size, motion from interactions) comes last as advisory and is not counted. Above it a count of
+  focus, labels, errors) are left out. To fix first, then to check, then done; a AAA criterion a check stands for (a
+  comfortable target size, motion from interactions, a focus ring's thickness) comes last as advisory and is not counted. Above it a count of
   each status, and when the audit last ran (or that it has not), with what is excused (`behaviourExceptions`).
   Under each criterion: what the audit found on it that is about accessibility rather than Figma (a text's contrast
   in one variant and mode, `splitFindings`, with who acts and what to do); the last browser check's findings
@@ -447,10 +447,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Playground laid out out of sight and drawn again as set, each result said once with the variants it holds in.
   The tries are the Tab stops in order, a name and a visible focus on each stop, a stop drawn as disabled that Tab
   still reaches, each behaviour tried with the page's own events (a key only a native element answers is said to be
-  given by the browser), the text contrast in every variant and colour mode, the WCAG 2.1 checks of `wcag-page.js`,
+  given by the browser), the text contrast in every variant and colour mode, the WCAG 2.2 checks of `wcag-page.js`,
   and what it does when used (hover, focus, input, press) on six variants that can be used. A criterion is done when
-  its check ran and found nothing (the page's run, `ran` in the last audit's `a11y.json` for zoom, spacing, reflow
-  and a keyboard trap, the code read for the rest) and to check when only a person can judge it, with what to look
+  its check ran and found nothing (the page's run, `ran` in the last audit's `a11y.json` for zoom, spacing, reflow,
+  a keyboard trap, a focus hidden under other content and target size, the code read for the rest) and to check when only a person can judge it, with what to look
   at.
 - **What no check reads** (`a11yView().sources`, built in `styleguide-gen.mjs`, `unreadRows`), rows of the same table,
   each with its status (To check when it states accessibility in a way a check could read, else Not needed, read by
@@ -1036,15 +1036,17 @@ the default is the plain human summary; **`--a11y`** adds the exact elements (st
 the same findings as a machine-readable record (selector, contrast ratio, theme, role, and the fix) for an
 agent or CI. When it runs against anything other than the styleguide it ends with a one-line tip on how to
 get the deepest, per-state result. **Each finding says how sure the check is of it** (W5): a **blocker** is measured
-on the rendered page against a WCAG 2.1 A or AA criterion (a contrast, the name the accessibility tree gives, a key
+on the rendered page against a WCAG 2.2 A or AA criterion (a contrast, the name the accessibility tree gives, a key
 pressed and nothing happening); a **warning** is read from the code, the contract or a Figma note, or is a pattern
 that usually fails (a placeholder as the only label, an action on pointerdown), so it can be wrong; an **advisory**
-is beyond AA (a focus ring under 2px, motion left on when the person asked for less) or for a person to judge (text
-on an image). The report lists blockers first and ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory
-· WCAG 2.1 AA` (`· not all of it checked` when a page could not be read or opened); `--json` carries `severity` on
-each issue and the same counts in `verdict`. `ds-config.json → a11yStrict: true` promotes blockers and warnings to
-a hard fail; an advisory never stops a run. It
-runs inside the audit and standalone: `node a11y-check.mjs [--component A,B|.selector] [--url <page>] [--a11y|--json] [--axe] [--states]`
+is beyond AA (a focus ring under 2px, motion left on when the person asked for less, a control under the comfortable
+44px touch size, text a colour-blind person cannot read) or for a person to judge (text on an image). The report lists
+blockers first and ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.2 AA` (`· not all of it
+checked` when a page could not be read or opened, axe-core could not be loaded, or a part was left out); `--json`
+carries `severity` on each issue and the same counts in `verdict`. `ds-config.json → a11yStrict: true` promotes
+blockers and warnings to a hard fail; an advisory never stops a run. The run's summary, the one the chat relays,
+carries the verdict and each kind of problem with its count and the components it is in, blockers first. It
+runs inside the audit and standalone: `node a11y-check.mjs [--component A,B|.selector] [--url <page>] [--a11y|--json] [--no-axe] [--no-states]`
 (`--component` scopes the sweep and accepts a raw CSS selector too). **Skips cleanly** (exit 0) with no
 browser, never a false fail. Deps: Node >= 22 (built-in WebSocket), Chrome/Chromium (or `CHROME_PATH`), and
 a render target.
@@ -1107,9 +1109,32 @@ whatever surface the project serves, in this order:
 So a Storybook or router-based DS runs fully automatically the first time — no config, no questions; a
 bespoke app that exposes no page index is the only case that needs a `--url` / `a11y.urls` hint (set once).
 
-**Broader coverage via `--axe`:** opt in and it also runs **axe-core** (fetched from a CDN, no npm dependency) against the same rendered page, adding the rules the five native checks do not cover — **non-text / component contrast** (WCAG 1.4.11 for borders, icons, graphics), **target size**, **duplicate ids**, **ARIA validity**, **heading order**, **form labels**, and **reading order / skip-links / landmarks** (`region`, `landmark-*`, `bypass`, `tabindex`) — reported as an extra plain-language advisory section (and under `axe` in `--json`). The **focus-ring** part of 1.4.11 is already covered natively (check 3 above).
-
-**Live hover contrast via `--states`:** opt in (or `a11y.interactionStates:true`) and it forces `:hover` (CDP `CSS.forcePseudoState`) on the interactive elements and re-measures, flagging text that reads fine at rest but drops below AA while hovered — the one interaction-state case axe cannot see (it reads the resting DOM).
+**The whole check, every run.** Nothing else needs to be run beside it:
+- **axe-core runs in every accessibility check** (no npm dependency: downloaded once, pinned, then cached) on the
+  same page: its WCAG 2.0, 2.1 and 2.2 A and AA rules, the ones it keeps experimental that stand for a criterion (an
+  orientation lock, a label not in the name, a paragraph styled as a heading, table headers, an element in the Tab
+  order with no role) and its best practices (heading order, landmarks, a dialog's name, a page's one main heading).
+  Each element it fails is located as the engine's own findings are (`tag#id.class` and its component), so an element
+  both report is reported once, by the engine; what only axe-core found is a finding of its own, one per rule
+  (`axe:<rule>` in `--json`, with `rule`, `wcag`, `url` and its `elements`), a blocker for a serious or critical WCAG
+  rule, a warning for a moderate one, an advisory for a minor one or a best practice. The report ends with how many
+  of the elements axe-core failed are its own and how many were already the engine's. It cannot be downloaded
+  (offline, blocked) and no copy is cached: said as not checked, never clean (`a11y.axePath` points at a local copy).
+- **Every control hovered, focused and pressed**, in every colour mode (the pseudo-class forced through the DevTools
+  protocol, as a pointer or the keyboard sets it): its text measured again (`hovercontrast`, `statecontrast` with its
+  `state`, 1.4.3) and the edge of a field, a checkbox, a radio or a switch (`stateedge`, 1.4.11). Only what reads fine
+  at rest and fails in the state is reported; what pressed shares with hover or focus is said once, and a plain link
+  pressed, which takes the browser's own red, is not the system's.
+- `--no-axe`, `--no-states` (or `a11y.axe: false`, `a11y.interactionStates: false`) leave one out for a run: the report
+  says what was left out (`leftOut` in `--json`) and the verdict that not all of it was checked.
+- **What was measured** — the report says how many texts, icons and controls were read, in how many components and
+  themes, and how many instances of each component the per-component checks tried; `--json` carries `measured`, and
+  every element with its verdict (`elements`: text and icons with their ratio, controls with their focus) in the file
+  the audit keeps (with `--a11y` on the screen too).
+- **What a screen reader says** — for the first instance of each component (or the page itself), the lines VoiceOver
+  and NVDA read from the same accessibility tree: `checkbox, Remember me, not checked · button, Bold, not pressed`.
+  Words for a person to judge (whether a name says what it does), shown for a run about a few components or with
+  `--a11y`, and in `--json` as `heard`.
 
 **Deeper checks (every run, every page).** Each is isolated: a check that cannot run on a page is skipped
 there, never a failure.
@@ -1119,11 +1144,18 @@ there, never a failure.
 - **Real keyboard focus** — a Tab key press first, so `:focus-visible` styles show as a keyboard user sees
   them. A focus style drawn with a background change, an underline or on `::before`/`::after` counts; a ring
   drawn outside the element is measured against the parent's background.
-- **Target size (2.5.8)** — a control under 24×24 with another control inside its 24px circle. Links in
-  running text, and inputs whose label is the target, are exempt.
-- **Keyboard walk** — a real Tab walk: a focus trap, any positive `tabindex` (visits out of order), and a
-  focused control completely covered by other content such as a sticky header (2.4.11; on real pages,
-  not on the styleguide, whose sticky header is its own chrome).
+- **Target size (2.5.8)** — a control under 24×24 whose 24px circle, on its centre, touches another control or
+  another small control's circle, in every mode (one finding per control, with the modes it is small in). Links in
+  running text, and inputs whose label is the target, are exempt. A control between 24 and 44 pixels is an advisory
+  (`target44`, 2.5.5): a finger covers about 44 on a touch screen.
+- **Keyboard walk** — a real Tab walk, then the same with Shift+Tab: a focus trap (one control three presses running,
+  or Tab going round two to six controls while the page has more; a round inside a modal dialog is its own and is
+  left alone), any positive `tabindex` (visits out of order), and a focused control completely covered by other
+  content such as a sticky header (2.4.11; on real pages, not on the styleguide, whose sticky header is its own chrome).
+- **Clickable, but not by keyboard (2.1.1)** — an element a script makes clickable that Tab never reaches: its handler
+  read where a framework keeps it (an `onclick`, React's props, Vue's invokers), or, for one with a pointer cursor,
+  Chrome's own list of its listeners (one added with `addEventListener`). A part inside a control, a label, a card
+  around its own link or button, and a dialog's backdrop are left alone.
 - **Keyboard activation** — a control built from a plain element (`role="button"`, `checkbox`, `switch`,
   `tab`, `link`…) that does nothing on Enter (and Space for buttons, checkboxes and switches). The click is
   caught before the element's own handler, so the check never navigates or submits.
@@ -1215,9 +1247,14 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **Reduced motion (2.3.3)** — under `prefers-reduced-motion: reduce`, anything that still transitions or
   animates.
 - **Forced colours** — under `forced-colors: active` (Windows high contrast), a focus indicator that
-  disappears because it was only a shadow or a background.
+  disappears because it was only a shadow or a background, and an icon or a text the mode makes vanish
+  (`forcedcontrast`: an icon drawn as a background colour, a CSS mask, takes the page's colour).
+- **Colour vision** — text that passes WCAG, read as people who do not see red, green or blue see it (the
+  matrices Chrome's own vision simulator uses): one that falls below its ratio for one of them is an advisory
+  (`cvdcontrast`, with the `vision` that loses it; red on black is the usual case).
 - **Text spacing (1.4.12)** — the spacing a reader may set (line height 1.5, letter spacing 0.12em, word
-  spacing 0.16em); text that becomes cut off.
+  spacing 0.16em); text that becomes cut off, or that spills out of a box that keeps its height onto what is
+  next to it (the same at 200% zoom). A box that scrolls keeps its text reachable.
 - **Semantics** — each component's rendered role (accessibility tree) against the contract's authored
   `semantics` (`contract.authored.json`).
 - **What a role requires** — for each component with a role (the contract's `semantics`, or a Figma note,
@@ -1231,10 +1268,13 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   - anything that looks disabled is `disabled` or `aria-disabled`
   A state is read from the instance's classes or `data-state` (error or invalid, selected, active or
   current, disabled). Nothing is checked for a component without a declared role.
-- **Reflow at 320px (1.4.10)** — opt in with `a11y.reflow: true`. The engine's style guide fits 320 pixels (its
-  Parity filter and a control with many options scroll sideways), so a system checked on its style guide can turn it on.
-- **WCAG 2.1, the rest a component can be checked for** (`wcag-page.js`, run on the first three instances of each
-  component, the first one also used) — an image or `role="img"` with no words (1.1.1); a video with no captions
+- **Reflow at 320px (1.4.10)** — each component on a 320px screen, in every run that checks components: one
+  that cannot be narrower than the screen (its min-content, as nothing around it asks for more) is named with
+  the width it needs. Content that needs two dimensions (a data table, a picture, code) is left out, as WCAG
+  does. The whole page at 320px stays opt-in with `a11y.reflow: true`; the engine's style guide fits 320
+  pixels (its Parity filter and a control with many options scroll sideways).
+- **WCAG 2.2, the rest a component can be checked for** (`wcag-page.js`, run on up to 24 instances of each
+  component, so a grid of chips is judged on its chips, the first one also used) — an image or `role="img"` with no words (1.1.1); a video with no captions
   track, sound that plays by itself (1.2.2, 1.4.2); radio buttons with no named group, a data table with no header
   cells, a tab, an option or a list item outside the container its role needs (1.3.1); controls Tab reaches in
   another order than they are shown (1.3.2, 2.4.3); a field that asks for a name, an email, a phone or an address
@@ -1246,11 +1286,14 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   second (2.2.2, 2.3.1); a link with no words or with "click here" (2.4.4); an empty heading, label or legend
   (2.4.6); a control whose `aria-label` leaves out the words it shows (2.5.3); a control that acts on the press
   rather than the release (2.5.2); taking the focus, or changing a value, that opens a page, sends a form, opens a
-  dialog or moves the focus (3.2.1, 3.2.2); an id used twice (4.1.1); a role or an `aria-*` attribute ARIA does not
-  have, a value it does not take, a reference to a missing id, `aria-hidden` over something Tab reaches (4.1.2); a
-  toast, a status line or a loader that no live region announces (4.1.3). Each finding carries its criterion in
+  dialog or moves the focus (3.2.1, 3.2.2); something moved only by dragging (`draggable`, a grab cursor) with no
+  button or click beside it that does the same (2.5.7, a warning); a password or one-time-code field that cancels a
+  paste, or turns autofill off (3.3.8); an id used twice, a role or an `aria-*` attribute ARIA does not have, a value
+  it does not take, a reference to a missing id, `aria-hidden` over something Tab reaches, a link with nowhere to go
+  (`href="#"`, `javascript:`) that acts as a button (4.1.2; WCAG 2.2 removed 4.1.1, and a duplicate id is counted
+  here); a toast, a status line or a loader that no live region announces (4.1.3). Each finding carries its criterion in
   `--json` (`wcag`), and `ran` lists the page-wide checks that finished (`wcag21`, `tabtrap`, `spacing`, `reflow`,
-  `zoom`), so a criterion is said to be met only where its check ran. A tooltip drawn by CSS `:hover` alone is
+  `zoom`, `states`, `targets`), so a criterion is said to be met only where its check ran. A tooltip drawn by CSS `:hover` alone is
   tried through the focus, as events from a page cannot hover.
 - **WCAG 2.1 in the code, no browser needed** (`a11y-static.mjs`, every script, `.vue` and `.svelte` scripts
   included) — a single letter, number or sign as a shortcut on the whole page with no Ctrl, Alt or Cmd (2.1.4);
@@ -1282,13 +1325,15 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **One element failing the same way in many places is one finding**, with the number of places and a few
   of its texts, and each element names the design-system component it sits in.
 - **axe-core** must match a pinned SHA-384 hash before it is ever injected into a page (from the CDN, or
-  from the npm registry's package when a CDN is blocked). With `a11yStrict`, its serious and critical
-  findings count toward failing the check.
+  from the npm registry's package when a CDN is blocked). With `a11yStrict`, its blockers and warnings
+  count toward failing the check as the engine's own do.
 - **axe-core** is cached in `~/.cache/rms-design-system-engine` after the first download (or `a11y.axePath`
-  points at a local copy), runs the WCAG 2.0/2.1/2.2 A and AA rules explicitly, and is scoped to the
-  checked components.
+  points at a local copy), and is scoped to the checked components.
 
-**Not yet:** forcing `:active`.
+**Not yet:** text laid over a sibling's or a pseudo-element's background is measured against its ancestors' background;
+contrast is measured in each mode the system declares, not in every combination of two switches (dark with high
+contrast); and the Figma side (contrast and target size measured on Figma's own screens, findings pinned there) is not
+read.
 
 #### Evals (I7, a separate entry point — measures agent OUTPUT, never gates the repo)
 

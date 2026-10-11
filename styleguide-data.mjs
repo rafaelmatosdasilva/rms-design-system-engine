@@ -10,7 +10,7 @@
 import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
 import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs';
 import { requirementEntry } from './annotation-categories.mjs';
-import { WCAG21, WCAG21_KIND } from './wcag21.mjs';
+import { WCAG22, WCAG21_KIND } from './wcag21.mjs';
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // A Figma prop name without its node suffix ("Label#3:4" → "Label").
@@ -1277,19 +1277,21 @@ export function apiView(api, file = api?.file) {
 }
 
 // ── Accessibility, per component: what it owes and what the last browser check found ─────────────────────────────────
-// Each check of a11y-check.mjs, by the WCAG success criterion it stands for (the WCAG 2.1 checks of wcag-page.js and
+// Each check of a11y-check.mjs, by the WCAG success criterion it stands for (the WCAG 2.2 checks of wcag-page.js and
 // a11y-static.mjs added from wcag21.mjs).
 const A11Y_WCAG_OWN = {
   contrast: '1.4.3', hovercontrast: '1.4.3', focuscontrast: '1.4.11', iconcontrast: '1.4.11', name: '4.1.2', focus: '2.4.7', ariastate: '4.1.2', keyboard: '2.1.1',
   target: '2.5.8', tabtrap: '2.1.2', tabindex: '2.4.3', escape: '2.1.1', focusreturn: '2.4.3', heading: '1.3.1', motion: '2.3.3', forcedfocus: '2.4.7',
   spacing: '1.4.12', activate: '2.1.1', arrows: '2.1.1', zoom: '1.4.4', obscured: '2.4.11', focusthin: '2.4.13', rolecontract: '4.1.2', annotation: '4.1.2',
   reflow: '1.4.10', partrole: '1.3.1', behaviour: '2.1.1', statefollows: '4.1.2', semantics: '4.1.2',
+  statecontrast: '1.4.3', stateedge: '1.4.11', target44: '2.5.5', forcedcontrast: '1.4.11',
 };
 export const A11Y_WCAG = { ...WCAG21_KIND, ...A11Y_WCAG_OWN };
-// The criteria the page names, with their WCAG title and level (every WCAG 2.1 criterion at A and AA, and the 2.2 ones
+// The criteria the page names, with their WCAG title and level (every WCAG 2.2 criterion at A and AA, and the AAA ones
 // the checks stand for).
 export const WCAG_CRITERIA = {
-  ...Object.fromEntries(WCAG21.map((c) => [c.sc, [c.name, c.level]])),
+  ...Object.fromEntries(WCAG22.map((c) => [c.sc, [c.name, c.level]])),
+  '2.5.5': ['Target Size (Enhanced)', 'AAA'],
   '1.3.1': ['Info and Relationships', 'A'], '1.4.3': ['Contrast (Minimum)', 'AA'], '1.4.4': ['Resize Text', 'AA'], '1.4.10': ['Reflow', 'AA'],
   '1.4.11': ['Non-text Contrast', 'AA'], '1.4.12': ['Text Spacing', 'AA'], '2.1.1': ['Keyboard', 'A'], '2.1.2': ['No Keyboard Trap', 'A'],
   '2.3.3': ['Animation from Interactions', 'AAA'], '2.4.3': ['Focus Order', 'A'], '2.4.7': ['Focus Visible', 'AA'], '2.4.11': ['Focus Not Obscured (Minimum)', 'AA'],
@@ -1349,16 +1351,17 @@ export function a11yView({ name, cls = null, role = null, roleFrom = null, annot
         const k = r.issue + '|' + detail;
         if (seen.has(k)) continue;
         seen.add(k);
-        found.push({ kind: r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', detail });
+        found.push({ kind: r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', detail, ...(r.rule ? { wcag: r.wcag ?? null, help: r.help } : {}) });
       }
       // One line per kind of problem: how many, where each is, the fix and the criterion once.
       const issues = [];
       for (const f of found) {
         const same = issues.find((i) => i.kind === f.kind);
         if (same) { same.details.push(f.detail); continue; }
-        issues.push({ kind: f.kind, fix: f.fix, wcag: A11Y_WCAG[f.kind] ?? null, details: [f.detail] });
+        issues.push({ kind: f.kind, fix: f.fix, wcag: A11Y_WCAG[f.kind] ?? f.wcag ?? null, details: [f.detail], ...(f.help ? { help: f.help } : {}) });
       }
-      for (const i of issues) i.title = guide[i.kind]?.title ? guide[i.kind].title(i.details.length) : i.kind;
+      // An axe-core rule is said in its own words (its help line).
+      for (const i of issues) i.title = guide[i.kind]?.title ? guide[i.kind].title(i.details.length) : i.help ?? i.kind;
       checked = { at, issues };
     }
   }
