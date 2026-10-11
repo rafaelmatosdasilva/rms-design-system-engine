@@ -190,6 +190,10 @@ test('in the browser: no script error, a control changes the real component, the
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--checked', 'chip', '1.3.3', '--by', 'Ana'], { cwd: dir, encoding: 'utf8' });
   const ckFile = join(dir, 'design-system-engine-checked.json'), ck = JSON.parse(readFileSync(ckFile, 'utf8'));
   ck.checks.push({ component: 'chip', sc: '3.3.7', by: 'Ana', at: '2026-09-01T10:00:00.000Z', signature: 'before' }); writeFileSync(ckFile, JSON.stringify(ck));
+  // A component the team retired (K12), still drawn in a page of the system, by its script and in its notes.
+  writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify({ components: { button: { status: 'deprecated', supersededBy: 'chip', since: '2.0' } } }));
+  mkdirSync(join(dir, 'src', 'pages'), { recursive: true });
+  writeFileSync(join(dir, 'src', 'pages', 'Home.jsx'), "import { Button } from '../components/Button';\nexport const Home = () => <Button Label=\"Save\" />;\n");
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
   const c = await launchChrome(chromePath);
   try {
@@ -468,6 +472,8 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`location.hash = '#c-button?Disabled=true'`); await new Promise((r) => setTimeout(r, 400));
     assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), true);
     await run(`location.hash = '#c-button?Disabled=false'`); await new Promise((r) => setTimeout(r, 400));
+    // Its page says it is retired, what replaces it, and how much still moves.
+    assert.match(await run(`document.querySelector('#c-button .pg-header').textContent`), /Deprecated.*Use chip instead\. Still used in 3 places \(This system 3\), each on the To do page\./);
     assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), false);
     // How a product brings it in: the import line, copied by the system's button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-import code').textContent`), "import { Chip } from '@/components/Chip';");
@@ -488,6 +494,8 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#todo tbody tr')].every((tr) => !tr.hidden)`), true);
     // What the tokens owe is a row of The system: the descriptions to write, for whoever keeps Figma.
     assert.match(await run(`[...document.querySelectorAll('#todo tr[data-area="System"]')].map((tr) => tr.textContent).join('|')`), /Tokens, description.*You in Figma.*semantic tokens have no description in Figma.*Write what each one is for/);
+    // A retired component still in use: a row for each place it is used, under its name, with what replaces it.
+    assert.match(await run(`[...document.querySelectorAll('#todo tr[data-area="Migration"]')].map((tr) => tr.textContent).join('|')`), /^\d+MigrationRetired.*This system3 places.*Claude in the code.*Move this system off button \(figma-mcp\/settings\.md:105, src\/components\/system\.js:1, src\/pages\/Home\.jsx:2\)\..*Use chip instead\. Every place is in migrations\.md\. Tell Claude to do it\./);
     const nums = await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`);
     assert.ok(nums.length > 0 && nums.every(([, n], i) => +n === i + 1), 'numbered 1, 2, 3 down the page');
     const byNo = (a) => a.slice().sort((p, q) => p[1] - q[1]);

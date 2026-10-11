@@ -16,8 +16,12 @@
 //     acme/primary) stops making sense the day a second product or brand uses the system;
 //   • aliases to a removed token: a Figma variable that points at a variable no longer in the file (the capture records it,
 //     brokenAliases), and a token in the code that points at one declared nowhere, so it always shows its fallback.
+//   • a product's near-copy of a system component (I83): a class a product styles almost as the system styles one of
+//     its components, a decision rather than a drift: use the component (a new option if it needs one), or add the new
+//     one to the system on purpose.
 
 import { sameInEveryMode } from './prune-check.mjs';
+import { styleOnly } from './a11y-static.mjs';
 
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
@@ -125,6 +129,65 @@ export function nearDuplicateComponents(css, classes, { min = 5, share = 0.8 } =
     if (same / of >= share) out.push({ a: names[i], b: names[j], same, of });
   }
   return out.sort((x, y) => y.same / y.of - x.same / x.of || x.a.localeCompare(y.a));
+}
+
+// I83: the declarations of each rule whose selector is one class (.name { … }), merged across the rules of that class.
+// css: a stylesheet (or the style blocks of a page). → Map<class (no dot), { decls: Set<'prop: value'>, line }>.
+export function classRules(css) {
+  const src = String(css ?? '').replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+  const out = new Map();
+  for (const m of src.matchAll(/(?:^|(?<=[{};]))\s*\.([A-Za-z_][\w-]*)\s*\{([^{}]*)\}/g)) {
+    const e = out.get(m[1]) ?? { decls: new Set(), line: lineOf(src, m.index + m[0].indexOf('.')) };
+    for (const d of m[2].split(';')) { const t = d.trim().replace(/\s+/g, ' '); if (t && t.includes(':')) e.decls.add(t); }
+    out.set(m[1], e);
+  }
+  return out;
+}
+
+// I83: each rule of `rules` that nearly copies a system component's own rule: `share` of the larger one's declarations
+// written alike in both, each with at least `min`. system: Map<component, Set<decl>>. own: the system's classes (its own rules are not copies).
+// → [{ cls, line, like, same, of, differ: [property] }], the most alike component for each.
+export function nearCopies(rules, system, { own = new Set(), min = 5, share = 0.75 } = {}) {
+  const out = [];
+  for (const [cls, r] of rules ?? []) {
+    if (own.has(cls) || r.decls.size < min) continue;
+    let best = null;
+    for (const [like, decls] of system ?? []) {
+      if (decls.size < min) continue;
+      const same = [...r.decls].filter((d) => decls.has(d)).length, of = Math.max(r.decls.size, decls.size);
+      if (same / of >= share && (!best || same / of > best.same / best.of)) best = { like, same, of, decls };
+    }
+    if (best) out.push({ cls, line: r.line, like: best.like, same: best.same, of: best.of, differ: [...new Set([...r.decls, ...best.decls].filter((d) => !(r.decls.has(d) && best.decls.has(d))).map((d) => d.split(':')[0].trim()))] });
+  }
+  return out;
+}
+
+// The system's components as near-copy targets: each component's own declarations in its stylesheet.
+// css: the system's stylesheet. classes: { component: '.base-class' }. → { system: Map<component, Set>, own: Set<class> }.
+export function systemRules(css, classes) {
+  const rules = classRules(css), system = new Map(), own = new Set();
+  for (const [name, cls] of Object.entries(classes ?? {})) {
+    if (typeof cls !== 'string' || !/^\.[\w-]+$/.test(cls)) continue;
+    own.add(cls.slice(1));
+    const r = rules.get(cls.slice(1));
+    if (r) system.set(name, r.decls);
+  }
+  return { system, own };
+}
+
+// I83 across the products: files { product: [{ file, text }] } (their stylesheets, and the <style> blocks of their pages
+// and components). → [{ product, file, line, cls, like, same, of, differ }].
+export function productCopies(products, css, classes, opts = {}) {
+  const { system, own } = systemRules(css, classes);
+  if (!system.size) return [];
+  const out = [];
+  for (const [product, files] of Object.entries(products ?? {})) for (const { file, text } of files ?? []) {
+    if (/\.html?$/i.test(file) && (files ?? []).some((f) => f.file === file.replace(/\.(html?)$/i, '.src.$1'))) continue;   // built from the .src beside it
+    const sheet = /\.(css|scss|less)$/i.test(file);
+    if (!sheet && !/<style\b/i.test(String(text ?? ''))) continue;
+    for (const c of nearCopies(classRules(sheet ? text : styleOnly(text)), system, { own, ...opts })) out.push({ product, file, ...c });
+  }
+  return out;
 }
 
 // I17: semantic tokens named by look: a colour word or a scale step (50, 100 … 900) as a part of the name.
