@@ -256,10 +256,11 @@ test('in the browser: no script error, a control changes the real component, the
     // lists everything: the chip's Size, Icon and pressed sides, each check said once with the variants it holds in.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const a11y = await run(`document.querySelector('#c-chip .pg-a11y').textContent`);
-    // One table by WCAG criterion, in the Playground's card: what was found, where it is read from, the status; a count
-    // above it and when the audit last ran. Only what applies: no row is said not to be needed. No separate table of
+    // One table by WCAG criterion, in the Playground's card, the same table as Parity's and the To do page's: the issue
+    // number, the area with the criterion, what Figma states, what was found, what to do with who acts, the status with
+    // when and where it was read; a count above it and when the audit last ran. Only what applies. No separate table of
     // sources.
-    assert.match(a11y, /WCAG.*What was found.*Source.*Status/);
+    assert.match(a11y, /Issue nr.*Area.*Figma.*Code.*What to do.*Status/);
     assert.doesNotMatch(a11y, /What it means|Where it is read from/);
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
     // What a criterion means opens from its name, by a click (the focus in it, Escape gives it back) or a rest of the pointer.
@@ -274,7 +275,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(a11y, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
     assert.match(a11y, /The audit has not run in a browser yet/);
     assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /\d+ done/);
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
     // The page tries the keyboard on every variant after it is drawn: wait for that result (its 2.1.1 row says what Tab
     // reached), never for a fixed time, so a busy machine reads it as a quiet one does (E17).
     let live = '';
@@ -298,7 +299,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
-    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /^1\.4\.3/.test(r.cells[0].textContent)).textContent`), /\d+\.\d:1.*(Done|To fix)/s, 'measured again in the other mode');
+    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /1\.4\.3 Contrast/.test(r.cells[1].textContent)).textContent`), /\d+\.\d:1.*(Done|To fix)/s, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
     assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
@@ -309,10 +310,11 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
-    // Parity: one table of everything the chip has (props, variables, values), Figma beside code, a status and when.
+    // Parity: one table of everything the chip has (props, variables, values), Figma beside code, what to do, a status and
+    // when, the same table as the Accessibility area's and the To do page's.
     const parRows = await run(`[...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].map((r) => r.dataset.type + ':' + r.dataset.status)`);
     assert.ok(parRows.some((r) => /^Prop:/.test(r)) && parRows.some((r) => /^Variable:/.test(r)), 'props and variables: ' + parRows);
-    assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity.*the same.*differ.*only in Figma.*only in code.*Type.*Figma.*Code.*Status.*Updated/s);
+    assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity.*the same.*differ.*only in Figma.*only in code.*Issue nr.*Area.*Figma.*Code.*What to do.*Status.*Updated/s);
     // The filter shows one type at a time.
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'Prop').click()`);
     // The filter acts on Parity's own table, never on the Accessibility tables beside it.
@@ -435,6 +437,23 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), false);
     // How a product brings it in: the import line, copied by the system's button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-import code').textContent`), "import { Chip } from '@/components/Chip';");
+    // The To do page: the same table as a component's areas, each open row under the issue number its component's own
+    // area shows. Every component is tried in the browser once; what was tried is kept, so a refresh lists it at once
+    // and tries nothing again.
+    await run(`location.hash = '#todo'`); await shownIs('todo');
+    const tried = async () => { let v = ''; for (let n = 0; n < 480 && !/Every component was tried/.test(v); n++) { if (n) await new Promise((r) => setTimeout(r, 250)); v = await run(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`); } return v; };
+    assert.match(await tried(), /Every component was tried in this browser/);
+    assert.match(await run(`document.querySelector('#todo thead').textContent`), /^Issue nr\s*Area\s*Figma\s*Code\s*What to do\s*Status$/);
+    const nums = await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`);
+    assert.ok(nums.length > 0 && nums.every(([, n], i) => +n === i + 1), 'numbered 1, 2, 3 down the page');
+    const byNo = (a) => a.slice().sort((p, q) => p[1] - q[1]);
+    assert.deepEqual(byNo(await run(`[...document.querySelectorAll('#c-chip .sg-todo-no')].filter((td) => td.textContent).map((td) => [td.dataset.todoKey, td.textContent])`)), nums.filter(([k]) => decodeURIComponent(k).startsWith('chip\u0000')), 'the chip\'s areas show the To do page\'s numbers');
+    await send('Page.reload', {}, sessionId);
+    await new Promise((r) => setTimeout(r, 300));
+    await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { tolerateErrors: true });
+    await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0);
+    assert.match(await run(`document.querySelector('#todo .sg-todo-note').textContent`), /Every component was tried in this browser/, 'a refresh lists what was tried without trying it again');
+    assert.deepEqual(await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`), nums, 'the same list at once');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
