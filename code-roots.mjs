@@ -60,3 +60,10 @@ export function brandNames(ROOT, cfg = {}) {
   if (scope) list.push(scope[1]);
   return [...new Set(list.filter((x) => typeof x === 'string' && x.trim()))];
 }
+
+// Each product's own built page, for the products ds-config.json lists (paths.plugins): beside its source in
+// paths.pluginCSS (ui.src.html → ui.html), else <its folder>/ui.html. Only the pages that exist. → [{ product, file }]
+export function productPages(ROOT, cfg = {}) {
+  const plugins = cfg?.paths?.plugins ?? [], src = cfg?.paths?.pluginCSS ?? [];
+  return plugins.map((p, i) => ({ product: p, file: resolve(ROOT, src[i] && /\.html?$/i.test(src[i]) ? src[i].replace(/\.src\.(html?)$/i, '.$1') : `${appDir(cfg, p)}/ui.html`) })).filter((x) => existsSync(x.file));
+}

@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Motion and screens against Figma, every combination of modes, and the products' own pages checked (continuous evaluation)
+
+What changed since the entry below (engine f8675f6): C5 compares Figma's prototype transitions with the code's (--figma-motion); I96 compares each product's page with its designed screens (--figma-screens); L6 checks every combination of modes; F12 and I97 check each product's own page whole, with the Tab order and lost focus. The refresh recipe gains the two read-only captures and says a token is only ever set in the project's .env, never asked for; usage and config describe the new commands and keys. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `0a2a84e09ff6` · Project measured: `13d811a9d668`
+
+| Haiku, engine c739389 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.057 |
+| Input a run | 103k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 103k. Records: `records/motion-screens-modes`.
+
 ## 2026-10: A rename sweep, steps off what the system retired, and a near copy as a decision (continuous evaluation)
 
 What changed since the entry below (engine 99a6dc7): L11: --rename-sweep renames a token renamed in Figma in every rule, script and doc of the system and its products in one patch per folder, the old name kept in the theme; the router sends a rename to it. K12: the audit lists what the system retired that is still used, with what replaces it and every place, in handback/migrations.md, with a patch for each token swap; the style guide shows it on the old component's page and in its To do. I83: a class a product styles almost as a system component is a decision in System health, in the style guide's To do (You decide) and in the edit check. The guide changed in `cookbook/fix-a-difference.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.

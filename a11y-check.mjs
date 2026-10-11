@@ -72,7 +72,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSy
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { gunzipSync } from 'zlib';
-import { join, resolve, dirname } from 'path';
+import { join, resolve, dirname, relative } from 'path';
 import { spawn } from 'child_process';
 import { pathToFileURL } from 'url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './cdp.mjs';
@@ -371,6 +371,16 @@ export const A11Y_GUIDE = {
     why: 'The icon is the only thing that says what the control or the message is, and its colour is too close to its background (often only in the dark theme, when the icon kept its light-theme colour).',
     fix: 'Draw the icon in currentColor or a token that changes with the theme, at least three times the contrast of its background.',
   },
+  pageorder: {
+    title: (n) => `${plural(n, 'place sends', 'places send')} Tab back up the page`,
+    why: 'Pressing Tab moves the focus to a control above the one before it, in the same column, so someone using a keyboard is taken back over what they have read and loses their place.',
+    fix: 'Put the controls in the code in the order they are seen, or move them on the page. Never fix it with tabindex or a CSS order.',
+  },
+  focushidden: {
+    title: (n) => `${plural(n, 'control takes', 'controls take')} the focus where no one can see it`,
+    why: 'Tab stops on something hidden (off the screen, with no size, or see-through), so someone using a keyboard cannot tell where they are.',
+    fix: 'Take it out of the Tab order while it is hidden (hidden, inert or tabindex="-1"), or show it when it has the focus, as a skip link does.',
+  },
   tabindex: {
     title: (n) => `${plural(n, 'control jumps', 'controls jump')} the Tab order`,
     why: 'A positive tabindex makes the Tab key visit this control out of reading order, which is confusing to follow.',
@@ -483,7 +493,7 @@ export const severityOf = (kind) => (A11Y_BLOCKER.has(kind) ? 'blocker' : A11Y_A
 export const bucketSeverity = (kind, list = []) => list[0]?.severity ?? severityOf(kind);
 const SEVERITY_ORDER = { blocker: 0, warning: 1, advisory: 2 };
 // The order the report lists the kinds in, within each severity; a kind not listed comes after these.
-export const A11Y_ORDER = ['contrast', 'hovercontrast', 'statecontrast', 'iconcontrast', 'name', 'focus', 'focuscontrast', 'ariastate', 'keyboard', 'tooltipname', 'target', 'tabtrap', 'tabindex',
+export const A11Y_ORDER = ['contrast', 'hovercontrast', 'statecontrast', 'iconcontrast', 'name', 'focus', 'focuscontrast', 'ariastate', 'keyboard', 'tooltipname', 'target', 'tabtrap', 'tabindex', 'pageorder', 'focushidden',
   'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole',
   'behaviour', 'statefollows', 'forcedcontrast', 'target44', 'cvdcontrast'];
 // The kinds whose same element failing the same way in many places is one finding with a count.
@@ -534,6 +544,36 @@ export function tabTrap(seq = [], { stops = 0 } = {}) {
   }
   return null;
 }
+// I97: where Tab goes against where things are on a whole page. boxes: the focus after each press, in page coordinates
+// ({ d, x, y, w, h, shown, fixed }), null on the page itself; one round is read, up to the first stop again. A stop
+// above the one before it in the same column sends the reader back up the page (a stop in another column, or one in a
+// bar that stays on screen, is not); a stop no one can see loses them. → [{ kind: 'pageorder'|'focushidden', desc }]
+export function focusFlow(boxes = []) {
+  const out = [], seen = new Set();
+  const first = boxes.findIndex(Boolean);
+  for (let i = first + 1; i >= 1 && i < boxes.length; i++) {
+    const a = boxes[i - 1], b = boxes[i];
+    if (b && b.d === boxes[first].d) break;
+    if (b && !b.shown && !seen.has(`h|${b.d}`)) { seen.add(`h|${b.d}`); out.push({ kind: 'focushidden', desc: b.d }); }
+    if (!a || !b || !a.shown || !b.shown || a.fixed || b.fixed) continue;
+    const column = b.x < a.x + a.w && a.x < b.x + b.w;
+    if (column && b.y + b.h <= a.y - 4 && !seen.has(`o|${a.d}|${b.d}`)) { seen.add(`o|${a.d}|${b.d}`); out.push({ kind: 'pageorder', desc: `Tab goes from ${a.d} back up to ${b.d}, above it` }); }
+  }
+  if (first >= 0 && !boxes[first].shown) out.unshift({ kind: 'focushidden', desc: boxes[first].d });
+  return out;
+}
+// What has the focus, where it is on the page and whether anyone can see it (for focusFlow).
+export const FOCUS_BOX = `(() => {
+  const e = document.activeElement;
+  if (!e || e === document.body || e === document.documentElement) return null;
+  const r = e.getBoundingClientRect();
+  let fixed = false, seen = true;
+  for (let x = e; x && x !== document.documentElement; x = x.parentElement) { const s = getComputedStyle(x); if (s.position === 'fixed' || s.position === 'sticky') fixed = true; if (s.visibility === 'hidden' || s.display === 'none' || +s.opacity === 0) seen = false; }
+  const shown = seen && r.width * r.height > 1 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+  const words = (e.getAttribute('aria-label') || e.textContent || e.getAttribute('title') || e.value || '').trim().replace(/\\s+/g, ' ').slice(0, 30);
+  const d = (e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/).slice(0, 2).join('.') : '') + (words ? ' "' + words + '"' : '')).slice(0, 90);
+  return { d, x: Math.round(r.left + scrollX), y: Math.round(r.top + scrollY), w: Math.round(r.width), h: Math.round(r.height), shown, fixed };
+})()`;
 // The words for a bucket: the engine's own guide, or an axe-core rule in its own words (what it checks, what failed).
 export function guideFor(kind, list = []) {
   if (A11Y_GUIDE[kind]) return A11Y_GUIDE[kind];
@@ -609,6 +649,7 @@ export function groupSame(list) {
 // numbers + the fix. Same facts as the plain lines, but parseable.
 export function a11yFindingRecord(kind, f) {
   const rec = { issue: kind, severity: f.severity ?? severityOf(kind), selector: f.desc ?? null, fix: f.fix ?? A11Y_GUIDE[kind]?.fix ?? null };
+  if (f.product) rec.product = f.product;   // found on a product's own page (F12)
   if (f.wcag ?? WCAG21_KIND[kind]) rec.wcag = f.wcag ?? WCAG21_KIND[kind];
   if (f.rule) { rec.rule = f.rule; rec.help = f.help; rec.url = f.url; rec.elements = f.elements; }
   if (f.state) rec.state = f.state;
@@ -1724,6 +1765,14 @@ async function main() {
   } else if (sg) {
     targets = styleguideShares(sg);
     console.log(`ℹ️  [a11y] target: the generated styleguide — every component × state, no dev server (${sg.label}${targets.length > 1 ? `, in ${targets.length} parts of up to ${SHARE_COMPONENTS} components` : ''})`);
+    // The products' own pages too (F12): what their layout and nesting do to the components, checked as a whole page.
+    // Not for a check of some components (--component); a11y.products: false leaves them out.
+    if (!components.length && cfg.a11y?.products !== false) {
+      const { productPages } = await import('./code-roots.mjs');
+      const pages = productPages(ROOT, cfg);
+      for (const { product, file } of pages) targets.push({ label: relative(ROOT, file), url: pathToFileURL(file).href, page: true, wholePage: true, product });
+      if (pages.length) console.log(`ℹ️  [a11y] target: ${pages.length} product page${pages.length === 1 ? '' : 's'} as a whole (${pages.map((x) => x.product).join(', ')})`);
+    }
   } else {
     targets = plugins.map(builtUiPath).filter((f) => existsSync(f)).map((f) => ({ label: f.replace(ROOT + '/', ''), url: pathToFileURL(f).href }));
   }
@@ -1863,9 +1912,11 @@ async function main() {
     unfinished.push(...notChecked(cut.target, `stopped partway: the check ran out of its ${limitSec}s`));
     cut = null;
   };
+  const dsRoots = roots;   // the design system's components: a product page is checked whole (F12)
   for (const target of targets) {
     endCut();
     stopPage = null;
+    roots = target.wholePage ? null : dsRoots;
     if (outOfTime) { unfinished.push(...notChecked(target, `not reached: the check ran out of its ${limitSec}s`)); continue; }
     pagesDone++;
     const label = target.label;
@@ -2248,16 +2299,18 @@ async function main() {
       const positive = await evalv(`[...document.querySelectorAll('[tabindex]')].filter(e => +e.getAttribute('tabindex') > 0).map(e => (e.tagName.toLowerCase() + (e.id ? '#' + e.id : '')).slice(0, 60))`);
       for (const d of positive ?? []) findings.push({ kind: 'tabindex', plugin: label, desc: d });
       await evalv(`document.activeElement && document.activeElement.blur && document.activeElement.blur()`);
-      const seq = [];
+      const seq = [], boxes = [];
       const obscured = new Set();
       for (let i = 0; i < 60; i++) {
         await pressKey('Tab', 'Tab', 9);
         seq.push(await evalv(deepSweepExpression(null, 'active')));
+        if (target.page) boxes.push(await evalv(FOCUS_BOX));   // a whole page: where each stop is (I97)
         // On the styleguide a sticky header is the page's own chrome, not the design system's.
         const ob = target.styleguide ? null : await evalv(deepSweepExpression(null, 'obscured'));
         if (ob) obscured.add(ob);
       }
       for (const d of obscured) findings.push({ kind: 'obscured', plugin: label, desc: d });
+      if (target.page) { for (const f of focusFlow(boxes)) findings.push({ kind: f.kind, plugin: label, desc: f.desc }); ranChecks.add('pageorder'); }
       // The same walk backwards (Shift+Tab): a trap can hold in one direction only.
       const back = [];
       for (let i = 0; i < 60; i++) { await pressKey('Tab', 'Tab', 9, undefined, 8); back.push(await evalv(deepSweepExpression(null, 'active'))); }
@@ -2564,6 +2617,10 @@ async function main() {
     } catch (e) { if (!cut) throw e; }
   }
   endCut();
+  roots = dsRoots;
+  // What was found on a product's own page says which product (F12).
+  const productOf = new Map(targets.filter((t) => t.product).map((t) => [t.label, t.product]));
+  if (productOf.size) for (const f of [...findings, ...axeViolations]) if (productOf.has(f.plugin)) f.product = productOf.get(f.plugin);
 
   closeCDP(); cleanup(); clearTimeout(killTimer);
 
@@ -2743,4 +2800,19 @@ async function main() {
 // Only run when invoked directly — importing for tests has no side effects.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((e) => { console.error('⏭  [a11y] skipped - ' + e.message); process.exit(0); });
+}
+
+// F12: the style guide's To do rows for what the browser check found on each product's own page, one row per product.
+// result: the audit's a11y.json. → [{ area: 'Products', type, kind, who, say, todo }]
+export function productA11yTodos(result) {
+  const by = new Map();
+  for (const i of result?.issues ?? []) if (i.product) { if (!by.has(i.product)) by.set(i.product, []); by.get(i.product).push(i); }
+  return [...by].map(([product, list]) => {
+    const kinds = new Map();
+    for (const i of list) kinds.set(i.issue, (kinds.get(i.issue) ?? 0) + 1);
+    const what = [...kinds].map(([k, n]) => (A11Y_GUIDE[k]?.title ? A11Y_GUIDE[k].title(n) : `${n} × ${k}`)).slice(0, 4).join('; ');
+    return { area: 'Products', type: `${product}, accessibility`, kind: 'Accessibility', who: 'code',
+      say: `${product}'s page, checked as a whole, has ${list.length} accessibility problem${list.length === 1 ? '' : 's'} (${what}${kinds.size > 4 ? '; and more' : ''}), first ${list.slice(0, 3).map((i) => i.selector).filter(Boolean).join('; ')}.`,
+      todo: `Fix them in ${product}. Each one is in the audit's accessibility list, with its fix. Tell Claude to do it.` };
+  });
 }

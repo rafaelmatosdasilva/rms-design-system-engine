@@ -275,6 +275,70 @@ if (process.argv.includes('--summary')) {
   process.exit(2);
 }
 
+// ── --figma-motion: Figma's prototype transitions between variants, for the motion check (C5) ──
+// Without a file: writes the read-only capture script to run with the Figma tool of the session. With the file its
+// answer was saved to: keeps it as the motion snapshot, then compares it with the code's transitions.
+if (process.argv.includes('--figma-motion')) {
+  let mcfg = {};
+  try { mcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const mp = await import('./motion-parity.mjs');
+  const at = process.argv.indexOf('--figma-motion'), file = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  if (!file) {
+    mkdirSync(capDir, { recursive: true });
+    writeFileSync(join(capDir, 'motion-capture.js'), mp.motionCaptureScript(mcfg.figma?.componentsPage ?? null));
+    console.log(`Motion capture script → ${relative(ROOT, join(capDir, 'motion-capture.js'))} (read-only: it changes nothing in Figma).`);
+    console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${relative(ROOT, join(capDir, 'motion.json'))}, then run rms-design-system-engine --figma-motion ${relative(ROOT, join(capDir, 'motion.json'))}`);
+    process.exit(0);
+  }
+  let snap;
+  try { snap = mp.motionSnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  const target = mcfg.paths?.snapshotMotion ?? join(dirname(mcfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-motion.snapshot.json');
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  const n = Object.values(snap.components).reduce((k, l) => k + l.length, 0);
+  console.log(`✓ ${n} transition${n === 1 ? '' : 's'} on ${Object.keys(snap.components).length} component${Object.keys(snap.components).length === 1 ? '' : 's'} read from Figma → ${target}`);
+  const r = await mp.projectMotion(ROOT, mcfg);
+  if (r?.findings?.length) { console.log(`🎞  ${r.findings.length} difference${r.findings.length === 1 ? '' : 's'} in motion between Figma and the code:`); for (const f of r.findings.slice(0, 20)) console.log(`   ${f.message}`); }
+  else console.log('✓ The code moves as Figma does, wherever Figma animates a change.');
+  process.exit(0);
+}
+
+// ── --figma-screens: the screens designed for each product, for the screen check (I96) ──
+// Without a file: writes the read-only capture script for the frames and screens ds-config.json names. With the file
+// its answer was saved to: keeps it as the screen layout snapshot, then compares each product's page with its screens.
+if (process.argv.includes('--figma-screens')) {
+  let scfg = {};
+  try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const at = process.argv.indexOf('--figma-screens'), file = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  if (!file) {
+    const ids = [...new Set([...(scfg.frames ?? []), ...(scfg.screens ?? [])].map((f) => f.nodeId).filter(Boolean))];
+    if (!ids.length) { console.log('ℹ️  ds-config.json names no frames or screens: add each product\'s screen ({ name, nodeId, plugin }) to frames, then run this again.'); process.exit(0); }
+    const { screenCaptureScript } = await import('./screen-layout.mjs');
+    mkdirSync(capDir, { recursive: true });
+    writeFileSync(join(capDir, 'screen-capture.js'), screenCaptureScript(ids).trim() + '\n');
+    console.log(`Screen capture script for ${ids.length} screen${ids.length === 1 ? '' : 's'} → ${relative(ROOT, join(capDir, 'screen-capture.js'))} (read-only: it changes nothing in Figma).`);
+    console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${relative(ROOT, join(capDir, 'screens.json'))}, then run rms-design-system-engine --figma-screens ${relative(ROOT, join(capDir, 'screens.json'))}`);
+    process.exit(0);
+  }
+  const sp = await import('./screen-parity.mjs');
+  let snap;
+  try { snap = sp.screenSnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  const target = scfg.paths?.screenLayout ?? join(dirname(scfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-layout.snapshot.json');
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  console.log(`✓ ${snap.screens.length} screen${snap.screens.length === 1 ? '' : 's'} read from Figma → ${target}`);
+  const { findChrome } = await import('./cdp.mjs');
+  const r = await sp.projectScreens(ROOT, scfg, { chromePath: process.env.CHROME_PATH || findChrome() });
+  for (const s of r?.screens ?? []) {
+    if (s.findings.length) { console.log(`🖼  ${s.product}'s page against "${s.name}" (${s.width}px), ${s.findings.length} difference${s.findings.length === 1 ? '' : 's'}:`); for (const f of s.findings.slice(0, 12)) console.log(`   ${f.message}`); }
+    else console.log(`✓ ${s.product}'s page is laid out as "${s.name}".`);
+  }
+  for (const why of r?.notCompared ?? []) console.log(`ℹ️  Not compared: ${why}`);
+  process.exit(0);
+}
+
 // ── --rename-sweep: a token renamed in Figma, renamed everywhere in one change (L11) ──
 // Pairs the tokens gone and new between the vars snapshot as last committed (or as of --since <git ref>) and as now, by
 // their values in every mode, and writes one patch per root (the system's, then each product's) that renames the CSS
@@ -4065,6 +4129,68 @@ function reportFull(label, items, shown) {
       if (lines.length) {
         console.log(C.yellow(`\n🧭 System health: ${lines.filter((l) => !/^   ·/.test(l)).length} thing${lines.filter((l) => !/^   ·/.test(l)).length === 1 ? '' : 's'} to keep the system healthy as it grows. Advisory.`));
         for (const l of lines) console.log(C.yellow(`     ${l}`));
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Every combination of modes (L6, advisory) ──────────────────────────────────
+  _section('advice');
+  // Each switch is checked on its own by the gates; this turns every combination on at once (Dark on a phone), in the
+  // browser, and lists what goes wrong only together: a token Figma has one value for and the code another, and a text
+  // and background pair that passes with each switch alone and fails together. "modeCombinations": false turns it off.
+  if (cfg.modeCombinations !== false && !ONLY && !NO_FIGMA) {
+    try {
+      const mc = await import('./mode-combos.mjs');
+      const pairs = await mc.projectPairs(ROOT, cfg);
+      const r = await mc.modeCombinations(ROOT, cfg, { pairs });
+      mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+      writeFileSync(join(ROOT, OUT_DIR, 'mode-combinations.json'), JSON.stringify({ at: new Date().toISOString(), combos: r.combos ?? 0, axes: (r.axes ?? []).map((a) => ({ name: a.name, modes: a.modes.map((m) => m.name) })), findings: r.findings ?? [], contrast: r.contrast ?? [], ...(r.why ? { why: r.why } : {}) }, null, 1) + '\n');
+      const n = (r.findings?.length ?? 0) + (r.contrast?.length ?? 0);
+      if (n) {
+        console.log(C.yellow(`\n🎛  Every combination of modes: ${n} thing${n === 1 ? '' : 's'} wrong only when ${r.axes.map((a) => a.name).join(' and ')} are switched together (each switch alone is right). Advisory.`));
+        for (const f of (r.findings ?? []).slice(0, 12)) console.log(C.yellow(`     ${f.combo}: ${f.cssVar} is ${f.got}, Figma ${f.want} (${f.token}; right in ${f.alone})`));
+        for (const f of (r.contrast ?? []).slice(0, 8)) console.log(C.yellow(`     ${f.combo}: ${f.name} reads ${f.ratio}:1 (needs ${f.need}:1)`));
+      } else if (r.combos > 1) console.log(`\nℹ️  Every combination of modes: all ${r.combos} combinations of ${r.axes.map((a) => `${a.name} (${a.modes.map((m) => m.name).join(', ')})`).join(' and ')} resolve as Figma has them.`);
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Motion against Figma (C5, advisory) ─────────────────────────────────────────
+  _section('advice');
+  // Where Figma animates a change between variants (its prototype's transitions, --figma-motion), the code's transition
+  // into that state: none, another duration, another curve. Runs once the motion snapshot exists.
+  if (!ONLY && !NO_FIGMA) {
+    try {
+      const { projectMotion } = await import('./motion-parity.mjs');
+      const r = await projectMotion(ROOT, cfg);
+      if (r) {
+        mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+        writeFileSync(join(ROOT, OUT_DIR, 'motion.json'), JSON.stringify({ at: new Date().toISOString(), compared: r.compared, findings: r.findings }, null, 1) + '\n');
+        if (r.findings.length) {
+          console.log(C.yellow(`\n🎞  Motion against Figma: ${r.findings.length} change${r.findings.length === 1 ? '' : 's'} the code animates differently from Figma's prototype. Advisory.`));
+          for (const f of r.findings.slice(0, 12)) console.log(C.yellow(`     ${f.message}`));
+        } else if (r.compared) console.log(`\nℹ️  Motion against Figma: the ${r.compared} transition${r.compared === 1 ? '' : 's'} Figma's prototype animates move the same in the code.`);
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Product screens against their Figma frames (I96, advisory) ──────────────────
+  _section('advice');
+  // Each product's own page opened at the size and colour mode of each screen designed for it (the screen capture), its
+  // system components compared with the screen's: which and how many, their order, the space between neighbours and
+  // their alignment. Runs once the screen capture exists; "screenParity": false turns it off.
+  if (cfg.screenParity !== false && !ONLY && !NO_FIGMA) {
+    try {
+      const { projectScreens } = await import('./screen-parity.mjs');
+      const r = await projectScreens(ROOT, cfg);
+      if (r) {
+        mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+        writeFileSync(join(ROOT, OUT_DIR, 'screens.json'), JSON.stringify({ at: new Date().toISOString(), ...r }, null, 1) + '\n');
+        const n = r.screens.reduce((k, x) => k + x.findings.length, 0);
+        if (n) {
+          console.log(C.yellow(`\n🖼  Product screens against Figma: ${n} place${n === 1 ? '' : 's'} where a product's page is laid out otherwise than its designed screen. Advisory.`));
+          for (const sc of r.screens.filter((x) => x.findings.length)) { console.log(C.yellow(`     ${sc.product} (${sc.page}) against "${sc.name}"${sc.width ? ` at ${sc.width}px` : ''}:`)); for (const f of sc.findings.slice(0, 8)) console.log(C.yellow(`       · ${f.message}`)); }
+        } else if (r.screens.length) console.log(`\nℹ️  Product screens against Figma: ${r.screens.length} designed screen${r.screens.length === 1 ? '' : 's'} match${r.screens.length === 1 ? 'es' : ''} the product's page (which components, their order, spacing and alignment).`);
+        if (r.notCompared.length) console.log(`   Not compared: ${r.notCompared.join('; ')}.`);
       }
     } catch { /* advisory: never fails */ }
   }
