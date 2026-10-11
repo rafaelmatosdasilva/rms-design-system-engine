@@ -85,5 +85,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-11-token-todo` | The 21 guide tasks on Haiku (engine baae26a) | "What the tokens owe, on the style guide's To do" |
 | `2026-10-11-removed-token-aliases` | The 21 guide tasks on Haiku (engine b27d0fd) | "Aliases to a removed token, in Figma and in the code" |
 | `2026-10-11-order-of-authority` | The 21 guide tasks on Haiku (engine fd564b2) | "An order of authority, written down" |
+| `2026-10-11-checked-by-hand-brand-names` | The 21 guide tasks on Haiku (engine 99a6dc7) | "Checks made by hand, and no brand or product names in tokens" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

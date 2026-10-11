@@ -85,6 +85,8 @@ rms-design-system-engine --baseline                      # capture today's faili
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
 rms-design-system-engine --no-baseline                   # ignore any design-system-engine-baseline.json this run (enforce every gate)
+rms-design-system-engine --checked badge 1.3.3 --by "Ana"  # the person checked a criterion only a person can judge: Done in the style guide, by them and when, until the component changes (commit design-system-engine-checked.json)
+rms-design-system-engine --unchecked badge 1.3.3          # take it back: to check again
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
 rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
 rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
@@ -438,7 +440,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   part, a person checks that…", or what has still to run, else what the criterion asks) and Status (✕ To fix, ! To
   check, ✓ Done, a sign and the system's colour, with New in the last audit, when it was last tried and where each
   finding is read from under it: a Figma annotation, `contract.authored.json`, its code, the style guide in the
-  browser, the last audit or the audit's code capture, a person). Only what applies to the component is listed: a criterion of the page that uses it (a
+  browser, the last audit or the audit's code capture, a person). A criterion only a person can judge (1.3.3, 1.4.5,
+  2.4.6, 3.1.2, 3.3.3, 3.3.7 and the media ones) says how to mark it (Checked it? Tell Claude badge 1.3.3 is checked); once
+  the person has, `--checked` records who and when with the component's signature (its CSS rules, its contract entry, its
+  source file) in `design-system-engine-checked.json`, and the row is Done, Checked by them on that day, until the
+  component changes, then To check again, saying who checked it before. With nothing to fix or to check the summary
+  says Meets WCAG 2.2 at level A and AA. Only what applies to the component is listed: a criterion of the page that uses it (a
   title, a skip link, orientation, consistent navigation), video and sound it does not play, what it has nothing for
   (no link for 2.4.4), and what asks of controls or fields on a component with none in any variant (keyboard,
   focus, labels, errors) are left out. To fix first, then to check, then done; a AAA criterion a check stands for (a

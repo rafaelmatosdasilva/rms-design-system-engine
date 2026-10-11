@@ -2202,6 +2202,12 @@ a.pg-usage-name { color: var(--sg-text); }
       if (its.some(function (it) { return it.st === 'todo'; })) st = k.extra ? 'check' : 'todo';
       else if (its.some(function (it) { return it.st === 'check'; }) && st) st = 'check';
       else if (!st && its.some(function (it) { return it.st === 'done'; })) st = 'done';
+      // What a person checked by hand (G5): Done, by whom and when, while the component is as it was then; once it has
+      // changed, to check again, saying who checked it before. Asked of a person only: a finding still open keeps it open.
+      var ok = k.person && st === 'check' && !its.some(function (it) { return it.st === 'todo' || it.st === 'check'; }) && (a.confirmed || {})[k.sc];
+      if (ok && ok.current) { st = 'done'; note = 'Checked by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + ': ' + k.person; }
+      else if (ok) note = 'Checked by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + ', before ' + c.name + ' changed. ' + person;
+      if (k.person && st === 'check' && !its.some(function (it) { return it.st === 'todo'; })) note += ' Checked it? Tell Claude ' + c.name + ' ' + k.sc + ' is checked.';
       if (!st) return null;
       return { k: k, st: st, its: its, note: note, how: how, fig: fig };
     }).filter(Boolean);
@@ -2798,7 +2804,9 @@ a.pg-usage-name { color: var(--sg-text); }
       var n = {};
       Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
       a11ySumEl.innerHTML = [['todo', 'to fix'], ['check', 'to check'], ['done', 'done']].filter(function (x) { return n[x[0]]; })
-        .map(function (x) { return '<span class="pg-par-status pg-par--' + STATUS[x[0]][2] + '"><span class="pg-par-sign" aria-hidden="true">' + STATUS[x[0]][0] + '</span>' + n[x[0]] + ' ' + x[1] + '</span>'; }).join('');
+        .map(function (x) { return '<span class="pg-par-status pg-par--' + STATUS[x[0]][2] + '"><span class="pg-par-sign" aria-hidden="true">' + STATUS[x[0]][0] + '</span>' + n[x[0]] + ' ' + x[1] + '</span>'; }).join('') +
+        // Nothing to fix or to check, the checks a person makes included: it meets WCAG 2.2 at A and AA.
+        (!n.todo && !n.check && n.done ? '<span class="pg-par-status pg-par--' + STATUS.done[2] + ' pg-a11y-meets"><span class="pg-par-sign" aria-hidden="true">' + STATUS.done[0] + '</span>Meets WCAG 2.2 at level A and AA</span>' : '');
       var ch = c.a11y && c.a11y.checked;
       // Only what a row cannot say: when each check ran is in its own row.
       a11yNote.textContent = [!ch ? 'The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.' : ch.notRead ? 'The last audit (' + when(ch.at) + ') could not check it: ' + (ch.why || 'it was not drawn on the page it opened') + '.' : '',
