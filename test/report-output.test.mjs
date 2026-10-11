@@ -128,6 +128,9 @@ test('R2: every finding as one record (rule, evidence, verdict, who acts), each 
     ['Structure', 'Structure matches', 'chip', 'advisory', 'decide', true, false],   // a link points at a difference, it is not one
   ]);
   assert.equal(r[0].evidence, '[sizing/-] radii/chip → --radii-chip');
+  // Each record says which level of the order of authority its rule stands on (K3).
+  assert.deepEqual(r.map((x) => x.authority), ['standard', 'standard', 'standard', 'standard']);
+  assert.deepEqual(findingRecords(['System health :: 3 of 3 semantic tokens have no description', 'Exemption debt :: chip/height'], []).map((x) => x.authority), ['heuristic', 'decision']);
   assert.match(r[0].id, /^[0-9a-z]+$/);
   // The same finding after an edit higher up the file keeps its identity.
   assert.equal(findingRecords(['Structure :: ⚠️  x (src/a.css:61)'], [])[0].id, findingRecords(['Structure :: ⚠️  x (src/a.css:9)'], [])[0].id);
