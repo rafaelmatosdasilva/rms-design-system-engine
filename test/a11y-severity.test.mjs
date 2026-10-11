@@ -1,5 +1,5 @@
 // W5: every accessibility finding says how sure the check is of it. A blocker is measured on the rendered page
-// against a WCAG 2.1 A or AA criterion, a warning is read from the code, a contract or a Figma note, an advisory is
+// against a WCAG 2.2 A or AA criterion, a warning is read from the code, a contract or a Figma note, an advisory is
 // beyond AA or only a person can judge it. The check ends with one verdict line, and must-pass never stops on an
 // advisory.
 import { test } from 'node:test';
@@ -32,16 +32,16 @@ test('every kind of finding has a severity; a blocker fails an A or AA criterion
 });
 
 test('one verdict line: how many of each, against what, and whether all of it was checked', () => {
-  assert.equal(a11yVerdict([['contrast', [1, 2]], ['name', [1]], ['annotation', [1, 2]], ['focusthin', [1]]]).line, '3 blockers · 2 warnings · 1 advisory · WCAG 2.1 AA');
+  assert.equal(a11yVerdict([['contrast', [1, 2]], ['name', [1]], ['annotation', [1, 2]], ['focusthin', [1]]]).line, '3 blockers · 2 warnings · 1 advisory · WCAG 2.2 AA');
   const v = a11yVerdict([], { cannot: 2, partial: true });
   assert.deepEqual([v.blockers, v.warnings, v.advisories], [0, 0, 2]);   // text on an image is checked by eye
-  assert.equal(v.line, '0 blockers · 0 warnings · 2 advisories · WCAG 2.1 AA · not all of it checked');
+  assert.equal(v.line, '0 blockers · 0 warnings · 2 advisories · WCAG 2.2 AA · not all of it checked');
 });
 
 const PAGE = `<!doctype html><html lang="en"><head><title>T</title><style>
   body { font: 14px sans-serif; margin: 16px; }
   .thin:focus { outline: 1px solid #000; }
-  button { padding: 8px; }
+  button { padding: 8px; min-width: 44px; min-height: 44px; }   /* a comfortable touch target: no advice about its size */
 </style></head><body><main><h1>Page</h1>
   <button class="thin">Thin ring</button>
   BODY
@@ -57,7 +57,7 @@ test('the report lists blockers first, then warnings, then advisories, and ends 
   const at = (w) => out.indexOf(`• ${w}: `);
   assert.ok(at('Blocker') > 0 && at('Blocker') < at('Warning') && at('Warning') < at('Advisory'), out);
   assert.match(out, /• Blocker: 1 button or field has no label[\s\S]*• Warning: One field is labelled only by a placeholder[\s\S]*• Advisory: 1 focus ring is thinner than 2 pixels/);
-  assert.match(out.trimEnd().split('\n').pop(), /^Verdict: 1 blocker · 1 warning · 1 advisory · WCAG 2\.1 AA$/);
+  assert.match(out.trimEnd().split('\n').pop(), /^Verdict: 1 blocker · 1 warning · 1 advisory · WCAG 2\.2 AA$/);
   const d = JSON.parse(run(dir, ['--json']).out);
   assert.deepEqual([d.verdict.blockers, d.verdict.warnings, d.verdict.advisories], [1, 1, 1]);
   assert.deepEqual(d.issues.map((i) => [i.issue, i.severity]), [['name', 'blocker'], ['placeholderlabel', 'warning'], ['focusthin', 'advisory']]);

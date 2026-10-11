@@ -148,6 +148,22 @@
     return best;
   }
 
+  // 1.4.11 Non-text contrast: the edge of a field, a checkbox, a radio or a switch stands out 3:1 from what is around it.
+  function edgeCheck(root, all, shown, push, seen) {
+    shown.concat(all.filter(function (el) { return el.tagName === 'INPUT' && /^(checkbox|radio)$/i.test(el.type); })).forEach(function (el) {
+      var field = (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|image|range|color|file|hidden)$/i.test(el.type)) || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || /^(textbox|searchbox|combobox)$/.test(el.getAttribute('role') || '');
+      var box = el.tagName === 'INPUT' && /^(checkbox|radio)$/i.test(el.type) || /^(checkbox|radio|switch)$/.test(el.getAttribute('role') || '');
+      if (!field && !box || el.disabled || el.getAttribute('aria-disabled') === 'true') return;
+      var edge = field ? el : edgeOf(el); if (!edge || !vis(edge)) return;
+      // A field drawn inside a wrapper that carries its edge (an input in a bordered wrapper): the wrapper's edge is the one seen.
+      if (field && edge.parentElement && edge.parentElement !== root.parentElement) { var w = edge.parentElement; if (w.getBoundingClientRect().height <= edge.getBoundingClientRect().height + 16 && boundary(w) > boundary(edge)) edge = w; }
+      seen('boundary');
+      var r = boundary(edge);
+      // No edge drawn at all (a field shown as plain text) asks nothing of 1.4.11; an edge drawn too faint does.
+      if (r > 0 && r < 3) push('boundary', '1.4.11', edge, 'its edge stands out ' + (Math.floor(r * 10) / 10).toFixed(1) + ':1 from what is around it, needs 3:1');
+    });
+  }
+
   function check(root, opts) {
     opts = opts || {};
     var out = [], ran = {}, all = scope(root).filter(function (el) { return el.nodeType === 1; });
@@ -212,19 +228,7 @@
       if (TOKENS.indexOf(ac) < 0) push('autocomplete', '1.3.5', el, 'asks for ' + hit[1] + ' with ' + (ac ? 'autocomplete="' + ac + '"' : 'no autocomplete') + ', needs autocomplete="' + hit[1] + '"');
     });
 
-    // 1.4.11 Non-text contrast: the edge of a field, a checkbox, a radio or a switch stands out 3:1 from what is around it.
-    shown.concat(all.filter(function (el) { return el.tagName === 'INPUT' && /^(checkbox|radio)$/i.test(el.type); })).forEach(function (el) {
-      var field = (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|image|range|color|file|hidden)$/i.test(el.type)) || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || /^(textbox|searchbox|combobox)$/.test(el.getAttribute('role') || '');
-      var box = el.tagName === 'INPUT' && /^(checkbox|radio)$/i.test(el.type) || /^(checkbox|radio|switch)$/.test(el.getAttribute('role') || '');
-      if (!field && !box || el.disabled || el.getAttribute('aria-disabled') === 'true') return;
-      var edge = field ? el : edgeOf(el); if (!edge || !vis(edge)) return;
-      // A field drawn inside a wrapper that carries its edge (an input in a bordered wrapper): the wrapper's edge is the one seen.
-      if (field && edge.parentElement && edge.parentElement !== root.parentElement) { var w = edge.parentElement; if (w.getBoundingClientRect().height <= edge.getBoundingClientRect().height + 16 && boundary(w) > boundary(edge)) edge = w; }
-      seen('boundary');
-      var r = boundary(edge);
-      // No edge drawn at all (a field shown as plain text) asks nothing of 1.4.11; an edge drawn too faint does.
-      if (r > 0 && r < 3) push('boundary', '1.4.11', edge, 'its edge stands out ' + (Math.floor(r * 10) / 10).toFixed(1) + ':1 from what is around it, needs 3:1');
-    });
+    edgeCheck(root, all, shown, push, seen);
 
     // 2.2.2 Pause, stop, hide and 2.3.1 Three flashes: what moves by itself for more than 5 seconds, what flashes.
     var secs = function (v) { return Math.max.apply(null, [0].concat(String(v).split(',').map(function (x) { x = x.trim(); return (x.slice(-2) === 'ms' ? parseFloat(x) / 1000 : parseFloat(x)) || 0; }))); };
@@ -302,6 +306,33 @@
         var f = el.matches(FOCUSABLE) && el.tabIndex >= 0 && !el.disabled ? el : Array.prototype.filter.call(el.querySelectorAll(FOCUSABLE), function (n) { return n.tabIndex >= 0 && !n.disabled && vis(n); })[0];
         if (f) push('aria', '4.1.2', f, 'aria-hidden="true" on something Tab reaches');
       }
+    });
+
+    // 2.5.7 Dragging movements: something moved by dragging (draggable, a grab or move cursor) in a component that has no
+    // other control to do it with one click or tap. A slider's track takes a click, and a part inside the dragged one is it.
+    shown.forEach(function (el) {
+      var cur = getComputedStyle(el).cursor, drag = el.getAttribute('draggable') === 'true';
+      if (!drag && !/^(grab|grabbing|move)$/.test(cur)) return;
+      if (el.closest('input[type=range],[role=slider],[role=scrollbar]') || el.parentElement && (el.parentElement.closest('[draggable=true]') || !drag && getComputedStyle(el.parentElement).cursor === cur)) return;
+      seen('dragging');
+      // The other way to do it sits beside it or in it (a list's move buttons, an item's menu), not anywhere on the page.
+      var others = scope(el.parentElement && root.contains(el.parentElement) ? el.parentElement : root).filter(function (n) { return n.nodeType === 1 && n !== el && !n.contains(el) && n.matches(CONTROL) && vis(n); });
+      if (!others.length) push('dragging', '2.5.7', el, (drag ? 'draggable' : 'a ' + cur + ' cursor') + ', with no button or click that does the same');
+    });
+
+    // 3.3.8 Accessible authentication: a password field lets a password manager fill it (paste is tried when it is used).
+    shown.forEach(function (el) {
+      if (!el.matches('input[type=password],input[autocomplete=one-time-code]')) return;
+      seen('auth');
+      if ((el.getAttribute('autocomplete') || '').trim().toLowerCase() === 'off') push('authfill', '3.3.8', el, 'autocomplete="off" on a password field');
+    });
+
+    // 4.1.2 A link with nowhere to go (href="#", javascript:) that a script turns into an action: it is announced as a link,
+    // and Space does nothing on it.
+    shown.forEach(function (el) {
+      if (!el.matches('a[href="#"],a[href^="javascript:"]') || el.getAttribute('role')) return;
+      seen('link');
+      push('fakelink', '4.1.2', el, 'href="' + el.getAttribute('href').slice(0, 24) + '" goes nowhere, so it acts as a button');
     });
 
     // 4.1.3 Status messages: a message, a toast or a loader is announced without taking focus.
@@ -435,6 +466,15 @@
         if (x.type === 'checkbox' || x.type === 'radio') x.checked = was; else if (x.tagName === 'SELECT') x.selectedIndex = was; else x.value = was;
         fire(x, 'input'); fire(x, 'change'); x.blur();
       }
+      // 3.3.8 Accessible authentication: a password or a one-time code can be pasted (a password manager, a copied code).
+      var secrets = scope(root).filter(function (el) { return el.nodeType === 1 && el.matches('input[type=password],input[autocomplete=one-time-code]') && seenOn(el) && !el.disabled && !el.readOnly; }).slice(0, 4);
+      for (var q = 0; q < secrets.length; q++) {
+        ran.auth = 1;
+        var ev;
+        try { var dt = new DataTransfer(); dt.setData('text/plain', 'x'); ev = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }); } catch (e) { ev = new Event('paste', { bubbles: true, cancelable: true }); }
+        secrets[q].dispatchEvent(ev);
+        if (ev.defaultPrevented) push('authpaste', '3.3.8', secrets[q], 'it cancels a paste');
+      }
       // 2.5.2 Pointer cancellation: pressing a control does nothing until it is released, so sliding off cancels it.
       // A handle that is dragged (a splitter, a resize grip) acts on the press by nature and is left out.
       var press = controls.filter(function (el) { var s = getComputedStyle(el); return !/resize|move|grab/.test(s.cursor) && el.getAttribute('role') !== 'separator' && !/resize|drag|handle|splitter|grip/i.test(typeof el.className === 'string' ? el.className : '') && !/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName); });
@@ -452,5 +492,12 @@
     })().finally(function () { window.open = realOpen; history.pushState = realPush; document.removeEventListener('submit', stopSubmit, true); });
   }
 
-  g.__wcag21 = { check: check, interact: interact };
+  // Only the control edges (1.4.11), for the passes that read them again in another mode or state: fast on a big page.
+  function edges(root) {
+    var out = [], all = scope(root).filter(function (el) { return el.nodeType === 1; });
+    edgeCheck(root, all, all.filter(vis), function (kind, sc, el, why) { out.push({ kind: kind, sc: sc, desc: (el ? desc(el) : '') + (why ? ' (' + why + ')' : '') }); }, function () {});
+    return { findings: out, ran: [] };
+  }
+
+  g.__wcag21 = { check: check, interact: interact, edges: edges };
 })(typeof window !== 'undefined' ? window : globalThis);
