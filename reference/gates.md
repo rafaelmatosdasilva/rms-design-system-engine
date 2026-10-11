@@ -116,6 +116,13 @@ someComponent: {
 
 **Prefer `{ sel, prop, expectedVar }` over a plain selector** whenever the annotation specifies a visual property - it's the only form that would have caught `background: var(--bg)` being wrong while `.sectionHeader` still existed.
 
+**A state written with what a screen reader hears.** A `propertyMap` selector may carry the attribute the element
+announces (`'.node.node-disabled[aria-disabled="true"]'`, `'.toast.toast-error[role="alert"]'`). Gates [13] and [14]
+take a rule for the rest of it (`.node.node-disabled`) as building the state: the `aria-*` or `role` attribute is the
+markup's duty, which the accessibility check reads. Any other attribute (`[data-size="l"]`) is styled by CSS, so its
+rule is still asked for. Every selector list is read at its own commas only, so a rule like
+`.row:not(.selected, .no-button):hover svg` is one selector, matched whole against `ALLOWED_BROAD_RULES` (Gate [12]).
+
 ### Reading annotations correctly
 
 Annotations describe design intent, not CSS mechanics. Read them for what they require the code to guarantee:

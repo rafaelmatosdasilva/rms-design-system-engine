@@ -9,6 +9,7 @@
 //
 // Exit 0 = all propertyMap selectors found in CSS.  Exit 1 = missing selectors.
 
+import { splitSelectors, withoutHeardState } from './selector-list.mjs';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -56,20 +57,27 @@ const allCSS = [...THEME_PATHS, ...PLUGIN_CSS]
 const cssSelectors = new Set();
 for (const m of allCSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
   const raw = m[1].trim().replace(/\s+/g, ' ');
-  for (const part of raw.split(',')) {
+  for (const part of splitSelectors(raw)) {
     const sel = part.trim();
     if (sel && !sel.startsWith('@')) cssSelectors.add(sel);
   }
 }
 
+// A state written with what a screen reader hears ([aria-disabled="true"], [role="alert"]) is built by a rule for the
+// rest of it: the attribute is the markup's duty, which the accessibility check reads.
 function isCovered(sel) {
   if (!sel || typeof sel !== 'string') return true;
+  const bare = withoutHeardState(sel);
+  if (bare && bare !== sel && coveredAsWritten(bare)) return true;
+  return coveredAsWritten(sel);
+}
+function coveredAsWritten(sel) {
   if (sel.startsWith('@')) return true; // container queries, media - can't easily match
   const norm = sel.replace(/\s+/g, ' ').trim();
   if (cssSelectors.has(norm)) return true;
   for (const cssEl of cssSelectors) {
     // Multi-selector rule: ".a, .b { }" - check comma-split parts
-    if (cssEl.split(',').map(s => s.trim()).includes(norm)) return true;
+    if (splitSelectors(cssEl).includes(norm)) return true;
     // Compound/child selector: propertyMap selector is a PREFIX of a CSS rule's selector.
     // e.g. ".step-option.done" is covered by ".step-option.done .step-dot"
     if (cssEl.startsWith(norm + ' ') || cssEl.startsWith(norm + ':') || cssEl.startsWith(norm + '.')) return true;
