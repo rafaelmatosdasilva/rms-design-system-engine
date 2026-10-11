@@ -187,7 +187,7 @@
 📐 Contracts → contracts  (3 components · 13 DTCG tokens)
 ℹ️  Figma prop types → contracts/figma-props.d.ts: type a component's props with its <Name>FigmaProps so tsc shows prop drift.
 ℹ️  Prune candidates: 4 (leaner library = cheaper agent context). Advisory - decide keep or drop.
-     1 group(s) of tokens equal in every mode · 3 token(s) only one component uses
+     1 group(s) of tokens with the same value written by hand · 3 token(s) only one component uses
      Run with --prune to list them.
 ℹ️  Contract completeness: 3/3 have a description · 3/3 have semantics · 0/3 carry whenNotToUse/useInstead guidance. Advisory only.
 
