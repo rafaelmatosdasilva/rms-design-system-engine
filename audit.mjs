@@ -3874,7 +3874,8 @@ function reportFull(label, items, shown) {
   _section('advice');
   // Runs ONLY when ds-config.json declares `tiers` (never imposes a tier model). Classifies each
   // token by the project's own regexes and flags a token that aliases a token in a tier its
-  // `mayReference` list does not allow. Advisory: surfaces cross-tier references, never fails.
+  // `mayReference` list does not allow, and, when the tiers carry a `layer`, one that skips a layer or
+  // points back at a later one (L3). Advisory: surfaces cross-tier references, never fails.
   {
     const tiers = Array.isArray(cfg.tiers) ? cfg.tiers.filter((t) => t && t.name && t.match != null) : [];
     if (tiers.length) {
@@ -3889,14 +3890,18 @@ function reportFull(label, items, shown) {
           for (const [tok, target] of Object.entries(vsnap.aliases?.[mode] || {})) {
             const key = tok.replace(/\/color$/, '');
             if (!aliasMap.has(key)) aliasMap.set(key, new Set());
-            for (const ref of (Array.isArray(target) ? target : [target])) if (ref) aliasMap.get(key).add(String(ref).replace(/\/color$/, ''));
+            // The token it aliases, not the rest of the chain: a component token that aliases a semantic one
+            // reaches a primitive through it, and that is the layering asked for.
+            const ref = Array.isArray(target) ? target[0] : target;
+            if (ref) aliasMap.get(key).add(String(ref).replace(/\/color$/, ''));
           }
         }
         const { violations, classified } = checkTiers([...tokenSet], (t) => [...(aliasMap.get(t) || [])], tiers);
         const summary = Object.entries(classified).map(([n, c]) => `${n}:${c}`).join(' · ') || 'none classified';
         if (violations.length) {
           console.log(C.yellow(`\n⚠️  Token tiers (declared): ${violations.length} cross-tier reference(s) the project's rules disallow. [${summary}]`));
-          for (const v of violations.slice(0, 20)) console.log(C.yellow(`     · ${v.token} (${v.tier}) → ${v.ref} (${v.refTier})`));
+          for (const v of violations.slice(0, 20)) console.log(C.yellow(`     · ${v.token} (${v.tier}) → ${v.ref} (${v.refTier})${v.kind ? `: ${v.reason}` : ''}`));
+          if (violations.length > 20) console.log(`     … ${violations.length - 20} more`);
           console.log('   Advisory: the tiers are yours (ds-config → tiers); the engine only surfaces the crossings.');
         } else {
           console.log(`\nℹ️  Token tiers (declared): all ${tokenSet.size} tokens respect the declared tier references. [${summary}]`);
@@ -4340,19 +4345,23 @@ function reportFull(label, items, shown) {
   // ── The Figma file's own hygiene (I23, advisory) ──────────────────────────────
   _section('advice');
   // Values with no variable or style, detached instances, variants with no auto layout, components with no
-  // description: read from the hygiene record the component-values sweep writes. For whoever keeps the Figma
+  // description, variables bound outside their scope or left on all scopes: read from the hygiene record the
+  // component-values sweep writes and the vars snapshot's variableScopes. For whoever keeps the Figma
   // file; the parity never changes Figma. Silent until the sweep carries the record. Off with "figmaHygiene": false.
   if (cfg.figmaHygiene !== false) {
     try {
       const { hygieneBlock, hygieneScore, hygieneFindings } = await import('./figma-hygiene.mjs');
       const values = JSON.parse(readFileSync(join(ROOT, 'component-values.snapshot.json'), 'utf8'));
       const only = _scopeNames.length ? _scopeNames : null;
-      const lines = hygieneBlock(values, { only, all: process.argv.includes('--hygiene') });
+      // Each variable's scopes (F7), when the Figma capture recorded them.
+      let scopes = null;
+      try { scopes = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8')).variableScopes ?? null; } catch { /* no vars snapshot */ }
+      const lines = hygieneBlock(values, { only, scopes, all: process.argv.includes('--hygiene') });
       if (lines.length) {
-        const clean = !hygieneFindings(values, { only }).length;
+        const clean = !hygieneFindings(values, { only, scopes }).length;
         console.log((clean ? C.green : C.yellow)(`\n${lines[0]}`));
         for (const l of lines.slice(1)) console.log(C.yellow(l));
-        _sc.hygiene = hygieneScore(values, { only });
+        _sc.hygiene = hygieneScore(values, { only, scopes });
       }
     } catch { /* no component-values.snapshot.json: nothing to read */ }
   }
@@ -4595,6 +4604,15 @@ function reportFull(label, items, shown) {
       const hb = (f) => (existsSync(join(ROOT, hbDir, f)) ? join(hbDir, f) : null);
       mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
       writeFileSync(join(ROOT, OUT_DIR, 'differences.json'), JSON.stringify({ at: new Date().toISOString(), ...d }, null, 1) + '\n');
+      // The model behind it (R2): each gate's verdict with its rule in plain words, and every finding as one record.
+      try {
+        const { findingRecords, gateRecords } = await import('./run-diff.mjs');
+        let plainNames = []; try { plainNames = GATE_PLAIN; } catch { /* not in reach */ }
+        const gr = gateRecords(gates, plainNames);
+        const rules = Object.fromEntries(gr.filter((g) => g.rule).map((g) => [g.check, g.rule]));
+        const records = findingRecords(now, names, { prev: prev?.findings ?? null, rules, failing: gr.filter((g) => g.verdict === 'fails').map((g) => g.check) });
+        writeFileSync(join(ROOT, OUT_DIR, 'findings.json'), JSON.stringify({ at: new Date().toISOString(), gates: gr, findings: records }, null, 1) + '\n');
+      } catch { /* a convenience */ }
       writeFileSync(join(ROOT, OUT_DIR, 'differences.md'), differencesMarkdown(d, { at: new Date().toISOString().slice(0, 16).replace('T', ' '), handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') } }));
       console.log(`\n📋 Differences between Figma and the code: ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list → ${OUT_DIR}/differences.md`);
     } catch { /* a convenience */ }
@@ -4634,7 +4652,28 @@ function reportFull(label, items, shown) {
     let a11yIssues = null;
     try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
     const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), noFigma: NO_FIGMA, a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues, why: (rA11y?.stdout ?? '').match(/⏭\s+\[a11y\]\s+(.+)/)?.[1]?.replace(/\.$/, '') ?? null } : null } : null;
-    let summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine, noSnapshot, foundNowhere: _foundNowhere });
+    // The verification headline (I93), for a full run: each component passing, drifting or not checked, from this
+    // run's differences and, when it measured in a browser, this run's census.
+    let headline = null;
+    if (!ONLY && !_scopeNames.length) try {
+      const { verification, verificationLine } = await import('./run-diff.mjs');
+      const started = Date.now() - process.uptime() * 1000;
+      const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8'));
+      if (new Date(d.at).getTime() >= started) {
+        const cPath = join(ROOT, outDir, 'census.json');
+        const census = existsSync(cPath) && statSync(cPath).mtimeMs >= started ? JSON.parse(readFileSync(cPath, 'utf8')) : null;
+        const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+        const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_') && n.length > 2);
+        headline = verificationLine(verification(names, d, census));
+      }
+    } catch { /* no differences written this run */ }
+    // Is the Figma file reliable enough to compare (R1): said with the state of the Figma data, before what failed.
+    let figmaTrust = null;
+    if (!NO_FIGMA && cfg.figmaHygiene !== false) try {
+      const { reliability, reliabilityLine } = await import('./figma-hygiene.mjs');
+      figmaTrust = reliabilityLine(reliability(JSON.parse(readFileSync(join(ROOT, 'component-values.snapshot.json'), 'utf8')), { only: _scopeNames.length ? _scopeNames : null }));
+    } catch { /* no component-values.snapshot.json */ }
+    let summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine, noSnapshot, foundNowhere: _foundNowhere, headline, figma: figmaTrust });
     mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
     // Where every difference is listed (written by a full audit above), so the chat always says where to look.
     let diffLine = '';

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { addedLines, editFindings, editCheck, componentTagIn, normHex, themeSizes } from '../edit-check.mjs';
+import { addedLines, editFindings, editCheck, componentTagIn, normHex, themeSizes, importFindings, nestedComponents, nestingFindings } from '../edit-check.mjs';
 import { steeringTruth } from '../steering-check.mjs';
 import { makeFixture } from './helpers.mjs';
 
@@ -190,6 +190,87 @@ test('the hook: a UI edit in a parity project, with an opt-out; everything else 
   const plain = makeFixture({ 'a.css': '.x{color:#fff}' });
   const none = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ hook_event_name: 'PostToolUse', cwd: plain, tool_name: 'Write', tool_input: { file_path: join(plain, 'a.css'), content: '.x{color:#fff}' } }), encoding: 'utf8' });
   assert.equal(none.stdout, '');
+});
+
+test('an import a product should no longer write (I76): the replaced library, the system\'s insides past its exports', () => {
+  const imports = { replaced: { '@old/ui': '@acme/ds', 'legacy-icons': '@acme/ds/icons' }, system: '@acme/ds', exports: { '.': './index.js', './button': './src/button.js', './icons/*': './icons/*.js' } };
+  const f = (line) => importFindings(line, imports);
+  assert.deepEqual(f("import { Button } from '@old/ui';"), ["'@old/ui' is from the library the system replaced; import from '@acme/ds'"]);
+  assert.deepEqual(f("import Chip from '@old/ui/chip';"), ["'@old/ui/chip' is from the library the system replaced; import from '@acme/ds'"]);
+  assert.deepEqual(f("const i = require('legacy-icons');"), ["'legacy-icons' is from the library the system replaced; import from '@acme/ds/icons'"]);
+  assert.deepEqual(f("@import '@old/ui/theme.css';"), ["'@old/ui/theme.css' is from the library the system replaced; import from '@acme/ds'"]);
+  assert.deepEqual(f("import { Button } from '@acme/ds/src/button.js';"), ["'@acme/ds/src/button.js' reaches inside @acme/ds; import from '@acme/ds/button'"]);
+  assert.deepEqual(f("export { Chip } from '@acme/ds/src/chip';"), ["'@acme/ds/src/chip' reaches inside @acme/ds; import from '@acme/ds'"]);
+  assert.deepEqual(f("const m = await import('@acme/ds/internal/tokens');"), ["'@acme/ds/internal/tokens' reaches inside @acme/ds; import from '@acme/ds'"]);
+  // What the package exports, a pattern included, the package itself, and other modules stay silent.
+  for (const ok of ["import { Button } from '@acme/ds';", "import { Button } from '@acme/ds/button';", "import Star from '@acme/ds/icons/star';", "import React from 'react';", "import '@old/uikit';", "import x from './src/local.js';", 'const old = "@old/ui is gone";']) assert.deepEqual(f(ok), [], ok);
+  // No exports map: the package's sources, build output and private folders are its insides; the rest is public.
+  const bare = { replaced: {}, system: '@acme/ds', exports: null };
+  assert.deepEqual(importFindings("import x from '@acme/ds/dist/esm/chip.js';", bare), ["'@acme/ds/dist/esm/chip.js' reaches inside @acme/ds; import from '@acme/ds'"]);
+  assert.deepEqual(importFindings("import x from '@acme/ds/_private';", bare), ["'@acme/ds/_private' reaches inside @acme/ds; import from '@acme/ds'"]);
+  assert.deepEqual(importFindings("import x from '@acme/ds/chip';", bare), []);
+  assert.deepEqual(importFindings("import { Button } from '@old/ui';", null), []);
+});
+
+test('the hook reads imports from ds-config.json and the system\'s package.json; the system\'s own repository stays silent', () => {
+  const files = {
+    'src/theme.css': theme,
+    'contracts/catalog.json': catalog,
+    'node_modules/@acme/ds/package.json': { name: '@acme/ds', exports: { '.': './index.js', './button': './src/button.js' } },
+  };
+  const cfg = { paths: { themeCSS: 'src/theme.css' }, imports: { system: '@acme/ds', replaced: { '@old/ui': '@acme/ds' } } };
+  const content = "import { Button } from '@acme/ds/src/button.js';\nimport { Chip } from '@old/ui';\nimport { Card } from '@acme/ds';\n";
+  const write = (dir) => ({ hook_event_name: 'PostToolUse', cwd: dir, tool_name: 'Write', tool_input: { file_path: join(dir, 'src/pages/Home.jsx'), content } });
+  const product = makeFixture({ ...files, 'package.json': { name: 'product' } });
+  const r = editCheck(write(product), { root: product, cfg, headOf: () => null });
+  assert.match(r, /2 things it added the system does not have/);
+  assert.match(r, /Home\.jsx:1  '@acme\/ds\/src\/button\.js' reaches inside @acme\/ds; import from '@acme\/ds\/button'/);
+  assert.match(r, /Home\.jsx:2  '@old\/ui' is from the library the system replaced; import from '@acme\/ds'/);
+  // The design system's own repository imports its insides; a replaced library is still flagged there.
+  const own = makeFixture({ ...files, 'package.json': { name: '@acme/ds' } });
+  const o = editCheck(write(own), { root: own, cfg, headOf: () => null });
+  assert.doesNotMatch(o, /reaches inside/);
+  assert.match(o, /'@old\/ui' is from the library the system replaced/);
+  // No imports in ds-config.json: nothing about imports.
+  assert.equal(editCheck(write(product), { root: product, cfg: { paths: cfg.paths }, headOf: () => null }), null);
+});
+
+test('R3: a component put inside another the way the system never does, with the catalog\'s rules', () => {
+  const comps = {
+    toolbar: { children: ['buttonTertiary', 'iconButton'], props: { Icon: { type: 'slot' } } },
+    card: { children: ['input'], props: { Slot: { type: 'children' } } },                                  // an open slot: anything goes in
+    panel: { children: ['input'], props: { Slot: { type: 'children', slot: { preferredOnly: true, preferred: 1 } } } },
+    modal: { children: ['buttonPrimary'], neverCombineWith: ['modal'], props: {} },
+    buttonPrimary: {}, buttonTertiary: {}, input: {}, iconButton: {},
+  };
+  const src = [
+    '<Toolbar>',
+    '  <div className="row">',
+    '    <ButtonPrimary label="Go" icon={<IconButton />} />',   // through a div: still inside; the attribute's JSX is not
+    '  </div>',
+    '  <ButtonTertiary />',
+    '</Toolbar>',
+    '<Card><ButtonPrimary /></Card>',
+    '<Panel><ButtonPrimary /></Panel>',
+    '<Modal>',
+    '  <MyRow><Input /></MyRow>',                                // the app's own component between: not judged
+    '  <Modal />',
+    '</Modal>',
+    '<Toolbar><hb-icon-button></hb-icon-button></Toolbar>',
+  ].join('\n');
+  assert.deepEqual(nestedComponents(src, comps).map((x) => `${x.parent}>${x.child}@${x.line}`),
+    ['toolbar>buttonPrimary@3', 'toolbar>buttonTertiary@5', 'card>buttonPrimary@7', 'panel>buttonPrimary@8', 'modal>modal@11', 'toolbar>iconButton@13']);
+  assert.deepEqual(nestingFindings(src, comps), [
+    { line: 3, text: 'the design system never puts buttonPrimary inside toolbar (it holds only buttonTertiary, iconButton): put it beside toolbar, not inside it' },
+    { line: 8, text: 'the design system never puts buttonPrimary inside panel (it holds only input): put it beside panel, not inside it' },
+    { line: 11, text: 'modal must never contain modal; put the modal beside it' },
+  ]);
+  // Through the edit check: only where the edit added the inner component.
+  const ctx2 = { ...ctx, nesting: comps };
+  const lines = src.split('\n');
+  assert.deepEqual(editFindings([lines[2]], src, ctx2).map((f) => [f.line, f.kind]), [[3, 'nesting']]);
+  assert.deepEqual(editFindings([lines[4]], src, ctx2), []);
+  assert.deepEqual(editFindings([lines[2]], src, ctx2, { sheet: true }).filter((f) => f.kind === 'nesting'), []);
 });
 
 test('a plain element the edit styled as a declared primitive (I42): the component to write, only on added lines', async () => {

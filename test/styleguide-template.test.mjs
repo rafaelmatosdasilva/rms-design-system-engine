@@ -403,8 +403,8 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="docs"] .pg-anatomy')`), false, 'Documentation draws nothing of its own');
     // Do and Don't from the references, each with its caption, the do first.
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
-    // Each section of rows in the Playground's tables: its title the head (Usage, Accessibility).
-    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /Usage/);
+    // Each section of rows in the Playground's tables: its title the head (Coverage, as the page it matches, then Details).
+    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /^Coverage/);
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-anatomy-doc')`), false, 'no Anatomy card under the Playground');
     // Its header: only its version and when it last changed (with the time), its links at the top right, no issue link.
     assert.doesNotMatch(await run(`(document.querySelector('#c-chip .pg-facts') || {}).textContent || ''`), /Figma|Accessibility|Used in/);
@@ -434,8 +434,11 @@ test('in the browser: no script error, a control changes the real component, the
     }
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
-    // How to use it: the same four sections on every page, a missing one said; the overview counts them.
-    assert.match(await run(`document.querySelector('#c-chip [data-area="docs"]').textContent`), /Usage.*When to use.*When not to use.*Common mistakes.*Limitations.*Not written yet/s);
+    // Its Documentation asks for what the Coverage page counts, under the same names, in the same order; a missing one said.
+    const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge dt')].map((d) => d.textContent).join('|')`);
+    assert.equal(kinds, 'What it is|When to use|When not to use|Common mistakes|Limitations|Do and don\'t|Role|Used in');
+    assert.equal(await run(`[...document.querySelectorAll('#coverage thead th')].slice(1).map((d) => d.textContent).join('|')`), kinds);
+    assert.match(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet/);
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
     assert.equal(await run(`document.getElementById('sg-menu').textContent + '|' + document.getElementById('sg-nav-close').textContent`), 'Menu|Close menu');
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
@@ -491,6 +494,16 @@ test('in the browser: no script error, a control changes the real component, the
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
     assert.match(await until(`(document.querySelector('#c-chip .pg-a11y-rows') || {}).textContent || ''`, (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
+    // Coverage: what the team wrote about each component, the thinnest first; a kind nobody wrote is Missing, never guessed.
+    const cov = JSON.parse(await run(`JSON.stringify((() => { const t = document.querySelector('#coverage table'); const heads = [...t.tHead.rows[0].cells].map((c) => c.textContent); return { heads, rows: [...t.tBodies[0].rows].map((tr) => ({ name: tr.cells[0].textContent, have: +tr.dataset.have, cells: [...tr.cells].slice(1).map((c) => c.textContent) })), sum: document.querySelector('#coverage .pg-par-sum').textContent }; })())`));
+    assert.deepEqual(cov.heads, ['Component', 'What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Used in']);
+    const chipRow = cov.rows.find((r) => r.name === 'chip');
+    assert.equal(chipRow.cells[0], '✓Figma');                     // its Figma description
+    assert.equal(chipRow.cells[5], '✓2 pictures');                 // a do and a don't
+    assert.equal(chipRow.cells[6], '✓Figma');                      // Role: togglebutton, a Figma annotation
+    assert.equal(chipRow.cells[1], '!Missing');                   // no When to use written anywhere
+    assert.deepEqual(cov.rows.map((r) => r.have), cov.rows.map((r) => r.have).slice().sort((a, b) => a - b), 'the thinnest first');
+    assert.match(cov.sum, new RegExp(`of ${cov.rows.length} components have every kind written\\. What it is \\d+, When to use \\d+`));
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
@@ -965,8 +978,8 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /\['log', 'Changelog'\]/);
   assert.match(tpl, /'<div class="pg-head"><h2>' \+ esc\(c\.name\) \+ '<\/h2>' \+ headLinksHTML\(c\.links\)/, 'its links at the top right, beside its name');
   assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
-  // What's new: every component's changes by release, one row per commit with the components it touched.
-  assert.match(tpl, /navLink\('whats-new', 'what\\'s new'\)/);
+  // Changelog: every component's changes by release, one row per commit with the components it touched.
+  assert.match(tpl, /navLink\('changelog', 'changelog'\)/);
   assert.match(tpl, /One row per commit: the components it changed, then what it says\./);
   // A Width frame runs the system's own scripts and lets a selection move, as the live preview does.
   assert.match(tpl, /querySelectorAll\('script\[data-system-script\]'\)/);

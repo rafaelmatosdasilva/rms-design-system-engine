@@ -101,3 +101,36 @@ test('burndown: open findings per component, most specific name, with what the l
   ]);
   assert.equal(burndownLines(b, { scoped: true }).length, 2);   // scoped to a component: no "next up"
 });
+
+test('R2: every finding as one record (rule, evidence, verdict, who acts), each gate with its verdict', async () => {
+  const { findingRecords, gateRecords, differences } = await import('../run-diff.mjs');
+  const findings = [
+    'Token values :: gate fails',
+    'Token values :: ❌ [sizing/-] radii/chip → --radii-chip',
+    'Token values :: Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px',
+    'Figma file hygiene :: chip: no description',
+    'Structure :: ⚠️  chip height: Figma 32, rendered 36px (src/theme.css:60)',
+    'Structure :: 🔗 chip in Figma: https://figma.com/x',
+  ];
+  const gates = [{ n: 1, label: 'Token values  (color · sizing)', pass: false }, { n: 2, label: 'Structure', pass: true }, { n: 3, label: 'Motion', pass: true, notRun: true }];
+  const gr = gateRecords(gates, ['Token values match Figma', 'Structure matches', 'Motion matches']);
+  assert.deepEqual(gr, [
+    { check: 'Token values', rule: 'Token values match Figma', verdict: 'fails' },
+    { check: 'Structure', rule: 'Structure matches', verdict: 'passes' },
+    { check: 'Motion', rule: 'Motion matches', verdict: 'not checked' },
+  ]);
+  const rules = Object.fromEntries(gr.map((g) => [g.check, g.rule]));
+  const r = findingRecords(findings, ['chip'], { rules, failing: ['Token values'], prev: [findings[1]] });
+  assert.deepEqual(r.map((x) => [x.check, x.rule, x.component, x.verdict, x.side, x.new, x.difference]), [
+    ['Token values', 'Token values match Figma', 'chip', 'fails', 'decide', false, true],
+    ['Figma file hygiene', null, 'chip', 'advisory', 'figma', true, true],
+    ['Structure', 'Structure matches', 'chip', 'advisory', 'decide', true, true],
+    ['Structure', 'Structure matches', 'chip', 'advisory', 'decide', true, false],   // a link points at a difference, it is not one
+  ]);
+  assert.equal(r[0].evidence, '[sizing/-] radii/chip → --radii-chip');
+  assert.match(r[0].id, /^[0-9a-z]+$/);
+  // The same finding after an edit higher up the file keeps its identity.
+  assert.equal(findingRecords(['Structure :: ⚠️  x (src/a.css:61)'], [])[0].id, findingRecords(['Structure :: ⚠️  x (src/a.css:9)'], [])[0].id);
+  // The differences list is built from the same records.
+  assert.deepEqual(differences(findings, ['chip']).groups[0].items.map((i) => i.check), ['Token values', 'Figma file hygiene', 'Structure']);
+});

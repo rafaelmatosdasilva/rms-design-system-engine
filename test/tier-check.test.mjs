@@ -36,3 +36,27 @@ test('no tiers / no reference rule = no violations (never imposes)', () => {
   const loose = [{ name: 'any', match: '.' }];
   assert.deepEqual(checkTiers(['a/b'], () => ['x/y'], loose).violations, []);
 });
+
+test('L3: with layers, each points at the one before it; a skipped layer or a backward alias is flagged', () => {
+  const layered = [
+    { name: 'primitive', match: '^primitives/', layer: 1 },
+    { name: 'semantic',  match: '^semantic/',  layer: 2 },
+    { name: 'component', match: '.',           layer: 3 },
+  ];
+  const aliases = {
+    'semantic/bg': ['primitives/neutral-0'],    // one layer down
+    'semantic/bg-raised': ['semantic/bg'],      // within its layer
+    'button/bg': ['semantic/bg'],               // one layer down
+    'button/label': ['primitives/neutral-900'], // skips the semantic layer
+    'semantic/fg': ['button/label'],            // points back at a later layer
+  };
+  const tokens = Object.keys(aliases);
+  const { violations } = checkTiers(tokens, (t) => aliases[t] || [], layered);
+  assert.deepEqual(violations.map((v) => [v.token, v.kind, v.reason]), [
+    ['button/label', 'skipped', 'a component token skips the semantic layer, straight to a primitive token'],
+    ['semantic/fg', 'backward', 'a semantic token points back at a component token, a later layer'],
+  ]);
+  // mayReference still decides first, and a tier with no layer is never judged on order.
+  const mixed = [{ name: 'primitive', match: '^primitives/', layer: 1 }, { name: 'semantic', match: '^semantic/', mayReference: ['primitive'] }, { name: 'component', match: '.', layer: 3 }];
+  assert.deepEqual(checkTiers(['button/label', 'semantic/fg'], (t) => aliases[t] || [], mixed).violations.map((v) => [v.token, v.kind ?? 'mayReference']), [['button/label', 'skipped'], ['semantic/fg', 'mayReference']]);
+});
