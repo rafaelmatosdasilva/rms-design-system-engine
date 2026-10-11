@@ -24,7 +24,7 @@
 import { usedClasses } from './class-use.mjs';
 import { appDir } from './code-roots.mjs';
 import { codeSizeCSS, modeRootCSS, scopeView } from './styleguide-data.mjs';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
 import { join, dirname, resolve, relative, basename } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
@@ -643,6 +643,19 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const every = view.allComponents ?? view.components;
     view.ui = { segmented: segmentedUi(every) ?? radioGroupUi(every, systemCss) ?? buttonsAsSegmentedUi(every, systemCss), tabs: tabsUi(every), field: fieldUi(every, systemCss), button: buttonUi(every, systemCss, sh.ui?.button ?? null), card: cardUi(every, systemCss), iconButton: iconButtonUi(every, systemCss), overlay: every.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
     view.ui.gaps = standInGaps(view.ui);
+    // What the tokens owe (F8, L9), rows of the To do page under The system: descriptions to write in Figma, tokens equal
+    // in every mode and tokens one component uses, a decision each. The single-use ones come from the contracts the last
+    // audit wrote, so the page and the audit count the same; with none written, that row waits for an audit.
+    if (cfg.systemHealth !== false && !opts.only?.length) try {
+      const { tokenTodos } = await import('./system-advice.mjs');
+      let users = null;
+      const cdir = resolve(ROOT, cfg.contracts?.out ?? 'contracts');
+      if (existsSync(cdir)) {
+        const built = readdirSync(cdir).filter((f) => f.endsWith('.contract.json')).map((f) => ({ name: f.replace(/\.contract\.json$/, ''), contract: readJson(relative(ROOT, join(cdir, f))) })).filter((b) => b.contract);
+        if (built.length) users = (await import('./contract-gen.mjs')).tokenUsers(built);
+      }
+      view.systemTodo = tokenTodos({ vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, users, primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
+    } catch { /* advice: the page builds without it */ }
     // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
     // product brings it in (its import line and its file) and the system's components it is built with.

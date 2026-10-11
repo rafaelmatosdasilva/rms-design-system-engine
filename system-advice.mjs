@@ -13,6 +13,8 @@
 //   • tokens named by look (I17): a semantic token named for its colour or a scale step (blue-500) rather than its role
 //     (text/subtle), which agents then pick by appearance.
 
+import { sameInEveryMode } from './prune-check.mjs';
+
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
 // The attributes a theme switches modes on: [data-x] or [data-x="…"] in a selector whose rule declares custom properties.
@@ -131,5 +133,28 @@ export function namedByLook(names, { primitivePrefix = 'primitives/' } = {}) {
     const word = n.split(/[\/\-_.\s]+/).find((p) => LOOK.test(p));
     if (word) out.push({ name: n, word });
   }
+  return out;
+}
+
+// The style guide's To do rows for the tokens (F8, L9), under The system: the semantic tokens with no description, for
+// whoever keeps Figma; the groups equal in every mode and the tokens one component uses, a decision each. vars: the vars
+// snapshot. users: token → [component, …] (contract-gen tokenUsers), or null when no contracts were written.
+// → [{ kind, who, say, todo }], none when there is nothing to do.
+const some = (list, n = 4, more = 'more') => list.slice(0, n).join(list.some((x) => x.includes(',')) ? '; ' : ', ') + (list.length > n ? `${list.some((x) => x.includes(',')) ? ';' : ','} and ${list.length - n} ${more}` : '');
+const group = (g) => (g.length > 3 ? `${g.slice(0, 2).join(', ')}, and ${g.length - 2} more` : g.length === 3 ? `${g[0]}, ${g[1]}, and ${g[2]}` : g.join(' and '));
+export function tokenTodos({ vars = {}, users = null, primitivePrefix = 'primitives/' } = {}) {
+  const out = [];
+  const ud = undescribedTokens(vars, { primitivePrefix });
+  if (ud.missing.length) out.push({ kind: 'Description', who: 'figma',
+    say: `${ud.missing.length} of ${ud.total} semantic tokens have no description in Figma (${some(ud.missing)}).`,
+    todo: 'Write what each one is for in its variable\'s description in Figma. Agents read it to pick the right token. Each token\'s panel on this page shows it, or says Not written yet.' });
+  const same = sameInEveryMode(vars, { primitivePrefix });
+  if (same.length) out.push({ kind: 'Same value', who: 'both',
+    say: `${same.length} group${same.length === 1 ? ' of tokens has' : 's of tokens have'} the same value in every mode (${some(same.map(group), 3, 'more groups')}).`,
+    todo: 'Decide for each group whether one name will do. Merge them in Figma, or keep them apart when they are meant to differ later. Ask Claude for every group.' });
+  const single = [...(users ?? new Map())].filter(([, who]) => who.length === 1).map(([t, who]) => `${t.replace(/\./g, '/')} in ${who[0]}`).sort();
+  if (single.length) out.push({ kind: 'Single use', who: 'both',
+    say: `${single.length} token${single.length === 1 ? ' is' : 's are'} used by one component only (${some(single, 8)}).`,
+    todo: 'Decide for each whether it stays shared or becomes that component\'s own token.' });
   return out;
 }
