@@ -280,3 +280,21 @@ test('asking to build, create or implement is asking for a change (English and P
   for (const t of ['build the button from Figma', 'create the tokens', 'implement the field', 'constrói o botão', 'cria os tokens', 'implementa o campo']) assert.equal(asksForChange(t), true, t);
   assert.equal(asksForChange('how do I build the button?'), false);
 });
+
+test('a check made by hand is the person\'s to record: --checked runs when they said they checked it (G5)', () => {
+  const j = (e, userText = null) => judge(e, { cfg, userText })?.decision ?? 'pass';
+  const run = (c) => ({ tool_name: 'Bash', tool_input: { command: c } });
+  const mark = 'rms-design-system-engine --checked badge 1.3.3';
+  assert.equal(j(run(mark), 'fix the badge contrast'), 'ask');
+  assert.equal(j(run(mark), 'run the accessibility audit'), 'ask');
+  assert.equal(j(run(mark), 'I checked the badge, nothing relies on colour alone'), 'pass');
+  assert.equal(j(run(mark), 'badge 1.3.3 is checked'), 'pass');
+  assert.equal(j(run(mark), 'mark 8 and 9 as checked'), 'pass');
+  assert.equal(j(run(mark), 'verifiquei o badge'), 'pass');
+  assert.equal(j(run('rms-design-system-engine --unchecked badge 1.3.3'), 'fix it'), 'ask');
+  assert.equal(j(run('rms-design-system-engine --unchecked badge 1.3.3'), 'badge changed, uncheck 1.3.3'), 'pass');
+  // The record itself, by hand or by the shell, asks the same way.
+  assert.equal(j({ tool_name: 'Edit', tool_input: { file_path: '/p/design-system-engine-checked.json' } }, 'audit the badge'), 'ask');
+  assert.equal(j(run('rm design-system-engine-checked.json'), 'audit the badge'), 'ask');
+  assert.equal(j({ tool_name: 'Edit', tool_input: { file_path: '/p/design-system-engine-checked.json' } }, 'I checked the badge'), 'pass');
+});
