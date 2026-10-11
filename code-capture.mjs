@@ -281,10 +281,23 @@ export async function componentSpecs(ROOT, cfg) {
     const selector = locator.selectorFor(name).replace(/\s+/g, ' ').trim();
     if (!probes.has(selector) && !unbuilt.has(name)) { const p = jsxProbe(name); if (p && /^<[a-z]/.test(p)) probes.set(selector, p); }
     const states = [];
+    const defaults = defaultClassesByProp(propsSnap[name], CONTRACT[name]?.propertyMap, selector);
     for (const [figProp, mapping] of Object.entries(CONTRACT[name]?.propertyMap ?? {})) {
       if (!mapping || typeof mapping !== 'object') continue;
+      // A property one of the component's own inputs draws (.toggle-input:checked + .toggle-track): each option is
+      // that input ticked or not, set on the instance, so the option without :checked is measured unticked.
+      const checks = checkedOptions(mapping);
       for (const [option, sel] of Object.entries(mapping)) {
-        if (typeof sel !== 'string' || sel.replace(/\s+/g, ' ').trim() === selector) continue;
+        if (typeof sel !== 'string') continue;
+        if (checks[option]) { states.push({ label: `${figProp}=${option}`, selector: sel, check: checks[option] }); continue; }
+        // An option drawn by the bare component is a state of its own when Figma's default for that property adds a
+        // class (Disabled=True is .field--off, Disabled=False the bare .field): it is measured with that
+        // class taken off. Otherwise it is the instance as measured.
+        if (sel.replace(/\s+/g, ' ').trim() === selector) {
+          const d = defaults[figProp];
+          if (d?.classes.length && String(option).toLowerCase() !== d.defaultValue) states.push({ label: `${figProp}=${option}`, selector: sel, remove: d.classes });
+          continue;
+        }
         states.push({ label: `${figProp}=${option}`, selector: sel });
       }
     }
@@ -301,25 +314,46 @@ export async function componentSpecs(ROOT, cfg) {
   });
 }
 
+// A property whose options differ only by an input of the component being ticked: { [option]: { part, value } } for
+// each option, the input's selector with true for the ticked one and false for the one that names the same element
+// without it (True: '.toggle-input:checked + .toggle-track', False: '.toggle-track'). Else {}.
+export function checkedOptions(mapping) {
+  const out = {};
+  const ticked = Object.entries(mapping ?? {}).map(([o, sel]) => [o, typeof sel === 'string' ? /^([^\s+~>]+):checked\s*(?:[+~>]\s*|\s+)(.+)$/.exec(sel.trim()) : null]).filter(([, m]) => m);
+  if (ticked.length !== 1) return out;
+  const [[on, m]] = ticked;
+  const part = m[1], rest = m[2].trim();
+  const off = Object.entries(mapping).filter(([o, sel]) => o !== on && typeof sel === 'string' && sel.replace(/\s+/g, ' ').trim() === rest.replace(/\s+/g, ' '));
+  if (!off.length) return out;
+  out[on] = { part, value: true };
+  for (const [o] of off) out[o] = { part, value: false };
+  return out;
+}
+
 // The classes that draw Figma's default variant, from the contract's propertyMap: each variant property's default
 // option whose selector is the component's own with classes added (Type=negative → .badge.high gives ['high']). A
 // state (:hover), a part (a descendant) or an option the map does not name adds nothing. The capture measures an
 // instance with these classes on, so it compares Figma's default variant with the code's.
 export function defaultVariantClasses(figmaProps, propertyMap, selector) {
-  const out = new Set();
+  return [...new Set(Object.values(defaultClassesByProp(figmaProps, propertyMap, selector)).flatMap((d) => d.classes))];
+}
+
+// The same, per property of the contract's map: { [map key]: { defaultValue (lower case), classes } }.
+export function defaultClassesByProp(figmaProps, propertyMap, selector) {
+  const out = {};
   const own = String(selector ?? '').trim().split(/\s+/).pop();
   const base = new Set((own.match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1)));
   const clean = (k) => String(k).split('#')[0].trim().toLowerCase();
   for (const [prop, def] of Object.entries(figmaProps?.properties ?? {})) {
     if (def?.type !== 'VARIANT' || def.defaultValue == null) continue;
-    const map = Object.entries(propertyMap ?? {}).find(([k, v]) => clean(k) === clean(prop) && v && typeof v === 'object')?.[1];
+    const [key, map] = Object.entries(propertyMap ?? {}).find(([k, v]) => clean(k) === clean(prop) && v && typeof v === 'object') ?? [];
     const sel = map && Object.entries(map).find(([o]) => o.toLowerCase() === String(def.defaultValue).toLowerCase())?.[1];
     if (typeof sel !== 'string' || /[:\s>+~\[]/.test(sel.trim())) continue;
     const classes = (sel.match(/\.[\w-]+/g) ?? []).map((c) => c.slice(1));
     if (![...base].every((b) => classes.includes(b))) continue;
-    for (const c of classes) if (!base.has(c)) out.add(c);
+    out[key] = { defaultValue: String(def.defaultValue).toLowerCase(), classes: classes.filter((c) => !base.has(c)) };
   }
-  return [...out];
+  return out;
 }
 
 // Figma variants that change two or more axes from the default variant, when every changed axis value
@@ -328,13 +362,13 @@ export function defaultVariantClasses(figmaProps, propertyMap, selector) {
 export function variantCombos(figma, states, maxCombos = 12) {
   if (!figma?.variants || !figma.defaultVariant) return [];
   const axes = (n) => Object.fromEntries(String(n).split(',').map((p) => p.split('=').map((x) => x.trim().toLowerCase())).filter((p) => p.length === 2));
-  const bySel = new Map(states.map((st) => [st.label.replace(/\s+/g, '').toLowerCase(), st.selector]));
+  const bySel = new Map(states.map((st) => [st.label.replace(/\s+/g, '').toLowerCase(), st]));
   const def = axes(figma.defaultVariant);
   const out = [];
   for (const v of Object.keys(figma.variants)) {
     const diff = Object.entries(axes(v)).filter(([k, x]) => def[k] !== x);
     if (diff.length < 2) continue;
-    const parts = diff.map(([k, x]) => ({ label: `${k}=${x}`, selector: bySel.get(`${k}=${x}`) }));
+    const parts = diff.map(([k, x]) => { const st = bySel.get(`${k}=${x}`); return { label: `${k}=${x}`, selector: st?.selector, ...(st?.remove ? { remove: st.remove } : {}), ...(st?.check ? { check: st.check } : {}) }; });
     if (parts.some((p) => !p.selector)) continue;
     out.push({ name: v, parts });
     if (out.length >= maxCombos) break;

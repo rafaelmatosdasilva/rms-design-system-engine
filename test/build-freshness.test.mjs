@@ -46,3 +46,17 @@ test('a build never seen current is judged by its dates', () => {
   at(p.theme, 30);
   assert.deepEqual(buildFreshness(p.args).stale, ['lab (theme newer)']);
 });
+
+// A fresh clone writes every file out in no order: the source can read newer than its build although both came in
+// the same commit. Files git holds unchanged are dated by their commits; a source changed here is dated by itself.
+test('a fresh clone is judged by its commits, not by the order the checkout wrote its files', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const p = project();
+  const git = (...a) => execFileSync('git', ['-C', p.dir, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { stdio: 'ignore' });
+  git('init', '-q'); git('add', '.'); git('commit', '-q', '-m', 'build');
+  at(p.src, 50); at(p.theme, 40);   // as a checkout may leave them: both newer than the build
+  assert.deepEqual(buildFreshness(p.args), { stale: [], datesOnly: [] });
+  writeFileSync(p.src, '<p>two</p>');   // edited now, after the commit
+  const later = new Date(Date.now() + 5000); utimesSync(p.src, later, later);
+  assert.deepEqual(buildFreshness(p.args).stale, ['lab'], 'a source changed here is newer than its build');
+});
