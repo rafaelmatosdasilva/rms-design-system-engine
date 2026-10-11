@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore } from '../figma-hygiene.mjs';
+import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore, reliability, reliabilityLine } from '../figma-hygiene.mjs';
 import { byNodeId } from '../figma-fetch.mjs';
 import { burndown } from '../run-diff.mjs';
 
@@ -110,7 +110,52 @@ test('the Plugin API capture in the cookbook carries the engine function, and ru
   assert.deepEqual(out.Chip.nums, [16, 32, 40]);
   assert.deepEqual(out.Chip.hygiene.raw, [{ at: 'Size=M', field: 'fill', value: '#ffffff' }, { at: 'Size=M', field: 'radius', value: 16 }]);
   assert.equal(out.Chip.hygiene.description, false);
-  assert.deepEqual(out.Divider.hygiene, { raw: [], rawCount: 0, noAutoLayout: [], description: true });
+  assert.deepEqual(out.Divider.hygiene, { raw: [], rawCount: 0, values: 1, noAutoLayout: [], variants: 0, description: true, binds: { 'VariableID:1:1': { FRAME_FILL: 'Divider' } } });
+});
+
+test('F7: a property bound to a variable scoped to other properties, and the variables left on all scopes', () => {
+  const v = (id) => ({ type: 'VARIABLE_ALIAS', id });
+  // REST and Plugin API alike: node bindings (a text's per-range font size is a list) and a paint's own colour.
+  const comp = { type: 'COMPONENT', name: 'Chip', layoutMode: 'HORIZONTAL', cornerRadius: 8, paddingLeft: 8,
+    boundVariables: { topLeftRadius: v('V:space'), paddingLeft: v('V:space'), visible: v('V:flag') },
+    fills: [solid(1, 1, 1, { boundVariables: { color: v('V:text') } })],
+    children: [
+      { type: 'TEXT', name: 'Label', textStyleId: 'S:1', boundVariables: { fontSize: [v('V:space')] }, fills: [solid(0, 0, 0, { boundVariables: { color: v('V:text') } })] },
+      { type: 'RECTANGLE', name: 'Dot', boundVariables: { fills: [v('V:fill')] }, fills: [solid(1, 0, 0)] },
+      { type: 'INSTANCE', name: 'Icon', boundVariables: { width: v('V:space') } },   // its own component's, recorded there
+    ] };
+  const h = hygieneOf(comp, 'A chip.');
+  assert.deepEqual(h.binds, {
+    'V:space': { CORNER_RADIUS: 'Chip', GAP: 'Chip', FONT_SIZE: 'Chip/Label' },
+    'V:text': { FRAME_FILL: 'Chip', TEXT_FILL: 'Chip/Label' },
+    'V:fill': { SHAPE_FILL: 'Chip/Dot' },
+  });
+  const scopes = {
+    'V:space': { name: 'space/200', scopes: ['GAP'] },
+    'V:text': { name: 'text/primary', scopes: ['TEXT_FILL'] },
+    'V:fill': { name: 'surface/accent', scopes: ['ALL_FILLS'] },
+    'V:raw': { name: 'primitives/blue/500', scopes: ['ALL_SCOPES'] },
+    'V:raw2': { name: 'primitives/blue/600', scopes: ['ALL_SCOPES'] },
+  };
+  const values = { chip: { hygiene: h } };
+  assert.deepEqual(hygieneFindings(values, { scopes }).map((f) => [f.component, f.kind, f.text]), [
+    [null, 'allScopes', '2 variables are offered for every property (all scopes): primitives/blue/500, primitives/blue/600. Scope each to the properties it is for, and a primitive to none, so only the tokens that alias it are offered'],
+    ['chip', 'scope', 'the corner radius of Chip is bound to space/200, a variable scoped to gap and padding: bind one scoped to corner radius, or add that scope to space/200'],
+    ['chip', 'scope', 'the font size of Chip/Label is bound to space/200, a variable scoped to gap and padding: bind one scoped to font size, or add that scope to space/200'],
+    ['chip', 'scope', 'the frame fill of Chip is bound to text/primary, a variable scoped to text fill: bind one scoped to frame fill, or add that scope to text/primary'],
+  ]);
+  const block = hygieneBlock(values, { scopes });
+  assert.equal(block[0], '🎨 Figma file hygiene: 1 of 1 component (3 properties bound outside their variable\'s scope · 2 variables on all scopes). For whoever keeps the Figma file: code can only match what Figma states. The parity never changes Figma. Advisory.');
+  assert.match(block[1], /^     2 variables are offered for every property/);
+  assert.match(block[2], /^     chip: the corner radius of Chip/);
+  assert.deepEqual(hygieneScore(values, { scopes }), { n: 1, clean: 0 });
+  // A scoped run keeps to its components; a variable from a library, or none recorded, is not judged.
+  assert.equal(hygieneFindings(values, { scopes, only: ['chip'] }).filter((f) => f.kind === 'allScopes').length, 0);
+  assert.deepEqual(hygieneFindings(values), []);
+  // Only the whole file on all scopes: the block names the variables.
+  const clean = { chip: { hygiene: { raw: [], rawCount: 0, noAutoLayout: [], description: true } } };
+  assert.match(hygieneBlock(clean, { scopes })[0], /^🎨 Figma file hygiene: the variables \(2 variables on all scopes\)/);
+  assert.deepEqual(hygieneScore(clean, { scopes }), { n: 1, clean: 1 });
 });
 
 test('REST lists of published components are read by node id, and so is a map', () => {
@@ -143,4 +188,26 @@ test('I69: an instance whose layer spells its component\'s name another way', ()
   const found = hygieneFindings({ toolbar: { hygiene: h } });
   assert.deepEqual(found.map((f) => f.text), ['toolbar/Button Tertiary is an instance of buttonTertiary named "Button Tertiary": an agent reading the file writes "Button Tertiary"; name the layer buttonTertiary, or after its role']);
   assert.match(hygieneBlock({ toolbar: { hygiene: h } })[0], /1 instance named unlike its component/);
+});
+
+test('R1: is the Figma file reliable enough to compare, from the share of values bound and of variants in auto layout', () => {
+  const h = hygieneOf(restSet, '');
+  // Size=M: a fill (bound), a radius (raw), padding and a gap (bound), the label's fill and text (styled): 6.
+  // Size=L: a fill (bound; the hidden one not counted), a radius (bound), the label's fill and text (raw), Tail's
+  // padding and gap (raw): 6. The instance and the artwork are not counted.
+  assert.equal(h.values, 12);
+  assert.equal(h.rawCount, 5);
+  assert.equal(h.variants, 2);
+  const rec = (values, rawCount, variants, loose) => ({ hygiene: { raw: [], rawCount, values, variants, noAutoLayout: Array(loose).fill('v'), description: true } });
+  assert.deepEqual(reliability({ a: rec(20, 1, 4, 0), b: rec(10, 0, 2, 0) }), { level: 'reliable', bound: 29 / 30, layout: 1, values: 30, variants: 6, least: [] });
+  assert.equal(reliabilityLine(reliability({ a: rec(20, 1, 4, 0) })), null);
+  const partly = reliability({ chip: rec(10, 3, 4, 0), card: rec(10, 1, 4, 1) });
+  assert.equal(partly.level, 'partly');
+  assert.equal(reliabilityLine(partly), '**The Figma file is only partly reliable to compare.** 80% of its values have a variable or style and 88% of its variants use auto layout. Least reliable: chip (70%). The Figma file hygiene block lists what to fix.');
+  const poor = reliability({ chip: rec(10, 6, 2, 0), card: rec(10, 2, 2, 0), tag: rec(2, 2, 0, 0) });
+  assert.equal(poor.level, 'unreliable');
+  assert.match(reliabilityLine(poor), /^\*\*The Figma file is not reliable enough to compare\.\*\* 55% of its values have a variable or style and 100% of its variants use auto layout, so a match or a difference with the code can be chance\. Least reliable: chip \(40%\), card \(80%\)\./);
+  // Records from before the counts, and a scoped run's other components, are not counted.
+  assert.equal(reliability({ old: { hygiene: { raw: [], rawCount: 3, noAutoLayout: [], description: true } } }), null);
+  assert.equal(reliability({ chip: rec(10, 6, 2, 0), card: rec(10, 0, 2, 0) }, { only: ['card'] }).level, 'reliable');
 });

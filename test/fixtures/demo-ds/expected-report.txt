@@ -274,6 +274,8 @@ Verdict: 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA
 
 **Not in parity.** 2 of 25 gates fail.
 
+**Components: 1 passing · 2 drifting (button, chip) · 1 not checked (tag).**
+
 **Figma data was not refreshed in this run.** The audit used the committed snapshots (the oldest, src/figma-vars.snapshot.json, updated today). To refresh them: rms-design-system-engine --recipe refresh-figma.
 
 - **Token values** fails:

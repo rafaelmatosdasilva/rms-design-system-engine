@@ -74,3 +74,27 @@ test('the summary lists what a gate could not check, even inside a gate that pas
   assert.doesNotMatch(s, /Token values:/);
   assert.deepEqual(notCheckedLines([{ label: 'X  (y)', pass: true, lines: ['✅ fine'] }]), []);
 });
+
+test('I93: the verification headline, each component passing, drifting or not checked', async () => {
+  const { verification, verificationLine } = await import('../run-diff.mjs');
+  const d = { groups: [
+    { component: 'chip', items: [{ side: 'decide' }] },
+    { component: 'card', items: [{ side: 'figma' }] },   // work in the Figma file alone is not drift
+    { component: null, items: [{ side: 'decide' }] },
+  ] };
+  const census = { components: { chip: { compared: 4 }, card: { compared: 6 }, badge: { compared: 0, notComparable: 2 } } };
+  const v = verification(['badge', 'card', 'chip', 'modal'], d, census);
+  assert.deepEqual(v, { passing: ['card'], drifting: ['chip'], notChecked: ['badge', 'modal'], measured: true });
+  assert.equal(verificationLine(v), '**Components: 1 passing · 1 drifting (chip) · 2 not checked (badge, modal).**');
+  // Nothing measured in a browser: nothing is "not checked" by the census, and the line says what passing means then.
+  assert.match(verificationLine(verification(['card', 'chip'], d, null)), /^\*\*Components: 1 passing · 1 drifting \(chip\) · 0 not checked\.\*\* Nothing was measured in a browser this run/);
+  assert.equal(verificationLine(verification([], d, census)), null);
+  // Under the verdict in the summary; never on a run that writes the baseline.
+  assert.match(buildSummary({ verdict: 'pass', headline: '**Components: 2 passing · 0 drifting · 0 not checked.**' }), /In parity\.[^\n]*\n\n\*\*Components: 2 passing/);
+  assert.doesNotMatch(buildSummary({ verdict: 'baseline', baselineWritten: { count: 1 }, headline: '**Components: x**' }), /Components: x/);
+});
+
+test('R1: whether the Figma file is reliable enough to compare is said with the Figma data, before what fails', () => {
+  const s = buildSummary({ verdict: 'failed', gates: [tokens], data: '**Figma data was not refreshed in this run.**', figma: '**The Figma file is only partly reliable to compare.** x' });
+  assert.match(s, /not refreshed in this run\.\*\*\n\n\*\*The Figma file is only partly reliable to compare\.\*\* x\n\n- \*\*Token values\*\* fails/);
+});

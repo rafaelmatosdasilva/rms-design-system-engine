@@ -106,7 +106,9 @@ export function dataStateLine({ refreshedFromApi = false, fromFigmaCli = null, s
 
 // only: { words, noFigma, a11y: { static, browser } | null } when the run was --only (or had no Figma file): the summary says what ran, so a part
 // never reads as the whole system.
-export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null, toBuild = null, noSnapshot = false, foundNowhere = [] } = {}) {
+// headline: the verification headline (run-diff.mjs verificationLine), under the verdict. figma: whether the Figma file
+// is reliable enough to compare (figma-hygiene.mjs reliabilityLine), with the state of the Figma data.
+export function buildSummary({ verdict, gates = [], scope = [], burndown = [], next, notRun = 0, baselineWritten = null, data = null, only = null, toBuild = null, noSnapshot = false, foundNowhere = [], headline = null, figma = null } = {}) {
   const lines = [];
   const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
   const debt = gates.filter((g) => g.baselined);
@@ -119,6 +121,7 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
       : noSnapshot ? `**Nothing compared with Figma yet.** No Figma data is captured, so the checks against Figma had nothing to compare; the checks of the code alone pass${notRun ? ` (${notRun} not verified)` : ''}.`
       : toBuild ? `**What is built matches Figma.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}; the rest is still to build.`
       : `**In parity.** Every gate that ran passes${notRun ? ` (${notRun} not verified)` : ''}.`);
+  if (headline && verdict !== 'baseline') lines.push('', headline);
   if (only) {
     lines.push('', only.noFigma ? `Only ${only.words} ran: there is no Figma file yet (figmaFileKey in ds-config.json), so nothing was compared with Figma.`
       : `Only ${only.words} ran in this run; nothing else was checked.`);
@@ -130,6 +133,7 @@ export function buildSummary({ verdict, gates = [], scope = [], burndown = [], n
   }
   if (foundNowhere.length && !(scope.length && scope.every((n) => foundNowhere.includes(n)))) lines.push('', `**Nothing checked for ${foundNowhere.join(', ')}**: in neither the Figma data nor the code.`);
   if (data) lines.push('', data);
+  if (figma) lines.push('', figma);
   for (const g of verdict === 'baseline' ? [] : failing) {
     const f = failLines(g);
     lines.push('', `- **${gateName(g.label)}** fails:`);

@@ -20,6 +20,12 @@
 //   • a size written by hand (I75): a padding, margin, gap, corner radius or font size in px or rem, with the token
 //     that has that value, or the nearest ones when none has it. Only a kind of size the theme names (no spacing
 //     tokens, no spacing finding); 0, 1px hairlines, a pill's 999px, negatives and calc() are left alone.
+//   • an import a product should no longer write (I76), with the import to write: from a library the system replaced
+//     (ds-config.json → imports.replaced), or from inside the system's package (imports.system) past what its
+//     package.json exports. The system's own repository imports its insides freely;
+//   • a component put inside another the way the system never does (R3): the catalog's rules, the same the prototype
+//     check applies (check-ui): one it must never contain, or one outside what Figma has it hold when it has no open
+//     slot. Read from the component tags, the edit's added lines only.
 // Silent when the edit added none of these. Precise before complete: component tags the catalog does not know
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
@@ -151,6 +157,94 @@ export function addedLines(event, { headText = null } = {}) {
   return [];
 }
 
+// ── Imports (I76) ───────────────────────────────────────────────────────────────────────────────────────────────
+// Every module a line imports: import … from, a bare import, export … from, require(), import(), and CSS @import.
+const IMPORT_SPEC = /\bimport\s+(?:[^'"`;]*?\s+from\s+)?['"]([^'"]+)['"]|\bexport\s+[^'";]*?\s+from\s+['"]([^'"]+)['"]|\brequire\(\s*['"]([^'"]+)['"]\s*\)|\bimport\(\s*['"]([^'"]+)['"]\s*\)|@import\s+(?:url\(\s*)?['"]?([^'")\s;]+)/g;
+// A package's insides when its package.json lists no exports: its sources, its build output, a private folder.
+const INSIDES = /(^|\/)(src|internal|private|dist|lib|esm|cjs|build)(\/|$)|(^|\/)_/;
+// Whether a subpath ("./ui/button") is one the package's exports map lets a product import. A string or a map of
+// conditions exports only the package itself; keys may end in a pattern ("./icons/*").
+function exportedPath(exports, sub) {
+  if (!exports || typeof exports !== 'object') return false;
+  const keys = Object.keys(exports).filter((k) => k.startsWith('.'));
+  return keys.some((k) => k === sub || (k.includes('*') && new RegExp(`^${k.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace('*', '.*')}$`).test(sub)));
+}
+// The public path to write instead: an exported subpath whose file has the same name, else the package itself.
+function publicPath(exports, sub, pkg) {
+  const base = (p) => String(p).split('/').pop().replace(/\.[^.]+$/, '');
+  const want = base(sub);
+  const hit = exports && typeof exports === 'object' ? Object.entries(exports).find(([k, v]) => k !== '.' && k.startsWith('.') && !k.includes('*') && (base(k) === want || (typeof v === 'string' && base(v) === want))) : null;
+  return hit ? `${pkg}${hit[0].slice(1)}` : pkg;
+}
+// → the findings for one line. imports: { replaced: { old: new }, system: name | null, exports: object | null }.
+export function importFindings(line, imports) {
+  if (!imports) return [];
+  const out = [];
+  const old = Object.keys(imports.replaced ?? {}).sort((a, b) => b.length - a.length);
+  for (const m of String(line).matchAll(IMPORT_SPEC)) {
+    const spec = m.slice(1).find(Boolean);
+    if (!spec) continue;
+    const was = old.find((k) => spec === k || spec.startsWith(`${k}/`));
+    if (was) { out.push(`'${spec}' is from the library the system replaced; import from '${imports.replaced[was]}'`); continue; }
+    const sys = imports.system;
+    if (!sys || !spec.startsWith(`${sys}/`)) continue;
+    const sub = `./${spec.slice(sys.length + 1)}`;
+    if (exportedPath(imports.exports, sub) || (!imports.exports && !INSIDES.test(sub.slice(2)))) continue;
+    out.push(`'${spec}' reaches inside ${sys}; import from '${publicPath(imports.exports, sub, sys)}'`);
+  }
+  return out;
+}
+
+// ── How components are put together (R3) ─────────────────────────────────────────────────────────────────────────
+// Each design-system component tag directly inside another (HTML elements between are layout, an app's own component
+// between is unknown and ends the chain), with its line: [{ parent, child, line }]. JSX inside an attribute ({icon} or
+// render props) is not a child. components: the catalog's components.
+export function nestedComponents(text, components) {
+  const src = String(text ?? ''), names = new Map(Object.keys(components ?? {}).map((n) => [normName(n), n]));
+  const dsName = (tag) => {
+    if (/^[A-Z]/.test(tag)) return names.get(normName(tag)) ?? null;
+    if (tag.includes('-')) { const n = normName(tag); for (const [k, v] of names) if (n.endsWith(k) && /^[a-z]{1,4}$/.test(n.slice(0, -k.length))) return v; }
+    return null;
+  };
+  const out = [], stack = [];
+  const lineAt = (i) => src.slice(0, i).split('\n').length;
+  const re = /<(\/?)([A-Za-z][\w.-]*)/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const [, close, tag] = m;
+    if (!/^[A-Z]/.test(tag) && !tag.includes('-')) continue;   // an HTML element: layout, not a component
+    if (close) { const at = stack.map((x) => x.tag).lastIndexOf(tag); if (at >= 0) stack.length = at; continue; }
+    // The end of the opening tag, past attribute strings and {expressions}.
+    let i = re.lastIndex, depth = 0, q = null;
+    for (; i < src.length; i++) {
+      const c = src[i];
+      if (q) { if (c === q && src[i - 1] !== '\\') q = null; continue; }
+      if (c === '"' || c === "'" || c === '`') q = c;
+      else if (c === '{') depth++;
+      else if (c === '}') depth--;
+      else if (c === '>' && depth <= 0) break;
+    }
+    const self = src[i - 1] === '/', name = dsName(tag), top = stack[stack.length - 1];
+    if (name && top && top.name) out.push({ parent: top.name, child: name, line: lineAt(m.index) });
+    re.lastIndex = i + 1;
+    if (!self) stack.push({ tag, name });
+  }
+  return out;
+}
+// The catalog's rules on each pair, worded as the prototype check words them.
+export function nestingFindings(text, components) {
+  const out = [];
+  for (const { parent, child, line } of nestedComponents(text, components)) {
+    const def = components[parent] ?? {};
+    if ((def.neverCombineWith ?? []).includes(child)) { out.push({ line, text: `${parent} must never contain ${child}; put the ${child} beside it` }); continue; }
+    const open = Object.values(def.props ?? {}).some((e) => e.type === 'children' && !e.slot?.preferredOnly);
+    if (def.children?.length && !def.children.includes(child) && !open && child !== parent) {
+      out.push({ line, text: `the design system never puts ${child} inside ${parent} (it holds only ${def.children.join(', ')}): put it beside ${parent}, not inside it` });
+    }
+  }
+  return out;
+}
+
 // What the check compares against, read once per edit from what the audit already wrote.
 export function editTruth(ROOT, cfg = {}) {
   const read = (p) => { try { return readFileSync(resolve(ROOT, p), 'utf8'); } catch { return ''; } };
@@ -205,12 +299,18 @@ export function editTruth(ROOT, cfg = {}) {
   // The static accessibility rules (I74), with the project's styles read only when an edit removes an outline.
   let styles = null;
   const a11y = cfg.a11yStatic === false ? null : { styles: () => (styles ??= projectStyleText(ROOT)) };
-  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  // The imports a product should no longer write (I76): the system's own repository imports its insides freely.
+  const ic = cfg.imports ?? {};
+  const sys = typeof ic.system === 'string' && ic.system && ic.system !== json('package.json').name ? ic.system : null;
+  const replaced = ic.replaced && typeof ic.replaced === 'object' ? ic.replaced : {};
+  const imports = sys || Object.keys(replaced).length ? { replaced, system: sys, exports: sys ? json(join('node_modules', sys, 'package.json')).exports ?? null : null } : null;
+  const nesting = Object.keys(catalog.components ?? {}).length ? catalog.components : null;   // R3
+  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, imports, nesting, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null, imports = null, nesting = null }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -246,6 +346,7 @@ export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = 
       }
     }
     if (/^\s*--[\w-]+\s*:/.test(l) || COMMENT.test(l)) continue;   // a token being defined, a comment
+    for (const f of importFindings(l, imports)) push(line, f, { kind: 'import' });
     // A custom-property declaration anywhere on the line (a minified :root{--x: #fff;…}) defines a token.
     const scan = l.replace(/--[\w-]+\s*:[^;}]*/g, ' ').replace(/var\([^)]*\)/g, ' ').replace(/&#x?[0-9a-fA-F]+;/g, ' ');
     for (const m of scan.matchAll(HEX)) {
@@ -307,6 +408,11 @@ export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = 
       found.push(...cssFindings(css, `${css}\n${a11y.styles()}`));
     }
     for (const f of found) if (addedAt.has(f.line)) push(f.line, `${f.desc}${f.fix ? `; ${f.fix}` : ''}`, { kind: 'a11y' });
+  }
+  // A component put inside another the way the system never does (R3), where the edit added the inner one.
+  if (nesting && !sheet) {
+    const addedAt = new Set(added.map(lineOf).filter(Boolean));
+    for (const f of nestingFindings(fullText, nesting)) if (addedAt.has(f.line)) push(f.line, f.text, { kind: 'nesting' });
   }
   return out;
 }

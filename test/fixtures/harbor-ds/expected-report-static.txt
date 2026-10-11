@@ -229,6 +229,8 @@
 
 **Not in parity.** 2 of 25 gates fail.
 
+**Components: 1 passing · 2 drifting (badge, iconButton) · 0 not checked.** Nothing was measured in a browser this run, so passing means the checks that ran found no difference.
+
 **Figma data was not refreshed in this run.** The audit used the committed snapshots (the oldest, figma/vars.snapshot.json, updated today). To refresh them: rms-design-system-engine --recipe refresh-figma.
 
 - **Token values** fails:

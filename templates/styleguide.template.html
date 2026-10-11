@@ -218,9 +218,10 @@ a.pg-usage-name { color: var(--sg-text); }
    segmented control; how a product imports it and what it is built with, above them. */
 /* The areas stay at the top while the component's page scrolls, under the top bar when one shows. */
 .pg-areas { margin: var(--sg-space-xs) 0 var(--sg-space-l); position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; display: flex; align-items: center; gap: var(--sg-space-m); flex-wrap: wrap; }
-/* Its name stays in view: in the sticky bar beside the areas once its heading has scrolled away. */
+/* Its name stays in view once its heading has scrolled away: on its own line at the top of the sticky bar, the areas
+   below it, as the page lays them out. */
 .pg-areas-name { display: none; font-size: var(--sg-title); line-height: normal; font-weight: var(--sg-heading-weight); color: var(--sg-text); }
-.pg-areas.is-stuck > .pg-areas-name { display: inline; }
+.pg-areas.is-stuck > .pg-areas-name { display: block; flex: 0 0 100%; }
 /* On a narrow screen the areas scroll sideways inside the bar, never wrap or squeeze: the system's segmented control
    keeps its own size, and the area chosen scrolls into view. */
 .pg-areas-scroll { position: relative; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scrollbar-width: thin; }
@@ -329,6 +330,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-issues td { overflow-wrap: break-word; }
 .sg-issues .sg-todo-area { white-space: normal; }
 .sg-issues .pg-at-date { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-text-2); font-size: var(--sg-s); }   /* when it was last updated, under its status */
+.sg-todo-head > :last-child { margin-bottom: 0; }   /* the counts and the filter spaced as on a component's Parity area */
 .sg-todo-note { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s) var(--sg-space-m); }
 .pg-diff { border-color: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
 .pg-note:last-child { margin-bottom: var(--sg-space-m); }
@@ -505,6 +507,23 @@ a.pg-usage-name { color: var(--sg-text); }
 </div>
 <script type="application/json" id="sg-data">/*{{AGREED}}*/</script>
 <script>/*{{WCAG_PAGE}}*/</script>
+<script>
+// A host that caches the page (GitHub Pages keeps a copy for ten minutes) can serve one older than the last published:
+// the page asks the host when its newest copy was published and opens that one when it is newer, so a new build shows
+// as soon as it is out. Nothing happens on a file opened from disk or when the host does not say.
+(function () {
+  if (!/^https?:$/.test(location.protocol) || !window.fetch) return;
+  var mine = Date.parse(document.lastModified);
+  fetch(location.pathname + '?fresh=' + Date.now(), { method: 'HEAD', cache: 'no-store' }).then(function (r) {
+    var theirs = Date.parse((r && r.headers.get('last-modified')) || '');
+    if (!theirs || !mine || theirs <= mine + 1000) return;
+    var u = new URL(location.href);
+    if (u.searchParams.get('v') === String(theirs)) return;   // already asked for that copy
+    u.searchParams.set('v', String(theirs));
+    location.replace(u.href);
+  }).catch(function () {});
+})();
+</script>
 <script>
 (function () {
   var DATA = JSON.parse(document.getElementById('sg-data').textContent || '{}');
@@ -881,13 +900,13 @@ a.pg-usage-name { color: var(--sg-text); }
   // The To do page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
   hr(); navLink('todo', 'to do');
   var td = section('todo', 'To do', 'What to do', 'List all open parity and accessibility issues by component, showing who handles each one (you in Figma, Claude in code, or manual check). Then tell Claude which ones to do, for example, do 3 and 7.');
-  // What's new: every component's changes gathered by the release they shipped in, newest first, each a table of
+  // Changelog: every component's changes gathered by the release they shipped in, newest first, each a table of
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
   COMPONENTS.forEach(function (c) { (c.changelog || []).forEach(function (r) { CHANGES.push({ comp: c.name, r: r }); }); });
   if (CHANGES.length) {
-    hr(); navLink('whats-new', 'what\'s new');
-    var wn = section('whats-new', 'Changes', 'What\'s new', 'Each release and what it changed, with the components each change touched, from the code\'s history.');
+    hr(); navLink('changelog', 'changelog');
+    var wn = section('changelog', 'Changes', 'Changelog', 'Each release and what it changed, with the components each change touched, from the code\'s history.');
     var rel = {}, order = [];
     CHANGES.forEach(function (x) { var k = x.r.release || ''; if (!rel[k]) { rel[k] = { k: k, rows: [], at: '' }; order.push(rel[k]); } rel[k].rows.push(x); if (String(x.r.date) > rel[k].at) rel[k].at = String(x.r.date); });
     order.sort(function (a, b) { return (a.k ? 1 : 0) - (b.k ? 1 : 0) || (b.at > a.at ? 1 : b.at < a.at ? -1 : 0); });   // not released yet first, then newest
@@ -903,6 +922,57 @@ a.pg-usage-name { color: var(--sg-text); }
         return '<tr><td>' + x.comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + esc(says) + ' ' + sha + '</td></tr>';
       }).join('') + '</table></div>';
     }).join('');
+  }
+  // Coverage: where what the team knows about each component is thin. What it is, how to use it, pictures of it used
+  // well and badly, its role and the products that use it, each as the team wrote it (Figma, the code, the contract)
+  // or as the products show it; the thinnest first, so the first row is the next thing to write. A kind nobody wrote
+  // is marked missing, never guessed.
+  var KNOW_FROM = function (from) { return /^Figma/.test(from || '') ? 'Figma' : /^the code$/i.test(from || '') ? 'The code' : /authored|contract/i.test(from || '') ? 'The contract' : from ? 'The last audit' : ''; };
+  // Each kind once, for the Coverage page and each component's Documentation area alike, so the two always ask for the
+  // same things under the same names, in the same order: [name, its Coverage mark (where it was written, or '' when
+  // nobody wrote it), what was written (the Documentation area shows it), what to say when it is missing].
+  var guideOf = function (c, key) { return ((c.guidance || {}).sections || []).filter(function (x) { return x.key === key; })[0] || null; };
+  var paras = function (list) { return list.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join(''); };
+  var figmaWhat = function (c) { return (c.description || '').replace(/@\w+/g, '').trim(); };
+  var guideKind = function (key, title) {
+    return [title, function (c) { var s = guideOf(c, key); return s && s.text ? KNOW_FROM(s.from) : ''; },
+      function (c) { var s = guideOf(c, key); return paras(s.text) + '<p class="pg-from">From ' + esc(s.from) + '</p>'; }, 'Not written yet.'];
+  };
+  var KNOW = [
+    ['What it is', function (c) { return figmaWhat(c) ? 'Figma' : (c.note || '').trim() ? 'The code' : ''; },
+      function (c) { return figmaWhat(c) ? paras([figmaWhat(c)]) + '<p class="pg-from">From Figma, its description</p>' : paras([c.note.trim()]) + '<p class="pg-from">From the code</p>'; }, 'Not written yet.'],
+    guideKind('whenToUse', 'When to use'),
+    guideKind('whenNotToUse', 'When not to use'),
+    guideKind('mistakes', 'Common mistakes'),
+    guideKind('limitations', 'Limitations'),
+    ['Do and don\'t', function (c) { var n = (c.examples || []).length; return n ? n + (n === 1 ? ' picture' : ' pictures') : ''; },
+      function (c) { return examplesGrid(c) + '<p class="pg-from">From Figma</p>'; }, 'No pictures yet.'],
+    ['Role', function (c) { var a = c.a11y || {}; return a.role ? (a.roleFrom === 'figma' ? 'Figma' : a.roleFrom === 'contract' ? 'The contract' : 'The code') : ''; },
+      function (c) { var a = c.a11y; return paras([a.role]) + '<p class="pg-from">From ' + (a.roleFrom === 'figma' ? 'Figma, its annotation' : a.roleFrom === 'contract' ? 'the contract' : 'the code') + '</p>'; }, 'Not written yet.'],
+    ['Used in', function (c) { var n = (c.usage || []).length; return n ? n + (n === 1 ? ' product' : ' products') : ''; },
+      function (c) { return paras([(c.usage || []).map(function (k) { return typeof k === 'string' ? k : k.name || k.key; }).join(', ')]) + '<p class="pg-from">From the products\' pages; the Used in area shows where</p>'; }, 'Not found in any of the products\' pages.']
+  ];
+  // Its Documentation, kind by kind as the Coverage page counts them: what was written and where, or that it is missing.
+  function knowledgeHTML(c) {
+    var missing = KNOW.filter(function (k) { return !k[1](c); });
+    return '<div class="pg-doc pg-knowledge"><h3>Coverage</h3><dl class="pg-updated">' + KNOW.map(function (k) {
+      return '<div><dt>' + esc(k[0]) + '</dt><dd>' + (k[1](c) ? k[2](c) : '<p class="pg-missing">' + esc(k[3]) + '</p>') + '</dd></div>';
+    }).join('') + '</dl>' + (missing.some(function (k) { return /^(What it is|When|Common|Limitations)/.test(k[0]); }) ? '<p class="pg-from">Write a missing one in Figma, as a line of the component\'s description that starts with its name (When to use: …), or in contract.authored.json under guidance.</p>' : '') + '</div>';
+  }
+  var KNOWN = COMPONENTS.filter(function (c) { return !c.codeOnly; });
+  if (KNOWN.length) {
+    hr(); navLink('coverage', 'coverage');
+    var kv = section('coverage', 'Coverage', 'Where knowledge is thin', 'What the team has written about each component and where its products use it, the thinnest first. Write a missing one in Figma, as a line of the component\'s description that starts with its name (When to use: …), or in contract.authored.json.');
+    var rowsK = KNOWN.map(function (c) { var cells = KNOW.map(function (k) { return k[1](c); }); return { c: c, cells: cells, have: cells.filter(Boolean).length }; })
+      .sort(function (a, b) { return a.have - b.have || a.c.name.localeCompare(b.c.name); });
+    var whole = rowsK.filter(function (r) { return r.have === KNOW.length; }).length;
+    var mark = function (v) { return v ? '<span class="pg-par-status pg-par--match"><span class="pg-par-sign" aria-hidden="true">✓</span>' + esc(v) + '</span>' : '<span class="pg-par-status pg-par--figma"><span class="pg-par-sign" aria-hidden="true">!</span>Missing</span>'; };
+    var kbox = document.createElement('div'); kbox.className = 'pg-cards'; kv.appendChild(kbox);
+    kbox.innerHTML = '<p class="pg-par-sum">' + esc(whole + ' of ' + KNOWN.length + ' components have every kind written. ' + KNOW.map(function (k, i) { return k[0] + ' ' + rowsK.filter(function (r) { return r.cells[i]; }).length; }).join(', ') + '.') + '</p>' +
+      '<div class="pg-inspect"><table class="pg-par-table pg-coverage"><thead><tr><th>Component</th>' + KNOW.map(function (k) { return '<th>' + esc(k[0]) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rowsK.map(function (r) { return '<tr data-have="' + r.have + '"><td><a class="sg-uses-link" href="#' + esc(cid(r.c.name)) + '">' + esc(r.c.name) + '</a></td>' + r.cells.map(function (v) { return '<td>' + mark(v) + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody></table></div>';
+    labelCells(kv);   // on a phone each row is a block, each value under its column's name
   }
   if ((DATA.screens || []).length) {
     hr(); navLink('in-use', 'in use');
@@ -1719,12 +1789,12 @@ a.pg-usage-name { color: var(--sg-text); }
   // Its changelog in the Playground's tables: when Figma was last read, then one table per release, each commit a row
   // (its commit and pull request, what it says, its date).
   // Its Do and Don't: each example from Figma (or its references) with what it shows, the do's beside the don'ts.
-  function examplesHTML(c) {
+  function examplesGrid(c) {
     var ex = c.examples || [];
     if (!ex.length) return '';
-    return '<div class="pg-doc"><div class="pg-inspect pg-doc-card pg-examples-card"><div class="pg-inspect-head"><h3>Do and Don\'t</h3></div><div class="pg-examples">' + ex.map(function (e) {
+    return '<div class="pg-examples">' + ex.map(function (e) {
       return '<div class="pg-example"><div class="pg-ctl-label">' + (e.kind === 'do' ? 'Do' : 'Don\'t') + '</div><div class="pg-example-stage"><img alt="' + esc((e.kind === 'do' ? 'Do: ' : 'Don\'t: ') + (e.caption || c.name)) + '" src="' + esc(e.src) + '" width="' + Math.round(e.w) + '" height="' + Math.round(e.h) + '"></div>' + (e.caption ? '<p class="pg-example-caption">' + esc(e.caption) + '</p>' : '') + '</div>';
-    }).join('') + '</div></div></div>';
+    }).join('') + '</div>';
   }
   function changelogHTML(c) {
     var u = c.updated || {}, log = c.changelog || [], figma = c.figmaLog || [];
@@ -1765,7 +1835,8 @@ a.pg-usage-name { color: var(--sg-text); }
   function hashParts() {
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
-    return { id: j < 0 ? path : path.slice(0, j), area: area, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
+    var id = j < 0 ? path : path.slice(0, j);
+    return { id: id === 'whats-new' ? 'changelog' : id, area: area, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // a link from when it was What's new
   }
   function copyText(text, btn, said) {
     var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
@@ -1830,14 +1901,7 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   // ── Its accessibility: its role, what it owes (each with its WCAG criterion), the contrast of its text as drawn, and
   // what the last browser check found on it ──────────────────────────────────────────────────────────────────────────
-  // How to use it: the same four sections on every component, each from where it was written; a missing one says so
-  // and where to write it.
-  function guidanceHTML(c) {
-    var g = c.guidance; if (!g) return '';
-    return '<div class="pg-doc"><h3>Usage</h3><dl class="pg-updated">' + g.sections.map(function (x) {
-      return '<div><dt>' + esc(x.title) + '</dt><dd>' + (x.text ? x.text.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '<p class="pg-from">From ' + esc(x.from) + '</p>' : '<p class="pg-missing">Not written yet.</p>') + '</dd></div>';
-    }).join('') + '</dl>' + (g.missing.length ? '<p class="pg-from">Write a missing one in Figma, as a line of the component\'s description that starts with its name (' + esc(g.sections.filter(function (x) { return !x.text; })[0].title) + ': …), or in contract.authored.json under guidance.</p>' : '') + '</div>';
-  }
+
   // Accessibility, one table like Parity's: each thing asked of it in plain words, its status as a sign and the
   // system's colour (done, to fix, not checked yet, not needed) and its WCAG criterion. What to fix first; then what
   // the browser finds on the variant shown (tried live) and its text contrast; then what its role asks for, checked by
@@ -1984,7 +2048,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var kinds = ['Parity', 'Accessibility', 'Page'].filter(function (a) { return areas[a]; });
     if (todoArea !== 'all' && !areas[todoArea]) todoArea = 'all';
     var filter = kinds.length > 1 ? '<div class="pg-par-filter sg-todo-filter">' + segHTML([{ label: 'All (' + all + ')', v: 'all' }].concat(kinds.map(function (a) { return { label: a + ' (' + areas[a] + ')', v: a }; })), 'Show') + '</div>' : '';
-    box.innerHTML = note + '<p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + filter + order.map(function (g) {
+    box.innerHTML = note + '<div class="sg-todo-head"><p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + filter + '</div>' + order.map(function (g) {
       return issueTableHTML(g.rows, '', g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system');
     }).join('');
     var seg = box.querySelector('.sg-todo-filter');
@@ -2251,13 +2315,15 @@ a.pg-usage-name { color: var(--sg-text); }
     // Its documentation: Figma's description and annotations first, then the code's own note.
     var figDesc = c.description && c.description.replace(/@\w+/g, '').trim();
     var figNotes = (c.annotations || []).filter(function (a) { return a && a !== figDesc; });
-    var docRows = (figDesc || figNotes.length ? '<div><dt>From Figma</dt><dd>' + [figDesc].concat(figNotes).filter(Boolean).map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') + '</dd></div>' : '') +
+    // What is not one of the kinds the Coverage page counts: Figma's notes, its slots, the code's own note when Figma has
+    // the description (else the note is what it is, above).
+    var docRows = (figNotes.length ? '<div><dt>From Figma</dt><dd>' + figNotes.map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') + '</dd></div>' : '') +
       (c.slots ? '<div><dt>Slots</dt><dd>' + c.slots.map(function (sl) {
         var what = sl.preferredOnly ? (sl.preferred.length ? 'Takes only ' + sl.preferred.join(', ') : sl.preferredCount ? 'Takes only its ' + (sl.preferredCount === 1 ? 'preferred component' : sl.preferredCount + ' preferred components') : 'Set in Figma to take only preferred components, with none listed yet') : (sl.preferred.length ? 'Takes any content; suggested ' + sl.preferred.join(', ') : 'Takes any content the product puts in it');
         var count = sl.min && sl.max ? ', ' + sl.min + ' to ' + sl.max + ' items' : sl.min ? ', at least ' + sl.min + (sl.min === 1 ? ' item' : ' items') : sl.max ? ', at most ' + sl.max + ' items' : '';
         return '<p><b>' + esc(sl.name) + '</b> ' + esc(what + count + '.' + (sl.emptyAtFirst ? ' Empty until the product fills it.' : '') + (sl.description ? ' ' + sl.description : '')) + '</p>';
       }).join('') + '</dd></div>' : '') +
-      (c.note ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '') +
+      (c.note && figDesc ? '<div><dt>From the code</dt><dd><p>' + esc(c.note) + '</p></dd></div>' : '') +
       // Its file and the props its code declares, for a component only the code has (no Figma props to show them by).
       (c.codeOnly ? '<div><dt>In the code</dt><dd><p><code>' + esc(c.codeOnly.file) + '</code></p>' + ((c.codeOnly.props || []).length ? '<ul class="pg-code-props">' + c.codeOnly.props.map(function (p) {
         return '<li><code>' + esc(p.name) + '</code>' + (p.options ? ' ' + esc(p.options.join(' | ')) : '') + (p.default != null ? ', ' + esc('default ' + p.default) : '') + (p.required ? ', required' : '') + '</li>';
@@ -2296,8 +2362,8 @@ a.pg-usage-name { color: var(--sg-text); }
       (ALL || !variantRows(c).length ? '' : '<div class="pg-area" data-area="variants"><div class="pg-footer"><div class="pg-variants"></div></div></div>') +
       // Documentation: its API, Figma's and the code's own words, and when each side last changed.
       '<div class="pg-area" data-area="docs"><div class="pg-footer">' +
-        guidanceHTML(c) + examplesHTML(c) + apiHTML(c) +
-        (docRows ? '<div class="pg-doc"><h3>Documentation</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
+        knowledgeHTML(c) + apiHTML(c) +
+        (docRows ? '<div class="pg-doc"><h3>Details</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
         '</div></div>' +
       '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + a11yHTML(c) + '</div></div>' +
       '<div class="pg-area" data-area="parity"><div class="pg-footer">' + parityHTML(c) + '</div></div>' +
@@ -2717,9 +2783,10 @@ a.pg-usage-name { color: var(--sg-text); }
       a11ySumEl.innerHTML = [['todo', 'to fix'], ['check', 'to check'], ['done', 'done']].filter(function (x) { return n[x[0]]; })
         .map(function (x) { return '<span class="pg-par-status pg-par--' + STATUS[x[0]][2] + '"><span class="pg-par-sign" aria-hidden="true">' + STATUS[x[0]][0] + '</span>' + n[x[0]] + ' ' + x[1] + '</span>'; }).join('');
       var ch = c.a11y && c.a11y.checked;
-      a11yNote.textContent = 'The WCAG 2.2 criteria at level A and AA that apply to it' + (liveNow ? (c.__a11y && c.__a11y.baked ? ', every variant tried in a browser when this page was built' : ', every variant tried in this browser') + (liveNow.at ? ' (' + when(liveNow.at) + ')' : '') : '') + '. ' +
-        (!ch ? 'The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.' : ch.notRead ? 'The last audit (' + when(ch.at) + ') could not check it: ' + (ch.why || 'it was not drawn on the page it opened') + '.' : 'Last audit in a browser ' + when(ch.at) + '.') +
-        ((c.a11y && c.a11y.excused || []).length ? ' Not asked of it, ' + c.a11y.excused.map(function (x) { return x.says + ' (' + x.reason + ')'; }).join('; ') + '.' : '');
+      // Only what a row cannot say: when each check ran is in its own row.
+      a11yNote.textContent = [!ch ? 'The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.' : ch.notRead ? 'The last audit (' + when(ch.at) + ') could not check it: ' + (ch.why || 'it was not drawn on the page it opened') + '.' : '',
+        (c.a11y && c.a11y.excused || []).length ? 'Not asked of it, ' + c.a11y.excused.map(function (x) { return x.says + ' (' + x.reason + ')'; }).join('; ') + '.' : ''].filter(Boolean).join(' ');
+      a11yNote.hidden = !a11yNote.textContent;
     }
     a11yRender(liveNow);
     // Every variant tried in the browser (checkLive, below), its rows in the Accessibility table.
