@@ -19,6 +19,24 @@ export function collectDeprecatedTokens(dict, prefix = '', out = []) {
   return out;
 }
 
+// The token budget (L9): semantic tokens whose value equals another's in every mode (one name would do, unless
+// they are meant to part later), from the vars snapshot's colours; primitives (prefix) are left out.
+// → [[name, name, …], …], each group two or more names, largest first.
+export function sameInEveryMode(vars, { primitivePrefix = 'primitives/' } = {}) {
+  const modes = Object.keys(vars?.color ?? {});
+  if (!modes.length) return [];
+  const names = new Set();
+  for (const m of modes) for (const n of Object.keys(vars.color[m] ?? {})) if (!n.startsWith(primitivePrefix) && !n.startsWith('_')) names.add(n);
+  const groups = new Map();
+  for (const n of names) {
+    const key = modes.map((m) => String(vars.color[m]?.[n] ?? '').toLowerCase()).join('|');
+    if (!key.replace(/\|/g, '')) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(n);
+  }
+  return [...groups.values()].filter((g) => g.length > 1).map((g) => g.sort()).sort((a, b) => b.length - a.length || a[0].localeCompare(b[0]));
+}
+
 // Normalize usageCounts' component reach (a Map, or a plain object) to a Map<name, count>.
 function reachMap(components) {
   if (components instanceof Map) return components;
@@ -31,7 +49,7 @@ function reachMap(components) {
 // Returns the candidate lists plus `total` (deprecated tokens/components + single-option variants +
 // single-use components). Unreferenced components are reported separately and NOT counted - a
 // component nobody composes is usually a top-level entry, not dead code.
-export function pruneCandidates({ built = [], usage = null, tokensDict = null } = {}) {
+export function pruneCandidates({ built = [], usage = null, tokensDict = null, vars = null, primitivePrefix = 'primitives/' } = {}) {
   const deprecatedTokens = tokensDict ? collectDeprecatedTokens(tokensDict) : [];
 
   const singleOptionVariants = [];   // a "variant" prop with exactly one option - an axis that does not vary
@@ -53,6 +71,10 @@ export function pruneCandidates({ built = [], usage = null, tokensDict = null } 
     else if (n === 0) unreferencedComponents.push(name);
   }
 
-  const total = deprecatedTokens.length + deprecatedComponents.length + singleOptionVariants.length + singleUseComponents.length;
-  return { deprecatedTokens, deprecatedComponents, singleOptionVariants, singleUseComponents, unreferencedComponents, total };
+  // The token budget (L9): tokens that equal another in every mode, and tokens only one component uses (a candidate to
+  // keep inside that component). Questions, as the rest; tokens nothing uses are the unused-variable check's.
+  const sameTokens = vars ? sameInEveryMode(vars, { primitivePrefix }) : [];
+  const singleUseTokens = [...(usage?.tokens instanceof Map ? usage.tokens : new Map(Object.entries(usage?.tokens || {})))].filter(([, n]) => n === 1).map(([t]) => t).sort();
+  const total = deprecatedTokens.length + deprecatedComponents.length + singleOptionVariants.length + singleUseComponents.length + sameTokens.length + singleUseTokens.length;
+  return { deprecatedTokens, deprecatedComponents, singleOptionVariants, singleUseComponents, unreferencedComponents, sameTokens, singleUseTokens, total };
 }

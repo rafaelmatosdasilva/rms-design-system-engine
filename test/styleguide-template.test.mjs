@@ -128,6 +128,18 @@ test('tokens are shown only when equal to Figma in every mode, grouped like the 
   assert.equal(t.differences, 1);
 });
 
+test('F8: a token\'s description in Figma travels to the token panel; one with none says so', () => {
+  const check = { passVars: [{ dimension: 'color', token: 'surface/page/color', cssVar: '--surface-page', mode: 'light', value: '#fff' }, { dimension: 'sizing', token: 'gap/s', cssVar: '--gap-s', value: '4px' }] };
+  const vars = { color: { light: { 'surface/page/color': '#fff' } }, tokenMeta: { 'surface/page': { description: 'The page behind everything' }, 'gap/s': { description: 'Between small items' } } };
+  const t = agreedTokens(check, vars);
+  assert.equal(t.colors[0].items[0].description, 'The page behind everything');
+  assert.equal(t.spacing[0].description, 'Between small items');
+  assert.equal('description' in agreedTokens(check, { color: vars.color }).colors[0].items[0], false);
+  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  assert.match(tpl, /'<div><dt>What it is for<\/dt><dd><p>' \+ esc\(t\.description\)/);
+  assert.match(tpl, /t\.figma && !t\.primitive \? '<div><dt>What it is for<\/dt><dd><p class="pg-missing">Not written yet\.<\/p>/);
+});
+
 test('--component with --styleguide: that component audited first, then its own page beside the whole one, its address printed', { timeout: 600000 }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sgc-');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
@@ -437,7 +449,7 @@ test('in the browser: no script error, a control changes the real component, the
     // Its Documentation asks for what the Coverage page counts, under the same names, in the same order; a missing one said.
     const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge dt')].map((d) => d.textContent).join('|')`);
     assert.equal(kinds, 'What it is|When to use|When not to use|Common mistakes|Limitations|Do and don\'t|Role|Used in');
-    assert.equal(await run(`[...document.querySelectorAll('#coverage thead th')].slice(1).map((d) => d.textContent).join('|')`), kinds);
+    assert.equal(await run(`[...document.querySelector('#coverage table').tHead.rows[0].cells].map((d) => d.textContent).join('|')`), kinds);
     assert.match(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet/);
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
     assert.equal(await run(`document.getElementById('sg-menu').textContent + '|' + document.getElementById('sg-nav-close').textContent`), 'Menu|Close menu');
@@ -494,9 +506,10 @@ test('in the browser: no script error, a control changes the real component, the
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
     assert.match(await until(`(document.querySelector('#c-chip .pg-a11y-rows') || {}).textContent || ''`, (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
-    // Coverage: what the team wrote about each component, the thinnest first; a kind nobody wrote is Missing, never guessed.
-    const cov = JSON.parse(await run(`JSON.stringify((() => { const t = document.querySelector('#coverage table'); const heads = [...t.tHead.rows[0].cells].map((c) => c.textContent); return { heads, rows: [...t.tBodies[0].rows].map((tr) => ({ name: tr.cells[0].textContent, have: +tr.dataset.have, cells: [...tr.cells].slice(1).map((c) => c.textContent) })), sum: document.querySelector('#coverage .pg-par-sum').textContent }; })())`));
-    assert.deepEqual(cov.heads, ['Component', 'What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Used in']);
+    // Coverage: what the team wrote about each component, one table each with its name on the head as on the To do page,
+    // the thinnest first; a kind nobody wrote is Missing, never guessed.
+    const cov = JSON.parse(await run(`JSON.stringify((() => { const cards = [...document.querySelectorAll('#coverage .pg-par-card')]; return { heads: [...cards[0].querySelector('table').tHead.rows[0].cells].map((c) => c.textContent), rows: cards.map((k) => { const tr = k.querySelector('tbody tr'); return { name: k.querySelector('.pg-inspect-head a').textContent, have: +tr.dataset.have, cells: [...tr.cells].map((c) => c.textContent) }; }), sum: document.querySelector('#coverage .pg-par-sum').textContent }; })())`));
+    assert.deepEqual(cov.heads, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Used in']);
     const chipRow = cov.rows.find((r) => r.name === 'chip');
     assert.equal(chipRow.cells[0], '✓Figma');                     // its Figma description
     assert.equal(chipRow.cells[5], '✓2 pictures');                 // a do and a don't

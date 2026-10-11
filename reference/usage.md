@@ -115,7 +115,8 @@ checks each piece once it exists.
   icon, is markup). A colour Figma paints with no variable is named with its value, to write as it is and report,
   never as an invented variable. An experimental component gets its sheet when asked for, though it stays off the
   build list. Every line is what the structure check compares once the component exists, so a component built from
-  the sheet needs no `structure-contract.mjs` entry; an entry the project writes always wins.
+  the sheet needs no `structure-contract.mjs` entry; an entry the project writes always wins. When a product already
+  uses the component, one line shows how its code writes it, with the file and line, to copy.
 - **Component stylesheets.** A component built into its own stylesheet (`src/components/button.css`) is found by its
   class and added to `paths.themeCSS` after the token file, said once in the report, so every gate reads it.
 - **A token an edit invents.** In any project, a custom property an edit adds with a value of its own (a colour, a size) that Figma has no variable for is handed back, in the theme too; one that only points at the system's tokens, or that Figma has, is not.
@@ -569,15 +570,19 @@ values, per mode, and flags pairs below AA; a no-browser complement to the rende
 background sharing its state/variant qualifier, on by default, opt out with `a11y.derivePairs: false` —
 and/or **declared** in `ds-config.json → a11y.tokenPairs: [{text, bg, large?}]`; icon/stroke roles use the
 3:1 non-text bar); **declared token tiers** (opt-in — only when
-`ds-config.json → tiers: [{ name, match, mayReference?, layer? }]` is set: classifies each token by the
+`ds-config.json → tiers: [{ name, match, mayReference?, layer?, holds? }]` is set: classifies each token by the
 project's own regexes and flags a token that aliases a tier its `mayReference` disallows; with `layer`
 numbering the tiers from the base up, each layer points at the one before it, so a token that skips a
 layer (a component token straight to a primitive) or points back at a later one is listed too; only the
-token it aliases counts, not the rest of the chain; never imposes a tier model, zero config = does not run); and an **AI-readiness scorecard** (a running R/Y/G
+token it aliases counts, not the rest of the chain; `holds` names the kinds of token a tier keeps
+(`color`, `sizing`, `typography`, `string`, `boolean`), so a colour in a sizes-only layer is listed;
+never imposes a tier model, zero config = does not run); and an **AI-readiness scorecard** (a running R/Y/G
 measure across gate health, coverage, documentation and guidance, aggregated from the signals above,
 never a grade and never blocking); and **prune candidates** (a leaner library is cheaper for an agent
 to read and mis-picks less: surfaces deprecated tokens still present, variant axes that do not vary
-(a "variant" prop with one option), and components used in exactly one place — each a QUESTION, never
+(a "variant" prop with one option), components used in exactly one place, and the token budget: semantic
+colour tokens equal to another in every mode (one name would do, unless they are meant to part later) and
+tokens only one component uses (a candidate to keep inside it) — each a QUESTION, never
 a verdict; totals each run, full list with `--prune`). One more **opt-in, project-declared** advisory:
 **list duplication** (`ds-config.json → duplication: { surfaces: ["AGENTS.md", ".cursorrules", …], minCluster? }`) —
 a DS list copied by hand into an agent-instruction file, skill, or doc drifts into a stale parallel truth
@@ -1371,6 +1376,9 @@ non-deterministic. **Advisory** (exit 0 unless `evals.strict`), and it **never g
   stdin, the DS context (`llms.txt`) path is in `$EVAL_CONTEXT`, `$EVAL_ID`/`$EVAL_COMPONENT` are set, and
   the command's **stdout** becomes the candidate (written to `evals/<id>.<ext>`). The prompt is the case's
   `prompt` alone: the expected `component` is for the scoring, so do not pass `$EVAL_COMPONENT` to the agent.
+  The command may write what the generation spent to the file `$EVAL_USAGE` names (a number of tokens, or the
+  agent's JSON usage, `{ input_tokens, output_tokens }`); the summary then adds `avg N tokens a generation`, and the
+  history keeps it.
 - A case's `component` is what it expects: a candidate that does not use it (its class, or a tag of its name)
   avoided the system and fails (`avoided-component`), and the summary counts `N avoided the system`. A prompt
   that names a component is flagged before the run, since its score would measure reading the prompt.

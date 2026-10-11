@@ -134,3 +134,25 @@ test('R2: every finding as one record (rule, evidence, verdict, who acts), each 
   // The differences list is built from the same records.
   assert.deepEqual(differences(findings, ['chip']).groups[0].items.map((i) => i.check), ['Token values', 'Figma file hygiene', 'Structure']);
 });
+
+test('I72: a component only in code gets what to build in Figma, its props and the tokens its styles use', async () => {
+  const { figmaToBuild } = await import('../handback.mjs');
+  assert.equal(figmaToBuild([]), '');
+  const md = figmaToBuild([
+    { name: 'StatusPill', file: 'src/components/StatusPill.tsx', props: [{ name: 'tone', options: ['info', 'warn'], default: 'info' }, { name: 'label', required: true }],
+      tokens: [{ prop: 'background', var: '--pill-bg' }, { prop: 'padding', var: '--space-s' }, { prop: 'gap', var: '--space-s' }] },
+    { name: 'Divider', file: 'src/components/Divider.tsx', props: [], tokens: [] },
+  ]);
+  assert.match(md, /^# Components to build in Figma\n\nProposed by rms-design-system-engine: 2 components the code has and Figma does not\./);
+  assert.match(md, /## StatusPill\n\nFrom `src\/components\/StatusPill\.tsx`\.\n\n- \*\*Props\*\*: tone \(info \| warn, default info\); label, required\n- \*\*Tokens its styles use\*\*: --pill-bg \(background\); --space-s \(padding, gap\)/);
+  assert.match(md, /## Divider[\s\S]*- \*\*Props\*\*: none the code declares\.\n- \*\*Tokens its styles use\*\*: none \(its values are written by hand; bind them to variables in Figma\)\./);
+});
+
+test('advice on the system (prune candidates, system health) is neither an open finding nor a difference', async () => {
+  const { burndown, differences } = await import('../run-diff.mjs');
+  const f = ['Prune candidates :: 1 group(s) of tokens equal in every mode', 'System health :: 17 of 17 semantic tokens have no description in Figma', 'Token values :: ❌ [sizing/-] radii/chip → --radii-chip'];
+  const b = burndown(f, ['chip']);
+  assert.equal(b.loose, 0);
+  assert.deepEqual(b.rows.map((r) => r.name), ['chip']);
+  assert.equal(differences(f, ['chip']).total, 1);
+});

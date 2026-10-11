@@ -34,6 +34,9 @@ test('a token by its path or its CSS variable; anything else names the closest',
   assert.deepEqual(answerLines(answer('radius/control', { catalog, tokens, varOf })), ['radius/control  →  var(--hb-radius-control)  6px']);
   assert.deepEqual(answerLines(answer('--hb-surface-base', { catalog, tokens, varOf })), ['surface/base/color  →  var(--hb-surface-base)  light #fff · dark #000']);
   assert.deepEqual(answerLines(answer('radius', { catalog, tokens, varOf })), ['radius: no component or token of that name. Closest: radius/control']);
+  // What a token is for, from its Figma description, under its value.
+  const described = flattenTokens({ text: { subtle: { color: { $type: 'color', $value: '#666', $description: 'Secondary text: captions, hints, metadata.' } } } });
+  assert.deepEqual(answerLines(answer('text/subtle', { catalog, tokens: described, varOf })).slice(1), ['  for: Secondary text: captions, hints, metadata.']);
 });
 
 test('the command: several terms in one call, exit 1 when one is not found, 2 before the first audit', () => {
