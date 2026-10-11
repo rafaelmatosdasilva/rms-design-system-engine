@@ -113,6 +113,24 @@ export function figmaChanges(items, linkFor = () => null) {
   return rows.join('\n');
 }
 
+// What to build in Figma for each component the code has and Figma does not (I72), so both sides hold it and the match
+// can be recorded: its props with their values and default, and the tokens its styles use. Nothing is built here.
+// list: [{ name, file, props: [{ name, options?, default?, required? }], tokens: [{ prop, var }] }].
+export function figmaToBuild(list) {
+  if (!list?.length) return '';
+  const rows = ['# Components to build in Figma', '', `Proposed by rms-design-system-engine: ${list.length} component${list.length === 1 ? '' : 's'} the code has and Figma does not. Build each one in Figma with these props and tokens, and the next audit compares it. Nothing was changed in Figma.`, ''];
+  for (const c of list) {
+    rows.push(`## ${c.name}`, '', `From \`${c.file}\`.`, '');
+    const props = c.props ?? [];
+    rows.push(props.length ? `- **Props**: ${props.map((p) => `${p.name}${p.options?.length ? ` (${p.options.join(' | ')}${p.default != null ? `, default ${p.default}` : ''})` : p.default != null ? ` (default ${p.default})` : ''}${p.required ? ', required' : ''}`).join('; ')}` : '- **Props**: none the code declares.');
+    const byProp = new Map();
+    for (const t of c.tokens ?? []) { if (!byProp.has(t.var)) byProp.set(t.var, new Set()); byProp.get(t.var).add(t.prop); }
+    rows.push(byProp.size ? `- **Tokens its styles use**: ${[...byProp].map(([v, ps]) => `${v} (${[...ps].join(', ')})`).join('; ')}` : '- **Tokens its styles use**: none (its values are written by hand; bind them to variables in Figma).');
+    rows.push('');
+  }
+  return rows.join('\n');
+}
+
 // Writes both files (or removes them when there is nothing to hand back). Returns what it wrote.
 export function writeHandback(root, outDir, { codeDiffs, figmaItems, linkFor }) {
   const dir = join(root, outDir, 'handback');

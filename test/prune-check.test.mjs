@@ -46,3 +46,16 @@ test('pruneCandidates accepts a plain-object reach map and empty inputs', () => 
   assert.equal(r.total, 0);                                   // unreferenced is NOT counted
   assert.deepEqual(pruneCandidates({}).total, 0);             // nothing in, nothing out
 });
+
+test('L9: the token budget, tokens equal to another in every mode and tokens only one component uses', async () => {
+  const { sameInEveryMode } = await import('../prune-check.mjs');
+  const vars = { color: {
+    light: { 'text/primary': '#111', 'icon/primary': '#111', 'text/muted': '#666', 'primitives/gray/900': '#111', 'border/strong': '#111' },
+    dark: { 'text/primary': '#eee', 'icon/primary': '#eee', 'text/muted': '#999', 'primitives/gray/900': '#eee', 'border/strong': '#fff' },
+  } };
+  assert.deepEqual(sameInEveryMode(vars), [['icon/primary', 'text/primary']]);   // border/strong parts in dark; primitives left out
+  const pr = pruneCandidates({ built: [], usage: { components: {}, tokens: new Map([['color.text.primary', 1], ['color.text.muted', 3]]) }, vars });
+  assert.deepEqual(pr.sameTokens, [['icon/primary', 'text/primary']]);
+  assert.deepEqual(pr.singleUseTokens, ['color.text.primary']);
+  assert.equal(pr.total, 2);
+});

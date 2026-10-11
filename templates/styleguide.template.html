@@ -638,6 +638,8 @@ a.pg-usage-name { color: var(--sg-text); }
     tokenPop.setAttribute('aria-label', v);
     tokenPop.innerHTML = '<p class="sg-token-pop-name"><code>' + esc(v) + '</code></p><dl class="pg-updated">' +
       (t.figma ? '<div><dt>In Figma</dt><dd><p>' + esc(t.figma) + '</p></dd></div>' : '') +
+      // What it is for, as Figma describes it; a semantic token with none says so (a primitive needs none).
+      (t.description ? '<div><dt>What it is for</dt><dd><p>' + esc(t.description) + '</p></dd></div>' : t.figma && !t.primitive ? '<div><dt>What it is for</dt><dd><p class="pg-missing">Not written yet.</p></dd></div>' : '') +
       '<div><dt>' + (rows.length ? 'In each mode' : 'Its value') + '</dt><dd>' + values + '</dd></div>' +
       '<div><dt>Used by</dt><dd>' + (comps.length ? comps.slice(0, 12).map(function (c) { return '<p><a class="sg-uses-link" href="#' + esc(cid(c.n)) + '">' + esc(c.n) + '</a>' + (c.through ? ', through ' + esc(c.through) : '') + '</p>'; }).join('') + (comps.length > 12 ? '<p><a class="sg-uses-link" href="#uses?t=' + encodeURIComponent(v) + '">and ' + (comps.length - 12) + ' more</a></p>' : '') : '<p>No component uses it yet.</p>') + '</dd></div></dl>' +
       '<div class="sg-token-pop-actions">' + sysButton('button', 'Copy ' + v, ' data-copy-token') + '</div>';

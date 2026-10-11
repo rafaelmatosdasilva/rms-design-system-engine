@@ -3885,8 +3885,12 @@ function reportFull(label, items, shown) {
         const vsnap = JSON.parse(readFileSync(vPath, 'utf8'));
         const tokenSet = new Set();
         const aliasMap = new Map();   // token path -> Set(referenced token paths)
+        const kinds = new Map();      // token path -> its kind, for a tier that says what it holds (L4)
+        for (const [key, kind] of [['sizing', 'sizing'], ['typography', 'typography'], ['strings', 'string'], ['booleans', 'boolean']]) {
+          for (const k of Object.keys(vsnap[key] || {})) if (!k.startsWith('_')) { tokenSet.add(k); kinds.set(k, kind); }
+        }
         for (const mode of Object.keys(vsnap.color || {})) {
-          for (const k of Object.keys(vsnap.color[mode] || {})) tokenSet.add(k.replace(/\/color$/, ''));
+          for (const k of Object.keys(vsnap.color[mode] || {})) { tokenSet.add(k.replace(/\/color$/, '')); kinds.set(k.replace(/\/color$/, ''), 'color'); }
           for (const [tok, target] of Object.entries(vsnap.aliases?.[mode] || {})) {
             const key = tok.replace(/\/color$/, '');
             if (!aliasMap.has(key)) aliasMap.set(key, new Set());
@@ -3896,11 +3900,11 @@ function reportFull(label, items, shown) {
             if (ref) aliasMap.get(key).add(String(ref).replace(/\/color$/, ''));
           }
         }
-        const { violations, classified } = checkTiers([...tokenSet], (t) => [...(aliasMap.get(t) || [])], tiers);
+        const { violations, classified } = checkTiers([...tokenSet], (t) => [...(aliasMap.get(t) || [])], tiers, (t) => kinds.get(t) ?? null);
         const summary = Object.entries(classified).map(([n, c]) => `${n}:${c}`).join(' · ') || 'none classified';
         if (violations.length) {
           console.log(C.yellow(`\n⚠️  Token tiers (declared): ${violations.length} cross-tier reference(s) the project's rules disallow. [${summary}]`));
-          for (const v of violations.slice(0, 20)) console.log(C.yellow(`     · ${v.token} (${v.tier}) → ${v.ref} (${v.refTier})${v.kind ? `: ${v.reason}` : ''}`));
+          for (const v of violations.slice(0, 20)) console.log(C.yellow(v.kind === 'kind' ? `     · ${v.token}: ${v.reason}` : `     · ${v.token} (${v.tier}) → ${v.ref} (${v.refTier})${v.kind ? `: ${v.reason}` : ''}`));
           if (violations.length > 20) console.log(`     … ${violations.length - 20} more`);
           console.log('   Advisory: the tiers are yours (ds-config → tiers); the engine only surfaces the crossings.');
         } else {
@@ -3908,6 +3912,59 @@ function reportFull(label, items, shown) {
         }
       } catch { /* advisory: never fails the audit */ }
     }
+  }
+
+  // ── System health (advisory) ──────────────────────────────────────────────────
+  _section('advice');
+  // What keeps the system healthy as it grows (system-advice.mjs): modes set below a product's root (L7), two themes in
+  // one product (K14), semantic tokens with no description (F8), Storybook preview rules that style a component (F11),
+  // near-duplicate components (F14), tokens named by look (I17). Advice only; "systemHealth": false turns it off.
+  if (cfg.systemHealth !== false && !ONLY) {
+    try {
+      const sa = await import('./system-advice.mjs');
+      const { ENGINE_DIRS } = await import('./names.mjs');
+      const SKIP = new Set(['node_modules', 'dist', 'build', 'coverage', '.git', '.next', 'out', ...ENGINE_DIRS.map((d) => d.split('/')[0])]);
+      const walk = (dir, test, out = []) => {
+        let list = [];
+        try { list = readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+        for (const e of list) {
+          const p = join(dir, e.name);
+          if (e.isDirectory()) { if (!SKIP.has(e.name) && !(e.name.startsWith('.') && e.name !== '.storybook') && !/apps[\/]style-?guide$/.test(p)) walk(p, test, out); }
+          else if (test(p)) out.push(p);
+        }
+        return out;
+      };
+      const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return ''; } };
+      const theme = readThemeCSS();
+      let vsnap = {};
+      try { vsnap = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8')); } catch { /* no vars snapshot */ }
+      const prefix = cfg.figma?.primitivePrefix ?? 'primitives/';
+      const roots = codeRoots(ROOT, cfg);
+      const products = roots.slice(1);
+      const ui = (p) => /\.(html?|jsx|tsx|js|ts|mjs|vue|svelte|css|scss|less)$/i.test(p) && !/\.(test|spec|stories)\./.test(p) && !/\.min\./.test(p);
+      const files = (dir) => walk(dir, ui).map((f) => ({ file: relative(ROOT, f), text: read(f) }));
+      const productFiles = Object.fromEntries(products.map((d) => [relative(ROOT, d), files(d)]));
+      const names = [...new Set([...Object.keys(JSON.parse(read(join(ROOT, SNAP_STRUCT)) || '{}').components ?? {})])].filter((n) => !n.startsWith('_'));
+      const classes = Object.fromEntries(names.map((n) => [n, cfg.componentSelectors?.[n] ?? `.${n.charAt(0).toLowerCase()}${n.slice(1)}`]));
+      const colourNames = [...new Set(Object.values(vsnap.color ?? {}).flatMap((m) => Object.keys(m ?? {})))];
+      const lines = [];
+      const modes = sa.modesBelowRoot(Object.values(productFiles).flat(), sa.modeAttributes(theme));
+      if (modes.length) { lines.push(`${modes.length} mode${modes.length === 1 ? '' : 's'} set below a product's root, so part of its page draws in another mode (set it on <html> or <body>):`); for (const m of modes.slice(0, 8)) lines.push(`   · ${m.file}:${m.line}  ${m.attr} on ${m.on}`); }
+      const two = sa.productsWithTwoThemes(productFiles, [cfg.paths?.themeCSS ?? []].flat());
+      for (const t of two) lines.push(`${t.product} brings in two themes (${t.themes.join(', ')}); one overrides the other by load order. Bring in one (${t.files.join(', ')}).`);
+      const ud = sa.undescribedTokens(vsnap, { primitivePrefix: prefix });
+      if (ud.missing.length) lines.push(`${ud.missing.length} of ${ud.total} semantic tokens have no description in Figma (${ud.missing.slice(0, 5).join(', ')}${ud.missing.length > 5 ? ', …' : ''}): what a token is for is what an agent reads to pick it.`);
+      const sb = sa.catalogueOnlyPatches(roots.flatMap((r) => walk(join(r, '.storybook'), (p) => /\.(css|scss|less|html)$/i.test(p))).map((f) => ({ file: relative(ROOT, f), text: read(f) })), classes);
+      if (sb.length) { lines.push(`${sb.length} Storybook preview rule${sb.length === 1 ? '' : 's'} style a component, so the catalogue shows it right while products draw it as the code does (fix the component):`); for (const f of sb.slice(0, 8)) lines.push(`   · ${f.file}:${f.line}  ${f.selector} (${f.component})`); }
+      const near = sa.nearDuplicateComponents(theme, classes);
+      for (const n of near.slice(0, 8)) lines.push(`${n.a} and ${n.b} are nearly the same (${n.same} of ${n.of} declarations): one may be a variant of the other.`);
+      const look = sa.namedByLook([...colourNames, ...Object.keys(vsnap.sizing ?? {})], { primitivePrefix: prefix });
+      if (look.length) lines.push(`${look.length} semantic token${look.length === 1 ? ' is' : 's are'} named by look rather than role (${look.slice(0, 5).map((x) => x.name).join(', ')}${look.length > 5 ? ', …' : ''}): agents then pick them by appearance.`);
+      if (lines.length) {
+        console.log(C.yellow(`\n🧭 System health: ${lines.filter((l) => !/^   ·/.test(l)).length} thing${lines.filter((l) => !/^   ·/.test(l)).length === 1 ? '' : 's'} to keep the system healthy as it grows. Advisory.`));
+        for (const l of lines) console.log(C.yellow(`     ${l}`));
+      }
+    } catch { /* advisory: never fails */ }
   }
 
   // ── Right-to-left (opt-in: ds-config rtl: true, advisory) ────────────────────
@@ -4151,6 +4208,7 @@ function reportFull(label, items, shown) {
         const pr = r.prune || {};
         const dt = pr.deprecatedTokens || [], dc = pr.deprecatedComponents || [];
         const sv = pr.singleOptionVariants || [], su = pr.singleUseComponents || [];
+        const st = pr.sameTokens || [], ut = pr.singleUseTokens || [];   // the token budget (L9)
         if (pr.total) {
           const detail = process.argv.includes('--prune');
           console.log(C.yellow(`ℹ️  Prune candidates: ${pr.total} (leaner library = cheaper agent context). Advisory - decide keep or drop.`));
@@ -4159,12 +4217,16 @@ function reportFull(label, items, shown) {
           if (dc.length) bits.push(`${dc.length} deprecated component(s)`);
           if (sv.length) bits.push(`${sv.length} single-option variant(s)`);
           if (su.length) bits.push(`${su.length} single-use component(s)`);
+          if (st.length) bits.push(`${st.length} group(s) of tokens equal in every mode`);
+          if (ut.length) bits.push(`${ut.length} token(s) only one component uses`);
           console.log(C.dim(`     ${bits.join(' · ')}`));
           if (detail) {
             for (const t of dt) console.log(C.yellow(`     · deprecated token: ${t}`));
             for (const c of dc) console.log(C.yellow(`     · deprecated component: ${c}`));
             for (const v of sv) console.log(C.yellow(`     · single-option variant: ${v.component}.${v.prop} = "${v.option}" (axis does not vary - inline it?)`));
             for (const c of su) console.log(C.yellow(`     · single-use component: ${c} (composed by exactly one parent - inline?)`));
+            for (const g of st) console.log(C.yellow(`     · equal in every mode: ${g.join(', ')} (one name would do, unless they are meant to part)`));
+            for (const t of ut) console.log(C.yellow(`     · token only one component uses: ${t} (keep it inside that component?)`));
           } else {
             console.log(C.dim('     Run with --prune to list them.'));
           }
@@ -4615,6 +4677,33 @@ function reportFull(label, items, shown) {
       } catch { /* a convenience */ }
       writeFileSync(join(ROOT, OUT_DIR, 'differences.md'), differencesMarkdown(d, { at: new Date().toISOString().slice(0, 16).replace('T', ' '), handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') } }));
       console.log(`\n📋 Differences between Figma and the code: ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list → ${OUT_DIR}/differences.md`);
+    } catch { /* a convenience */ }
+    // The components only the code has (I72): what to build in Figma, with their props and the tokens their styles use.
+    if (!_scopeNames.length && !NO_FIGMA) try {
+      const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+      const figmaNames = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_'));
+      if (figmaNames.length) {
+        const { codeComponents, textReader, textComponentApi } = await import('./component-source.mjs');
+        const { componentTokens } = await import('./styleguide-data.mjs');
+        const { loadLocator } = await import('./component-locator.mjs');
+        const { figmaToBuild } = await import('./handback.mjs');
+        const locator = await loadLocator(ROOT, cfg);
+        const squash = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const known = new Set(figmaNames.map(squash)), classes = new Set(figmaNames.map((n) => String(locator.classFor(n) ?? '').replace(/^\./, '')).filter(Boolean));
+        const read = textReader(), css = readThemeCSS() + '\n' + [cfg.paths?.pluginCSS ?? []].flat().map((p) => { try { return readFileSync(join(ROOT, p), 'utf8'); } catch { return ''; } }).join('\n');
+        const only = codeComponents(ROOT, cfg, read).filter((k) => !classes.has(k.cls) && !known.has(squash(k.name))).map((k) => {
+          const api = textComponentApi(join(ROOT, k.file), read(join(ROOT, k.file)));
+          const props = Object.entries(api?.props ?? {}).map(([name, d]) => ({ name, ...(d.options ? { options: [...d.options] } : {}), ...(d.default != null ? { default: String(d.default) } : {}), ...(d.required ? { required: true } : {}) }));
+          return { name: k.name, file: k.file, props, tokens: componentTokens(css, k.cls) };
+        });
+        const md = figmaToBuild(only);
+        if (md) {
+          const dir = join(dirname(codeSnapshotPath(cfg)), 'handback');
+          mkdirSync(join(ROOT, dir), { recursive: true });
+          writeFileSync(join(ROOT, dir, 'figma-to-build.md'), md);
+          console.log(`\n🧱 ${only.length} component${only.length === 1 ? '' : 's'} only in code: what to build in Figma, with the props and tokens of each → ${join(dir, 'figma-to-build.md')}`);
+        }
+      }
     } catch { /* a convenience */ }
     ledger.scopes = { ...(ledger.scopes ?? {}), [scopeKey]: { at: new Date().toISOString(), findings: now } };
     mkdirSync(dirname(ledgerPath), { recursive: true });

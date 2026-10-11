@@ -60,3 +60,19 @@ test('L3: with layers, each points at the one before it; a skipped layer or a ba
   const mixed = [{ name: 'primitive', match: '^primitives/', layer: 1 }, { name: 'semantic', match: '^semantic/', mayReference: ['primitive'] }, { name: 'component', match: '.', layer: 3 }];
   assert.deepEqual(checkTiers(['button/label', 'semantic/fg'], (t) => aliases[t] || [], mixed).violations.map((v) => [v.token, v.kind ?? 'mayReference']), [['button/label', 'skipped'], ['semantic/fg', 'mayReference']]);
 });
+
+test('L4: a tier that says what it holds lists a token of another kind', () => {
+  const tiers = [
+    { name: 'primitive', match: '^primitives/' },
+    { name: 'spacing', match: '^space/', holds: ['sizing'] },
+    { name: 'semantic', match: '.', holds: ['color', 'typography'] },
+  ];
+  const kind = { 'space/s': 'sizing', 'space/accent': 'color', 'text/primary': 'color', 'radius/m': 'sizing', 'primitives/blue': 'color' };
+  const { violations } = checkTiers(Object.keys(kind), () => [], tiers, (t) => kind[t]);
+  assert.deepEqual(violations.map((v) => [v.token, v.kind, v.reason]), [
+    ['space/accent', 'kind', 'a color token in the spacing layer, which holds only sizing'],
+    ['radius/m', 'kind', 'a sizing token in the semantic layer, which holds only color, typography'],
+  ]);
+  // No kind known, or a tier that does not say: nothing.
+  assert.deepEqual(checkTiers(['space/accent'], () => [], tiers).violations, []);
+});
