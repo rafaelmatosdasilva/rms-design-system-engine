@@ -539,7 +539,8 @@ with `ds-config.json → contracts.auto: false`. It splits captured from authore
   field. A deprecated **token** whose Figma description names its replacement or reason gets that
   explanation as its DTCG `$deprecated` string (`"Use radii/button instead. too sharp"`) instead of a bare `true`),
   `contract.schema.json`, and an `llms.txt` AI index (which opens by telling an agent to use these components,
-  build nothing by hand that one covers and ask `--query` before guessing a name; it also lists each component's guidance and
+  build nothing by hand that one covers and ask `--query` before guessing a name, then gives the order of authority with
+  this system's own source at each level, `authority.mjs`; it also lists each component's guidance and
   composition, tags a non-current component `[deprecated]`/`[experimental]`, and gives it a
   `status: deprecated · use X instead · since 2.0 · why: …` line). They carry the DS's real values, so a single
   `.gitignore` keeps them local. When these are present, a token divergence also **cites its source**:

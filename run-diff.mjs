@@ -8,6 +8,7 @@
 // Headers and counts vary with the numbers in them, so each finding is keyed by its section and its
 // own text. Two findings whose text differs only in numbers are one finding that changed.
 // Pure: the audit reads and writes the file.
+import { authorityOf } from './authority.mjs';
 
 const ANSI = /\x1b\[[0-9;]*m/g;
 const GATE = /^(✅|❌|⚠️|⏭)\s+\[(\d+)\]\s+(.+?)(?:\s{2}\(.*)?$/;
@@ -159,7 +160,8 @@ export function findingRecords(findings = [], names = [], { prev = null, rules =
     const i = f.indexOf(' :: ');
     const check = i > 0 ? f.slice(0, i) : '';
     const evidence = (i > 0 ? f.slice(i + 4) : f).replace(/^\s*(❌|⚠️|ℹ️)\s*/, '');
-    return { id: idOf(same(f)), check, rule: rules[check] ?? null, component: componentOf(f, names), evidence, verdict: bad.has(check) ? 'fails' : 'advisory',
+    // authority: the level of the order of authority the check's rule stands on (K3: standard, decision or heuristic).
+    return { id: idOf(same(f)), check, rule: rules[check] ?? null, authority: authorityOf(check), component: componentOf(f, names), evidence, verdict: bad.has(check) ? 'fails' : 'advisory',
       side: FIGMA_WORK.test(f) ? 'figma' : 'decide', new: prev ? !old.has(same(f)) : false, difference: !NOT_A_DIFFERENCE.test(f) && !POINTER.test(evidence.trim()) };
   });
 }
