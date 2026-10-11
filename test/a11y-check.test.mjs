@@ -254,6 +254,13 @@ test('a style guide that draws no component is not the page checked: the project
   assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => '<html>a page of its own</html>').styleguide, true, 'a list it cannot read: taken as it is');
 });
 
+test('on the style guide, the rules that a landmark sit at the top of the page are the page\'s, never the component\'s', async () => {
+  const { axeRules, AXE_PAGE_LANDMARKS } = await import('../a11y-check.mjs');
+  assert.ok(AXE_PAGE_LANDMARKS.includes('landmark-complementary-is-top-level'));
+  for (const id of AXE_PAGE_LANDMARKS) assert.deepEqual(axeRules(true)[id], { enabled: false }, id);
+  for (const id of AXE_PAGE_LANDMARKS) assert.equal(axeRules(false)[id], undefined, 'any other page is held to them');
+});
+
 test('a style guide with many components is checked in parts of a few components each, every part drawing only its own', async () => {
   const { styleguideShares, SHARE_COMPONENTS } = await import('../a11y-check.mjs');
   const sgPath = '/proj/.design-system-engine-out/styleguide/index.html';

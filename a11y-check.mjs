@@ -1544,12 +1544,19 @@ async function fetchAxeSource(cfg = {}) {
 // components when there are any. Each element it fails is located as the engine's own findings are (tag#id.class and
 // the component it sits in), so a problem both find is reported once.
 export const AXE_EXPERIMENTAL = ['css-orientation-lock', 'label-content-name-mismatch', 'p-as-heading', 'td-has-header', 'table-fake-caption'];
-async function runAxe(send, sessionId, axeSource, roots = null) {
+// On a page that draws components inside its own main region (the style guide), the rules that a landmark sit at the
+// top of the page judge the page's nesting, never the component: a panel drawn as an aside is inside the guide's main
+// there, and at the top of the product that uses it.
+export const AXE_PAGE_LANDMARKS = ['landmark-banner-is-top-level', 'landmark-complementary-is-top-level', 'landmark-contentinfo-is-top-level', 'landmark-main-is-top-level'];
+export function axeRules(styleguide = false) {
+  return Object.fromEntries([...AXE_EXPERIMENTAL.map((id) => [id, { enabled: true }]), ['frame-tested', { enabled: false }], ...(styleguide ? AXE_PAGE_LANDMARKS.map((id) => [id, { enabled: false }]) : [])]);
+}
+async function runAxe(send, sessionId, axeSource, roots = null, styleguide = false) {
   if (!axeSource) return null;
   try {
     await send('Runtime.evaluate', { expression: axeSource, returnByValue: false }, sessionId);
     const ctx = roots ? `{ include: ${JSON.stringify(roots.map((s) => [s]))} }` : 'document';
-    const rules = Object.fromEntries([...AXE_EXPERIMENTAL.map((id) => [id, { enabled: true }]), ['frame-tested', { enabled: false }]]);
+    const rules = axeRules(styleguide);
     const expr = `(() => {
       const roots = ${JSON.stringify(roots)};
       const desc = (el) => (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + ((el.className && typeof el.className === 'string' && el.className.trim()) ? '.' + el.className.trim().split(/\\s+/).join('.') : '')).slice(0, 80);
@@ -2549,7 +2556,7 @@ async function main() {
     });
 
     if (axeSource) {
-      const v = await runAxe(send, sessionId, axeSource, roots);
+      const v = await runAxe(send, sessionId, axeSource, roots, !!target.styleguide);
       if (v) for (const row of v) axeViolations.push(row);
       else unfinished.push(`${label}: axe-core's rules (the scan did not finish)`);
     }
