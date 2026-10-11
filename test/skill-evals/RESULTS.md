@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Accessibility findings say how sure they are, with one verdict line; a removed focus outline a stronger rule puts back is not reported (continuous evaluation)
+
+What changed since the entry below (engine 06a82d2): Accessibility findings say how sure they are, with one verdict line; a removed focus outline a stronger rule puts back is not reported. The guide changed in `cookbook/a11y-notes.md`, `reference/usage.md`.
+
+Guide set measured: `bf47ee56e5a7` · Project measured: `13d811a9d668`
+
+| Haiku, engine 293d460 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 107k | 106k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 106k a run against 107k. Records: `records/2026-10-11-accessibility-findings-say-how-sure`.
+
 ## 2026-10: A state written with what a screen reader hears is built by its classes; a selector list split at its own commas (continuous evaluation)
 
 What changed since the entry below (engine ff08c96): A state written with what a screen reader hears is built by its classes; a selector list split at its own commas. The guide changed in `reference/gates.md`.
