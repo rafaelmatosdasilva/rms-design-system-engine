@@ -122,7 +122,7 @@ export function staticTokenReading(sources, modes) {
 // Every custom property the page's stylesheets declare (CSSOM, including @import, <style> added by
 // script and adopted sheets), plus any set directly on the root element, read from the root's
 // computed style. Returns { vars: { name: value }, blocked: [sheet hrefs the page could not read] }.
-const READ_ROOT_VARS = `(() => {
+export const READ_ROOT_VARS = `(() => {
   const names = new Set(); const blocked = [];
   const walk = (rules) => { for (const r of rules) {
     if (r.style) for (let i = 0; i < r.style.length; i++) { const p = r.style[i]; if (p.startsWith('--')) names.add(p); }
@@ -195,7 +195,7 @@ function modeSwitchFor(mode) {
 // A throwaway page holding only the theme CSS, so the browser resolves the theme alone. The files
 // are inlined in cascade order (imports already come first), because Chrome treats a file://
 // stylesheet as another origin and hides its rules from the page.
-function themePage(files) {
+export function themePage(files) {
   const css = files.map((f) => f.text.replace(/@import\s[^;]*;/g, '')).join('\n').replace(/<\/style/gi, '<\\/style');
   return `<!doctype html><html><head><style>${css}</style></head><body></body></html>`;
 }

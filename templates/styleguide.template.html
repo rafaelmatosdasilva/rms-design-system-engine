@@ -125,6 +125,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
   .sg-card-grid .sg-card > h3 { font-size: var(--sg-m); padding: var(--sg-space-s) var(--sg-space-m); }
   .sg-card-grid .sg-thumb-dot { width: 20px; height: 20px; }
   .sg-card-grid .sg-thumb-box { width: 24px; height: 24px; }
+  /* The other grids of cards two side by side too: the icons, the products a component is used in, its pictures in use. */
+  .sg-card-grid.pg-usedin, .sg-main .sg-icon-grid, .sg-main .sg-screens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 /* Each overview link is the system's own card (DATA.ui.card); with none, a plain block link. Never a box of the page's. */
 .sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
@@ -202,6 +204,14 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-inspect.sg-token-card td, .pg-inspect.sg-token-card td:first-child, .pg-inspect.sg-token-card td:last-child { color: var(--sg-text); width: auto; word-break: normal; overflow-wrap: anywhere; }
 .pg-inspect.sg-token-card td.sg-token-sample { width: calc(var(--sg-space-xxl) * 3); }
 .pg-inspect.sg-token-card td:nth-child(2), .pg-inspect.sg-token-card td:nth-child(3) { width: 35%; }
+.pg-inspect.sg-token-card td.sg-token-value { overflow-wrap: normal; }   /* a value breaks only between its words, never inside one (2px, #ffffff) */
+/* Where the cards are narrow (a phone, or a tablet beside the menu), columns as wide as what they hold: the names wrap,
+   the value keeps the room it needs and is never cut. Wider, the columns line up from one card to the next. */
+.sg-token-cards { container-type: inline-size; }
+@container (max-width: 560px) {
+  .pg-inspect.sg-token-card table { table-layout: auto; }
+  .pg-inspect.sg-token-card td:nth-child(2), .pg-inspect.sg-token-card td:nth-child(3) { width: auto; }
+}
 .sg-token-sample > span { display: block; }
 .sg-token-swatch { width: var(--sg-space-xxl); height: var(--sg-space-xxl); border: var(--sg-line); border-radius: var(--sg-radius-s); }
 .sg-token-sample > .spacing-bar { height: var(--sg-space-xxl); border-radius: 0; }   /* every sample as tall as the others, so a space reads as its width */
@@ -827,7 +837,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // A control the page needs and the system lacks: drawn with a stand-in until the system has one.
   ((DATA.ui && DATA.ui.gaps) || []).forEach(function (g) { TODO.push({ who: 'both', comp: null, say: g.say, todo: g.todo }); });
   // What the tokens owe (descriptions to write in Figma, a value written by hand twice, tokens one component uses).
-  (DATA.systemTodo || []).forEach(function (t) { TODO.push({ who: t.who, comp: null, area: 'System', type: 'Tokens, ' + t.kind.toLowerCase(), say: t.say, todo: t.todo }); });
+  (DATA.systemTodo || []).forEach(function (t) { TODO.push({ who: t.who, comp: null, area: t.area || 'System', type: t.type || 'Tokens, ' + t.kind.toLowerCase(), say: t.say, todo: t.todo }); });
   ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. Tell Claude to do it.' }); });
   var ORDER = ['figma', 'code', 'both'];
   TODO.sort(function (a, b) { return ORDER.indexOf(a.who) - ORDER.indexOf(b.who); });
@@ -906,11 +916,31 @@ a.pg-usage-name { color: var(--sg-text); }
     at.innerHTML = ''; var k = src.cloneNode(true); k.classList.add('sg-thumb-live'); k.setAttribute('inert', ''); at.appendChild(k);
     fitThumb(at);
   }
-  // Scaled to fit its card once the overview is on screen (a hidden card has no size to fit).
+  // Scaled to fit its card once the overview is on screen (a hidden card has no size to fit). What it draws is measured,
+  // not only its own box: a part may reach past it (a modal's buttons wider than its panel, a row wider than its cell),
+  // and what a part clips (a list that scrolls) is not drawn. The drawing is then centred in the picture.
   function fitThumb(at) {
     var k = at.querySelector('.sg-thumb-live'); if (!k || !at.clientWidth) return;
-    k.style.transform = ''; var bw = at.clientWidth - 24, bh = at.clientHeight - 24, r = k.getBoundingClientRect();
-    var f = Math.min(1, bw / (r.width || 1), bh / (r.height || 1)); if (f < 1) k.style.transform = 'scale(' + f.toFixed(3) + ')';
+    // A still picture: a component's own animation (a modal that scales in) would hold its transform over the fit.
+    k.style.animation = 'none'; k.style.transition = 'none'; k.style.transform = '';
+    // Squeezed to the card, a component can spill out of its own box (a modal's buttons past its panel): it is drawn
+    // as wide as its content needs, then scaled down with the rest.
+    k.style.width = ''; k.style.maxWidth = '';
+    var over = k.scrollWidth - k.clientWidth; if (over > 1) { k.style.maxWidth = 'none'; k.style.width = (k.offsetWidth + over) + 'px'; }
+    var L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
+    (function drawn(e) {
+      var s = getComputedStyle(e); if (s.display === 'none') return;
+      var b = e.getBoundingClientRect();
+      if (s.visibility !== 'hidden' && b.width * b.height >= 1) { L = Math.min(L, b.left); T = Math.min(T, b.top); R = Math.max(R, b.right); B = Math.max(B, b.bottom); }
+      if (e !== k && s.overflowX !== 'visible' && s.overflowY !== 'visible') return;
+      for (var i = 0; i < e.children.length; i++) drawn(e.children[i]);
+    })(k);
+    if (!(R > L && B > T)) return;
+    var a = at.getBoundingClientRect(), kb = k.getBoundingClientRect();
+    var f = Math.min(1, (at.clientWidth - 24) / (R - L), (at.clientHeight - 24) / (B - T));
+    var cx = (kb.left + kb.right) / 2, cy = (kb.top + kb.bottom) / 2;
+    var tx = (a.left + a.right) / 2 - cx - f * ((L + R) / 2 - cx), ty = (a.top + a.bottom) / 2 - cy - f * ((T + B) / 2 - cy);
+    if (f < 1 || Math.abs(tx) > 0.5 || Math.abs(ty) > 0.5) k.style.transform = 'translate(' + tx.toFixed(1) + 'px, ' + ty.toFixed(1) + 'px) scale(' + f.toFixed(3) + ')';
   }
   // The To do page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
   hr(); navLink('todo', 'to do');
@@ -1746,6 +1776,14 @@ a.pg-usage-name { color: var(--sg-text); }
       var label = u.label || String(u);
       if (out.some(function (r) { return r.type === 'Prop' && r.st === 'todo' && r.who === WHO.code && r.figma.indexOf('>' + esc(label) + '<') >= 0; })) return;
       out.push({ key: c.name + '\u0000unbuilt:' + label, area: 'Parity', kind: 'Prop', type: 'Prop', figma: side({ name: label, value: '' }), code: side(null), todo: esc('Build the ' + label + ' property of ' + c.name + ' in the code. Tell Claude to do it.'), who: WHO.code, st: 'todo', rel: PAR_REL.figma, at: at0 });
+    });
+    // Where it moves otherwise than Figma's prototype (C5): a change Figma animates and the code makes at once, another
+    // duration, another curve. The prototype is the design: the code follows it.
+    (c.motionDiffs || []).forEach(function (m) {
+      var fig = '<code>' + esc(m.figma.ms + 'ms') + '</code><span class="pg-par-val">' + esc(m.figma.easing + ', on ' + m.trigger) + '</span>';
+      var code = m.code ? '<code>' + esc(m.code.ms + 'ms') + '</code><span class="pg-par-val">' + esc(m.code.easing + ' · ' + m.code.selector + ' · ' + m.code.file + ':' + m.code.line) + '</span>' : side(null);
+      var todo = m.kind === 'none' ? 'Give it a transition of ' + m.figma.ms + 'ms, ' + m.figma.easing + ', as Figma has it.' : m.kind === 'duration' ? 'Make the transition ' + m.figma.ms + 'ms, as Figma has it.' : 'Ease it ' + m.figma.easing + ', as Figma does.';
+      out.push({ key: c.name + '\u0000motion:' + m.kind + ':' + m.trigger + ':' + m.change, area: 'Parity', kind: 'Motion', type: 'Other', figma: fig, code: code, todo: esc(capital(m.change) + '. ' + todo + ' Tell Claude to do it.'), who: WHO.code, st: 'todo', rel: PAR_REL.differs, at: at0 });
     });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
     if (c.codeOnly && c.codeOnly.figma) out.push({ key: c.name + '\u0000codeOnly', area: 'Parity', kind: 'Component', type: 'Other', figma: side(null), code: side({ name: c.name, value: c.codeOnly.file }), todo: esc('Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.'), who: WHO.figma, st: 'todo', rel: PAR_REL.code, at: at0 });
