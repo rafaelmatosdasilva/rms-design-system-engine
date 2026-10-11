@@ -701,6 +701,18 @@ test('To do: a role the code fails or has still to be tried on is Claude\'s even
   assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Its code' }], ''), 'Claude in the code');
 });
 
+test('a control with no name only where an on/off prop hides its words fails, with what the product does about it', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const named = new Function(tpl.slice(tpl.indexOf('function showsText('), tpl.indexOf('function showFirst(')) + 'return namedWhereUsed;')();
+  const props = [{ label: 'Show Label', type: 'BOOLEAN', default: true }, { label: 'Label Content', type: 'TEXT' }, { label: 'Show Icon', type: 'BOOLEAN', default: true }];
+  // Unnamed only with its label off: what to do is said, naming the prop.
+  assert.match(named([{ 'Show Label': false, 'Show Icon': true }, { 'Show Label': false, 'Show Icon': false }], props), /^With Show Label off it shows no words, so nothing names it\. Where a product uses it that way, give it a name there: an aria-label/);
+  // Unnamed with its label shown too: the component's own fault, nothing more said.
+  assert.equal(named([{ 'Show Label': false }, { 'Show Label': true }], props), '');
+  // An on/off prop that shows no words (an icon) never counts.
+  assert.equal(named([{ 'Show Icon': false }], [{ label: 'Show Icon', type: 'BOOLEAN', default: true }]), '');
+});
+
 test('an accessibility finding goes to Accessibility, a difference from Figma to Parity', async () => {
   const { splitFindings } = await import('../styleguide-data.mjs');
   const { parity, a11y } = splitFindings([{ check: 'State contrast', what: 'badge [Type=Warning · light]: 2.04:1 (needs 4.5:1)' }, { check: 'Structure', what: 'badge · height: Figma 20, code 22' }, { check: 'Token layering', what: 'x' }]);
