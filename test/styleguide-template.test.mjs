@@ -1056,6 +1056,19 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.doesNotMatch(tpl, /Each swatch is the CSS variable itself/, 'no line under the colours title');
   assert.match(tpl, /a\.scoped && a\.attr === 'data-size'; \}, function \(a\) \{ return a\.scoped && a\.attr !== 'data-size'/, 'the sizing mode top left, the colour mode bottom right, inside the playground');
   assert.match(tpl, /\.sg-thumb-live \{[^}]*align-self: center/, 'a card preview is centred whatever its own rule says');
+  // A card's picture holds the whole component: what it draws is measured (a modal's buttons past its panel), a
+  // component squeezed out of its own box is drawn as wide as its content, and its own animation never holds it.
+  const fit = tpl.slice(tpl.indexOf('function fitThumb('), tpl.indexOf('// The To do page'));
+  assert.match(fit, /k\.style\.animation = 'none'/);
+  assert.match(fit, /var over = k\.scrollWidth - k\.clientWidth; if \(over > 1\)/);
+  assert.match(fit, /for \(var i = 0; i < e\.children\.length; i\+\+\) drawn\(e\.children\[i\]\)/);
+  assert.match(fit, /'translate\(' \+ tx\.toFixed\(1\) \+ 'px, ' \+ ty\.toFixed\(1\) \+ 'px\) scale\('/);
+  // On a phone every grid of cards is two side by side: the overview, the icons, Used in, the pictures in use.
+  const phone = tpl.slice(tpl.indexOf('@media (max-width: 480px)'), tpl.indexOf('/* Each overview link is'));
+  assert.match(phone, /\.sg-card-grid\.pg-usedin, \.sg-main \.sg-icon-grid, \.sg-main \.sg-screens \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/);
+  // A token's value is never cut or broken inside a word; narrow token cards size their columns by what they hold.
+  assert.match(tpl, /\.pg-inspect\.sg-token-card td\.sg-token-value \{ overflow-wrap: normal; \}/);
+  assert.match(tpl, /@container \(max-width: 560px\) \{\s*\.pg-inspect\.sg-token-card table \{ table-layout: auto; \}/);
 });
 
 test('what uses each token: in a component\'s own rules, or through another token, nearest first', async () => {
