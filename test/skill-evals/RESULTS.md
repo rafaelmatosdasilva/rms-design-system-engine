@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Coverage becomes Documentation, the same cards as each component's (continuous evaluation)
+
+What changed since the entry below (engine c739389): The style guide's Coverage page is renamed Documentation and gathers each component's own Documentation card, so the two always hold the same thing; Used in is no longer a kind of documentation. reference/usage.md describes it. The guide changed in `reference/usage.md`.
+
+Guide set measured: `526e9e6ccc56` · Project measured: `13d811a9d668`
+
+| Haiku, engine 53b5844 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.059 |
+| Input a run | 100k | 109k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 109k a run against 100k. Records: `records/documentation-page`.
+
 ## 2026-10: Motion and screens against Figma, every combination of modes, and the products' own pages checked (continuous evaluation)
 
 What changed since the entry below (engine f8675f6): C5 compares Figma's prototype transitions with the code's (--figma-motion); I96 compares each product's page with its designed screens (--figma-screens); L6 checks every combination of modes; F12 and I97 check each product's own page whole, with the Tab order and lost focus. The refresh recipe gains the two read-only captures and says a token is only ever set in the project's .env, never asked for; usage and config describe the new commands and keys. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
