@@ -1061,7 +1061,11 @@ whatever surface the project serves, in this order:
    opened via `file://`. It renders **every component × every
    state on one static page**, so the sweep is deterministic, complete and needs **no dev server**, and —
    because each state is its own instance in the resting DOM — the existing checks get **per-state coverage
-   for free** (a disabled/checked/error instance is measured directly). `a11y.styleguide:false` opts out;
+   for free** (a disabled/checked/error instance is measured directly). The checks that press keys, click or type act
+   only on components drawn in a preview (`.pg-preview`), never on the page's own controls built from them. A guide with more than six components is
+   checked in parts of six, the same page drawing only its own (`?all&only=a,b`), each finding named as the guide's:
+   on one page with every component its whole-page checks (the Tab walk, text spacing, reflow, zoom) outlasted any
+   time limit, and nothing it found was kept. `a11y.styleguide:false` opts out;
    `a11y.regenerateStyleguide:true` rebuilds it first (via `styleguide-gen.mjs`) so a11y never audits a
    stale one. Falls through to the built plugin UIs (`apps/*/ui.html`) when there is no styleguide.
    **The components rendered from their own code** (`component-harness.mjs`) — in build mode, or when there is no
@@ -1092,7 +1096,9 @@ whatever surface the project serves, in this order:
    packages are not installed is told so, and a generated style guide that draws no component is not used.
    A component whose class no element in the code has is said at once, with the classes that hold its name
    (`.modal-wrapper` for modal), never waited for on every page. The check's time grows with its pages and
-   modes (`a11y.timeoutSec` sets it), and a check stopped by it says how many pages it reached.
+   modes (`a11y.timeoutSec` sets it, and the audit waits for it past its other gates' limit). A check stopped by it
+   keeps what the pages it finished found, and says the page it was on and the ones it never reached not checked
+   (a style guide's part by its components), never clean.
    **A component shown only after an action** (a modal behind its "Show modal" button, a menu kept hidden until
    its trigger is pressed, a popover, a toast): when the scoped component is not seen on a page after two seconds,
    the controls that may open it are pressed in turn, up to 8: those whose words name it first, then those that say

@@ -1738,7 +1738,7 @@ function reportFull(label, items, shown) {
   //     (ds-config.json → gateTimeoutSec, default 180) is a FAIL with the reason, never a pass;
   //   • status null is kept for one meaning only: the script file does not exist.
   const GATE_TIMEOUT_MS = Math.max(10, Number(cfg.gateTimeoutSec) || 180) * 1000;
-  function runScriptAsync(scriptPath, args = []) {
+  function runScriptAsync(scriptPath, args = [], timeoutMs = GATE_TIMEOUT_MS) {
     return new Promise(res => {
       const abs = resolve(SCRIPT_DIR, scriptPath);
       if (!existsSync(abs)) return res({ status: null, stdout: '', stderr: '' });
@@ -1753,12 +1753,12 @@ function reportFull(label, items, shown) {
       let child;
       try { child = spawn(process.execPath, ['--import', pathToFileURL(join(SCRIPT_DIR, 'stdio-sync.mjs')).href, abs, ...args], { cwd: ROOT, env: process.env }); }
       catch (e) { return finish(1, `could not start (${e.message})`); }
-      const timer = setTimeout(() => { timedOut = true; try { child.kill('SIGKILL'); } catch { /* already gone */ } }, GATE_TIMEOUT_MS);
+      const timer = setTimeout(() => { timedOut = true; try { child.kill('SIGKILL'); } catch { /* already gone */ } }, timeoutMs);
       child.stdout.on('data', d => { stdout += d; });
       child.stderr.on('data', d => { stderr += d; });
       child.on('error', e => finish(1, `could not start (${e.message})`));
       child.on('close', (status, signal) => {
-        if (timedOut) return finish(1, `timed out after ${GATE_TIMEOUT_MS / 1000}s (raise ds-config.json → gateTimeoutSec if it needs longer)`);
+        if (timedOut) return finish(1, `timed out after ${timeoutMs / 1000}s (raise ds-config.json → gateTimeoutSec if it needs longer)`);
         if (status === null) return finish(1, `was stopped (${signal ?? 'killed'})`);
         finish(status);
       });
@@ -3091,8 +3091,16 @@ function reportFull(label, items, shown) {
   try { unlinkSync(A11Y_JSON); } catch { /* not there */ }
   // Building a component: every accessibility line is listed element by element, as it is part of building it.
   // axe-core's rules and the hover, focus and pressed states run in every accessibility check: --no-axe, --no-states leave one out.
+  // The accessibility check keeps its own time: it grows with the pages and the style guide's components, and a check
+  // stopped by it keeps what it found. Killed at a gate's limit, it kept nothing, and the style guide never had its results.
+  // So the gate waits for it, a little past the longest it may take; inside a git hook a commit never waits past the
+  // gate's limit, and the check is given that limit as its own.
+  const hookRun = !!process.env.GIT_INDEX_FILE || process.argv.includes('--hook');
+  const { LIMIT_CAP_SEC: A11Y_CAP_SEC } = await import('./a11y-check.mjs');
+  const a11yWaitMs = hookRun ? GATE_TIMEOUT_MS : Math.max(GATE_TIMEOUT_MS, ((Number(cfg.a11y?.timeoutSec) || A11Y_CAP_SEC) + 180) * 1000);
   const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') || (cfg.build === true && SCOPE_COMPONENTS.length) ? ['--a11y'] : []),
-    ...['--no-axe', '--no-states'].filter((f) => process.argv.includes(f)), '--json-out', A11Y_JSON];
+    ...['--no-axe', '--no-states'].filter((f) => process.argv.includes(f)), '--json-out', A11Y_JSON,
+    ...(hookRun ? ['--time-limit', String(Math.max(10, GATE_TIMEOUT_MS / 1000 - 90))] : [])];
 
   // Code capture: the code side read once per run (code-capture.mjs), the mirror of the Figma
   // capture. Cached by content, so an unchanged project reuses it at once. Gates that need facts
@@ -3122,7 +3130,7 @@ function reportFull(label, items, shown) {
   // Subprocess gates. The file-reading gates launch concurrently. The two browser gates each start a
   // Chrome, so they run one after the other, beside the rest: two browsers competing with thirty
   // processes for the CPU is what makes a slow machine time out.
-  const browserGates = (async () => [await runScriptAsync('rendered-check.mjs'), !ONLY || ONLY.a11y ? await runScriptAsync('a11y-check.mjs', a11yArgs) : null])();
+  const browserGates = (async () => [await runScriptAsync('rendered-check.mjs'), !ONLY || ONLY.a11y ? await runScriptAsync('a11y-check.mjs', a11yArgs, a11yWaitMs) : null])();
   const [rParity, rStructure, rBound, rIsolation, rVisual, rState, rExemption, rMode, rNaming, rPseudo, rIcon, rStateBinding, rStateVar, rIconSlot, rComponentSlot, rFormControl, rHtmlStructure, rTransition, rIconFreshness, rCoverage, rMotion, rEffect, rContainment, rCompProp, rCompose, rTemplateCompose, rStateOpacity, rIconInv, rScreenEl, rDocsTruth, rReimpl, rCase] = await Promise.all([
     runScriptAsync('parity-check.mjs', ['--json']),
     runScriptAsync('structure-check.mjs'),

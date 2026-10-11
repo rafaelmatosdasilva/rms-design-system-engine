@@ -158,7 +158,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-card > h3:not(:last-child) { padding-bottom: var(--sg-space-xxs); }
 .sg-card > h3 + p { margin: 0; padding: 0 var(--sg-space-l) var(--sg-space-m); background: var(--sg-bg-2); }   /* the line under the name, aligned with it, on its background */
 .sg-card > :last-child:not(.sg-thumb):not(.pg-shot) { flex-grow: 1; }   /* that background down to the card's edge */
-.sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; padding: var(--sg-space-m) var(--sg-space-l); background: var(--sg-bg-2); border-top: var(--sg-line); }
+.sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; padding: var(--sg-space-m) var(--sg-space-l); background: var(--sg-bg-2); border-top: var(--sg-line); overflow-wrap: anywhere; }   /* a long name wraps, never spills, with wider text spacing too (WCAG 1.4.12) */
 .sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--sg-space-l); }
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
 .sg-screen img { display: block; width: 100%; height: auto; }
@@ -666,6 +666,19 @@ a.pg-usage-name { color: var(--sg-text); }
       return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '"' + (o.off ? (RADIO ? '' : ' disabled') + ' aria-disabled="true" title="' + esc(o.title || '') + '"' : '') + '>' + text + '</' + tag + '>';
     }).join('') + (SEG ? SEG.close : '</div>');
   }
+  // The page's own switch says its choice the way its role does: a radio is checked, a tab or an option selected, a plain
+  // button pressed. A radio that also says pressed breaks WCAG 4.1.2, so when the system's script makes the options
+  // radios after the page drew them, the pressed state is taken off (never on a component the page shows).
+  var CHOICE_ROLE = /^(radio|menuitemradio|tab|option)$/;
+  function sayChoice(el, on) {
+    var role = el.getAttribute('role') || '';
+    if (!CHOICE_ROLE.test(role)) { el.setAttribute('aria-pressed', on ? 'true' : 'false'); return; }
+    el.removeAttribute('aria-pressed');
+    el.setAttribute(/^(tab|option)$/.test(role) ? 'aria-selected' : 'aria-checked', on ? 'true' : 'false');
+  }
+  if (typeof MutationObserver !== 'undefined') new MutationObserver(function (ms) {
+    ms.forEach(function (m) { var el = m.target; if (el.hasAttribute('aria-pressed') && el.hasAttribute('data-v') && CHOICE_ROLE.test(el.getAttribute('role') || '') && !el.closest('.pg-preview, .pg-frame')) sayChoice(el, el.getAttribute('aria-pressed') === 'true'); });
+  }).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['role'] });
   function segSelect(el, on) {
     if (SEG) {
       (SEG.selected.add || []).forEach(function (k) { el.classList.toggle(k, on); });
@@ -673,7 +686,7 @@ a.pg-usage-name { color: var(--sg-text); }
       Object.keys(SEG.selected.attrs || {}).forEach(function (a) { if (on) el.setAttribute(a, SEG.selected.attrs[a]); else el.removeAttribute(a); });
     } else el.classList.toggle('selected', on);
     if (RADIO) { var r = el.querySelector('input'); if (r) r.checked = on; el.dataset.on = on ? '1' : ''; }
-    else el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    else sayChoice(el, on);
     if (on) nudge();   // the system's own script places what follows the selection (a sliding pill) again
   }
   /* ── The switch between a component's areas is the system's own tabs (DATA.ui.tabs, read from its markup). With none,
@@ -695,7 +708,7 @@ a.pg-usage-name { color: var(--sg-text); }
       (TABS.selected.remove || []).forEach(function (k) { el.classList.toggle(k, !on); });
       Object.keys(TABS.selected.attrs || {}).forEach(function (a) { if (on) el.setAttribute(a, TABS.selected.attrs[a]); else el.removeAttribute(a); });
     } else el.classList.toggle('is-on', on);
-    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    sayChoice(el, on);
     if (on) nudge();
   }
   function segItems(box) { return Array.prototype.slice.call(box.querySelectorAll('[data-v]')); }
@@ -736,7 +749,7 @@ a.pg-usage-name { color: var(--sg-text); }
         diff.hidden = !list.length;
       };
       wrap._sync();
-      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (b.getAttribute('aria-pressed') === 'true' || b.dataset.on === '1') return;   // the choice already set changes nothing
+      segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (/true/.test(b.getAttribute('aria-pressed') || b.getAttribute('aria-checked') || b.getAttribute('aria-selected') || '') || b.dataset.on === '1') return;   // the choice already set changes nothing
       if (b.dataset.v === '__auto') scope.removeAttribute(axis.attr); else apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(axis); }); });
       return wrap;
     }
@@ -1787,7 +1800,9 @@ a.pg-usage-name { color: var(--sg-text); }
     return '<div class="sg-card-grid pg-usedin">' + u.map(function (k) {
       var p = (DATA.products || {})[k.key] || null, boxes = (p && p.boxes && p.boxes[c.name]) || [];
       var pct = function (v, of) { return (Math.round(v / of * 10000) / 100) + '%'; };
-      var shot = p ? '<div class="pg-shot"><img src="' + p.shot + '" alt="' + esc(k.name + (boxes.length ? ', with ' + c.name + ' marked' : '')) + '">' +
+      // The picture says nothing the card's words do not: its name is the title beside it and the line under it says
+      // where the component is marked, so a screen reader hears each once (alt="", never the name twice).
+      var shot = p ? '<div class="pg-shot"><img src="' + p.shot + '" alt="">' +
         (p.w ? boxes.map(function (b) { return '<span class="pg-mark" style="left:' + pct(b[0], p.w) + ';top:' + pct(b[1], p.h) + ';width:' + pct(b[2], p.w) + ';height:' + pct(b[3], p.h) + '"></span>'; }).join('') : '') + '</div>' : '';
       var where = k.ownInstead ? 'Draws its own instead (' + k.ownInstead + '); the To do list says to use this one.' : k.figmaOnly ? 'Its screens use it in Figma; its code builds it by hand.' : k.places ? (k.places === 1 ? 'Once in its code.' : k.places + ' times in its code.') : '';
       var note = [where, !p || p.from === 'image' ? '' : boxes.length ? (boxes.length === 1 ? 'Marked where it shows when the product opens.' : 'Marked in the ' + boxes.length + ' places it shows when the product opens.') : 'Not on the screen it opens with.'].filter(Boolean).join(' ');
@@ -2084,7 +2099,10 @@ a.pg-usage-name { color: var(--sg-text); }
       else if (k.how === 'audit') {
         var did = audited && audited.ran.indexOf(WCAG_AUDIT[k.sc]) >= 0;
         st = did ? 'done' : 'check';
-        note = did ? 'Passes, tried by the last audit in a browser. ' + k.says : !audited ? 'Run the audit, it tries this on ' + c.name + ' in a browser.' : WCAG_AUDIT[k.sc] === 'reflow' ? 'The last audit did not try ' + c.name + ' 320 pixels wide. Run it again.' : 'The last audit did not get to ' + c.name + '. Run it again.';
+        // Not tried by the audit that ran: a component the code has no markup for is built first; one it did not reach is
+        // tried by running it again.
+        var why = ch && ch.notRead ? ch.why || '' : null;
+        note = did ? 'Passes, tried by the last audit in a browser. ' + k.says : why != null ? (/no markup/.test(why) ? 'Build ' + c.name + ' in the code: the audit tries this once the page draws it from the code.' : 'The last audit did not get to ' + c.name + (why ? ' (' + why + ')' : '') + '. Run it again.') : !audited ? 'Run the audit, it tries this on ' + c.name + ' in a browser.' : WCAG_AUDIT[k.sc] === 'reflow' ? 'The last audit did not try ' + c.name + ' 320 pixels wide. Run it again.' : 'The last audit did not get to ' + c.name + '. Run it again.';
       } else if (k.ran && live && !k.ran.some(function (r) { return live.ran[r]; }) && !its.length) st = null;   // nothing in it that this asks about
       else if (!tried && !(ch && !ch.notRead)) { st = 'check'; note = 'Tried on ' + c.name + ' when its Accessibility area is open.'; }
       else {
@@ -2099,7 +2117,8 @@ a.pg-usage-name { color: var(--sg-text); }
       // otherwise).
       if (live && !live.ran.control && /^(2\.1\.1|2\.1\.2|2\.4\.3|2\.4\.7|2\.5\.2|2\.5\.3|3\.2\.1|3\.2\.2|4\.1\.2|1\.4\.13)$/.test(k.sc)) { st = null; its = its.filter(function (it) { return it.st === 'todo'; }); }
       if (live && !live.ran.field && /^(3\.3\.1|3\.3\.2|3\.3\.3|1\.3\.5)$/.test(k.sc)) { st = null; its = its.filter(function (it) { return it.st === 'todo'; }); }
-      if (its.some(function (it) { return it.st === 'todo'; })) st = 'todo';
+      // Beyond A and AA (a AAA criterion) a finding is advice: something to check and decide, never a must-fix.
+      if (its.some(function (it) { return it.st === 'todo'; })) st = k.extra ? 'check' : 'todo';
       else if (its.some(function (it) { return it.st === 'check'; }) && st) st = 'check';
       else if (!st && its.some(function (it) { return it.st === 'done'; })) st = 'done';
       if (!st) return null;
@@ -2141,7 +2160,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // there; what a person checks, or what has still to run, is what to do.
       var note = r.st === 'todo' ? '' : r.note || '', act = '', cut = note.indexOf('On ' + c.name);
       if (/a person checks that/.test(note) && cut >= 0) { act = note.slice(cut); note = note.slice(0, cut).trim(); }
-      else if (/^(Run the audit|For every component|The last audit did not get|Tried on .* when its Accessibility area is open|Read once the audit runs)/.test(note)) { act = note; note = ''; }
+      else if (/^(Run the audit|Build .* in the code: the audit|For every component|The last audit did not get|Tried on .* when its Accessibility area is open|Read once the audit runs)/.test(note)) { act = note; note = ''; }
       if (note) found += '<div class="pg-a11y-item pg-a11y-quiet">' + esc(note) + '</div>';
       // What to do: each open finding's own fix, then what a person checks or what has still to run; a finding with no
       // fix of its own, what the criterion asks.
@@ -2163,7 +2182,7 @@ a.pg-usage-name { color: var(--sg-text); }
       if (!src.length) src.push(WCAG_SRC[r.k.how] || r.how || '');
       return { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : '<button type="button" class="sg-token-link pg-wcag-tip" data-wcag="' + esc(r.k.sc) + '" aria-expanded="false" aria-haspopup="dialog">' + esc(name) + '</button>',
         figma: r.fig.map(function (x) { return '<div>' + esc(x) + '</div>'; }).join(''), code: found, todo: todos.map(function (x) { return '<div>' + x + '</div>'; }).join(''),
-        who: r.st === 'todo' || r.st === 'check' ? own || a11yWho(r.k.sc, r.k.how, open, r.note) : '', st: r.st, at: at, src: src, extra: !!r.k.extra, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note };
+        who: r.st === 'todo' || r.st === 'check' ? (r.k.extra ? WHO.both : own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: at, src: src, extra: !!r.k.extra, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note };
     });
   }
 
@@ -2699,7 +2718,7 @@ a.pg-usage-name { color: var(--sg-text); }
         .map(function (x) { return '<span class="pg-par-status pg-par--' + STATUS[x[0]][2] + '"><span class="pg-par-sign" aria-hidden="true">' + STATUS[x[0]][0] + '</span>' + n[x[0]] + ' ' + x[1] + '</span>'; }).join('');
       var ch = c.a11y && c.a11y.checked;
       a11yNote.textContent = 'The WCAG 2.2 criteria at level A and AA that apply to it' + (liveNow ? (c.__a11y && c.__a11y.baked ? ', every variant tried in a browser when this page was built' : ', every variant tried in this browser') + (liveNow.at ? ' (' + when(liveNow.at) + ')' : '') : '') + '. ' +
-        (!ch ? 'The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.' : ch.notRead ? 'The last audit (' + when(ch.at) + ') could not check it: it was not drawn on the page it opened.' : 'Last audit in a browser ' + when(ch.at) + '.') +
+        (!ch ? 'The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.' : ch.notRead ? 'The last audit (' + when(ch.at) + ') could not check it: ' + (ch.why || 'it was not drawn on the page it opened') + '.' : 'Last audit in a browser ' + when(ch.at) + '.') +
         ((c.a11y && c.a11y.excused || []).length ? ' Not asked of it, ' + c.a11y.excused.map(function (x) { return x.says + ' (' + x.reason + ')'; }).join('; ') + '.' : '');
     }
     a11yRender(liveNow);
@@ -2982,7 +3001,9 @@ a.pg-usage-name { color: var(--sg-text); }
           var h = rs.length ? Math.max.apply(null, rs.map(function (q) { return q.bottom; })) - Math.min.apply(null, rs.map(function (q) { return q.top; })) : 0;
           var fill = document.createElement('div');
           fill.className = 'pg-slot-area pg-slot-fill'; fill.setAttribute('data-slot', slotName(r)); fill.setAttribute('aria-hidden', 'true');
-          fill.style.minWidth = Math.max(w, 96) + 'px'; fill.style.minHeight = Math.max(h, 40) + 'px';
+          // Its width is the content's, never more than the room it has: a minimum would hold a component wider than a
+          // narrow screen (a 469px action bar at 320px) and fail its reflow for a size the page set, not the system.
+          fill.style.width = 'min(' + Math.max(w, 96) + 'px, 100%)'; fill.style.minHeight = Math.max(h, 40) + 'px';
           el.insertBefore(fill, kids[0] || null);
           kids.forEach(function (k) { k.classList.add('pg-slot-gone'); });
         });
@@ -3243,6 +3264,8 @@ a.pg-usage-name { color: var(--sg-text); }
   // Each component is its own view, drawn the first time it is opened (every view at once with ?all, as the engine's
   // own checks open the page). Its card's thumbnail is its markup at first, then its drawn preview.
   var ALL = /[?&]all\b/.test(location.search), BUILDERS = {};
+  // With ?all&only=a,b only those components are drawn: the engine's accessibility check takes a big system in parts.
+  var ONLY = (function () { var m = /[?&]only=([^&]*)/.exec(location.search); return m ? decodeURIComponent(m[1]).split(',') : null; })();
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
     BUILDERS[cid(c.name)] = function () {
       hr();
@@ -3254,7 +3277,7 @@ a.pg-usage-name { color: var(--sg-text); }
       return cardEl;
     };
     navLink(cid(c.name), c.name);
-    if (ALL) BUILDERS[cid(c.name)](); else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
+    if (ALL) { if (!ONLY || ONLY.indexOf(c.name) >= 0) BUILDERS[cid(c.name)](); } else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
   });
   if (!COMPONENTS.length && !FLAT.length) { var empty = document.createElement('p'); empty.className = 'pg-empty'; empty.textContent = 'Nothing agreed yet.'; main.appendChild(empty); }
 
