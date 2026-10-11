@@ -9,6 +9,7 @@
 3. When no refresh path is available (no figma-cli, no token, no Figma MCP, no Plugin API), say so and audit the committed snapshots.
 4. When the Figma tool of this session can read the file, also refresh the annotation categories, which no other path returns: run `rms-design-system-engine --annotation-categories`, run the script it writes with that tool (once per page on a large file), save each result unchanged under `.design-system-engine-out/figma-capture/`, then run `rms-design-system-engine --annotation-categories <each file>`.
 5. After a refresh, run the audit (`--recipe full-audit` or `--recipe audit-component`).
+6. When a token was renamed in Figma (the person says so, or the audit's `🔁` line), run `rms-design-system-engine --rename-sweep`. It writes one patch for the system and one for each product that renames the variable in every rule, script and doc, with the old name kept in the theme pointing at the new one. Show the person the change and apply it only when they ask.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 

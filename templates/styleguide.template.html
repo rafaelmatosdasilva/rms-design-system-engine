@@ -2007,6 +2007,25 @@ a.pg-usage-name { color: var(--sg-text); }
   var WCAG_SRC = { auto: 'The style guide, in the browser', audit: 'The last audit, in a browser', static: 'Its code', person: 'A person', page: 'The page that uses it', media: 'Video and sound only' };
   var WCAG_AUDIT = { '1.4.4': 'zoom', '1.4.10': 'reflow', '1.4.12': 'spacing', '2.1.2': 'tabtrap', '2.4.11': 'tabtrap', '2.5.8': 'targets' };
 
+  // A retired component still in use (K12): one row for each product that still uses it, with its first places and
+  // what replaces it; every place is in migrations.md beside the audit's other hand-back files.
+  function migrationRows(c) {
+    var m = c.migration; if (!m) return [];
+    return m.products.map(function (p) {
+      return { key: c.name + '\u0000migration:' + p.name, area: 'Migration', kind: 'Retired', figma: '', code: '<code>' + esc(p.name) + '</code><span class="pg-par-val">' + esc(p.count + (p.count === 1 ? ' place' : ' places')) + '</span>',
+        todo: esc('Move ' + (p.name === 'This system' ? 'this system' : p.name) + ' off ' + c.name + ' (' + p.at.join(', ') + (p.count > p.at.length ? ', and ' + (p.count - p.at.length) + ' more' : '') + ').') + '<span class="pg-todo">' + esc((m.toName ? 'Use ' + m.toName + ' instead. ' : 'Decide what replaces it first. ') + 'Every place is in migrations.md. Tell Claude to do it.') + '</span>',
+        who: m.toName ? WHO.code : WHO.both, st: m.toName ? 'todo' : 'check', rel: '', at: DATA.builtAt || null };
+    });
+  }
+  // A class a product styles almost as this component (I83): a decision, one row each, to use the component or to add
+  // the new one to the system on purpose.
+  function copyRows(c) {
+    return (c.copies || []).map(function (x) {
+      return { key: c.name + '\u0000copy:' + x.product + ':' + x.cls, area: 'Products', kind: 'Near copy', figma: '', code: '<code>.' + esc(x.cls) + '</code><span class="pg-par-val">' + esc(x.product + ', ' + x.file + ':' + x.line) + '</span>',
+        todo: esc(x.product + '\'s .' + x.cls + ' is nearly ' + c.name + ' (' + x.same + ' of ' + x.of + ' declarations alike' + (x.differ.length ? '; it differs in ' + x.differ.slice(0, 4).join(', ') : '') + ').') + '<span class="pg-todo">' + esc('Decide: use ' + c.name + ' in ' + x.product + ', with a new option if it needs one, or add .' + x.cls + ' to the system on purpose. Tell Claude which.') + '</span>',
+        who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null };
+    });
+  }
   // Every open item, by component, in the table each component's own areas show: its Parity rows to fix or to check,
   // then its Accessibility rows (a criterion the browser has not tried yet waits for that try); the system's own items
   // first. Numbered in the order the page shows them, and each component's areas show the same numbers.
@@ -2030,6 +2049,8 @@ a.pg-usage-name { color: var(--sg-text); }
         });
         unreadRows(c).filter(isOpen).forEach(function (r) { rows.push(r); });
       } catch (e) { /* its accessibility is read on its own page */ }
+      migrationRows(c).forEach(function (r) { rows.push(r); });
+      copyRows(c).forEach(function (r) { rows.push(r); });
       if (rows.length) order.push({ name: c.name, rows: rows });
     });
     // Numbered in the order the page shows them, top to bottom: the system first, then each component by name, in each
@@ -2062,7 +2083,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var sign = function (st) { var x = STATUS[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>'; };
     // A filter by area: every row, or only Parity's, Accessibility's or the page's own; kept as the list is drawn again.
     var areas = {}; order.forEach(function (g) { g.rows.forEach(function (r) { areas[r.area] = (areas[r.area] || 0) + 1; }); });
-    var kinds = ['Parity', 'Accessibility', 'System', 'Page'].filter(function (a) { return areas[a]; });
+    var kinds = ['Parity', 'Accessibility', 'Migration', 'Products', 'System', 'Page'].filter(function (a) { return areas[a]; });
     if (todoArea !== 'all' && !areas[todoArea]) todoArea = 'all';
     var filter = kinds.length > 1 ? '<div class="pg-par-filter sg-todo-filter">' + segHTML([{ label: 'All (' + all + ')', v: 'all' }].concat(kinds.map(function (a) { return { label: a + ' (' + areas[a] + ')', v: a }; })), 'Show') + '</div>' : '';
     box.innerHTML = note + '<div class="sg-todo-head"><p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + filter + '</div>' + order.map(function (g) {
@@ -2359,6 +2380,8 @@ a.pg-usage-name { color: var(--sg-text); }
         // A component only the code has: said at its top, so nothing on its page reads as agreed with Figma.
         (c.codeOnly ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">Only in the code</span><span>' + (c.codeOnly.figma ? 'Figma has no component for it: compared with nothing in Figma.' : 'No Figma data yet: compared with nothing in Figma.') + '</span></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
+        // Retired and still in use: what replaces it and how much still moves, each place a row of the To do page.
+        (c.migration ? '<p class="pg-status pg-migration">' + (c.status ? '' : statusPill({ kind: 'deprecated', status: 'Deprecated' })) + '<span>' + esc((c.migration.toName ? 'Use ' + c.migration.toName + ' instead. ' : 'Nothing replaces it yet. ') + 'Still used in ' + c.migration.count + (c.migration.count === 1 ? ' place' : ' places') + ' (' + c.migration.products.map(function (p) { return p.name + ' ' + p.count; }).join(', ') + '), each on the ') + '<a href="#todo">To do</a> page.</span></p>' : '') +
         // Its version, when it last changed and how to import it: one line, wrapping only when the room runs out.
         '<div class="pg-meta">' + (ALL ? '' : factsHTML(c)) + importHTML(c) + '</div>' +
       '</div>' +

@@ -85,6 +85,13 @@ test('guidelines links, setup and refresh', () => {
   assert.match(refresh.say[0], /set FIGMA_TOKEN in the project's \.env file; never paste a token in the chat\.$/);   // how to give access, so the agent never improvises "share a token"
   assert.match(refresh.notes.join(' '), /Without it, do not offer a refresh and never edit a snapshot/);
   assert.equal(r('o design mudou, atualiza os dados do Figma').recipe, 'refresh-figma');
+  // A token renamed in Figma (L11): the sweep, one change everywhere, applied only when the person asks.
+  for (const t of ['I renamed the surface tokens in Figma, update the code', 'renomeei a variável surface/old no Figma', 'we renamed --surface-old to --surface-raised']) {
+    const rn = r(t);
+    assert.deepEqual([rn.recipe, rn.run], ['refresh-figma', ['rms-design-system-engine --rename-sweep']], t);
+    assert.match(rn.notes.join(' '), /apply it only when they ask; never rename by hand/);
+  }
+  assert.notEqual(r('rename the chip').run[0], 'rms-design-system-engine --rename-sweep', 'a component, not a token');
 });
 
 test('setup takes where the code is and the Figma link from the request, and asks for what it leaves out', () => {

@@ -785,6 +785,34 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       }
       if (cfg.styleguide?.groups) view.groups = cfg.styleguide.groups;
     } catch { /* no status, no coverage */ }
+    // What the system retired that is still in use (K12): each deprecated component on its own page and in its To do
+    // rows, product by product; each retired token in the system's To do, a swap or a decision.
+    if (!opts.only?.length) try {
+      const { projectMigrations, migrationView } = await import('./migrations.mjs');
+      const { codeSnapshotPath } = await import('./names.mjs');
+      const { steps } = await projectMigrations(ROOT, cfg);
+      if (steps.length) {
+        const mv = migrationView(steps, { dir: join(dirname(codeSnapshotPath(cfg)), 'handback') });
+        if (mv.tokens.length) view.systemTodo = [...(view.systemTodo ?? []), ...mv.tokens];
+        for (const c of new Set([...(view.allComponents ?? []), ...view.components])) if (mv.components[c.name]) c.migration = mv.components[c.name];
+      }
+    } catch { /* the page builds without it */ }
+    // A class a product styles almost as the system styles one of its components (I83): a decision in that component's
+    // To do rows, to use the component (a new option if it needs one) or to add the new one to the system on purpose.
+    if (!opts.only?.length && cfg.systemHealth !== false) try {
+      const { productCopies } = await import('./system-advice.mjs');
+      const { sourceFiles } = await import('./code-roots.mjs');
+      const { rootOf } = await import('./migrations.mjs');
+      const every = [...new Set([...(view.allComponents ?? []), ...view.components])];
+      const files = sourceFiles(ROOT, cfg), products = {};
+      for (const f of files) { const r = rootOf(f.file); if (r !== '.') (products[r] ??= []).push(f); }
+      const sheets = files.filter((f) => rootOf(f.file) === '.' && /\.(css|scss|less)$/i.test(f.file)).map((f) => f.text).join('\n');
+      const classes = Object.fromEntries(every.filter((c) => c.cls && /^[\w-]+$/.test(c.cls)).map((c) => [c.name, `.${c.cls}`]));
+      for (const x of productCopies(products, sheets, classes)) {
+        const c = every.find((k) => k.name === x.like);
+        if (c) (c.copies ??= []).push({ product: basename(x.product), file: x.file.slice(x.product.length + 1), line: x.line, cls: x.cls, same: x.same, of: x.of, differ: x.differ });
+      }
+    } catch { /* the page builds without it */ }
     // Figma beside the code: each variant's Figma image (refs, else the Figma API with FIGMA_TOKEN), in the page, up to
     // styleguide.figmaImagesMB in all (8 by default, each component's default first); styleguide.figmaImages: false for none.
     if (cfg.styleguide?.figmaImages !== false) {

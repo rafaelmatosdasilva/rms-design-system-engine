@@ -33,15 +33,16 @@ export function appDir(cfg, app) {
 // dependencies, builds, tests, stories, minified files, the engine's own output or the style guide app.
 const SKIP = new Set(['node_modules', 'dist', 'build', 'coverage', '.git', '.next', 'out', ...ENGINE_DIRS.map((d) => d.split('/')[0])]);
 const UI = /\.(html?|jsx|tsx|js|ts|mjs|vue|svelte|css|scss|less)$/i;
-export function sourceFiles(ROOT, cfg = null) {
+export function sourceFiles(ROOT, cfg = null, { docs = false } = {}) {
   const out = [];
+  const want = docs ? /\.(html?|jsx|tsx|js|ts|mjs|vue|svelte|css|scss|less|md|mdx)$/i : UI;
   const walk = (dir) => {
     let list = [];
     try { list = readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of list) {
       const p = join(dir, e.name);
       if (e.isDirectory()) { if (!SKIP.has(e.name) && !e.name.startsWith('.') && !/apps[\/]style-?guide$/.test(p)) walk(p); }
-      else if (UI.test(p) && !/\.(test|spec|stories)\./.test(p) && !/\.min\./.test(p)) { try { out.push({ file: relative(ROOT, p), text: readFileSync(p, 'utf8') }); } catch { /* unreadable */ } }
+      else if (want.test(p) && !/\.(test|spec|stories)\./.test(p) && !/\.min\./.test(p) && !/(^|\/)CHANGELOG\.md$/i.test(p)) { try { out.push({ file: relative(ROOT, p), text: readFileSync(p, 'utf8') }); } catch { /* unreadable */ } }
     }
   };
   for (const r of codeRoots(ROOT, cfg)) walk(r);
