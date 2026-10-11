@@ -373,7 +373,8 @@
   function page() { return location.pathname + '|' + nav.pushed + '|' + nav.opened; }
   function state(root) {
     return [page(), document.querySelectorAll('dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true]').length,
-      scope(root).map(function (el) { return el.nodeType === 1 ? [el.getAttribute('aria-pressed'), el.getAttribute('aria-checked'), el.getAttribute('aria-expanded'), el.getAttribute('aria-selected'), el.checked, el.className].join() : ''; }).join('|'),
+      // A tooltip shown or hidden is not the page acting: a tip closes when anything is pressed, as it should (1.4.13).
+      scope(root).filter(function (el) { return !(el.nodeType === 1 && el.closest && el.closest('[role=tooltip]')); }).map(function (el) { return el.nodeType === 1 ? [el.getAttribute('aria-pressed'), el.getAttribute('aria-checked'), el.getAttribute('aria-expanded'), el.getAttribute('aria-selected'), el.checked, el.className].join() : ''; }).join('|'),
       root.isConnected].join('§');
   }
 
@@ -485,7 +486,11 @@
       var press = controls.filter(function (el) { var s = getComputedStyle(el); return !/resize|move|grab/.test(s.cursor) && el.getAttribute('role') !== 'separator' && !/resize|drag|handle|splitter|grip/i.test(typeof el.className === 'string' ? el.className : '') && !/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName); });
       for (var p = 0; p < press.length; p++) {
         var b = press[p]; ran.pointerdown = 1;
+        // A press on nothing first closes what an earlier step left open (a menu or a tip that closes on any press
+        // outside it), and a page still changing by itself is let settle: only what the press itself changes counts.
+        fire(document.body, 'pointerdown'); fire(document.body, 'mousedown'); fire(document.body, 'pointerup'); fire(document.body, 'mouseup');
         var s0 = state(root), was0 = desc(b);
+        for (var settle = 0; settle < 6; settle++) { await sleep(50); var s1 = state(root); if (s1 === s0) break; s0 = s1; }
         fire(b, 'pointerdown'); fire(b, 'mousedown'); await sleep(50);
         var changed = state(root) !== s0;
         fire(document.body, 'pointerup'); fire(document.body, 'mouseup');

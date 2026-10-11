@@ -108,6 +108,28 @@ test('page: a tip that fades out slowly once Escape is pressed is closed, not on
   });
 });
 
+// T14: a tip or a menu that closes when anything is pressed is not the control acting on the press (a tip must close so,
+// WCAG 1.4.13); only what the press itself does counts. A control that acts on the press is still found.
+test('page: a tip or a menu that closes on any press is not the pressed control acting; one that acts on the press is found', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+  await inPage(async (ev) => {
+    const found = await ev(`(async () => {
+      const box = document.createElement('div');
+      box.innerHTML = '<button type="button" id="calm" data-tip="Tokens">Tokens</button><button type="button" id="opener" aria-expanded="false">Menu</button><ul id="menu" hidden><li>One</li></ul><button type="button" id="eager">Now</button><div id="tt" role="tooltip" class="tt">Tokens</div>';
+      document.body.appendChild(box);
+      const tt = box.querySelector('#tt'), opener = box.querySelector('#opener'), menu = box.querySelector('#menu'), eager = box.querySelector('#eager');
+      box.querySelector('#calm').addEventListener('mouseover', () => { tt.className = 'tt visible'; });
+      document.addEventListener('mousedown', () => { tt.className = 'tt'; if (!menu.hidden) { menu.hidden = true; opener.setAttribute('aria-expanded', 'false'); } });
+      opener.addEventListener('click', () => { menu.hidden = false; opener.setAttribute('aria-expanded', 'true'); });
+      eager.addEventListener('pointerdown', () => { eager.classList.toggle('on'); });
+      const r = await window.__wcag21.interact(box, { wait: 100, triggers: 1 });
+      box.remove();
+      return r.findings.filter((f) => f.kind === 'pointerdown').map((f) => f.desc);
+    })()`);
+    assert.equal(found.length, 1, JSON.stringify(found));
+    assert.match(found[0], /eager|Now/);
+  });
+});
+
 test('page: each WCAG 2.1 problem the page breaks once is found, and the part that is fine is left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
   await inPage(async (ev) => {
     const good = await ev(`(async () => { const r = document.getElementById('good'); const a = window.__wcag21.check(r, { name: 'x' }); const b = await window.__wcag21.interact(r); return { f: a.findings.concat(b.findings), ran: a.ran.concat(b.ran) }; })()`);

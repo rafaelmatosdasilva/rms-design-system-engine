@@ -953,8 +953,10 @@ function sweepExpression(roots, doFocus, stateMap) {
           const look = (s, pb, pa) => [s.outlineStyle, s.outlineWidth, ring(s), s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor, s.textDecorationLine,
             pb.outlineStyle, ring(pb), pb.boxShadow, pb.borderColor, pb.backgroundColor, pb.opacity, pa.outlineStyle, ring(pa), pa.boxShadow, pa.borderColor, pa.backgroundColor, pa.opacity].join('|');
           // The box that holds only this control (a field's frame around its borderless input) may show the focus
-          // for it (:focus-within): up to two levels up, while no other control is inside.
-          const boxes = []; for (let p = el.parentElement, i = 0; p && i < 2 && p.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[tabindex]').length === 1; p = p.parentElement, i++) boxes.push(p);
+          // for it (:focus-within): up to two levels up, while no other Tab stop is inside. A part the Tab key never
+          // reaches (a clear button with tabindex="-1", one not shown until there is a value) is not another stop.
+          const stops = (p) => Array.prototype.filter.call(p.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,[tabindex]'), (k) => k === el || (k.tabIndex >= 0 && !k.disabled && k.getClientRects().length > 0)).length;
+          const boxes = []; for (let p = el.parentElement, i = 0; p && i < 2 && stops(p) === 1; p = p.parentElement, i++) boxes.push(p);
           const boxState = (p) => { const s = getComputedStyle(p); return { key: [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.backgroundColor].join('|'), outline: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0 ? s.outlineColor : '', ow: parseFloat(s.outlineWidth) || 0, shadow: s.boxShadow, border: s.borderTopColor, bw: parseFloat(s.borderTopWidth) || 0, bg: s.backgroundColor }; };
           // A focus style that eases in (a frame whose border colour takes 0.15s) is read where it ends, as a keyboard
           // user sees it once it has drawn, and its rest where the easing back ends: the transitions a focus or a blur
