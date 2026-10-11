@@ -472,3 +472,20 @@ test('components: corners of a root that draws nothing, alignment it cannot show
   assert.match(why('slotted', 'alignment (cross axis)'), /slot/);
   assert.match(why('line', 'width'), /page sets this width/);
 });
+
+test('components: padding and gap around layers all placed outside the layout draw nothing; with a layer inside they count', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.c' });
+  const comp = () => ({ confidence: 'high', instance: { hasText: true }, props: { paddingLeft: v('0px'), paddingRight: v('0px'), columnGap: v('0px') }, layout: { display: 'flex' } });
+  const code = { components: { chipdot: comp(), pill: comp(), old: comp() } };
+  const box = { paddingPx: [0, 8, 0, 8], gapPx: 8, box: { layout: 'HORIZONTAL', sizing: { h: 'FIXED', v: 'FIXED' } } };
+  const structure = {
+    chipdot: { ...box, inFlow: 0, defaultVariant: 'Filled=True', variants: { 'Filled=True': { ...box, inFlow: 0 } } },
+    pill: { ...box, inFlow: 1 },
+    old: { ...box },   // captured before inFlow was read: compared as before
+  };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  const differ = r.differ.map((d) => `${d.component} ${d.field}`).sort();
+  assert.deepEqual(differ.filter((d) => d.startsWith('chipdot')), []);
+  assert.ok(differ.includes('pill padding left') && differ.includes('pill gap') && differ.includes('old padding right'));
+  assert.match(r.notComparable.find((n) => n.component === 'chipdot' && n.field === 'padding left')?.why ?? '', /placed outside it/);
+});

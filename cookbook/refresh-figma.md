@@ -276,10 +276,26 @@ return {sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder
   modeVariants: modeVariantsOut,   // per-collection, per-mode non-colour maps (optional)
   motion: motionOut,               // easing/duration tokens (optional - Gate: Motion parity)
   effects: effectsOut,             // shadow styles → box-shadow (optional - Gate: Effect parity)
+  variableScopes: scopesOut,       // each variable's scopes, by id (Step 1f)
 }
 ```
 
 > The snapshot `color` object has one key per mode (`snapshotKey`), e.g. `{ light: {...}, dark: {...}, "high-contrast": {...} }`.
+
+### Step 1f - Variable scopes
+
+Each variable's scopes (the properties Figma offers it for), keyed by id, into `variableScopes` in
+`figma-vars.snapshot.json`. The Figma file hygiene block reads them with the bindings the component sweep
+records: a property bound to a variable scoped to other properties, and the variables left on all scopes.
+Primitives included. Run it in batches of 150 variables (`BATCH_START`, `BATCH_END`) and merge the results.
+
+```js
+const BATCH_START=0, BATCH_END=150; // ← substitute per iteration
+const all=(await figma.variables.getLocalVariablesAsync()).filter(v=>v.resolvedType!=='BOOLEAN');
+const scopesOut={};
+for(const v of all.slice(BATCH_START,BATCH_END))scopesOut[v.id]={name:v.name,scopes:[...v.scopes]};
+return {total:all.length,scopes:scopesOut};
+```
 
 ---
 
@@ -483,6 +499,8 @@ async function deepFacts(node, set) {
       h: n(x.height),
       paddingPx: 'paddingTop' in x ? [x.paddingTop, x.paddingRight, x.paddingBottom, x.paddingLeft].map(n) : null,
       gapPx: 'itemSpacing' in x ? n(x.itemSpacing) : null,
+      // The layers its auto layout lays out: 0 when every one is placed outside it (a Background set to absolute).
+      inFlow: x.layoutMode && x.layoutMode !== 'NONE' ? (x.children ?? []).filter((c) => c.visible !== false && c.layoutPositioning !== 'ABSOLUTE').length : null,
       radiusPx: 'topLeftRadius' in x ? [x.topLeftRadius, x.topRightRadius, x.bottomRightRadius, x.bottomLeftRadius].map(n) : null,
       fontSize: t && t.fontSize !== figma.mixed ? n(t.fontSize) : null,
       colors: { fill: await paint(x.fills), text: t ? await paint(t.fills) : null, stroke: await paint(x.strokes) },
@@ -502,7 +520,7 @@ async function deepFacts(node, set) {
     minWidth: n(node.minWidth), maxWidth: n(node.maxWidth),
     align: { primary: node.primaryAxisAlignItems, counter: node.counterAxisAlignItems }, wrap: node.layoutWrap };
   const g = await geometry(node);
-  out.paddingPx = g.paddingPx; out.radiusPx = g.radiusPx; out.gapPx = g.gapPx; out.colors = g.colors;
+  out.paddingPx = g.paddingPx; out.radiusPx = g.radiusPx; out.gapPx = g.gapPx; out.colors = g.colors; out.inFlow = g.inFlow;
   if ((node.strokes ?? []).some((s) => s.visible !== false)) out.stroke = {
     weights: ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'].map((k) => n(typeof node[k] === 'number' ? node[k] : node.strokeWeight)),
     align: node.strokeAlign, dashed: (node.dashPattern ?? []).length > 0 };
