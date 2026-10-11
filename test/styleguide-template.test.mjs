@@ -323,7 +323,10 @@ test('in the browser: no script error, a control changes the real component, the
     // when, the same table as the Accessibility area's and the To do page's.
     const parRows = await run(`[...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].map((r) => r.dataset.type + ':' + r.dataset.status)`);
     assert.ok(parRows.some((r) => /^Prop:/.test(r)) && parRows.some((r) => /^Variable:/.test(r)), 'props and variables: ' + parRows);
-    assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity.*the same.*differ.*only in Figma.*only in code.*Issue nr.*Area.*Figma.*Code.*What to do.*Status.*Updated/s);
+    const parityText = await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`);
+    assert.match(parityText, /Parity.*Issue nr.*Area.*Figma.*Code.*What to do.*Status.*Updated/s);
+    assert.doesNotMatch(parityText, /Of \d+, \d+ the same/, 'no line counting what is the same, what differs and what is on one side');
+    assert.deepEqual(await run(`[...document.querySelectorAll('#c-chip [data-area="parity"] tr[data-status="done"]')].filter((tr) => /Same/.test(tr.lastElementChild.textContent)).length`), 0, 'a row that is done says nothing more under Done');
     // The filter shows one type at a time.
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'Prop').click()`);
     // The filter acts on Parity's own table, never on the Accessibility tables beside it.
@@ -454,6 +457,13 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0), /Every variant of every component was tried in a browser when this page was built, on \d{4}-\d\d-\d\d.*nothing runs while you read them/);
     assert.equal(await run(`!!document.getElementById('sg-a11y-baked') && document.querySelectorAll('.pg-offstage').length`), 0, 'nothing tried here');
     assert.match(await run(`document.querySelector('#todo thead').textContent`), /^Issue nr\s*Area\s*Figma\s*Code\s*What to do\s*Status$/);
+    // A filter by area: every row, or only Parity's or Accessibility's; the cards with none left go too.
+    assert.match((await run(`[...document.querySelectorAll('#todo .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^All \(\d+\)\|Parity \(\d+\)\|Accessibility \(\d+\)/);
+    await run(`document.querySelector('#todo .sg-todo-filter [data-v="Accessibility"]').click()`);
+    assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#todo tbody tr')].filter((tr) => !tr.hidden).map((tr) => tr.dataset.area))]`), ['Accessibility']);
+    assert.equal(await run(`[...document.querySelectorAll('#todo .pg-par-card')].every((c) => c.hidden || c.querySelector('tbody tr:not([hidden])'))`), true);
+    await run(`document.querySelector('#todo .sg-todo-filter [data-v="all"]').click()`);
+    assert.equal(await run(`[...document.querySelectorAll('#todo tbody tr')].every((tr) => !tr.hidden)`), true);
     const nums = await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`);
     assert.ok(nums.length > 0 && nums.every(([, n], i) => +n === i + 1), 'numbered 1, 2, 3 down the page');
     const byNo = (a) => a.slice().sort((p, q) => p[1] - q[1]);

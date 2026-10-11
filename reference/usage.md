@@ -294,11 +294,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   table as the Accessibility area's and the To do page's (`issueTableHTML`): Issue nr (the To do page's number, open rows
   only), Area (Parity, with the type under it), Figma (its name and value), Code (its name and value, and where in the
   code a difference is), What to do (who acts above it) and Status (a sign and the system's colour, To fix, To check,
-  Done or Not compared, with what it is under it, the same, differs from Figma, only in Figma, only in code, New in the
-  last audit when the last audit found it first, and when it last held). Each difference the audit found is merged into
+  Done or Not compared, with what it is under any but Done, differs from Figma, only in Figma, only in code, both not
+  compared, New in the last audit when the last audit found it first, and when it last held). Each difference the audit found is merged into
   the row it is about (`parityIssueRows`); what it found beyond those rows, a prop Figma has that the code does not build
-  and a component only the code has are rows of their own. Open rows first, a count of each status and of what is the
-  same, differs or is only on one side above it, a filter by type (props, variables, values, other), its head kept in
+  and a component only the code has are rows of their own. The To do page holds the open rows of every component in
+  that table, one card per component, with a filter by area (Parity, Accessibility, and the page's own items when it has
+  any) that hides the cards left empty. Open rows first, a count of each status above it, a filter by type (props, variables, values, other), its head kept in
   view under the areas as the rows scroll by (on a phone the table scrolls sideways instead); in the Playground's card
   table. The code is as tall as
   what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
