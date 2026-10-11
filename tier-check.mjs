@@ -16,6 +16,8 @@
 // layer then points at the one before it: a token that aliases a token two or more layers down skips a layer
 // (a component token straight to a primitive), one that aliases a later layer points backward. An alias
 // within its own layer is neither.
+// `holds` (optional, L4) lists the kinds of token the tier holds ("color", "sizing", "typography", "string",
+// "boolean"); a token of another kind in it is listed (a colour in a sizes-only layer).
 
 // First matching tier, or null. A bad regex is skipped (never throws).
 export function classifyTier(tokenPath, tiers) {
@@ -26,9 +28,10 @@ export function classifyTier(tokenPath, tiers) {
   return null;
 }
 
-// tokens: array of token paths. aliasesOf(token): array of the token paths it references (immediate).
+// tokens: array of token paths. aliasesOf(token): array of the token paths it references (immediate). kindOf(token):
+// its kind, for the tiers that say what they hold.
 // Returns { violations: [{token, tier, ref, refTier, reason}], classified: {tierName: count} }.
-export function checkTiers(tokens, aliasesOf, tiers) {
+export function checkTiers(tokens, aliasesOf, tiers, kindOf = () => null) {
   const byName = new Map((tiers || []).map((t) => [t.name, t]));
   const violations = [];
   const classified = {};
@@ -38,6 +41,10 @@ export function checkTiers(tokens, aliasesOf, tiers) {
     if (!tier) continue;
     classified[tier] = (classified[tier] || 0) + 1;
     const rule = byName.get(tier);
+    const kind = kindOf(tok);
+    if (kind && Array.isArray(rule?.holds) && rule.holds.length && !rule.holds.includes(kind)) {
+      violations.push({ token: tok, tier, ref: null, refTier: null, kind: 'kind', reason: `a ${kind} token in the ${tier} layer, which holds only ${rule.holds.join(', ')}` });
+    }
     for (const ref of (aliasesOf(tok) || [])) {
       const refTier = classifyTier(ref, tiers);
       if (!refTier) continue;

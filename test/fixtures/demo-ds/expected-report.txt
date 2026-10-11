@@ -242,9 +242,15 @@ Verdict: 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA
 
 ℹ️  State contrast: every rendered component state meets WCAG AA (8 checked; disabled states exempt).
 
+🧭 System health: 1 thing to keep the system healthy as it grows. Advisory.
+     17 of 17 semantic tokens have no description in Figma (button/background/color, button/background/hover/color, button/text/color, chip/background/color, chip/text/color, …): what a token is for is what an agent reads to pick it.
+
 📐 Contracts → contracts  (4 components · 19 DTCG tokens)
 ℹ️  Figma prop types → contracts/figma-props.d.ts: type a component's props with its <Name>FigmaProps so tsc shows prop drift.
 ℹ️  Decision status: 1 experimental  (llms.txt tells agents which one won and why)
+ℹ️  Prune candidates: 6 (leaner library = cheaper agent context). Advisory - decide keep or drop.
+     1 group(s) of tokens equal in every mode · 5 token(s) only one component uses
+     Run with --prune to list them.
 ℹ️  Contract completeness: 4/4 have a description · 4/4 have semantics · 0/4 carry whenNotToUse/useInstead guidance. Advisory only.
 
 ♿ Accessibility from the code (no browser needed): 1 finding in 3 markup and 1 style file (1 focus outline removed and not put back). Advisory.

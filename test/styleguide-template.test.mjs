@@ -128,6 +128,18 @@ test('tokens are shown only when equal to Figma in every mode, grouped like the 
   assert.equal(t.differences, 1);
 });
 
+test('F8: a token\'s description in Figma travels to the token panel; one with none says so', () => {
+  const check = { passVars: [{ dimension: 'color', token: 'surface/page/color', cssVar: '--surface-page', mode: 'light', value: '#fff' }, { dimension: 'sizing', token: 'gap/s', cssVar: '--gap-s', value: '4px' }] };
+  const vars = { color: { light: { 'surface/page/color': '#fff' } }, tokenMeta: { 'surface/page': { description: 'The page behind everything' }, 'gap/s': { description: 'Between small items' } } };
+  const t = agreedTokens(check, vars);
+  assert.equal(t.colors[0].items[0].description, 'The page behind everything');
+  assert.equal(t.spacing[0].description, 'Between small items');
+  assert.equal('description' in agreedTokens(check, { color: vars.color }).colors[0].items[0], false);
+  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  assert.match(tpl, /'<div><dt>What it is for<\/dt><dd><p>' \+ esc\(t\.description\)/);
+  assert.match(tpl, /t\.figma && !t\.primitive \? '<div><dt>What it is for<\/dt><dd><p class="pg-missing">Not written yet\.<\/p>/);
+});
+
 test('--component with --styleguide: that component audited first, then its own page beside the whole one, its address printed', { timeout: 600000 }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sgc-');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });

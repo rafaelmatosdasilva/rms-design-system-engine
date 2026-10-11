@@ -170,8 +170,14 @@
 
 ⏭  [a11y] no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing. The components were not rendered from their code either: no TypeScript to read the components' JSX (the project's own, or a global one: npm i -g typescript).
 
+🧭 System health: 1 thing to keep the system healthy as it grows. Advisory.
+     11 of 11 semantic tokens have no description in Figma (action/primary/color, action/primary/text/color, radius/control, space/2, space/3, …): what a token is for is what an agent reads to pick it.
+
 📐 Contracts → contracts  (3 components · 13 DTCG tokens)
 ℹ️  Figma prop types → contracts/figma-props.d.ts: type a component's props with its <Name>FigmaProps so tsc shows prop drift.
+ℹ️  Prune candidates: 4 (leaner library = cheaper agent context). Advisory - decide keep or drop.
+     1 group(s) of tokens equal in every mode · 3 token(s) only one component uses
+     Run with --prune to list them.
 ℹ️  Contract completeness: 3/3 have a description · 3/3 have semantics · 0/3 carry whenNotToUse/useInstead guidance. Advisory only.
 
 ♿ Accessibility from the code (no browser needed): nothing found in 3 markup and 1 style file.

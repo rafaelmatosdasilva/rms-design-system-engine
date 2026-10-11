@@ -98,13 +98,16 @@ export function componentOf(finding, names) {
 const NOT_A_FINDING = / :: ((❌|⚠️)\s+[A-Z][A-Z ?]*\s+\d|Fix:|⚠️\s+this gate printed no result line|… \d+ finding\(s\) outside )/;
 // Work in the Figma file, not in the code the burndown works down.
 const FIGMA_WORK = /^Figma file hygiene :: /;
+// Advice on the system's shape (what to prune, what keeps it healthy as it grows): a question for its owners, never an
+// open finding to work down nor a difference between Figma and the code.
+const ADVICE = /^(System health|Prune candidates) :: /;
 
 export function burndown(findings, names, prev = null) {
   const count = (list) => {
     const by = new Map();
     let loose = 0;
     for (const f of list ?? []) {
-      if (/ :: gate fails$/.test(f) || / :: (🔗|↳)/.test(f) || NOT_A_FINDING.test(f) || FIGMA_WORK.test(f)) continue;   // a gate's own verdict, a link, a note or a count
+      if (/ :: gate fails$/.test(f) || / :: (🔗|↳)/.test(f) || NOT_A_FINDING.test(f) || FIGMA_WORK.test(f) || ADVICE.test(f)) continue;   // a gate's own verdict, a link, a note or a count
       const c = componentOf(f, names);
       if (c) by.set(c, (by.get(c) ?? 0) + 1); else loose++;
     }
@@ -135,7 +138,7 @@ export function burndownLines(b, { top = 8, scoped = false } = {}) {
 // accessibility note), grouped by the component it names, else under "the whole system", each marked new when the
 // last run did not have it. Written to <out>/differences.md and differences.json; the style guide reads the JSON, so
 // a component's page lists its own open differences, and the hand-back files say how each side would change.
-const NOT_A_DIFFERENCE = /^(Data is up to date|Accessibility[^:]*|Token contrast|What this audit actually checked|Exemption debt) :: /;
+const NOT_A_DIFFERENCE = /^(Data is up to date|Accessibility[^:]*|Token contrast|What this audit actually checked|Exemption debt|System health|Prune candidates) :: /;
 // A line that points at a difference rather than being one: a Figma link, who last changed it, what was skipped,
 // how much was compared, the proposed patches. It stays in the audit, next to what it explains.
 const POINTER = /^(↳|🔗|⏭|📋|coverage source:|least checked:)|not a difference from Figma|\bskipped\b/;

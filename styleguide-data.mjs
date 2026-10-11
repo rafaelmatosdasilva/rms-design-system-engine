@@ -511,7 +511,7 @@ export function primitiveColours(figmaVars = {}, themeCss = '', cfg = {}) {
       if (!have || have !== String(want).toLowerCase()) { ok = false; break; }
       values[m.snapshotKey] = want;
     }
-    if (ok && Object.keys(values).length) items.push({ figma: name.slice(name.startsWith(prefix) ? prefix.length : 0), var: v, values });
+    if (ok && Object.keys(values).length) items.push({ figma: name.slice(name.startsWith(prefix) ? prefix.length : 0), var: v, values, primitive: true });
   }
   return items.length ? { group: 'primitives', items } : null;
 }
@@ -527,6 +527,8 @@ export function agreedTokens(check = {}, figmaVars = {}) {
     colours.get(p.token).values[p.mode] = p.value;
   }
   const modesOf = (token) => Object.keys(figmaVars.color ?? {}).filter((m) => figmaVars.color[m]?.[token] != null);
+  // What the token is for, as Figma describes it (F8): the token panel shows it.
+  const describe = (token) => { const m = figmaVars.tokenMeta ?? {}; const d = String(m[token]?.description ?? m[token.replace(/\/colou?r$/, '')]?.description ?? '').trim(); return d ? { description: d } : {}; };
   const groups = new Map();
   for (const [token, c] of colours) {
     const modes = modesOf(token);
@@ -534,7 +536,7 @@ export function agreedTokens(check = {}, figmaVars = {}) {
     const name = token.replace(/\/colou?r$/, '');
     const group = name.includes('/') ? name.split('/')[0] : 'color';
     if (!groups.has(group)) groups.set(group, []);
-    groups.get(group).push({ figma: name, var: c.var, values: c.values });
+    groups.get(group).push({ figma: name, var: c.var, values: c.values, ...describe(token) });
   }
   // A size whose value changes with a mode (a breakpoint): every mode's Figma value, the base first.
   const byMode = (token) => {
@@ -544,7 +546,7 @@ export function agreedTokens(check = {}, figmaVars = {}) {
     }
     return null;
   };
-  const sizes = pass.filter((x) => x.dimension === 'sizing').map((p) => ({ figma: p.token, var: p.cssVar, value: p.value, ...(byMode(p.token) ? { modes: byMode(p.token) } : {}) }));
+  const sizes = pass.filter((x) => x.dimension === 'sizing').map((p) => ({ figma: p.token, var: p.cssVar, value: p.value, ...(byMode(p.token) ? { modes: byMode(p.token) } : {}), ...describe(p.token) }));
   const isRadius = (t) => /radi(i|us)|corner/i.test(t.figma), isSpace = (t) => /\b(gap|padding|margin|space|spacing|inset)\b/i.test(t.figma.replace(/\//g, ' '));
   const scales = new Map();
   for (const p of pass.filter((x) => x.dimension === 'typography')) {

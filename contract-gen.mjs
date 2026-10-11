@@ -21,7 +21,7 @@
 // Generic: no project names, tokens, or components are hardcoded.
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, resolve, join } from 'node:path';
+import { dirname, resolve, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { pruneCandidates } from './prune-check.mjs';
 import { withTextScaleKeys } from './naming-convention.mjs';
@@ -726,8 +726,34 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   try {
     let code = null, selectorFor = null;
     try { code = await (await import('./code-capture.mjs')).readFreshSnapshot(ROOT, cfg); } catch { /* optional */ }
-    try { selectorFor = (await loadLocator(ROOT, cfg)).selectorFor; } catch { /* optional */ }
-    catalog = buildCatalog(built, { code, selectorFor });
+    let classFor = null;
+    try { const loc = await loadLocator(ROOT, cfg); selectorFor = loc.selectorFor; classFor = loc.classFor; } catch { /* optional */ }
+    // A real use of each component from the code (I26): the products' code first, then the system's own pages.
+    const examples = {};
+    try {
+      const { codeRoots } = await import('./code-roots.mjs');
+      const { readdirSync } = await import('node:fs');
+      const roots = codeRoots(ROOT, cfg);
+      const files = [];
+      const walk = (dir, product, depth = 0) => {
+        if (depth > 8 || files.length > 4000) return;
+        let list = [];
+        try { list = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of list) {
+          if (e.name.startsWith('.') || /^(node_modules|dist|build|coverage|out|style-?guide)$/.test(e.name)) continue;
+          const p = join(dir, e.name);
+          if (e.isDirectory()) walk(p, product, depth + 1);
+          else if (/\.(jsx|tsx|vue|svelte|mdx|html?)$/i.test(e.name) && !/\.(test|spec)\./.test(e.name) && !/\.min\./.test(e.name)) { try { files.push({ file: relative(ROOT, p), text: readFileSync(p, 'utf8'), product }); } catch { /* unreadable */ } }
+        }
+      };
+      roots.forEach((r, i) => walk(r, i > 0));
+      const { realExample } = await import('./ui-catalog.mjs');
+      for (const { name } of built) {
+        const ex = realExample(name, classFor ? classFor(name) : null, files);
+        if (ex) examples[name] = ex;
+      }
+    } catch { /* optional */ }
+    catalog = buildCatalog(built, { code, selectorFor, examples });
     writeFileSync(join(outDir, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
   } catch { /* best-effort */ }
   const llmsOut = cc.llmsOut ? resolve(ROOT, cc.llmsOut) : join(outDir, 'llms.txt');
@@ -746,7 +772,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   } catch { /* best-effort */ }
 
   // Prune candidates (I8): a lean-library advisory over what we just built. Surfaced, never enforced.
-  const prune = pruneCandidates({ built, usage, tokensDict: tokens });
+  const prune = pruneCandidates({ built, usage, tokensDict: tokens, vars, primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
 
   // Decision status cross-checks (I33): guidance that still points at a deprecated component, a
   // replacement that does not exist or is itself deprecated, a deprecation with no what/why.

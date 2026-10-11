@@ -125,3 +125,19 @@ test('an id written inside props says where it goes', async () => {
   const r = checkUi({ component: 'chip', props: { id: 'x', Label: 'A' } }, { components: { chip: { props: { Label: { type: 'text' } } } } });
   assert.ok(r.findings.some((f) => f.message === 'chip has no prop "id": "id" goes beside "component", not inside "props"'), JSON.stringify(r.findings));
 });
+
+test('I26: a real use of each component from the code, the products first, never its own definition', async () => {
+  const { realExample } = await import('../ui-catalog.mjs');
+  const { answer, answerLines } = await import('../query.mjs');
+  const files = [
+    { file: 'src/components/Chip.jsx', text: 'export function Chip({ size }) { return <span className="chip">x</span>; }' },
+    { file: 'docs/index.html', text: '<div class="card chip-row">\n<span class="x chip" data-on>Label</span>' },
+    { file: 'app/pages/Filters.jsx', product: true, text: '<div>\n  <Chip size="M" label="Open" />\n</div>' },
+  ];
+  assert.deepEqual(realExample('chip', '.chip', files), { code: '<Chip size="M" label="Open" />', file: 'app/pages/Filters.jsx', line: 2 });
+  assert.deepEqual(realExample('chip', '.chip', files.slice(0, 2)), { code: '<span class="x chip" data-on>', file: 'docs/index.html', line: 2 });
+  assert.equal(realExample('badge', '.badge', files), null);
+  // --query shows it under the props.
+  const catalog = { components: { chip: { description: 'A filter chip.', props: {}, example: { code: '<Chip size="M" />', file: 'app/pages/Filters.jsx', line: 2 } } } };
+  assert.ok(answerLines(answer('chip', { catalog })).includes('  as the code writes it: <Chip size="M" />  (app/pages/Filters.jsx:2)'));
+});

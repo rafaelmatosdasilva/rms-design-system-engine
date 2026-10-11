@@ -196,7 +196,7 @@ test('the colour modes in Figma\'s own order (Dark before Light), and the page r
 test('the primitive ramp: shown when the theme carries Figma\'s value for each primitive in every mode', () => {
   const vars = { primitives: { light: { 'primitives/Neutral 100': '#0a0a0a', 'primitives/red': '#c20000' }, dark: { 'primitives/Neutral 100': '#f5f5f5', 'primitives/red': '#fe6767' } } };
   const css = ':root { --neutral-100: #0a0a0a; --red: #c20000; } @media (prefers-color-scheme: dark) { :root { --neutral-100: #F5F5F5; } }';
-  assert.deepEqual(primitiveColours(vars, css), { group: 'primitives', items: [{ figma: 'Neutral 100', var: '--neutral-100', values: { light: '#0a0a0a', dark: '#f5f5f5' } }] }, 'red differs in dark: not agreed, not shown');
+  assert.deepEqual(primitiveColours(vars, css), { group: 'primitives', items: [{ figma: 'Neutral 100', var: '--neutral-100', values: { light: '#0a0a0a', dark: '#f5f5f5' }, primitive: true }] }, 'red differs in dark: not agreed, not shown');
   assert.equal(primitiveColours({}, css), null);
 });
 

@@ -70,6 +70,7 @@ export function answerLines(a) {
     const wrong = Object.entries(p.rejected ?? {});
     if (wrong.length) lines.push(`      not: ${wrong.slice(0, 6).map(([w, r]) => `${w} (use ${r})`).join(', ')}`);
   }
+  if (e.example?.code) lines.push(`  as the code writes it: ${e.example.code}  (${e.example.file}:${e.example.line})`);
   if (e.slots?.length) lines.push(`  slots: ${e.slots.map((s) => (typeof s === 'string' ? s : s.name)).join(', ')}`);
   if (e.neverCombineWith?.length) lines.push(`  never contains: ${e.neverCombineWith.join(', ')}`);
   if (e.whenNotToUse) lines.push(`  when not to use: ${e.whenNotToUse}`);
