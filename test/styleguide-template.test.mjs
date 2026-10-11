@@ -186,6 +186,10 @@ test('in the browser: no script error, a control changes the real component, the
   writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', 'notes.png'), shot);
   // Do and Don't pictures, each named for its caption.
   for (const [kind, cap] of [['do', 'One filter per chip'], ['dont', 'A sentence in a chip']]) { mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip', kind), { recursive: true }); writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', kind, `${cap}.png`), shot); }
+  // What a person checked by hand (G5): one as chip is now, one recorded before chip changed.
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--checked', 'chip', '1.3.3', '--by', 'Ana'], { cwd: dir, encoding: 'utf8' });
+  const ckFile = join(dir, 'design-system-engine-checked.json'), ck = JSON.parse(readFileSync(ckFile, 'utf8'));
+  ck.checks.push({ component: 'chip', sc: '3.3.7', by: 'Ana', at: '2026-09-01T10:00:00.000Z', signature: 'before' }); writeFileSync(ckFile, JSON.stringify(ck));
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
   const c = await launchChrome(chromePath);
   try {
@@ -511,6 +515,12 @@ test('in the browser: no script error, a control changes the real component, the
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
     assert.match(await until(`(document.querySelector('#c-chip .pg-a11y-rows') || {}).textContent || ''`, (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
+    // A check a person made by hand is Done, by whom and when, while chip is as it was; one made before chip changed is
+    // to check again, saying who checked it; one nobody checked says how to mark it.
+    const rowOf = (sc) => run(`(() => { const tr = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.textContent.includes('${sc} ')); return tr ? tr.dataset.status + '|' + tr.textContent : ''; })()`);
+    assert.match(await rowOf('1.3.3'), /^done\|.*Checked by Ana on \d{4}-\d\d-\d\d: No instruction relies only on shape/s);
+    assert.match(await rowOf('3.3.7'), /^check\|.*Checked by Ana on 2026-09-01, before chip changed\..*Checked it\? Tell Claude chip 3\.3\.7 is checked\./s);
+    assert.match(await rowOf('1.4.5'), /^check\|.*Checked it\? Tell Claude chip 1\.4\.5 is checked\./s);
     // Coverage: what the team wrote about each component, one table each with its name on the head as on the To do page,
     // the thinnest first; a kind nobody wrote is Missing, never guessed.
     const cov = JSON.parse(await run(`JSON.stringify((() => { const cards = [...document.querySelectorAll('#coverage .pg-par-card')]; return { heads: [...cards[0].querySelector('table').tHead.rows[0].cells].map((c) => c.textContent), rows: cards.map((k) => { const tr = k.querySelector('tbody tr'); return { name: k.querySelector('.pg-inspect-head a').textContent, have: +tr.dataset.have, cells: [...tr.cells].map((c) => c.textContent) }; }), sum: document.querySelector('#coverage .pg-par-sum').textContent }; })())`));

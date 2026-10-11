@@ -47,3 +47,15 @@ export function sourceFiles(ROOT, cfg = null) {
   for (const r of codeRoots(ROOT, cfg)) walk(r);
   return out;
 }
+
+// The names a token should never carry (F6): each product's (products.json, pluginDirs, the folders codeRoots names),
+// the brands ds-config.json declares (brands), and the system's own package scope (@acme/ds → acme).
+export function brandNames(ROOT, cfg = {}) {
+  const read = (p) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return null; } };
+  const products = read('products.json');
+  const list = [...(Array.isArray(products?.products) ? products.products : Array.isArray(products) ? products : []).flatMap((p) => [p?.name, String(p?.repo ?? '').split('/').pop()]),
+    ...Object.keys(cfg.pluginDirs ?? {}), ...[cfg.brands ?? []].flat()];
+  const scope = /^@([^/]+)\//.exec(read('package.json')?.name ?? '');
+  if (scope) list.push(scope[1]);
+  return [...new Set(list.filter((x) => typeof x === 'string' && x.trim()))];
+}

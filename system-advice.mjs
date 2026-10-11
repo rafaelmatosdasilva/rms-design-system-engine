@@ -12,6 +12,8 @@
 //     other (after several are built at once, this is where they drift into copies);
 //   • tokens named by look (I17): a semantic token named for its colour or a scale step (blue-500) rather than its role
 //     (text/subtle), which agents then pick by appearance.
+//   • brand or product names in token keys (F6): a token named after a product or a brand (harborNotes/accent,
+//     acme/primary) stops making sense the day a second product or brand uses the system;
 //   • aliases to a removed token: a Figma variable that points at a variable no longer in the file (the capture records it,
 //     brokenAliases), and a token in the code that points at one declared nowhere, so it always shows its fallback.
 
@@ -138,6 +140,25 @@ export function namedByLook(names, { primitivePrefix = 'primitives/' } = {}) {
   return out;
 }
 
+// F6: tokens whose name holds a product's or a brand's name. names: token names (Figma's, with /). brands: the names to
+// look for (each product, the declared brands, the system's package scope). components: the system's components, whose
+// own tokens are named after them on purpose. → [{ name, brand }].
+const squash = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export function brandNamedTokens(names, { brands = [], components = [] } = {}) {
+  const first = new Map(); for (const b of (brands ?? []).filter(Boolean)) if (!first.has(squash(b))) first.set(squash(b), b);   // each name as first written
+  const want = [...first.entries()].filter(([k]) => k.length >= 2);
+  const comps = new Set((components ?? []).map(squash));
+  const out = [];
+  for (const n of names ?? []) {
+    if (!n || n.startsWith('_')) continue;
+    const segs = String(n).split('/');
+    if (comps.has(squash(segs[0]))) continue;   // a component's own token, named after it
+    const hit = want.find(([k]) => segs.some((seg) => { const q = squash(seg); return q === k || (k.length >= 4 && q.includes(k)); }));
+    if (hit) out.push({ name: n, brand: hit[1] });
+  }
+  return out;
+}
+
 // A Figma variable that points at a variable no longer in the file, as the capture recorded it (vars.brokenAliases:
 // [{ name, mode, target }], target the missing variable's name, or its id when only that is known). → the same list.
 export function brokenFigmaAliases(vars) {
@@ -178,7 +199,9 @@ export function danglingCodeAliases(files, { removed = () => null } = {}) {
 // → [{ kind, who, say, todo }], none when there is nothing to do.
 const some = (list, n = 4, more = 'more') => list.slice(0, n).join(list.some((x) => x.includes(',')) ? '; ' : ', ') + (list.length > n ? `${list.some((x) => x.includes(',')) ? ';' : ','} and ${list.length - n} ${more}` : '');
 const group = (g) => (g.length > 3 ? `${g.slice(0, 2).join(', ')}, and ${g.length - 2} more` : g.length === 3 ? `${g[0]}, ${g[1]}, and ${g[2]}` : g.join(' and '));
-export function tokenTodos({ vars = {}, users = null, dangling = [], primitivePrefix = 'primitives/' } = {}) {
+// Every token name in the vars snapshot: colours in every mode, sizing, primitives.
+export const tokenNames = (vars) => [...new Set([...Object.values(vars?.color ?? {}).flatMap((m) => Object.keys(m ?? {})), ...Object.keys(vars?.sizing ?? {}), ...Object.values(vars?.primitives ?? {}).flatMap((m) => Object.keys(m ?? {}))])];
+export function tokenTodos({ vars = {}, users = null, dangling = [], brands = [], components = [], primitivePrefix = 'primitives/' } = {}) {
   const out = [];
   const ud = undescribedTokens(vars, { primitivePrefix });
   if (ud.missing.length) out.push({ kind: 'Description', who: 'figma',
@@ -188,6 +211,10 @@ export function tokenTodos({ vars = {}, users = null, dangling = [], primitivePr
   if (same.length) out.push({ kind: 'Same value', who: 'both',
     say: `${same.length} group${same.length === 1 ? ' of tokens holds' : 's of tokens hold'} the same value written by hand rather than pointing at one primitive (${some(same.map(group), 3, 'more groups')}).`,
     todo: 'Decide for each group whether one is enough. Keep one in Figma and point the others at it, or keep them apart when they are meant to differ later. Ask Claude for every group.' });
+  const branded = brandNamedTokens(tokenNames(vars), { brands, components });
+  if (branded.length) out.push({ kind: 'Brand in the name', who: 'figma',
+    say: `${branded.length} token${branded.length === 1 ? ' is' : 's are'} named after a product or brand (${some(branded.map((b) => `${b.name} for ${b.brand}`))}), a name that stops making sense when a second product or brand uses the system.`,
+    todo: 'Rename each one in Figma to the role it plays (text/accent rather than harborNotes/accent).' });
   const broken = brokenFigmaAliases(vars);
   if (broken.length) out.push({ kind: 'Broken alias', who: 'figma',
     say: `${broken.length} Figma variable${broken.length === 1 ? ' points' : 's point'} at a variable that is no longer in the file (${some([...new Set(broken.map((b) => b.name + (b.target && !/^VariableID:/.test(b.target) ? ` to ${b.target}` : '')))])}).`,
