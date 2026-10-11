@@ -818,6 +818,8 @@ a.pg-usage-name { color: var(--sg-text); }
   });
   // A control the page needs and the system lacks: drawn with a stand-in until the system has one.
   ((DATA.ui && DATA.ui.gaps) || []).forEach(function (g) { TODO.push({ who: 'both', comp: null, say: g.say, todo: g.todo }); });
+  // What the tokens owe (descriptions to write in Figma, tokens equal in every mode or used by one component only).
+  (DATA.systemTodo || []).forEach(function (t) { TODO.push({ who: t.who, comp: null, area: 'System', type: 'Tokens, ' + t.kind.toLowerCase(), say: t.say, todo: t.todo }); });
   ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. Tell Claude to do it.' }); });
   var ORDER = ['figma', 'code', 'both'];
   TODO.sort(function (a, b) { return ORDER.indexOf(a.who) - ORDER.indexOf(b.who); });
@@ -2006,7 +2008,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // same table, the system's first.
     var sys = TODO.filter(function (t) { return !t.comp; }).map(function (t, i) {
       var comp = /^Figma has the (.+) component; the code does not have it yet\.$/.exec(t.say || '');
-      return { key: '\u0000system:' + i + ':' + t.say, area: comp ? 'Parity' : 'Page', kind: comp ? 'Component' : 'Stand-in', figma: comp ? '<code>' + esc(comp[1]) + '</code>' : '', code: comp ? '<span class="pg-par-none">Not there</span>' : '', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: WHO[t.who] || WHO.both, st: t.who !== 'both' ? 'todo' : 'check', rel: comp ? PAR_REL.figma : '', at: DATA.builtAt || null };
+      return { key: '\u0000system:' + i + ':' + t.say, area: t.area || (comp ? 'Parity' : 'Page'), kind: t.type || (comp ? 'Component' : 'Stand-in'), figma: comp ? '<code>' + esc(comp[1]) + '</code>' : '', code: comp ? '<span class="pg-par-none">Not there</span>' : '', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: WHO[t.who] || WHO.both, st: t.who !== 'both' ? 'todo' : 'check', rel: comp ? PAR_REL.figma : '', at: DATA.builtAt || null };
     });
     if (sys.length) order.push({ name: null, rows: sys });
     COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
@@ -2052,7 +2054,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var sign = function (st) { var x = STATUS[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>'; };
     // A filter by area: every row, or only Parity's, Accessibility's or the page's own; kept as the list is drawn again.
     var areas = {}; order.forEach(function (g) { g.rows.forEach(function (r) { areas[r.area] = (areas[r.area] || 0) + 1; }); });
-    var kinds = ['Parity', 'Accessibility', 'Page'].filter(function (a) { return areas[a]; });
+    var kinds = ['Parity', 'Accessibility', 'System', 'Page'].filter(function (a) { return areas[a]; });
     if (todoArea !== 'all' && !areas[todoArea]) todoArea = 'all';
     var filter = kinds.length > 1 ? '<div class="pg-par-filter sg-todo-filter">' + segHTML([{ label: 'All (' + all + ')', v: 'all' }].concat(kinds.map(function (a) { return { label: a + ' (' + areas[a] + ')', v: a }; })), 'Show') + '</div>' : '';
     box.innerHTML = note + '<div class="sg-todo-head"><p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + filter + '</div>' + order.map(function (g) {

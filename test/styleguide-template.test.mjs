@@ -479,6 +479,8 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#todo .pg-par-card')].every((c) => c.hidden || c.querySelector('tbody tr:not([hidden])'))`), true);
     await run(`document.querySelector('#todo .sg-todo-filter [data-v="all"]').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#todo tbody tr')].every((tr) => !tr.hidden)`), true);
+    // What the tokens owe is a row of The system: the descriptions to write, for whoever keeps Figma.
+    assert.match(await run(`[...document.querySelectorAll('#todo tr[data-area="System"]')].map((tr) => tr.textContent).join('|')`), /Tokens, description.*You in Figma.*semantic tokens have no description in Figma.*Write what each one is for/);
     const nums = await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`);
     assert.ok(nums.length > 0 && nums.every(([, n], i) => +n === i + 1), 'numbered 1, 2, 3 down the page');
     const byNo = (a) => a.slice().sort((p, q) => p[1] - q[1]);

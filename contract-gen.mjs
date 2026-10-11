@@ -500,6 +500,16 @@ function collectRefSlots(contract, out = []) {
   return out;
 }
 
+// Which components reference each token (dot path → [component, …]): the style guide's To do names the one component a
+// single-use token belongs to (L9).
+export function tokenUsers(built) {
+  const out = new Map();
+  for (const { name, contract } of built) {
+    for (const ref of new Set(collectRefSlots(contract).map((r) => r.ref))) { if (!out.has(ref)) out.set(ref, []); out.get(ref).push(name); }
+  }
+  return out;
+}
+
 // Blast radius (I20): how many components depend on each token / component, so a change to a shared
 // contract reads as authorship rather than a quiet local tweak (S9 "may it?"). Counts only - the
 // engine SURFACES the reach, it never enforces authority. Pure and testable.
