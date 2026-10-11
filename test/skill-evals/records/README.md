@@ -87,5 +87,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-11-order-of-authority` | The 21 guide tasks on Haiku (engine fd564b2) | "An order of authority, written down" |
 | `2026-10-11-checked-by-hand-brand-names` | The 21 guide tasks on Haiku (engine 99a6dc7) | "Checks made by hand, and no brand or product names in tokens" |
 | `rename-migrations-copies` | The 21 guide tasks on Haiku (engine f8675f6) | "A rename sweep, steps off what the system retired, and a near copy as a decision" |
+| `motion-screens-modes` | The 21 guide tasks on Haiku (engine c739389) | "Motion and screens against Figma, every combination of modes, and the products' own pages checked" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
