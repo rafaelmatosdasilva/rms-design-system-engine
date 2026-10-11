@@ -253,6 +253,15 @@ test('components: Figma\'s own minimum height, and a state set on a part compare
   assert.ok(facts.includes('checkbox · height (State=Checked)=true'));
 });
 
+test('capture: options a component\'s own checkbox draws are that checkbox ticked or not; a lone :checked option is not', async () => {
+  const { checkedOptions } = await import('../code-capture.mjs');
+  assert.deepEqual(checkedOptions({ True: '.sw-input:checked + .sw-track', False: '.sw-track' }),
+    { True: { part: '.sw-input', value: true }, False: { part: '.sw-input', value: false } });
+  assert.deepEqual(checkedOptions({ On: '.cb-input:checked ~ .cb-box', Off: '.cb-box' }), { On: { part: '.cb-input', value: true }, Off: { part: '.cb-input', value: false } });
+  assert.deepEqual(checkedOptions({ True: '.sw-input:checked + .sw-track', False: '.sw.off' }), {}, 'the other option is not the same part');
+  assert.deepEqual(checkedOptions({ True: '.sw.on', False: '.sw' }), {});
+});
+
 test('capture: Figma\'s default variant is drawn with the classes the contract gives it, never a state or a part', async () => {
   const { defaultVariantClasses } = await import('../code-capture.mjs');
   const props = { properties: { Type: { type: 'VARIANT', defaultValue: 'Negative' }, State: { type: 'VARIANT', defaultValue: 'Hover' }, 'Size#1:2': { type: 'VARIANT', defaultValue: 'M' }, Label: { type: 'TEXT', defaultValue: 'x' } } };
@@ -426,4 +435,40 @@ test('components: text decoration, italic and text alignment against Figma\'s fi
   const r = compareComponents(code, { link: { text }, ok: { text } }, {}, cfg, maps());
   assert.deepEqual(r.differ.map((x) => `${x.component} ${x.field}: ${x.figma} / ${x.code}`).sort(),
     ['link italic: italic / normal', 'link text alignment: center / start', 'link text decoration: underline / none']);
+});
+
+// What Figma cannot show is not a difference: a root that draws no fill or stroke shows no corners (a child Background
+// rectangle draws the shape), an alignment along an axis the box hugs has no room to show, a root holding its content in
+// a slot is lined up by the slot, a root spaced by a wrapper frame inside it carries the wrapper's spacing in the code,
+// and a width the page sets in a style attribute is the page's.
+test('components: corners of a root that draws nothing, alignment it cannot show, a wrapper\'s spacing and a width the page sets', () => {
+  const v = (value, rule = '.c') => ({ value, confidence: 'verified', rule });
+  const corners = (px) => Object.fromEntries(['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'].map((k) => [k, v(px)]));
+  const comp = (props, layout = { display: 'flex' }) => ({ confidence: 'high', instance: { hasText: true }, props, layout });
+  const code = { components: {
+    ghost: comp(corners('24px')),
+    framed: comp(corners('24px')),
+    bar: comp({ columnGap: v('8px') }),
+    tight: comp({ columnGap: v('4px') }),
+    stack: comp({ justifyContent: v('normal'), alignItems: v('center') }),
+    slotted: comp({ justifyContent: v('flex-start'), alignItems: v('center') }),
+    line: { confidence: 'high', instance: { hasText: false }, size: { width: 533 }, props: { width: v('533px', '(style attribute)') } },
+  } };
+  const structure = {
+    ghost: { radiusPx: [0, 0, 0, 0], colors: { fill: null, stroke: null } },
+    framed: { radiusPx: [0, 0, 0, 0], colors: { fill: { token: 'x/background', hex: '#000' }, stroke: null } },
+    bar: { gapPx: 0, childFrameGaps: [{ name: 'Slot', gapVar: 'gap/m' }] },
+    tight: { gapPx: 0, childFrameGaps: [{ name: 'Slot', gapVar: 'gap/m' }] },
+    stack: { box: { layout: 'VERTICAL', sizing: { h: 'FIXED', v: 'HUG' }, align: { primary: 'CENTER', counter: 'CENTER' } } },
+    slotted: { slot: true, box: { layout: 'HORIZONTAL', sizing: { h: 'FIXED', v: 'HUG' }, align: { primary: 'CENTER', counter: 'MIN' } } },
+    line: { box: { width: 100, sizing: { h: 'FIXED', v: 'HUG' } } },
+  };
+  const r = compareComponents(code, structure, { sizing: { 'gap/m': '8px' } }, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => `${d.component} ${d.field}: ${d.figma} / ${d.code}`).sort(), ['framed radius: 0 / 24px', 'tight gap: 0 / 4px']);
+  const why = (comp, field) => r.notComparable.find((n) => n.component === comp && n.field === field)?.why ?? '';
+  assert.match(why('ghost', 'radius'), /child layer/);
+  assert.match(why('bar', 'gap'), /wrapper frame/);
+  assert.match(why('stack', 'alignment (main axis)'), /hugs its content/);
+  assert.match(why('slotted', 'alignment (cross axis)'), /slot/);
+  assert.match(why('line', 'width'), /page sets this width/);
 });

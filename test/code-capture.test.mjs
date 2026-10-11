@@ -373,6 +373,63 @@ browserTest('components: a bottom border\'s own colour, a relative width as writ
   assert.equal(snapshot.components.sw.parts.text.props.fontSize.value, '12px');   // the drawn label, not the clipped name
 });
 
+// Figma's default variant adds a class (Disabled=True is .fld--off); the option the bare component draws
+// (Disabled=False) is measured with that class taken off, not skipped as the instance itself.
+browserTest('components: an option the bare component draws is measured with the default variant\'s class taken off', async () => {
+  const theme = `.fld { display: block; padding: 4px; }
+.fld.fld--off { padding: 2px; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body><div class="fld">Field</div></body></html>`;
+  const contract = `export const CONTRACT = { fld: { propertyMap: { Disabled: { True: '.fld.fld--off', False: '.fld' } } } };`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'structure-contract.mjs': contract, 'struct.json': { components: { fld: {} } },
+    'props.json': { fld: { properties: { Disabled: { type: 'VARIANT', defaultValue: 'True', variantOptions: ['True', 'False'] } } } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json', compPropsSnapshot: 'props.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const fld = snapshot.components.fld;
+  assert.equal(fld.props.paddingTop.value, '2px');                                  // Figma's default, Disabled=True
+  const off = fld.states['Disabled=False'];
+  assert.equal(off.produced, 'class .fld--off taken off');
+  assert.equal(off.changed.paddingTop.value, '4px');
+});
+
+// A switch drawn by its own checkbox: each Enable option is that checkbox ticked or not, set on the instance (never a
+// class of a part put on the root), and the text's own colour is read in each.
+browserTest('components: an option drawn by the component\'s own checkbox ticks it or not, and its text is read there', async () => {
+  const theme = `.sw { display: inline-flex; gap: 4px; color: #444444; }
+.sw-input { position: absolute; opacity: 0; }
+.sw-track { width: 20px; height: 10px; background: #888888; }
+.sw-input:checked + .sw-track { background: #000000; }
+.sw-desc { color: #444444; }
+.sw-input:checked ~ .sw-desc { color: #111111; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body><label class="sw"><input type="checkbox" class="sw-input" checked><span class="sw-track"></span><span class="sw-desc">On</span></label></body></html>`;
+  const contract = `export const CONTRACT = { sw: { propertyMap: { Enable: { True: '.sw-input:checked + .sw-track', False: '.sw-track' } } } };`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'structure-contract.mjs': contract, 'struct.json': { components: { sw: {} } },
+    'props.json': { sw: { properties: { Enable: { type: 'VARIANT', defaultValue: 'True', variantOptions: ['True', 'False'] } } } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json', compPropsSnapshot: 'props.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const { states } = snapshot.components.sw;
+  assert.equal(states['Enable=False'].produced, '.sw-input not ticked');
+  assert.equal(states['Enable=False'].colors.light.textColor, 'rgb(68, 68, 68)');
+  assert.equal(states['Enable=True'].colors.light.textColor, 'rgb(17, 17, 17)');
+  assert.equal(states['Enable=False'].changed.width, undefined);                       // the root is not drawn as its track
+});
+
+// Figma reads a field's first TEXT layer: its label when one comes before the value. A field with no label before it
+// is its own text.
+browserTest('components: a label drawn before a text field is the first text; a field alone is its text', async () => {
+  const theme = `.fld { display: inline-flex; gap: 4px; }
+.fld .lbl { color: #333333; }
+.fld input { color: #999999; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body>
+    <label class="fld"><span class="lbl">Label</span><input value="Value"></label>
+    <div class="bare"><input class="bare-in" value="Value" style="color:#999999"><span>after</span></div>
+  </body></html>`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'struct.json': { components: { fld: {}, bare: {} } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  assert.equal(snapshot.components.fld.parts.text.props.color.value, 'rgb(51, 51, 51)');    // the label, not the value
+  assert.equal(snapshot.components.bare.parts.text.props.color.value, 'rgb(153, 153, 153)'); // the field comes first
+});
+
 // B8, B9: the capture reads the box's min and max width, alignment and wrap, every side's border style, and the first
 // text's decoration, italic and alignment, each traced to its rule.
 browserTest('components: min and max width, alignment, wrap, border style, and the text\'s decoration, italic and alignment', async () => {
