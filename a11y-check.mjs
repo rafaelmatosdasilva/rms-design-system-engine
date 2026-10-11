@@ -91,6 +91,10 @@ import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, m
 // (e.g. a gradient keyword or color(display-p3 …)) — callers treat null as "cannot compute".
 // After a mode switch, every CSS transition it started jumps to its end: a colour is read as it settles, never halfway
 // (a button whose text colour transitions and whose background does not reads 1:1 for a moment).
+// The time the browser check may take (a11y.timeoutSec sets it): each component on a style guide page adds its share,
+// each colour mode as much again, up to a cap that keeps a stuck run from holding a build for long.
+export const PER_COMPONENT_SEC = 15;
+export const LIMIT_CAP_SEC = 3600;
 export const SETTLE_TRANSITIONS = `document.getAnimations().forEach((a) => { if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) { try { a.finish(); } catch (e) {} } })`;
 
 // State-class → the aria/native state it must also expose. A common-English default (extend or override per project via
@@ -756,17 +760,34 @@ export function styleguideTarget(cfg, ROOT, exists = existsSync, read = (f) => r
   if (cfg?.a11y?.styleguide === false) return null;
   // A guide that draws no component (built before any was agreed, or with no Figma data) has nothing to try: the
   // project's own pages are checked instead. One whose list cannot be read is taken as it is.
-  const draws = (abs) => {
-    try { const m = /<script[^>]*\bid=["']sg-data["'][^>]*>([\s\S]*?)<\/script>/.exec(read(abs)); return !m || (JSON.parse(m[1]).components ?? [1]).length > 0; } catch { return true; }
+  // How many components it draws (null when its list cannot be read): 0 means nothing to try.
+  const list = (abs) => {
+    try { const m = /<script[^>]*\bid=["']sg-data["'][^>]*>([\s\S]*?)<\/script>/.exec(read(abs)); return m ? (JSON.parse(m[1]).components ?? [{}]).map((c) => c?.name) : null; } catch { return null; }
   };
   // Where the style guide is written: the configured place, else the project's own template's, else the engine's.
   for (const rel of [cfg?.styleguide?.out, 'apps/styleguide/index.html', `${OUT_DIR}/styleguide/index.html`].filter(Boolean)) {
     const abs = join(ROOT, rel);
-    if (exists(abs) && draws(abs)) return { label: rel, url: pathToFileURL(abs).href + '?all', styleguide: true };   // every view drawn at once
+    const names = exists(abs) ? list(abs) : [];
+    if (exists(abs) && names?.length !== 0) return { label: rel, url: pathToFileURL(abs).href + '?all', styleguide: true, components: names?.length ?? 1, ...(names?.every(Boolean) ? { names } : {}) };   // every view drawn at once
   }
   // Not built by the project yet: the code capture keeps its own copy, built from the same template.
   const cap = join(ROOT, dirname(codeSnapshotPath(cfg)), 'styleguide.html');
   return cfg?.styleguide?.template && exists(cap) ? { label: 'styleguide (built by the code capture)', url: pathToFileURL(cap).href + '?all', styleguide: true } : null;
+}
+
+// A style guide with many components is checked in parts, a few components a page (?all&only=a,b): its page-wide
+// checks (the Tab walk, text spacing, reflow, zoom) grow faster than the page, and one page with every component on
+// it outlasted any time limit, so nothing it found was kept. Each part keeps the guide's label: a finding reads the
+// same whichever part found it.
+export const SHARE_COMPONENTS = 6;
+export function styleguideShares(sg, size = SHARE_COMPONENTS) {
+  if (!sg?.names || sg.names.length <= size) return [sg];
+  const parts = [];
+  for (let i = 0; i < sg.names.length; i += size) {
+    const only = sg.names.slice(i, i + size);
+    parts.push({ ...sg, url: `${sg.url}&only=${encodeURIComponent(only.join(','))}`, components: only.length, names: only, only, part: `${parts.length + 1}` });
+  }
+  return parts.map((p) => ({ ...p, part: `${p.part} of ${parts.length}` }));
 }
 
 // Chrome discovery + DevTools plumbing live in cdp.mjs (shared with Gate [16]).
@@ -907,7 +928,11 @@ function sweepExpression(roots, doFocus, stateMap) {
           const boxBefore = boxes.map(boxState);
           // The parts beside it in the box that holds only this control (a radio's circle, a switch's track, drawn next to
           // the native input they stand for): what shows its focus may be one of them (input:focus-visible + .circle).
-          const parts = boxes.length ? Array.prototype.filter.call(boxes[boxes.length - 1].querySelectorAll('*'), (k) => k !== el && !el.contains(k) && !k.contains(el)).slice(0, 30) : [];
+          // So may what follows it, which a rule like input:focus-visible + .track draws, even when its box holds another
+          // control too (a switch whose label has a tip button): each later sibling that holds no control, with its insides.
+          const CTRL = 'a[href],button,input:not([type=hidden]),select,textarea,[tabindex]';
+          const follows = []; for (let k = el.nextElementSibling; k && follows.length < 30; k = k.nextElementSibling) { if (k.matches(CTRL) || k.querySelector(CTRL)) continue; follows.push(k, ...k.querySelectorAll('*')); }
+          const parts = [...new Set([...follows, ...(boxes.length ? Array.prototype.filter.call(boxes[boxes.length - 1].querySelectorAll('*'), (k) => k !== el && !el.contains(k) && !k.contains(el)) : [])])].slice(0, 30);
           const partState = (k) => { const x = boxState(k); const pa = getComputedStyle(k, '::after'), pb = getComputedStyle(k, '::before'); x.key += '|' + [pb.outlineStyle, pb.outlineColor, pb.boxShadow, pb.borderColor, pa.outlineStyle, pa.outlineColor, pa.boxShadow, pa.borderColor].join('|'); x.offset = parseFloat(getComputedStyle(k).outlineOffset || '0'); return x; };
           const partBefore = parts.map(partState);
           try { el.focus(); } catch(e){}
@@ -1136,14 +1161,14 @@ export function pageLoadedExpression(waitFor = null) {
 
 // One deeper check at a time. A check that throws (the browser slow to answer, a page that changed under it)
 // is tried once more with its partial findings removed; if it fails again it is listed in `unfinished` and
-// reported as not checked, never silently clean.
+// reported as not checked, never silently clean. DSE_A11Y_TIMES=1 prints how long each one took (to find a slow one).
 export function makeStep(findings, unfinished, label) {
   let n = 0;
   return async (fn) => {
-    const no = ++n;
+    const no = ++n, t0 = Date.now();
     for (let attempt = 0; attempt < 2; attempt++) {
       const before = findings.length;
-      try { await fn(); return; } catch (e) {
+      try { await fn(); if (process.env.DSE_A11Y_TIMES) console.error(`[a11y time] ${label} step ${no}: ${Date.now() - t0}ms`); return; } catch (e) {
         findings.length = before;
         if (attempt === 1) unfinished.push(`${label}: deeper check ${no} (${String(e?.message ?? e).slice(0, 80)})`);
       }
@@ -1319,11 +1344,16 @@ export function revealExpression(roots, words, phase, k = 0) {
   })()`;
 }
 
-export function deepSweepExpression(roots, what) {
+// stage: where the components are drawn on a page that also uses them for its own controls (the style guide's
+// previews). The checks that press keys or click (composites, widgets, openers) act only there: an arrow key on the
+// page's own switch would change the component it shows, and every check after it would judge that one.
+export function deepSweepExpression(roots, what, stage = null) {
   return `(() => {
     const roots = ${JSON.stringify(roots)};
     const rootEls = roots ? roots.flatMap(s => { try { return [...document.querySelectorAll(s)]; } catch { return []; } }) : [document.body];
-    const scope = roots ? [...new Set(rootEls.flatMap(r => [r, ...r.querySelectorAll('*')]))] : [...document.body.querySelectorAll('*')];   // roots may nest: each element once
+    const stage = ${JSON.stringify(stage)};
+    const all = roots ? [...new Set(rootEls.flatMap(r => [r, ...r.querySelectorAll('*')]))] : [...document.body.querySelectorAll('*')];   // roots may nest: each element once
+    const scope = stage && ['composites', 'widgets', 'openers'].includes(${JSON.stringify(what)}) ? all.filter((el) => el.closest(stage)) : all;
     const vis = (el) => { const s = getComputedStyle(el); if (s.display==='none'||s.visibility==='hidden'||+s.opacity===0) return false; const r = el.getBoundingClientRect(); return r.width>0 && r.height>0; };
     const desc = (el) => (el.tagName.toLowerCase() + (el.id?('#'+el.id):'') + ((el.className && typeof el.className==='string') ? '.'+el.className.trim().split(/\\s+/).join('.') : '')).slice(0,80);
     // The design-system component an element sits in (the innermost root around it), so a bare "button" says where it is.
@@ -1514,12 +1544,19 @@ async function fetchAxeSource(cfg = {}) {
 // components when there are any. Each element it fails is located as the engine's own findings are (tag#id.class and
 // the component it sits in), so a problem both find is reported once.
 export const AXE_EXPERIMENTAL = ['css-orientation-lock', 'label-content-name-mismatch', 'p-as-heading', 'td-has-header', 'table-fake-caption'];
-async function runAxe(send, sessionId, axeSource, roots = null) {
+// On a page that draws components inside its own main region (the style guide), the rules that a landmark sit at the
+// top of the page judge the page's nesting, never the component: a panel drawn as an aside is inside the guide's main
+// there, and at the top of the product that uses it.
+export const AXE_PAGE_LANDMARKS = ['landmark-banner-is-top-level', 'landmark-complementary-is-top-level', 'landmark-contentinfo-is-top-level', 'landmark-main-is-top-level'];
+export function axeRules(styleguide = false) {
+  return Object.fromEntries([...AXE_EXPERIMENTAL.map((id) => [id, { enabled: true }]), ['frame-tested', { enabled: false }], ...(styleguide ? AXE_PAGE_LANDMARKS.map((id) => [id, { enabled: false }]) : [])]);
+}
+async function runAxe(send, sessionId, axeSource, roots = null, styleguide = false) {
   if (!axeSource) return null;
   try {
     await send('Runtime.evaluate', { expression: axeSource, returnByValue: false }, sessionId);
     const ctx = roots ? `{ include: ${JSON.stringify(roots.map((s) => [s]))} }` : 'document';
-    const rules = Object.fromEntries([...AXE_EXPERIMENTAL.map((id) => [id, { enabled: true }]), ['frame-tested', { enabled: false }]]);
+    const rules = axeRules(styleguide);
     const expr = `(() => {
       const roots = ${JSON.stringify(roots)};
       const desc = (el) => (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + ((el.className && typeof el.className === 'string' && el.className.trim()) ? '.' + el.className.trim().split(/\\s+/).join('.') : '')).slice(0, 80);
@@ -1591,6 +1628,8 @@ async function main() {
   const JSON_OUT = argv.includes('--json-out') ? argv[argv.indexOf('--json-out') + 1] : null;
   const components = argValues('--component', argv).concat(argValues('--components', argv));
   const cliUrls = argValues('--url', argv);   // check a live page directly (any project that serves it)
+  // --time-limit <sec>: the most it may take, whatever its pages ask for (the audit passes it inside a git hook).
+  const TIME_LIMIT = argv.includes('--time-limit') ? Number(argv[argv.indexOf('--time-limit') + 1]) || null : null;
 
   let cfg = {};
   try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); }
@@ -1683,8 +1722,8 @@ async function main() {
     console.log(`ℹ️  [a11y] target: ${harness.groups.length} component(s) rendered from their own code in each Figma variant, no dev server (${harness.groups.map((g) => g.name).join(', ')})`);
     for (const m of harness.missing) console.log(`ℹ️  [a11y] not rendered: ${m}`);
   } else if (sg) {
-    targets = [sg];
-    console.log(`ℹ️  [a11y] target: the generated styleguide — every component × state on one page, no dev server (${sg.label})`);
+    targets = styleguideShares(sg);
+    console.log(`ℹ️  [a11y] target: the generated styleguide — every component × state, no dev server (${sg.label}${targets.length > 1 ? `, in ${targets.length} parts of up to ${SHARE_COMPONENTS} components` : ''})`);
   } else {
     targets = plugins.map(builtUiPath).filter((f) => existsSync(f)).map((f) => ({ label: f.replace(ROOT + '/', ''), url: pathToFileURL(f).href }));
   }
@@ -1773,10 +1812,24 @@ async function main() {
   // The time the check may take grows with its pages and colour modes (a fixed two minutes stopped a scoped check of
   // 23 pages halfway, and said so only where the audit never showed it); a11y.timeoutSec sets it.
   // axe-core's rules and the states measured again add to each page's share.
+  // The style guide is one page with every component on it: its share grows with them (one of 36 components stopped
+  // at a page's share, and nothing it found was kept).
   const perPage = Math.max(1, modes.length) * (12 + (RUN_STATES ? 8 : 0)) + (RUN_AXE ? 20 : 0);
-  const limitSec = Number(cfg.a11y?.timeoutSec) || Math.min(1200, Math.max(150, targets.length * perPage));
+  const perComponent = Math.max(1, modes.length) * PER_COMPONENT_SEC;
+  const share = (t) => perPage + (t.styleguide ? Math.max(0, (t.components ?? 1) - 1) * perComponent : 0);
+  const ownLimit = Number(cfg.a11y?.timeoutSec) || Math.min(LIMIT_CAP_SEC, Math.max(150, targets.reduce((s, t) => s + share(t), 0)));
+  const limitSec = TIME_LIMIT ? Math.min(TIME_LIMIT, ownLimit) : ownLimit;
   let pagesDone = 0;
-  const killTimer = setTimeout(() => { console.log(`⏭  [a11y] stopped after ${limitSec}s, with ${Math.max(0, pagesDone - 1)} of ${targets.length} page(s) checked: what they found is not reported. Give it longer with ds-config.json → a11y.timeoutSec, or check fewer pages (--url).`); cleanup(); process.exit(STRICT ? 1 : 0); }, limitSec * 1000); killTimer.unref();
+  // Out of time, the page being checked is closed, so its checks stop at once, and the report is written with what the
+  // pages before it found: that page and the ones not reached are said not checked, never clean (a style guide's part
+  // names its components). A run still going a minute later stops with nothing kept.
+  let outOfTime = false, stopPage = null, cut = null;
+  const killTimer = setTimeout(() => {
+    outOfTime = true;
+    console.log(`⏭  [a11y] stopped after ${limitSec}s, with ${Math.max(0, pagesDone - 1)} of ${targets.length} page(s) checked: what they found is kept, the rest is said not checked. Give it longer with ds-config.json → a11y.timeoutSec, or check fewer pages (--url).`);
+    stopPage?.();
+    setTimeout(() => { console.log('⏭  [a11y] the stopped check did not end within a minute: what it found is not reported.'); cleanup(); process.exit(STRICT ? 1 : 0); }, 60000).unref();
+  }, limitSec * 1000); killTimer.unref();
 
   // A cold Chrome on a busy machine can take longer than one start allows: try once more before giving up.
   let launchError = null;
@@ -1802,15 +1855,30 @@ async function main() {
   const opened = [], notOpened = [];   // a component opened by a press before it was checked, or one no press showed (E31)
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
+  // A page the time limit cut or never reached: each of its components (a style guide's part), else the page, not checked.
+  const notChecked = (t, why) => (t.only ?? [t.label]).map((n) => `${n} (${why})`);
+  const endCut = () => {
+    if (!cut) return;
+    for (const [list, n] of cut.marks) list.length = n;   // the failures the closing caused are the stop, not findings
+    unfinished.push(...notChecked(cut.target, `stopped partway: the check ran out of its ${limitSec}s`));
+    cut = null;
+  };
   for (const target of targets) {
+    endCut();
+    stopPage = null;
+    if (outOfTime) { unfinished.push(...notChecked(target, `not reached: the check ran out of its ${limitSec}s`)); continue; }
     pagesDone++;
     const label = target.label;
+    const where = target.only ? `${label} (${target.only.join(', ')})` : label;   // a part of the style guide, by its components
     const { targetId, sessionId } = await openPage(send, target.url);
+    stopPage = () => { cut = { target, marks: [unfinished, unread, unrendered, notOpened].map((l) => [l, l.length]) }; send('Target.closeTarget', { targetId }).catch(() => {}); };
+    if (outOfTime) stopPage();
+    try {   // the page closed by the time limit fails what was running on it: that is the stop, handled by endCut
     // up to ~10s — a dev server / SPA can be slower than a file://
     // The components rendered from their code are served here and transpiled on request: a busy machine gets ~30s.
     const loadSeconds = target.harness ? 30 : 10;
     const loaded = await waitForTrue(send, sessionId, pageLoadedExpression(waitFor) + (target.ready ? ` && (${target.ready})` : ''), { attempts: loadSeconds * 20, intervalMs: 50, tolerateErrors: true });
-    if (!loaded) { unread.push(`${label} (the page did not finish loading within ${loadSeconds}s)`); await send('Target.closeTarget', { targetId }); continue; }
+    if (!loaded) { unread.push(`${where} (the page did not finish loading within ${loadSeconds}s)`); await send('Target.closeTarget', { targetId }); continue; }
     await new Promise((res) => setTimeout(res, 300));   // settle — let an SPA finish its first render
     // A selector the browser cannot parse (a component named table/row gives .table/row) would make every sweep of the
     // page throw: it is dropped, and its component said not checked, never clean.
@@ -1859,7 +1927,7 @@ async function main() {
     // The rest of the ten seconds a page is given to render, when no press was tried (they took that time).
     for (let i = 4; !shown && reveal && !pressed && i < 20; i++) { await new Promise((res) => setTimeout(res, 500)); shown = await shows(); }
     if (!shown && reveal) shown = await shows();
-    if (!shown) { unrendered.push(label); await send('Target.closeTarget', { targetId }); continue; }
+    if (!shown) { unrendered.push(where); await send('Target.closeTarget', { targetId }); continue; }
     sweptPlugins++;
     // A keyboard user's page: one real Tab first, so the browser shows focus as it does for the keyboard
     // (:focus-visible), not as it does after a mouse click.
@@ -1935,7 +2003,7 @@ async function main() {
       if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
       await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId).catch(() => {});
       const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, true, STATE_MAP), returnByValue: true }, sessionId).catch((e) => ({ error: e.message }));
-      if (!r.result?.value) { const why = r.error ?? r.exceptionDetails?.exception?.description?.split('\n')[0]; unread.push(`${label} (${mode.name}${why ? `: ${why}` : ''})`); if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); first = false; continue; }
+      if (!r.result?.value) { const why = r.error ?? r.exceptionDetails?.exception?.description?.split('\n')[0]; unread.push(`${where} (${mode.name}${why ? `: ${why}` : ''})`); if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); first = false; continue; }
       const { textEls = [], iconEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [], judged = [] } = r.result.value;
       // Every element read, with its verdict, so a check that passes says what it passed on.
       for (const e of accountFor(textEls, iconEls, mode.name)) if (accounted.length < 5000) accounted.push({ ...e, page: label });
@@ -1985,6 +2053,9 @@ async function main() {
     // On the style guide a component is read where it is drawn, in its own section's playground: the page's own chrome
     // (a navigation card, a hidden menu button) shares the system's classes and is never the component.
     const ownSection = (comp, sel) => (target.styleguide && sel ? `#c-${String(comp).replace(/[^\w-]+/g, '-')} .pg-preview :is(${sel})` : sel);
+    // On the style guide the checks that act (a key, a click, typing) act only on a component drawn in a preview, never
+    // on the page's own controls built from the same components.
+    const STAGE = target.styleguide ? '.pg-preview' : null;
     const media0 = modes[0].sw.media;
     const step = makeStep(findings, unfinished, label);
     // Target size in every mode (a density mode can shrink a control): one finding per control, with the modes it is small in.
@@ -2021,10 +2092,10 @@ async function main() {
     // Up to 24 of each: a grid of chips is judged on its chips, not on its first; what it does when used is tried on
     // the first. → { out, total, checked }
     const wcagRun = (sel, edgesOnly) => evalv(`(async () => {
-      const sel = ${JSON.stringify(sel)};
+      const sel = ${JSON.stringify(sel)}, stage = ${JSON.stringify(STAGE)};
       const all = sel ? [...document.querySelectorAll(sel)] : [document.body];
       const seen = [], out = [];
-      let total = 0;
+      let total = 0, acted = false;
       for (const el of all) {
         if (seen.some((s) => s.contains(el)) || !el.getClientRects().length) continue;
         total++;
@@ -2035,7 +2106,8 @@ async function main() {
         if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
         ${SETTLE_TRANSITIONS};
         out.push(...(${edgesOnly} ? window.__wcag21.edges(el) : window.__wcag21.check(el, { name: sel || '' })).findings);
-        if (!${edgesOnly} && seen.length === 1) out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings);
+        // What it does when used is tried on the first one, on the style guide the first one drawn in a preview.
+        if (!${edgesOnly} && !acted && (!stage || el.closest(stage))) { acted = true; out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings); }
       }
       return { out, total, checked: seen.length };
     })()`);
@@ -2091,7 +2163,9 @@ async function main() {
       const doc = await send('DOM.getDocument', { depth: 0 }, sessionId);
       const ids = ((await send('DOM.querySelectorAll', { nodeId: doc.root.nodeId, selector }, sessionId)).nodeIds || []).slice(0, 400);
       if (!ids.length) return;
-      const force = async (classes) => { for (const id of ids) { try { await send('CSS.forcePseudoState', { nodeId: id, forcedPseudoClasses: classes }, sessionId); } catch { /* gone */ } } };
+      // Every control at once: one at a time, each answer waited for, cost a tenth of a second a control on a big page
+      // (a style guide's part: 18 seconds a state), where all of them take as long as one.
+      const force = (classes) => Promise.all(ids.map((id) => send('CSS.forcePseudoState', { nodeId: id, forcedPseudoClasses: classes }, sessionId).catch(() => { /* gone */ })));
       const STATES = [['hovered', ['hover']], ['focused', ['focus', 'focus-visible', 'focus-within']], ['pressed', ['active', 'hover', 'focus']]];
       const edgeAtRest = new Set([...edgeOf.entries()].flatMap(([k, f]) => (f.modes ?? [modes[0].name]).map((m) => `${k}|${m}`)));
       const stateEdges = new Map(), seenState = new Set();
@@ -2336,9 +2410,9 @@ async function main() {
         if (components.length && !components.includes(comp)) continue;
         if (Object.keys(f).length) {
           // A component the code has no markup for is drawn as a stand-in on the style guide: there is nothing of the
-          // code's to read, so it is said not checked.
+          // code's to read, so it is said not checked (never counted as rendering something else than Figma says).
           if (target.styleguide && await evalv(`!!document.querySelector(${JSON.stringify(ownSection(comp, selOf(comp)))})?.matches('[data-sg-standin]')`)) {
-            findings.push({ kind: 'annotation', plugin: label, desc: `${comp}: not checked, the code has no markup for it (the style guide draws a stand-in)` });
+            if (!unfinished.some((u) => u.startsWith(`${comp} (`))) unfinished.push(`${comp} (the code has no markup for it: the style guide draws a stand-in)`);
             continue;
           }
           const got = await axOf(ownSection(comp, selOf(comp)), f.role ? String(f.role).toLowerCase() : null);
@@ -2432,7 +2506,7 @@ async function main() {
     });
     await step(async () => {
       // Composite widgets move with the arrow keys.
-      for (const g of (await evalv(deepSweepExpression(roots, 'composites'))) ?? []) {
+      for (const g of (await evalv(deepSweepExpression(roots, 'composites', STAGE))) ?? []) {
         const started = await evalv(`(() => { const g = document.querySelector('[data-design-system-engine-group="${g.i}"]'); if (!g) return false; const items = [...g.querySelectorAll('[role=radio],[role=tab],[role=menuitem],[role=option]')]; const s = items.find((x) => x.tabIndex >= 0) || items[0]; s.focus(); window.__designSystemEngineStart = s; return document.activeElement === s; })()`);
         if (!started) continue;
         const vertical = ['menu', 'listbox'].includes(g.role);
@@ -2444,7 +2518,7 @@ async function main() {
     await step(async () => {
       // Controls built from plain elements respond to Enter (and Space). Last, since it presses keys
       // on the page: the click is caught before the element's own handler, so nothing navigates.
-      for (const w of (await evalv(deepSweepExpression(roots, 'widgets'))) ?? []) {
+      for (const w of (await evalv(deepSweepExpression(roots, 'widgets', STAGE))) ?? []) {
         const keys = ['checkbox', 'switch', 'radio', 'option'].includes(w.role) ? [[' ', 'Space', 32, ' ']] : w.role === 'button' ? [['Enter', 'Enter', 13, '\r'], [' ', 'Space', 32, ' ']] : [['Enter', 'Enter', 13, '\r']];
         for (const [key, code, kc, text] of keys) {
           const armed = await evalv(`(() => { const el = document.querySelector('[data-design-system-engine-kbd="${w.i}"]'); if (!el) return false;
@@ -2462,7 +2536,7 @@ async function main() {
     await step(async () => {
       // A dialog or menu opened from its trigger closes on Escape and gives the focus back to the trigger (I78).
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-      for (const t of (await evalv(deepSweepExpression(roots, 'openers'))) ?? []) {
+      for (const t of (await evalv(deepSweepExpression(roots, 'openers', STAGE))) ?? []) {
         if (!(await evalv(openerExpression(t.i, 'open')))) continue;
         await wait(200);
         const what = await evalv(openerExpression(t.i, 'opened'));
@@ -2482,16 +2556,19 @@ async function main() {
     });
 
     if (axeSource) {
-      const v = await runAxe(send, sessionId, axeSource, roots);
+      const v = await runAxe(send, sessionId, axeSource, roots, !!target.styleguide);
       if (v) for (const row of v) axeViolations.push(row);
       else unfinished.push(`${label}: axe-core's rules (the scan did not finish)`);
     }
     await send('Target.closeTarget', { targetId });
+    } catch (e) { if (!cut) throw e; }
   }
+  endCut();
 
   closeCDP(); cleanup(); clearTimeout(killTimer);
 
   const notOpenedLine = notOpened.length ? ` Not opened by any press: ${notOpened.join('; ')}.` : '';
+  if (!sweptPlugins && outOfTime) skip(`stopped after ${limitSec}s, before any page was checked. Give it longer with ds-config.json → a11y.timeoutSec.`);
   if (!sweptPlugins) skip(unrendered.length ? `nothing rendered to check — ${unrendered.join(', ')} showed none of the design system's components within 10s.${notOpenedLine}` : 'nothing rendered to check — a --url/dev-server page did not load, or the plugin UIs are not built');
   for (const o of opened) console.log(`ℹ️  [a11y] ${o}, then checked open`);
   for (const o of notOpened) console.log(`⚠️  [a11y] not opened: ${o}; not checked open, so not clean`);

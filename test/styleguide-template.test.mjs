@@ -161,6 +161,12 @@ test('in the browser: no script error, a control changes the real component, the
   // A Figma note on the chip that no check reads: a row of its own on its Accessibility area, read by the To do page too.
   const propsSnap = join(dir, 'src', 'figma', 'figma-component-props.snapshot.json'), snap = JSON.parse(readFileSync(propsSnap, 'utf8'));
   snap.chip.annotations.push({ label: 'Screen readers announce the hint after the label' }); writeFileSync(propsSnap, JSON.stringify(snap));
+  // The system's own script, as a product runs it: a moment after a button is drawn it gives it a fuller name. Its focus
+  // ring is drawn on ::after. The page measures each variant once the script has answered, and reads the ring there.
+  writeFileSync(join(dir, 'src', 'components', 'system.js'), "new MutationObserver(() => Promise.resolve().then(() => { for (const b of document.querySelectorAll('.button:not([aria-label])')) b.setAttribute('aria-label', 'Save now'); })).observe(document.body, { subtree: true, childList: true });");
+  writeFileSync(join(dir, 'src', 'components', 'button.css'), readFileSync(join(dir, 'src', 'components', 'button.css'), 'utf8') + "\n.button { position: relative; }\n.button:focus-visible { outline: none; }\n.button::after { content: ''; position: absolute; inset: -3px; border-radius: inherit; }\n.button:focus-visible::after { outline: 2px solid var(--button-background); }\n");
+  const cfg0 = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'] }));
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
@@ -317,7 +323,10 @@ test('in the browser: no script error, a control changes the real component, the
     // when, the same table as the Accessibility area's and the To do page's.
     const parRows = await run(`[...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].map((r) => r.dataset.type + ':' + r.dataset.status)`);
     assert.ok(parRows.some((r) => /^Prop:/.test(r)) && parRows.some((r) => /^Variable:/.test(r)), 'props and variables: ' + parRows);
-    assert.match(await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`), /Parity.*the same.*differ.*only in Figma.*only in code.*Issue nr.*Area.*Figma.*Code.*What to do.*Status.*Updated/s);
+    const parityText = await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`);
+    assert.match(parityText, /Parity.*Issue nr.*Area.*Figma.*Code.*What to do.*Status.*Updated/s);
+    assert.doesNotMatch(parityText, /Of \d+, \d+ the same/, 'no line counting what is the same, what differs and what is on one side');
+    assert.deepEqual(await run(`[...document.querySelectorAll('#c-chip [data-area="parity"] tr[data-status="done"]')].filter((tr) => /Same/.test(tr.lastElementChild.textContent)).length`), 0, 'a row that is done says nothing more under Done');
     // The filter shows one type at a time.
     await run(`[...document.querySelectorAll('#c-chip .pg-par-filter [data-v]')].find((b) => b.dataset.v === 'Prop').click()`);
     // The filter acts on Parity's own table, never on the Accessibility tables beside it.
@@ -448,6 +457,13 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0), /Every variant of every component was tried in a browser when this page was built, on \d{4}-\d\d-\d\d.*nothing runs while you read them/);
     assert.equal(await run(`!!document.getElementById('sg-a11y-baked') && document.querySelectorAll('.pg-offstage').length`), 0, 'nothing tried here');
     assert.match(await run(`document.querySelector('#todo thead').textContent`), /^Issue nr\s*Area\s*Figma\s*Code\s*What to do\s*Status$/);
+    // A filter by area: every row, or only Parity's or Accessibility's; the cards with none left go too.
+    assert.match((await run(`[...document.querySelectorAll('#todo .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^All \(\d+\)\|Parity \(\d+\)\|Accessibility \(\d+\)/);
+    await run(`document.querySelector('#todo .sg-todo-filter [data-v="Accessibility"]').click()`);
+    assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#todo tbody tr')].filter((tr) => !tr.hidden).map((tr) => tr.dataset.area))]`), ['Accessibility']);
+    assert.equal(await run(`[...document.querySelectorAll('#todo .pg-par-card')].every((c) => c.hidden || c.querySelector('tbody tr:not([hidden])'))`), true);
+    await run(`document.querySelector('#todo .sg-todo-filter [data-v="all"]').click()`);
+    assert.equal(await run(`[...document.querySelectorAll('#todo tbody tr')].every((tr) => !tr.hidden)`), true);
     const nums = await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`);
     assert.ok(nums.length > 0 && nums.every(([, n], i) => +n === i + 1), 'numbered 1, 2, 3 down the page');
     const byNo = (a) => a.slice().sort((p, q) => p[1] - q[1]);
@@ -467,6 +483,11 @@ test('in the browser: no script error, a control changes the real component, the
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { tolerateErrors: true });
     await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0);
     assert.match(await note(), /when this page was built/, 'what the build tried stands again after a refresh');
+    // The button as the system's script leaves it, a moment after it is drawn, and its focus ring drawn on ::after.
+    await run(`location.hash = '#c-button/accessibility'`); await shownIs('c-button');
+    const btn = await until(`(document.querySelector('#c-button .pg-a11y-rows') || {}).textContent || ''`, (v) => /Tab reaches/.test(v));
+    assert.match(btn, /Tab reaches it once: "Save now"/, 'measured once the system\'s script has named it');
+    assert.doesNotMatch(btn, /shows no change when it takes the focus/, 'a ring drawn on ::after is a focus that shows');
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
     assert.match(await until(`(document.querySelector('#c-chip .pg-a11y-rows') || {}).textContent || ''`, (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
@@ -521,7 +542,7 @@ test('a state set on an earlier part is set there: the checkbox input is ticked,
 test('choosing the option already set does nothing, and a slot is documented with how Figma lets it be filled', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /if \(next === state\[p\.label\]\) return;/);
-  assert.match(tpl, /if \(b\.getAttribute\('aria-pressed'\) === 'true' \|\| b\.dataset\.on === '1'\) return;/);
+  assert.match(tpl, /if \(\/true\/\.test\(b\.getAttribute\('aria-pressed'\) \|\| b\.getAttribute\('aria-checked'\) \|\| b\.getAttribute\('aria-selected'\) \|\| ''\) \|\| b\.dataset\.on === '1'\) return;/);
   // A new selection tells the system's own script, so what follows the selection (a sliding pill) moves with it.
   assert.match(tpl.slice(tpl.indexOf('function segSelect'), tpl.indexOf('function segItems')), /if \(on\) nudge\(\);/);
   assert.match(tpl, /<dt>Slots<\/dt>/);
@@ -647,7 +668,7 @@ test('accessibility per component: its role\'s obligations and behaviours with W
   // no role stated: nothing invented; no browser check yet: null, and the page says so
   const none = a11yView({ name: 'card', cls: 'card' });
   assert.deepEqual([none.role, none.expects, none.checked], [null, [], null]);
-  assert.deepEqual(a11yView({ name: 'card', result: { checkedAt: 't', notRead: ['card (not rendered)'], issues: [] } }).checked, { at: 't', notRead: true, issues: [] });
+  assert.deepEqual(a11yView({ name: 'card', result: { checkedAt: 't', notRead: ['card (not rendered)'], issues: [] } }).checked, { at: 't', notRead: true, why: 'not rendered', issues: [] });
 });
 
 test('parity per component: what agrees (since when), its props and tokens, what differs, not built, not compared', async () => {
@@ -662,7 +683,7 @@ test('parity per component: what agrees (since when), its props and tokens, what
   assert.equal(v.notCompared, null);
 });
 
-test('To do: a role the code fails is Claude\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
+test('To do: a role the code fails or has still to be tried on is Claude\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('var WHO = {'), tpl.indexOf('function doWhat('));
   const a11yWho = new Function(src + 'return a11yWho;')();
@@ -672,10 +693,36 @@ test('To do: a role the code fails is Claude\'s even when a Figma note asked for
   assert.equal(a11yWho('1.3.1', 'audit', [{ st: 'todo', from: 'Figma annotation on the "Label" layer' }], ''), 'Claude in the code');
   // Nothing failed and what is missing is in Figma: its role is not stated yet.
   assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma, once annotated' }], ''), 'You in Figma');
+  // What a Figma note's role asks, not tried yet: the audit tries it on the code, so nothing is to do in Figma.
+  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'Claude in the code');
   // A colour pair is a design decision; what only a person judges is checked by hand; the code's own finding is Claude's.
   assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'You in Figma');
   assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'You check by hand');
   assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Its code' }], ''), 'Claude in the code');
+});
+
+test('To do: AAA advice is to check and to decide, never a must-fix; a component the audit could not try says why', async () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  // A comfortable 44px target or a 2px ring (AAA) found short is advice: checked, and yours to decide, as its size is the design's.
+  assert.match(tpl, /if \(its\.some\(function \(it\) \{ return it\.st === 'todo'; \}\)\) st = k\.extra \? 'check' : 'todo';/);
+  assert.match(tpl, /who: r\.st === 'todo' \|\| r\.st === 'check' \? \(r\.k\.extra \? WHO\.both : own \|\| a11yWho\(/);
+  // The code has no markup for it: build it first; the audit stopped before it: run it again, never "run the audit" as if it had not.
+  assert.match(tpl, /\/no markup\/\.test\(why\) \? 'Build ' \+ c\.name \+ ' in the code: the audit tries this once the page draws it from the code\.'/);
+  assert.match(tpl, /'The last audit did not get to ' \+ c\.name \+ \(why \? ' \(' \+ why \+ '\)' : ''\) \+ '\. Run it again\.'/);
+  const { a11yView } = await import('../styleguide-data.mjs');
+  assert.equal(a11yView({ name: 'overflow', result: { notRead: ['overflow (the code has no markup for it: the style guide draws a stand-in)'], issues: [] } }).checked.why, 'the code has no markup for it: the style guide draws a stand-in');
+});
+
+test('a control with no name only where an on/off prop hides its words fails, with what the product does about it', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const named = new Function(tpl.slice(tpl.indexOf('function showsText('), tpl.indexOf('function showFirst(')) + 'return namedWhereUsed;')();
+  const props = [{ label: 'Show Label', type: 'BOOLEAN', default: true }, { label: 'Label Content', type: 'TEXT' }, { label: 'Show Icon', type: 'BOOLEAN', default: true }];
+  // Unnamed only with its label off: what to do is said, naming the prop.
+  assert.match(named([{ 'Show Label': false, 'Show Icon': true }, { 'Show Label': false, 'Show Icon': false }], props), /^With Show Label off it shows no words, so nothing names it\. Where a product uses it that way, give it a name there: an aria-label/);
+  // Unnamed with its label shown too: the component's own fault, nothing more said.
+  assert.equal(named([{ 'Show Label': false }, { 'Show Label': true }], props), '');
+  // An on/off prop that shows no words (an icon) never counts.
+  assert.equal(named([{ 'Show Icon': false }], [{ label: 'Show Icon', type: 'BOOLEAN', default: true }]), '');
 });
 
 test('an accessibility finding goes to Accessibility, a difference from Figma to Parity', async () => {
@@ -826,9 +873,16 @@ test('a control the system lacks: its stand-in draws the switch, and the page sa
   assert.match(b.segHTML([{ v: 'a', label: 'A' }], 'Width'), /^<div aria-label="Width" class="sg-seg">/);
   assert.doesNotMatch(tpl, /segHTML\((?:[^;]*?)\)\s*\+\s*'<\/div>'\s*:\s*''|segHTML\(\[\{ v: '', label: 'Not in the code yet'[^;]*\]\);/, 'every switch on the page is named');
   const cls = new Set(['bSecondary']), attrs = {};
-  const el = { classList: { toggle: (k, on) => (on ? cls.add(k) : cls.delete(k)) }, setAttribute: (a, v) => { attrs[a] = v; }, removeAttribute: (a) => { delete attrs[a]; }, querySelector: () => null, dataset: {} };
+  const el = { classList: { toggle: (k, on) => (on ? cls.add(k) : cls.delete(k)) }, getAttribute: (a) => attrs[a] ?? null, setAttribute: (a, v) => { attrs[a] = v; }, removeAttribute: (a) => { delete attrs[a]; }, querySelector: () => null, dataset: {} };
   b.segSelect(el, true);
   assert.deepEqual([[...cls], attrs['aria-pressed']], [['bPrimary'], 'true']);
+  // An option the system's script made a radio says checked, never pressed (WCAG 4.1.2: a radio cannot be pressed).
+  attrs.role = 'radio';
+  b.segSelect(el, false);
+  assert.deepEqual([attrs['aria-pressed'], attrs['aria-checked']], [undefined, 'false']);
+  attrs.role = 'tab';
+  b.segSelect(el, true);
+  assert.equal(attrs['aria-selected'], 'true');
   const r = run({ segmented: pick([radio]) });
   assert.match(r.segHTML([{ v: 'a', label: 'A' }, { v: 'b', label: 'B', off: true }]), /^<div class="sg-seg" role="radiogroup"><label class="radio" data-v="a"><input type="radio" name="sg-r1" class="radio-input"><span class="radio-label">A<\/span><\/label><label class="radio" data-v="b" aria-disabled="true" title=""><input type="radio" name="sg-r1" class="radio-input" disabled>/);
   const input = { checked: false }, lab = { classList: { toggle() {} }, setAttribute: (a) => { throw new Error('no aria-pressed on a radio label: ' + a); }, removeAttribute() {}, querySelector: () => input, dataset: {} };
@@ -981,7 +1035,7 @@ test('Figma images of each variant: the reference folder first, never the networ
 
 test('a text prop comes right after the boolean that shows it; the rest keep Figma\'s order and nothing is dropped', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
-  const src = /  function showFirst\(list, propOf\) \{[\s\S]*?\n  \}\n/.exec(tpl)[0];
+  const src = /  function showsText\(b, t\) \{[\s\S]*?\n  \}\n/.exec(tpl)[0] + /  function showFirst\(list, propOf\) \{[\s\S]*?\n  \}\n/.exec(tpl)[0];
   const showFirst = new Function(`${src}; return showFirst;`)();
   const order = (props) => showFirst(props, (p) => p).map((p) => p.label).join(' | ');
   assert.equal(order([{ label: 'State', type: 'VARIANT' }, { label: 'Text Content', type: 'TEXT', part: '.t' }, { label: 'Show Text', type: 'BOOLEAN', part: '.t' }, { label: 'Show Divider', type: 'BOOLEAN' }]), 'State | Show Text | Text Content | Show Divider');
@@ -1033,6 +1087,11 @@ test('in the browser: with a width chosen, a link to another component opens it'
     assert.equal(await run(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`), 'c-button', errors.join('\n'));
     assert.match(await run(`location.hash`), /^#c-button(\?width=desktop)?$/, 'no test text leaks into the address');
     assert.equal(await run(`!!document.querySelector('#c-button .pg-frame iframe') && document.querySelector('#c-button .pg-frame iframe').contentDocument.querySelector('.pg-frame-stage') !== null`), true, 'drawn at the width chosen');
+    // The accessibility check's part of the measuring page draws only the components it names.
+    const part = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}?all&only=chip`);
+    await waitForTrue(send, part.sessionId, FILE_PAGE_LOADED);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal((await send('Runtime.evaluate', { expression: `[...document.querySelectorAll('main > section.pg-card-section')].map((s) => s.id).join()`, returnByValue: true }, part.sessionId)).result.value, 'c-chip');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }

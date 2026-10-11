@@ -498,6 +498,7 @@ test('page: a field whose frame shows its focus with an easing border passes, an
     <label class="wrap good thin">City <input id="thin"></label><label>Note <input id="bare" class="bare"></label>
     <label class="pick"><input type="radio" name="f" id="dotted"><span class="dot"></span>PDF</label>
     <label class="pick plain"><input type="checkbox" id="plain"><span class="dot"></span>Bleed</label>
+    <label class="pick"><input type="checkbox" id="tipped"><span class="dot"></span>Crop <button type="button" aria-label="About crop">?</button></label>
     <div inert><label class="wrap">Thumb <input id="thumb"></label></div>
   </main></body></html>`.replace('.pick input:focus-visible + .dot', '.pick:not(.plain) input:focus-visible + .dot');
   const dir = makeFixture({ 'page.html': page });
@@ -506,7 +507,9 @@ test('page: a field whose frame shows its focus with an easing border passes, an
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();
-  assert.deepEqual(kinds('focus'), ['input#bare', 'input#plain'], out);   // the radio's circle shows its focus; the inert thumbnail takes none to judge
+  // The radio's circle shows its focus, and so does the box's circle beside a label that holds a tip button too; the
+  // inert thumbnail takes none to judge.
+  assert.deepEqual(kinds('focus'), ['input#bare', 'input#plain'], out);
   assert.deepEqual(kinds('focuscontrast'), ['input#faint'], out);
   assert.deepEqual(kinds('focusthin'), ['input#thin'], out);
 });
@@ -559,8 +562,9 @@ test('annotations on the style guide: read in the component\'s own section; pres
   const d = pageResult(out);
   assert.equal(d.usedStyleguide, true, out);
   // A plain element with no role (generic) holds no meaning, as presentation asks; a component the code has no markup
-  // for is drawn as a stand-in, and its role is said not checked, never read on the stand-in.
-  assert.deepEqual(d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector), ['ghost: not checked, the code has no markup for it (the style guide draws a stand-in)'], out);
+  // for is drawn as a stand-in, and it is said not checked, never read on the stand-in nor counted as a mismatch.
+  assert.deepEqual(d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector), [], out);
+  assert.ok((d.notRead ?? []).includes('ghost (the code has no markup for it: the style guide draws a stand-in)'), out);
 });
 
 // A composite widget has one Tab stop and the arrow keys for the rest (a radio group, a tab list, a menu): an option
@@ -578,4 +582,37 @@ test('keyboard: an option a composite reaches by its arrow keys is reachable; a 
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   assert.deepEqual(d.issues.filter((i) => i.issue === 'keyboard').map((i) => i.selector).sort(), ['span[role=button]', 'span[role=radio]', 'span[role=radio]'], out);   // each option of the group with no stop
+});
+
+// On the style guide the page's own controls are built from the system's components (a Playground switch is the
+// system's segmented control). The checks that press keys or click act only on a component drawn in a preview: an arrow
+// key on the page's own switch would change the component it shows (its words turned off), and every check after it,
+// axe-core's last, would judge that changed one.
+test('style guide: the checks that act (arrow keys, Enter, an opener) act only on components drawn in a preview', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 60000 }, async () => {
+  const { deepSweepExpression } = await import('../a11y-check.mjs');
+  const { launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const dir = makeFixture({ 'sg.html': `<!doctype html><html lang="en"><body><main><h1>Guide</h1>
+    <section id="c-seg"><div class="pg-ctl"><div class="seg" role="radiogroup" aria-label="Show label" id="own"><span role="radio" aria-checked="true" tabindex="0">On</span><span role="radio" aria-checked="false" tabindex="-1">Off</span></div>
+      <span class="seg" role="button" tabindex="0" aria-haspopup="menu" id="ownOpener">More</span></div>
+    <div class="pg-preview"><div class="seg" role="radiogroup" aria-label="View" id="drawn"><span role="radio" aria-checked="true" tabindex="0">List</span><span role="radio" aria-checked="false" tabindex="-1">Grid</span></div>
+      <span class="seg" role="button" tabindex="0" aria-haspopup="menu" id="drawnOpener">Open</span></div></section>
+  </main></body></html>` });
+  const c = await launchChrome(CHROME);
+  try {
+    const { send, close } = await connectCDP(c.wsUrl);
+    const { sessionId } = await openPage(send, pathToFileURL(join(dir, 'sg.html')).href);
+    await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
+    const run = async (what, stage) => (await send('Runtime.evaluate', { expression: deepSweepExpression(['.seg'], what, stage), returnByValue: true }, sessionId)).result.value;
+    const ids = async (attr) => (await send('Runtime.evaluate', { expression: `[...document.querySelectorAll('[${attr}]')].map((e) => e.id || e.parentElement.id)`, returnByValue: true }, sessionId)).result.value;
+    assert.equal((await run('composites', '.pg-preview')).length, 1);
+    assert.deepEqual(await ids('data-design-system-engine-group'), ['drawn'], 'the page\'s own switch is never pressed');
+    await send('Runtime.evaluate', { expression: `document.querySelectorAll('[data-design-system-engine-kbd],[data-design-system-engine-opener]').forEach((e) => { e.removeAttribute('data-design-system-engine-kbd'); e.removeAttribute('data-design-system-engine-opener'); })` }, sessionId);
+    await run('widgets', '.pg-preview');
+    assert.ok((await ids('data-design-system-engine-kbd')).every((id) => id === 'drawn' || id === 'drawnOpener'), 'only drawn widgets are pressed');
+    await run('openers', '.pg-preview');
+    assert.deepEqual(await ids('data-design-system-engine-opener'), ['drawnOpener']);
+    // Any other page is checked as before: every one counts.
+    assert.equal((await run('composites', null)).length, 2);
+    close();
+  } finally { c.kill(); }
 });

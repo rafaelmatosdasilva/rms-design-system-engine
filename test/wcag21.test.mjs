@@ -90,6 +90,24 @@ async function inPage(fn) {
   } finally { close(); chrome.kill(); }
 }
 
+test('page: a tip that fades out slowly once Escape is pressed is closed, not one that stays', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+  await inPage(async (ev) => {
+    const found = await ev(`(async () => {
+      const box = document.createElement('div');
+      box.innerHTML = '<button type="button" data-tip="Save it">Save</button><div id="slowtip" role="tooltip" style="position:fixed;top:0;left:0;width:80px;height:20px;opacity:0">Save it</div>';
+      document.body.appendChild(box);
+      const b = box.querySelector('button'), tip = box.querySelector('#slowtip');
+      b.addEventListener('mouseover', () => { tip.style.transition = 'none'; tip.style.opacity = '1'; });
+      // Escape starts a fade far longer than the check waits: in a page the browser does not draw, any fade is that.
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { tip.style.transition = 'opacity 30s'; tip.style.opacity = '0'; } });
+      const r = await window.__wcag21.interact(box, { wait: 100, triggers: 1 });
+      box.remove();
+      return r.findings.map((f) => f.desc);
+    })()`);
+    assert.ok(!found.some((d) => /does not close with Escape/.test(d)), JSON.stringify(found));
+  });
+});
+
 test('page: each WCAG 2.1 problem the page breaks once is found, and the part that is fine is left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
   await inPage(async (ev) => {
     const good = await ev(`(async () => { const r = document.getElementById('good'); const a = window.__wcag21.check(r, { name: 'x' }); const b = await window.__wcag21.interact(r); return { f: a.findings.concat(b.findings), ran: a.ran.concat(b.ran) }; })()`);

@@ -1339,7 +1339,10 @@ export function a11yView({ name, cls = null, role = null, roleFrom = null, annot
   let checked = null;
   if (result) {
     const at = result.checkedAt ?? null;
-    if ((result.notRead ?? []).some((x) => String(x).split(' (')[0] === name)) checked = { at, notRead: true, issues: [] };
+    // Not checked, with why when the check said it (the code has no markup for it, the check ran out of time).
+    const nr = (result.notRead ?? []).find((x) => String(x).split(' (')[0] === name);
+    const why = nr && /\((.+)\)$/.exec(String(nr))?.[1];
+    if (nr) checked = { at, notRead: true, ...(why ? { why } : {}), issues: [] };
     else {
       const mine = new RegExp(`\\.${String(cls ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`);
       const seen = new Set(), found = [];

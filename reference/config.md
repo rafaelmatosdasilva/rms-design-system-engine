@@ -129,7 +129,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 
 ### More settings (all optional)
 
-- `gateTimeoutSec` (default 180) - a gate that runs longer is stopped and reported as a failure ("timed out, not verified"), so one stuck gate never freezes the audit or a pre-commit hook.
+- `gateTimeoutSec` (default 180) - a gate that runs longer is stopped and reported as a failure ("timed out, not verified"), so one stuck gate never freezes the audit or a pre-commit hook. The accessibility check keeps its own time instead (it grows with its pages and the style guide's components, `a11y.timeoutSec` sets it) and keeps what it found when it stops; inside a git hook it is given this limit as its own.
 - `codeReading.timeoutSec` (default 120) - the time limit for the code capture inside the audit; past it the gates keep their own readings. `codeReading.hookBrowser: true` lets the capture use the browser inside git hooks too.
 - `codeReading.visual: true` - the visual diff under MEASURED (see *Each component against its Figma image* in `rms-design-system-engine --recipe refresh-figma`). `codeReading.visualTolerance` (default 10, per colour channel) and `codeReading.visualThreshold` (default 2, the percentage of pixels outside text that marks a component ⚠️).
 - `scanExcludeDirs`, `scanExcludeFilenames` - folders and file names (with `*` wildcards) the hardcoded-value and clean-CSS scans skip, such as demo pages. The styleguide template and output are always skipped (they are generated surfaces).
