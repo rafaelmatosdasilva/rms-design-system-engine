@@ -2167,9 +2167,25 @@ a.pg-usage-name { color: var(--sg-text); }
   // A text that shows only while a boolean is on (Show Text and Text Content, show-label and label-content, or both
   // acting on the same part) comes right after that boolean, which decides whether it is seen; the rest keep their
   // order and nothing is left out. list: the controls in Figma's order; propOf(item) its prop, or none.
+  // Whether an on/off prop shows a text prop's words (Show Text and Text Content, or both acting on the same part).
+  function showsText(b, t) {
+    var word = function (x, cut) { return String(x || '').toLowerCase().replace(cut, '').replace(/[^a-z0-9]+/g, ''); };
+    var n = word(b.label, /^\s*show[\s_-]*/); return b.type === 'BOOLEAN' && t.type === 'TEXT' && ((n && n === word(t.label, /[\s_-]*content\s*$/)) || (!!b.part && b.part === t.part));
+  }
+  // A control with no name only in the variants where an on/off prop hides its words (an icon-only button, a box with no
+  // text): it fails as it is, and what to do is the product's, which names it where it uses it that way. sets: the props
+  // of each variant it fails in; props: the component's. → what to do, or '' when it fails with its words shown too.
+  function namedWhereUsed(sets, props) {
+    var bools = props.filter(function (b) { return props.some(function (x) { return showsText(b, x); }); }), offs = [];
+    var every = sets.length && sets.every(function (set) {
+      var off = bools.filter(function (b) { var v = b.label in set ? set[b.label] : !!b.default; return v === false || v === 'false'; });
+      off.forEach(function (b) { if (offs.indexOf(b.label) < 0) offs.push(b.label); });
+      return off.length > 0;
+    });
+    return every && offs.length ? 'With ' + offs.join(' or ') + ' off it shows no words, so nothing names it. Where a product uses it that way, give it a name there: an aria-label, or aria-labelledby on words beside it. Say so in its Usage.' : '';
+  }
   function showFirst(list, propOf) {
-    var out = list.slice(), word = function (x, cut) { return String(x || '').toLowerCase().replace(cut, '').replace(/[^a-z0-9]+/g, ''); };
-    var shows = function (b, t) { var n = word(b.label, /^\s*show[\s_-]*/); return b.type === 'BOOLEAN' && t.type === 'TEXT' && ((n && n === word(t.label, /[\s_-]*content\s*$/)) || (!!b.part && b.part === t.part)); };
+    var out = list.slice(), shows = showsText;
     out.filter(function (k) { var p = propOf(k); return p && p.type === 'TEXT'; }).forEach(function (t) {
       var b = out.find(function (k) { var p = propOf(k); return p && shows(p, propOf(t)); });
       if (!b) return;
@@ -2765,9 +2781,9 @@ a.pg-usage-name { color: var(--sg-text); }
         Array.prototype.forEach.call(tb.rows, function (tr) {
           var html = tr.cells[1].innerHTML, plain = html.replace(/"[^"]*"/g, '"…"');
           var key = tr.dataset.status + '|' + plain + '|' + tr.cells[3].textContent;
-          if (!byKey[key]) { byKey[key] = { st: tr.dataset.status, html: html, plain: plain, wcag: tr.cells[3].textContent, where: [] }; groups.push(byKey[key]); }
+          if (!byKey[key]) { byKey[key] = { st: tr.dataset.status, html: html, plain: plain, wcag: tr.cells[3].textContent, where: [], sets: [] }; groups.push(byKey[key]); }
           if (byKey[key].html !== html) byKey[key].mixed = true;
-          byKey[key].where.push(cb.name);
+          byKey[key].where.push(cb.name); byKey[key].sets.push(cb.set);
         });
         modeSets.forEach(function (ms) {
           ms.forEach(function (m) { preview.setAttribute(m[0].attr, m[1].value); });
@@ -2793,7 +2809,9 @@ a.pg-usage-name { color: var(--sg-text); }
           return ' In ' + where.slice(0, 3).join('; ') + (where.length > 3 ? ' and ' + (where.length - 3) + ' more' : '') + '.';
         };
         // Each check's result as an item under its criterion, with the variants it holds in; the text contrast as one.
-        liveItems = groups.map(function (g) { return { sc: scOfLabel(g.wcag), label: g.wcag, st: g.st, html: (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + esc(scope(g.where)), from: FROM_PAGE }; }).filter(function (it) { return it.sc; });
+        // A control with no name only where an on/off prop hides its words (an icon-only button, a box with no text): it
+        // fails as it is, and what to do is said: the product that uses it that way names it there.
+        liveItems = groups.map(function (g) { var say = g.st === 'todo' && /has no name a screen reader can read/.test(g.html) ? namedWhereUsed(g.sets, props) : ''; return { sc: scOfLabel(g.wcag), label: g.wcag, st: g.st, todo: esc(say), html: (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + esc(scope(g.where)), from: FROM_PAGE }; }).filter(function (it) { return it.sc; });
         if (lowest) liveItems.push({ sc: '1.4.3', label: 'WCAG 1.4.3 Contrast (Minimum) (AA)', st: failing ? 'todo' : 'done', from: FROM_PAGE, html: failing
           ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
           : 'Text at least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.' });
