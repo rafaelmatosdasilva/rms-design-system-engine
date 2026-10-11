@@ -41,7 +41,7 @@ Or from the terminal:
 rms-design-system-engine                       # the whole design system
 rms-design-system-engine --component input     # one component (or a few: input,button)
 rms-design-system-engine --check-ui ui.json     # check a UI an AI tool generated against your components
-rms-design-system-engine --query badge          # one component or token, names written exactly; a text colour also lists the surfaces it can be read on
+rms-design-system-engine --query badge          # one component or token, names written exactly; a token says what it is for (its Figma description), a text colour also lists the surfaces it can be read on
 rms-design-system-engine --component chip --baseline --findings --match radi   # accept one known difference (the chip's radius) as debt; everything else keeps failing
 rms-design-system-engine --only accessibility   # only the accessibility check
 rms-design-system-engine --only parity          # every check against Figma, without accessibility
