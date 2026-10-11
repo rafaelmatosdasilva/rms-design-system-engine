@@ -423,8 +423,13 @@
         if (pop) {
           ran.hovercontent = 1;
           fire(document.activeElement || document.body, 'keydown', { key: 'Escape', code: 'Escape' }); fire(document, 'keydown', { key: 'Escape', code: 'Escape' });
-          // Given time to fade out (a transition of a few tenths of a second) before it is said to stay.
-          for (var tEsc = 0; tEsc < 12 && pop.isConnected && vis(pop); tEsc++) await sleep(50);
+          // Given time to fade out (a transition of a few tenths of a second) before it is said to stay. A fade it started
+          // is taken to its end at once: in a page the browser does not draw (one of several tried at a time), a
+          // transition never moves on, and a tip that closed would read as one still shown.
+          for (var tEsc = 0; tEsc < 12 && pop.isConnected && vis(pop); tEsc++) {
+            if (pop.getAnimations) pop.getAnimations().forEach(function (a) { try { a.finish(); } catch (e) { /* an endless one is left */ } });
+            if (vis(pop)) await sleep(50);
+          }
           if (pop.isConnected && vis(pop) && covers(pop, before)) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') does not close with Escape');
           await leave();
           pop = await appear();

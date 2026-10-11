@@ -222,3 +222,36 @@ test('each component on a 320px screen: one that cannot be narrower is named, on
   assert.ok(d.ran.includes('reflow'));
   assert.deepEqual(Object.keys(d.heard).sort(), ['bar', 'fits']);
 });
+
+// A check that runs out of time writes its report with what the pages it finished found: the page it was on and the
+// ones it never reached are said not checked. Each slow page waits on a server that never answers, so it never
+// finishes loading: the time limit falls on one of them, after the first page was checked.
+test('out of time: what the pages it finished found is kept, the page it was on and the ones not reached are said not checked', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 240000 }, async () => {
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const { readFileSync } = await import('node:fs');
+  const held = [];
+  const server = createServer((req, res) => { held.push(res); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const slow = Array.from({ length: 8 }, (_, i) => `slow${i}.html`);
+  const dir = makeFixture({
+    'ds-config.json': { a11y: { timeoutSec: 30 } },
+    'first.html': '<!doctype html><html lang="en"><title>First</title><body><main><h1>First</h1><p style="color:#bbb;background:#fff">Faint words</p></main></body></html>',
+    ...Object.fromEntries(slow.map((f, i) => [f, `<!doctype html><html lang="en"><title>Slow</title><body><img alt="" src="http://127.0.0.1:${server.address().port}/${i}.png"></body></html>`])),
+  });
+  try {
+    const urls = ['first.html', ...slow].flatMap((f) => ['--url', pathToFileURL(join(dir, f)).href]);
+    const child = spawn(process.execPath, [join(ENGINE, 'a11y-check.mjs'), ...urls, '--no-axe', '--no-states', '--json-out', join(dir, 'a11y.json')], { cwd: dir, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { out += d; });
+    await new Promise((r) => child.on('close', r));
+    assert.match(out, /stopped after 30s, with \d+ of 9 page\(s\) checked: what they found is kept/, out);
+    const d = JSON.parse(readFileSync(join(dir, 'a11y.json'), 'utf8'));
+    assert.ok(d.issues.some((i) => i.issue === 'contrast' && /Faint words/.test(JSON.stringify(i))), JSON.stringify(d.issues));
+    const said = (d.notRead ?? []).join('\n');
+    assert.match(said, /slow\d\.html \(stopped partway: the check ran out of its 30s\)/, said);
+    assert.match(said, /slow7\.html \(not reached: the check ran out of its 30s\)/, said);
+    assert.doesNotMatch(said, /first\.html/);
+  } finally { for (const r of held) r.destroy(); server.close(); }
+});
