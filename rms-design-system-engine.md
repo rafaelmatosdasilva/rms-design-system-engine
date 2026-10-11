@@ -119,6 +119,11 @@ the same call. Opening this skill or printing a recipe runs nothing, so never sa
 snapshots were refreshed without that output. The SUMMARY's **Figma data** line says whether this run
 refreshed anything and how old the snapshots are: repeat it as it is.
 
+**When sources disagree, the higher one decides:** the goal of the people who use the product, then verified research,
+then the system's documented standards (Figma, the contracts, the team's guidelines, WCAG 2.2 AA), then accepted past
+decisions, then general heuristics. WCAG 2.2 AA is the floor at every level. Say which source decided, and never put your
+own preference above a documented standard. The project's `llms.txt` names its own source at each level.
+
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
 `--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
 refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.json` edit, a commit, a push,
