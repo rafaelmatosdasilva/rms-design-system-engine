@@ -81,10 +81,19 @@ const colorVarIds = col.variableIds.filter(id => {
   return v && v.resolvedType === 'COLOR' && !v.name.startsWith(PRIMITIVE_PREFIX);
 });
 const sizingCol = SIZING_COLLECTION ? collections.find(c => c.name === SIZING_COLLECTION) : null;
+// An alias to a variable this file does not hold: a library's resolves; one that was deleted is a broken alias.
+const modeName = {}; for (const c of collections) for (const m of c.modes) modeName[m.modeId] = m.name;
+const brokenAliases = [];
+for (const v of Object.values(idToVar)) for (const [modeId, val] of Object.entries(v.valuesByMode)) {
+  const a = val?.type === 'VARIABLE_ALIAS' ? val : val?.color?.type === 'VARIABLE_ALIAS' ? val.color : null;
+  if (!a || idToVar[a.id] || await figma.variables.getVariableByIdAsync(a.id)) continue;
+  brokenAliases.push({ name: v.name, mode: modeName[modeId] ?? modeId, target: a.id });
+}
 return {
   colorCount: colorVarIds.length,
   sizingCount: sizingCol?.variableIds.length ?? 0,
   modes: col.modes.map(m => m.name),
+  brokenAliases,
 };
 ```
 
@@ -1115,7 +1124,7 @@ For every changed or new token:
 
 ## Phase 1 - Step 5: Update snapshots
 
-Write fresh live data to both files, with `_modeOrder` (each collection's modes in Figma's own order, which the style guide lists them in) on the vars snapshot. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] (Data is up to date) the data is fresh.
+Write fresh live data to both files, with `_modeOrder` (each collection's modes in Figma's own order, which the style guide lists them in) and the probe's `brokenAliases` (a variable that points at one no longer in the file; `[]` when none) on the vars snapshot. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] (Data is up to date) the data is fresh.
 
 > **Also stamp `_figmaVersion` on the vars snapshot.** Fetch it with
 > `GET /v1/files/{key}?depth=1` (the `version` field) and write it alongside `_updated`.

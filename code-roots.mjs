@@ -3,8 +3,9 @@
 // pluginDirs ({ "gallery": "../gallery-app" }) or codeRoots (["../some-app"]); every source scan then
 // reads their code as the project's own, so a variable or a class only a product uses is not "unused", and a hard-coded
 // value in a product is still found. Folders inside the project are already walked; a missing folder is skipped.
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve, relative, isAbsolute } from 'node:path';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { resolve, relative, isAbsolute, join } from 'node:path';
+import { ENGINE_DIRS } from './names.mjs';
 
 const cache = new Map();
 
@@ -26,4 +27,23 @@ export function codeRoots(ROOT, cfg = null) {
 export function appDir(cfg, app) {
   const d = cfg?.pluginDirs?.[app];
   return typeof d === 'string' && d ? d.replace(/\/+$/, '') : `apps/${app}`;
+}
+
+// Every UI source file of every root (styles, markup, scripts, Vue and Svelte), as { file (from ROOT), text }: no
+// dependencies, builds, tests, stories, minified files, the engine's own output or the style guide app.
+const SKIP = new Set(['node_modules', 'dist', 'build', 'coverage', '.git', '.next', 'out', ...ENGINE_DIRS.map((d) => d.split('/')[0])]);
+const UI = /\.(html?|jsx|tsx|js|ts|mjs|vue|svelte|css|scss|less)$/i;
+export function sourceFiles(ROOT, cfg = null) {
+  const out = [];
+  const walk = (dir) => {
+    let list = [];
+    try { list = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of list) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) { if (!SKIP.has(e.name) && !e.name.startsWith('.') && !/apps[\/]style-?guide$/.test(p)) walk(p); }
+      else if (UI.test(p) && !/\.(test|spec|stories)\./.test(p) && !/\.min\./.test(p)) { try { out.push({ file: relative(ROOT, p), text: readFileSync(p, 'utf8') }); } catch { /* unreadable */ } }
+    }
+  };
+  for (const r of codeRoots(ROOT, cfg)) walk(r);
+  return out;
 }
