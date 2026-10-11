@@ -219,15 +219,18 @@ function locateExpression(specs) {
         if (p) { p.setAttribute('data-design-system-engine-part', ((p.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-' + kind).trim()); parts[kind] = true; }
       }
       // The first element that holds visible text: what Figma's font fields describe (the first TEXT node).
-      // A text field's text is its <input> or <textarea> value, not a text node: that element is the text part.
+      // A text field's text is its <input> or <textarea> value, not a text node, so the field counts as text where it
+      // sits: a label drawn before it is the first text (Figma's Label layer before its Value), else the field is.
       const field = el.matches('input,textarea') ? el : el.querySelector('input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=range]),textarea');
-      if (field) { field.setAttribute('data-design-system-engine-part', ((field.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; }
       // Only text that is drawn: a visually hidden label (clipped to a pixel) or a hidden span is not the text Figma shows.
       const drawn = (e) => { const r = e.getBoundingClientRect(), st = getComputedStyle(e); return r.width > 1 && r.height > 1 && st.visibility !== 'hidden' && st.opacity !== '0'; };
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-      for (let t = field ? null : walker.nextNode(); t; t = walker.nextNode()) {
-        if (t.textContent.trim() && t.parentElement && drawn(t.parentElement)) { t.parentElement.setAttribute('data-design-system-engine-part', ((t.parentElement.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; break; }
+      let first = null;
+      for (let t = field === el ? null : walker.nextNode(); t; t = walker.nextNode()) {
+        if (t.textContent.trim() && t.parentElement && drawn(t.parentElement)) { first = t.parentElement; break; }
       }
+      const textEl = field && (!first || (first.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_PRECEDING)) ? field : first;
+      if (textEl) { textEl.setAttribute('data-design-system-engine-part', ((textEl.getAttribute('data-design-system-engine-part') || '') + ' ' + i + '-text').trim()); parts.text = true; }
       return { i, how, count, stripped, parts, hasText: !!(el.textContent.trim() || field) };
     });
   })()`;
@@ -286,12 +289,22 @@ function layersExpression(selector, childParts) {
     return out;
   })()`;
 }
+// A state the bare component draws, while the default variant's class is on: the recipe also takes that class off.
+export function withRemoved(how, remove) {
+  if (how.error || !remove?.length) return how;
+  const said = how.describe === 'same as the base selector' ? [] : [how.describe];
+  return { ...how, remove, describe: [...said, ...remove.map((c) => `class .${c} taken off`)].join(' + ') };
+}
+// An input of the component ticked or not (a switch's own checkbox), set on the instance.
+export function checkRecipe(check) {
+  return { classes: [], attrs: [], force: [], disabled: false, checked: false, checks: [check], describe: `${check.part} ${check.value ? 'ticked' : 'not ticked'}` };
+}
 // Several recipes at once, for a variant combination: every class, attribute and forced state.
 function mergeRecipes(list) {
   const err = list.find((h) => h.error);
   if (err) return { error: err.error };
   return {
-    classes: list.flatMap((h) => h.classes), attrs: list.flatMap((h) => h.attrs), force: [...new Set(list.flatMap((h) => h.force))],
+    classes: list.flatMap((h) => h.classes), remove: list.flatMap((h) => h.remove ?? []), checks: list.flatMap((h) => h.checks ?? []), attrs: list.flatMap((h) => h.attrs), force: [...new Set(list.flatMap((h) => h.force))],
     disabled: list.some((h) => h.disabled), checked: list.some((h) => h.checked), describe: list.map((h) => h.describe).join(' + '),
   };
 }
@@ -473,6 +486,10 @@ export async function captureComponents(ctx) {
           try {
             await applyRecipe(send, sessionId, j.i, j.nodeId, j.how, true);
             sMode[ji][mode.snapshotKey] = (await send('Runtime.evaluate', { expression: measureExpression(capSel(j.i)), returnByValue: true }, sessionId)).result?.value;
+            // The text's own colour in this state: a text with a rule of its own (a switch's description ticked or not)
+            // need not follow the component's colour.
+            const textColor = (await send('Runtime.evaluate', { expression: `(() => { const t = document.querySelector('[data-design-system-engine-part~="${j.i}-text"]'); return t ? getComputedStyle(t).color : null; })()`, returnByValue: true }, sessionId)).result?.value;
+            if (textColor && sMode[ji][mode.snapshotKey]?.cs) sMode[ji][mode.snapshotKey].textColor = textColor;
             if (mi === 0) sTrace[ji] = await trace(j.nodeId);
             if (mi === 0 && j.childParts?.length) sLayers[ji] = (await send('Runtime.evaluate', { expression: layersExpression(capSel(j.i), j.childParts), returnByValue: true }, sessionId)).result?.value ?? null;
           } finally { await applyRecipe(send, sessionId, j.i, j.nodeId, j.how, false).catch(() => {}); }
@@ -585,6 +602,7 @@ export async function captureComponents(ctx) {
     for (const [mk, mv] of Object.entries(perMode)) {
       if (!mv) continue;
       out[mk] = Object.fromEntries([...COLOR_PROPS].map((k) => [k, mv.cs[k]]));
+      if (mv.textColor) out[mk].textColor = mv.textColor;
       // An inside stroke drawn as an inset ring has its colour there, not in border-color (which then follows the text).
       if (mv.cs.boxShadow && mv.cs.boxShadow !== 'none') out[mk].boxShadow = mv.cs.boxShadow;
       if (mv.before) out[mk].beforeBackground = mv.before.backgroundColor;
@@ -724,7 +742,7 @@ export async function captureComponents(ctx) {
           ...(kind === 'text' || kind === 'font' ? { colors: colorsOf(pMode) } : {}) };
       }
       for (const st of comp.states ?? []) {
-        const how = stateRecipe(comp.selector, st.selector);
+        const how = st.check ? checkRecipe(st.check) : withRemoved(stateRecipe(comp.selector, st.selector), st.remove);
         if (how.error || !nodeId) { deferred.push({ comp: comp.name, st, why: how.error ?? 'instance not addressable' }); continue; }
         const baseJob = stateJobs.length;
         stateJobs.push({ i: loc.i, nodeId, how, st, props, entry, childParts: comp.childParts });   // measured for the whole page at once
@@ -740,7 +758,7 @@ export async function captureComponents(ctx) {
       }
       // Variant combinations (two or more axes at once), each recipe put on together.
       for (const combo of comp.combos ?? []) {
-        const how = mergeRecipes(combo.parts.map((p) => stateRecipe(comp.selector, p.selector)));
+        const how = mergeRecipes(combo.parts.map((p) => (p.check ? checkRecipe(p.check) : withRemoved(stateRecipe(comp.selector, p.selector), p.remove))));
         if (how.error || !nodeId) { (entry.combosNotProduced ??= []).push({ variant: combo.name, why: how.error ?? 'instance not addressable' }); continue; }
         stateJobs.push({ i: loc.i, nodeId, how, st: { label: combo.name, selector: combo.parts.map((p) => p.selector).join(' + ') }, props, entry, childParts: comp.childParts, combo: combo.name });
       }
@@ -811,6 +829,9 @@ export function stateRecipe(baseSel, stateSel) {
 }
 async function applyRecipe(send, sessionId, capId, nodeId, how, on) {
   const js = `(() => { const el = document.querySelector('[data-design-system-engine-cap~="${capId}"]'); if (!el) return;
+    ${JSON.stringify(how.remove ?? [])}.forEach((c) => el.classList.${on ? 'remove' : 'add'}(c));
+    ${JSON.stringify(how.checks ?? [])}.forEach(({ part, value }) => { const p = el.matches(part) ? el : el.querySelector(part); if (!p || !('checked' in p)) return;
+      ${on ? "p.setAttribute('data-design-system-engine-was', p.checked ? '1' : '0'); p.checked = value;" : "if (p.hasAttribute('data-design-system-engine-was')) { p.checked = p.getAttribute('data-design-system-engine-was') === '1'; p.removeAttribute('data-design-system-engine-was'); }"} });
     ${JSON.stringify(how.classes)}.forEach((c) => el.classList.${on ? 'add' : 'remove'}(c));
     ${JSON.stringify(how.attrs)}.forEach(([k, v]) => ${on ? 'el.setAttribute(k, v)' : 'el.removeAttribute(k)'});
     ${how.disabled ? `el.${on ? 'setAttribute("disabled", "")' : 'removeAttribute("disabled")'};` : ''}

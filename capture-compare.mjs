@@ -262,17 +262,35 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     // are (a value with a variable is compared above, by its variable).
     const rawDef = f.variants?.[f.defaultVariant] ?? f;
     if (!low && !iconOnly) {
+      // A root Figma spaces with nothing (0) around one wrapper frame (a Slot, a Container) that holds the content: the
+      // code draws no wrapper and puts the wrapper's spacing on its root. That value is the same, not a difference.
+      const wrapperValue = (field) => {
+        const gap = /gap/.test(field), side = /top|bottom/.test(field) ? 'tb' : 'lr';
+        const vars = gap ? (f.childFrameGaps ?? []).map((x) => x.gapVar) : (f.childFramePadding ?? []).map((x) => x.paddingVar?.[side]);
+        return vars.filter(Boolean).map((v) => toNum(tokenValue(v))).filter((n) => Number.isFinite(n));
+      };
       const raw = (fig, fact, field) => {
         if (typeof fig !== 'number' || !fact || fact.confidence === 'not-read' || fact.confidence === 'uncertain' || fact.confidence === 'default') return;
-        settle(Math.abs(toNum(fact.value) - fig) < 0.5, { component: name, field, figma: fig, code: fact.value, rule: fact.rule, at: fact.at, confidence: fact.confidence });
+        const got = toNum(fact.value);
+        if (fig === 0 && Math.abs(got) >= 0.5 && wrapperValue(field).some((w) => Math.abs(w - got) < 0.5)) {
+          out.notComparable.push({ component: name, field, figma: fig, code: fact.value, why: 'the code puts on its root the spacing Figma gives the wrapper frame inside it' });
+          return;
+        }
+        settle(Math.abs(got - fig) < 0.5, { component: name, field, figma: fig, code: fact.value, rule: fact.rule, at: fact.at, confidence: fact.confidence });
       };
       const pp = rawDef.paddingPx;
       if (Array.isArray(pp)) {
         if (!f.paddingVar?.tb) [['paddingTop', 0], ['paddingBottom', 2]].forEach(([k, i]) => raw(pp[i], c.props?.[k], k.replace('padding', 'padding ').toLowerCase()));
         if (!f.paddingVar?.lr) [['paddingRight', 1], ['paddingLeft', 3]].forEach(([k, i]) => raw(pp[i], c.props?.[k], k.replace('padding', 'padding ').toLowerCase()));
       }
-      // One radius, however many corners set it: the first corner that differs stands for the rest.
-      if (!f.innerRadiusVar && Array.isArray(rawDef.radiusPx) && f.fillStructure !== 'before') {
+      // One radius, however many corners set it: the first corner that differs stands for the rest. A root that draws
+      // no fill and no stroke of its own shows no corners: the shape a person sees is a child layer (a Background
+      // rectangle), whose corners the capture does not read, so the root's 0 is not the component's.
+      const figDrawsNothing = !rawDef.colors?.fill && !rawDef.colors?.stroke && !f.stroke && !Object.values(f.variants ?? {}).some((v) => v.colors?.fill || v.colors?.stroke);
+      if (figDrawsNothing && Array.isArray(rawDef.radiusPx) && rawDef.radiusPx.every((r) => !r) && !f.innerRadiusVar) {
+        const r = (c.parts?.radius?.props ?? c.props)?.borderTopLeftRadius;
+        if (r && toNum(r.value) > 0) out.notComparable.push({ component: name, field: 'radius', figma: 0, code: r.value, why: 'Figma draws the shape on a child layer (its root has no fill or stroke), whose corners the capture does not read' });
+      } else if (!f.innerRadiusVar && Array.isArray(rawDef.radiusPx) && f.fillStructure !== 'before') {
         const corners = ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'].map((k, i) => [rawDef.radiusPx[i], (c.parts?.radius?.props ?? c.props)?.[k]]).filter(([fig, fact]) => typeof fig === 'number' && fact);
         const wrong = corners.find(([fig, fact]) => !(Math.abs(toNum(fact.value) - fig) < 0.5));
         if (corners.length) raw(...(wrong ?? corners[0]), 'radius');
@@ -346,6 +364,8 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       // A main component on the canvas always reads FIXED (FILL needs an auto-layout parent): a code width relative to
       // its container (width: 100%) is the page's, and what the page draws is not the component's to compare.
       if (!w?.rule) out.notComparable.push({ component: name, field: 'width', figma: f.box.width, why: 'the code width follows its content or container' });
+      // A width the page sets on the element (its style attribute, as a preview stretches a line to its room) is the page's.
+      else if (/style attribute/i.test(String(w.rule))) out.notComparable.push({ component: name, field: 'width', figma: f.box.width, why: 'the page sets this width on the element, not the component\'s rule' });
       else if (RELATIVE_SIZE.test(String(w.declared ?? ''))) out.notComparable.push({ component: name, field: 'width', figma: f.box.width, why: `the code width follows its container (${w.declared})` });
       else settle(Math.abs((c.size?.width ?? toNum(w.value)) - f.box.width) < 0.5, { component: name, field: 'width', figma: f.box.width, code: c.size?.width ?? toNum(w.value), rule: w.rule, at: w.at });
     }
@@ -365,8 +385,14 @@ export function compareComponents(code, structure, vars, cfg, maps) {
         const CROSS = { MIN: ['flex-start', 'start', 'self-start'], CENTER: ['center'], MAX: ['flex-end', 'end', 'self-end'], BASELINE: ['baseline', 'first baseline'] };
         const word = (x) => ({ MIN: 'start', MAX: 'end', SPACE_BETWEEN: 'space-between' }[x] ?? String(x).toLowerCase());
         const jc = c.props?.justifyContent, ai = c.props?.alignItems, a = f.box.align ?? {};
-        if (MAIN[a.primary] && jc) settle(MAIN[a.primary].includes(String(jc.value).trim()), { component: name, field: 'alignment (main axis)', figma: word(a.primary), code: jc.value, rule: jc.rule, at: jc.at, confidence: jc.confidence });
-        if (CROSS[a.counter] && ai) {
+        // Along an axis where Figma's box hugs its content there is no room left over: its alignment there cannot show.
+        const mainHugs = (f.box.layout ?? f.layout) === 'VERTICAL' ? f.box.sizing?.v === 'HUG' : f.box.sizing?.h === 'HUG';
+        // A root whose content sits in a slot is lined up by the slot, whose alignment the capture does not read.
+        const inSlot = f.slot === true;
+        if (MAIN[a.primary] && jc && (mainHugs || inSlot)) { if (!MAIN[a.primary].includes(String(jc.value).trim())) out.notComparable.push({ component: name, field: 'alignment (main axis)', figma: word(a.primary), code: jc.value, why: inSlot ? 'its content sits in a slot, which lines it up' : 'Figma\'s box hugs its content along this axis, so its alignment there cannot show' }); }
+        else if (MAIN[a.primary] && jc) settle(MAIN[a.primary].includes(String(jc.value).trim()), { component: name, field: 'alignment (main axis)', figma: word(a.primary), code: jc.value, rule: jc.rule, at: jc.at, confidence: jc.confidence });
+        if (CROSS[a.counter] && ai && inSlot) { if (!CROSS[a.counter].includes(String(ai.value).trim())) out.notComparable.push({ component: name, field: 'alignment (cross axis)', figma: word(a.counter), code: ai.value, why: 'its content sits in a slot, which lines it up' }); }
+        else if (CROSS[a.counter] && ai) {
           // Stretched children against children lined up at the start: the same until one is smaller than the row.
           if (a.counter === 'MIN' && /^(normal|stretch)$/.test(String(ai.value).trim())) out.notComparable.push({ component: name, field: 'alignment (cross axis)', figma: word(a.counter), code: ai.value, why: 'the code stretches its children; Figma lines them up at the start, which shows only when one is smaller than the row' });
           else settle(CROSS[a.counter].includes(String(ai.value).trim()), { component: name, field: 'alignment (cross axis)', figma: word(a.counter), code: ai.value, rule: ai.rule, at: ai.at, confidence: ai.confidence });
@@ -486,7 +512,8 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       const slots = [
         ['fill', 'background', (col) => (c.fill === 'before' ? col.beforeBackground : col.backgroundColor), c.props?.backgroundColor],
         // A text part with its own colour rule is read on the part in every mode (its colours per mode, from the capture).
-        ['text', 'text colour', (col, m) => (m === firstMode && !suffix ? textFact?.value : textInherits ? col.color : !suffix ? partColors?.[m]?.color ?? null : null), textFact],
+        // In a state, the text's own colour there when the capture read it; else the component's, when the text follows it.
+        ['text', 'text colour', (col, m) => (m === firstMode && !suffix ? textFact?.value : suffix && col.textColor ? col.textColor : textInherits ? col.color : !suffix ? partColors?.[m]?.color ?? null : null), textFact],
         // A stroke drawn as an inset ring, with no border of its own, is the ring's colour (its border-color is the text's).
         ['stroke', 'border colour', (col) => { const ring = insetRingOf(col.boxShadow); return ring && !(toNum(c.props?.borderTopWidth?.drawn ?? c.props?.borderTopWidth?.value) > 0) ? ring.color : col[strokeKey] ?? col.borderTopColor; }, c.props?.[strokeKey]],
       ];
