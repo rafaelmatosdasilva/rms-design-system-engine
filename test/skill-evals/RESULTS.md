@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: What the tokens owe, on the style guide's To do (continuous evaluation)
+
+What changed since the entry below (engine 09ee19f): The style guide's To do lists under The system the semantic tokens with no description in Figma, the same value written by hand in two tokens and the tokens one component uses; tokens that share a primitive are never listed. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `4efe9853277b` · Project measured: `13d811a9d668`
+
+| Haiku, engine baae26a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.060 |
+| Input a run | 100k | 116k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 116k a run against 100k. Records: `records/2026-10-11-token-todo`.
+
 ## 2026-10: System health advice, the token budget, tiers by kind and the Figma build list (continuous evaluation)
 
 What changed since the entry below (engine c46a5e4): System health advice (modes below a product's root, two themes in one product, undescribed tokens, catalogue-only patches, near-duplicate components, tokens named by look), the token budget in prune candidates, tiers that say what they hold, figma-to-build.md, a product's own usage line in --query, and tokens per generation in evals. The guide changed in `reference/config.md`, `reference/usage.md`.
