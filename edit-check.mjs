@@ -25,7 +25,10 @@
 //     package.json exports. The system's own repository imports its insides freely;
 //   • a component put inside another the way the system never does (R3): the catalog's rules, the same the prototype
 //     check applies (check-ui): one it must never contain, or one outside what Figma has it hold when it has no open
-//     slot. Read from the component tags, the edit's added lines only.
+//     slot. Read from the component tags, the edit's added lines only;
+//   • a class rule the edit added that nearly copies one of the system's components (I83, system-advice.mjs): a new
+//     component is a decision, so it goes back to use that component, with a new option if it needs one, or to ask
+//     the person whether the new one belongs in the system.
 // Silent when the edit added none of these. Precise before complete: component tags the catalog does not know
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
@@ -40,6 +43,7 @@ import { primitiveTable, projectClassRules, primitiveFindings, primitiveTag } fr
 import { markupFindings, cssFindings, styleOnly, projectStyleText } from './a11y-static.mjs';
 import { codeSnapshotPath } from './names.mjs';
 import { colorHex, COLOUR_NAMES } from './css-values.mjs';
+import { classRules, nearCopies, systemRules } from './system-advice.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
 const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.design-system-engine-out|\.design-system-engine-refs)\//;
@@ -305,12 +309,17 @@ export function editTruth(ROOT, cfg = {}) {
   const replaced = ic.replaced && typeof ic.replaced === 'object' ? ic.replaced : {};
   const imports = sys || Object.keys(replaced).length ? { replaced, system: sys, exports: sys ? json(join('node_modules', sys, 'package.json')).exports ?? null : null } : null;
   const nesting = Object.keys(catalog.components ?? {}).length ? catalog.components : null;   // R3
-  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, imports, nesting, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  // The system's components as near-copy targets (I83), read only once an edit adds a class rule.
+  const names = [...new Set([...Object.keys(catalog.components ?? {}), ...Object.keys(json(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').components ?? {})])].filter((n) => !n.startsWith('_'));
+  const classes = Object.fromEntries(names.map((n) => [n, cfg.componentSelectors?.[n] ?? `.${n.charAt(0).toLowerCase()}${n.slice(1)}`]));
+  let targets = null;
+  const copies = names.length && cfg.systemHealth !== false ? { targets: () => (targets ??= systemRules(`${theme}\n${projectStyleText(ROOT)}`, classes)) } : null;
+  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, imports, nesting, copies, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null, imports = null, nesting = null }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null, imports = null, nesting = null, copies = null }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -414,6 +423,15 @@ export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = 
     const addedAt = new Set(added.map(lineOf).filter(Boolean));
     for (const f of nestingFindings(fullText, nesting)) if (addedAt.has(f.line)) push(f.line, f.text, { kind: 'nesting' });
   }
+  // A class rule the edit added that nearly copies one of the system's components (I83): a new component is a decision.
+  if (copies && (sheet || /<style\b/i.test(String(fullText ?? '')))) {
+    const addedAt = new Set(added.map(lineOf).filter(Boolean));
+    const found = classRules(sheet ? fullText : styleOnly(fullText));
+    if ([...found.values()].some((r) => addedAt.has(r.line))) {
+      const { system, own } = copies.targets();
+      for (const x of nearCopies(found, system, { own })) if (addedAt.has(x.line)) push(x.line, `.${x.cls} nearly copies the system's ${x.like} (${x.same} of ${x.of} declarations alike); a new component is a decision: use ${x.like}, with a new option if it needs one, or ask the person whether to add .${x.cls} to the system`, { kind: 'copy' });
+    }
+  }
   return out;
 }
 
@@ -443,7 +461,9 @@ export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
     : `rms-design-system-engine checked this edit: ${n} thing${n === 1 ? '' : 's'} to fix.`;
   const next = count('silencer') === n
     ? `Take ${them} out and fix what the check reports. When that cannot be done, ask the person before switching a check off.`
-    : `Fix ${them} in this file now.${system ? ' Not sure of a name? rms-design-system-engine --query <name>.' : ''}${count('silencer') ? ' A comment that switches a check off comes out; when what it hides cannot be fixed, ask the person.' : ''}`;
+    : count('copy') === n
+    ? `Use the system's component instead, or ask the person whether the new one belongs in the system. Never keep a copy without asking.`
+    : `Fix ${them} in this file now.${system ? ' Not sure of a name? rms-design-system-engine --query <name>.' : ''}${count('silencer') ? ' A comment that switches a check off comes out; when what it hides cannot be fixed, ask the person.' : ''}${count('copy') ? ' A rule that nearly copies a system component: use the component, or ask the person whether to add the new one to the system.' : ''}`;
   return `${title}\n${lines.join('\n')}${n > 12 ? `\n  and ${n - 12} more` : ''}\n${next}`;
 }
 

@@ -146,6 +146,8 @@ const SC = /\b[1-4]\.\d{1,2}\.\d{1,2}\b/;
 const RULES = [
   ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
   ['guidelines-links', (t) => LINK.test(t)],
+  // A token renamed in Figma (L11): one change renames it everywhere, the old name kept pointing at the new one.
+  ['refresh-figma', (t) => /\b(renam\w*|renome\w*)\b/i.test(t) && /\btokens?\b|variab\w*|vari[aá]ve(l|is)|--[\w-]+/i.test(t), 'rename'],
   ['prototype', (t) => PROTOTYPE.test(t) && !FIGMA_GAPS.test(t) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
   // Building from Figma (a project that has only Figma, or a component Figma has and the code does not yet):
   // the engine lists what to build and checks each piece; the agent writes it with the names and values it prints.
@@ -284,6 +286,10 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
       const crits = [...new Set(t.match(new RegExp(SC.source, 'g')) ?? [])];
       notes.push('The person says they checked these by hand: record each one exactly as they named it, then rebuild the style guide. Never mark a check they did not name; when the component or the criterion is missing, ask which one.');
       return { recipe, question: false, run: named.length && crits.length ? [...named.flatMap((n) => crits.map((c) => `${cmd} --checked ${n} ${c}`)), `${cmd} --styleguide`] : [], notes, kind };
+    }
+    if (kind === 'rename') {
+      notes.push('A token renamed in Figma: refresh the Figma data first when it was read before the rename, then run the sweep. It pairs each old name with its new one by value and writes one patch for the system and one for each product, the old name kept in the theme pointing at the new one. Show the person the change and apply it only when they ask; never rename by hand.');
+      return { recipe, question: false, run: [`${cmd} --rename-sweep`], notes, kind };
     }
     if (kind === 'forbidden-green') {
       notes.push('Do not raise maxSnapshotAgeDays or edit ds-config.json to go green: that hides drift. Say so, and run the audit to show what really fails.');

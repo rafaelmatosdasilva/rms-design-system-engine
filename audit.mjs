@@ -25,7 +25,7 @@ import { spawn, spawnSync }                                      from 'child_pro
 import { existsSync, readdirSync, readFileSync, statSync,
          writeFileSync, copyFileSync, mkdirSync,
          symlinkSync, unlinkSync }                               from 'fs';
-import { join, dirname, resolve, relative }                     from 'path';
+import { join, dirname, resolve, relative, basename }           from 'path';
 import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
 import { readGateLabels, parseOnly, onlyWords, onlyHelp } from './only.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
@@ -273,6 +273,45 @@ if (process.argv.includes('--summary')) {
   console.log('No summary yet: run the audit first (rms-design-system-engine, or --component <name>).');
   console.log('NEXT: rms-design-system-engine');
   process.exit(2);
+}
+
+// ── --rename-sweep: a token renamed in Figma, renamed everywhere in one change (L11) ──
+// Pairs the tokens gone and new between the vars snapshot as last committed (or as of --since <git ref>) and as now, by
+// their values in every mode, and writes one patch per root (the system's, then each product's) that renames the CSS
+// variable in every rule, script and doc, with the old name kept pointing at the new one in the theme (--no-keep-old
+// leaves it out). Nothing is applied: the person reviews the patch and applies it when they ask.
+if (process.argv.includes('--rename-sweep')) {
+  let rcfg = {};
+  try { rcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const snapPath = rcfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json';
+  const rs = await import('./rename-sweep.mjs');
+  const sinceAt = process.argv.indexOf('--since');
+  const prevRaw = rs.previousSnapshot(ROOT, snapPath, sinceAt > 0 ? process.argv[sinceAt + 1] : null);
+  let next = {};
+  try { next = JSON.parse(readFileSync(join(ROOT, snapPath), 'utf8')); } catch { console.log(`❌ ${snapPath} not found: refresh the Figma data first.`); process.exit(2); }
+  if (!prevRaw) { console.log(`No earlier read of Figma to compare with: ${snapPath} has no committed history${sinceAt > 0 ? ` at ${process.argv[sinceAt + 1]}` : ''}.`); process.exit(0); }
+  const { resolveNamingSpec } = await import('./naming-convention.mjs');
+  let explicit = {};
+  try { const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href); explicit = { ...(map.EXPLICIT ?? {}), ...(map.EXPLICIT_SIZING ?? {}) }; } catch { /* no map */ }
+  const { sourceFiles } = await import('./code-roots.mjs');
+  const themes = [rcfg.paths?.themeCSS ?? []].flat();
+  const sweep = rs.renameSweep({ prev: prevRaw.vars, next, spec: resolveNamingSpec(rcfg), explicit, files: sourceFiles(ROOT, rcfg, { docs: true }), themes, keepOld: !process.argv.includes('--no-keep-old') });
+  if (!sweep.renames.length) { console.log(`✓ No token renamed in Figma since ${prevRaw.label} that the code still writes by its old name.`); process.exit(0); }
+  const dir = join(ROOT, OUT_DIR, 'handback');
+  mkdirSync(dir, { recursive: true });
+  console.log(`🔁 ${sweep.renames.length} token${sweep.renames.length === 1 ? '' : 's'} renamed in Figma since ${prevRaw.label}:`);
+  for (const r of sweep.renames) console.log(`   ${r.token.from} → ${r.token.to}   (${r.from} → ${r.to})`);
+  const written = [];
+  for (const p of sweep.patches) {
+    const name = p.root === '.' ? 'rename-sweep.diff' : `rename-sweep-${basename(p.root)}.diff`;
+    writeFileSync(join(dir, name), p.diff);
+    written.push({ ...p, file: relative(ROOT, join(dir, name)) });
+    console.log(`   ${p.root === '.' ? 'This system' : basename(p.root)}: ${p.lines} line${p.lines === 1 ? '' : 's'} in ${p.files} file${p.files === 1 ? '' : 's'} → ${relative(ROOT, join(dir, name))}`);
+  }
+  if (!process.argv.includes('--no-keep-old')) console.log('   The old names stay in the theme, pointing at the new ones, until every product has moved (migrations.md lists where).');
+  const sys = written.find((p) => p.root === '.'), others = written.filter((p) => p.root !== '.');
+  console.log(`NEXT: show the person the change; when they ask, apply it${sys ? ` with git apply ${sys.file}` : ''}${others.length ? `${sys ? ', and' : ''} in each product's folder with git apply ${others.map((p) => resolve(ROOT, p.file)).join(', ')}` : ''}, then run rms-design-system-engine`);
+  process.exit(0);
 }
 
 // ── --checked <component> <criterion>: a person checked a WCAG criterion by hand (G5) ──
@@ -3999,6 +4038,11 @@ function reportFull(label, items, shown) {
       if (sb.length) { lines.push(`${sb.length} Storybook preview rule${sb.length === 1 ? '' : 's'} style a component, so the catalogue shows it right while products draw it as the code does (fix the component):`); for (const f of sb.slice(0, 8)) lines.push(`   · ${f.file}:${f.line}  ${f.selector} (${f.component})`); }
       const near = sa.nearDuplicateComponents(theme, classes);
       for (const n of near.slice(0, 8)) lines.push(`${n.a} and ${n.b} are nearly the same (${n.same} of ${n.of} declarations): one may be a variant of the other.`);
+      // A product's near-copy of one of the system's components (I83): a decision, not a drift.
+      const { rootOf } = await import('./migrations.mjs');
+      const sheets = (await import('./code-roots.mjs')).sourceFiles(ROOT, cfg).filter((f) => rootOf(f.file) === '.' && /\.(css|scss|less)$/i.test(f.file)).map((f) => f.text);
+      const copies = sa.productCopies(productFiles, [theme, ...sheets].join('\n'), classes);
+      if (copies.length) { lines.push(`${copies.length} class${copies.length === 1 ? ' in the products nearly copies' : 'es in the products nearly copy'} a system component. For each, decide: use the component (with a new option if it needs one), or add the new one to the system on purpose:`); for (const x of copies.slice(0, 8)) lines.push(`   · ${x.file}:${x.line}  .${x.cls} is nearly ${x.like} (${x.same} of ${x.of} declarations alike${x.differ.length ? `; differs in ${x.differ.slice(0, 4).join(', ')}` : ''})`); }
       // A token named after a product or a brand (F6), its components' own tokens aside.
       const branded = sa.brandNamedTokens(sa.tokenNames(vsnap), { brands: (await import('./code-roots.mjs')).brandNames(ROOT, cfg), components: names });
       if (branded.length) { lines.push(`${branded.length} token${branded.length === 1 ? ' is' : 's are'} named after a product or brand, a name that stops making sense when a second one uses the system (rename each to the role it plays):`); for (const x of branded.slice(0, 8)) lines.push(`   · ${x.name} (${x.brand})`); }
@@ -4761,6 +4805,33 @@ function reportFull(label, items, shown) {
           writeFileSync(join(ROOT, dir, 'figma-to-build.md'), md);
           console.log(`\n🧱 ${only.length} component${only.length === 1 ? '' : 's'} only in code: what to build in Figma, with the props and tokens of each → ${join(dir, 'figma-to-build.md')}`);
         }
+      }
+    } catch { /* a convenience */ }
+    // A token renamed in Figma that the code still writes by its old name (L11): one line pointing at the sweep.
+    if (!_scopeNames.length && !NO_FIGMA) try {
+      const rs = await import('./rename-sweep.mjs');
+      const prevRead = rs.previousSnapshot(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
+      if (prevRead) {
+        const { resolveNamingSpec } = await import('./naming-convention.mjs');
+        const { sourceFiles } = await import('./code-roots.mjs');
+        const nowVars = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8'));
+        const sw = rs.renameSweep({ prev: prevRead.vars, next: nowVars, spec: resolveNamingSpec(cfg), files: sourceFiles(ROOT, cfg), themes: [cfg.paths?.themeCSS ?? []].flat() });
+        if (sw.renames.length) console.log(`\n🔁 ${sw.renames.length} token${sw.renames.length === 1 ? '' : 's'} renamed in Figma that the code still writes by the old name (${sw.renames.slice(0, 3).map((r) => `${r.from} → ${r.to}`).join(', ')}${sw.renames.length > 3 ? ', …' : ''}): rms-design-system-engine --rename-sweep writes one change for every use.`);
+      }
+    } catch { /* a convenience */ }
+    // What the system retired that is still in use (K12): a deprecated component or token, or an old name a rename
+    // kept, with what replaces it and every file and line, product by product, and a patch for each token swap.
+    if (!_scopeNames.length) try {
+      const mg = await import('./migrations.mjs');
+      const { steps, patches } = await mg.projectMigrations(ROOT, cfg);
+      const dir = join(dirname(codeSnapshotPath(cfg)), 'handback');
+      for (const f of (() => { try { return readdirSync(join(ROOT, dir)); } catch { return []; } })()) if (/^migrations(-[\w.-]+)?\.(md|diff)$/.test(f)) unlinkSync(join(ROOT, dir, f));   // only what is still open
+      if (steps.length) {
+        mkdirSync(join(ROOT, dir), { recursive: true });
+        for (const p of patches) { p.file = join(dir, p.root === '.' ? 'migrations.diff' : `migrations-${basename(p.root)}.diff`); writeFileSync(join(ROOT, p.file), p.diff); }
+        writeFileSync(join(ROOT, dir, 'migrations.md'), mg.migrationsMarkdown(steps, patches));
+        const uses = steps.reduce((k, s) => k + s.count, 0);
+        console.log(`\n🚚 ${steps.length} retired component${steps.length === 1 ? '' : 's'} or token${steps.length === 1 ? '' : 's'} still used in ${uses} place${uses === 1 ? '' : 's'} (${steps.slice(0, 3).map((s) => s.kind === 'component' ? s.name : s.from).join(', ')}${steps.length > 3 ? ', …' : ''}): what replaces each and every place → ${join(dir, 'migrations.md')}`);
       }
     } catch { /* a convenience */ }
     ledger.scopes = { ...(ledger.scopes ?? {}), [scopeKey]: { at: new Date().toISOString(), findings: now } };
