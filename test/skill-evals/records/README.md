@@ -76,5 +76,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-10-the-style-guide-published-from` | The 21 guide tasks on Haiku (engine ff08c96) | "The style guide published from CI; an inset-ring stroke compared by its own width and colour; a test waits on state" |
 | `2026-10-11-a-state-written-with-what` | The 21 guide tasks on Haiku (engine 06a82d2) | "A state written with what a screen reader hears is built by its classes; a selector list split at its own commas" |
 | `2026-10-11-accessibility-findings-say-how-sure` | The 21 guide tasks on Haiku (engine 293d460) | "Accessibility findings say how sure they are, with one verdict line; a removed focus outline a stronger rule puts back is not reported" |
+| `2026-10-11-style-guide-accessibility-tried-while` | The 21 guide tasks on Haiku (engine e645170) | "The style guide opens with its accessibility already tried; one issue table for To do, Parity and Accessibility" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

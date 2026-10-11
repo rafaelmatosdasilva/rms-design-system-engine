@@ -51,7 +51,7 @@ test('a component only the code has is listed apart, and with no Figma data ever
 });
 
 test('the style guide of a Vue system shows its code\'s components, with Figma\'s data and before it', { timeout: 300000 }, () => {
-  const run = (dir) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const run = (dir) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   // With Figma's data: its three components, and a chip only the code has.
   const withFigma = mkdtempSync(join(tmpdir(), 'sg-code-only-'));
   cpSync(HARBOR, withFigma, { recursive: true });

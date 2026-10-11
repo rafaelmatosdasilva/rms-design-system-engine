@@ -612,6 +612,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // How each component moves (an entry, an exit, an overlay it opens in), so its preview can play it.
     const allCss = [systemCss, ...(ctx?.componentSheets ?? []).map(readText)].join('\n');
     // What uses each token, for the page's "What uses it" view.
+    // When the page was built: a row read then (its code, the team's notes, a stand-in) says so in its Updated column.
+    view.builtAt = new Date().toISOString();
     try { const { tokenUses } = await import('./styleguide-data.mjs'); view.tokenUses = tokenUses(allCss, view.components); } catch { /* none listed */ }
     // Every token each component is drawn with (its parts and states too, seen in this variant or not), by Figma's name.
     try {
