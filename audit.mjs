@@ -505,6 +505,17 @@ if (process.argv.includes('--styleguide')) {
     // Its Vue components: drawn from what the project's own Vite renders, or from their templates, and why (E28).
     if (r.vue) console.log(r.vue.rendered ? `   ${r.vue.rendered} of ${r.vue.of} Vue component${r.vue.of === 1 ? '' : 's'} drawn as the project's own Vite renders ${r.vue.of === 1 ? 'it' : 'them'}${r.vue.rendered < r.vue.of ? `; the rest from their templates${r.vue.failed?.length ? ` (${r.vue.failed.map((f) => `${f.name}: ${f.why}`).join('; ')})` : ''}` : ''}.` : `   Vue components drawn from their templates: ${r.vue.why ?? 'none rendered'}.`);
     for (const name of r.scope?.asked ?? SCOPE_COMPONENTS) console.log(`   ${name}: ${relative(ROOT, r.out)}#c-${name}  (its Accessibility and Parity areas)`);
+    // Accessibility tried now in a browser, every variant of every component, and kept in the page: whoever opens it reads
+    // the final results at once, nothing running while they read (styleguide-bake.mjs). --no-a11y-bake builds the page
+    // without it (a page only measured, as a CI's first build is); styleguide.bakeA11y: false in ds-config.json too.
+    if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false) {
+      const { bakeA11y } = await import('./styleguide-bake.mjs');
+      console.log('   Trying every component\'s accessibility in a browser, to keep the results in the page...');
+      const b = await bakeA11y(resolve(ROOT, r.out)).catch((e) => ({ skipped: String(e.message).split('\n')[0] }));
+      console.log(b.skipped ? `   Accessibility not tried while building (${b.skipped}): a browser that opens the page tries it and keeps what it finds.`
+        : `♿ Accessibility tried in a browser: ${b.tried} of ${b.of} components, every variant, kept in the page (${Math.round(b.ms / 1000)}s)${b.tried < b.of ? `; the other ${b.of - b.tried} are tried by the browser that opens it` : ''}.`);
+      for (const e of b.errors ?? []) console.log(`   ⚠️  The page threw while trying: ${e}`);
+    }
     // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
     const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
     const found = checkFile(r.out);

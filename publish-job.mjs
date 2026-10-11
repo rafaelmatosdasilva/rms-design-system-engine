@@ -31,9 +31,9 @@ const steps = (out, products, host) => {
   const clone = (r) => (host === 'github' ? `git clone --depth 1 "https://github.com/${r}.git" ../${r.split('/')[1]}` : `git clone --depth 1 "$CI_SERVER_URL/${r}.git" ../${r.split('/')[1]}`);
   return [
     ...products.map(clone),
-    'node ../engine/audit.mjs --styleguide            # the page the audit measures each component on',
+    'node ../engine/audit.mjs --styleguide --no-a11y-bake   # the page the audit measures each component on',
     'node ../engine/audit.mjs || true                 # the differences the page shows; a failing audit still publishes',
-    'node ../engine/audit.mjs --styleguide            # the page again, with them',
+    'node ../engine/audit.mjs --styleguide            # the page again, with them, its accessibility tried and kept in it',
     `node ../engine/audit.mjs --styleguide-check ${out}   # only the system on it, its own accessibility: else nothing is published`,
     `mkdir -p public && cp ${out} public/index.html`,
     'cp .design-system-engine-out/differences.md public/differences.md 2>/dev/null || true',
