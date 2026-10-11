@@ -81,5 +81,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-11-merge-main-into-claude-nifty` | The 21 guide tasks on Haiku (engine 77fc968) | "Accessibility: one run is the whole check, on main's style guide" |
 | `2026-10-11-accessibility-the-style-guide-s` | The 21 guide tasks on Haiku (engine 7ab28d4) | "The style guide's accessibility check finishes and reaches the guide" |
 | `2026-10-11-coverage-scopes-imports-layers` | The 21 guide tasks on Haiku (engine c46a5e4) | "Coverage, variable scopes, imports, token layers, the verification headline and how components go together" |
+| `2026-10-11-system-health-token-budget` | The 21 guide tasks on Haiku (engine 09ee19f) | "System health advice, the token budget, tiers by kind and the Figma build list" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

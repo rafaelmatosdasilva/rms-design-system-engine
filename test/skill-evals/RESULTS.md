@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: System health advice, the token budget, tiers by kind and the Figma build list (continuous evaluation)
+
+What changed since the entry below (engine c46a5e4): System health advice (modes below a product's root, two themes in one product, undescribed tokens, catalogue-only patches, near-duplicate components, tokens named by look), the token budget in prune candidates, tiers that say what they hold, figma-to-build.md, a product's own usage line in --query, and tokens per generation in evals. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `baf59fe593d6` · Project measured: `13d811a9d668`
+
+| Haiku, engine 09ee19f | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.057 |
+| Input a run | 92k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 92k. Records: `records/2026-10-11-system-health-token-budget`.
+
 ## 2026-10: Coverage, variable scopes, imports, token layers, the verification headline and how components go together (continuous evaluation)
 
 What changed since the entry below (engine 7ab28d4): Padding and gap around layers placed outside Figma's layout draw nothing (not compared); the edit check flags imports from a replaced library or the system's insides (I76) and a component put inside another the way the system never does (R3); Figma hygiene lists variables bound outside their scope or left on all scopes (F7); declared token tiers with layers flag a skipped or backward alias (L3); the summary counts components passing, drifting and not checked (I93) and says when the Figma file is not reliable enough to compare (R1); findings.json keeps every finding as one record (R2); the style guide's Coverage page and Documentation tab, Changelog. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
