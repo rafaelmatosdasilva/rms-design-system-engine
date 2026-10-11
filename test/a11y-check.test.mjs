@@ -254,6 +254,22 @@ test('a style guide that draws no component is not the page checked: the project
   assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => '<html>a page of its own</html>').styleguide, true, 'a list it cannot read: taken as it is');
 });
 
+test('a style guide with many components is checked in parts of a few components each, every part drawing only its own', async () => {
+  const { styleguideShares, SHARE_COMPONENTS } = await import('../a11y-check.mjs');
+  const sgPath = '/proj/.design-system-engine-out/styleguide/index.html';
+  const names = Array.from({ length: SHARE_COMPONENTS * 2 + 1 }, (_, i) => `c${i}`).concat('table/row');
+  const sg = styleguideTarget({}, '/proj', (p) => p === sgPath, () => `<script type="application/json" id="sg-data">${JSON.stringify({ components: names.map((name) => ({ name })) })}</script>`);
+  assert.deepEqual(sg.names, names);
+  const parts = styleguideShares(sg);
+  assert.equal(parts.length, 3);
+  assert.deepEqual(parts.flatMap((p) => p.only), names, 'every component in one part, once');
+  assert.ok(parts.every((p) => p.label === sg.label && p.styleguide), 'a finding reads the same whichever part found it');
+  assert.equal(parts[2].url, `${sg.url}&only=c${SHARE_COMPONENTS * 2}%2Ctable%2Frow`);
+  assert.equal(parts[0].part, '1 of 3');
+  assert.deepEqual(styleguideShares({ ...sg, names: names.slice(0, 2) }), [{ ...sg, names: names.slice(0, 2) }], 'a small one stays one page');
+  assert.equal(styleguideShares({ label: 'x', url: 'file:///x?all', styleguide: true }).length, 1, 'a list it cannot read: one page');
+});
+
 test('a dev server that prints its address in colour (Vite\'s bold port) is read without the colour codes', { timeout: 30000 }, async () => {
   const { startDevServer } = await import('../a11y-check.mjs');
   const { mkdtempSync, writeFileSync } = await import('node:fs');

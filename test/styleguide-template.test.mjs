@@ -542,7 +542,7 @@ test('a state set on an earlier part is set there: the checkbox input is ticked,
 test('choosing the option already set does nothing, and a slot is documented with how Figma lets it be filled', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /if \(next === state\[p\.label\]\) return;/);
-  assert.match(tpl, /if \(b\.getAttribute\('aria-pressed'\) === 'true' \|\| b\.dataset\.on === '1'\) return;/);
+  assert.match(tpl, /if \(\/true\/\.test\(b\.getAttribute\('aria-pressed'\) \|\| b\.getAttribute\('aria-checked'\) \|\| b\.getAttribute\('aria-selected'\) \|\| ''\) \|\| b\.dataset\.on === '1'\) return;/);
   // A new selection tells the system's own script, so what follows the selection (a sliding pill) moves with it.
   assert.match(tpl.slice(tpl.indexOf('function segSelect'), tpl.indexOf('function segItems')), /if \(on\) nudge\(\);/);
   assert.match(tpl, /<dt>Slots<\/dt>/);
@@ -668,7 +668,7 @@ test('accessibility per component: its role\'s obligations and behaviours with W
   // no role stated: nothing invented; no browser check yet: null, and the page says so
   const none = a11yView({ name: 'card', cls: 'card' });
   assert.deepEqual([none.role, none.expects, none.checked], [null, [], null]);
-  assert.deepEqual(a11yView({ name: 'card', result: { checkedAt: 't', notRead: ['card (not rendered)'], issues: [] } }).checked, { at: 't', notRead: true, issues: [] });
+  assert.deepEqual(a11yView({ name: 'card', result: { checkedAt: 't', notRead: ['card (not rendered)'], issues: [] } }).checked, { at: 't', notRead: true, why: 'not rendered', issues: [] });
 });
 
 test('parity per component: what agrees (since when), its props and tokens, what differs, not built, not compared', async () => {
@@ -699,6 +699,18 @@ test('To do: a role the code fails or has still to be tried on is Claude\'s even
   assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'You in Figma');
   assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'You check by hand');
   assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Its code' }], ''), 'Claude in the code');
+});
+
+test('To do: AAA advice is to check and to decide, never a must-fix; a component the audit could not try says why', async () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  // A comfortable 44px target or a 2px ring (AAA) found short is advice: checked, and yours to decide, as its size is the design's.
+  assert.match(tpl, /if \(its\.some\(function \(it\) \{ return it\.st === 'todo'; \}\)\) st = k\.extra \? 'check' : 'todo';/);
+  assert.match(tpl, /who: r\.st === 'todo' \|\| r\.st === 'check' \? \(r\.k\.extra \? WHO\.both : own \|\| a11yWho\(/);
+  // The code has no markup for it: build it first; the audit stopped before it: run it again, never "run the audit" as if it had not.
+  assert.match(tpl, /\/no markup\/\.test\(why\) \? 'Build ' \+ c\.name \+ ' in the code: the audit tries this once the page draws it from the code\.'/);
+  assert.match(tpl, /'The last audit did not get to ' \+ c\.name \+ \(why \? ' \(' \+ why \+ '\)' : ''\) \+ '\. Run it again\.'/);
+  const { a11yView } = await import('../styleguide-data.mjs');
+  assert.equal(a11yView({ name: 'overflow', result: { notRead: ['overflow (the code has no markup for it: the style guide draws a stand-in)'], issues: [] } }).checked.why, 'the code has no markup for it: the style guide draws a stand-in');
 });
 
 test('a control with no name only where an on/off prop hides its words fails, with what the product does about it', () => {
@@ -861,9 +873,16 @@ test('a control the system lacks: its stand-in draws the switch, and the page sa
   assert.match(b.segHTML([{ v: 'a', label: 'A' }], 'Width'), /^<div aria-label="Width" class="sg-seg">/);
   assert.doesNotMatch(tpl, /segHTML\((?:[^;]*?)\)\s*\+\s*'<\/div>'\s*:\s*''|segHTML\(\[\{ v: '', label: 'Not in the code yet'[^;]*\]\);/, 'every switch on the page is named');
   const cls = new Set(['bSecondary']), attrs = {};
-  const el = { classList: { toggle: (k, on) => (on ? cls.add(k) : cls.delete(k)) }, setAttribute: (a, v) => { attrs[a] = v; }, removeAttribute: (a) => { delete attrs[a]; }, querySelector: () => null, dataset: {} };
+  const el = { classList: { toggle: (k, on) => (on ? cls.add(k) : cls.delete(k)) }, getAttribute: (a) => attrs[a] ?? null, setAttribute: (a, v) => { attrs[a] = v; }, removeAttribute: (a) => { delete attrs[a]; }, querySelector: () => null, dataset: {} };
   b.segSelect(el, true);
   assert.deepEqual([[...cls], attrs['aria-pressed']], [['bPrimary'], 'true']);
+  // An option the system's script made a radio says checked, never pressed (WCAG 4.1.2: a radio cannot be pressed).
+  attrs.role = 'radio';
+  b.segSelect(el, false);
+  assert.deepEqual([attrs['aria-pressed'], attrs['aria-checked']], [undefined, 'false']);
+  attrs.role = 'tab';
+  b.segSelect(el, true);
+  assert.equal(attrs['aria-selected'], 'true');
   const r = run({ segmented: pick([radio]) });
   assert.match(r.segHTML([{ v: 'a', label: 'A' }, { v: 'b', label: 'B', off: true }]), /^<div class="sg-seg" role="radiogroup"><label class="radio" data-v="a"><input type="radio" name="sg-r1" class="radio-input"><span class="radio-label">A<\/span><\/label><label class="radio" data-v="b" aria-disabled="true" title=""><input type="radio" name="sg-r1" class="radio-input" disabled>/);
   const input = { checked: false }, lab = { classList: { toggle() {} }, setAttribute: (a) => { throw new Error('no aria-pressed on a radio label: ' + a); }, removeAttribute() {}, querySelector: () => input, dataset: {} };
@@ -1016,7 +1035,7 @@ test('Figma images of each variant: the reference folder first, never the networ
 
 test('a text prop comes right after the boolean that shows it; the rest keep Figma\'s order and nothing is dropped', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
-  const src = /  function showFirst\(list, propOf\) \{[\s\S]*?\n  \}\n/.exec(tpl)[0];
+  const src = /  function showsText\(b, t\) \{[\s\S]*?\n  \}\n/.exec(tpl)[0] + /  function showFirst\(list, propOf\) \{[\s\S]*?\n  \}\n/.exec(tpl)[0];
   const showFirst = new Function(`${src}; return showFirst;`)();
   const order = (props) => showFirst(props, (p) => p).map((p) => p.label).join(' | ');
   assert.equal(order([{ label: 'State', type: 'VARIANT' }, { label: 'Text Content', type: 'TEXT', part: '.t' }, { label: 'Show Text', type: 'BOOLEAN', part: '.t' }, { label: 'Show Divider', type: 'BOOLEAN' }]), 'State | Show Text | Text Content | Show Divider');
@@ -1068,6 +1087,11 @@ test('in the browser: with a width chosen, a link to another component opens it'
     assert.equal(await run(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`), 'c-button', errors.join('\n'));
     assert.match(await run(`location.hash`), /^#c-button(\?width=desktop)?$/, 'no test text leaks into the address');
     assert.equal(await run(`!!document.querySelector('#c-button .pg-frame iframe') && document.querySelector('#c-button .pg-frame iframe').contentDocument.querySelector('.pg-frame-stage') !== null`), true, 'drawn at the width chosen');
+    // The accessibility check's part of the measuring page draws only the components it names.
+    const part = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}?all&only=chip`);
+    await waitForTrue(send, part.sessionId, FILE_PAGE_LOADED);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal((await send('Runtime.evaluate', { expression: `[...document.querySelectorAll('main > section.pg-card-section')].map((s) => s.id).join()`, returnByValue: true }, part.sessionId)).result.value, 'c-chip');
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
