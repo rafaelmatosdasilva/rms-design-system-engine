@@ -242,6 +242,7 @@ a.pg-usage-name { color: var(--sg-text); }
    row as the card's head. overflow: clip keeps the corners and the head row sticky. */
 .pg-par-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); overflow: clip; background: var(--sg-bg); }
 .pg-par-card + .pg-par-card { margin-top: var(--sg-space-m); }
+.pg-par-card[hidden], .pg-par-table tr[hidden] { display: none; }
 .pg-par-card .pg-par-table th { background: var(--sg-bg-2); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
 .pg-par-card .pg-par-table tr:last-child td { border-bottom: none; }
 .pg-wcag-tip { text-align: left; }
@@ -1583,12 +1584,12 @@ a.pg-usage-name { color: var(--sg-text); }
   function statusHTML(st, sub) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
   function issueRowHTML(r) {
     var n = isOpen(r) ? TODO_NO[r.key] : null;
-    return '<tr data-status="' + r.st + '"' + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
+    return '<tr data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
       '<td class="pg-par-type sg-todo-no" data-todo-key="' + esc(encodeURIComponent(r.key)) + '">' + (n || '') + '</td>' +
       '<td class="sg-todo-area">' + esc(r.area) + (r.kindHTML || r.kind ? '<span class="pg-par-val">' + (r.kindHTML || esc(r.kind)) + '</span>' : '') + '</td>' +
       '<td>' + (r.figma || '') + '</td><td>' + (r.code || '') + '</td>' +
       '<td>' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (r.todo || '') + '</td>' +
-      '<td>' + statusHTML(r.st, r.rel) + (r.fresh && isOpen(r) ? '<span class="pg-par-val">New in the last audit</span>' : '') + (r.at ? '<span class="pg-at-date">Updated ' + esc(when(r.at)) + '</span>' : '') + (r.src || []).filter(Boolean).map(function (x) { return '<span class="pg-a11y-from">' + esc(x) + '</span>'; }).join('') + '</td></tr>';
+      '<td>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel) + (r.fresh && isOpen(r) ? '<span class="pg-par-val">New in the last audit</span>' : '') + (r.at ? '<span class="pg-at-date">Updated ' + esc(when(r.at)) + '</span>' : '') + (r.src || []).filter(Boolean).map(function (x) { return '<span class="pg-a11y-from">' + esc(x) + '</span>'; }).join('') + '</td></tr>';
   }
   function issueTableHTML(rows, bodyCls, head) { return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues">' + ISSUE_HEAD + '<tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(issueRowHTML).join('') + '</tbody></table></div></div>'; }
   // A count of each status above a table, as the To do page counts them.
@@ -1655,12 +1656,10 @@ a.pg-usage-name { color: var(--sg-text); }
   function parityHTML(c) {
     var rows = byStatus(parityIssueRows(c));
     if (!rows.length) return '<div class="pg-doc"><p class="pg-parity-sum">Nothing of it was read from Figma or the code yet.</p></div>';
-    var rel = {}; rows.forEach(function (r) { rel[r.rel] = (rel[r.rel] || 0) + 1; });
-    var counts = 'Of ' + rows.length + ', ' + [['Same', ' the same'], [PAR_REL.differs, ' differ'], ['Only in Figma', ' only in Figma'], ['Only in code', ' only in code'], [PAR_REL.paired, ' in both, not compared']].filter(function (x, i) { return i < 4 || rel[x[0]]; }).map(function (x) { return (rel[x[0]] || 0) + x[1]; }).join(', ') + '.';
     var types = ['Prop', 'Variable', 'Value', 'Other'].filter(function (t) { return rows.some(function (r) { return r.type === t; }); });
     var plural = { Prop: 'Props', Variable: 'Variables', Value: 'Values', Other: 'Other' };
     var filter = types.length > 1 ? '<div class="pg-par-filter">' + segHTML([{ label: 'All (' + rows.length + ')', v: 'all' }].concat(types.map(function (t) { return { label: plural[t] + ' (' + rows.filter(function (r) { return r.type === t; }).length + ')', v: t }; })), 'Show') + '</div>' : '';
-    return '<div class="pg-doc pg-par"><div class="pg-par-sum">' + statusSum(rows) + '</div><p class="pg-wcag-note">' + esc(counts) + '</p>' + filter + issueTableHTML(rows) + '</div>';
+    return '<div class="pg-doc pg-par"><div class="pg-par-sum">' + statusSum(rows) + '</div>' + filter + issueTableHTML(rows) + '</div>';
   }
   // Each cell of a table of several columns carries the name of its column (data-label), shown above its value on a
   // phone where each row is a block; the table keeps its roles there, as a phone's browser drops them for a block.
@@ -1965,10 +1964,26 @@ a.pg-usage-name { color: var(--sg-text); }
     if (link) link.lastChild.textContent = wait ? 'to do' : 'to do (' + all + ')';   // its count once every component is tried
     if (!all) { box.innerHTML = note + '<p class="pg-par-sum">Nothing open: Figma and the code agree, and nothing fails for accessibility.</p>'; return; }
     var sign = function (st) { var x = STATUS[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>'; };
-    box.innerHTML = note + '<p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + order.map(function (g) {
+    // A filter by area: every row, or only Parity's, Accessibility's or the page's own; kept as the list is drawn again.
+    var areas = {}; order.forEach(function (g) { g.rows.forEach(function (r) { areas[r.area] = (areas[r.area] || 0) + 1; }); });
+    var kinds = ['Parity', 'Accessibility', 'Page'].filter(function (a) { return areas[a]; });
+    if (todoArea !== 'all' && !areas[todoArea]) todoArea = 'all';
+    var filter = kinds.length > 1 ? '<div class="pg-par-filter sg-todo-filter">' + segHTML([{ label: 'All (' + all + ')', v: 'all' }].concat(kinds.map(function (a) { return { label: a + ' (' + areas[a] + ')', v: a }; })), 'Show') + '</div>' : '';
+    box.innerHTML = note + '<p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + filter + order.map(function (g) {
       return issueTableHTML(g.rows, '', g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system');
     }).join('');
+    var seg = box.querySelector('.sg-todo-filter');
+    if (seg) segItems(seg).forEach(function (b) { b.addEventListener('click', function () { todoArea = b.dataset.v; showTodoArea(box); }); });
+    showTodoArea(box);
     labelCells(td);
+  }
+  // Only the rows of the area chosen, and only the cards that still hold one; the numbers stay as they are.
+  var todoArea = 'all';
+  function showTodoArea(box) {
+    var seg = box.querySelector('.sg-todo-filter');
+    if (seg) segItems(seg).forEach(function (b) { segSelect(b, b.dataset.v === todoArea); });
+    Array.prototype.forEach.call(box.querySelectorAll('.pg-par-table tbody tr'), function (tr) { tr.hidden = todoArea !== 'all' && tr.dataset.area !== todoArea; });
+    Array.prototype.forEach.call(box.querySelectorAll('.pg-par-card'), function (card) { card.hidden = !card.querySelector('tbody tr:not([hidden])'); });
   }
   // What the browser found on each component. Tried once while the page was built (--styleguide opens it in a browser
   // and keeps the results in it, sg-a11y-baked): the To do page and every Accessibility area show those results at
