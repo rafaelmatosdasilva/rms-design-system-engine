@@ -431,6 +431,9 @@ test('in the browser: no script error, a control changes the real component, the
     // On a phone the areas scroll sideways in one row, never wrap; the one chosen scrolls into view.
     await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 800, deviceScaleFactor: 1, mobile: true }, sessionId);
     await new Promise((r) => setTimeout(r, 100));
+    // On a phone the overview keeps two cards side by side, each shorter than on a wide screen.
+    // (The overview is out of sight here, so its columns read as declared, repeat(2, …), rather than as two widths.)
+    assert.match(await run(`(() => { const g = document.querySelector('#overview .sg-card-grid'); const t = g.querySelector('.sg-thumb'); return getComputedStyle(g).gridTemplateColumns + '|' + getComputedStyle(t).height; })()`), /^(repeat\(2, [^|]+|\d+(\.\d+)?px \d+(\.\d+)?px)\|104px$/);
     assert.equal(await run(`(() => { const s = document.querySelector('#c-chip .pg-areas-scroll'), items = [...s.querySelectorAll('[data-v]')]; return s.scrollWidth > s.clientWidth && new Set(items.map((b) => Math.round(b.getBoundingClientRect().top))).size === 1 && document.documentElement.scrollWidth <= innerWidth; })()`), true, 'one row that scrolls, the page itself no wider than the screen');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     assert.ok(await run(`(() => { const p = document.querySelector('#c-chip .pg-preview').getBoundingClientRect(), t = document.querySelector('#c-chip .pg-stage-bar--top').getBoundingClientRect(); return t.bottom <= p.top + 1; })()`), 'the bar sits above the stage, never over the component');
