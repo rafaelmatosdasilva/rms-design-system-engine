@@ -315,9 +315,6 @@ a.pg-usage-name { color: var(--sg-text); }
   .pg-par-table td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
   .pg-par-table td:empty { display: none; }
   .pg-a11y .pg-par-type { min-width: 0; }
-  /* A Coverage table's head names the component, so its first cell is a kind like the rest, under its own name. */
-  .pg-par-table.pg-coverage td:first-child { font-weight: inherit; padding-bottom: var(--sg-space-xs); }
-  .pg-par-table.pg-coverage td[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 }
 /* Where it is used: each product's own page pictured, the component marked on it. */
 .pg-usedin { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
@@ -975,14 +972,14 @@ a.pg-usage-name { color: var(--sg-text); }
       }).join('') + '</table></div>';
     }).join('');
   }
-  // Coverage: where what the team knows about each component is thin. What it is, how to use it, pictures of it used
-  // well and badly, its role and the products that use it, each as the team wrote it (Figma, the code, the contract)
-  // or as the products show it; the thinnest first, so the first row is the next thing to write. A kind nobody wrote
-  // is marked missing, never guessed.
+  // Documentation: what the team has written about each component. What it is, how to use it, pictures of it used well
+  // and badly and its role, each as the team wrote it (Figma, the code, the contract). A kind nobody wrote is said
+  // missing, never guessed. A component's Documentation area shows its own; the Documentation page gathers the same
+  // cards for every component, the thinnest first, so the first is the next thing to write.
   var KNOW_FROM = function (from) { return /^Figma/.test(from || '') ? 'Figma' : /^the code$/i.test(from || '') ? 'The code' : /authored|contract/i.test(from || '') ? 'The contract' : from ? 'The last audit' : ''; };
-  // Each kind once, for the Coverage page and each component's Documentation area alike, so the two always ask for the
-  // same things under the same names, in the same order: [name, its Coverage mark (where it was written, or '' when
-  // nobody wrote it), what was written (the Documentation area shows it), what to say when it is missing].
+  // Each kind once, for the Documentation page and each component's Documentation area alike, so the two always show the
+  // same things under the same names, in the same order: [name, where it was written (or '' when nobody wrote it), what
+  // was written, what to say when it is missing].
   var guideOf = function (c, key) { return ((c.guidance || {}).sections || []).filter(function (x) { return x.key === key; })[0] || null; };
   var paras = function (list) { return list.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join(''); };
   var figmaWhat = function (c) { return (c.description || '').replace(/@\w+/g, '').trim(); };
@@ -1000,33 +997,42 @@ a.pg-usage-name { color: var(--sg-text); }
     ['Do and don\'t', function (c) { var n = (c.examples || []).length; return n ? n + (n === 1 ? ' picture' : ' pictures') : ''; },
       function (c) { return examplesGrid(c) + '<p class="pg-from">From Figma</p>'; }, 'No pictures yet.'],
     ['Role', function (c) { var a = c.a11y || {}; return a.role ? (a.roleFrom === 'figma' ? 'Figma' : a.roleFrom === 'contract' ? 'The contract' : 'The code') : ''; },
-      function (c) { var a = c.a11y; return paras([a.role]) + '<p class="pg-from">From ' + (a.roleFrom === 'figma' ? 'Figma, its annotation' : a.roleFrom === 'contract' ? 'the contract' : 'the code') + '</p>'; }, 'Not written yet.'],
-    ['Used in', function (c) { var n = (c.usage || []).length; return n ? n + (n === 1 ? ' product' : ' products') : ''; },
-      function (c) { return paras([(c.usage || []).map(function (k) { return typeof k === 'string' ? k : k.name || k.key; }).join(', ')]) + '<p class="pg-from">From the products\' pages; the Used in area shows where</p>'; }, 'Not found in any of the products\' pages.']
+      function (c) { var a = c.a11y; return paras([a.role]) + '<p class="pg-from">From ' + (a.roleFrom === 'figma' ? 'Figma, its annotation' : a.roleFrom === 'contract' ? 'the contract' : 'the code') + '</p>'; }, 'Not written yet.']
   ];
-  // Its Documentation, kind by kind as the Coverage page counts them: what was written and where, or that it is missing.
-  function knowledgeHTML(c) {
+  // Its Documentation, kind by kind: what was written and where, or that it is missing. head: the card's title (the
+  // component's own area says Documentation; the Documentation page names the component, linked to it).
+  var WRITE_HINT = 'Write a missing one in Figma, as a line of the component\'s description that starts with its name (When to use: …), or in contract.authored.json under guidance.';
+  function knowledgeHTML(c, head) {
     var missing = KNOW.filter(function (k) { return !k[1](c); });
-    return '<div class="pg-doc pg-knowledge"><h3>Coverage</h3><dl class="pg-updated">' + KNOW.map(function (k) {
+    return '<div class="pg-doc pg-knowledge"><h3>' + (head || 'Documentation') + '</h3><dl class="pg-updated">' + KNOW.map(function (k) {
       return '<div><dt>' + esc(k[0]) + '</dt><dd>' + (k[1](c) ? k[2](c) : '<p class="pg-missing">' + esc(k[3]) + '</p>') + '</dd></div>';
-    }).join('') + '</dl>' + (missing.some(function (k) { return /^(What it is|When|Common|Limitations)/.test(k[0]); }) ? '<p class="pg-from">Write a missing one in Figma, as a line of the component\'s description that starts with its name (When to use: …), or in contract.authored.json under guidance.</p>' : '') + '</div>';
+    }).join('') + '</dl>' + (!head && missing.some(function (k) { return /^(What it is|When|Common|Limitations)/.test(k[0]); }) ? '<p class="pg-from">' + esc(WRITE_HINT) + '</p>' : '') + '</div>';
+  }
+  // Documentation, Accessibility and the rest in the Playground's tables: a section of rows (Usage, Documentation,
+  // Accessibility, Anatomy) becomes a card whose head is its title, each row a name and its text. The same on a
+  // component's page and on the Documentation page.
+  function docCards(root) {
+    Array.prototype.forEach.call(root.querySelectorAll('.pg-footer > .pg-doc'), function (d) {
+      var h = d.firstElementChild;
+      if (!h || h.tagName !== 'H3' || !d.querySelector(':scope > dl.pg-updated')) return;
+      var card = document.createElement('div'); card.className = 'pg-inspect pg-doc-card';
+      var head = document.createElement('div'); head.className = 'pg-inspect-head'; card.appendChild(head);
+      while (d.firstChild) (d.firstChild === h ? head : card).appendChild(d.firstChild);
+      d.appendChild(card);
+    });
   }
   var KNOWN = COMPONENTS.filter(function (c) { return !c.codeOnly; });
   if (KNOWN.length) {
-    hr(); navLink('coverage', 'coverage');
-    var kv = section('coverage', 'Coverage', 'Where knowledge is thin', 'What the team has written about each component and where its products use it, the thinnest first. Write a missing one in Figma, as a line of the component\'s description that starts with its name (When to use: …), or in contract.authored.json.');
+    hr(); navLink('documentation', 'documentation');
+    var kv = section('documentation', 'Documentation', 'What the team has written', 'Each component\'s Documentation, all in one place, the thinnest first. ' + WRITE_HINT);
     var rowsK = KNOWN.map(function (c) { var cells = KNOW.map(function (k) { return k[1](c); }); return { c: c, cells: cells, have: cells.filter(Boolean).length }; })
       .sort(function (a, b) { return a.have - b.have || a.c.name.localeCompare(b.c.name); });
     var whole = rowsK.filter(function (r) { return r.have === KNOW.length; }).length;
-    var mark = function (v) { return v ? '<span class="pg-par-status pg-par--match"><span class="pg-par-sign" aria-hidden="true">✓</span>' + esc(v) + '</span>' : '<span class="pg-par-status pg-par--figma"><span class="pg-par-sign" aria-hidden="true">!</span>Missing</span>'; };
-    var kbox = document.createElement('div'); kbox.className = 'pg-cards'; kv.appendChild(kbox);
+    var kbox = document.createElement('div'); kbox.className = 'pg-footer sg-doc-all'; kv.appendChild(kbox);
+    // The same card each component's Documentation area shows, its name as the card's title, linked to its page.
     kbox.innerHTML = '<p class="pg-par-sum">' + esc(whole + ' of ' + KNOWN.length + ' components have every kind written. ' + KNOW.map(function (k, i) { return k[0] + ' ' + rowsK.filter(function (r) { return r.cells[i]; }).length; }).join(', ') + '.') + '</p>' +
-      // One table per component, its name on the table's head as on the To do page, the thinnest first.
-      rowsK.map(function (r) {
-        return '<div class="pg-par-card sg-todo-card"><div class="pg-inspect-head"><a class="sg-uses-link" href="#' + esc(cid(r.c.name)) + '">' + esc(r.c.name) + '</a></div><div class="pg-par-scroll"><table class="pg-par-table pg-coverage"><thead><tr>' +
-          KNOW.map(function (k) { return '<th>' + esc(k[0]) + '</th>'; }).join('') + '</tr></thead><tbody><tr data-have="' + r.have + '">' + r.cells.map(function (v) { return '<td>' + mark(v) + '</td>'; }).join('') + '</tr></tbody></table></div></div>';
-      }).join('');
-    labelCells(kv);   // on a phone each row is a block, each value under its column's name
+      rowsK.map(function (r) { return knowledgeHTML(r.c, '<a class="sg-uses-link" href="#' + esc(cid(r.c.name)) + '">' + esc(r.c.name) + '</a>').replace('class="pg-doc pg-knowledge"', 'class="pg-doc pg-knowledge" data-have="' + r.have + '"'); }).join('');
+    docCards(kbox);
   }
   if ((DATA.screens || []).length) {
     hr(); navLink('in-use', 'in use');
@@ -1899,7 +1905,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
     var id = j < 0 ? path : path.slice(0, j);
-    return { id: id === 'whats-new' ? 'changelog' : id, area: area, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // a link from when it was What's new
+    return { id: id === 'whats-new' ? 'changelog' : id === 'coverage' ? 'documentation' : id, area: area, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // a link from when it was What's new
   }
   function copyText(text, btn, said) {
     var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
@@ -2515,16 +2521,7 @@ a.pg-usage-name { color: var(--sg-text); }
     }
     if (widthBar) segItems(widthBar).forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.v !== WIDTH) showWidth(b.dataset.v); }); });
     if (widthBar) segItems(widthBar).forEach(function (b) { segSelect(b, b.dataset.v === WIDTH); });   // the width last chosen
-    // Documentation, Accessibility and the rest in the Playground's tables: a section of rows (Usage, Documentation,
-    // Accessibility, Anatomy) becomes a card whose head is its title, each row a name and its text.
-    Array.prototype.forEach.call(sec.querySelectorAll('.pg-footer > .pg-doc'), function (d) {
-      var h = d.firstElementChild;
-      if (!h || h.tagName !== 'H3' || !d.querySelector(':scope > dl.pg-updated')) return;
-      var card = document.createElement('div'); card.className = 'pg-inspect pg-doc-card';
-      var head = document.createElement('div'); head.className = 'pg-inspect-head'; card.appendChild(head);
-      while (d.firstChild) (d.firstChild === h ? head : card).appendChild(d.firstChild);
-      d.appendChild(card);
-    });
+    docCards(sec);
     // Every area under its own title, the same on each: its name, as the area switch says it.
     Array.prototype.forEach.call(sec.querySelectorAll('.pg-area'), function (a) {
       var name = AREAS.filter(function (x) { return x[0] === a.getAttribute('data-area'); })[0];

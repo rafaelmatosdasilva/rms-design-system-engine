@@ -298,7 +298,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
   top too); Parity carries the system's alert icon (an icon named warning or alert) before its label while its table
   marks something (a row that differs, one only in Figma or only in code, a prop not built), and Accessibility while a
-  problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Coverage and Details in Documentation, Accessibility) is one of the
+  problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Documentation and Details in Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
   table as the Accessibility area's and the To do page's (`issueTableHTML`): Issue nr (the To do page's number, open rows
@@ -323,7 +323,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   label edit writes only its words into its part. An option the contract maps to another element's selector (a
   product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
   the component's own `:checked` rule, and an option the code does not build is offered as not built.
-- **Coverage** (in Documentation): the kinds the Coverage page counts, under the same names and in the same order (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role, Used in), each with what was written and where, or said as missing; then the API, and Details (Figma's notes, the slots, the code's own note). The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
+- **Documentation** (its first card): the same card the Documentation page gathers for every component (one per component, the thinnest first, an old `#coverage` link opening it), under the same names and in the same order (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), each with what was written and where, or said as missing; then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
@@ -369,7 +369,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   its component set in one images call, cached under `visual/figma-variants/` until `_figmaVersion` changes). They go
   in the page, up to `styleguide.figmaImagesMB` (8) in all; `styleguide.figmaImages: false` for none. It returns the
   width to Fit, and a width chosen turns it off.
-- **Do and Don't** (`exampleImages`, `visual-diff.mjs`), in Documentation's Coverage: the pictures in
+- **Do and Don't** (`exampleImages`, `visual-diff.mjs`), in its Documentation card: the pictures in
   `<visualRefs>/components/<name>/do/` and `dont/` (each file named for its caption; a leading number orders them),
   then the Figma nodes `contract.authored.json` → `components.<name>.examples` names (`[{ "kind": "do" | "dont",
   "nodeId", "caption" }]`, fetched with `FIGMA_TOKEN`). Within the page's Figma image budget. A variant image of another
