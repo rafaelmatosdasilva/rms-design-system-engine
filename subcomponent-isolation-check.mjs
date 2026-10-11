@@ -28,6 +28,7 @@
 //
 // Exit 0 = all broad rules documented. Exit 1 = new undocumented rule.
 
+import { splitSelectors } from './selector-list.mjs';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -82,7 +83,7 @@ function extractRules(css) {
     }
     const body = stripped.slice(open + 1, j - 1).trim();
     if (body.includes('{')) rules.push(...extractRules(body));
-    else for (const sel of selector.split(',')) rules.push({ selector: sel.trim(), body });
+    else for (const sel of splitSelectors(selector)) rules.push({ selector: sel, body });   // never inside :not(a, b)
     i = j;
   }
   return rules;

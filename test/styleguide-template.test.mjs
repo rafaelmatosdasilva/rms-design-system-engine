@@ -173,13 +173,17 @@ test('in the browser: no script error, a control changes the real component, the
     const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}`);
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
+    // Each state read once it is reached, never after a fixed time: the page keeps trying variants while it changes, and
+    // a busy machine is slower than a quiet one (E17).
+    const until = async (expr, ok) => { let v; for (let n = 0; n < 60; n++) { v = await run(expr); if (ok(v)) break; await new Promise((r) => setTimeout(r, 100)); } return v; };
+    const shownIs = (id) => until(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`, (v) => v === id);
     // One view at a time: the overview, with each component's thumbnail, and a component drawn when it is opened.
     assert.equal(await run(`document.querySelectorAll('main > section[id^="c-"]').length`), 0, 'no component drawn before it is opened');
     assert.equal(await run(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`), 'overview');
     assert.equal(await run(`!!document.querySelector('a.sg-card[href="#c-chip"] .sg-thumb .chip')`), true, 'the card shows the component itself');
     await run(`location.hash = '#c-chip'`);
-    await new Promise((r) => setTimeout(r, 300));
-    assert.equal(await run(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`), 'c-chip');
+    assert.equal(await shownIs('c-chip'), 'c-chip');
+    await until(`document.querySelectorAll('.pg-preview').length`, (v) => v === 1);
     assert.equal(await run(`document.querySelectorAll('.pg-preview').length`), 1);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').getBoundingClientRect().height`), 24);
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
@@ -210,10 +214,11 @@ test('in the browser: no script error, a control changes the real component, the
     // opened sets them, the controls following.
     assert.equal(await run(`location.hash`), '#c-chip?Size=L');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].some((b) => b.textContent === 'Copy link')`), false, 'no Copy link button: the address bar holds the link');
-    await run(`location.hash = '#overview'`); await new Promise((r) => setTimeout(r, 200));
+    await run(`location.hash = '#overview'`); await shownIs('overview');
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'M').click()`);
     assert.equal(await run(`location.hash`), '#overview', 'a view not shown leaves the address alone');
-    await run(`location.hash = '#c-chip?Size=L&Nope=1'`); await new Promise((r) => setTimeout(r, 300));
+    await run(`location.hash = '#c-chip?Size=L&Nope=1'`); await shownIs('c-chip');
+    await until(`!!document.querySelector('#c-chip .pg-preview .chip.chip--l')`, (v) => v === true);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l') + '|' + [...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').getAttribute('aria-pressed')`), 'true|true');
     // Figma beside the code: the image of the variant set (Size=L), beside a still copy of it, or over it with a slider;
     // a variant Figma has no image of says so.
@@ -240,9 +245,10 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`document.querySelector('.sg-token-pop').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
     assert.equal(await run(`document.querySelector('.sg-token-pop').hidden + '|' + (document.activeElement === ${tokenBtn})`), 'true|true');
     // The full view of what uses a token stays at its address.
-    await run(`location.hash = '#uses?t=--chip-background'`); await new Promise((r) => setTimeout(r, 300));
+    await run(`location.hash = '#uses?t=--chip-background'`); await shownIs('uses');
+    await until(`document.getElementById('uses').textContent`, (v) => /Used by/.test(v));
     assert.match(await run(`document.getElementById('uses').textContent`), /--chip-background.*One component uses it.*Used by.*chip/s);
-    await run(`location.hash = '#c-chip?Size=L'`); await new Promise((r) => setTimeout(r, 300));
+    await run(`location.hash = '#c-chip?Size=L'`); await shownIs('c-chip');
     // Its API read from Chip.jsx, and its accessibility: the role's obligations with their WCAG criterion, the text
     // contrast measured as drawn, and no browser check yet.
     assert.match(await run(`document.querySelector('#c-chip [data-area="docs"] .pg-footer').textContent`), /Props.*Label.*default Filter.*Read from src\/components\/Chip\.jsx/s);
@@ -258,10 +264,11 @@ test('in the browser: no script error, a control changes the real component, the
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
     // What a criterion means opens from its name, by a click (the focus in it, Escape gives it back) or a rest of the pointer.
     const tip = `[...document.querySelectorAll('#c-chip .pg-wcag-tip')].find((b) => /^2\.1\.1/.test(b.textContent))`;
+    const popOpen = /^false\|WCAG 2\.1\.1 Keyboard \(A\)What it means.*How it is checked/;
     await run(`${tip}.click()`);
-    assert.match(await run(`document.querySelector('.sg-token-pop').hidden + '|' + document.querySelector('.sg-token-pop').textContent`), /^false\|WCAG 2\.1\.1 Keyboard \(A\)What it means.*How it is checked/);
+    assert.match(await until(`document.querySelector('.sg-token-pop').hidden + '|' + document.querySelector('.sg-token-pop').textContent`, (v) => popOpen.test(v)), popOpen);
     await run(`document.querySelector('.sg-token-pop').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
-    assert.equal(await run(`document.querySelector('.sg-token-pop').hidden + '|' + (document.activeElement === ${tip})`), 'true|true');
+    assert.equal(await until(`document.querySelector('.sg-token-pop').hidden + '|' + (document.activeElement === ${tip})`, (v) => v === 'true|true'), 'true|true');
     assert.match(a11y, /2\.1\.1 Keyboard \(A\)/);
     assert.match(a11y, /a <button type="button"> with aria-pressed/);
     assert.match(a11y, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);

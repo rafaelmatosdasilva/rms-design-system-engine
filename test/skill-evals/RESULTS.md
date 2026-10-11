@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: A state written with what a screen reader hears is built by its classes; a selector list split at its own commas (continuous evaluation)
+
+What changed since the entry below (engine ff08c96): A state written with what a screen reader hears is built by its classes; a selector list split at its own commas. The guide changed in `reference/gates.md`.
+
+Guide set measured: `53c05f8219d7` · Project measured: `13d811a9d668`
+
+| Haiku, engine 06a82d2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.057 |
+| Input a run | 111k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 107k a run against 111k. Records: `records/2026-10-11-a-state-written-with-what`.
+
 ## 2026-10: The style guide published from CI; an inset-ring stroke compared by its own width and colour; a test waits on state (continuous evaluation)
 
 What changed since the entry below (engine f4f0402): The style guide published from CI; an inset-ring stroke compared by its own width and colour; a test waits on state. The guide changed in `cookbook/publish-styleguide.md`, `reference/usage.md`, `rms-design-system-engine.md`.
