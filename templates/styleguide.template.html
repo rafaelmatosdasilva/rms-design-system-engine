@@ -764,7 +764,10 @@ a.pg-usage-name { color: var(--sg-text); }
   function a11yWho(sc, how, its, note) {
     var from = its.map(function (it) { return it.from || ''; }).join(' ');
     var failed = its.some(function (it) { return it.st === 'todo'; });
-    return /Figma/.test(from) && !failed ? WHO.figma : /^1\.4\.(3|11)$/.test(sc) ? WHO.figma : how === 'person' || (!its.length && /a person checks/.test(note)) ? WHO.person : WHO.code;
+    // What waits on its try in a browser is the code's to answer and the audit's to run, a duty a Figma note asked for
+    // included: nothing about it is to do in Figma.
+    var waits = its.length && its.every(function (it) { return /Tried once the audit runs/.test(it.html || ''); });
+    return waits ? WHO.code : /Figma/.test(from) && !failed ? WHO.figma : /^1\.4\.(3|11)$/.test(sc) ? WHO.figma : how === 'person' || (!its.length && /a person checks/.test(note)) ? WHO.person : WHO.code;
   }
   function doWhat(t) { var r = String(t || '').replace(/^In (the code|Figma), /, ''); return r.charAt(0).toUpperCase() + r.slice(1); }   // the label already says where
   var TODO = [], TODO_NO = {};
@@ -1481,21 +1484,23 @@ a.pg-usage-name { color: var(--sg-text); }
     // Read at rest and focused, never mid-way: a transition would still show the old colour.
     var kept = spots.map(function (n) { var t = n.style.getPropertyValue('transition'), p = n.style.getPropertyPriority('transition'); n.style.setProperty('transition', 'none', 'important'); return [t, p]; });
     var restore = function () { spots.forEach(function (n, i) { if (kept[i][0]) n.style.setProperty('transition', kept[i][0], kept[i][1]); else n.style.removeProperty('transition'); }); };
-    var read = function () { return spots.map(function (n) { var cs = getComputedStyle(n), o = {}; LOOK.forEach(function (k) { o[k] = cs[k]; }); return o; }); };
+    // Each one as itself and as its ::before and ::after, where a ring is often drawn (one shown only while focused too).
+    var PSEUDO = ['', '::before', '::after'];
+    var read = function () { return spots.map(function (n) { return PSEUDO.map(function (ps) { var cs = getComputedStyle(n, ps || null), o = {}; if (ps && /^(none|normal)$/.test(cs.content)) return null; LOOK.forEach(function (k) { o[k] = cs[k]; }); return o; }); }); };
     var was = read();
     el.focus({ focusVisible: true, preventScroll: true });
     if (document.activeElement !== el) { restore(); return null; }
     var now = read(), changed = false, best = 0;
     el.blur(); restore();
-    spots.forEach(function (n, i) {
-      var a = was[i], b = now[i], around = behind(n.parentElement || n);
-      if (!LOOK.some(function (k) { return a[k] !== b[k]; })) return;
+    spots.forEach(function (n, i) { PSEUDO.forEach(function (ps, j) {
+      var a = was[i][j] || {}, b = now[i][j], around = behind(ps ? n : n.parentElement || n);
+      if (!b || !LOOK.some(function (k) { return a[k] !== b[k]; })) return;
       changed = true;
       var drawn = b.outlineStyle !== 'none' && parseFloat(b.outlineWidth) > 0;
       if (drawn && (b.outlineStyle !== a.outlineStyle || b.outlineWidth !== a.outlineWidth || b.outlineColor !== a.outlineColor)) { var oc = rgba(b.outlineColor); if (oc) best = Math.max(best, ratioOf(over(oc, around), around)); }
       if (b.boxShadow !== a.boxShadow && b.boxShadow !== 'none') { var m = /rgba?\([^)]*\)/.exec(b.boxShadow), sc = m && rgba(m[0]); if (sc) best = Math.max(best, ratioOf(over(sc, around), around)); }
       ['borderTopColor', 'backgroundColor', 'color'].forEach(function (k) { if (a[k] === b[k]) return; var x = rgba(a[k]), y = rgba(b[k]); if (x && y) best = Math.max(best, ratioOf(over(y, around), over(x, around))); });
-    });
+    }); });
     return { changed: changed, ratio: best };
   }
   // A behaviour tried: its control set up, the act done, then what changed.
@@ -2710,65 +2715,78 @@ a.pg-usage-name { color: var(--sg-text); }
       // Colours read as they settle in each mode, never halfway through a component's own transition.
       play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false; preview.classList.add('pg-still');
       var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {};
-      try {
-        plan.combos.forEach(function (cb) {
-          props.forEach(function (p) { state[p.label] = byDefault(p); });
-          Object.keys(cb.set).forEach(function (k) { state[k] = cb.set[k]; });
-          refresh();
-          var root = preview.firstElementChild || cur, tb = document.createElement('tbody');
-          // Whether it holds anything a person acts on, or a field, in any variant: what asks of controls and fields only
-          // applies then.
-          var all0 = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
-          if (all0.some(function (el) { return el.matches('a[href],button,input:not([type=hidden]),select,textarea,summary,[tabindex]:not([tabindex="-1"]),[contenteditable=""],[contenteditable=true],[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=tab],[role=menuitem],[role=option],[role=slider],[role=spinbutton],[role=combobox],[role=textbox],[role=searchbox]'); })) wran.control = 1;
-          if (all0.some(function (el) { return el.matches('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]),select,textarea,[role=textbox],[role=searchbox],[role=combobox],[role=spinbutton],[contenteditable=""],[contenteditable=true]'); })) wran.field = 1;
-          try { tb.innerHTML = liveA11yHTML(root, c.a11y); } catch (e) { tb.innerHTML = a11yRow('check', 'In the browser', 'It could not be tried here.', '', FROM_PAGE); }
-          // WCAG 2.1 (wcag-page.js): what its markup and its CSS show in this variant.
-          if (window.__wcag21) try {
-            var w = window.__wcag21.check(root, { name: c.name }), byKind = {};
-            w.ran.forEach(function (k) { wran[k] = 1; });
-            w.findings.forEach(function (f) { (byKind[f.kind] = byKind[f.kind] || []).push(f.desc); });
-            Object.keys(byKind).forEach(function (k) {
-              wkinds[k] = Math.max(wkinds[k] || 0, byKind[k].length);
-              tb.insertAdjacentHTML('beforeend', a11yRow('todo', 'In the browser', esc(wcagTitle(k, byKind[k].length) + ': ' + byKind[k].join('; ') + '. ' + wcagFix(k)), wcagLabelOf(wcagScOf(k)), FROM_PAGE));
-            });
-          } catch (e) { /* the rest of the table stands */ }
-          // The same check with only the words of its control differing (Tab reaches "Text", Tab reaches "Description")
-          // is one row: what it found, in the variants it holds in.
-          Array.prototype.forEach.call(tb.rows, function (tr) {
-            var html = tr.cells[1].innerHTML, plain = html.replace(/"[^"]*"/g, '"…"');
-            var key = tr.dataset.status + '|' + plain + '|' + tr.cells[3].textContent;
-            if (!byKey[key]) { byKey[key] = { st: tr.dataset.status, html: html, plain: plain, wcag: tr.cells[3].textContent, where: [] }; groups.push(byKey[key]); }
-            if (byKey[key].html !== html) byKey[key].mixed = true;
-            byKey[key].where.push(cb.name);
-          });
-          modeSets.forEach(function (ms) {
-            ms.forEach(function (m) { preview.setAttribute(m[0].attr, m[1].value); });
-            var lo = contrastLowest(root); if (!lo) return;
-            measured++; if (lo.ratio < lo.need) failing++;
-            if (!lowest || lo.ratio / lo.need < lowest.ratio / lowest.need) { lowest = lo; lowest.where = cb.name + ms.map(function (m) { return ' · ' + (m[1].label || m[1].value); }).join(''); }
-          });
-          keptAttrs.forEach(function (k) { if (k[1] == null) preview.removeAttribute(k[0]); else preview.setAttribute(k[0], k[1]); });
-        });
-      } finally {
+      // Each variant is drawn, then measured once the system's own scripts have answered the change: their observers add
+      // roles, Tab stops, names and wiring a moment after it is drawn, as in a product, so it is never measured in the
+      // same step it is drawn in. A message to the page itself is the next task without a timer's wait.
+      var settle = function (fn) { var ch = new MessageChannel(); ch.port1.onmessage = function () { ch.port1.close(); fn(); }; ch.port2.postMessage(0); };
+      var restore = function () {
         keptAttrs.forEach(function (k) { if (k[1] == null) preview.removeAttribute(k[0]); else preview.setAttribute(k[0], k[1]); });
         play.classList.remove('pg-offstage'); play.hidden = wasPlay; preview.hidden = wasPreview; preview.classList.remove('pg-still');
         Object.keys(keep).forEach(function (k) { state[k] = keep[k]; });
         Object.keys(syncs).forEach(function (k) { syncs[k](); });
         refresh();
         checking = false;
-      }
-      var n = plan.combos.length, scope = function (where) {
-        if (where.length === n) return n === 1 ? '' : plan.every ? ' In all ' + n + ' variants.' : ' In every option.';
-        return ' In ' + where.slice(0, 3).join('; ') + (where.length > 3 ? ' and ' + (where.length - 3) + ' more' : '') + '.';
       };
-      // Each check's result as an item under its criterion, with the variants it holds in; the text contrast as one.
-      liveItems = groups.map(function (g) { return { sc: scOfLabel(g.wcag), label: g.wcag, st: g.st, html: (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + esc(scope(g.where)), from: FROM_PAGE }; }).filter(function (it) { return it.sc; });
-      if (lowest) liveItems.push({ sc: '1.4.3', label: 'WCAG 1.4.3 Contrast (Minimum) (AA)', st: failing ? 'todo' : 'done', from: FROM_PAGE, html: failing
-        ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
-        : 'Text at least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.' });
-      var live = { ran: wran, tried: n };
-      a11yRender(live);
-      wcagUse(plan, live);
+      var measure = function (cb) {
+        var root = preview.firstElementChild || cur, tb = document.createElement('tbody');
+        // Whether it holds anything a person acts on, or a field, in any variant: what asks of controls and fields only
+        // applies then.
+        var all0 = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
+        if (all0.some(function (el) { return el.matches('a[href],button,input:not([type=hidden]),select,textarea,summary,[tabindex]:not([tabindex="-1"]),[contenteditable=""],[contenteditable=true],[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=tab],[role=menuitem],[role=option],[role=slider],[role=spinbutton],[role=combobox],[role=textbox],[role=searchbox]'); })) wran.control = 1;
+        if (all0.some(function (el) { return el.matches('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]),select,textarea,[role=textbox],[role=searchbox],[role=combobox],[role=spinbutton],[contenteditable=""],[contenteditable=true]'); })) wran.field = 1;
+        try { tb.innerHTML = liveA11yHTML(root, c.a11y); } catch (e) { tb.innerHTML = a11yRow('check', 'In the browser', 'It could not be tried here.', '', FROM_PAGE); }
+        // WCAG 2.1 (wcag-page.js): what its markup and its CSS show in this variant.
+        if (window.__wcag21) try {
+          var w = window.__wcag21.check(root, { name: c.name }), byKind = {};
+          w.ran.forEach(function (k) { wran[k] = 1; });
+          w.findings.forEach(function (f) { (byKind[f.kind] = byKind[f.kind] || []).push(f.desc); });
+          Object.keys(byKind).forEach(function (k) {
+            wkinds[k] = Math.max(wkinds[k] || 0, byKind[k].length);
+            tb.insertAdjacentHTML('beforeend', a11yRow('todo', 'In the browser', esc(wcagTitle(k, byKind[k].length) + ': ' + byKind[k].join('; ') + '. ' + wcagFix(k)), wcagLabelOf(wcagScOf(k)), FROM_PAGE));
+          });
+        } catch (e) { /* the rest of the table stands */ }
+        // The same check with only the words of its control differing (Tab reaches "Text", Tab reaches "Description")
+        // is one row: what it found, in the variants it holds in.
+        Array.prototype.forEach.call(tb.rows, function (tr) {
+          var html = tr.cells[1].innerHTML, plain = html.replace(/"[^"]*"/g, '"…"');
+          var key = tr.dataset.status + '|' + plain + '|' + tr.cells[3].textContent;
+          if (!byKey[key]) { byKey[key] = { st: tr.dataset.status, html: html, plain: plain, wcag: tr.cells[3].textContent, where: [] }; groups.push(byKey[key]); }
+          if (byKey[key].html !== html) byKey[key].mixed = true;
+          byKey[key].where.push(cb.name);
+        });
+        modeSets.forEach(function (ms) {
+          ms.forEach(function (m) { preview.setAttribute(m[0].attr, m[1].value); });
+          var lo = contrastLowest(root); if (!lo) return;
+          measured++; if (lo.ratio < lo.need) failing++;
+          if (!lowest || lo.ratio / lo.need < lowest.ratio / lowest.need) { lowest = lo; lowest.where = cb.name + ms.map(function (m) { return ' · ' + (m[1].label || m[1].value); }).join(''); }
+        });
+        keptAttrs.forEach(function (k) { if (k[1] == null) preview.removeAttribute(k[0]); else preview.setAttribute(k[0], k[1]); });
+      };
+      (function step(i) {
+        if (i >= plan.combos.length) { restore(); return finish(); }
+        var cb = plan.combos[i];
+        try {
+          props.forEach(function (p) { state[p.label] = byDefault(p); });
+          Object.keys(cb.set).forEach(function (k) { state[k] = cb.set[k]; });
+          refresh();
+        } catch (e) { restore(); return finish(); }   // drawn no further: what was tried stands
+        settle(function () { try { measure(cb); } catch (e) { /* this variant could not be tried; the rest are */ } step(i + 1); });
+      })(0);
+      function finish() {
+        var n = plan.combos.length, scope = function (where) {
+          if (where.length === n) return n === 1 ? '' : plan.every ? ' In all ' + n + ' variants.' : ' In every option.';
+          return ' In ' + where.slice(0, 3).join('; ') + (where.length > 3 ? ' and ' + (where.length - 3) + ' more' : '') + '.';
+        };
+        // Each check's result as an item under its criterion, with the variants it holds in; the text contrast as one.
+        liveItems = groups.map(function (g) { return { sc: scOfLabel(g.wcag), label: g.wcag, st: g.st, html: (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + esc(scope(g.where)), from: FROM_PAGE }; }).filter(function (it) { return it.sc; });
+        if (lowest) liveItems.push({ sc: '1.4.3', label: 'WCAG 1.4.3 Contrast (Minimum) (AA)', st: failing ? 'todo' : 'done', from: FROM_PAGE, html: failing
+          ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
+          : 'Text at least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.' });
+        var live = { ran: wran, tried: n };
+        a11yRender(live);
+        wcagUse(plan, live);
+        if (!checking && bgRun) { var f = bgRun; bgRun = null; f(); }   // nothing left to try after it (no in-page checks)
+      }
     }
     // What it does when used (WCAG 2.1, wcag-page.js interact): what shows on hover or focus, what taking the focus or
     // changing a value does, whether a press acts before the release. Tried on the first six variants, one at a time,

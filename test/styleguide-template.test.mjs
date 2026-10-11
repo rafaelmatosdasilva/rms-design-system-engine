@@ -662,7 +662,7 @@ test('parity per component: what agrees (since when), its props and tokens, what
   assert.equal(v.notCompared, null);
 });
 
-test('To do: a role the code fails is Claude\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
+test('To do: a role the code fails or has still to be tried on is Claude\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('var WHO = {'), tpl.indexOf('function doWhat('));
   const a11yWho = new Function(src + 'return a11yWho;')();
@@ -672,6 +672,8 @@ test('To do: a role the code fails is Claude\'s even when a Figma note asked for
   assert.equal(a11yWho('1.3.1', 'audit', [{ st: 'todo', from: 'Figma annotation on the "Label" layer' }], ''), 'Claude in the code');
   // Nothing failed and what is missing is in Figma: its role is not stated yet.
   assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma, once annotated' }], ''), 'You in Figma');
+  // What a Figma note's role asks, not tried yet: the audit tries it on the code, so nothing is to do in Figma.
+  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'Claude in the code');
   // A colour pair is a design decision; what only a person judges is checked by hand; the code's own finding is Claude's.
   assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'You in Figma');
   assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'You check by hand');
