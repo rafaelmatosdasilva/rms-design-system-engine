@@ -210,7 +210,7 @@
 
 ─── Accessibility check (advisory — never blocks the build) ───
 
-Found 3 things that would make this hard to use for some people (checked in 2 themes):
+Found 5 things that would make this hard to use for some people (checked in 2 themes):
 
 • Blocker: 1 control does not show where the keyboard is
      Why it matters: When someone moves through the page with the Tab key, nothing lights up, so they cannot tell which control they are on.
@@ -224,11 +224,19 @@ Found 3 things that would make this hard to use for some people (checked in 2 th
      Why it matters: A Figma annotation on the component states its role, name, heading level or alt text; the rendered page says something else.
      What to do:     Render what the annotation says, or update the annotation in Figma if the design changed.
 
+• Advisory: 2 controls are smaller than a comfortable touch target
+     Why it matters: Between 24 and 44 pixels a control passes WCAG AA, but on a touch screen a finger covers about 44 pixels: people with a tremor, or on the move, miss it or hit the one beside it.
+     What to do:     Where it is used on touch screens, make the control at least 44 by 44 pixels (its padding or an invisible hit area counts).
+
 Want the exact list? Run the same command again with --a11y — it shows every element and where to find it. (Add --json instead for a machine-readable version an agent can act on.)
+
+axe-core's rules ran on the same page and found nothing.
 
 Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows the components that happen to be on screen. For the most thorough check — every component in every state (normal, disabled, error, focused) — add a styleguide (one page that shows all your components). Once it exists, this check finds and uses it automatically, so nothing is missed.
 
-Verdict: 1 blocker · 2 warnings · 0 advisories · WCAG 2.1 AA
+Measured in the browser: 4 texts and 3 controls, each text in 2 themes.
+
+Verdict: 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA
 
 ℹ️  Token contrast: all pairs meet WCAG AA across 2 mode(s) (2 derived from token names).
 
@@ -255,7 +263,7 @@ Verdict: 1 blocker · 2 warnings · 0 advisories · WCAG 2.1 AA
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: chip 6 · button 3 · field 1 · 7 not tied to a component
+📉 Burndown, open findings per component: chip 6 · button 4 · field 1 · 9 not tied to a component
    next up: chip. Run with --component chip, fix, run again.
 
 📋 Differences between Figma and the code: 9 open, in one list → .design-system-engine-out/differences.md
@@ -293,8 +301,14 @@ Verdict: 1 blocker · 2 warnings · 0 advisories · WCAG 2.1 AA
 - No hand-built DS components: no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
 - and 14 more
 
-Burndown, open findings per component: chip 6 · button 3 · field 1 · 7 not tied to a component
+Burndown, open findings per component: chip 6 · button 4 · field 1 · 9 not tied to a component
 Fix first: chip. Run with --component chip, fix, run again.
+
+**Accessibility.** 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA.
+- Blocker: 1 control does not show where the keyboard is
+- Warning: 1 component does not expose what its role requires
+- Warning: 1 component does not render what its Figma accessibility note says (chip)
+- Advisory: 2 controls are smaller than a comfortable touch target (button, chip)
 
 Every difference between Figma and the code, 9 open, in one list: .design-system-engine-out/differences.md
 
