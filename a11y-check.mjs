@@ -91,6 +91,10 @@ import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, m
 // (e.g. a gradient keyword or color(display-p3 …)) — callers treat null as "cannot compute".
 // After a mode switch, every CSS transition it started jumps to its end: a colour is read as it settles, never halfway
 // (a button whose text colour transitions and whose background does not reads 1:1 for a moment).
+// The time the browser check may take (a11y.timeoutSec sets it): each component on a style guide page adds its share,
+// each colour mode as much again, up to a cap that keeps a stuck run from holding a build for long.
+export const PER_COMPONENT_SEC = 15;
+export const LIMIT_CAP_SEC = 3600;
 export const SETTLE_TRANSITIONS = `document.getAnimations().forEach((a) => { if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) { try { a.finish(); } catch (e) {} } })`;
 
 // State-class → the aria/native state it must also expose. A common-English default (extend or override per project via
@@ -756,13 +760,15 @@ export function styleguideTarget(cfg, ROOT, exists = existsSync, read = (f) => r
   if (cfg?.a11y?.styleguide === false) return null;
   // A guide that draws no component (built before any was agreed, or with no Figma data) has nothing to try: the
   // project's own pages are checked instead. One whose list cannot be read is taken as it is.
-  const draws = (abs) => {
-    try { const m = /<script[^>]*\bid=["']sg-data["'][^>]*>([\s\S]*?)<\/script>/.exec(read(abs)); return !m || (JSON.parse(m[1]).components ?? [1]).length > 0; } catch { return true; }
+  // How many components it draws (null when its list cannot be read): 0 means nothing to try.
+  const count = (abs) => {
+    try { const m = /<script[^>]*\bid=["']sg-data["'][^>]*>([\s\S]*?)<\/script>/.exec(read(abs)); return m ? (JSON.parse(m[1]).components ?? [1]).length : null; } catch { return null; }
   };
   // Where the style guide is written: the configured place, else the project's own template's, else the engine's.
   for (const rel of [cfg?.styleguide?.out, 'apps/styleguide/index.html', `${OUT_DIR}/styleguide/index.html`].filter(Boolean)) {
     const abs = join(ROOT, rel);
-    if (exists(abs) && draws(abs)) return { label: rel, url: pathToFileURL(abs).href + '?all', styleguide: true };   // every view drawn at once
+    const n = exists(abs) ? count(abs) : 0;
+    if (exists(abs) && n !== 0) return { label: rel, url: pathToFileURL(abs).href + '?all', styleguide: true, components: n ?? 1 };   // every view drawn at once
   }
   // Not built by the project yet: the code capture keeps its own copy, built from the same template.
   const cap = join(ROOT, dirname(codeSnapshotPath(cfg)), 'styleguide.html');
@@ -1773,8 +1779,12 @@ async function main() {
   // The time the check may take grows with its pages and colour modes (a fixed two minutes stopped a scoped check of
   // 23 pages halfway, and said so only where the audit never showed it); a11y.timeoutSec sets it.
   // axe-core's rules and the states measured again add to each page's share.
+  // The style guide is one page with every component on it: its share grows with them (one of 36 components stopped
+  // at a page's share, and nothing it found was kept).
   const perPage = Math.max(1, modes.length) * (12 + (RUN_STATES ? 8 : 0)) + (RUN_AXE ? 20 : 0);
-  const limitSec = Number(cfg.a11y?.timeoutSec) || Math.min(1200, Math.max(150, targets.length * perPage));
+  const perComponent = Math.max(1, modes.length) * PER_COMPONENT_SEC;
+  const share = (t) => perPage + (t.styleguide ? Math.max(0, (t.components ?? 1) - 1) * perComponent : 0);
+  const limitSec = Number(cfg.a11y?.timeoutSec) || Math.min(LIMIT_CAP_SEC, Math.max(150, targets.reduce((s, t) => s + share(t), 0)));
   let pagesDone = 0;
   const killTimer = setTimeout(() => { console.log(`⏭  [a11y] stopped after ${limitSec}s, with ${Math.max(0, pagesDone - 1)} of ${targets.length} page(s) checked: what they found is not reported. Give it longer with ds-config.json → a11y.timeoutSec, or check fewer pages (--url).`); cleanup(); process.exit(STRICT ? 1 : 0); }, limitSec * 1000); killTimer.unref();
 
