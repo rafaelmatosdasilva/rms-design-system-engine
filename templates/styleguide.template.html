@@ -2152,7 +2152,10 @@ a.pg-usage-name { color: var(--sg-text); }
       // What is still to be tried once the audit runs in a browser: running it is what to do.
       if (!todos.length && r.st === 'check' && r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) todos.push(esc('Run the audit, it tries this on ' + c.name + ' in a browser.'));
       var open = r.its.filter(function (it) { return it.st !== 'done'; });
-      var own = r.its.map(function (it) { return it.who; }).filter(Boolean)[0];
+      // Who acts: the code's when the code fails it (a role not stated in Figma beside it waits its turn), else the first
+      // finding's own, else how the criterion is known.
+      var failed = open.some(function (it) { return it.st === 'todo' && !it.who; });
+      var own = failed ? null : r.its.map(function (it) { return it.who; }).filter(Boolean)[0];
       // Where it is read from: each finding's own source, else how the criterion is known; Figma's annotations stand in
       // the Figma column.
       var src = [];
