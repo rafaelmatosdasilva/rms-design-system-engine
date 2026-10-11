@@ -27,7 +27,7 @@ export function flattenTokens(tree, prefix = []) {
   for (const [k, v] of Object.entries(tree ?? {})) {
     if (k.startsWith('$') || !v || typeof v !== 'object') continue;
     const ext = v.$extensions?.['com.rms.design-system-engine'];
-    if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: ext?.modes ?? null, readableOn: ext?.readableOn ?? null, deprecated: v.$deprecated === true });
+    if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: ext?.modes ?? null, readableOn: ext?.readableOn ?? null, deprecated: v.$deprecated === true, ...(typeof v.$description === 'string' && v.$description.trim() ? { description: v.$description.trim() } : {}) });
     else out.push(...flattenTokens(v, [...prefix, k]));
   }
   return out;
@@ -51,6 +51,7 @@ export function answerLines(a) {
     const { token: x, cssVar } = a;
     const modes = x.modes ? Object.entries(x.modes).map(([m, v]) => `${m} ${v}`).join(' · ') : String(x.value);
     return [`${x.path}${cssVar ? `  →  var(${cssVar})` : ''}  ${modes}${x.deprecated ? '  [deprecated]' : ''}`,
+      ...(x.description ? [`  for: ${x.description}`] : []),   // what it is for, from its Figma description (F8)
       ...(x.readableOn?.length ? [`  readable on (4.5:1 in every mode): ${x.readableOn.join(', ')}`] : [])];
   }
   const { name, entry: e } = a;
