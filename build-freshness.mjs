@@ -4,10 +4,24 @@
 // newer than the build while the content is the one it was built from. So whenever the dates say a build is
 // current, what it was built from (the source and the theme files) and what it is (the built page) are recorded by
 // content. A later newer date is a stale build only when that content changed. A build never seen current is
-// judged by its dates, as before.
+// judged by its dates. A file git holds unchanged is dated by its last commit: a fresh clone writes every file out
+// in no order, while the commits keep the order the files changed in.
 import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+
+// The time of a file's last commit when git holds it unchanged, else null (a file changed here, new, or outside git
+// is dated by itself).
+export function committedAt(file) {
+  try {
+    const git = (...a) => execFileSync('git', ['-C', dirname(file), ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (git('status', '--porcelain', '--', file)) return null;
+    const t = Number(git('log', '-1', '--format=%ct', '--', file));
+    return t ? t * 1000 : null;
+  } catch { return null; }
+}
+const timeOf = (file) => committedAt(file) ?? statSync(file).mtimeMs;
 
 const hashOf = (files) => {
   const h = createHash('sha256');
@@ -21,13 +35,13 @@ export function buildFreshness({ products, themes, recordFile }) {
   let record = {};
   try { record = JSON.parse(readFileSync(recordFile, 'utf8')); } catch { /* none yet */ }
   const themeFiles = themes.filter((p) => existsSync(p));
-  const themeTime = Math.max(0, ...themeFiles.map((p) => statSync(p).mtimeMs));
+  const themeTime = Math.max(0, ...themeFiles.map(timeOf));
   const stale = [], datesOnly = [];
   let changed = false;
   for (const { name, src, out } of products) {
     if (!existsSync(src) || !existsSync(out)) continue;
-    const outTime = statSync(out).mtimeMs;
-    const srcNewer = statSync(src).mtimeMs > outTime;
+    const outTime = timeOf(out);
+    const srcNewer = timeOf(src) > outTime;
     const themeNewer = themeTime > outTime;
     const now = { inputs: hashOf([src, ...themeFiles]), output: hashOf([out]) };
     if (!srcNewer && !themeNewer) {
