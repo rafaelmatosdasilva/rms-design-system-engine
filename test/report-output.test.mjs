@@ -150,7 +150,7 @@ test('I72: a component only in code gets what to build in Figma, its props and t
 
 test('advice on the system (prune candidates, system health) is neither an open finding nor a difference', async () => {
   const { burndown, differences } = await import('../run-diff.mjs');
-  const f = ['Prune candidates :: 1 group(s) of tokens equal in every mode', 'System health :: 17 of 17 semantic tokens have no description in Figma', 'Token values :: ❌ [sizing/-] radii/chip → --radii-chip'];
+  const f = ['Prune candidates :: 1 group(s) of tokens with the same value written by hand', 'System health :: 17 of 17 semantic tokens have no description in Figma', 'Token values :: ❌ [sizing/-] radii/chip → --radii-chip'];
   const b = burndown(f, ['chip']);
   assert.equal(b.loose, 0);
   assert.deepEqual(b.rows.map((r) => r.name), ['chip']);

@@ -60,7 +60,7 @@ test('I17: semantic tokens named by look, not by role', () => {
   ]);
 });
 
-test('the To do rows for the tokens: descriptions for Figma, then two decisions, each with its examples', async () => {
+test('the To do rows for the tokens: descriptions for Figma, then two decisions, each with its examples; shared primitives are no row', async () => {
   const { tokenTodos } = await import('../system-advice.mjs');
   const { tokenUsers } = await import('../contract-gen.mjs');
   const vars = { color: {
@@ -71,7 +71,10 @@ test('the To do rows for the tokens: descriptions for Figma, then two decisions,
   const rows = tokenTodos({ vars, users: tokenUsers(built) });
   assert.deepEqual(rows.map((r) => [r.kind, r.who]), [['Description', 'figma'], ['Same value', 'both'], ['Single use', 'both']]);
   assert.match(rows[0].say, /^5 of 6 semantic tokens have no description in Figma \(a\/x\/color, b\/y\/color, c\/z\/color, d\/w\/color, and 1 more\)\.$/);
-  assert.match(rows[1].say, /^2 groups of tokens have the same value in every mode \(a\/x\/color, b\/y\/color, and 2 more; e\/color and f\/color\)\.$/);
+  assert.match(rows[1].say, /^2 groups of tokens hold the same value written by hand rather than pointing at one primitive \(a\/x\/color, b\/y\/color, and 2 more; e\/color and f\/color\)\.$/);
+  // Tokens that point at the same primitive share its value by design: no row for them.
+  const aliased = { ...vars, aliases: Object.fromEntries(['light', 'dark'].map((m) => [m, Object.fromEntries(Object.keys(vars.color[m]).filter((n) => !n.startsWith('primitives/')).map((n) => [n, ['primitives/white']]))])) };
+  assert.deepEqual(tokenTodos({ vars: aliased }).map((r) => r.kind), ['Description']);
   assert.equal(rows[2].say, '1 token is used by one component only (radii/input in input).');
   // Nothing to do: no rows; no contracts written yet: no single-use row.
   assert.deepEqual(tokenTodos({ vars: { color: { light: { 'e/color': '#000' } }, tokenMeta: { 'e/color': { description: 'Body text' } } } }), []);

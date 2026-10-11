@@ -782,7 +782,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   } catch { /* best-effort */ }
 
   // Prune candidates (I8): a lean-library advisory over what we just built. Surfaced, never enforced.
-  const prune = pruneCandidates({ built, usage, tokensDict: tokens, vars, primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
+  const prune = pruneCandidates({ built, usage, tokensDict: tokens, vars });
 
   // Decision status cross-checks (I33): guidance that still points at a deprecated component, a
   // replacement that does not exist or is itself deprecated, a deprecation with no what/why.

@@ -4217,7 +4217,7 @@ function reportFull(label, items, shown) {
           if (dc.length) bits.push(`${dc.length} deprecated component(s)`);
           if (sv.length) bits.push(`${sv.length} single-option variant(s)`);
           if (su.length) bits.push(`${su.length} single-use component(s)`);
-          if (st.length) bits.push(`${st.length} group(s) of tokens equal in every mode`);
+          if (st.length) bits.push(`${st.length} group(s) of tokens with the same value written by hand`);
           if (ut.length) bits.push(`${ut.length} token(s) only one component uses`);
           console.log(C.dim(`     ${bits.join(' · ')}`));
           if (detail) {
@@ -4225,7 +4225,7 @@ function reportFull(label, items, shown) {
             for (const c of dc) console.log(C.yellow(`     · deprecated component: ${c}`));
             for (const v of sv) console.log(C.yellow(`     · single-option variant: ${v.component}.${v.prop} = "${v.option}" (axis does not vary - inline it?)`));
             for (const c of su) console.log(C.yellow(`     · single-use component: ${c} (composed by exactly one parent - inline?)`));
-            for (const g of st) console.log(C.yellow(`     · equal in every mode: ${g.join(', ')} (one name would do, unless they are meant to part)`));
+            for (const g of st) console.log(C.yellow(`     · same value written by hand: ${g.join(', ')} (keep one and point the others at it?)`));
             for (const t of ut) console.log(C.yellow(`     · token only one component uses: ${t} (keep it inside that component?)`));
           } else {
             console.log(C.dim('     Run with --prune to list them.'));

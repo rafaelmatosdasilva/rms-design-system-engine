@@ -47,15 +47,18 @@ test('pruneCandidates accepts a plain-object reach map and empty inputs', () => 
   assert.deepEqual(pruneCandidates({}).total, 0);             // nothing in, nothing out
 });
 
-test('L9: the token budget, tokens equal to another in every mode and tokens only one component uses', async () => {
+test('L9: the token budget, the same value written by hand in two tokens and tokens only one component uses', async () => {
   const { sameInEveryMode } = await import('../prune-check.mjs');
   const vars = { color: {
-    light: { 'text/primary': '#111', 'icon/primary': '#111', 'text/muted': '#666', 'primitives/gray/900': '#111', 'border/strong': '#111' },
-    dark: { 'text/primary': '#eee', 'icon/primary': '#eee', 'text/muted': '#999', 'primitives/gray/900': '#eee', 'border/strong': '#fff' },
-  } };
-  assert.deepEqual(sameInEveryMode(vars), [['icon/primary', 'text/primary']]);   // border/strong parts in dark; primitives left out
+    light: { 'text/primary': '#111', 'icon/primary': '#111', 'text/muted': '#666', 'border/strong': '#111', 'chip/text/color': '#111', 'badge/text/color': '#111' },
+    dark: { 'text/primary': '#eee', 'icon/primary': '#eee', 'text/muted': '#999', 'border/strong': '#fff', 'chip/text/color': '#eee', 'badge/text/color': '#eee' },
+  }, primitives: { light: { 'primitives/gray/900': '#666', 'primitives/ink': '#666' }, dark: { 'primitives/gray/900': '#999', 'primitives/ink': '#999' } },
+  aliases: { light: { 'chip/text/color': ['text/primary'], 'badge/text/color': ['text/primary'] }, dark: { 'chip/text/color': ['text/primary'], 'badge/text/color': ['text/primary'] } } };
+  // Two tokens that point at the same one share its value by design; the same value written by hand is listed, primitives
+  // included (two primitives for one colour, a token that repeats a primitive instead of pointing at it).
+  assert.deepEqual(sameInEveryMode(vars), [['primitives/gray/900', 'primitives/ink', 'text/muted'], ['icon/primary', 'text/primary']]);
   const pr = pruneCandidates({ built: [], usage: { components: {}, tokens: new Map([['color.text.primary', 1], ['color.text.muted', 3]]) }, vars });
-  assert.deepEqual(pr.sameTokens, [['icon/primary', 'text/primary']]);
+  assert.deepEqual(pr.sameTokens, [['primitives/gray/900', 'primitives/ink', 'text/muted'], ['icon/primary', 'text/primary']]);
   assert.deepEqual(pr.singleUseTokens, ['color.text.primary']);
-  assert.equal(pr.total, 2);
+  assert.equal(pr.total, 3);
 });

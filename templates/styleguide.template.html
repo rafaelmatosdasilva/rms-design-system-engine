@@ -818,7 +818,7 @@ a.pg-usage-name { color: var(--sg-text); }
   });
   // A control the page needs and the system lacks: drawn with a stand-in until the system has one.
   ((DATA.ui && DATA.ui.gaps) || []).forEach(function (g) { TODO.push({ who: 'both', comp: null, say: g.say, todo: g.todo }); });
-  // What the tokens owe (descriptions to write in Figma, tokens equal in every mode or used by one component only).
+  // What the tokens owe (descriptions to write in Figma, a value written by hand twice, tokens one component uses).
   (DATA.systemTodo || []).forEach(function (t) { TODO.push({ who: t.who, comp: null, area: 'System', type: 'Tokens, ' + t.kind.toLowerCase(), say: t.say, todo: t.todo }); });
   ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. Tell Claude to do it.' }); });
   var ORDER = ['figma', 'code', 'both'];
