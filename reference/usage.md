@@ -77,6 +77,7 @@ rms-design-system-engine --refresh-figma                 # read Figma the best w
 rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then a page of it and the components it nests (styleguide/modal.html), its address printed
+rms-design-system-engine --styleguide --no-a11y-bake     # the page without its accessibility tried while it is built (a page only measured, as a CI's first build is)
 rms-design-system-engine --publish-styleguide            # write the CI job that publishes the style guide on every push (GitHub Pages or GitLab Pages, from the git remote; --host github|gitlab, --print to only show it)
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
@@ -472,6 +473,17 @@ A project's own template is filled through markers:
 - `{{USAGE}}` ← which plugins reference each component's class (scanned from plugin source).
 - `{{DOCS}}` / `{{DOCS_CODE}}` ← Figma descriptions and code notes, from the design-intent JSON (hardcoded pixel dimensions are stripped — docs describe with tokens).
 - `{{THEME_CSS}}` ← the token CSS inlined verbatim, with its `@media (prefers-color-scheme: dark)` guarded to `:root:not([data-color])` so the manual light/dark toggle wins; `{{COMPONENT_CSS}}` ← the component stylesheets outside the theme.
+
+**Its accessibility is tried while it is built.** After writing the page, `--styleguide` opens it in Chrome
+(`styleguide-bake.mjs`, four pages at once, each trying a share of the components, `#todo?bake=1/4`) and has it try
+every variant of every component as its Accessibility area does, then keeps what each found in the page
+(`<script id="sg-a11y-baked">`, with when it ran and each component's signature). Whoever opens the page reads those
+results at once on the To do page and in every Accessibility area, the final ones, with nothing running in their
+browser; a component's area never tries again on its own. A component the build could not try (no Chrome there, its
+signature changed) is tried in the viewer's browser and kept there (`localStorage`), and Try again in this browser,
+on the To do page, tries every component afresh. `--no-a11y-bake` (or `styleguide.bakeA11y: false`) builds the page
+without it; without Chrome it is skipped and said, and a script error the page throws while trying is printed
+under the count.
 
 **The page is checked against the system it shows.** After building it, `--styleguide` checks the page's own CSS
 (every `<style>` but the system's, which the template marks `data-system`): a colour, font, text size, weight, line
