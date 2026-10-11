@@ -123,6 +123,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
   .sg-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sg-space-m); margin-bottom: var(--sg-space-xl); }
   .sg-card-grid .sg-thumb { height: 104px; gap: var(--sg-space-xs); }
   .sg-card-grid .sg-card > h3 { font-size: var(--sg-m); padding: var(--sg-space-s) var(--sg-space-m); }
+  .sg-card-grid .sg-card > h3 + p { padding: 0 var(--sg-space-m) var(--sg-space-s); }   /* the line under the name starts where the name does */
   .sg-card-grid .sg-thumb-dot { width: 20px; height: 20px; }
   .sg-card-grid .sg-thumb-box { width: 24px; height: 24px; }
   /* The other grids of cards two side by side too: the icons, the products a component is used in, its pictures in use. */
@@ -204,7 +205,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-inspect.sg-token-card td, .pg-inspect.sg-token-card td:first-child, .pg-inspect.sg-token-card td:last-child { color: var(--sg-text); width: auto; word-break: normal; overflow-wrap: anywhere; }
 .pg-inspect.sg-token-card td.sg-token-sample { width: calc(var(--sg-space-xxl) * 3); }
 .pg-inspect.sg-token-card td:nth-child(2), .pg-inspect.sg-token-card td:nth-child(3) { width: 35%; }
-.pg-inspect.sg-token-card td.sg-token-value { overflow-wrap: normal; }   /* a value breaks only between its words, never inside one (2px, #ffffff) */
+.pg-inspect.sg-token-card td.sg-token-value { overflow-wrap: normal; }
+.pg-inspect.sg-token-card.sg-token-card--plain td:nth-child(1), .pg-inspect.sg-token-card.sg-token-card--plain td:nth-child(2) { width: 40%; }   /* no sample column: the name and the variable share the room */   /* a value breaks only between its words, never inside one (2px, #ffffff) */
 /* Where the cards are narrow (a phone, or a tablet beside the menu), columns as wide as what they hold: the names wrap,
    the value keeps the room it needs and is never cut. Wider, the columns line up from one card to the next. */
 .sg-token-cards { container-type: inline-size; }
@@ -247,10 +249,15 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-areas-scroll > .sg-tabs { min-width: 100%; }   /* the line under the tabs across the whole width, longer when they scroll */
 /* Every bar that stays at the top as a page scrolls (a component's areas, a page's title, a foundation's size switch)
    is one kind: the page's background, 8px above and below, and a line under the lowest one once it is stuck, faded in. */
-.pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch { position: sticky; z-index: 15; background: var(--sg-bg); padding-top: var(--sg-space-s); padding-bottom: var(--sg-space-s); box-shadow: 0 1px 0 0 transparent; transition: box-shadow 0.15s ease; }
+.pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head { position: sticky; z-index: 15; background: var(--sg-bg); padding-top: var(--sg-space-s); padding-bottom: var(--sg-space-s); box-shadow: 0 1px 0 0 transparent; transition: box-shadow 0.15s ease; }
 .sg-sticky-edge { box-shadow: 0 1px 0 0 var(--sg-border); }
 /* A foundation's title stays at the top as its page scrolls. */
-.sg-section:not(.pg-card-section) > h2 { position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); margin: calc(-1 * var(--sg-space-s)) 0 0; padding: var(--sg-space-s) 0; }   /* its words 8px under the tag, as on every page; the bar's own padding above it */
+.sg-section:not(.pg-card-section) > h2 { position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); margin: calc(-1 * var(--sg-space-s)) 0 0; padding: var(--sg-space-s) 0; }
+/* On the To do page its counts and filter stay at the top instead, so the long list keeps the room the title would take
+   and the filter is always at hand; each card's head row stays under them. */
+#todo > h2 { position: static; }
+.sg-todo-head { top: var(--sg-sticky-top, 0px); margin-bottom: var(--sg-space-m); }
+.sg-todo-head .pg-par-filter { margin-bottom: 0; }   /* its words 8px under the tag, as on every page; the bar's own padding above it */
 .pg-import { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); color: var(--sg-text-2); }
 .pg-import code { font-family: inherit; color: var(--sg-text); }
 .pg-parity-sum { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
@@ -1059,8 +1066,9 @@ a.pg-usage-name { color: var(--sg-text); }
   // A group of tokens as one card, as a typography style is: its name as the card's head, then one row per token with
   // its sample, its Figma name, its variable and its value.
   function tokenCard(head, rows) {
-    return '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><table>' + rows.map(function (r) {
-      return '<tr><td class="sg-token-sample">' + r.sample + '</td><td>' + esc(r.t.figma) + '</td><td>' + usesLink(r.t.var) + '</td><td class="sg-token-value">' + esc(r.value || '') + '</td></tr>';
+    var plain = rows.every(function (r) { return r.sample == null; });   // a list with no samples: its name, variable and value
+    return '<div class="pg-inspect sg-token-card' + (plain ? ' sg-token-card--plain' : '') + '"><div class="pg-inspect-head">' + esc(head) + '</div><table>' + rows.map(function (r) {
+      return '<tr>' + (plain ? '' : '<td class="sg-token-sample">' + r.sample + '</td>') + '<td>' + esc(r.t.figma) + '</td><td>' + usesLink(r.t.var) + '</td><td class="sg-token-value">' + esc(r.value || '') + '</td></tr>';
     }).join('') + '</table></div>';
   }
 
@@ -1124,13 +1132,13 @@ a.pg-usage-name { color: var(--sg-text); }
       var val = {}; list.forEach(function (t) { val[t.var] = sizedValue(d, sized, t.var) || t.value; });
       d.innerHTML = fams.map(function (f) {
         var rows = byFam[f].slice().sort(function (a, b) { return (parseFloat(val[a.var]) || 0) - (parseFloat(val[b.var]) || 0); });
-        return tokenCard(f, rows.map(function (t) { return { sample: sample(t), t: t, value: val[t.var] }; }));
+        return tokenCard(f, rows.map(function (t) { return { sample: sample ? sample(t) : null, t: t, value: val[t.var] }; }));
       }).join('');
       Array.prototype.forEach.call(d.querySelectorAll('.sg-token-sample > span'), sized);
     };
     var sSized = sizeSwitch(s, draw); s.appendChild(d); draw(sSized);
   }
-  sizeList('spacing', 'Spacing', TOKENS.spacing, function (t) { return '<span class="spacing-bar" style="width:var(' + esc(t.var) + ')"></span>'; });
+  sizeList('spacing', 'Spacing', TOKENS.spacing, null);   // names and values only: a bar per space read as a chart
   sizeList('radii', 'Radii', TOKENS.radii, function (t) { return '<span class="sg-token-radius" style="border-radius:var(' + esc(t.var) + ')"></span>'; });
 
   /* ── Icons: every icon is a real one from the system's symbol sheet, referenced by id ───────────────────────── */
@@ -2131,7 +2139,11 @@ a.pg-usage-name { color: var(--sg-text); }
     if (seg) segItems(seg).forEach(function (b) { b.addEventListener('click', function () { todoArea = b.dataset.v; showTodoArea(box); }); });
     showTodoArea(box);
     labelCells(td);
+    todoHeadHeight();
   }
+  // Each card's head row sticks under the counts and the filter, whatever their height at this width.
+  function todoHeadHeight() { var h = document.querySelector('#todo .sg-todo-head'); if (h) document.getElementById('todo').style.setProperty('--pg-areas-h', h.offsetHeight + 'px'); }
+  window.addEventListener('resize', todoHeadHeight);
   // Only the rows of the area chosen, and only the cards that still hold one; the numbers stay as they are.
   var todoArea = 'all';
   function showTodoArea(box) {
@@ -3605,7 +3617,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (h && name) h.textContent = name;
   });
   // The lowest bar stuck at the top carries the line under it (sg-sticky-edge), on every page alike.
-  var STICKY = '.pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch', stickQueued = false;
+  var STICKY = '.pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head', stickQueued = false;
   function markStuck() {
     stickQueued = false;
     var edge = null;
