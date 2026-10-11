@@ -161,6 +161,12 @@ test('in the browser: no script error, a control changes the real component, the
   // A Figma note on the chip that no check reads: a row of its own on its Accessibility area, read by the To do page too.
   const propsSnap = join(dir, 'src', 'figma', 'figma-component-props.snapshot.json'), snap = JSON.parse(readFileSync(propsSnap, 'utf8'));
   snap.chip.annotations.push({ label: 'Screen readers announce the hint after the label' }); writeFileSync(propsSnap, JSON.stringify(snap));
+  // The system's own script, as a product runs it: a moment after a button is drawn it gives it a fuller name. Its focus
+  // ring is drawn on ::after. The page measures each variant once the script has answered, and reads the ring there.
+  writeFileSync(join(dir, 'src', 'components', 'system.js'), "new MutationObserver(() => Promise.resolve().then(() => { for (const b of document.querySelectorAll('.button:not([aria-label])')) b.setAttribute('aria-label', 'Save now'); })).observe(document.body, { subtree: true, childList: true });");
+  writeFileSync(join(dir, 'src', 'components', 'button.css'), readFileSync(join(dir, 'src', 'components', 'button.css'), 'utf8') + "\n.button { position: relative; }\n.button:focus-visible { outline: none; }\n.button::after { content: ''; position: absolute; inset: -3px; border-radius: inherit; }\n.button:focus-visible::after { outline: 2px solid var(--button-background); }\n");
+  const cfg0 = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'] }));
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
@@ -467,6 +473,11 @@ test('in the browser: no script error, a control changes the real component, the
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { tolerateErrors: true });
     await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0);
     assert.match(await note(), /when this page was built/, 'what the build tried stands again after a refresh');
+    // The button as the system's script leaves it, a moment after it is drawn, and its focus ring drawn on ::after.
+    await run(`location.hash = '#c-button/accessibility'`); await shownIs('c-button');
+    const btn = await until(`(document.querySelector('#c-button .pg-a11y-rows') || {}).textContent || ''`, (v) => /Tab reaches/.test(v));
+    assert.match(btn, /Tab reaches it once: "Save now"/, 'measured once the system\'s script has named it');
+    assert.doesNotMatch(btn, /shows no change when it takes the focus/, 'a ring drawn on ::after is a focus that shows');
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
     assert.match(await until(`(document.querySelector('#c-chip .pg-a11y-rows') || {}).textContent || ''`, (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
