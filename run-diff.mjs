@@ -139,17 +139,53 @@ const NOT_A_DIFFERENCE = /^(Data is up to date|Accessibility[^:]*|Token contrast
 // A line that points at a difference rather than being one: a Figma link, who last changed it, what was skipped,
 // how much was compared, the proposed patches. It stays in the audit, next to what it explains.
 const POINTER = /^(↳|🔗|⏭|📋|coverage source:|least checked:)|not a difference from Figma|\bskipped\b/;
-export function differences(findings = [], names = [], prev = null) {
-  // A difference keeps its identity when only its line number moved (an edit higher up the same file).
+// ── One model for rules, evidence and verdicts (R2) ──────────────────────────────────────────────────────────────────
+// Every finding of a run as one record, whatever check printed it: the rule (what the check asks, in plain words), the
+// evidence (what was found, and where), the verdict (fails: under a gate that failed; advisory: reported, never failing),
+// who acts (figma: work in the Figma file; decide: either side, by whoever knows which is right), the component it
+// names, whether the last run had it, and whether it is a difference between Figma and the code. The differences list,
+// the verification headline and the style guide read these records; findings.json keeps them with each gate's verdict.
+// rules: { <check>: <plain rule> }, failing: the checks whose gate failed.
+const idOf = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
+export function findingRecords(findings = [], names = [], { prev = null, rules = {}, failing = [] } = {}) {
+  // A finding keeps its identity when only its line number moved (an edit higher up the same file).
   const same = (f) => String(f).replace(/(\.[\w]+):\d+\b/g, '$1');
   const old = new Set((prev ?? []).map(same));
-  const items = findings.filter((f) => !NOT_A_FINDING.test(f) && !NOT_A_DIFFERENCE.test(f) && !/ :: gate fails$/.test(f)).map((f) => {
+  const bad = new Set(failing);
+  return findings.filter((f) => !NOT_A_FINDING.test(f) && !/ :: gate fails$/.test(f)).map((f) => {
     const i = f.indexOf(' :: ');
-    return { component: componentOf(f, names), check: i > 0 ? f.slice(0, i) : '', what: i > 0 ? f.slice(i + 4).replace(/^\s*(❌|⚠️|ℹ️)\s*/, '') : f, side: FIGMA_WORK.test(f) ? 'figma' : 'decide', new: prev ? !old.has(same(f)) : false };
-  }).filter((it) => !POINTER.test(it.what.trim()));
+    const check = i > 0 ? f.slice(0, i) : '';
+    const evidence = (i > 0 ? f.slice(i + 4) : f).replace(/^\s*(❌|⚠️|ℹ️)\s*/, '');
+    return { id: idOf(same(f)), check, rule: rules[check] ?? null, component: componentOf(f, names), evidence, verdict: bad.has(check) ? 'fails' : 'advisory',
+      side: FIGMA_WORK.test(f) ? 'figma' : 'decide', new: prev ? !old.has(same(f)) : false, difference: !NOT_A_DIFFERENCE.test(f) && !POINTER.test(evidence.trim()) };
+  });
+}
+// Each gate's own verdict, beside its findings: passes, fails, accepted (its failures are recorded debt) or not checked.
+export function gateRecords(gates = [], plain = []) {
+  return gates.map((g, i) => ({ check: String(g.label ?? '').replace(/\s{2,}\(.*$/, '').trim(), rule: plain[(g.n ?? i + 1) - 1] ?? null,
+    verdict: g.notRun || g.planLimited ? 'not checked' : g.baselined ? 'accepted' : g.pass ? 'passes' : 'fails' }));
+}
+export function differences(findings = [], names = [], prev = null) {
+  const items = findingRecords(findings, names, { prev }).filter((r) => r.difference)
+    .map((r) => ({ component: r.component, check: r.check, what: r.evidence, side: r.side, new: r.new }));
   const groups = new Map();
   for (const it of items) { const k = it.component ?? ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); }
   return { total: items.length, fresh: items.filter((x) => x.new).length, groups: [...groups].sort((a, b) => (a[0] === '') - (b[0] === '') || b[1].length - a[1].length).map(([component, list]) => ({ component: component || null, items: list })) };
+}
+// The verification headline (I93): each Figma component passing, drifting (an open difference between Figma and the
+// code; work in the Figma file alone is not drift) or not checked (the measured comparison reached none of its values
+// this run). census: this run's census, or null when nothing was measured in a browser.
+export function verification(names = [], d = null, census = null) {
+  const drifting = new Set((d?.groups ?? []).filter((g) => g.component && g.items.some((i) => i.side !== 'figma')).map((g) => g.component));
+  const reached = census ? new Set(Object.entries(census.components ?? {}).filter(([, x]) => x.compared > 0).map(([n]) => n)) : null;
+  const out = { passing: [], drifting: [], notChecked: [], measured: !!census };
+  for (const n of [...new Set(names)].sort()) (drifting.has(n) ? out.drifting : reached && !reached.has(n) ? out.notChecked : out.passing).push(n);
+  return out;
+}
+export function verificationLine(v) {
+  if (!v || !(v.passing.length + v.drifting.length + v.notChecked.length)) return null;
+  const few = (list) => (list.length && list.length <= 5 ? ` (${list.join(', ')})` : '');
+  return `**Components: ${v.passing.length} passing · ${v.drifting.length} drifting${few(v.drifting)} · ${v.notChecked.length} not checked${few(v.notChecked)}.**${v.measured ? '' : ' Nothing was measured in a browser this run, so passing means the checks that ran found no difference.'}`;
 }
 export function differencesMarkdown(d, { at = '', handback = {} } = {}) {
   const out = ['# Differences between Figma and the code', '',

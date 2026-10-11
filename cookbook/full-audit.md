@@ -328,7 +328,7 @@ Powers the **per-component** parity scoping of the hardcoded-value gate (Hard Ru
 
 `{ "ButtonPrimary": { "nums": [4, 24, 40, 48], "colors": ["2563eb", "ffffff"], "hygiene": { … } }, … }`
 
-The same sweep records each component's **Figma file hygiene** in `hygiene`: values with no variable and no style (a solid fill or stroke colour, a corner radius, a padding, a gap in an auto layout, a text layer with no text style), frames detached from an instance (the Plugin API capture only; REST has no such flag), variants with two or more layers and no auto layout, and whether the component has a description. The audit lists them in a `🎨 Figma file hygiene` block, for whoever keeps the Figma file: code can only match what Figma states. Vector artwork and instances are left out (an instance holds its own component's values). Advisory, never a gate; `"figmaHygiene": false` turns it off and `--hygiene` lists every finding. The parity never changes a value in Figma.
+The same sweep records each component's **Figma file hygiene** in `hygiene`: values with no variable and no style (a solid fill or stroke colour, a corner radius, a padding, a gap in an auto layout, a text layer with no text style), frames detached from an instance (the Plugin API capture only; REST has no such flag), variants with two or more layers and no auto layout, whether the component has a description, how many values it read (`values`) and how many variants hold two or more layers (`variants`), which say how reliable the file is to compare, and in `binds` the variable each property is bound to, by the scope Figma gives that property (compared with `variableScopes` in the vars snapshot, refresh Step 1f). The audit lists them in a `🎨 Figma file hygiene` block, for whoever keeps the Figma file: code can only match what Figma states. Vector artwork and instances are left out (an instance holds its own component's values). Advisory, never a gate; `"figmaHygiene": false` turns it off and `--hygiene` lists every finding. The parity never changes a value in Figma.
 
 **Optional convenience - auto-refresh (REST):** `audit.mjs` regenerates it on every run when `FIGMA_TOKEN` is set. Not required; the plugin capture below is the universal, any-plan, no-token path.
 
@@ -352,7 +352,9 @@ function collectRaw(node, nums, colors) {
 }
 // The Figma file hygiene record (the same function as the engine's figma-hygiene.mjs).
 function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
-  const out = { raw: [], rawCount: 0, noAutoLayout: [], description: !!String(description ?? '').trim() };
+  // values: how many values were read (raw or bound), variants: how many variants hold two or more layers; with rawCount
+  // and noAutoLayout they say how far the file can be trusted for a comparison (R1).
+  const out = { raw: [], rawCount: 0, values: 0, noAutoLayout: [], variants: 0, description: !!String(description ?? '').trim() };
   const key = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const mainName = (n) => {
     if (names[n.componentId]) return names[n.componentId];
@@ -367,6 +369,20 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
   const artwork = /^(VECTOR|BOOLEAN_OPERATION|STAR|LINE|POLYGON|REGULAR_POLYGON)$/;
   const raw = (at, field, value) => { out.rawCount++; if (out.raw.length < 12) out.raw.push({ at, field, value }); };
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomRightRadius', 'bottomLeftRadius'];
+  // The scope Figma gives each property a variable can be bound to; a fill's depends on the layer.
+  const SCOPE = { width: 'WIDTH_HEIGHT', height: 'WIDTH_HEIGHT', minWidth: 'WIDTH_HEIGHT', maxWidth: 'WIDTH_HEIGHT', minHeight: 'WIDTH_HEIGHT', maxHeight: 'WIDTH_HEIGHT',
+    itemSpacing: 'GAP', counterAxisSpacing: 'GAP', paddingTop: 'GAP', paddingRight: 'GAP', paddingBottom: 'GAP', paddingLeft: 'GAP', gridRowGap: 'GAP', gridColumnGap: 'GAP',
+    topLeftRadius: 'CORNER_RADIUS', topRightRadius: 'CORNER_RADIUS', bottomRightRadius: 'CORNER_RADIUS', bottomLeftRadius: 'CORNER_RADIUS',
+    strokeWeight: 'STROKE_FLOAT', strokeTopWeight: 'STROKE_FLOAT', strokeRightWeight: 'STROKE_FLOAT', strokeBottomWeight: 'STROKE_FLOAT', strokeLeftWeight: 'STROKE_FLOAT',
+    strokes: 'STROKE_COLOR', opacity: 'OPACITY', characters: 'TEXT_CONTENT', fontFamily: 'FONT_FAMILY', fontStyle: 'FONT_STYLE', fontWeight: 'FONT_WEIGHT', fontSize: 'FONT_SIZE',
+    lineHeight: 'LINE_HEIGHT', letterSpacing: 'LETTER_SPACING', paragraphSpacing: 'PARAGRAPH_SPACING', paragraphIndent: 'PARAGRAPH_INDENT' };
+  // binds: { <variable id>: { <scope>: the first layer bound that way } }, only when something is bound.
+  const bind = (a, scope, at) => {
+    if (!a || a.type !== 'VARIABLE_ALIAS' || !a.id) return;
+    out.binds = out.binds || {};
+    const b = (out.binds[a.id] = out.binds[a.id] || {});
+    if (!b[scope]) b[scope] = at;
+  };
   const sides = [['paddingTop', 'top'], ['paddingRight', 'right'], ['paddingBottom', 'bottom'], ['paddingLeft', 'left']];
   let detached = null;
   const walk = (n, at) => {
@@ -378,11 +394,20 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
       return;
     }
     if (n.detachedInfo !== undefined) { detached = detached || []; if (n.detachedInfo) detached.push(at); }
+    const fillScope = n.type === 'TEXT' ? 'TEXT_FILL' : /^(FRAME|COMPONENT|SECTION)$/.test(n.type) ? 'FRAME_FILL' : 'SHAPE_FILL';
+    for (const [k, v] of Object.entries(n.boundVariables || {})) {
+      const scope = k === 'fills' ? fillScope : SCOPE[k];
+      if (scope) for (const a of [].concat(v)) bind(a, scope, at);
+    }
+    for (const [list, scope] of [['fills', fillScope], ['strokes', 'STROKE_COLOR']]) {
+      for (const p of Array.isArray(n[list]) ? n[list] : []) if (p && p.boundVariables) bind(p.boundVariables.color, scope, at);
+    }
     if (!artwork.test(n.type)) {
       for (const [list, kind] of [['fills', 'fill'], ['strokes', 'stroke']]) {
         const paints = Array.isArray(n[list]) ? n[list] : [];
         paints.forEach((p, i) => {
           if (!p || p.type !== 'SOLID' || p.visible === false || !p.color) return;
+          out.values++;
           const viaNode = n.boundVariables && Array.isArray(n.boundVariables[list]) && n.boundVariables[list][i];
           if (has(p.boundVariables, 'color') || viaNode || styled(n, kind)) return;
           raw(at, kind, hex(p.color));
@@ -391,11 +416,15 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
     }
     const radii = Array.isArray(n.rectangleCornerRadii) ? n.rectangleCornerRadii : corners.map((k) => n[k]);
     const radius = num(n.cornerRadius) ? n.cornerRadius : Math.max(0, ...radii.filter(num));
+    if (radius > 0) out.values++;
     if (radius > 0 && !bound(n, 'cornerRadius') && !corners.some((k) => bound(n, k))) raw(at, 'radius', radius);
+    if (sides.some(([k]) => num(n[k]))) out.values++;
     const loose = sides.filter(([k]) => num(n[k]) && !bound(n, k)).map(([k, w]) => `${w} ${n[k]}`);
     if (loose.length) raw(at, 'padding', loose.join(', '));
     const auto = n.layoutMode && n.layoutMode !== 'NONE';
+    if (auto && num(n.itemSpacing) && kids(n).length > 1) out.values++;
     if (auto && num(n.itemSpacing) && kids(n).length > 1 && !bound(n, 'itemSpacing')) raw(at, 'gap', n.itemSpacing);
+    if (n.type === 'TEXT') out.values++;
     if (n.type === 'TEXT' && !styled(n, 'text') && !bound(n, 'fontSize')) {
       const size = typeof n.fontSize === 'number' ? n.fontSize : n.style && n.style.fontSize;
       raw(at, 'text style', size ? `${size}px` : 'mixed');
@@ -405,6 +434,7 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
   const variants = root && root.type === 'COMPONENT_SET' ? kids(root) : [root];
   for (const v of variants) {
     if (!v) continue;
+    if (kids(v).length > 1) out.variants++;
     if (kids(v).length > 1 && (!v.layoutMode || v.layoutMode === 'NONE')) out.noAutoLayout.push(v.name);
     walk(v, v.name);
   }

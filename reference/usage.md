@@ -68,7 +68,7 @@ rms-design-system-engine --exemption-debt                # list every exemption/
 rms-design-system-engine --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
 rms-design-system-engine --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
 rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) or a token's variable, values per mode and, for a text colour, the surfaces it reads on
-rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description (the first 15 show on every run)
+rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
 rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
@@ -85,7 +85,7 @@ rms-design-system-engine --baseline                      # capture today's faili
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
 rms-design-system-engine --no-baseline                   # ignore any design-system-engine-baseline.json this run (enforce every gate)
-rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is)
+rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
 rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
 rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
 rms-design-system-engine --route "<request>"             # the first step for any request: the recipe, the exact command, SAY and NEXT (the project's hook runs it for /rms-design-system-engine requests)
@@ -288,7 +288,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
   top too); Parity carries the system's alert icon (an icon named warning or alert) before its label while its table
   marks something (a row that differs, one only in Figma or only in code, a prop not built), and Accessibility while a
-  problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Usage, Documentation, Accessibility) is one of the
+  problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Coverage and Details in Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
   table as the Accessibility area's and the To do page's (`issueTableHTML`): Issue nr (the To do page's number, open rows
@@ -309,7 +309,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   label edit writes only its words into its part. An option the contract maps to another element's selector (a
   product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
   the component's own `:checked` rule, and an option the code does not build is offered as not built.
-- **Usage** (`guidanceView`), in Documentation: When to use, When not to use, Common mistakes, Limitations, from a
+- **Coverage** (in Documentation): the kinds the Coverage page counts, under the same names and in the same order (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role, Used in), each with what was written and where, or said as missing; then the API, and Details (Figma's notes, the slots, the code's own note). The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
@@ -355,13 +355,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   its component set in one images call, cached under `visual/figma-variants/` until `_figmaVersion` changes). They go
   in the page, up to `styleguide.figmaImagesMB` (8) in all; `styleguide.figmaImages: false` for none. It returns the
   width to Fit, and a width chosen turns it off.
-- **Do and Don't** (`exampleImages`, `visual-diff.mjs`), in Documentation after Usage: the pictures in
+- **Do and Don't** (`exampleImages`, `visual-diff.mjs`), in Documentation's Coverage: the pictures in
   `<visualRefs>/components/<name>/do/` and `dont/` (each file named for its caption; a leading number orders them),
   then the Figma nodes `contract.authored.json` → `components.<name>.examples` names (`[{ "kind": "do" | "dont",
   "nodeId", "caption" }]`, fetched with `FIGMA_TOKEN`). Within the page's Figma image budget. A variant image of another
   scale says so in its name (`Size=L@1x.png`); 2x by default. The Figma panel says its image is in the mode its frame
   uses in Figma.
-- **What's new** (view `#whats-new`, when the code has history): every component's changelog gathered by release, newest
+- **Changelog** (view `#changelog`, when the code has history; an old `#whats-new` link opens it): every component's changes gathered by release, newest
   first (not released yet on top), one row per commit with the components it changed.
 - **Disabled**: a prop named Disabled, on, disables the native controls inside (`input`, `button`, `select`, `textarea`),
   as a product sets them; the live accessibility check then says Tab passes it by, as it should, and measures focus
@@ -569,9 +569,11 @@ values, per mode, and flags pairs below AA; a no-browser complement to the rende
 background sharing its state/variant qualifier, on by default, opt out with `a11y.derivePairs: false` —
 and/or **declared** in `ds-config.json → a11y.tokenPairs: [{text, bg, large?}]`; icon/stroke roles use the
 3:1 non-text bar); **declared token tiers** (opt-in — only when
-`ds-config.json → tiers: [{ name, match, mayReference? }]` is set: classifies each token by the
-project's own regexes and flags a token that aliases a tier its `mayReference` disallows; never imposes
-a tier model, zero config = does not run); and an **AI-readiness scorecard** (a running R/Y/G
+`ds-config.json → tiers: [{ name, match, mayReference?, layer? }]` is set: classifies each token by the
+project's own regexes and flags a token that aliases a tier its `mayReference` disallows; with `layer`
+numbering the tiers from the base up, each layer points at the one before it, so a token that skips a
+layer (a component token straight to a primitive) or points back at a later one is listed too; only the
+token it aliases counts, not the rest of the chain; never imposes a tier model, zero config = does not run); and an **AI-readiness scorecard** (a running R/Y/G
 measure across gate health, coverage, documentation and guidance, aggregated from the signals above,
 never a grade and never blocking); and **prune candidates** (a leaner library is cheaper for an agent
 to read and mis-picks less: surfaces deprecated tokens still present, variant axes that do not vary

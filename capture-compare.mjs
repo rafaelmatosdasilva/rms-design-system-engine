@@ -269,9 +269,16 @@ export function compareComponents(code, structure, vars, cfg, maps) {
         const vars = gap ? (f.childFrameGaps ?? []).map((x) => x.gapVar) : (f.childFramePadding ?? []).map((x) => x.paddingVar?.[side]);
         return vars.filter(Boolean).map((v) => toNum(tokenValue(v))).filter((n) => Number.isFinite(n));
       };
+      // A Figma box whose layers all sit outside its auto layout (placed absolutely, as a Background rectangle) lays out
+      // nothing: its own padding and gap draw nothing either. The capture says so with inFlow (the layers it lays out).
+      const nothingInside = rawDef.inFlow === 0 || (rawDef.inFlow == null && f.inFlow === 0);
       const raw = (fig, fact, field) => {
         if (typeof fig !== 'number' || !fact || fact.confidence === 'not-read' || fact.confidence === 'uncertain' || fact.confidence === 'default') return;
         const got = toNum(fact.value);
+        if (nothingInside && /^(padding|gap)/.test(field) && !(Math.abs(got - fig) < 0.5)) {
+          out.notComparable.push({ component: name, field, figma: fig, code: fact.value, why: 'nothing sits inside Figma\'s layout (its layers are placed outside it), so its padding and gap draw nothing' });
+          return;
+        }
         if (fig === 0 && Math.abs(got) >= 0.5 && wrapperValue(field).some((w) => Math.abs(w - got) < 0.5)) {
           out.notComparable.push({ component: name, field, figma: fig, code: fact.value, why: 'the code puts on its root the spacing Figma gives the wrapper frame inside it' });
           return;

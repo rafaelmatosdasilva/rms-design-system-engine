@@ -1,0 +1,32 @@
+name: tell the style guide
+
+# A design system whose style guide is built from this engine checks for a new engine on a schedule. This tells it at
+# once instead: on every push to main it starts that repository's style guide workflow, so an engine change shows on the
+# published page within minutes of the merge. Set the repository variable STYLE_GUIDE_REPO (owner/name of the design
+# system) and the secret STYLE_GUIDE_DISPATCH (a fine-grained token with Actions read and write on that repository).
+# STYLE_GUIDE_WORKFLOW names its workflow file when it is not style-guide.yml. Without them nothing is sent, and the
+# style guide picks the change up on its own next check.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the style guide's workflow
+        env:
+          GH_TOKEN: ${{ secrets.STYLE_GUIDE_DISPATCH }}
+          REPO: ${{ vars.STYLE_GUIDE_REPO }}
+          WORKFLOW: ${{ vars.STYLE_GUIDE_WORKFLOW || 'style-guide.yml' }}
+        run: |
+          if [ -z "$GH_TOKEN" ] || [ -z "$REPO" ]; then
+            echo "No STYLE_GUIDE_DISPATCH or STYLE_GUIDE_REPO: nothing sent; the style guide picks the change up on its own next check." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh api "repos/$REPO/actions/workflows/$WORKFLOW/dispatches" -f ref=main
+          echo "Started $WORKFLOW in $REPO." | tee -a "$GITHUB_STEP_SUMMARY"
