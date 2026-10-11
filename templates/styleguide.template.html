@@ -290,6 +290,9 @@ a.pg-usage-name { color: var(--sg-text); }
   .pg-par-table td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
   .pg-par-table td:empty { display: none; }
   .pg-a11y .pg-par-type { min-width: 0; }
+  /* A Coverage table's head names the component, so its first cell is a kind like the rest, under its own name. */
+  .pg-par-table.pg-coverage td:first-child { font-weight: inherit; padding-bottom: var(--sg-space-xs); }
+  .pg-par-table.pg-coverage td[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 }
 /* Where it is used: each product's own page pictured, the component marked on it. */
 .pg-usedin { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
@@ -638,6 +641,8 @@ a.pg-usage-name { color: var(--sg-text); }
     tokenPop.setAttribute('aria-label', v);
     tokenPop.innerHTML = '<p class="sg-token-pop-name"><code>' + esc(v) + '</code></p><dl class="pg-updated">' +
       (t.figma ? '<div><dt>In Figma</dt><dd><p>' + esc(t.figma) + '</p></dd></div>' : '') +
+      // What it is for, as Figma describes it; a semantic token with none says so (a primitive needs none).
+      (t.description ? '<div><dt>What it is for</dt><dd><p>' + esc(t.description) + '</p></dd></div>' : t.figma && !t.primitive ? '<div><dt>What it is for</dt><dd><p class="pg-missing">Not written yet.</p></dd></div>' : '') +
       '<div><dt>' + (rows.length ? 'In each mode' : 'Its value') + '</dt><dd>' + values + '</dd></div>' +
       '<div><dt>Used by</dt><dd>' + (comps.length ? comps.slice(0, 12).map(function (c) { return '<p><a class="sg-uses-link" href="#' + esc(cid(c.n)) + '">' + esc(c.n) + '</a>' + (c.through ? ', through ' + esc(c.through) : '') + '</p>'; }).join('') + (comps.length > 12 ? '<p><a class="sg-uses-link" href="#uses?t=' + encodeURIComponent(v) + '">and ' + (comps.length - 12) + ' more</a></p>' : '') : '<p>No component uses it yet.</p>') + '</dd></div></dl>' +
       '<div class="sg-token-pop-actions">' + sysButton('button', 'Copy ' + v, ' data-copy-token') + '</div>';
@@ -969,9 +974,11 @@ a.pg-usage-name { color: var(--sg-text); }
     var mark = function (v) { return v ? '<span class="pg-par-status pg-par--match"><span class="pg-par-sign" aria-hidden="true">✓</span>' + esc(v) + '</span>' : '<span class="pg-par-status pg-par--figma"><span class="pg-par-sign" aria-hidden="true">!</span>Missing</span>'; };
     var kbox = document.createElement('div'); kbox.className = 'pg-cards'; kv.appendChild(kbox);
     kbox.innerHTML = '<p class="pg-par-sum">' + esc(whole + ' of ' + KNOWN.length + ' components have every kind written. ' + KNOW.map(function (k, i) { return k[0] + ' ' + rowsK.filter(function (r) { return r.cells[i]; }).length; }).join(', ') + '.') + '</p>' +
-      '<div class="pg-inspect"><table class="pg-par-table pg-coverage"><thead><tr><th>Component</th>' + KNOW.map(function (k) { return '<th>' + esc(k[0]) + '</th>'; }).join('') + '</tr></thead><tbody>' +
-      rowsK.map(function (r) { return '<tr data-have="' + r.have + '"><td><a class="sg-uses-link" href="#' + esc(cid(r.c.name)) + '">' + esc(r.c.name) + '</a></td>' + r.cells.map(function (v) { return '<td>' + mark(v) + '</td>'; }).join('') + '</tr>'; }).join('') +
-      '</tbody></table></div>';
+      // One table per component, its name on the table's head as on the To do page, the thinnest first.
+      rowsK.map(function (r) {
+        return '<div class="pg-par-card sg-todo-card"><div class="pg-inspect-head"><a class="sg-uses-link" href="#' + esc(cid(r.c.name)) + '">' + esc(r.c.name) + '</a></div><div class="pg-par-scroll"><table class="pg-par-table pg-coverage"><thead><tr>' +
+          KNOW.map(function (k) { return '<th>' + esc(k[0]) + '</th>'; }).join('') + '</tr></thead><tbody><tr data-have="' + r.have + '">' + r.cells.map(function (v) { return '<td>' + mark(v) + '</td>'; }).join('') + '</tr></tbody></table></div></div>';
+      }).join('');
     labelCells(kv);   // on a phone each row is a block, each value under its column's name
   }
   if ((DATA.screens || []).length) {

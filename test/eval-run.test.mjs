@@ -180,3 +180,19 @@ test('a component name with a regex character is found in a prompt as written', 
   assert.deepEqual(promptLeaks([{ id: 'a', prompt: 'build the c++ card' }], ['c++']), [{ id: 'a', name: 'c++' }]);
   assert.deepEqual(promptLeaks([{ id: 'b', prompt: 'build the cxx card' }], ['c.x']), []);
 });
+
+test('I27: the tokens a generation spent, from the file EVAL_USAGE names', async () => {
+  const { readUsage } = await import('../eval-run.mjs');
+  const { writeFileSync, existsSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'usage-'));
+  const f = (name, text) => { const p = join(dir, name); writeFileSync(p, text); return p; };
+  assert.equal(readUsage(f('a', '1234')), 1234);
+  assert.equal(readUsage(f('b', JSON.stringify({ input_tokens: 900, output_tokens: 100, cache_read_input_tokens: 50 }))), 1050);
+  assert.equal(readUsage(f('c', JSON.stringify({ tokens: 77 }))), 77);
+  assert.equal(readUsage(f('d', 'not a count')), null);
+  assert.equal(readUsage(join(dir, 'never-written')), null);
+  const used = f('e', '5'); readUsage(used);
+  assert.equal(existsSync(used), false, 'read once, then removed');
+});

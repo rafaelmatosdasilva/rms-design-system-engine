@@ -19,9 +19,28 @@ import { rejectedNames, rightFor } from './prop-vocabulary.mjs';
 const STATE_PROP = /^(state|states|interaction)$/i;
 const TYPE = { enum: 'enum', boolean: 'boolean', text: 'text', instance: 'slot', children: 'children' };
 
+// A real use of the component, as the code writes it (I26): its tag in a JSX, Vue or Svelte file (<Chip size="M" />), else
+// the opening tag of an element with its class in markup; one line, the first in a product's code before the system's
+// own (a story, a page), never its own definition. files: [{ file, text, product }]. → { code, file, line } | null.
+export function realExample(name, cls, files, { own = null } = {}) {
+  const tag = name.charAt(0).toUpperCase() + name.slice(1);
+  const tagRe = new RegExp(`<${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\s/>])[^<>]*?(?:\\/>|>[^<>\\n]{0,60}<\\/${tag}>)`);
+  const c = cls ? String(cls).replace(/^\./, '') : null;
+  const classRe = c ? new RegExp(`<[a-z][\\w-]*\\s[^<>]*\\bclass(?:Name)?=["'][^"']*(?<![\\w-])${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])[^"']*["'][^<>]*>`) : null;
+  const order = [...(files ?? [])].sort((a, b) => (b.product ? 1 : 0) - (a.product ? 1 : 0));
+  const squash = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const { file, text } of order) {
+    if ((own && file === own) || squash(file.split('/').pop().replace(/\.[^.]+$/, '')) === squash(name)) continue;   // its own definition
+    const src = String(text ?? '');
+    const m = (/\.(jsx|tsx|vue|svelte|mdx)$/i.test(file) ? tagRe.exec(src) : null) ?? (classRe && /\.(html?|vue|svelte|jsx|tsx)$/i.test(file) ? classRe.exec(src) : null);
+    if (m && m[0].length <= 200 && !m[0].includes('\n')) return { code: m[0], file, line: src.slice(0, m.index).split('\n').length };
+  }
+  return null;
+}
+
 // built: [{ name, contract }] (contract-gen). code: the code snapshot (optional, fresh only).
-// selectorFor: (name) → the component's selector (optional).
-export function buildCatalog(built, { code = null, selectorFor = null } = {}) {
+// selectorFor: (name) → the component's selector (optional). examples: { name: realExample(…) } (optional).
+export function buildCatalog(built, { code = null, selectorFor = null, examples = {} } = {}) {
   const names = new Set(built.map((b) => b.name));
   const components = {};
   for (const { name, contract: c } of built) {
@@ -61,6 +80,7 @@ export function buildCatalog(built, { code = null, selectorFor = null } = {}) {
     if (c.whenNotToUse) entry.whenNotToUse = c.whenNotToUse;
     const rendered = renderedFacts(code?.components?.[name], c.semantics);
     if (rendered) entry.rendered = rendered;
+    if (examples[name]) entry.example = examples[name];
     components[name] = entry;
   }
   return {

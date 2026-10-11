@@ -19,8 +19,9 @@
 // (I68): its score would measure reading the prompt, not finding the component.
 
 import './stdio-sync.mjs';   // the whole report reaches a pipe before process.exit
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { evalConformance } from './eval-check.mjs';
@@ -79,6 +80,22 @@ export function generateCandidate(c, cmd, ctxPath, run = defaultRun, env = {}) {
     return out && out.trim() ? out : null;
   } catch { return null; }
 }
+
+// What a generation spent (I27): the generate command may write its token count to the file EVAL_USAGE names, as a
+// number or JSON ({ input_tokens, output_tokens } or { tokens }). → the tokens, or null when it wrote none.
+export function readUsage(path) {
+  let raw = '';
+  try { raw = readFileSync(path, 'utf8').trim(); } catch { return null; }
+  try { rmSync(path, { force: true }); } catch { /* gone already */ }
+  if (/^\d+$/.test(raw)) return Number(raw);
+  try {
+    const u = JSON.parse(raw);
+    const n = Number(u.tokens ?? (Number(u.input_tokens ?? 0) + Number(u.output_tokens ?? 0) + Number(u.cache_read_input_tokens ?? 0) + Number(u.cache_creation_input_tokens ?? 0)));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch { return null; }
+}
+// A fresh file for one generation to write its usage to.
+const usageFile = (id, k = 0) => join(tmpdir(), `eval-usage-${process.pid}-${String(id).replace(/[^\w-]/g, '_')}-${k}.json`);
 
 // Prompts that name a design-system component (whole word, any case, camelCase split too): the case then
 // measures whether the agent read the prompt, not whether it found the component. → [{ id, name }]
@@ -298,6 +315,7 @@ async function main() {
   const ctxPath = resolve(ROOT, cfg.contracts?.llmsOut || join(outDir === 'contracts' ? outDir : 'contracts', 'llms.txt'));
   const ctxArg = () => (existsSync(ctxPath) ? ctxPath : '');
   const genTimes = {};   // case id -> avg generation time (ms), for the completion-time metric (S16)
+  const genTokens = {};  // case id -> avg tokens a generation spent, when the generate command writes them to EVAL_USAGE (I27)
   // N runs (S16): generation is non-deterministic, so run each case `runs` times and measure how
   // reliably it comes out clean. Only meaningful with a generate.cmd (a static file is identical every
   // time). Clamped; 3–5 gives signal, 10+ is definitive.
@@ -331,17 +349,21 @@ async function main() {
   let results, summary;
   if (runs > 1) {
     results = cases.map((c) => {
-      let cleanRuns = 0, totalMs = 0, rep = null, avoidedRuns = 0;
+      let cleanRuns = 0, totalMs = 0, rep = null, avoidedRuns = 0, tokens = 0, counted = 0;
       for (let k = 0; k < runs; k++) {
         const t0 = Date.now();
-        const code = generateCandidate(c, genCmd, ctxArg()) || '';
+        const uf = usageFile(c.id, k);
+        const code = generateCandidate(c, genCmd, ctxArg(), undefined, { EVAL_USAGE: uf }) || '';
         totalMs += Date.now() - t0;
+        const used = readUsage(uf);
+        if (used != null) { tokens += used; counted++; }
         const chk = score(code, ctx, c);
         if (chk.metrics.clean) cleanRuns++;
         if (chk.metrics.avoided) avoidedRuns++;
         if (!rep) rep = { code, ...chk };
       }
       genTimes[c.id] = Math.round(totalMs / runs);
+      if (counted) genTokens[c.id] = Math.round(tokens / counted);
       try { const target = resolve(ROOT, outDir, `${c.id}.${ext}`); mkdirSync(dirname(target), { recursive: true }); if (rep.code) writeFileSync(target, rep.code); } catch { /* optional */ }
       return { id: c.id, prompt: c.prompt || '', component: c.component ?? null, code: rep.code, metrics: rep.metrics, violations: rep.violations, runs, cleanRuns, avoidedRuns };
     });
@@ -354,8 +376,11 @@ async function main() {
         const target = resolve(ROOT, outDir, `${c.id}.${ext}`);
         if (!forceGen && existsSync(target)) continue;
         const t0 = Date.now();
-        const code = generateCandidate(c, genCmd, ctxArg());
+        const uf = usageFile(c.id);
+        const code = generateCandidate(c, genCmd, ctxArg(), undefined, { EVAL_USAGE: uf });
         genTimes[c.id] = Date.now() - t0;
+        const used = readUsage(uf);
+        if (used != null) genTokens[c.id] = used;
         if (code) { try { mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, code); console.log(`   ↻ generated ${c.id} via evals.generate.cmd (${genTimes[c.id]}ms)`); } catch { /* keep going */ } }
       }
     }
@@ -375,8 +400,11 @@ async function main() {
   const judged = results.filter((r) => r.judge).length;
   const judgePass = results.filter((r) => r.judge?.ok).length;
   for (const r of results) if (genTimes[r.id] != null) r.genMs = genTimes[r.id];
+  for (const r of results) if (genTokens[r.id] != null) r.genTokens = genTokens[r.id];
   const gennedMs = Object.values(genTimes);
   const avgGenMs = gennedMs.length ? Math.round(gennedMs.reduce((a, b) => a + b, 0) / gennedMs.length) : null;
+  const spent = Object.values(genTokens);
+  const avgGenTokens = spent.length ? Math.round(spent.reduce((a, b) => a + b, 0) / spent.length) : null;
 
   console.log(`\n─── DS-conformance evals ─────────────────────────────────────────`);
   console.log(`   context: ${ctx.cssVars.size} DS vars · ${ctx.dsClasses.size} DS classes · candidates in ${outDir}/${genCmd ? ' · generate:on' : ''}${runs > 1 ? ` · ${runs} runs/case` : ''}${judgeCmd ? ' · judge:on' : ''}\n`);
@@ -390,7 +418,7 @@ async function main() {
     const judge = r.judge ? `   ${r.judge.ok ? '⚖️ ok' : '⚖️ review'}${r.judge.notes ? ` — ${r.judge.notes}` : ''}` : '';
     console.log(`  ${icon} ${r.id}${r.component ? ` [${r.component}]` : ''} — ${base}${runNote}${judge}`);
   }
-  console.log(`\n   ${summary.produced}/${summary.cases} produced · ${summary.clean}/${summary.cases} zero-fix (${summary.zeroFixRate}%) · ${summary.violations} violation(s) · ${summary.inlineStyles} inline-style(s)${summary.expecting ? ` · ${summary.avoided} avoided the system` : ''}${ctx.compile ? ` · ${summary.typeErrors} type error(s)` : ''}${judged ? ` · judge ${judgePass}/${judged} ok` : ''}${avgGenMs != null ? ` · avg gen ${avgGenMs}ms` : ''}`);
+  console.log(`\n   ${summary.produced}/${summary.cases} produced · ${summary.clean}/${summary.cases} zero-fix (${summary.zeroFixRate}%) · ${summary.violations} violation(s) · ${summary.inlineStyles} inline-style(s)${summary.expecting ? ` · ${summary.avoided} avoided the system` : ''}${ctx.compile ? ` · ${summary.typeErrors} type error(s)` : ''}${judged ? ` · judge ${judgePass}/${judged} ok` : ''}${avgGenMs != null ? ` · avg gen ${avgGenMs}ms` : ''}${avgGenTokens != null ? ` · avg ${avgGenTokens} tokens a generation` : ''}`);
   console.log(`   Advisory: evals measure agent output, they never gate the repo.\n`);
 
   // History (best-effort; capped). With --ci, a run worse than the last one fails (I60, S29).
@@ -400,7 +428,7 @@ async function main() {
     let hist = []; try { hist = JSON.parse(readFileSync(hp, 'utf8')); } catch { /* first run */ }
     worse = ciDrop([...hist].reverse().find((h) => h.zeroFixRate != null && !h.levels), summary);
     if (worse.length) console.log(`   Worse than the last run: ${worse.join(' · ')}${process.argv.includes('--ci') ? ' (--ci: failing)' : ''}\n`);
-    hist.push({ timestamp: new Date().toISOString(), ...summary, judged, judgePass, avgGenMs });
+    hist.push({ timestamp: new Date().toISOString(), ...summary, judged, judgePass, avgGenMs, ...(avgGenTokens != null ? { avgGenTokens } : {}) });
     if (hist.length > 100) hist = hist.slice(-100);
     writeFileSync(hp, JSON.stringify(hist, null, 2) + '\n');
   } catch { /* optional */ }
