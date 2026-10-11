@@ -227,7 +227,7 @@ export function focusIndex(all, { tags = new Map() } = {}) {
 }
 
 // The elements each class is put on, read from the markup and from the markup the scripts write
-// (<button class="buttonQuaternary">, `<button class="${cls} chip">`). → Map class → Set of tag names
+// (<button class="quiet">, `<button class="${cls} chip">`). → Map class → Set of tag names
 export function classTags(texts) {
   const out = new Map();
   for (const text of texts) {
@@ -242,7 +242,7 @@ export function classTags(texts) {
   return out;
 }
 
-// A rule that takes the outline off an element in every state (.buttonQuaternary { outline: none }) loses to a rule
+// A rule that takes the outline off an element in every state (.quiet { outline: none }) loses to a rule
 // that shows focus on every element of its kind and is more specific (button:focus-visible beats one class), when
 // every element the class is put on is of a kind such a rule covers.
 const cmpSpec = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
