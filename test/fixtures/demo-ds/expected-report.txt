@@ -212,21 +212,23 @@
 
 Found 3 things that would make this hard to use for some people (checked in 2 themes):
 
-• 1 control does not show where the keyboard is
+• Blocker: 1 control does not show where the keyboard is
      Why it matters: When someone moves through the page with the Tab key, nothing lights up, so they cannot tell which control they are on.
      What to do:     Add a visible outline (a focus ring) on the control itself when it is focused — not only on a box around it.
 
-• 1 component does not expose what its role requires
+• Warning: 1 component does not expose what its role requires
      Why it matters: The contract or a Figma note says what the component is (a toggle button, a checkbox, a text field, a tab). Assistive technology needs the matching wiring: the pressed or checked state, a label, the error link, the selected tab.
      What to do:     Add what the finding names (aria-pressed that changes on click, a real checkbox input with a label, aria-invalid and aria-describedby on an errored field, aria-selected on the selected tab, disabled or aria-disabled).
 
-• 1 component does not render what its Figma accessibility note says
+• Warning: 1 component does not render what its Figma accessibility note says
      Why it matters: A Figma annotation on the component states its role, name, heading level or alt text; the rendered page says something else.
      What to do:     Render what the annotation says, or update the annotation in Figma if the design changed.
 
 Want the exact list? Run the same command again with --a11y — it shows every element and where to find it. (Add --json instead for a machine-readable version an agent can act on.)
 
 Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows the components that happen to be on screen. For the most thorough check — every component in every state (normal, disabled, error, focused) — add a styleguide (one page that shows all your components). Once it exists, this check finds and uses it automatically, so nothing is missed.
+
+Verdict: 1 blocker · 2 warnings · 0 advisories · WCAG 2.1 AA
 
 ℹ️  Token contrast: all pairs meet WCAG AA across 2 mode(s) (2 derived from token names).
 
