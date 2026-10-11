@@ -513,6 +513,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const st = cfg.a11yStatic === false ? null : staticA11y(ROOT);
       const statics = st ? wcagStatics(st.findings, view.components) : {};
       for (const c of view.components) if (c.a11y) { c.a11y.static = statics[c.name] ?? []; c.a11y.audited = result && !c.a11y.checked?.notRead ? { at: result.checkedAt ?? null, ran: result.ran ?? [] } : null; }
+      // What a person checked by hand (G5): each criterion with who and when, current while the component is as it was.
+      const ck = await import('./checked.mjs');
+      const checks = ck.readChecked(ROOT);
+      if (checks.length) for (const c of view.components) if (c.a11y) { const own = ck.checksFor(checks, c.name, ck.componentSignature(ROOT, cfg, c.name, c.cls)); if (Object.keys(own).length) c.a11y.confirmed = own; }
       // Where its accessibility is read from, each source with what it holds and what uses it: each Figma annotation
       // (annotationUses), the team's guidelines (a Notion or GitLab page fetched into a file, or a committed one: the
       // agents read the section named after it as design intent, no check reads it), the authored contract, its code,
@@ -666,7 +670,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         return r.status === 0 && sha ? { sha, date } : null;
       };
       const dangling = danglingCodeAliases(sourceFiles(ROOT, cfg), { removed });
-      view.systemTodo = tokenTodos({ vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, users, dangling, primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
+      const { brandNames } = await import('./code-roots.mjs');
+      view.systemTodo = tokenTodos({ vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, users, dangling, brands: brandNames(ROOT, cfg), components: (view.allComponents ?? view.components).map((c) => c.name), primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
     } catch { /* advice: the page builds without it */ }
     // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a

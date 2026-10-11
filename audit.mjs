@@ -275,6 +275,47 @@ if (process.argv.includes('--summary')) {
   process.exit(2);
 }
 
+// ── --checked <component> <criterion>: a person checked a WCAG criterion by hand (G5) ──
+// Recorded with the component as it is now (checked.mjs): the style guide shows it Done, by whom and when, until the
+// component changes. --unchecked takes one back. Only the person marks a check; the project's hooks ask otherwise.
+if (process.argv.includes('--checked') || process.argv.includes('--unchecked')) {
+  const undo = process.argv.includes('--unchecked');
+  const at = process.argv.indexOf(undo ? '--unchecked' : '--checked');
+  const [component, sc] = process.argv.slice(at + 1).filter((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--by');
+  let ccfg = {};
+  try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { WCAG22 } = await import('./wcag21.mjs');
+  const byPerson = WCAG22.filter((k) => k.person);
+  if (!component || !sc) {
+    console.log(`Usage: rms-design-system-engine ${undo ? '--unchecked' : '--checked'} <component> <criterion> [--by "<name>"]`);
+    console.log(`   The criteria a person checks: ${byPerson.map((k) => `${k.sc} ${k.name}`).join(', ')}.`);
+    process.exit(2);
+  }
+  const ck = await import('./checked.mjs');
+  if (undo) {
+    console.log(ck.removeCheck(ROOT, component, sc) ? `✓ ${component} ${sc} is to check again.` : `${component} ${sc} was not marked as checked.`);
+    console.log(`NEXT: commit ${PROJECT.checked.now} when the person asks`);
+    process.exit(0);
+  }
+  const crit = byPerson.find((k) => k.sc === sc);
+  if (!crit) { console.log(`❌ ${sc} is not a criterion a person checks by hand. Those are ${byPerson.map((k) => k.sc).join(', ')}.`); process.exit(2); }
+  // A component the system has, as Figma or the code names it, in any case.
+  const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+  const known = [...new Set([...Object.keys(readJ(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').components ?? {}),
+    ...Object.keys(readJ(ccfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json')), ...Object.keys(ccfg.componentSelectors ?? {}), ...Object.keys(ccfg.componentFiles ?? {})])].filter((n) => n && !/^[_$]/.test(n));
+  const name = known.find((n) => n === component) ?? known.find((n) => n.toLowerCase() === String(component).toLowerCase());
+  if (!name) { console.log(`❌ ${component}: no component of that name in this system${known.length ? ` (${known.slice(0, 12).join(', ')}${known.length > 12 ? ', …' : ''})` : ''}.`); process.exit(2); }
+  const { loadLocator } = await import('./component-locator.mjs');
+  const cls = (await loadLocator(ROOT, ccfg)).classFor(name);
+  const byAt = process.argv.indexOf('--by');
+  const git = spawnSync('git', ['config', 'user.name'], { cwd: ROOT, encoding: 'utf8' });
+  const by = (byAt > 0 && process.argv[byAt + 1]) || String(git.stdout ?? '').trim() || 'a person';
+  const e = ck.recordCheck(ROOT, { component: name, sc, by, signature: ck.componentSignature(ROOT, ccfg, name, cls) });
+  console.log(`✓ ${name}, ${sc} ${crit.name}: checked by ${e.by} on ${e.at.slice(0, 10)}. The style guide shows it Done until ${name} changes.`);
+  console.log(`NEXT: commit ${PROJECT.checked.now} when the person asks, then rebuild the style guide (rms-design-system-engine --styleguide)`);
+  process.exit(0);
+}
+
 // Set when Figma rejects the credential itself (expired/revoked token), as opposed to
 // the plan or scope gating an endpoint. Kept separate so the audit prescribes the right
 // fix: a stale snapshot blamed on the plan hides a token that just needs reissuing.
@@ -3958,6 +3999,9 @@ function reportFull(label, items, shown) {
       if (sb.length) { lines.push(`${sb.length} Storybook preview rule${sb.length === 1 ? '' : 's'} style a component, so the catalogue shows it right while products draw it as the code does (fix the component):`); for (const f of sb.slice(0, 8)) lines.push(`   · ${f.file}:${f.line}  ${f.selector} (${f.component})`); }
       const near = sa.nearDuplicateComponents(theme, classes);
       for (const n of near.slice(0, 8)) lines.push(`${n.a} and ${n.b} are nearly the same (${n.same} of ${n.of} declarations): one may be a variant of the other.`);
+      // A token named after a product or a brand (F6), its components' own tokens aside.
+      const branded = sa.brandNamedTokens(sa.tokenNames(vsnap), { brands: (await import('./code-roots.mjs')).brandNames(ROOT, cfg), components: names });
+      if (branded.length) { lines.push(`${branded.length} token${branded.length === 1 ? ' is' : 's are'} named after a product or brand, a name that stops making sense when a second one uses the system (rename each to the role it plays):`); for (const x of branded.slice(0, 8)) lines.push(`   · ${x.name} (${x.brand})`); }
       // Aliases to a removed token: in Figma (what the capture recorded), and in the code (a var() with a fallback whose
       // token is declared nowhere), each with the commit that removed it when the history has one.
       const broken = sa.brokenFigmaAliases(vsnap);

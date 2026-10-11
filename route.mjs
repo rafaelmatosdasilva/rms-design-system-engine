@@ -139,7 +139,12 @@ export const PROTOTYPE = /\b(prototyp\w*|mock[\s-]?ups?|wireframes?|prot[oó]tip
 // Figma"): the same engine-written script, after the same yes.
 export const FIGMA_GAPS = /\b(gaps?|lacunas?|to[\s-]?do( list)?|backlog|what the system lacks|o que (o sistema )?falta)\b[^.\n]{0,40}\b(to|in|into|on|no|na|pro|pra|para o)\s+figma\b/i;
 export const FIGMA_EDITS = /\b(update|align|sync|bring|make|annotat\w*|atualiz\w*|alinh\w*|sincroniz\w*|p[oõ]e)\b[^.\n]{0,20}\bfigma\b[^.\n]{0,60}\b(code|c[oó]digo)\b|\bfigma\b[^.\n]{0,30}\b(match(es)?|in line with|up to date with|aligned with|igual ao|alinhado com)\s+(the\s+|o\s+)?(code|c[oó]digo)\b|\b(add|write|put|set|acrescent\w*|adicion\w*|p[oõ]e|coloca\w*)\b[^.\n]{0,30}\b(the\s+|os?\s+|as?\s+)?(roles?|pap[eé]is|annotations?|anota[çc][õo]es)\b[^.\n]{0,20}\b(in|to|into|no|na|ao)\s+figma\b|--figma-edits/i;
+// The person says they checked a criterion only a person can judge (G5): "badge 1.3.3 is checked", "I checked 2.4.6 on
+// the input", "verifiquei o 1.4.5 do badge".
+const CHECKED_SAYS = /\b(is|are|was|were)\s+checked\b|\b(i|we)\s+(have\s+|'ve\s+)?(checked|verified|confirmed|reviewed)\b|\bmark\w*\b[\s\S]{0,60}\b(checked|done)\b|\b(verifiquei|conferi|chequei|est[áa] verificad)/i;
+const SC = /\b[1-4]\.\d{1,2}\.\d{1,2}\b/;
 const RULES = [
+  ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
   ['guidelines-links', (t) => LINK.test(t)],
   ['prototype', (t) => PROTOTYPE.test(t) && !FIGMA_GAPS.test(t) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
   // Building from Figma (a project that has only Figma, or a component Figma has and the code does not yet):
@@ -273,6 +278,12 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
     if (kind === 'figma') {
       notes.push('Nothing is changed in Figma for this request, and never offer to: a value in Figma is the person\'s change in the Figma editor (the skill writes to Figma only what the code already states, through --figma-edits). Run the audit, then tell the person what to change in Figma.');
       return { recipe, question, run: [scoped], notes, kind };
+    }
+    if (kind === 'checked') {
+      // Each criterion they named, on each component they named: recorded as theirs, then the page rebuilt.
+      const crits = [...new Set(t.match(new RegExp(SC.source, 'g')) ?? [])];
+      notes.push('The person says they checked these by hand: record each one exactly as they named it, then rebuild the style guide. Never mark a check they did not name; when the component or the criterion is missing, ask which one.');
+      return { recipe, question: false, run: named.length && crits.length ? [...named.flatMap((n) => crits.map((c) => `${cmd} --checked ${n} ${c}`)), `${cmd} --styleguide`] : [], notes, kind };
     }
     if (kind === 'forbidden-green') {
       notes.push('Do not raise maxSnapshotAgeDays or edit ds-config.json to go green: that hides drift. Say so, and run the audit to show what really fails.');

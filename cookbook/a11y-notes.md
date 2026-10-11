@@ -1,11 +1,12 @@
 # Accessibility notes and findings
 
-**Use when.** the person asks how to write accessibility notes in Figma, or about an accessibility finding.
+**Use when.** the person asks how to write accessibility notes in Figma, about an accessibility finding, or says they checked one by hand.
 
 ## Steps
 
 1. Notes use Figma's annotation tool, in the Accessibility category, one fact per line: `Role: togglebutton`, `aria-label: Close dialog`, `Heading level 2`, `Alt: …`. A part's role goes on its own layer: `Role: label`, `Role: indicator`, `Role: decrement`. A note in Intent, Implementation, Content or Authoring is design intent, never checked and never a To do.
 2. The accessibility check is advisory, and one run is the whole check: axe-core's rules and the hover, focus and pressed states run in it, so suggest nothing else to run. Run `rms-design-system-engine --a11y` for every element and where it is, and what a screen reader says for each component. Each finding is a blocker (measured on the page against WCAG A or AA), a warning (read from the code, a contract or a note) or an advisory (beyond AA, or for a person to judge); give the person its `Verdict:` line as it is. While a component is being built, its lines are part of building it (the `NEXT:` line says so), except one that says to send it back to Figma: that one is the person's.
+3. A criterion only a person can judge (1.3.3, 1.4.5, 2.4.6, 3.1.2, 3.3.3, 3.3.7) stays To check until a person says they checked it. When they do ("badge 1.3.3 is checked"), run `rms-design-system-engine --checked badge 1.3.3` for each one they named, then rebuild the style guide; never mark one they did not name, and ask which when the component or the criterion is missing.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 

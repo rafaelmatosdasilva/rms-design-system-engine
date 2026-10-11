@@ -187,3 +187,12 @@ test('another design system than the one set up here: its code and Figma link ar
   assert.equal(otherSystem('check the React DS components', names), null);
   for (const t of ['build the Harbor DS style guide', 'check our design system', 'audit the whole DS', 'check the harbor design system', 'check DS', 'write ds-config.json by hand']) assert.ok(!route(t, { names }).ask, t);
 });
+
+test('a person who says they checked a criterion has it recorded as theirs (G5)', () => {
+  const x = r('field 1.3.3 is checked');
+  assert.equal(x.recipe, 'a11y-notes');
+  assert.deepEqual(x.run, ['rms-design-system-engine --checked field 1.3.3', 'rms-design-system-engine --styleguide']);
+  assert.deepEqual(r('I checked 1.4.5 and 2.4.6 on the chip').run.slice(0, 2), ['rms-design-system-engine --checked chip 1.4.5', 'rms-design-system-engine --checked chip 2.4.6']);
+  assert.deepEqual(r('1.3.3 is checked').run, []);                 // no component named: ask which
+  assert.ok(!r('check the accessibility of the chip').run.some((c) => /--checked/.test(c)));
+});

@@ -172,11 +172,13 @@ export const stopOutput = (reason) => (reason ? JSON.stringify({ decision: 'bloc
 const ACCEPT_ASKED = /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit|\bbaseline|ratchet|lock (it |them )?in/i;   // the router's accept-debt words, or the baseline named
 const EXCEPTION_ASKED = /\b(exception|exempt|ignore|skip|mapping|map|exce[çc][õoã]|isen[çc]|ignor|mapa|mapeamento|set ?up|configur|install|init)\w*/i;   // setting the project up writes the map too
 const NAMES_ASKED = /\b(renam|name|bind|alias|record|contract|map)\w*|\b(renome|nome|v[ií]ncul|regist|contrat|mape)\w*/i;   // the person asks to record or rename a binding
+const CHECKED_ASKED = /\b(i|we)\s+(have\s+|'ve\s+)?(checked|verified|confirmed|reviewed|tested)\b|\bis checked\b|\b(are|were|was)\s+checked\b|\bmark\w*\b[\s\S]{0,60}\b(checked|done|verified)\b|\b(unmark|uncheck|to check again)\w*|\b(verifiquei|conferi|chequei|testei|est[áa] verificad|marc\w*[\s\S]{0,60}(verificad|feito|conferid))/i;   // the person says they checked it by hand
 const PICTURE_ASKED = /\b(approve|accept|update|aprov|aceit|atualiz)\w*\b[\s\S]{0,60}\b(pictures?|images?|screenshots?|references?|imagem|imagens|refer[eê]ncias?|capturas?)\b|\b(pictures?|images?|screenshots?|references?|imagem|imagens|refer[eê]ncias?|capturas?)\b[\s\S]{0,60}\b(approve|accept|update|aprov|aceit|atualiz)\w*/i;
 export function decisionFile(path, cfg = {}) {
   const p = String(path ?? '').replace(/\\/g, '/'), b = basename(p);
   if ([PROJECT.baseline.now, cfg.baseline?.path && basename(cfg.baseline.path)].includes(b)) return 'debt';
   if (b === PROJECT.agreed.now) return 'agreed';
+  if (b === PROJECT.checked.now) return 'checked';
   if (b === PROJECT.map.now) return 'exceptions';
   if (b === basename(cfg.contracts?.authored ?? 'contract.authored.json')) return 'names';
   const refs = [cfg.visualRefs, PROJECT.refs.now].filter(Boolean).map((d) => String(d).replace(/^\.?\/+|\/+$/g, ''));
@@ -187,6 +189,7 @@ const DECISION = {
   debt: { asked: ACCEPT_ASKED, reason: (f) => `${f} is what the person accepted as debt: an agent never accepts its own differences. When the person asks to accept one, run rms-design-system-engine --baseline --findings --match <what they named>; otherwise report the difference and leave it failing.` },
   exceptions: { asked: EXCEPTION_ASKED, reason: (f) => `${f} holds the names the audit cannot work out and the system's exceptions: an entry added there can hide a finding instead of fixing it. Confirm the person asked for this change to it, or fix what the audit reports.` },
   names: { asked: NAMES_ASKED, reason: (f) => `${f} records which code name stands for each Figma name: a binding added there makes a differently named prop pass instead of fixing it. Confirm the person asked for this binding, or name the prop the way Figma does.` },
+  checked: { asked: CHECKED_ASKED, reason: (f) => `${f} records what a person checked by hand: an agent never marks a check it did not make. When the person says they checked one, run rms-design-system-engine --checked <component> <criterion>; otherwise leave it to check.` },
   pictures: { asked: PICTURE_ASKED, reason: (f) => `${f} is an approved reference picture: it changes only when a person approves the new one. Report the difference, or confirm the person approved it.` },
 };
 const decisionVerdict = (kind, file, userText) => {
@@ -241,6 +244,8 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
     }
     // Accepting debt is the person's decision, even through the engine: --baseline runs when they asked for it.
     if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--baseline\b/.test(cmd) && userText !== null && !ACCEPT_ASKED.test(userText)) return { decision: 'ask', reason: DECISION.debt.reason('The baseline') };
+    // A check made by hand is the person's to record: --checked and --unchecked run when they said so.
+    if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--(un)?checked\b/.test(cmd) && userText !== null && !CHECKED_ASKED.test(userText)) return { decision: 'ask', reason: DECISION.checked.reason('A check made by hand') };
     // A shell write, copy, move or delete of a decision file (the approved picture copied over, the debt rewritten).
     for (const f of shellTargets(cmd)) {
       const kind = decisionFile(f, cfg);

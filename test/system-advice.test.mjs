@@ -102,3 +102,23 @@ test('aliases to a removed token: a Figma variable the capture found pointing no
   assert.match(rows[0].say, /^1 Figma variable points at a variable that is no longer in the file \(chip\/bg to surface\/raised\)\.$/);
   assert.match(rows[1].say, /^2 tokens in the code point at a token declared nowhere, so they show only their fallback \(--chip-bg to --surface-raised; app\.css:1 to --old-text, removed in abc123\)\.$/);
 });
+
+test('F6: a token named after a product or a brand, the components\' own tokens aside', async () => {
+  const { brandNamedTokens, tokenTodos } = await import('../system-advice.mjs');
+  const { brandNames } = await import('../code-roots.mjs');
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(join(tmpdir(), 'brands-'));
+  writeFileSync(join(dir, 'products.json'), JSON.stringify({ products: [{ name: 'Harbor Notes', repo: 'acme/harbor-notes' }] }));
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@acme/ds' }));
+  const brands = brandNames(dir, { pluginDirs: { 'tide-chart': '../tide' }, brands: ['Lab'] });
+  assert.deepEqual(brands, ['Harbor Notes', 'harbor-notes', 'tide-chart', 'Lab', 'acme']);
+  const names = ['harborNotes/accent/color', 'acme/primary', 'text/primary', 'label/color', 'lab/surface', 'badge/acme', 'tideChartHeader/color', 'primitives/blue'];
+  // A short name matches a whole part only (lab, not label); a long one inside a part (tideChartHeader).
+  assert.deepEqual(brandNamedTokens(names, { brands, components: ['badge'] }).map((x) => [x.name, x.brand]),
+    [['harborNotes/accent/color', 'Harbor Notes'], ['acme/primary', 'acme'], ['lab/surface', 'Lab'], ['tideChartHeader/color', 'tide-chart']]);
+  const row = tokenTodos({ vars: { color: { light: { 'acme/primary': '#000' } }, tokenMeta: { 'acme/primary': { description: 'x' } } }, brands }).find((r) => r.kind === 'Brand in the name');
+  assert.equal(row.who, 'figma');
+  assert.match(row.say, /^1 token is named after a product or brand \(acme\/primary for acme\)/);
+});
