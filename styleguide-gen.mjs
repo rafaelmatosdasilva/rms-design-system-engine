@@ -672,6 +672,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const dangling = danglingCodeAliases(sourceFiles(ROOT, cfg), { removed });
       const { brandNames } = await import('./code-roots.mjs');
       view.systemTodo = tokenTodos({ vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, users, dangling, brands: brandNames(ROOT, cfg), components: (view.allComponents ?? view.components).map((c) => c.name), primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
+      // What goes wrong only when two modes are on together (L6), from the last audit's reading in the browser.
+      const { comboTodos } = await import('./mode-combos.mjs');
+      view.systemTodo.push(...comboTodos(readJson(join(OUT_DIR, 'mode-combinations.json'))));
+      // What the browser check found on each product's own page, checked as a whole (F12).
+      const { productA11yTodos } = await import('./a11y-check.mjs');
+      view.systemTodo.push(...productA11yTodos(readJson(join(OUT_DIR, 'a11y.json'))));
+      // Where a product's page is laid out otherwise than its designed screens (I96).
+      const { screenTodos } = await import('./screen-parity.mjs');
+      view.systemTodo.push(...screenTodos(readJson(join(OUT_DIR, 'screens.json'))));
     } catch { /* advice: the page builds without it */ }
     // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
@@ -797,6 +806,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         for (const c of new Set([...(view.allComponents ?? []), ...view.components])) if (mv.components[c.name]) c.migration = mv.components[c.name];
       }
     } catch { /* the page builds without it */ }
+    // Where the code moves otherwise than Figma's prototype (C5), from the last audit: rows of its Parity area.
+    try {
+      const motion = readJson(join(OUT_DIR, 'motion.json'));
+      for (const c of new Set([...(view.allComponents ?? []), ...view.components])) { const own = (motion?.findings ?? []).filter((f) => f.component === c.name); if (own.length) c.motionDiffs = own; }
+    } catch { /* no motion read */ }
     // A class a product styles almost as the system styles one of its components (I83): a decision in that component's
     // To do rows, to use the component (a new option if it needs one) or to add the new one to the system on purpose.
     if (!opts.only?.length && cfg.systemHealth !== false) try {

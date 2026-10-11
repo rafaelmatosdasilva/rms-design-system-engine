@@ -89,6 +89,10 @@ rms-design-system-engine --checked badge 1.3.3 --by "Ana"  # the person checked 
 rms-design-system-engine --unchecked badge 1.3.3          # take it back: to check again
 rms-design-system-engine --rename-sweep                  # a token renamed in Figma, renamed everywhere in one change: one patch for the system and one per product, every rule, script and doc, the old name kept in the theme pointing at the new one (nothing applied)
 rms-design-system-engine --rename-sweep --since v2.3.0   # the renames since that git ref, not since the last committed read of Figma; --no-keep-old drops the old names
+rms-design-system-engine --figma-motion                  # write the read-only script that reads Figma's prototype transitions between variants (figma.componentsPage, else the page open), to run with use_figma
+rms-design-system-engine --figma-motion <answer.json>    # keep its answer as the motion snapshot (paths.snapshotMotion) and say each transition the code makes otherwise (at once, another duration, another curve)
+rms-design-system-engine --figma-screens                 # write the read-only script that reads the screens ds-config.json names (frames and screens), to run with use_figma
+rms-design-system-engine --figma-screens <answer.json>   # keep its answer as the screen layout snapshot (paths.screenLayout) and compare each product's page with its screens
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
 rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
 rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
@@ -1091,6 +1095,11 @@ whatever surface the project serves, in this order:
    time limit, and nothing it found was kept. `a11y.styleguide:false` opts out;
    `a11y.regenerateStyleguide:true` rebuilds it first (via `styleguide-gen.mjs`) so a11y never audits a
    stale one. Falls through to the built plugin UIs (`apps/*/ui.html`) when there is no styleguide.
+   **Each product's own page** comes after the guide (a run on the whole guide, no `--component`): the built page
+   of each product in `paths.plugins` (`ui.html` beside the `pluginCSS` source, else `<product>/ui.html`), opened
+   whole, with every rule, axe-core's page rules (heading order, landmarks) included. Each finding carries its
+   product (`product` in `a11y.json`) and the style guide lists them in the To do list under Products, one row per
+   product. `a11y.products: false` leaves them out.
    **The components rendered from their own code** (`component-harness.mjs`) — in build mode, or when there is no
    page to open: each React component (`.jsx`/`.tsx`) in each of its Figma variants on one served page, its CSS
    linked and its JSX turned into calls to a small stand-in for React that keeps each component's state and updates
@@ -1182,6 +1191,11 @@ there, never a failure.
   or Tab going round two to six controls while the page has more; a round inside a modal dialog is its own and is
   left alone), any positive `tabindex` (visits out of order), and a focused control completely covered by other
   content such as a sticky header (2.4.11; on real pages, not on the styleguide, whose sticky header is its own chrome).
+- **Focus order and lost focus, on a whole page** (a product's page, a page named with `--url`) — the first round of
+  the Tab walk is followed on the page: a stop drawn above the one before it in the same column sends the reader back
+  up the page (`pageorder`, 2.4.3; a bar fixed or sticky on screen is left alone), and a stop the focus lands on with
+  nothing seen (off the screen, inside a closed panel, no size) loses them (`focushidden`, 2.4.7). A skip link that
+  shows when it has the focus is seen.
 - **Clickable, but not by keyboard (2.1.1)** — an element a script makes clickable that Tab never reaches: its handler
   read where a framework keeps it (an `onclick`, React's props, Vue's invokers), or, for one with a pointer cursor,
   Chrome's own list of its listeners (one added with `addEventListener`). A part inside a control, a label, a card
