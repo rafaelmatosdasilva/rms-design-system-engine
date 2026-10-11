@@ -372,6 +372,27 @@ export const A11Y_GUIDE = {
   // WCAG 2.1 A and AA, the rest of what a component can be checked for (wcag-page.js, wcag21.mjs).
   ...WCAG21_GUIDE,
 };
+// How sure the check is of each kind of finding (W5). A blocker is measured on the rendered page against a WCAG 2.1 A
+// or AA criterion: the contrast, the name the accessibility tree gives, a key pressed and nothing happening. A warning
+// is read from the code, the contract or a Figma note, or a pattern that usually fails (a placeholder as the only
+// label, an action on pointerdown): it can be wrong. An advisory is beyond AA (a focus ring under 2px, motion the
+// person asked to reduce) or only a person can judge it (text on an image, measured by eye). A kind not listed is a
+// warning.
+export const A11Y_BLOCKER = new Set(['contrast', 'hovercontrast', 'iconcontrast', 'boundary', 'focuscontrast', 'name', 'focus', 'keyboard', 'tabtrap', 'target', 'zoom', 'reflow', 'spacing', 'obscured',
+  'escape', 'focusreturn', 'activate', 'arrows', 'textalt', 'captions', 'autoaudio', 'dupid', 'aria', 'emptylabel', 'labelname', 'context', 'hovercontent', 'onfocus', 'oninput', 'pause', 'flash']);
+export const A11Y_ADVISORY = new Set(['focusthin', 'motion']);
+export const severityOf = (kind) => (A11Y_BLOCKER.has(kind) ? 'blocker' : A11Y_ADVISORY.has(kind) ? 'advisory' : 'warning');
+const SEVERITY_ORDER = { blocker: 0, warning: 1, advisory: 2 };
+const SEVERITY_WORD = { blocker: 'Blocker', warning: 'Warning', advisory: 'Advisory' };
+// The one line a run ends with: how many of each, against what. `buckets` [[kind, findings]], `cannot` the texts that
+// could not be measured (each an advisory), `partial` when part of the page was not checked.
+export function a11yVerdict(buckets, { cannot = 0, partial = false, target = 'WCAG 2.1 AA' } = {}) {
+  const n = { blocker: 0, warning: 0, advisory: cannot };
+  for (const [kind, list] of buckets) n[severityOf(kind)] += list.length;
+  const word = (k, one, many) => `${n[k]} ${n[k] === 1 ? one : many}`;
+  const line = [word('blocker', 'blocker', 'blockers'), word('warning', 'warning', 'warnings'), word('advisory', 'advisory', 'advisories'), target].join(' · ') + (partial ? ' · not all of it checked' : '');
+  return { blockers: n.blocker, warnings: n.warning, advisories: n.advisory, target, partial, line };
+}
 const A11Y_ROLE_WORD = { button: 'A button', link: 'A link', textbox: 'An input field', searchbox: 'A search field', checkbox: 'A checkbox', radio: 'A radio button', switch: 'A switch', combobox: 'A dropdown', tab: 'A tab', slider: 'A slider' };
 // One readable line locating a single finding.
 export function a11yItemLine(kind, f) {
@@ -404,7 +425,7 @@ export function groupSame(list) {
 // Structured record for --json (machines / an agent that fixes the code): exact locator +
 // numbers + the fix. Same facts as the plain lines, but parseable.
 export function a11yFindingRecord(kind, f) {
-  const rec = { issue: kind, selector: f.desc ?? null, fix: A11Y_GUIDE[kind]?.fix ?? null };
+  const rec = { issue: kind, severity: severityOf(kind), selector: f.desc ?? null, fix: A11Y_GUIDE[kind]?.fix ?? null };
   if (WCAG21_KIND[kind]) rec.wcag = WCAG21_KIND[kind];
   if (kind === 'contrast' || kind === 'hovercontrast') { rec.theme = f.theme ?? null; rec.text = f.text ?? null; rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
   if (kind === 'focuscontrast') { rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
@@ -2025,9 +2046,15 @@ async function main() {
   const themes   = [...new Set(modes.map((m) => m.name))];
 
   const more = ['tooltipname', 'target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'behaviour', 'statefollows', ...Object.keys(WCAG21_GUIDE)].map((k) => [k, findings.filter((f) => f.kind === k)]);
-  const buckets = [['contrast', contrast], ['hovercontrast', hoverCon], ['iconcontrast', iconCon], ['name', names], ['focus', focus], ['focuscontrast', focusCon], ['ariastate', state], ['keyboard', keyboard], ...more].filter(([, l]) => l.length);
+  // Blockers first, then warnings, then advisories; within each, the order the checks are listed in.
+  const buckets = [['contrast', contrast], ['hovercontrast', hoverCon], ['iconcontrast', iconCon], ['name', names], ['focus', focus], ['focuscontrast', focusCon], ['ariastate', state], ['keyboard', keyboard], ...more].filter(([, l]) => l.length)
+    .map((b, i) => [b, i]).sort((x, y) => SEVERITY_ORDER[severityOf(x[0][0])] - SEVERITY_ORDER[severityOf(y[0][0])] || x[1] - y[1]).map(([b]) => b);
   const total = buckets.reduce((n, [, l]) => n + l.length, 0);
   const inThemes = themes.length > 1 ? ` (checked in ${themes.length} themes)` : '';
+  const partial = !!(unread.length || unrendered.length || unfinished.length || notOpened.length);
+  const verdict = a11yVerdict(buckets, { cannot: cannot.length, partial });
+  // Must-pass stops on a blocker or a warning; an advisory never stops a run.
+  const stops = verdict.blockers + verdict.warnings;
 
   const axe = RUN_AXE ? summarizeAxe(axeViolations) : [];
   // Findings name the component they sit in ("… in .chip"); that component links to Figma.
@@ -2066,6 +2093,7 @@ async function main() {
     target: targets.map((t) => t.label),
     usedStyleguide: !!sg,
     themes, strict: STRICT, total, cannotMeasure: cannot.length,
+    verdict,
     checkedAt: new Date().toISOString(),
     // The page-wide checks that finished: a criterion they stand for (a keyboard trap, text spacing, reflow, zoom) is
     // met only where its check ran.
@@ -2082,7 +2110,7 @@ async function main() {
   if (JSON_OUT) { try { mkdirSync(dirname(resolve(JSON_OUT)), { recursive: true }); writeFileSync(resolve(JSON_OUT), JSON.stringify(machine(), null, 2) + '\n'); } catch { /* the file is a convenience */ } }
   if (JSON_MODE) {
     console.log(JSON.stringify(machine(), null, 2));
-    process.exit(STRICT && (total || severeAxe) ? 1 : 0);
+    process.exit(STRICT && (stops || severeAxe) ? 1 : 0);
   }
 
   // ── Human lane (default): plain language, no jargon ──
@@ -2096,7 +2124,7 @@ async function main() {
     for (const [kind, list] of buckets) {
       const g = A11Y_GUIDE[kind];
       const places = list.reduce((n, f) => n + (f.places ?? 1), 0);
-      console.log(`• ${g.title(list.length)}${places > list.length ? ` (${places} places on the page)` : ''}`);
+      console.log(`• ${SEVERITY_WORD[severityOf(kind)]}: ${g.title(list.length)}${places > list.length ? ` (${places} places on the page)` : ''}`);
       console.log(`     Why it matters: ${g.why}`);
       console.log(`     What to do:     ${g.fix}`);
       if (VERBOSE) {
@@ -2143,8 +2171,9 @@ async function main() {
     }
   }
 
-  if (STRICT && (total || severeAxe)) {
-    console.log(`\nThis check is set to must-pass, so the run stops here until these are fixed${severeAxe ? ` (including ${severeAxe} serious or critical axe-core finding${severeAxe === 1 ? '' : 's'})` : ''}.`);
+  console.log(`\nVerdict: ${verdict.line}`);
+  if (STRICT && (stops || severeAxe)) {
+    console.log(`\nThis check is set to must-pass, so the run stops here until the blockers and warnings are fixed${severeAxe ? ` (including ${severeAxe} serious or critical axe-core finding${severeAxe === 1 ? '' : 's'})` : ''}; advisories never stop it.`);
     process.exit(1);
   }
   process.exit(0);

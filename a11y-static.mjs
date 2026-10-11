@@ -30,6 +30,8 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
 import { join, relative, extname } from 'node:path';
 import { ENGINE_DIRS } from './names.mjs';
+import { specificity } from './css-source.mjs';
+import { splitSelectors } from './selector-list.mjs';
 
 const SKIP_DIR = new Set(['node_modules', 'dist', 'build', 'out', '.git', '.next', '.nuxt', 'coverage', ...ENGINE_DIRS, 'contracts', 'storybook-static', 'vendor']);
 const MARKUP = new Set(['.html', '.htm', '.vue', '.jsx', '.tsx', '.svelte']);
@@ -184,7 +186,7 @@ function cssRules(text) {
       let j = i + 1; while (j < css.length && css[j] !== '{' && css[j] !== '}') j++;
       if (css[j] === '}') {
         const raw = css.slice(s, i), head = raw.trim();
-        if (head && !head.startsWith('@')) rules.push({ selectors: head.split(',').map((x) => x.trim()).filter(Boolean), decls: css.slice(i + 1, j), index: s + (raw.length - raw.trimStart().length) });
+        if (head && !head.startsWith('@')) rules.push({ selectors: splitSelectors(head), decls: css.slice(i + 1, j), index: s + (raw.length - raw.trimStart().length) });
         s = j + 1;
         continue;
       }
@@ -206,18 +208,53 @@ const sameFamily = (a, b) => {
 const base = (sel) => sel.replace(/:(focus-visible|focus-within|focus|hover|active)\b/g, '').replace(/::?[\w-]+(\([^)]*\))?$/, '').trim();
 
 // What puts focus back, read once from the text of every style file: for each element (its selector without the
-// state), the focus selectors that show focus on it, and the :focus-within wrappers that show it. Read once for the
-// whole project, not once per file (392 files read 2.7 MB each: hours).
-export function focusIndex(all) {
-  const byBase = new Map(), within = [];
+// state), the focus selectors that show focus on it, the :focus-within wrappers that show it, and the rules that show
+// focus on every element of a kind (button:focus-visible, :focus-visible) with how specific they are. Read once for the
+// whole project, not once per file (392 files read 2.7 MB each: hours). `tags` (class → the elements the markup puts it
+// on) says which kind of element a class is.
+export function focusIndex(all, { tags = new Map() } = {}) {
+  const byBase = new Map(), within = [], kinds = [];
   for (const x of cssRules(all).rules) {
     if (!showsFocus(x.decls)) continue;
     for (const s of x.selectors) {
       if (/:focus/.test(s)) { const b = base(s); if (!byBase.has(b)) byBase.set(b, new Set()); byBase.get(b).add(s); }
       if (/:focus-within/.test(s)) within.push(base(s));
+      const kind = /^(\*|[a-z][\w-]*)?:focus(?:-visible)?$/i.exec(s);
+      if (kind) kinds.push({ tag: (kind[1] ?? '*').toLowerCase(), spec: specificity(s) });
     }
   }
-  return { byBase, within };
+  return { byBase, within, kinds, tags };
+}
+
+// The elements each class is put on, read from the markup and from the markup the scripts write
+// (<button class="buttonQuaternary">, `<button class="${cls} chip">`). → Map class → Set of tag names
+export function classTags(texts) {
+  const out = new Map();
+  for (const text of texts) {
+    for (const m of String(text ?? '').matchAll(/<([a-z][\w-]*)\b[^<>]*?\bclass(?:Name)?\s*=\s*(?:"([^"]*)"|'([^']*)'|\{?`([^`]*)`)/gi)) {
+      const tag = m[1].toLowerCase();
+      for (const c of (m[2] ?? m[3] ?? m[4] ?? '').replace(/\$\{[^}]*\}/g, ' ').split(/\s+/).filter((c) => /^[A-Za-z_][\w-]*$/.test(c))) {
+        if (!out.has(c)) out.set(c, new Set());
+        out.get(c).add(tag);
+      }
+    }
+  }
+  return out;
+}
+
+// A rule that takes the outline off an element in every state (.buttonQuaternary { outline: none }) loses to a rule
+// that shows focus on every element of its kind and is more specific (button:focus-visible beats one class), when
+// every element the class is put on is of a kind such a rule covers.
+const cmpSpec = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+function restoredByKind(sel, idx) {
+  if (!idx.kinds?.length) return false;
+  const last = sel.split(/\s*[\s>+~]\s*/).pop() ?? '';
+  const own = /^[a-z][\w-]*/i.exec(last)?.[0]?.toLowerCase();
+  const cls = (last.match(/\.([A-Za-z_][\w-]*)/g) ?? []).map((c) => c.slice(1)).find((c) => idx.tags?.has(c));
+  const tags = own ? new Set([own]) : cls ? idx.tags.get(cls) : null;
+  if (!tags?.size) return false;
+  const spec = specificity(sel);
+  return [...tags].every((t) => idx.kinds.some((k) => (k.tag === t || k.tag === '*') && cmpSpec(k.spec, spec) > 0));
 }
 
 // Styles: every rule that removes the focus outline must have a focus style for the same element somewhere.
@@ -233,7 +270,7 @@ export function cssFindings(text, all = text) {
       if (!onFocus && /:(hover|active|disabled|checked|visited)\b|\[disabled\]|\[aria-disabled/.test(sel)) continue;   // another state, not focus
       const b = base(sel);
       if (onFocus && showsFocus(r.decls.replace(/outline[^;]*;?/gi, ''))) continue;   // replaced in the same rule
-      const restored = [...(idx.byBase.get(b) ?? [])].some((s) => s !== sel) || idx.within.some((w) => sameFamily(b, w) && w !== b);
+      const restored = [...(idx.byBase.get(b) ?? [])].some((s) => s !== sel) || idx.within.some((w) => sameFamily(b, w) && w !== b) || (!onFocus && restoredByKind(sel, idx));
       if (!restored) out.push({ line: lineAt(css, r.index), kind: 'focus', desc: `${sel} removes the focus outline and no focus style puts one back`, fix: `add a ${b || sel}:focus-visible style that shows where focus is` });
     }
   }
@@ -350,10 +387,10 @@ export function staticA11y(ROOT) {
   for (const f of markup) for (const x of markupFindings(read(f))) findings.push({ file: relative(ROOT, f), ...x });
   const styleText = new Map(styles.map((f) => [f, ['.vue', '.svelte'].includes(extname(f)) ? styleOnly(read(f)) : read(f)]));
   const all = [...styleText.values()].join('\n');
-  const focus = focusIndex(all);
+  const scripts = walk(ROOT, new Set(['.js', '.mjs', '.ts']));
+  const focus = focusIndex(all, { tags: classTags([...markup, ...scripts].map(read)) });
   for (const [f, text] of styleText) for (const x of cssFindings(text, focus)) findings.push({ file: relative(ROOT, f), ...x });
   // Animations with no reduced-motion alternative anywhere: reported once, at the first animation.
-  const scripts = walk(ROOT, new Set(['.js', '.mjs', '.ts']));
   // What the scripts do (WCAG 2.1): shortcuts, timers, gestures, device motion.
   for (const f of [...scripts, ...walk(ROOT, new Set(['.jsx', '.tsx', '.vue', '.svelte']))]) {
     const text = read(f);
