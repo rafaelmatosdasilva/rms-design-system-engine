@@ -47,7 +47,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Style guide → \.design-system-engine-out\/styleguide\/index\.html {2}\(2 components agreed · the engine's template\)/);
   assert.match(r.stdout, /components the code does not have yet \(button, field, disclosure and stepper\)/);
@@ -130,7 +130,7 @@ test('tokens are shown only when equal to Figma in every mode, grouped like the 
 
 test('--component with --styleguide: that component audited first, then its own page beside the whole one, its address printed', { timeout: 600000 }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sgc-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const out = r.stdout + r.stderr;
   assert.match(out, /Auditing button, then building the style guide\./);
@@ -141,7 +141,7 @@ test('--component with --styleguide: that component audited first, then its own 
 
 test('the demo design system: its real markup from its page, and props named differently stay out', { timeout: 300000 }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sg-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const data = JSON.parse(readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8').match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   const button = data.components.find((c) => c.name === 'button');
@@ -158,6 +158,9 @@ test('in the browser: no script error, a control changes the real component, the
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+  // A Figma note on the chip that no check reads: a row of its own on its Accessibility area, read by the To do page too.
+  const propsSnap = join(dir, 'src', 'figma', 'figma-component-props.snapshot.json'), snap = JSON.parse(readFileSync(propsSnap, 'utf8'));
+  snap.chip.annotations.push({ label: 'Screen readers announce the hint after the label' }); writeFileSync(propsSnap, JSON.stringify(snap));
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
@@ -294,7 +297,7 @@ test('in the browser: no script error, a control changes the real component, the
     for (let i = 0; i < 120 && await run(`!!document.querySelector('#c-chip .pg-offstage')`); i++) await new Promise((r) => setTimeout(r, 250));
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
     assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
-    // Another page mode: tried again in it.
+    // Another page mode: what was tried in every colour mode while the page was built stands, with its ratio.
     await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
@@ -438,11 +441,12 @@ test('in the browser: no script error, a control changes the real component, the
     // How a product brings it in: the import line, copied by the system's button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-import code').textContent`), "import { Chip } from '@/components/Chip';");
     // The To do page: the same table as a component's areas, each open row under the issue number its component's own
-    // area shows. Every component is tried in the browser once; what was tried is kept, so a refresh lists it at once
-    // and tries nothing again.
+    // area shows. Every variant of every component was tried while the page was built and kept in it: the final results
+    // at once, nothing tried here; a refresh shows the same.
     await run(`location.hash = '#todo'`); await shownIs('todo');
-    const tried = async () => { let v = ''; for (let n = 0; n < 480 && !/Every component was tried/.test(v); n++) { if (n) await new Promise((r) => setTimeout(r, 250)); v = await run(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`); } return v; };
-    assert.match(await tried(), /Every component was tried in this browser/);
+    const note = () => run(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`);
+    assert.match(await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0), /Every variant of every component was tried in a browser when this page was built, on \d{4}-\d\d-\d\d.*nothing runs while you read them/);
+    assert.equal(await run(`!!document.getElementById('sg-a11y-baked') && document.querySelectorAll('.pg-offstage').length`), 0, 'nothing tried here');
     assert.match(await run(`document.querySelector('#todo thead').textContent`), /^Issue nr\s*Area\s*Figma\s*Code\s*What to do\s*Status$/);
     const nums = await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`);
     assert.ok(nums.length > 0 && nums.every(([, n], i) => +n === i + 1), 'numbered 1, 2, 3 down the page');
@@ -452,8 +456,20 @@ test('in the browser: no script error, a control changes the real component, the
     await new Promise((r) => setTimeout(r, 300));
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { tolerateErrors: true });
     await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0);
-    assert.match(await run(`document.querySelector('#todo .sg-todo-note').textContent`), /Every component was tried in this browser/, 'a refresh lists what was tried without trying it again');
+    assert.match(await note(), /when this page was built/, 'a refresh shows the results the page was built with');
     assert.deepEqual(await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`), nums, 'the same list at once');
+    // Try again in this browser: every component tried afresh here, then kept in this browser, so a refresh tries nothing.
+    await run(`document.querySelector('#todo [data-a11y-again]').click()`);
+    let again = ''; for (let n = 0; n < 480 && !/Every component was tried in this browser/.test(again); n++) { if (n) await new Promise((r) => setTimeout(r, 250)); again = await note(); }
+    assert.match(again, /Every component was tried in this browser/);
+    await send('Page.reload', {}, sessionId);
+    await new Promise((r) => setTimeout(r, 300));
+    await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { tolerateErrors: true });
+    await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0);
+    assert.match(await note(), /when this page was built/, 'what the build tried stands again after a refresh');
+    // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
+    await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
+    assert.match(await until(`(document.querySelector('#c-chip .pg-a11y-rows') || {}).textContent || ''`, (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
@@ -466,7 +482,7 @@ test('"In use" shows the approved pictures of the system\'s own frames', { timeo
   mkdirSync(join(dir, '.design-system-engine-refs'), { recursive: true });
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   writeFileSync(join(dir, '.design-system-engine-refs', '5-1.png'), png);
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
   const data = JSON.parse(readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8').match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(data.screens.map((x) => x.caption), ['Settings']);
   assert.match(data.screens[0].src, /^data:image\/png;base64,iVBOR/);
@@ -1002,7 +1018,7 @@ test('in the browser: with a width chosen, a link to another component opens it'
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-nav-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p))); }
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
   const c = await launchChrome(chromePath);
   try {
     const { send, on, close } = await connectCDP(c.wsUrl);

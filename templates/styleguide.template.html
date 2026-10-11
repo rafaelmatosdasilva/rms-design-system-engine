@@ -509,6 +509,15 @@ a.pg-usage-name { color: var(--sg-text); }
   var DATA = JSON.parse(document.getElementById('sg-data').textContent || '{}');
   var TOKENS = DATA.tokens || { colors: [], spacing: [], radii: [], sizing: [], typography: [] };
   var COMPONENTS = DATA.components || [];
+  // What each component is, as the data gives it, taken before anything is drawn (drawing adds to it): the base of its
+  // signature, which says whether accessibility results kept for it still hold (compSig).
+  var COMP_DATA = {};
+  COMPONENTS.forEach(function (c) {
+    var a = {}; Object.keys(c.a11y || {}).forEach(function (k) { if (!/^(checked|audited|static|sources)$/.test(k)) a[k] = c.a11y[k]; });
+    COMP_DATA[c.name] = JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a]);
+  });
+  // The page's own styles and scripts, read before anything adds to them.
+  var PAGE_SIG = sigOf(Array.prototype.map.call(document.querySelectorAll('style, script:not([type="application/json"])'), function (s) { return s.textContent; }).join('\u0000'));
   var html = document.documentElement, main = document.getElementById('sg-main'), nav = document.getElementById('sg-nav');
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   // A component's place on the page: its name, any character an address reads (a slash, a space) as a dash.
@@ -1842,6 +1851,7 @@ a.pg-usage-name { color: var(--sg-text); }
         who: x.todo ? (/annotation/.test(x.from) ? WHO.figma : WHO.person) : '', st: x.todo ? 'check' : 'none', rel: 'Read by the agents, no check uses it', at: DATA.builtAt || null, src: [x.from] };
     });
   }
+  function unreadFix(x) { return (x.kind && x.kind !== 'accessibility' ? 'Nothing: its Figma category (' + esc(x.kind.charAt(0).toUpperCase() + x.kind.slice(1)) + ') makes it design intent, which the agents read.' : x.wording ? 'Write it in Figma as ' + esc(x.wording) + ' (--figma-edits lists it).' : /annotation/.test(x.from) ? 'Write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, the arrow keys move, Enter and Space activate, or Role: label on a layer.' : 'Nothing: the agents read it as design intent.'); }
   // Where a finding or a duty is, said with it: the component, its variant or the part it is on.
   function figmaOf(c) { var l = (c.links || []).find(function (x) { return /figma/i.test(x.label); }); return l ? l.url : null; }
   // What the data says about the component, each finding or duty as an item under its criterion: what the audit found
@@ -1938,11 +1948,13 @@ a.pg-usage-name { color: var(--sg-text); }
     var link = nav.querySelector('a[href="#todo"]');
     var box = td.querySelector('.sg-todo') || td.appendChild(document.createElement('div')); box.className = 'sg-todo';
     var tried = COMPONENTS.filter(function (c) { return c.__a11y; }), last = tried.reduce(function (m, c) { var at = c.__a11y.live && c.__a11y.live.at; return at && (!m || at > m) ? at : m; }, null);
-    var wait = !ALL && tried.length < COMPONENTS.length;
-    // How far the browser has got, and when what the list shows was tried: kept in this browser, so a refresh lists it at
-    // once and tries only a component that changed. A button tries every component again.
+    var wait = !ALL && tried.length < COMPONENTS.length, baked = !wait && tried.length && tried.every(function (c) { return c.__a11y.baked || !c.__a11y.live; }) && BAKED;
+    // When what the list shows was tried: while the page was built (the final results, nothing runs here), else in this
+    // browser, kept so a refresh lists it at once; while a component the build did not try is still being tried here,
+    // how far it has got. A button tries every component again in this browser.
     var note = ALL ? '' : '<div class="sg-todo-note"><p class="pg-wcag-note" role="status">' + (wait
-      ? 'Trying each component in the browser, as its Accessibility area does: ' + tried.length + ' of ' + COMPONENTS.length + ' so far. The list grows as each one is tried, and what is tried is kept for the next visit.'
+      ? 'Trying in this browser the components not tried when the page was built: ' + tried.length + ' of ' + COMPONENTS.length + ' so far. The list grows as each one is tried, and what is tried is kept for the next visit.'
+      : baked ? 'Every variant of every component was tried in a browser when this page was built, on ' + when(BAKED.at) + '. These are its results; nothing runs while you read them.'
       : 'Every component was tried in this browser' + (last ? ', the last on ' + when(last) : '') + '. A refresh lists what was found without trying again, and a component that changes is tried again on its own.') + '</p>' +
       (wait ? '' : sysButton('button', 'Try again in this browser', ' data-a11y-again')) + '</div>';
     if (link) link.lastChild.textContent = wait ? 'to do' : 'to do (' + all + ')';   // its count once every component is tried
@@ -1953,28 +1965,39 @@ a.pg-usage-name { color: var(--sg-text); }
     }).join('');
     labelCells(td);
   }
-  // What the browser found on each component, kept in this browser: the To do page lists it at once the next time it
-  // opens, and never tries a component again until it changes. Each component's own signature (what is drawn and what
-  // its accessibility check reads) and the page's (its styles and scripts) say whether what was kept still holds; what
-  // the data says (the audit, the code) is read again on every visit.
+  // What the browser found on each component. Tried once while the page was built (--styleguide opens it in a browser
+  // and keeps the results in it, sg-a11y-baked): the To do page and every Accessibility area show those results at
+  // once, the final ones, with nothing running in the viewer's browser. A component the build could not try is tried in
+  // the viewer's browser and kept there, so it is never tried again until it changes. Each component's own signature
+  // (what is drawn and what its accessibility check reads) and the page's (its styles and scripts) say whether what was
+  // kept still holds; what the data says (the audit, the code) is read again on every visit.
   function sigOf(text) { var h = 5381; for (var i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
-  var PAGE_SIG = sigOf(Array.prototype.map.call(document.querySelectorAll('style, script:not(#sg-data)'), function (s) { return s.textContent; }).join('\u0000'));
-  function compSig(c) {
-    var a = {}; Object.keys(c.a11y || {}).forEach(function (k) { if (!/^(checked|audited|static|sources)$/.test(k)) a[k] = c.a11y[k]; });
-    return PAGE_SIG + '.' + sigOf(JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a]));
-  }
+  // The build's own run: the page opened by --styleguide to try a share of the components (#todo?bake=1/4).
+  var BAKING = !ALL && /(^|[?&])bake=\d+\/\d+/.test(location.hash);
+  var BAKED = null;
+  try { BAKED = JSON.parse((document.getElementById('sg-a11y-baked') || {}).textContent || 'null'); } catch (e) { BAKED = null; }
+  function compSig(c) { return PAGE_SIG + '.' + sigOf(COMP_DATA[c.name] || ''); }
   var A11Y_KEY = 'sg-a11y-kept';
-  try {
-    var kept = JSON.parse(localStorage.getItem(A11Y_KEY) || 'null') || {};
-    COMPONENTS.forEach(function (c) { var k = kept[c.name]; if (k && k.sig === compSig(c) && k.live) c.__a11y = { items: (c.a11y ? a11yStaticItems(c) : []).concat(k.items || []), live: k.live, liveItems: k.items || [] }; });
-  } catch (e) { /* none kept */ }
+  // A component the build went through with nothing to try in a browser is kept too (live: null), so it is not tried here.
+  function useKept(c, k, baked) {
+    if (!k || k.sig !== compSig(c) || !(k.live || baked)) return;
+    c.__a11y = { items: (c.a11y ? a11yStaticItems(c) : []).concat(k.items || []), live: k.live || null, liveItems: k.items || [], baked: !!baked };
+    if (k.parts) c.__textParts = k.parts;   // its text parts, as drawn when it was tried, named in what a person checks
+  }
+  if (!BAKING) {
+    COMPONENTS.forEach(function (c) { useKept(c, BAKED && BAKED.results && BAKED.results[c.name], true); });
+    try { var kept = JSON.parse(localStorage.getItem(A11Y_KEY) || 'null') || {}; COMPONENTS.forEach(function (c) { if (!c.__a11y) useKept(c, kept[c.name], false); }); } catch (e) { /* none kept */ }
+  }
   function keepA11y() {
+    if (BAKING) return;
     try {
       var o = JSON.parse(localStorage.getItem(A11Y_KEY) || 'null') || {};
-      COMPONENTS.forEach(function (c) { if (c.__a11y && c.__a11y.live) o[c.name] = { sig: compSig(c), live: c.__a11y.live, items: c.__a11y.liveItems || [] }; });
+      COMPONENTS.forEach(function (c) { if (c.__a11y && c.__a11y.live && !c.__a11y.baked) o[c.name] = { sig: compSig(c), live: c.__a11y.live, items: c.__a11y.liveItems || [], parts: c.__textParts || [] }; });
       localStorage.setItem(A11Y_KEY, JSON.stringify(o));
     } catch (e) { /* not kept: tried again next time */ }
   }
+  // What this page tried, for the build to keep in the page: { name: { sig, live, items } }.
+  window.__sgA11yResults = function () { var o = {}; COMPONENTS.forEach(function (c) { if (c.__a11y) o[c.name] = { sig: compSig(c), live: c.__a11y.live || null, items: c.__a11y.liveItems || [], parts: c.__textParts || [] }; }); return o; };
   fillTodo();
   // Every component not tried yet in this browser, one after another, while the To do page is open: each built out of
   // sight, its Accessibility check run as its own area runs it, kept, then the list drawn again with what it found.
@@ -1982,21 +2005,23 @@ a.pg-usage-name { color: var(--sg-text); }
   function a11ySweep() {
     if (ALL || sweeping) return;
     var list = COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+    var share = /(?:^|[?&])bake=(\d+)\/(\d+)/.exec(location.hash);
+    if (BAKING && share) list = list.filter(function (c, i) { return i % +share[2] === +share[1]; });
     sweeping = true;
     (function next() {
-      if (sweepAt >= list.length || hashParts().id !== 'todo') { sweeping = false; if (sweepAt >= list.length) sweepAt = 0; keepA11y(); fillTodo(); return; }
+      if (sweepAt >= list.length || hashParts().id !== 'todo') { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
       var c = list[sweepAt++], id = cid(c.name);
-      if (c.__a11y && c.__a11y.live) return setTimeout(next, 0);
-      var sec = document.getElementById(id) || (BUILDERS[id] && BUILDERS[id]());
-      if (!sec || !sec._a11yRun) return setTimeout(next, 0);
+      if (c.__a11y && (c.__a11y.live || c.__a11y.baked)) return setTimeout(next, 0);
+      var sec = null; try { sec = document.getElementById(id) || (BUILDERS[id] && BUILDERS[id]()); } catch (e) { setTimeout(next, 0); throw e; }
+      if (!sec || !sec._a11yRun) { if (!c.__a11y) c.__a11y = { items: c.a11y ? a11yStaticItems(c) : [], live: null }; return setTimeout(next, 0); }   // nothing to try in a browser
       sec.hidden = false; sec.classList.add('pg-offstage');
       var finish = function () {
         sec.classList.remove('pg-offstage');
         // Only the page being viewed shows: the person may have moved on while this one was tried.
         var here = document.getElementById(hashParts().id || 'overview'); if (!here || !here.matches('main > section')) here = document.getElementById('overview');
         Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== here; });
-        if (!c.__a11y) c.__a11y = { items: c.a11y ? a11yStaticItems(c) : [], live: null };
-        keepA11y(); fillTodo(); setTimeout(next, 30);
+        // The next one is tried whatever happens here: one component's error never stops the rest.
+        try { if (!c.__a11y) c.__a11y = { items: c.a11y ? a11yStaticItems(c) : [], live: null }; keepA11y(); fillTodo(); } finally { setTimeout(next, 30); }
       };
       try { sec._a11yRun(finish); } catch (e) { finish(); }
     })();
@@ -2621,10 +2646,10 @@ a.pg-usage-name { color: var(--sg-text); }
     function a11yRender(live) {
       if (!a11yEl) return;
       if (live !== undefined) liveNow = live;
-      c.__textParts = textParts();
+      var tp = textParts(); if (tp.length || !c.__textParts) c.__textParts = tp;   // before it is drawn: the parts kept with its results
       if (liveNow && !liveNow.at) liveNow.at = new Date().toISOString();
       a11yEl.innerHTML = a11yIssueRows(c, staticItems.concat(liveItems), liveNow).concat(unreadRows(c)).map(issueRowHTML).join('');
-      if (liveNow) { c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice() }; fillTodo(); if (!checking) keepA11y(); }   // the To do page lists what it shows
+      if (liveNow) { c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice(), baked: !!(c.__a11y && c.__a11y.baked && c.__a11y.live === liveNow) }; fillTodo(); if (!checking) keepA11y(); }   // the To do page lists what it shows
       // Its switch carries the alert icon while anything on it is to fix or to check, as the area counts it.
       var open = a11yOpen(c, staticItems.concat(liveItems), liveNow);
       areaMark(sec.querySelector('.pg-areas [data-v="a11y"]'), open.todo, open.say);
@@ -2634,7 +2659,7 @@ a.pg-usage-name { color: var(--sg-text); }
       a11ySumEl.innerHTML = [['todo', 'to fix'], ['check', 'to check'], ['done', 'done']].filter(function (x) { return n[x[0]]; })
         .map(function (x) { return '<span class="pg-par-status pg-par--' + STATUS[x[0]][2] + '"><span class="pg-par-sign" aria-hidden="true">' + STATUS[x[0]][0] + '</span>' + n[x[0]] + ' ' + x[1] + '</span>'; }).join('');
       var ch = c.a11y && c.a11y.checked;
-      a11yNote.textContent = 'The WCAG 2.1 criteria at level A and AA that apply to it' + (liveNow ? ', every variant tried in this page' : '') + '. ' +
+      a11yNote.textContent = 'The WCAG 2.1 criteria at level A and AA that apply to it' + (liveNow ? (c.__a11y && c.__a11y.baked ? ', every variant tried in a browser when this page was built' : ', every variant tried in this browser') + (liveNow.at ? ' (' + when(liveNow.at) + ')' : '') : '') + '. ' +
         (!ch ? 'The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.' : ch.notRead ? 'The last audit (' + when(ch.at) + ') could not check it: it was not drawn on the page it opened.' : 'Last audit in a browser ' + when(ch.at) + '.') +
         ((c.a11y && c.a11y.excused || []).length ? ' Not asked of it, ' + c.a11y.excused.map(function (x) { return x.says + ' (' + x.reason + ')'; }).join('; ') + '.' : '');
     }
@@ -2665,6 +2690,7 @@ a.pg-usage-name { color: var(--sg-text); }
     };
     function checkLive() {
       if (ALL || !a11yEl || !cur || (areaNow !== 'a11y' && !bgRun)) return;
+      if (!bgRun && c.__a11y && c.__a11y.live) return;   // tried already, by the build or in this browser: its results stand
       // Tried once the page has started: the system's scripts, which run after this one, add their own elements, and one
       // added during a hover would be taken for what the hover shows.
       if (document.readyState !== 'complete') { if (!checkLive.waiting) { checkLive.waiting = true; window.addEventListener('load', function () { setTimeout(function () { checkLive.waiting = false; checkLive(); }, 50); }); } return; }

@@ -80,7 +80,7 @@ test('the browser check tries every variant of a Vue component, rendered by the 
 
 test('the style guide draws a Vue component as the project\'s own Vite renders it, its SCSS compiled', { skip: READY, timeout: 300000 }, () => {
   const dir = harbor('vue-sg-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /4 of 4 Vue components drawn as the project's own Vite renders them\./);
   const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
@@ -90,6 +90,6 @@ test('the style guide draws a Vue component as the project\'s own Vite renders i
   // Without the packages, its template is read as before, and the summary says why.
   const bare = mkdtempSync(join(tmpdir(), 'vue-sg-bare-'));
   cpSync(HARBOR, bare, { recursive: true });
-  const b = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: bare, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  const b = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: bare, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.match(b.stdout, /Vue components drawn from their templates: the project has no vue package installed\./);
 });

@@ -41,7 +41,7 @@ withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | '
 </script>
 <template><button :class="['hb-button', { 'hb-button--secondary': variant === 'Secondary' }]" type="button">{{ label }}<HbBadge /></button></template>
 `);
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   const out = r.stdout + r.stderr;
   assert.match(out, /🖼 {2}Style guide of button → \.design-system-engine-out\/styleguide\/button\.html {2}\(and the component it nests: badge · the engine's template\)/, out);
   assert.match(out, /The whole system's style guide: rms-design-system-engine --styleguide/);
