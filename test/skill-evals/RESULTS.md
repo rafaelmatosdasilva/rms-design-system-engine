@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The style guide's accessibility check finishes and reaches the guide (continuous evaluation)
+
+What changed since the entry below (engine 77fc968): The browser check on a style guide runs in parts of six components and forces states at once, keeps what it found when out of time, and acts only on drawn components; the audit waits for its own limit; the guide's own switches, slot areas, long names and pictures pass the checks it runs. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `59b9d35345b9` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7ab28d4 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.055 |
+| Input a run | 93k | 90k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 90k a run against 93k. Records: `records/2026-10-11-accessibility-the-style-guide-s`.
+
 ## 2026-10: Accessibility: one run is the whole check, on main's style guide (continuous evaluation)
 
 What changed since the entry below (engine 45668bd): Style guide: one issue table for the To do page, Parity and Accessibility; To do keeps what the browser tried; Style guide: accessibility tried while the page is built, so it opens with the final results. The guide changed in `reference/config.md`, `reference/usage.md`.

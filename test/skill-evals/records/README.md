@@ -79,5 +79,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-11-style-guide-accessibility-tried-while` | The 21 guide tasks on Haiku (engine e645170) | "The style guide opens with its accessibility already tried; one issue table for To do, Parity and Accessibility" |
 | `2026-10-11-accessibility-one-run-is-the` | The 21 guide tasks on Haiku (engine 45668bd) | "Accessibility: one run is the whole check, against WCAG 2.2 AA" |
 | `2026-10-11-merge-main-into-claude-nifty` | The 21 guide tasks on Haiku (engine 77fc968) | "Accessibility: one run is the whole check, on main's style guide" |
+| `2026-10-11-accessibility-the-style-guide-s` | The 21 guide tasks on Haiku (engine 7ab28d4) | "The style guide's accessibility check finishes and reaches the guide" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
