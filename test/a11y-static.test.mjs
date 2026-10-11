@@ -1,7 +1,7 @@
 // I34: accessibility checks that need no browser. What they find, and the look-alikes they leave alone.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { markupFindings, cssFindings, styleOnly, staticA11y } from '../a11y-static.mjs';
+import { markupFindings, cssFindings, styleOnly, staticA11y, focusIndex, classTags } from '../a11y-static.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const kinds = (xs) => xs.map((x) => [x.line, x.kind]);
@@ -82,6 +82,25 @@ test('a removed focus outline must be put back somewhere', () => {
 test('a component file keeps its own line numbers', () => {
   const vue = '<template>\n<div/>\n</template>\n<style>\n.c { outline: none; }\n</style>\n';
   assert.deepEqual(kinds(cssFindings(styleOnly(vue))), [[5, 'focus']]);
+});
+
+test('E36: an outline taken off a class is put back by a more specific rule for every element of its kind', () => {
+  const css = '.quiet { outline: none; }\nbutton:focus-visible { outline: 2px solid; }';
+  const on = (markup) => kinds(cssFindings('.quiet { outline: none; }', focusIndex(css, { tags: classTags([markup]) })));
+  assert.deepEqual(on('<button class="quiet">Go</button>'), []);                                   // button:focus-visible beats one class
+  assert.deepEqual(on('<div class="quiet" tabindex="0">Go</div>'), [[1, 'focus']]);                 // a div gets no button rule
+  assert.deepEqual(on('<button class="quiet">Go</button><a class="quiet" href="/">Go</a>'), [[1, 'focus']]);   // not every element it is put on
+  assert.deepEqual(on('const b = `<button class="${size} quiet">Go</button>`;'), []);              // markup a script writes
+  assert.deepEqual(kinds(cssFindings('.quiet { outline: none; }', focusIndex(css))), [[1, 'focus']]);   // which element is not known
+  // As specific or more: the rule taking the outline off wins, and is reported.
+  const tie = '.quiet { outline: none; }\n:focus-visible { outline: 2px solid; }';
+  assert.deepEqual(kinds(cssFindings('.quiet { outline: none; }', focusIndex(tie, { tags: classTags(['<button class="quiet">Go</button>']) }))), [[1, 'focus']]);
+  assert.deepEqual(kinds(cssFindings('button.quiet { outline: none; }', focusIndex('button.quiet { outline: none; }\nbutton:focus-visible { outline: 2px solid; }'))), [[1, 'focus']]);
+  // A rule that takes it off on focus itself is never put back by the element-wide one.
+  assert.deepEqual(kinds(cssFindings('.quiet:focus-visible { outline: none; }', focusIndex('.quiet:focus-visible { outline: none; }\nbutton:focus-visible { outline: 2px solid; }', { tags: classTags(['<button class="quiet">Go</button>']) }))), [[1, 'focus']]);
+  // Read across the project: the class's markup in a page, the rules in the theme.
+  const dir = makeFixture({ 'src/theme.css': css, 'src/page.html': '<main><h1>T</h1><button class="quiet">Go</button></main>' });
+  assert.deepEqual(staticA11y(dir).findings.filter((f) => f.kind === 'focus'), []);
 });
 
 test('the whole project: files found on their own, build output and dependencies skipped', () => {
