@@ -1,5 +1,35 @@
 # Skill evaluation results
 
+## 2026-10: Accessibility: one run is the whole check, on main's style guide (continuous evaluation)
+
+What changed since the entry below (engine 45668bd): Style guide: one issue table for the To do page, Parity and Accessibility; To do keeps what the browser tried; Style guide: accessibility tried while the page is built, so it opens with the final results. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `352229c420b3` · Project measured: `13d811a9d668`
+
+| Haiku, engine 77fc968 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.056 |
+| Input a run | 108k | 93k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 108k. Records: `records/2026-10-11-merge-main-into-claude-nifty`.
+
+## 2026-10: Accessibility: one run is the whole check, against WCAG 2.2 AA (continuous evaluation)
+
+What changed since the entry below (engine 293d460): The demo's golden report carries each finding's severity and the verdict; a comment names no system's component; Accessibility: one run is the whole check, against WCAG 2.2 AA. The guide changed in `cookbook/a11y-notes.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `d54534d2c552` · Project measured: `13d811a9d668`
+
+| Haiku, engine 45668bd | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.058 |
+| Input a run | 106k | 108k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 106k. Records: `records/2026-10-11-accessibility-one-run-is-the`.
+
 ## 2026-10: The style guide opens with its accessibility already tried; one issue table for To do, Parity and Accessibility (continuous evaluation)
 
 What changed since the entry below (engine 293d460): The style guide's To do page, Parity and Accessibility areas share one issue table (issue number, area, Figma, code, what to do with who acts, status with when), and --styleguide tries every component's accessibility in a browser while it builds the page and keeps the results in it, so the page opens with its final results. The guide changed in `reference/config.md`, `reference/usage.md`.

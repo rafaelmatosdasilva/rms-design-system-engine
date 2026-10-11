@@ -3090,7 +3090,9 @@ function reportFull(label, items, shown) {
   const A11Y_JSON = join(ROOT, OUT_DIR, 'a11y.json');
   try { unlinkSync(A11Y_JSON); } catch { /* not there */ }
   // Building a component: every accessibility line is listed element by element, as it is part of building it.
-  const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') || (cfg.build === true && SCOPE_COMPONENTS.length) ? ['--a11y'] : []), '--json-out', A11Y_JSON];
+  // axe-core's rules and the hover, focus and pressed states run in every accessibility check: --no-axe, --no-states leave one out.
+  const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') || (cfg.build === true && SCOPE_COMPONENTS.length) ? ['--a11y'] : []),
+    ...['--no-axe', '--no-states'].filter((f) => process.argv.includes(f)), '--json-out', A11Y_JSON];
 
   // Code capture: the code side read once per run (code-capture.mjs), the mirror of the Figma
   // capture. Cached by content, so an unchanged project reuses it at once. Gates that need facts
@@ -4629,7 +4631,10 @@ function reportFull(label, items, shown) {
     // Where every difference is listed (written by a full audit above), so the chat always says where to look.
     let diffLine = '';
     try { const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8')); if (!ONLY && !_scopeNames.length && d.total) diffLine = `\nEvery difference between Figma and the code, ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list: ${OUT_DIR}/differences.md\n`; } catch { /* none written */ }
-    summary = summary.replace(/\n(NEXT:)/, `${diffLine}\n$1`);
+    // The accessibility verdict and its problems, kind by kind, so the chat carries the result and not only a count.
+    let a11yBlock = '';
+    try { const { a11ySummaryLines } = await import('./a11y-check.mjs'); const l = a11ySummaryLines(JSON.parse(readFileSync(A11Y_JSON, 'utf8'))); if (l.length) a11yBlock = `\n${l.join('\n')}\n`; } catch { /* no browser this run */ }
+    summary = summary.replace(/\n(NEXT:)/, `${a11yBlock}${diffLine}\n$1`);
     writeFileSync(join(ROOT, OUT_DIR, 'summary.md'), summary);
     console.log(`\n${C.bold(`─── SUMMARY (relay this in the chat as is; also in ${OUT_DIR}/summary.md) ───`)}\n\n${summary}`);
   } catch { /* the full report above still stands */ }

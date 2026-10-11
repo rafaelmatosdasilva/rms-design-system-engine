@@ -17,7 +17,7 @@
 // rebuilds it first (via styleguide-gen.mjs) so a11y never audits a stale one.
 //
 // It checks:
-//   1. Contrast   — WCAG 2.1 AA ratio of each text leaf's computed color vs its EFFECTIVE
+//   1. Contrast   — WCAG AA ratio of each text leaf's computed color vs its EFFECTIVE
 //                   (composited) background; normal >= 4.5:1, large >= 3:1. Per theme.
 //   2. Name/role  — every interactive node in the accessibility tree has a non-empty accessible
 //                   name and a resolvable role (a component not exposing aria / an icon-button
@@ -40,12 +40,18 @@
 //                   icon drawn for the light theme that disappears in the dark one.
 //
 // Output is plain language, no jargon: each issue says what is wrong, why it matters, and what to
-// do. `--a11y` adds the exact elements; `--json` emits a machine-readable record for an agent/CI.
-// `--axe` (or ds-config a11y.axe:true) also runs axe-core (fetched from a CDN, no npm dep) for the
-// broader WCAG rules the five checks above do not cover — non-text contrast, target size, duplicate
-// ids, ARIA validity, heading order, labels — reported as an extra advisory section. `--states`
-// (or a11y.interactionStates:true) forces :hover and re-measures, flagging text that reads fine at
-// rest but fails contrast while hovered.
+// do. `--a11y` adds the exact elements and what a screen reader says for each component; `--json` emits a
+// machine-readable record for an agent/CI.
+//
+// One run is the whole check, against WCAG 2.2 at A and AA. axe-core (downloaded once, pinned, cached; no npm dep)
+// runs its WCAG rules, the experimental ones that stand for a criterion and its best practices on the same page, and
+// what only it finds is a finding of its own, an element both report said once. Every control is measured again while
+// hovered, focused and pressed, in every colour mode. Beyond the seven checks above and the deeper ones below: what a
+// script makes clickable that Tab never reaches, a trap that goes round a few controls or holds with Shift+Tab, target
+// size by the WCAG circle in every mode (44px as advice), each component on a 320px screen, text that spills when the
+// spacing grows, a password field that refuses paste, dragging with no other way, high-contrast mode, colour vision,
+// every element accounted for, and what a screen reader says. `--no-axe`, `--no-states` (or a11y.axe /
+// a11y.interactionStates false) leave a part out, and the verdict then says not all of it was checked.
 //
 // Advisory by default (never fails the audit); `ds-config.json → a11yStrict: true` promotes
 // findings to a hard fail (exit 1). Skips cleanly (exit 0) when no browser is available — never
@@ -54,17 +60,15 @@
 // No npm dependencies (Node >= 22 built-in WebSocket). Honors No-imposed-structure: findings
 // come from measured pixels and the accessibility tree, not from any presumed token/tier model.
 //
-// NOT yet (v2, by design):
-//   - Non-text contrast (WCAG 1.4.11, >= 3:1): the focus ring (check 3), icons (check 7) and control edges
-//     (wcag-page.js) are checked natively, control edges in the first mode only; graphics come from --axe.
-//   - Live pseudo-class states: :hover text contrast is forced with --states (first mode); :focus and :active
-//     text, and edges in those states, are not measured yet.
-//   - Reading order, skip links, landmark completeness — and anything the render cannot reveal:
-//     only when the project declares it in ds-config.json, never imposed (No-imposed-structure).
+// NOT yet, by design:
+//   - Text laid over a sibling or a pseudo-element: its background is taken from its ancestors.
+//   - Contrast in every combination of two mode switches (dark with high contrast): each declared mode is measured.
+//   - Reading order, skip links, landmark completeness beyond axe-core's best practices — and anything the render
+//     cannot reveal: only when the project declares it in ds-config.json, never imposed (No-imposed-structure).
 
 import { appDir } from './code-roots.mjs';
 import './stdio-sync.mjs';   // the whole report reaches a pipe before process.exit
-import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync, renameSync } from 'fs';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { gunzipSync } from 'zlib';
@@ -173,6 +177,70 @@ export const INTERACTIVE_ROLES = new Set([
   'listbox', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'slider', 'spinbutton', 'tab', 'option',
 ]);
 
+// One text leaf's reading: its ratio against what it sits on and the ratio it needs, or why it could not be read.
+// → { ratio, threshold } | { cannot } | null (see-through text: nothing drawn)
+export function measureText(el) {
+  if (el.bgImage) return { cannot: 'background-image/gradient' };
+  const unread = [el.color, ...(el.bgLayers ?? [])].find((c) => typeof c === 'string' && !parseColor(c));
+  if (unread) return { cannot: `colour space not read (${unread.slice(0, 40)})` };
+  const fg = parseColor(el.color);
+  if (fg.a === 0) return null;
+  const bg = effectiveBg(el.bgLayers);
+  return { ratio: Math.round(contrastRatio(fg.a < 1 ? over(fg, bg) : fg, bg) * 100) / 100, threshold: aaThreshold(el.fontSize, el.fontWeight) };
+}
+// Every element the sweep measured in one mode, with its verdict: what was read, not only what failed.
+// → [{ el, component, what: 'text' | 'icon', theme, ratio, needs, verdict: 'passes' | 'fails' | 'not measured' }]
+export function accountFor(textEls = [], iconEls = [], theme) {
+  const split = (d) => { const m = String(d ?? '').match(/^(.*?)(?: in ([^ ]+))?$/); return { el: m[1], component: m[2] ?? null }; };
+  const out = [];
+  for (const t of textEls) {
+    const m = measureText(t);
+    if (!m) continue;
+    out.push({ ...split(t.desc), what: 'text', theme, ...(m.cannot ? { verdict: 'not measured', why: m.cannot } : { ratio: m.ratio, needs: m.threshold, verdict: m.ratio + 1e-9 < m.threshold ? 'fails' : 'passes' }) });
+  }
+  for (const i of iconEls) {
+    const fg = parseColor(i.color);
+    if (!fg || fg.a === 0 || i.bgImage) continue;
+    const bg = effectiveBg(i.bgLayers);
+    const ratio = Math.round(contrastRatio(fg.a < 1 ? over(fg, bg) : fg, bg) * 100) / 100;
+    out.push({ ...split(i.desc), what: 'icon', theme, ratio, needs: 3, verdict: ratio + 1e-9 < 3 ? 'fails' : 'passes' });
+  }
+  return out;
+}
+
+// How people with a colour vision deficiency see a colour (Machado, Oliveira and Fernandes 2009, full severity), on linear
+// RGB: the matrices Chrome's own vision simulator and Stark use.
+export const CVD = {
+  protanopia: { says: 'people who do not see red (protanopia)', m: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]] },
+  deuteranopia: { says: 'people who do not see green (deuteranopia)', m: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]] },
+  tritanopia: { says: 'people who do not see blue (tritanopia)', m: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]] },
+};
+const linear = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+// The relative luminance of a colour as one deficiency sees it.
+export function cvdLuminance({ r, g, b }, kind) {
+  const c = [linear(r), linear(g), linear(b)], m = CVD[kind].m;
+  const [R, G, B] = m.map((row) => Math.min(1, Math.max(0, row[0] * c[0] + row[1] * c[1] + row[2] * c[2])));
+  return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+}
+// Text that passes WCAG and that one colour vision deficiency can no longer read: the worst of the three, an advisory
+// (WCAG's ratio is already meant for most people; this says who it leaves out). Pure, like contrastFindings.
+export function cvdFindings(textEls, theme) {
+  const out = [];
+  for (const el of textEls) {
+    const m = measureText(el);
+    if (!m || m.cannot || m.ratio + 1e-9 < m.threshold) continue;
+    const fg0 = parseColor(el.color), bg = effectiveBg(el.bgLayers), fg = fg0.a < 1 ? over(fg0, bg) : fg0;
+    let worst = null;
+    for (const kind of Object.keys(CVD)) {
+      const a = cvdLuminance(fg, kind), b = cvdLuminance(bg, kind);
+      const ratio = Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100;
+      if (ratio + 1e-9 < m.threshold && (!worst || ratio < worst.ratio)) worst = { kind, ratio };
+    }
+    if (worst) out.push({ kind: 'cvdcontrast', theme, desc: el.desc, text: el.text, ratio: worst.ratio, threshold: m.threshold, vision: worst.kind });
+  }
+  return out;
+}
+
 // Turn one theme's captured text leaves into contrast findings (pure; the heart of the gate).
 export function contrastFindings(textEls, theme) {
   const out = [];
@@ -244,6 +312,26 @@ export const A11Y_GUIDE = {
     why: 'When the mouse is over the control its colours change to something too faint — readable at rest, but not while it is being used.',
     fix: 'Give the hover state the same care as the normal state: keep the text at least 4.5 times the contrast of its background.',
   },
+  statecontrast: {
+    title: (n) => `${plural(n, 'control becomes', 'controls become')} hard to read when focused or pressed`,
+    why: 'While the keyboard is on the control, or while it is pressed, its colours change to something too faint: readable at rest, but not while it is being used.',
+    fix: 'Give the focused and pressed states the same care as the normal state: keep the text at least 4.5 times the contrast of its background (3 times for large text).',
+  },
+  cvdcontrast: {
+    title: (n) => `${plural(n, 'piece of text is', 'pieces of text are')} hard to read for people who are colour blind`,
+    why: 'The text passes WCAG, but for people who do not see red, green or blue its colour comes too close to its background (red on black is the usual case), as a colour-blindness simulator shows it.',
+    fix: 'Make the text lighter or darker against its background, not only a different hue: a lightness gap reads for everyone.',
+  },
+  forcedcontrast: {
+    title: (n) => `${plural(n, 'icon or text disappears', 'icons or texts disappear')} in high-contrast mode`,
+    why: 'Windows high-contrast mode paints the page in the person\'s own colours. An icon drawn as a background colour (a CSS mask) takes the page\'s colour and vanishes, and text kept in a fixed colour can no longer be told from its background.',
+    fix: 'Draw icons in currentColor (an SVG fill, or a mask with background-color: currentColor), or keep them with forced-color-adjust: none and a colour the mode allows (CanvasText).',
+  },
+  stateedge: {
+    title: (n) => `${plural(n, 'control edge fades', 'control edges fade')} when hovered, focused or pressed`,
+    why: 'The border of a field, a checkbox, a radio or a switch stands out at rest, but in one of its states it comes too close to what is around it, so people with low vision lose the control while using it.',
+    fix: 'Keep the edge in every state at least 3 times the contrast of the background around it (the state\'s border or fill token).',
+  },
   ariastate: {
     title: (n) => `${plural(n, 'control shows', 'controls show')} their state only by looks`,
     why: 'Something is marked selected, checked or open only with colour or a CSS class, so a screen reader never announces that state.',
@@ -258,6 +346,11 @@ export const A11Y_GUIDE = {
     title: (n) => `${plural(n, 'control is', 'controls are')} too small to tap or click reliably`,
     why: 'A control smaller than 24 by 24 pixels, with other controls close by, is easy to miss or to hit the wrong one — hard for anyone with a tremor or on a touch screen.',
     fix: 'Make the control at least 24 by 24 pixels (padding counts), or keep 24 pixels of space around it.',
+  },
+  target44: {
+    title: (n) => `${plural(n, 'control is', 'controls are')} smaller than a comfortable touch target`,
+    why: 'Between 24 and 44 pixels a control passes WCAG AA, but on a touch screen a finger covers about 44 pixels: people with a tremor, or on the move, miss it or hit the one beside it.',
+    fix: 'Where it is used on touch screens, make the control at least 44 by 44 pixels (its padding or an invisible hit area counts).',
   },
   tabtrap: {
     title: (n) => `${plural(n, 'place traps', 'places trap')} the keyboard`,
@@ -345,7 +438,7 @@ export const A11Y_GUIDE = {
     fix: 'Render what the annotation says, or update the annotation in Figma if the design changed.',
   },
   reflow: {
-    title: (n) => `${plural(n, 'page scrolls', 'pages scroll')} sideways on a narrow screen`,
+    title: (n) => `${plural(n, 'page or component does', 'pages or components do')} not fit a narrow screen`,
     why: 'At 320 pixels wide (a phone, or a page zoomed to 400%) the content does not fit, so people have to scroll in two directions to read it.',
     fix: 'Let the layout wrap or stack at narrow widths instead of keeping a fixed width.',
   },
@@ -378,17 +471,99 @@ export const A11Y_GUIDE = {
 // label, an action on pointerdown): it can be wrong. An advisory is beyond AA (a focus ring under 2px, motion the
 // person asked to reduce) or only a person can judge it (text on an image, measured by eye). A kind not listed is a
 // warning.
-export const A11Y_BLOCKER = new Set(['contrast', 'hovercontrast', 'iconcontrast', 'boundary', 'focuscontrast', 'name', 'focus', 'keyboard', 'tabtrap', 'target', 'zoom', 'reflow', 'spacing', 'obscured',
-  'escape', 'focusreturn', 'activate', 'arrows', 'textalt', 'captions', 'autoaudio', 'dupid', 'aria', 'emptylabel', 'labelname', 'context', 'hovercontent', 'onfocus', 'oninput', 'pause', 'flash']);
-export const A11Y_ADVISORY = new Set(['focusthin', 'motion']);
+export const A11Y_BLOCKER = new Set(['contrast', 'hovercontrast', 'statecontrast', 'stateedge', 'iconcontrast', 'boundary', 'focuscontrast', 'name', 'focus', 'keyboard', 'tabtrap', 'target', 'zoom', 'reflow', 'spacing', 'obscured',
+  'escape', 'focusreturn', 'activate', 'arrows', 'textalt', 'captions', 'autoaudio', 'dupid', 'aria', 'emptylabel', 'labelname', 'context', 'hovercontent', 'onfocus', 'oninput', 'pause', 'flash', 'authpaste']);
+export const A11Y_ADVISORY = new Set(['focusthin', 'motion', 'target44', 'cvdcontrast']);
 export const severityOf = (kind) => (A11Y_BLOCKER.has(kind) ? 'blocker' : A11Y_ADVISORY.has(kind) ? 'advisory' : 'warning');
+// A bucket's severity: an axe-core rule carries its own (from its impact), every other kind the one above.
+export const bucketSeverity = (kind, list = []) => list[0]?.severity ?? severityOf(kind);
 const SEVERITY_ORDER = { blocker: 0, warning: 1, advisory: 2 };
+// The order the report lists the kinds in, within each severity; a kind not listed comes after these.
+export const A11Y_ORDER = ['contrast', 'hovercontrast', 'statecontrast', 'iconcontrast', 'name', 'focus', 'focuscontrast', 'ariastate', 'keyboard', 'tooltipname', 'target', 'tabtrap', 'tabindex',
+  'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole',
+  'behaviour', 'statefollows', 'forcedcontrast', 'target44', 'cvdcontrast'];
+// The kinds whose same element failing the same way in many places is one finding with a count.
+export const A11Y_GROUPED = new Set(['contrast', 'hovercontrast', 'statecontrast', 'iconcontrast', 'cvdcontrast']);
 const SEVERITY_WORD = { blocker: 'Blocker', warning: 'Warning', advisory: 'Advisory' };
+// What a screen reader says for one accessibility node, the way VoiceOver and NVDA read it in browse mode: its role,
+// its name, its value and its states ("checkbox, Remember me, not checked"). null for a node read as nothing (a plain
+// element, an ignored one). → string | null
+const SAID_ROLE = { image: 'image', img: 'image', textbox: 'edit text', searchbox: 'search text', combobox: 'combo box', listbox: 'list box', menuitem: 'menu item',
+  menuitemcheckbox: 'menu item checkbox', menuitemradio: 'menu item radio', tablist: 'tab list', tabpanel: 'tab panel', radiogroup: 'radio group', spinbutton: 'stepper',
+  progressbar: 'progress bar', columnheader: 'column header', rowheader: 'row header', alertdialog: 'alert dialog', listitem: 'list item', contentinfo: 'footer', banner: 'header' };
+const SILENT_ROLE = /^(generic|none|presentation|StaticText|InlineTextBox|LineBreak|RootWebArea|WebArea|LabelText|paragraph|Section|ignored|Unknown)$/i;
+export function spokenLine(n) {
+  if (!n || n.ignored) return null;
+  const role = String(n.role?.value ?? '');
+  const prop = (k) => n.properties?.find((p) => p.name === k)?.value?.value;
+  if (role === 'StaticText') { const t = String(n.name?.value ?? '').trim(); return t ? `"${t.slice(0, 80)}"` : null; }
+  if (SILENT_ROLE.test(role) || (role === 'group' && !n.name?.value)) return null;
+  const parts = [SAID_ROLE[role] ?? role];
+  const name = String(n.name?.value ?? '').trim();
+  if (name) parts.push(name.slice(0, 80));
+  const value = String(n.value?.value ?? prop('valuetext') ?? '').trim();
+  if (value && value !== name) parts.push(value.slice(0, 40));
+  const level = prop('level'); if (role === 'heading' && level) parts.push(`level ${level}`);
+  const checked = prop('checked'); if (checked != null && /checkbox|radio|switch|menuitem/.test(role)) parts.push(checked === 'mixed' ? 'partly checked' : checked === 'true' || checked === true ? (role === 'switch' ? 'on' : 'checked') : (role === 'switch' ? 'off' : 'not checked'));
+  const pressed = prop('pressed'); if (pressed != null) parts.push(pressed === 'true' || pressed === true ? 'pressed' : pressed === 'mixed' ? 'partly pressed' : 'not pressed');
+  const expanded = prop('expanded'); if (expanded != null) parts.push(expanded === true || expanded === 'true' ? 'expanded' : 'collapsed');
+  if (prop('selected') === true && /tab|option|row|cell|treeitem/.test(role)) parts.push('selected');
+  if (prop('required') === true) parts.push('required');
+  if (prop('invalid') && prop('invalid') !== 'false') parts.push('invalid entry');
+  if (prop('disabled') === true) parts.push('unavailable');
+  return parts.join(', ');
+}
+// Where a walk of Tab presses gets stuck, from the focus after each press ('index|tag#id.class', null on the page
+// itself): on one control three presses running, or going round a few controls (2 to 6) three times while the page has
+// more stops than those. A round that passes the page itself (null) is the browser going back to the top: not a trap.
+// → { at } | { cycle: [desc], ids: [index] } | null
+export function tabTrap(seq = [], { stops = 0 } = {}) {
+  const distinct = new Set(seq.filter(Boolean));
+  for (let i = 2; i < seq.length; i++) if (seq[i] && seq[i] === seq[i - 1] && seq[i] === seq[i - 2] && distinct.size > 1) return { at: seq[i].split('|').slice(1).join('|') };
+  for (let p = 2; p <= 6; p++) {
+    const tail = seq.slice(-3 * p);
+    if (tail.length < 3 * p || tail.some((x) => !x)) continue;
+    if (!tail.every((x, i) => i < p || x === tail[i - p])) continue;
+    const round = tail.slice(0, p);
+    if (new Set(round).size !== p || stops <= p) continue;
+    return { cycle: round.map((x) => x.split('|').slice(1).join('|')), ids: round.map((x) => Number(x.split('|')[0])) };
+  }
+  return null;
+}
+// The words for a bucket: the engine's own guide, or an axe-core rule in its own words (what it checks, what failed).
+export function guideFor(kind, list = []) {
+  if (A11Y_GUIDE[kind]) return A11Y_GUIDE[kind];
+  const f = list[0] ?? {};
+  return { title: () => `${f.help ?? kind}${f.rule ? ` (axe-core ${f.rule}${f.wcag ? `, WCAG ${f.wcag}` : ''})` : ''}`, why: f.why ?? '', fix: f.fix ?? '' };
+}
+// The accessibility result in the run's summary, the one the chat relays: the verdict, then each kind of problem with
+// how many and the components it is in, blockers first. `result` is the check's --json result.
+export function a11ySummaryLines(result, { max = 6 } = {}) {
+  if (!result?.verdict) return [];
+  const groups = new Map();
+  for (const i of result.issues ?? []) {
+    const g = groups.get(i.issue) ?? { kind: i.issue, severity: i.severity ?? severityOf(i.issue), n: 0, components: new Set(), rec: i };
+    g.n++;
+    if (i.component) g.components.add(i.component);
+    groups.set(i.issue, g);
+  }
+  const rows = [...groups.values()].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || b.n - a.n);
+  const lines = [`**Accessibility.** ${result.verdict.line}.`];
+  for (const g of rows.slice(0, max)) {
+    const where = [...g.components];
+    lines.push(`- ${SEVERITY_WORD[g.severity]}: ${guideFor(g.kind, [g.rec]).title(g.n)}${where.length ? ` (${where.slice(0, 4).join(', ')}${where.length > 4 ? ` and ${where.length - 4} more` : ''})` : ''}`);
+  }
+  if (rows.length > max) lines.push(`- and ${rows.length - max} more kind${rows.length - max === 1 ? '' : 's'} of problem, each with its fix in the report above`);
+  if (result.notRead?.length) lines.push(`- Not all of it checked: ${result.notRead.slice(0, 2).join('; ')}${result.notRead.length > 2 ? `; and ${result.notRead.length - 2} more` : ''}`);
+  if (result.leftOut?.length) lines.push(`- Left out of this run: ${result.leftOut.join('; ')}`);
+  return lines;
+}
 // The one line a run ends with: how many of each, against what. `buckets` [[kind, findings]], `cannot` the texts that
 // could not be measured (each an advisory), `partial` when part of the page was not checked.
-export function a11yVerdict(buckets, { cannot = 0, partial = false, target = 'WCAG 2.1 AA' } = {}) {
+export const A11Y_TARGET = 'WCAG 2.2 AA';
+export function a11yVerdict(buckets, { cannot = 0, partial = false, target = A11Y_TARGET } = {}) {
   const n = { blocker: 0, warning: 0, advisory: cannot };
-  for (const [kind, list] of buckets) n[severityOf(kind)] += list.length;
+  for (const [kind, list] of buckets) n[bucketSeverity(kind, list)] += list.length;
   const word = (k, one, many) => `${n[k]} ${n[k] === 1 ? one : many}`;
   const line = [word('blocker', 'blocker', 'blockers'), word('warning', 'warning', 'warnings'), word('advisory', 'advisory', 'advisories'), target].join(' · ') + (partial ? ' · not all of it checked' : '');
   return { blockers: n.blocker, warnings: n.warning, advisories: n.advisory, target, partial, line };
@@ -402,9 +577,13 @@ export function a11yItemLine(kind, f) {
   }
   if (kind === 'focuscontrast') return `${f.desc} — its focus outline scores ${f.ratio} out of 21, needs at least ${f.threshold}`;
   if (kind === 'iconcontrast') return `${f.desc} — the icon scores ${f.ratio} out of 21 against its background, needs at least ${f.threshold} (${f.theme} theme)${f.places > 1 ? `, in ${f.places} places` : ''}`;
-  if (kind === 'hovercontrast') { const what = f.text ? `the text "${f.text}"` : (f.desc || 'text'); return `${what} on hover — its readability score is ${f.ratio} out of 21, needs at least ${f.threshold}`; }
+  if (kind === 'hovercontrast') { const what = f.text ? `the text "${f.text}"` : (f.desc || 'text'); return `${what} on hover — its readability score is ${f.ratio} out of 21, needs at least ${f.threshold}${f.theme ? ` (${f.theme} theme)` : ''}`; }
+  if (kind === 'cvdcontrast') { const what = f.text ? `the text "${f.text}"` : (f.desc || 'text'); return `${what} — ${f.ratio} out of 21 for ${CVD[f.vision]?.says ?? f.vision}, needs ${f.threshold} (${f.theme} theme)${f.places > 1 ? `, in ${f.places} places` : ''}`; }
+  if (kind === 'forcedcontrast') return `${f.what === 'text' && f.text ? `the text "${f.text}"` : f.desc} — ${f.ratio} out of 21 in high-contrast mode, needs ${f.threshold}`;
+  if (kind === 'statecontrast') { const what = f.text ? `the text "${f.text}"` : (f.desc || 'text'); return `${what} when ${f.state ?? 'focused'} — its readability score is ${f.ratio} out of 21, needs at least ${f.threshold}${f.theme ? ` (${f.theme} theme)` : ''}`; }
   if (kind === 'name') return `${A11Y_ROLE_WORD[f.role] || `A ${f.role || 'control'}`} with no label`;
-  if (kind === 'target') return `${f.desc} — ${f.size} with another control within 24 pixels`;
+  if (kind === 'target') return `${f.desc} — ${f.size} with another control within 24 pixels${f.modes && f.modes.length ? ` (${f.modes.join(', ')})` : ''}`;
+  if (kind === 'target44') return `${f.desc} — ${f.size}${f.places > 1 ? `, in ${f.places} places` : ''}${f.modes && f.modes.length ? ` (${f.modes.join(', ')})` : ''}`;
   if (kind === 'semantics') return `${f.desc} — announced as "${f.got}", the contract says "${f.want}"`;
   const where = f.modes && f.modes.length > 1 ? ` (${f.modes.join(', ')})` : '';
   return f.desc + where + (f.places > 1 ? `, in ${f.places} places` : '');   // focus / ariastate / keyboard / motion … — the CSS selector locates the element
@@ -414,7 +593,7 @@ export function a11yItemLine(kind, f) {
 export function groupSame(list) {
   const by = new Map();
   for (const f of list) {
-    const k = [f.desc, f.theme, f.ratio, f.threshold].join('|');
+    const k = [f.desc, f.theme, f.ratio, f.threshold, f.state, f.vision].join('|');
     const g = by.get(k);
     if (!g) { by.set(k, { ...f, places: 1, texts: f.text ? [f.text] : [] }); continue; }
     g.places++;
@@ -425,13 +604,16 @@ export function groupSame(list) {
 // Structured record for --json (machines / an agent that fixes the code): exact locator +
 // numbers + the fix. Same facts as the plain lines, but parseable.
 export function a11yFindingRecord(kind, f) {
-  const rec = { issue: kind, severity: severityOf(kind), selector: f.desc ?? null, fix: A11Y_GUIDE[kind]?.fix ?? null };
-  if (WCAG21_KIND[kind]) rec.wcag = WCAG21_KIND[kind];
-  if (kind === 'contrast' || kind === 'hovercontrast') { rec.theme = f.theme ?? null; rec.text = f.text ?? null; rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
+  const rec = { issue: kind, severity: f.severity ?? severityOf(kind), selector: f.desc ?? null, fix: f.fix ?? A11Y_GUIDE[kind]?.fix ?? null };
+  if (f.wcag ?? WCAG21_KIND[kind]) rec.wcag = f.wcag ?? WCAG21_KIND[kind];
+  if (f.rule) { rec.rule = f.rule; rec.help = f.help; rec.url = f.url; rec.elements = f.elements; }
+  if (f.state) rec.state = f.state;
+  if (f.vision) rec.vision = f.vision;
+  if (kind === 'contrast' || kind === 'hovercontrast' || kind === 'statecontrast' || kind === 'cvdcontrast') { rec.theme = f.theme ?? null; rec.text = f.text ?? null; rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
   if (kind === 'focuscontrast') { rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
   if (kind === 'iconcontrast') { rec.theme = f.theme ?? null; rec.contrast = f.ratio ?? null; rec.needs = f.threshold ?? null; }
   if (kind === 'name') rec.role = f.role ?? null;
-  if (kind === 'target') rec.size = f.size ?? null;
+  if (kind === 'target' || kind === 'target44') rec.size = f.size ?? null;
   if (kind === 'semantics') { rec.rendered = f.got ?? null; rec.contract = f.want ?? null; }
   if (f.modes) rec.modes = f.modes;
   if (f.places > 1) rec.places = f.places;
@@ -682,7 +864,7 @@ function sweepExpression(roots, doFocus, stateMap) {
       const cls = (host.className && typeof host.className==='string') ? '.'+host.className.trim().split(/\\s+/).join('.') : '';
       iconEls.push({ desc: (host.tagName.toLowerCase() + (host.id?('#'+host.id):'') + cls).slice(0,80) + ownerOf(host), color, bgLayers: layers, bgImage: false });
     }
-    let noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [];
+    let noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [], pointer = 0, judged = [];
     if (${doFocus ? 'true' : 'false'}) {
       const STATE_MAP = ${JSON.stringify(stateMap || {})};
       const stateWords = Object.keys(STATE_MAP);
@@ -701,6 +883,7 @@ function sweepExpression(roots, doFocus, stateMap) {
         const isInteractive = el.matches(INTERACTIVE);
         // 3. Visible focus — does focusing change the look, and is that change actually visible?
         if (!disabled(el) && el.matches('a[href],button,input:not([type=hidden]),select,textarea,[tabindex],[role=button],[role=link]')) {
+          judged.push((desc + ownerOf(el)).slice(0, 120));
           // A focus style may be an outline, a shadow, a border, a background change, an underline,
           // or drawn on ::before / ::after: every one of those counts as a visible change.
           // An outline's colour counts only while an outline is drawn (a ring kept transparent at rest that takes a colour on focus).
@@ -820,8 +1003,31 @@ function sweepExpression(roots, doFocus, stateMap) {
           if (!focusable) notKeyboard.push((desc+(role?('[role='+role+']'):'')).slice(0,70));
         }
       }
+      // What a script makes clickable and Tab never reaches. Its handler is read where a framework keeps it (an
+      // onclick, React's props, Vue's invokers); one only Chrome's listeners show is marked for Node to ask (pointer).
+      const ANY_FOCUSABLE = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[tabindex],[contenteditable=""],[contenteditable=true]';
+      const handles = (el) => typeof el.onclick === 'function' || el.hasAttribute('onclick') || Object.keys(el).some((k) => (k.indexOf('__reactProps$') === 0 && el[k] && (el[k].onClick || el[k].onMouseDown || el[k].onPointerDown)) || (k === '_vei' && el[k] && (el[k].onClick || el[k].onMousedown || el[k].onPointerdown)));
+      const bare = (el) => {
+        if (el === document.body || el === document.documentElement || el.matches(INTERACTIVE) || el.matches('label,option,svg *')) return false;
+        if (IROLES.includes(el.getAttribute('role'))) return false;
+        if (el.parentElement && el.parentElement.closest(INTERACTIVE + ',label')) return false;   // a part of a control: the control takes the keys
+        if (el.querySelector(ANY_FOCUSABLE)) return false;   // a card around its own link or button: the keyboard uses that
+        const cls = typeof el.className === 'string' ? el.className : '';
+        if (/backdrop|overlay|scrim|underlay/i.test(cls)) return false;   // a dialog's backdrop: Escape closes it
+        const st = getComputedStyle(el), r = el.getBoundingClientRect();
+        if (st.position === 'fixed' && r.width * r.height > innerWidth * innerHeight / 2) return false;
+        return true;
+      };
+      let marked = 0;
+      for (const el of scope) {
+        if (el.nodeType !== 1 || !vis(el) || disabled(el) || !bare(el)) continue;
+        const d = (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + ((el.className && typeof el.className === 'string' && el.className.trim()) ? '.' + el.className.trim().split(/\s+/).join('.') : '')).slice(0, 80);
+        if (handles(el)) notKeyboard.push(d + ' (a script handles its clicks, but Tab never reaches it)' + ownerOf(el));
+        else if (marked < 150 && getComputedStyle(el).cursor === 'pointer' && (!el.parentElement || getComputedStyle(el.parentElement).cursor !== 'pointer')) { el.setAttribute('data-dse-click', String(marked++)); el.__dseDesc = d + ' (a script handles its clicks, but Tab never reaches it)' + ownerOf(el); }
+      }
+      pointer = marked;
     }
-    return { textEls, iconEls, noFocus, faintFocus, thinFocus, ariaState, notKeyboard, scanned: rootEls.length };
+    return { textEls, iconEls, noFocus, faintFocus, thinFocus, ariaState, notKeyboard, pointer, judged, scanned: rootEls.length };
   })()`;
 }
 
@@ -1120,23 +1326,34 @@ export function deepSweepExpression(roots, what) {
     const scope = roots ? [...new Set(rootEls.flatMap(r => [r, ...r.querySelectorAll('*')]))] : [...document.body.querySelectorAll('*')];   // roots may nest: each element once
     const vis = (el) => { const s = getComputedStyle(el); if (s.display==='none'||s.visibility==='hidden'||+s.opacity===0) return false; const r = el.getBoundingClientRect(); return r.width>0 && r.height>0; };
     const desc = (el) => (el.tagName.toLowerCase() + (el.id?('#'+el.id):'') + ((el.className && typeof el.className==='string') ? '.'+el.className.trim().split(/\\s+/).join('.') : '')).slice(0,80);
+    // The design-system component an element sits in (the innermost root around it), so a bare "button" says where it is.
+    const ownerOf = (el) => { if (!roots) return ''; let best = null, depth = -1; for (const s of roots) { let r; try { r = el.closest(s); } catch (e) { continue; } if (!r) continue; let d = 0; for (let n = r; n; n = n.parentElement) d++; if (d > depth) { depth = d; best = s; } } return best ? ' in ' + best : ''; };
     const what = ${JSON.stringify(what)};
     if (what === 'targets') {
+      // WCAG 2.5.8: a target under 24 by 24 pixels passes only when a 24px circle on its centre touches no other target
+      // and no other small target's circle. One between 24 and 44 is said as advice for touch screens (2.5.5, AAA).
       const SEL = 'a[href],button,input:not([type=hidden]),select,textarea,[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=tab],[role=menuitem],[role=option],[tabindex]:not([tabindex="-1"])';
       const all = [...new Set(scope.filter(el => el.matches(SEL) && vis(el) && !el.disabled && el.getAttribute('aria-disabled')!=='true'))];
       const rects = all.map(el => el.getBoundingClientRect());
-      const out = [];
+      const inText = (el) => el.tagName === 'A' && el.closest('p,li,td,dd') && (el.closest('p,li,td,dd').textContent.trim().length > el.textContent.trim().length + 10);   // a link inside running text
+      const byLabel = (el) => el.tagName === 'INPUT' && el.labels && [...el.labels].some(l => { const lr = l.getBoundingClientRect(); return lr.width >= 24 && lr.height >= 24; });   // its label is the target
+      const small = all.map((el, i) => rects[i].width < 24 || rects[i].height < 24);
+      const centre = (r) => [r.left + r.width / 2, r.top + r.height / 2];
+      const out = [], roomy = new Map();
       all.forEach((el, i) => {
         const r = rects[i];
-        if (r.width >= 24 && r.height >= 24) return;
-        if (el.tagName === 'A' && el.closest('p,li,td,dd') && (el.closest('p,li,td,dd').textContent.trim().length > el.textContent.trim().length + 10)) return;   // a link inside running text
-        if (el.tagName === 'INPUT' && el.labels && [...el.labels].some(l => { const lr = l.getBoundingClientRect(); return lr.width >= 24 && lr.height >= 24; })) return;   // its label is the target
-        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-        const near = rects.some((o, j) => j !== i && !all[j].contains(el) && !el.contains(all[j]) &&
-          Math.hypot(Math.max(o.left - cx, 0, cx - o.right), Math.max(o.top - cy, 0, cy - o.bottom)) < 12);
-        if (near) out.push({ desc: desc(el), size: Math.round(r.width) + '×' + Math.round(r.height) });
+        if (inText(el) || byLabel(el)) return;
+        const own = (j) => j !== i && !all[j].contains(el) && !el.contains(all[j]);
+        if (!small[i]) {
+          if (r.width < 44 || r.height < 44) { const k = desc(el) + ownerOf(el) + '|' + Math.round(r.width) + '×' + Math.round(r.height); roomy.set(k, (roomy.get(k) || 0) + 1); }
+          return;
+        }
+        const [cx, cy] = centre(r);
+        const touches = rects.some((o, j) => own(j) && Math.hypot(Math.max(o.left - cx, 0, cx - o.right), Math.max(o.top - cy, 0, cy - o.bottom)) < 12);
+        const circles = rects.some((o, j) => own(j) && small[j] && (() => { const [ox, oy] = centre(o); return Math.hypot(ox - cx, oy - cy) < 24; })());
+        if (touches || circles) out.push({ desc: desc(el) + ownerOf(el), size: Math.round(r.width) + '×' + Math.round(r.height) });
       });
-      return out;
+      return { small: out, roomy: [...roomy].map(([k, n]) => ({ desc: k.split('|')[0], size: k.split('|')[1], places: n })) };
     }
     if (what === 'widgets') {
       // Controls built from a non-native element (a div with role=button): each is marked so Node
@@ -1169,13 +1386,39 @@ export function deepSweepExpression(roots, what) {
       return hidden ? desc(el) : null;
     }
     if (what === 'clipped') {
+      // Text cut off by its box (hidden, clipped, an ellipsis), or spilling out of a box that does not grow onto what is
+      // next to it. A box that scrolls keeps its text reachable.
       const out = [];
       for (const el of scope) {
         if (!vis(el)) continue;
         if (![...el.childNodes].some(n => n.nodeType===3 && n.textContent.trim())) continue;
         const s = getComputedStyle(el);
+        if (!(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)) continue;
         const hides = /hidden|clip/.test(s.overflowX + s.overflowY) || s.textOverflow === 'ellipsis';
-        if (hides && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)) out.push(desc(el));
+        if (hides) out.push(desc(el));
+        else if (!/auto|scroll/.test(s.overflowX + s.overflowY) && s.display !== 'inline' && el.clientHeight > 0) out.push(desc(el) + ' (spills over what is next to it)');
+      }
+      return out;
+    }
+    if (what === 'narrow') {
+      // WCAG 1.4.10 per component: on a 320px screen, the narrowest each one can be (min-content, as nothing around it
+      // asks for more). Content that needs two dimensions (a data table, a picture, code) is left out, as WCAG does.
+      const EXEMPT = 'table,[role=table],[role=grid],[role=treegrid],img,video,canvas,svg,pre,code,iframe,map,[role=img],[role=application]';
+      const out = [];
+      for (const s of roots || []) {
+        let n = 0, all = [];
+        try { all = [...document.querySelectorAll(s)]; } catch (e) { continue; }
+        for (const el of all) {
+          if (n >= 5) break;
+          if (!vis(el) || el.closest(EXEMPT)) continue;
+          n++;
+          if (/^inline$/.test(getComputedStyle(el).display) || el.getBoundingClientRect().width <= innerWidth + 1) continue;
+          const was = el.getAttribute('style');
+          el.style.setProperty('width', 'min-content', 'important'); el.style.setProperty('min-width', '0', 'important'); el.style.setProperty('max-width', 'none', 'important');
+          const min = el.getBoundingClientRect().width;
+          if (was === null) el.removeAttribute('style'); else el.setAttribute('style', was);
+          if (min > innerWidth + 1) { out.push({ el: desc(el), sel: s, width: Math.round(min) }); break; }
+        }
       }
       return out;
     }
@@ -1192,6 +1435,7 @@ export function deepSweepExpression(roots, what) {
       return [...new Set(out)].slice(0, 200);
     }
     if (what === 'reflow') return { scrollWidth: document.documentElement.scrollWidth, width: window.innerWidth };
+    if (what === 'stops') return [...document.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,summary,[tabindex]')].filter((el) => vis(el) && el.tabIndex >= 0 && !el.disabled && !el.closest('[inert]')).length;
     if (what === 'dialogs') return [...document.querySelectorAll('dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true]')].filter(vis).map(desc);
     // A dialog open on the page as it loads, and whether it lies over the page (in the top layer, or fixed by itself or a
     // box around it) as a dialog that was opened does; one drawn in the page's flow is a picture of a dialog (a
@@ -1258,26 +1502,84 @@ async function fetchAxeSource(cfg = {}) {
     let s = null;
     try { s = await get(); } catch { continue; }
     if (!axeIntact(s)) continue;   // not the pinned file: never run it
-    try { mkdirSync(cacheDir, { recursive: true }); writeFileSync(cached, s); } catch { /* cache is optional */ }
+    // Written beside it, then moved into place: several checks at once never read half a file.
+    try { mkdirSync(cacheDir, { recursive: true }); const tmp = `${cached}.${process.pid}.tmp`; writeFileSync(tmp, s); renameSync(tmp, cached); } catch { /* cache is optional */ }
     return s;
   }
   return null;
 }
-// Runs the WCAG 2.0/2.1/2.2 A and AA rules explicitly (so target size and friends are always on),
-// scoped to the checked components when there are any.
+// Runs the WCAG 2.0/2.1/2.2 A and AA rules explicitly (so target size and friends are always on), the ones axe-core keeps
+// experimental that stand for a WCAG criterion (an orientation lock, a label not in the name, a paragraph styled as a
+// heading, table headers), and its best practices (heading order, landmarks, a dialog's name), scoped to the checked
+// components when there are any. Each element it fails is located as the engine's own findings are (tag#id.class and
+// the component it sits in), so a problem both find is reported once.
+export const AXE_EXPERIMENTAL = ['css-orientation-lock', 'label-content-name-mismatch', 'p-as-heading', 'td-has-header', 'table-fake-caption'];
 async function runAxe(send, sessionId, axeSource, roots = null) {
   if (!axeSource) return null;
   try {
     await send('Runtime.evaluate', { expression: axeSource, returnByValue: false }, sessionId);
     const ctx = roots ? `{ include: ${JSON.stringify(roots.map((s) => [s]))} }` : 'document';
-    const expr = `axe.run(${ctx}, { resultTypes: ['violations'], runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } })
-      .then(r => JSON.stringify(r.violations.map(v => ({ id: v.id, help: v.help, impact: v.impact, helpUrl: v.helpUrl, count: v.nodes.length, targets: v.nodes.slice(0, 4).map(n => (n.target || []).join(' ')) }))))
-      .catch(e => 'ERR:' + e.message)`;
+    const rules = Object.fromEntries([...AXE_EXPERIMENTAL.map((id) => [id, { enabled: true }]), ['frame-tested', { enabled: false }]]);
+    const expr = `(() => {
+      const roots = ${JSON.stringify(roots)};
+      const desc = (el) => (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + ((el.className && typeof el.className === 'string' && el.className.trim()) ? '.' + el.className.trim().split(/\\s+/).join('.') : '')).slice(0, 80);
+      const ownerOf = (el) => { if (!roots) return ''; let best = null, depth = -1; for (const s of roots) { let r; try { r = el.closest(s); } catch (e) { continue; } if (!r) continue; let d = 0; for (let n = r; n; n = n.parentElement) d++; if (d > depth) { depth = d; best = s; } } return best ? ' in ' + best : ''; };
+      const at = (t) => { try { return typeof t === 'string' ? document.querySelector(t) : null; } catch (e) { return null; } };
+      return axe.run(${ctx}, { resultTypes: ['violations'], runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'] }, rules: ${JSON.stringify(rules)} })
+        .then(r => JSON.stringify(r.violations.map(v => ({ id: v.id, help: v.help, description: v.description, impact: v.impact, helpUrl: v.helpUrl,
+          tags: (v.tags || []).filter(t => /^wcag\\d{3,4}$|^best-practice$/.test(t)), count: v.nodes.length,
+          targets: v.nodes.slice(0, 4).map(n => (n.target || []).join(' ')),
+          nodes: v.nodes.slice(0, 60).map(n => { const el = at((n.target || [])[0]); return { target: (n.target || []).join(' '), desc: el ? desc(el) + ownerOf(el) : null, summary: String(n.failureSummary || '').replace(/\\s+/g, ' ').trim().slice(0, 300) }; }) }))))
+        .catch(e => 'ERR:' + e.message);
+    })()`;
     const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }, sessionId);
     const val = r.result?.value;
     if (typeof val !== 'string' || val.startsWith('ERR:')) return null;
     return JSON.parse(val);
   } catch { return null; }
+}
+// The engine's own findings that stand for each axe-core rule: an element both fail is reported once, by the engine.
+export const AXE_SAME = {
+  'color-contrast': ['contrast', 'hovercontrast', 'statecontrast'],
+  'button-name': ['name', 'tooltipname'], 'input-button-name': ['name'], 'aria-command-name': ['name'], 'link-name': ['name', 'link'], label: ['name', 'placeholderlabel'],
+  'select-name': ['name'], 'aria-input-field-name': ['name'], 'aria-toggle-field-name': ['name'], 'summary-name': ['name'], 'aria-tooltip-name': ['name'],
+  'image-alt': ['textalt'], 'input-image-alt': ['textalt'], 'role-img-alt': ['textalt'], 'svg-img-alt': ['textalt'], 'area-alt': ['textalt'], 'object-alt': ['textalt'],
+  'aria-allowed-attr': ['aria'], 'aria-required-attr': ['aria'], 'aria-roles': ['aria'], 'aria-valid-attr': ['aria'], 'aria-valid-attr-value': ['aria'],
+  'aria-hidden-focus': ['aria'], 'aria-prohibited-attr': ['aria'], 'aria-deprecated-role': ['aria'], 'aria-conditional-attr': ['aria'], 'duplicate-id-aria': ['dupid'],
+  list: ['context'], listitem: ['context'], 'aria-required-parent': ['context'], 'aria-required-children': ['context'], 'definition-list': ['context'], dlitem: ['context'],
+  'target-size': ['target'], 'video-caption': ['captions'], 'no-autoplay-audio': ['autoaudio'], 'autocomplete-valid': ['autocomplete'],
+  'label-content-name-mismatch': ['labelname'], 'empty-heading': ['emptylabel'], 'page-has-heading-one': ['heading'], 'scrollable-region-focusable': ['keyboard'],
+  'avoid-inline-spacing': ['spacing'], 'meta-viewport': ['zoom'], tabindex: ['tabindex'], 'th-has-data-cells': ['table'], 'td-headers-attr': ['table'], 'td-has-header': ['table'],
+};
+// The element a finding is about, as tag#id.class: what comes before " in <component>", " (why)" or "::placeholder".
+export const elementKey = (desc) => String(desc ?? '').replace(/^<\w+> /, '').replace(/ in [^ ]+$/, '').replace(/::placeholder.*$/, '').split(/ \(|\s/)[0];
+// axe-core's violations, as the engine's findings: one per rule, with the elements the engine did not already report
+// for the same problem (AXE_SAME), its severity from axe's impact (a best practice is an advisory) and its criterion.
+// → [{ kind: 'axe:<rule>', rule, help, why, fix, url, wcag, severity, places, desc, elements }]
+export function axeFindings(violations = [], engineFindings = []) {
+  const byKind = new Map();
+  for (const f of engineFindings) {
+    const k = f.el ?? elementKey(f.desc);
+    if (!byKind.has(f.kind)) byKind.set(f.kind, new Set());
+    byKind.get(f.kind).add(k);
+  }
+  const rows = new Map();
+  for (const v of violations) {
+    const same = AXE_SAME[v.id] ?? [];
+    const nodes = (v.nodes ?? (v.targets ?? []).map((t) => ({ target: t, desc: null }))).filter((n) => !(n.desc && same.some((k) => byKind.get(k)?.has(elementKey(n.desc)))));
+    if (!nodes.length) continue;
+    const row = rows.get(v.id) ?? { kind: `axe:${v.id}`, rule: v.id, help: v.help, why: v.description ?? v.help, fix: '', url: v.helpUrl ?? null, tags: v.tags ?? [], impact: v.impact ?? null, elements: [] };
+    for (const n of nodes) if (!row.elements.some((e) => e.target === n.target)) row.elements.push(n);
+    if (!row.fix) row.fix = nodes.find((n) => n.summary)?.summary ?? '';
+    rows.set(v.id, row);
+  }
+  return [...rows.values()].map((r) => {
+    const sc = r.tags.map((t) => t.match(/^wcag(\d)(\d)(\d+)$/)).filter(Boolean).map((m) => `${m[1]}.${m[2]}.${m[3]}`);
+    const practice = !sc.length;
+    const severity = practice || r.impact === 'minor' ? 'advisory' : r.impact === 'moderate' ? 'warning' : 'blocker';
+    return { kind: r.kind, rule: r.rule, help: r.help, why: r.why, fix: r.fix || `See ${r.url}`, url: r.url, wcag: sc[0] ?? null, severity, places: r.elements.length,
+      desc: r.elements.map((e) => e.desc ?? e.target).filter(Boolean).slice(0, 3).join(', '), elements: r.elements.map((e) => e.desc ?? e.target) };
+  });
 }
 
 async function main() {
@@ -1298,8 +1600,12 @@ async function main() {
   }
 
   const STRICT = cfg.a11yStrict === true;
-  const RUN_AXE = argv.includes('--axe') || cfg.a11y?.axe === true;   // broaden coverage with axe-core (opt-in)
-  const RUN_STATES = argv.includes('--states') || cfg.a11y?.interactionStates === true;   // check :hover contrast (opt-in)
+  // Every accessibility run is the whole check: axe-core's rules beside the engine's own, and the text and edges measured
+  // again while each control is hovered, focused and pressed. --no-axe, --no-states (or a11y.axe / a11y.interactionStates
+  // false) leave one out, and the report then says it was not checked.
+  const RUN_AXE = !argv.includes('--no-axe') && cfg.a11y?.axe !== false;
+  const RUN_STATES = !argv.includes('--no-states') && cfg.a11y?.interactionStates !== false;
+  const leftOut = [...(RUN_AXE ? [] : ['axe-core\'s rules (--no-axe or a11y.axe: false)']), ...(RUN_STATES ? [] : ['the hover, focus and pressed states (--no-states or a11y.interactionStates: false)'])];
   // With --json the reason is JSON too, so a reader never mistakes a page that was not checked for a clean one.
   const skip = (msg) => { console.log(JSON_MODE ? JSON.stringify({ notChecked: msg }) : `⏭  [a11y] ${msg}`); process.exit(0); };
 
@@ -1466,7 +1772,9 @@ async function main() {
 
   // The time the check may take grows with its pages and colour modes (a fixed two minutes stopped a scoped check of
   // 23 pages halfway, and said so only where the audit never showed it); a11y.timeoutSec sets it.
-  const limitSec = Number(cfg.a11y?.timeoutSec) || Math.min(900, Math.max(120, targets.length * Math.max(1, modes.length) * 12));
+  // axe-core's rules and the states measured again add to each page's share.
+  const perPage = Math.max(1, modes.length) * (12 + (RUN_STATES ? 8 : 0)) + (RUN_AXE ? 20 : 0);
+  const limitSec = Number(cfg.a11y?.timeoutSec) || Math.min(1200, Math.max(150, targets.length * perPage));
   let pagesDone = 0;
   const killTimer = setTimeout(() => { console.log(`⏭  [a11y] stopped after ${limitSec}s, with ${Math.max(0, pagesDone - 1)} of ${targets.length} page(s) checked: what they found is not reported. Give it longer with ds-config.json → a11y.timeoutSec, or check fewer pages (--url).`); cleanup(); process.exit(STRICT ? 1 : 0); }, limitSec * 1000); killTimer.unref();
 
@@ -1481,13 +1789,16 @@ async function main() {
   const axeViolations = [];
   let sweptPlugins = 0;
 
+  const unrendered = [], unread = [], unfinished = [], notJudged = [];
+  const accounted = [];   // every element measured, with its verdict
+  const heard = new Map();   // what a screen reader says for each component (its first instance), or the page
+  const instances = new Map();   // per component: how many it has on the pages, and how many the WCAG checks tried
   let axeSource = null;
   if (RUN_AXE) {
     axeSource = await fetchAxeSource(cfg);
-    if (!axeSource) console.log('ℹ️  [a11y] --axe: could not load axe-core (offline or blocked) — the broader scan was skipped; the core checks still ran.');
+    // Without its rules the run is not the whole check: said, never clean.
+    if (!axeSource) unfinished.push(`axe-core's rules (it could not be downloaded, offline or blocked, and no copy is cached: run once online, or point ds-config.json → a11y.axePath at a local axe.min.js ${AXE_VERSION})`);
   }
-
-  const unrendered = [], unread = [], unfinished = [], notJudged = [];
   const opened = [], notOpened = [];   // a component opened by a press before it was checked, or one no press showed (E31)
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
@@ -1566,21 +1877,34 @@ async function main() {
       const doc = (await send('Runtime.evaluate', { expression: 'document' }, sessionId)).result?.objectId;
       const nodes = [];
       for (const role of INTERACTIVE_ROLES) nodes.push(...((await send('Accessibility.queryAXTree', { objectId: doc, role }, sessionId)).nodes ?? []));
+      // The element a node stands for, as the other findings name it (tag#id.class and the component it sits in).
+      const locate = async (n) => {
+        if (!n.backendDOMNodeId) return null;
+        const obj = await send('DOM.resolveNode', { backendNodeId: n.backendDOMNodeId }, sessionId).catch(() => null);
+        if (!obj?.object?.objectId) return null;
+        const r = await send('Runtime.callFunctionOn', { objectId: obj.object.objectId, returnByValue: true, arguments: [{ value: roots }],
+          functionDeclaration: `function (roots) { const el = this.nodeType === 1 ? this : this.parentElement; if (!el) return null; const d = (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + ((el.className && typeof el.className === 'string' && el.className.trim()) ? '.' + el.className.trim().split(/\\s+/).join('.') : '')).slice(0, 80);
+            let best = null, depth = -1; for (const s of roots || []) { let r; try { r = el.closest(s); } catch (e) { continue; } if (!r) continue; let k = 0; for (let x = r; x; x = x.parentElement) k++; if (k > depth) { depth = k; best = s; } } return { el: d, owner: best }; }` }, sessionId).catch(() => null);
+        return r?.result?.value ?? null;
+      };
       for (const n of nodes) {
         if (n.ignored) continue;
         const role = n.role?.value;
         if (!INTERACTIVE_ROLES.has(role)) continue;
         const name = (n.name?.value || '').trim();
-        if (!name) findings.push({ kind: 'name', plugin: label, role, desc: `<${role}> with no accessible name` });
-        else if (namedByTitleOnly(n)) findings.push({ kind: 'tooltipname', plugin: label, role, desc: `<${role}> "${name.slice(0, 40)}", named only by its title` });
+        if (name && !namedByTitleOnly(n)) continue;
+        const at = await locate(n);
+        const where = at ? { el: at.el, ...(at.owner ? { owner: at.owner } : {}) } : {};
+        if (!name) findings.push({ kind: 'name', plugin: label, role, desc: `<${role}> with no accessible name${at?.owner ? ` in ${at.owner}` : ''}`, ...where });
+        else findings.push({ kind: 'tooltipname', plugin: label, role, desc: `<${role}> "${name.slice(0, 40)}", named only by its title${at?.owner ? ` in ${at.owner}` : ''}`, ...where });
       }
     } catch { /* Accessibility domain unavailable — skip name/role, not a fail */ }
 
     // A real Tab key press first: script focus then counts as keyboard focus, so :focus-visible
     // styles show exactly as a keyboard user sees them.
-    const pressKey = async (key, code, keyCode, text) => {
-      await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: keyCode, ...(text ? { text } : {}) }, sessionId);
-      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode }, sessionId);
+    const pressKey = async (key, code, keyCode, text, modifiers = 0) => {
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: keyCode, modifiers, ...(text ? { text } : {}) }, sessionId);
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode, modifiers }, sessionId);
     };
     // The page counts as focused even when another tab of the same browser holds the window's focus:
     // without it, script focus can miss :focus / :focus-visible and a ring reads as missing.
@@ -1612,10 +1936,16 @@ async function main() {
       await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId).catch(() => {});
       const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, true, STATE_MAP), returnByValue: true }, sessionId).catch((e) => ({ error: e.message }));
       if (!r.result?.value) { const why = r.error ?? r.exceptionDetails?.exception?.description?.split('\n')[0]; unread.push(`${label} (${mode.name}${why ? `: ${why}` : ''})`); if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); first = false; continue; }
-      const { textEls = [], iconEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [] } = r.result.value;
+      const { textEls = [], iconEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [], judged = [] } = r.result.value;
+      // Every element read, with its verdict, so a check that passes says what it passed on.
+      for (const e of accountFor(textEls, iconEls, mode.name)) if (accounted.length < 5000) accounted.push({ ...e, page: label });
+      if (first) for (const d of judged) { const m = d.match(/^(.*?)(?: in ([^ ]+))?$/); accounted.push({ el: m[1], component: m[2] ?? null, what: 'control', page: label, verdict: noFocus.includes(d.replace(/ in [^ ]+$/, '')) ? 'fails' : 'passes' }); }
       for (const f of iconContrastFindings(iconEls, mode.name)) findings.push({ plugin: label, ...f });
       for (const t of thinFocus) note('focusthin', t.desc, mode.name, { px: t.px });
       for (const f of contrastFindings(textEls, mode.name)) findings.push({ plugin: label, ...f });
+      // Colour vision (the way Stark and Chrome's own simulator show it): text that passes, read as people who do not see
+      // red, green or blue see it.
+      for (const f of cvdFindings(textEls, mode.name)) findings.push({ plugin: label, ...f });
       for (const desc of noFocus) note('focus', desc, mode.name);
       // Focus indicator visible? (WCAG 1.4.11 for the focus ring — computed in Node)
       for (const f of faintFocus) {
@@ -1629,33 +1959,25 @@ async function main() {
       if (first) {
         for (const desc of ariaState) findings.push({ kind: 'ariastate', plugin: label, desc });
         for (const desc of notKeyboard) findings.push({ kind: 'keyboard', plugin: label, desc });
+        // A pointer cursor on something Tab never reaches: Chrome's own list of its listeners says whether a script
+        // handles its clicks (a listener added with addEventListener, which no attribute shows).
+        for (let i = 0; i < (r.result.value.pointer ?? 0); i++) {
+          const o = await send('Runtime.evaluate', { expression: `document.querySelector('[data-dse-click="${i}"]')` }, sessionId).catch(() => null);
+          const id = o?.result?.objectId;
+          if (!id) continue;
+          const ls = (await send('DOMDebugger.getEventListeners', { objectId: id }, sessionId).catch(() => null))?.listeners ?? [];
+          if (ls.some((l) => /^(click|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)$/.test(l.type))) {
+            const d = (await send('Runtime.callFunctionOn', { objectId: id, functionDeclaration: 'function () { return this.__dseDesc || (this.tagName.toLowerCase() + \' (a script handles its clicks, but Tab never reaches it)\'); }', returnByValue: true }, sessionId).catch(() => null))?.result?.value;
+            findings.push({ kind: 'keyboard', plugin: label, desc: d });
+          }
+        }
+        await send('Runtime.evaluate', { expression: `document.querySelectorAll('[data-dse-click]').forEach((el) => { el.removeAttribute('data-dse-click'); delete el.__dseDesc; })` }, sessionId).catch(() => {});
       }
       if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId);
       first = false;
     }
     await send('Emulation.setEmulatedMedia', { features: modes[0].sw.media }, sessionId);
     if (modes[0].sw.apply) await send('Runtime.evaluate', { expression: modes[0].sw.apply }, sessionId);
-    // Interaction-state contrast (:hover) — force the pseudo-state via CDP and re-measure. Reuses the
-    // contrast sweep; reports only text that reads fine at rest but fails while hovered (opt-in --states).
-    if (RUN_STATES) {
-      try {
-        await send('DOM.enable', {}, sessionId);
-        await send('CSS.enable', {}, sessionId);
-        await send('Emulation.setEmulatedMedia', { features: modes[0].sw.media }, sessionId);
-        const doc = await send('DOM.getDocument', { depth: -1 }, sessionId);
-        const q = await send('DOM.querySelectorAll', { nodeId: doc.root.nodeId, selector: 'a[href],button,[role=button],[role=link],input:not([type=hidden]),select,textarea,[tabindex]' }, sessionId);
-        const ids = (q.nodeIds || []).slice(0, 400);
-        for (const id of ids) { try { await send('CSS.forcePseudoState', { nodeId: id, forcedPseudoClasses: ['hover'] }, sessionId); } catch {} }
-        await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId).catch(() => {});
-        const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, false, STATE_MAP), returnByValue: true }, sessionId);
-        const hoverText = (r.result?.value || {}).textEls || [];
-        const restKey = new Set(findings.filter((f) => f.kind === 'contrast' && f.theme === modes[0].name).map((f) => f.desc + '|' + f.text));
-        for (const f of contrastFindings(hoverText, modes[0].name)) {
-          if (!restKey.has(f.desc + '|' + f.text)) findings.push({ kind: 'hovercontrast', plugin: label, theme: f.theme, desc: f.desc, text: f.text, ratio: f.ratio, threshold: f.threshold });
-        }
-        for (const id of ids) { try { await send('CSS.forcePseudoState', { nodeId: id, forcedPseudoClasses: [] }, sessionId); } catch {} }
-      } catch (e) { unfinished.push(`${label}: hover contrast (${String(e?.message ?? e).slice(0, 80)})`); }   // missing, never clean
-    }
     // ── Deeper checks (WCAG 2.2): target size, a real Tab walk, dialogs and Escape, reduced motion,
     //    forced colours, text spacing, reflow (opt-in a11y.reflow), and semantics against the contract.
     //    Each one is isolated: a failure in one never stops the others or the check as a whole.
@@ -1665,8 +1987,30 @@ async function main() {
     const ownSection = (comp, sel) => (target.styleguide && sel ? `#c-${String(comp).replace(/[^\w-]+/g, '-')} .pg-preview :is(${sel})` : sel);
     const media0 = modes[0].sw.media;
     const step = makeStep(findings, unfinished, label);
+    // Target size in every mode (a density mode can shrink a control): one finding per control, with the modes it is small in.
     await step(async () => {
-      for (const x of (await evalv(deepSweepExpression(roots, 'targets'))) ?? []) findings.push({ kind: 'target', plugin: label, ...x });
+      const seen = new Map();
+      for (const mode of modes) {
+        await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
+        if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
+        try {
+          const r = (await evalv(deepSweepExpression(roots, 'targets'))) ?? {};
+          const nth = new Map();   // two controls read alike (two button.tiny) stay two findings
+          for (const [kind, list] of [['target', r.small ?? []], ['target44', r.roomy ?? []]]) {
+            for (const x of list) {
+              const base = `${kind}|${x.desc}|${x.size}`, n = (nth.get(base) ?? 0) + 1;
+              nth.set(base, n);
+              const k = `${base}|${n}`, had = seen.get(k);
+              if (had) { if (had.modes && !had.modes.includes(mode.name)) had.modes.push(mode.name); continue; }
+              const nf = { kind, plugin: label, ...x, ...(modes.length > 1 ? { modes: [mode.name] } : {}) };
+              seen.set(k, nf); findings.push(nf);
+            }
+          }
+        } finally { if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); }
+      }
+      await send('Emulation.setEmulatedMedia', { features: modes[0].sw.media }, sessionId);
+      if (modes[0].sw.apply) await send('Runtime.evaluate', { expression: modes[0].sw.apply }, sessionId);
+      ranChecks.add('targets');
     });
     // WCAG 2.1 A and AA, what is left once the checks above have run (wcag-page.js): text alternatives, groups and
     // tables, reading order, input purpose, control edges, moving and flashing content, link words, empty headings,
@@ -1674,22 +2018,26 @@ async function main() {
     // The first few of each component on the page; findings say the component they sit in.
     // The checks on the first few of each component, at rest; `edgesOnly` keeps the control edges (1.4.11), which
     // depend on the colour mode and are read again in every other mode.
+    // Up to 24 of each: a grid of chips is judged on its chips, not on its first; what it does when used is tried on
+    // the first. → { out, total, checked }
     const wcagRun = (sel, edgesOnly) => evalv(`(async () => {
       const sel = ${JSON.stringify(sel)};
       const all = sel ? [...document.querySelectorAll(sel)] : [document.body];
       const seen = [], out = [];
+      let total = 0;
       for (const el of all) {
-        if (seen.length >= 3) break;
         if (seen.some((s) => s.contains(el)) || !el.getClientRects().length) continue;
+        total++;
+        if (seen.length >= 24) continue;
         seen.push(el);
         // Read at rest: the focus the checks above gave a field is taken away and every transition it starts
         // jumps to its end, so an edge never reads halfway back from its focus look (a pass in one run, a fail in the next).
         if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
         ${SETTLE_TRANSITIONS};
-        out.push(...window.__wcag21.check(el, { name: sel || '' }).findings.filter((f) => !${edgesOnly} || f.kind === 'boundary'));
+        out.push(...(${edgesOnly} ? window.__wcag21.edges(el) : window.__wcag21.check(el, { name: sel || '' })).findings);
         if (!${edgesOnly} && seen.length === 1) out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings);
       }
-      return out;
+      return { out, total, checked: seen.length };
     })()`);
     // A control edge is one finding per element, with every mode it is too faint in.
     const edgeOf = new Map();
@@ -1699,8 +2047,9 @@ async function main() {
       const sels = roots ?? [null];
       for (const sel of sels) {
         const res = await wcagRun(sel, false);
+        if (sel && res) { const had = instances.get(sel) ?? { total: 0, checked: 0 }; instances.set(sel, { total: had.total + res.total, checked: had.checked + res.checked }); }
         const once = new Set();
-        for (const f of res ?? []) {
+        for (const f of res?.out ?? []) {
           const desc = sel ? `${f.desc} in ${sel}` : f.desc;
           if (once.has(f.kind + desc)) continue;
           once.add(f.kind + desc);
@@ -1718,7 +2067,7 @@ async function main() {
         if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
         try {
           for (const sel of roots ?? [null]) {
-            for (const f of (await wcagRun(sel, true)) ?? []) {
+            for (const f of (await wcagRun(sel, true))?.out ?? []) {
               const k = edgeKey(sel, f), had = edgeOf.get(k);
               if (had) { if (!had.modes.includes(mode.name)) had.modes.push(mode.name); continue; }
               const nf = { kind: 'boundary', plugin: label, desc: sel ? `${f.desc} in ${sel}` : f.desc, modes: [mode.name] };
@@ -1729,6 +2078,96 @@ async function main() {
       }
       await send('Emulation.setEmulatedMedia', { features: modes[0].sw.media }, sessionId);
       if (modes[0].sw.apply) await send('Runtime.evaluate', { expression: modes[0].sw.apply }, sessionId);
+    });
+    // Interaction states: each control hovered, focused and pressed (the pseudo-class forced through the DevTools
+    // protocol, as a person's pointer or keyboard sets it), in every colour mode, and its text and its edge measured
+    // again. Only what reads fine at rest and fails in the state is reported, with the state and the mode.
+    if (RUN_STATES) await step(async () => {
+      await send('DOM.enable', {}, sessionId);
+      await send('CSS.enable', {}, sessionId);
+      await evalv(WCAG_PAGE_SOURCE + '; true');
+      const CONTROLS = 'a[href],button,[role=button],[role=link],[role=tab],[role=menuitem],[role=option],[role=checkbox],[role=radio],[role=switch],input:not([type=hidden]),select,textarea,summary,[tabindex]';
+      const selector = roots ? roots.map((r) => `:is(${r}):is(${CONTROLS}), :is(${r}) :is(${CONTROLS})`).join(', ') : CONTROLS;
+      const doc = await send('DOM.getDocument', { depth: 0 }, sessionId);
+      const ids = ((await send('DOM.querySelectorAll', { nodeId: doc.root.nodeId, selector }, sessionId)).nodeIds || []).slice(0, 400);
+      if (!ids.length) return;
+      const force = async (classes) => { for (const id of ids) { try { await send('CSS.forcePseudoState', { nodeId: id, forcedPseudoClasses: classes }, sessionId); } catch { /* gone */ } } };
+      const STATES = [['hovered', ['hover']], ['focused', ['focus', 'focus-visible', 'focus-within']], ['pressed', ['active', 'hover', 'focus']]];
+      const edgeAtRest = new Set([...edgeOf.entries()].flatMap(([k, f]) => (f.modes ?? [modes[0].name]).map((m) => `${k}|${m}`)));
+      const stateEdges = new Map(), seenState = new Set();
+      for (const mode of modes) {
+        await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
+        if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
+        try {
+          const restKey = new Set(findings.filter((f) => f.kind === 'contrast' && f.theme === mode.name).map((f) => f.desc + '|' + f.text));
+          for (const [state, classes] of STATES) {
+            await force(classes);
+            try {
+              await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId).catch(() => {});
+              const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, false, STATE_MAP), returnByValue: true }, sessionId);
+              // A plain link pressed takes the browser's own red (-webkit-activelink), not a colour of the system's.
+              const own = ((r.result?.value || {}).textEls || []).filter((t) => !(state === 'pressed' && /^a(?=[.#\s]|$)/.test(t.desc) && t.color === 'rgb(255, 0, 0)'));
+              for (const f of contrastFindings(own, mode.name)) {
+                if (restKey.has(f.desc + '|' + f.text)) continue;
+                // Pressed holds the hover and the focus too: the same reading there is theirs, said once.
+                const same = `${f.desc}|${f.text}|${f.ratio}|${mode.name}`;
+                if (state === 'pressed' && seenState.has(same)) continue;
+                seenState.add(same);
+                findings.push({ kind: state === 'hovered' ? 'hovercontrast' : 'statecontrast', plugin: label, theme: f.theme, desc: f.desc, text: f.text, ratio: f.ratio, threshold: f.threshold, ...(state === 'hovered' ? {} : { state }) });
+              }
+              for (const sel of roots ?? [null]) {
+                for (const f of (await wcagRun(sel, true))?.out ?? []) {
+                  const k = edgeKey(sel, f);
+                  if (edgeAtRest.has(`${k}|${mode.name}`)) continue;
+                  if (state === 'pressed' && (stateEdges.has(`${k}|hovered`) || stateEdges.has(`${k}|focused`))) continue;
+                  const had = stateEdges.get(`${k}|${state}`);
+                  if (had) { if (!had.modes.includes(mode.name)) had.modes.push(mode.name); continue; }
+                  const nf = { kind: 'stateedge', plugin: label, state, desc: `${sel ? `${f.desc} in ${sel}` : f.desc}`.replace(/ \(/, ` when ${state} (`), modes: [mode.name] };
+                  stateEdges.set(`${k}|${state}`, nf); findings.push(nf);
+                }
+              }
+            } finally { await force([]); }   // a state left forced would colour every check after it
+          }
+        } finally { if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); }
+      }
+      await send('Emulation.setEmulatedMedia', { features: modes[0].sw.media }, sessionId);
+      if (modes[0].sw.apply) await send('Runtime.evaluate', { expression: modes[0].sw.apply }, sessionId);
+      ranChecks.add('states');
+    });
+    // What a screen reader says (what VoiceOver or NVDA would announce), for the first instance of each component, or
+    // for the page itself: from Chrome's accessibility tree, the same one they read. Words, for a person to judge.
+    await step(async () => {
+      await send('DOM.enable', {}, sessionId);
+      await send('Accessibility.enable', {}, sessionId);
+      const doc = await send('DOM.getDocument', { depth: 0 }, sessionId);
+      for (const sel of roots ?? ['body']) {
+        if (heard.has(sel)) continue;
+        // On the style guide, the component as its own section draws it; elsewhere, its first instance on the page.
+        const comp = locator.names().find((n) => selOf(n) === sel) ?? String(sel).replace(/^\./, '');
+        let q = null;
+        for (const at of [...new Set([ownSection(comp, sel), sel])]) {
+          try { q = await send('DOM.querySelector', { nodeId: doc.root.nodeId, selector: at }, sessionId); } catch { q = null; }
+          if (q?.nodeId) break;
+        }
+        if (!q?.nodeId) continue;
+        const top = (await send('Accessibility.getPartialAXTree', { nodeId: q.nodeId, fetchRelatives: false }, sessionId).catch(() => null))?.nodes?.[0];
+        if (!top) continue;
+        const said = [], cap = roots ? 15 : 40;
+        let visited = 0;
+        // In reading order. A node named from what it holds (a button, a link, a heading) says its words once: its
+        // text inside is not read again.
+        const walk = async (n, named) => {
+          if (said.length >= cap || visited++ > 300) return;
+          const line = spokenLine(n);
+          // A field says its value itself: the text inside it is that value.
+          const fromContents = /^(textbox|searchbox|combobox|spinbutton|slider)$/.test(String(n.role?.value)) || (n.name?.sources ?? []).some((x) => x.type === 'contents' && !x.superseded && x.value?.value);
+          if (line && !(named && /^"/.test(line)) && said.at(-1) !== line) said.push(line);
+          const kids = n.childIds?.length ? ((await send('Accessibility.getChildAXNodes', { id: n.nodeId }, sessionId).catch(() => null))?.nodes ?? []) : [];
+          for (const k of kids) await walk(k, named || (!!line && fromContents));
+        };
+        await walk(top, false);
+        if (said.length) heard.set(sel, said);
+      }
     });
     await step(async () => {
       // Positive tabindex, then a real walk: Tab through the page and watch where the focus goes.
@@ -1745,9 +2184,18 @@ async function main() {
         if (ob) obscured.add(ob);
       }
       for (const d of obscured) findings.push({ kind: 'obscured', plugin: label, desc: d });
-      const distinct = new Set(seq.filter(Boolean));
-      for (let i = 2; i < seq.length; i++) {
-        if (seq[i] && seq[i] === seq[i - 1] && seq[i] === seq[i - 2] && distinct.size > 1) { findings.push({ kind: 'tabtrap', plugin: label, desc: seq[i].split('|').slice(1).join('|') }); break; }
+      // The same walk backwards (Shift+Tab): a trap can hold in one direction only.
+      const back = [];
+      for (let i = 0; i < 60; i++) { await pressKey('Tab', 'Tab', 9, undefined, 8); back.push(await evalv(deepSweepExpression(null, 'active'))); }
+      const stops = (await evalv(deepSweepExpression(null, 'stops'))) ?? 0;
+      // A modal dialog keeps the focus inside it on purpose (it closes with Escape): a round inside one is not a trap.
+      const inModal = async (ids) => !!(await evalv(`(() => { const all = [...document.querySelectorAll('*')]; return ${JSON.stringify(ids)}.every((i) => { const el = all[i]; if (!el) return false; const d = el.closest('[aria-modal=true],dialog[open]'); if (!d) return false; try { return d.getAttribute('aria-modal') === 'true' || d.matches(':modal'); } catch (e) { return d.getAttribute('aria-modal') === 'true'; } }); })()`));
+      for (const [walk, how] of [[seq, ''], [back, ' (with Shift+Tab)']]) {
+        const trap = tabTrap(walk, { stops });
+        if (!trap) continue;
+        if (trap.cycle && await inModal(trap.ids)) continue;
+        findings.push({ kind: 'tabtrap', plugin: label, desc: trap.cycle ? `Tab goes round ${trap.cycle.length} controls (${trap.cycle.join(', ')}) and never leaves them${how}` : `${trap.at}${how}` });
+        break;
       }
       ranChecks.add('tabtrap');
     });
@@ -1772,7 +2220,15 @@ async function main() {
       const normal = new Set(findings.filter((f) => f.kind === 'focus' && f.plugin === label).map((f) => f.desc));
       await send('Emulation.setEmulatedMedia', { features: [...media0, { name: 'forced-colors', value: 'active' }] }, sessionId);
       const r2 = await evalv(sweepExpression(roots, true, STATE_MAP));
+      await evalv(`document.querySelectorAll('[data-dse-click]').forEach((el) => el.removeAttribute('data-dse-click'))`);
       for (const d of r2?.noFocus ?? []) if (!normal.has(d)) findings.push({ kind: 'forcedfocus', plugin: label, desc: d });
+      // What vanishes in high-contrast mode: an icon painted with a background colour (a mask), which the mode turns into
+      // the page's own colour, or text it can no longer tell from its background. Only what reads at rest counts.
+      const iconAtRest = new Set(findings.filter((f) => f.kind === 'iconcontrast').map((f) => f.desc));
+      const textAtRest = new Set(findings.filter((f) => f.kind === 'contrast').map((f) => `${f.desc}|${f.text}`));
+      const once = new Set();
+      for (const f of iconContrastFindings(r2?.iconEls ?? [], 'high contrast')) if (!iconAtRest.has(f.desc) && !once.has(f.desc)) { once.add(f.desc); findings.push({ kind: 'forcedcontrast', plugin: label, desc: f.desc, ratio: f.ratio, threshold: 3, what: 'icon' }); }
+      for (const f of contrastFindings(r2?.textEls ?? [], 'high contrast')) if (!f.cannotCompute && !textAtRest.has(`${f.desc}|${f.text}`)) findings.push({ kind: 'forcedcontrast', plugin: label, desc: f.desc, text: f.text, ratio: f.ratio, threshold: f.threshold, what: 'text' });
     });
     await send('Emulation.setEmulatedMedia', { features: media0 }, sessionId).catch(() => {});
     await step(async () => {
@@ -1782,6 +2238,14 @@ async function main() {
       for (const d of (await evalv(deepSweepExpression(roots, 'clipped'))) ?? []) if (!before.has(d)) findings.push({ kind: 'spacing', plugin: label, desc: d });
       await evalv(`document.getElementById('__designSystemEngine_spacing')?.remove()`);
       ranChecks.add('spacing');
+    });
+    // Each component on a 320px screen: one that cannot be narrower makes the page scroll sideways wherever it is.
+    if (roots) await step(async () => {
+      await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 1, mobile: false }, sessionId);
+      try {
+        for (const x of (await evalv(deepSweepExpression(roots, 'narrow'))) ?? []) findings.push({ kind: 'reflow', plugin: label, desc: `${x.el} (it cannot be narrower than ${x.width}px, wider than a 320px screen) in ${x.sel}` });
+        ranChecks.add('reflow');
+      } finally { await send('Emulation.clearDeviceMetricsOverride', {}, sessionId); }
     });
     if (cfg.a11y?.reflow === true) await step(async () => {
       await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 1, mobile: false }, sessionId);
@@ -2017,7 +2481,11 @@ async function main() {
       if (h1.length !== 1) findings.push({ kind: 'heading', plugin: label, desc: h1.length ? `${label}: ${h1.length} main headings (${h1.slice(0, 3).join(', ')})` : `${label}: no main heading (h1)` });
     });
 
-    if (axeSource) { const v = await runAxe(send, sessionId, axeSource, roots); if (v) for (const row of v) axeViolations.push(row); }
+    if (axeSource) {
+      const v = await runAxe(send, sessionId, axeSource, roots);
+      if (v) for (const row of v) axeViolations.push(row);
+      else unfinished.push(`${label}: axe-core's rules (the scan did not finish)`);
+    }
     await send('Target.closeTarget', { targetId });
   }
 
@@ -2034,29 +2502,32 @@ async function main() {
   if (behavioursNotChecked.size) console.log(`ℹ️  [a11y] behaviours not checked for ${[...behavioursNotChecked].join(', ')}: the style guide draws markup without the components' script. List the system's scripts in ds-config.json → systemScripts, or point a11y.urls (or --url) at a page that runs them (Storybook, the app), to check them.`);
 
   // ── Report ────────────────────────────────────────────────────────────────────
-  const contrast = groupSame(findings.filter((f) => f.kind === 'contrast' && !f.cannotCompute));
   const cannot   = findings.filter((f) => f.kind === 'contrast' && f.cannotCompute);
-  const names    = findings.filter((f) => f.kind === 'name');
-  const iconCon  = groupSame(findings.filter((f) => f.kind === 'iconcontrast'));
-  const focus    = findings.filter((f) => f.kind === 'focus');
-  const focusCon = findings.filter((f) => f.kind === 'focuscontrast');
-  const hoverCon = groupSame(findings.filter((f) => f.kind === 'hovercontrast'));
-  const state    = findings.filter((f) => f.kind === 'ariastate');
-  const keyboard = findings.filter((f) => f.kind === 'keyboard');
+  const measured = findings.filter((f) => !(f.kind === 'contrast' && f.cannotCompute));
   const themes   = [...new Set(modes.map((m) => m.name))];
-
-  const more = ['tooltipname', 'target', 'tabtrap', 'tabindex', 'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'behaviour', 'statefollows', ...Object.keys(WCAG21_GUIDE)].map((k) => [k, findings.filter((f) => f.kind === k)]);
+  // axe-core's rules, each one finding with the elements the engine's own checks did not already report.
+  const axeRows = RUN_AXE ? axeFindings(axeViolations, measured) : [];
+  const axeNodes = axeViolations.reduce((n, v) => n + (v.count ?? 0), 0);
+  const axeKept = axeRows.reduce((n, r) => n + r.places, 0);
+  // Every kind in the order the checks are listed in (a kind a new check adds comes after them), then axe-core's rules.
+  const kinds = [...new Set([...A11Y_ORDER, ...Object.keys(A11Y_GUIDE), ...measured.map((f) => f.kind)])];
   // Blockers first, then warnings, then advisories; within each, the order the checks are listed in.
-  const buckets = [['contrast', contrast], ['hovercontrast', hoverCon], ['iconcontrast', iconCon], ['name', names], ['focus', focus], ['focuscontrast', focusCon], ['ariastate', state], ['keyboard', keyboard], ...more].filter(([, l]) => l.length)
-    .map((b, i) => [b, i]).sort((x, y) => SEVERITY_ORDER[severityOf(x[0][0])] - SEVERITY_ORDER[severityOf(y[0][0])] || x[1] - y[1]).map(([b]) => b);
+  const buckets = [...kinds.map((k) => { const list = measured.filter((f) => f.kind === k); return [k, A11Y_GROUPED.has(k) ? groupSame(list) : list]; }), ...axeRows.map((r) => [r.kind, [r]])].filter(([, l]) => l.length)
+    .map((b, i) => [b, i]).sort((x, y) => SEVERITY_ORDER[bucketSeverity(...x[0])] - SEVERITY_ORDER[bucketSeverity(...y[0])] || x[1] - y[1]).map(([b]) => b);
   const total = buckets.reduce((n, [, l]) => n + l.length, 0);
   const inThemes = themes.length > 1 ? ` (checked in ${themes.length} themes)` : '';
-  const partial = !!(unread.length || unrendered.length || unfinished.length || notOpened.length);
+  const partial = !!(unread.length || unrendered.length || unfinished.length || notOpened.length || leftOut.length);
   const verdict = a11yVerdict(buckets, { cannot: cannot.length, partial });
   // Must-pass stops on a blocker or a warning; an advisory never stops a run.
   const stops = verdict.blockers + verdict.warnings;
 
   const axe = RUN_AXE ? summarizeAxe(axeViolations) : [];
+  // What was measured: every text and icon in each theme, every control's focus, and how many instances of each
+  // component the WCAG checks tried, so a pass says what it passed on.
+  const count = (what) => accounted.filter((e) => e.what === what && (what === 'control' || e.theme === themes[0])).length;
+  const partly = [...instances].filter(([, v]) => v.total > v.checked).map(([sel, v]) => `${v.checked} of the ${v.total} ${sel}`);
+  const measuredInfo = { texts: count('text'), icons: count('icon'), controls: count('control'), components: new Set(accounted.map((e) => e.component).filter(Boolean)).size, themes: themes.length,
+    ...(instances.size ? { instances: Object.fromEntries(instances) } : {}), ...(partly.length ? { partly } : {}) };
   // Findings name the component they sit in ("… in .chip"); that component links to Figma.
   const { figmaLinker } = await import('./figma-link.mjs');
   const linkFor = figmaLinker(ROOT, cfg);
@@ -2086,10 +2557,11 @@ async function main() {
   };
   const figmaOf = (desc) => { const n = ownerName(desc); return n ? linkFor(n) : null; };
   // Must-pass (a11yStrict) also counts axe's serious and critical violations, not only this check's own.
-  const severeAxe = axe.filter((v) => v.impact === 'serious' || v.impact === 'critical').length;
+  // axe-core's serious and critical rules are blockers in the verdict now; kept for a reader of the older field.
+  const severeAxe = axeRows.filter((r) => r.severity === 'blocker').length;
 
   // ── Machine lane (--json): precise, parseable — for an agent/CI that fixes the code ──
-  const machine = () => ({
+  const machine = (withElements = false) => ({
     target: targets.map((t) => t.label),
     usedStyleguide: !!sg,
     themes, strict: STRICT, total, cannotMeasure: cannot.length,
@@ -2106,11 +2578,18 @@ async function main() {
     // What a check left alone on purpose, with why (a dialog drawn as a picture): neither a finding nor clean.
     ...(notJudged.length ? { notJudged } : {}),
     ...(RUN_AXE ? { axe, severeAxe } : {}),
+    // A part of the check turned off for this run (--no-axe, --no-states): the verdict covers the rest only.
+    ...(leftOut.length ? { leftOut } : {}),
+    measured: measuredInfo,
+    // What a screen reader says for each component (its first instance), or for the page: for a person to judge the words.
+    ...(heard.size ? { heard: Object.fromEntries([...heard].map(([sel, l]) => [sel === 'body' ? 'page' : bySel.get(sel) ?? sel, l])) } : {}),
+    // Each element measured, with its verdict: in the file the audit keeps, and with --a11y on the screen.
+    ...(withElements ? { elements: accounted } : {}),
   });
-  if (JSON_OUT) { try { mkdirSync(dirname(resolve(JSON_OUT)), { recursive: true }); writeFileSync(resolve(JSON_OUT), JSON.stringify(machine(), null, 2) + '\n'); } catch { /* the file is a convenience */ } }
+  if (JSON_OUT) { try { mkdirSync(dirname(resolve(JSON_OUT)), { recursive: true }); writeFileSync(resolve(JSON_OUT), JSON.stringify(machine(true), null, 2) + '\n'); } catch { /* the file is a convenience */ } }
   if (JSON_MODE) {
-    console.log(JSON.stringify(machine(), null, 2));
-    process.exit(STRICT && (stops || severeAxe) ? 1 : 0);
+    console.log(JSON.stringify(machine(VERBOSE), null, 2));
+    process.exit(STRICT && stops ? 1 : 0);
   }
 
   // ── Human lane (default): plain language, no jargon ──
@@ -2122,21 +2601,23 @@ async function main() {
   } else {
     console.log(`Found ${plural(total, 'thing', 'things')} that would make this hard to use for some people${inThemes}:\n`);
     for (const [kind, list] of buckets) {
-      const g = A11Y_GUIDE[kind];
+      const g = guideFor(kind, list);
       const places = list.reduce((n, f) => n + (f.places ?? 1), 0);
-      console.log(`• ${SEVERITY_WORD[severityOf(kind)]}: ${g.title(list.length)}${places > list.length ? ` (${places} places on the page)` : ''}`);
+      console.log(`• ${SEVERITY_WORD[bucketSeverity(kind, list)]}: ${g.title(list.length)}${places > list.length ? ` (${places} places on the page)` : ''}`);
       console.log(`     Why it matters: ${g.why}`);
       console.log(`     What to do:     ${g.fix}`);
       if (VERBOSE) {
         console.log(`     Where:`);
-        for (const f of list.slice(0, 100)) {
+        // An axe-core rule lists each element it failed; the engine's own kinds one line per finding.
+        const lines = list[0]?.rule ? list[0].elements.map((e) => e) : list.map((f) => {
           const inSel = String(f.desc ?? '').match(/ in (.+)$/)?.[1];
-          const where = kind === 'contrast' || kind === 'hovercontrast' || kind === 'iconcontrast' ? (inSel ? ` · in ${ownerName(f.desc) ?? inSel}` : f.desc ? ` · ${f.desc}` : '') : '';
-          console.log(`       - ${a11yItemLine(kind, f)}${where}`);
-        }
-        if (list.length > 100) console.log(`       - ...and ${list.length - 100} more`);
+          const where = A11Y_GROUPED.has(kind) ? (inSel ? ` · in ${ownerName(f.desc) ?? inSel}` : f.desc ? ` · ${f.desc}` : '') : '';
+          return `${a11yItemLine(kind, f)}${where}`;
+        });
+        for (const l of lines.slice(0, 100)) console.log(`       - ${l}`);
+        if (lines.length > 100) console.log(`       - ...and ${lines.length - 100} more`);
         // The design-system components these sit in, opened in Figma.
-        const owners = [...new Set(list.map((f) => ownerName(f.desc)).filter(Boolean))];
+        const owners = [...new Set((list[0]?.rule ? list[0].elements : list.map((f) => f.desc)).map((d) => ownerName(d)).filter(Boolean))];
         for (const n of owners.slice(0, 10)) { const u = linkFor(n); if (u) console.log(`       🔗 ${n} in Figma: ${u}`); }
       }
       console.log('');
@@ -2147,19 +2628,20 @@ async function main() {
     console.log(`\n${cannot.length === 1 ? 'One piece of text sits' : `${cannot.length} pieces of text sit`} on an image or gradient background, so its readability could not be measured automatically — please check ${cannot.length === 1 ? 'it' : 'them'} by eye.`);
   }
 
-  // ── Broader scan (axe-core, opt-in) — the rules our own checks do not cover ──
-  if (RUN_AXE && axeSource) {
-    if (axe.length) {
-      console.log(`\nA broader scanner (axe-core) also found ${plural(axe.length, 'other kind of problem', 'other kinds of problem')}:`);
-      for (const v of axe) {
-        console.log(`• ${v.help} — in ${plural(v.count, 'place', 'places')}${v.impact ? ` (severity: ${v.impact})` : ''}`);
-        if (VERBOSE) for (const t of v.targets.slice(0, 5)) console.log(`       - ${t}`);
-      }
-      if (!VERBOSE) console.log(`Run with --a11y to see where each one is.`);
-    } else {
-      console.log(`\nThe broader scanner (axe-core) found nothing beyond the above.`);
-    }
+  // ── What a screen reader says: with --a11y, or for the few components a run was asked about ──
+  if (heard.size && (VERBOSE || (components.length && components.length <= 5))) {
+    console.log(`\nWhat a screen reader says (VoiceOver and NVDA read the same tree), so a person can judge the words:`);
+    for (const [sel, l] of heard) console.log(`  ${sel === 'body' ? 'The page' : bySel.get(sel) ?? sel}: ${l.join(' · ')}`);
   }
+
+  // ── axe-core: its rules ran on the same page; what only it found is listed above, each with its rule ──
+  const els = (n) => (n === 1 ? 'the element' : `the ${n} elements`), are = (n) => (n === 1 ? 'is' : 'are');
+  const axeSaid = !axeNodes ? ' and found nothing'
+    : axeKept === axeNodes ? `: ${els(axeNodes)} they failed ${are(axeNodes)} listed above under axe-core's rules`
+    : !axeKept ? `: ${els(axeNodes)} they failed ${are(axeNodes)} already among the engine's own findings`
+    : `: of the ${axeNodes} elements they failed, ${axeKept} ${are(axeKept)} listed above under axe-core's rules and the other ${axeNodes - axeKept} already among the engine's own findings`;
+  if (RUN_AXE && axeSource) console.log(`\naxe-core's rules ran on the same page${axeSaid}.`);
+  if (leftOut.length) console.log(`\n⏭  Left out of this run: ${leftOut.join('; ')}. The verdict covers the rest only.`);
 
   // ── Smart nudge: how to get deeper results (only when a styleguide wasn't the target) ──
   if (!sg && !harness && !targets.every((t) => t.harness) && cfg.a11y?.styleguide !== false) {
@@ -2171,9 +2653,11 @@ async function main() {
     }
   }
 
+  const parts = [[measuredInfo.texts, 'text', 'texts'], [measuredInfo.icons, 'icon', 'icons'], [measuredInfo.controls, 'control', 'controls']].filter(([n]) => n).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
+  if (parts.length) console.log(`\nMeasured in the browser: ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}${measuredInfo.components ? ` in ${measuredInfo.components} component${measuredInfo.components === 1 ? '' : 's'}` : ''}${themes.length > 1 ? `, each ${measuredInfo.icons ? 'text and icon' : 'text'} in ${themes.length} themes` : ''}${partly.length ? `; the per-component checks tried ${partly.slice(0, 3).join(', ')}${partly.length > 3 ? ` and ${partly.length - 3} more` : ''}` : ''}.`);
   console.log(`\nVerdict: ${verdict.line}`);
-  if (STRICT && (stops || severeAxe)) {
-    console.log(`\nThis check is set to must-pass, so the run stops here until the blockers and warnings are fixed${severeAxe ? ` (including ${severeAxe} serious or critical axe-core finding${severeAxe === 1 ? '' : 's'})` : ''}; advisories never stop it.`);
+  if (STRICT && stops) {
+    console.log(`\nThis check is set to must-pass, so the run stops here until the blockers and warnings are fixed${severeAxe ? ` (including ${severeAxe} serious or critical axe-core rule${severeAxe === 1 ? '' : 's'})` : ''}; advisories never stop it.`);
     process.exit(1);
   }
   process.exit(0);

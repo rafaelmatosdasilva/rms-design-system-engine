@@ -1886,7 +1886,7 @@ a.pg-usage-name { color: var(--sg-text); }
     });
     return items;
   }
-  // WCAG 2.1 at level A and AA (DATA.wcag21, from wcag21.mjs): each criterion, how the engine covers it, and the plain
+  // WCAG 2.2 at level A and AA (DATA.wcag21, from wcag21.mjs): each criterion, how the engine covers it, and the plain
   // words of each new check. The page runs the in-page checks itself (window.__wcag21, wcag-page.js) on every variant.
   var WCAG = DATA.wcag21 && DATA.wcag21.criteria ? DATA.wcag21 : null;
   var WCAG_SC = {};
@@ -1905,7 +1905,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // sc: { sc: n }, ran: { check: 1 }, tried: n }), or null before it ran (and on the page of every component).
   var WCAG_HOW = { auto: 'Tried in the browser on every variant', audit: 'Tried by the audit in a browser', static: 'Read in the code', person: 'A person checks', page: 'The page that uses it', media: 'Video and sound only' };
   var WCAG_SRC = { auto: 'The style guide, in the browser', audit: 'The last audit, in a browser', static: 'Its code', person: 'A person', page: 'The page that uses it', media: 'Video and sound only' };
-  var WCAG_AUDIT = { '1.4.4': 'zoom', '1.4.10': 'reflow', '1.4.12': 'spacing', '2.1.2': 'tabtrap' };
+  var WCAG_AUDIT = { '1.4.4': 'zoom', '1.4.10': 'reflow', '1.4.12': 'spacing', '2.1.2': 'tabtrap', '2.4.11': 'tabtrap', '2.5.8': 'targets' };
 
   // Every open item, by component, in the table each component's own areas show: its Parity rows to fix or to check,
   // then its Accessibility rows (a criterion the browser has not tried yet waits for that try); the system's own items
@@ -2043,12 +2043,12 @@ a.pg-usage-name { color: var(--sg-text); }
     var by = {};
     items.forEach(function (it) { (by[it.sc] = by[it.sc] || []).push(it); });
     var crit = (WCAG ? WCAG.criteria.slice() : []);
-    // A criterion the checks stand for beyond WCAG 2.1 A and AA (target size, focus not obscured): listed when it has a
+    // A criterion the checks stand for beyond WCAG 2.2 A and AA (a AAA one: a focus ring's thickness, a comfortable target): listed when it has a
     // finding, named as its label names it.
     Object.keys(by).forEach(function (sc) {
       if (crit.some(function (k) { return k.sc === sc; })) return;
       var m = /WCAG [\d.]+ (.+) \((A+)\)$/.exec(by[sc][0].label || '');
-      crit.push({ sc: sc, name: m ? m[1] : '', level: m ? m[2] : '', how: 'auto', says: 'Beyond WCAG 2.1 at A and AA (a WCAG 2.2 or AAA criterion), advisory.', extra: true });
+      crit.push({ sc: sc, name: m ? m[1] : '', level: m ? m[2] : '', how: 'auto', says: 'Beyond WCAG 2.2 at A and AA (a AAA criterion), advisory.', extra: true });
     });
     var rows = crit.map(function (k) {
       var its = (by[k.sc] || []).filter(function (it) { return it.st !== 'none'; }), st = null, note = '';
@@ -2064,7 +2064,7 @@ a.pg-usage-name { color: var(--sg-text); }
       else if (k.how === 'audit') {
         var did = audited && audited.ran.indexOf(WCAG_AUDIT[k.sc]) >= 0;
         st = did ? 'done' : 'check';
-        note = did ? 'Passes, tried by the last audit in a browser. ' + k.says : !audited ? 'Run the audit, it tries this on ' + c.name + ' in a browser.' : WCAG_AUDIT[k.sc] === 'reflow' ? 'For every component, ' + c.name + ' too, set a11y.reflow to true in ds-config.json, and the audit tries each 320 pixels wide.' : 'The last audit did not get to ' + c.name + '. Run it again.';
+        note = did ? 'Passes, tried by the last audit in a browser. ' + k.says : !audited ? 'Run the audit, it tries this on ' + c.name + ' in a browser.' : WCAG_AUDIT[k.sc] === 'reflow' ? 'The last audit did not try ' + c.name + ' 320 pixels wide. Run it again.' : 'The last audit did not get to ' + c.name + '. Run it again.';
       } else if (k.ran && live && !k.ran.some(function (r) { return live.ran[r]; }) && !its.length) st = null;   // nothing in it that this asks about
       else if (!tried && !(ch && !ch.notRead)) { st = 'check'; note = 'Tried on ' + c.name + ' when its Accessibility area is open.'; }
       else {
@@ -2106,7 +2106,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // its name) under the area; what Figma's annotations state for it; what was found (each finding with its own sign, or
   // what passed and where); what to do (each finding's fix, else what a person checks or what still has to run, else
   // what the criterion asks); who acts; its status; when and where it was read. To fix first, then to check, then done;
-  // what goes beyond WCAG 2.1 A and AA last, apart. Each row keeps its criterion, items and note (k, its, note) for the
+  // what goes beyond WCAG 2.2 A and AA last, apart. Each row keeps its criterion, items and note (k, its, note) for the
   // To do page.
   function a11yIssueRows(c, items, live) {
     var rows = a11yStatus(c, items, live), ch = c.a11y && c.a11y.checked;
@@ -2659,7 +2659,7 @@ a.pg-usage-name { color: var(--sg-text); }
       a11ySumEl.innerHTML = [['todo', 'to fix'], ['check', 'to check'], ['done', 'done']].filter(function (x) { return n[x[0]]; })
         .map(function (x) { return '<span class="pg-par-status pg-par--' + STATUS[x[0]][2] + '"><span class="pg-par-sign" aria-hidden="true">' + STATUS[x[0]][0] + '</span>' + n[x[0]] + ' ' + x[1] + '</span>'; }).join('');
       var ch = c.a11y && c.a11y.checked;
-      a11yNote.textContent = 'The WCAG 2.1 criteria at level A and AA that apply to it' + (liveNow ? (c.__a11y && c.__a11y.baked ? ', every variant tried in a browser when this page was built' : ', every variant tried in this browser') + (liveNow.at ? ' (' + when(liveNow.at) + ')' : '') : '') + '. ' +
+      a11yNote.textContent = 'The WCAG 2.2 criteria at level A and AA that apply to it' + (liveNow ? (c.__a11y && c.__a11y.baked ? ', every variant tried in a browser when this page was built' : ', every variant tried in this browser') + (liveNow.at ? ' (' + when(liveNow.at) + ')' : '') : '') + '. ' +
         (!ch ? 'The audit has not run in a browser yet: it adds real key presses, zoom, text spacing and a keyboard trap.' : ch.notRead ? 'The last audit (' + when(ch.at) + ') could not check it: it was not drawn on the page it opened.' : 'Last audit in a browser ' + when(ch.at) + '.') +
         ((c.a11y && c.a11y.excused || []).length ? ' Not asked of it, ' + c.a11y.excused.map(function (x) { return x.says + ' (' + x.reason + ')'; }).join('; ') + '.' : '');
     }

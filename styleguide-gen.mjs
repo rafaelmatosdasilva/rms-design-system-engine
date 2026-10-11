@@ -504,10 +504,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         c.a11y = a11yView({ name: c.name, cls: c.cls, role: c.role ?? authoredRoles[c.name] ?? null, roleFrom: c.role ? 'figma' : authoredRoles[c.name] ? 'contract' : null,
           annotations: entry.annotations ?? [], parts: partRolesOf(entry), exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE, notes: annotationUses(all, { cats, cfg }) });
       }
-      // WCAG 2.1 at level A and AA: every criterion, how the engine covers it, in plain words, and what the checks
+      // WCAG 2.2 at level A and AA: every criterion, how the engine covers it, in plain words, and what the checks
       // found (the page runs the in-page checks itself on every variant, wcag-page.js). What the code does (shortcuts,
       // timers, gestures, device motion) is read here, each finding given to the component its file or its code names.
-      const { WCAG21, WCAG21_GUIDE } = await import('./wcag21.mjs');
+      const { WCAG22, WCAG21_GUIDE } = await import('./wcag21.mjs');
       const { staticA11y } = await import('./a11y-static.mjs');
       const { wcagStatics } = await import('./styleguide-data.mjs');
       const st = cfg.a11yStatic === false ? null : staticA11y(ROOT);
@@ -548,7 +548,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         c.a11y.sources = src;
       }
       const say = (g) => ({ one: g.title(1), many: g.title(7).replace(/^7 /, '{n} '), fix: g.fix });
-      view.wcag21 = { criteria: WCAG21, guide: Object.fromEntries(Object.entries(WCAG21_GUIDE).map(([k, g]) => [k, say(g)])), staticRan: !!st };
+      view.wcag21 = { criteria: WCAG22, guide: Object.fromEntries(Object.entries(WCAG21_GUIDE).map(([k, g]) => [k, say(g)])), staticRan: !!st };
     } catch { /* the page shows what it can measure */ }
     // How to use it: the same four sections on every page, from what Figma, the code and the authored contract say.
     try {
@@ -867,7 +867,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     CHROME: () => chromeCSS(),
     ICON_SHEET: () => iconSheet(),
     SYSTEM_SCRIPTS: () => systemScripts(),
-    // The WCAG 2.1 checks the page runs on every variant (wcag-page.js).
+    // The WCAG 2.2 checks the page runs on every variant (wcag-page.js).
     WCAG_PAGE: async () => (await import('./wcag21.mjs')).WCAG_PAGE_SOURCE.replace(/<\/script/gi, '<\\/script'),
     USAGE: () => JSON.stringify(usageMap(intent)),
     DOCS_CODE: () => JSON.stringify(code),

@@ -1,4 +1,4 @@
-// wcag21.mjs - every WCAG 2.1 success criterion at level A and AA, and how the engine covers each one for a component.
+// wcag21.mjs - every WCAG 2.1 and 2.2 success criterion at level A and AA, and how the engine covers each one for a component.
 //
 // how:
 //   auto   - checked in the browser on every variant (wcag-page.js, in the style guide and in the audit). `kinds` are the
@@ -28,11 +28,11 @@ export const WCAG21 = [
   { sc: '1.3.5', name: 'Identify Input Purpose', level: 'AA', how: 'auto', kinds: ['autocomplete'], ran: ['autocomplete'], says: 'A field that asks about the person (name, email, phone) says so with autocomplete.' },
   { sc: '1.4.1', name: 'Use of Color', level: 'A', how: 'auto', kinds: ['ariastate', 'statefollows'], says: 'No state or meaning is shown by colour alone.' },
   { sc: '1.4.2', name: 'Audio Control', level: 'A', how: 'media', kinds: ['autoaudio'], says: 'Sound that starts by itself can be stopped.' },
-  { sc: '1.4.3', name: 'Contrast (Minimum)', level: 'AA', how: 'auto', kinds: ['contrast', 'hovercontrast'], says: 'Text stands out 4.5:1 from its background (3:1 when large).' },
+  { sc: '1.4.3', name: 'Contrast (Minimum)', level: 'AA', how: 'auto', kinds: ['contrast', 'hovercontrast', 'statecontrast'], says: 'Text stands out 4.5:1 from its background (3:1 when large).' },
   { sc: '1.4.4', name: 'Resize Text', level: 'AA', how: 'audit', kinds: ['zoom'], says: 'Text can be zoomed to twice its size without being cut off.' },
   { sc: '1.4.5', name: 'Images of Text', level: 'AA', how: 'person', person: 'Words are real text, not a picture of text (a logo is fine).', says: 'Words are text, not pictures of text.' },
   { sc: '1.4.10', name: 'Reflow', level: 'AA', how: 'audit', kinds: ['reflow', 'zoom'], says: 'It fits a narrow screen (320 pixels) without scrolling sideways.' },
-  { sc: '1.4.11', name: 'Non-text Contrast', level: 'AA', how: 'auto', kinds: ['boundary', 'focuscontrast', 'iconcontrast'], ran: ['boundary'], says: 'The edge of a control, an icon and the focus ring stand out 3:1 from what is around them.' },
+  { sc: '1.4.11', name: 'Non-text Contrast', level: 'AA', how: 'auto', kinds: ['boundary', 'focuscontrast', 'iconcontrast', 'stateedge'], ran: ['boundary'], says: 'The edge of a control, an icon and the focus ring stand out 3:1 from what is around them.' },
   { sc: '1.4.12', name: 'Text Spacing', level: 'AA', how: 'audit', kinds: ['spacing'], says: 'Nothing is cut off when a reader widens the spacing between letters, words and lines.' },
   { sc: '1.4.13', name: 'Content on Hover or Focus', level: 'AA', how: 'auto', kinds: ['hovercontent'], ran: ['hovercontent'], says: 'What shows on hover or focus closes with Escape, stays while the pointer is on it, and stays until the person moves away.' },
   { sc: '2.1.1', name: 'Keyboard', level: 'A', how: 'auto', kinds: ['keyboard', 'activate', 'arrows', 'behaviour', 'escape'], says: 'Everything it does can be done with the keyboard.' },
@@ -63,9 +63,22 @@ export const WCAG21 = [
   { sc: '3.3.3', name: 'Error Suggestion', level: 'AA', how: 'person', person: 'An error message says how to put it right.', says: 'An error says how to put it right.' },
   { sc: '3.3.4', name: 'Error Prevention (Legal, Financial, Data)', level: 'AA', how: 'page', says: 'A form that commits money, law or data can be checked or undone.' },
   { sc: '4.1.1', name: 'Parsing', level: 'A', how: 'auto', kinds: ['dupid'], ran: ['aria'], says: 'Each id is used once.' },
-  { sc: '4.1.2', name: 'Name, Role, Value', level: 'A', how: 'auto', kinds: ['name', 'aria', 'ariastate', 'rolecontract', 'semantics', 'statefollows'], ran: ['aria'], says: 'Each control has a name, a role and a state a screen reader can tell.' },
+  { sc: '4.1.2', name: 'Name, Role, Value', level: 'A', how: 'auto', kinds: ['name', 'aria', 'ariastate', 'rolecontract', 'semantics', 'statefollows', 'fakelink'], ran: ['aria'], says: 'Each control has a name, a role and a state a screen reader can tell.' },
   { sc: '4.1.3', name: 'Status Messages', level: 'AA', how: 'auto', kinds: ['status'], ran: ['status'], says: 'A message, a toast or a loader is announced without taking the focus.' },
 ];
+
+// WCAG 2.2 at level A and AA, the engine's target: the 2.1 criteria without 4.1.1 Parsing (2.2 removed it: a duplicate id
+// still breaks a label or a reference, so it is counted under 4.1.2), and the six 2.2 added at A and AA.
+export const WCAG22_NEW = [
+  { sc: '2.4.11', name: 'Focus Not Obscured (Minimum)', level: 'AA', how: 'audit', kinds: ['obscured'], says: 'A control is never completely hidden (by a sticky header, a banner) when it takes the focus.' },
+  { sc: '2.5.7', name: 'Dragging Movements', level: 'AA', how: 'auto', kinds: ['dragging'], ran: ['dragging'], person: 'What is done by dragging can also be done with a single click or tap (buttons to move an item, a click on a track).', says: 'What is done by dragging can also be done with one click or tap.' },
+  { sc: '2.5.8', name: 'Target Size (Minimum)', level: 'AA', how: 'audit', kinds: ['target'], says: 'A control is at least 24 by 24 pixels, or has room around it.' },
+  { sc: '3.2.6', name: 'Consistent Help', level: 'A', how: 'page', says: 'Help (a contact, a chat, a help page) sits in the same place on every page that offers it.' },
+  { sc: '3.3.7', name: 'Redundant Entry', level: 'A', how: 'person', person: 'A flow never asks for something the person already gave in it (it is filled in, or offered to pick).', says: 'A flow never asks twice for the same thing.' },
+  { sc: '3.3.8', name: 'Accessible Authentication (Minimum)', level: 'AA', how: 'auto', kinds: ['authpaste', 'authfill'], ran: ['auth'], says: 'Signing in never needs a memory test: a password field takes paste and a password manager.' },
+];
+export const WCAG22 = [...WCAG21.filter((c) => c.sc !== '4.1.1').map((c) => (c.sc === '4.1.2' ? { ...c, kinds: [...c.kinds, 'dupid'] } : c)), ...WCAG22_NEW]
+  .sort((a, b) => { const x = a.sc.split('.').map(Number), y = b.sc.split('.').map(Number); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; });
 
 // The finding kinds the new checks add, in plain words (merged into a11y-check.mjs A11Y_GUIDE).
 const plural = (n, one, many) => `${n === 1 ? 'One' : n} ${n === 1 ? one : many}`;
@@ -95,11 +108,16 @@ export const WCAG21_GUIDE = {
   oninput: { title: (n) => `${plural(n, 'field changes', 'fields change')} things as soon as a value changes`, why: 'Choosing an option or typing should not open a page, send a form or move the focus without warning.', fix: 'Act when the person confirms (a button), or say beforehand what will happen.' },
   dupid: { title: (n) => `${plural(n, 'id is', 'ids are')} used more than once`, why: 'A label, an error message or aria-labelledby can point to the wrong element when two share an id.', fix: 'Give each element its own id (a component used twice needs ids made unique per instance).' },
   aria: { title: (n) => `${plural(n, 'ARIA attribute or role is', 'ARIA attributes or roles are')} not valid`, why: 'A role or an aria- attribute that does not exist, or a value it does not take, or a reference to a missing id, is ignored or misread by screen readers.', fix: 'Use the role and the attribute values ARIA defines, and point aria-labelledby and aria-describedby at ids on the page.' },
+  dragging: { title: (n) => `${plural(n, 'thing is', 'things are')} moved only by dragging`, why: 'People who cannot hold a button down while moving (a tremor, a head pointer, a switch) cannot drag.', fix: 'Offer the same with one click or tap: buttons to move it up and down, a click on the track, or a menu with the places it can go.' },
+  authpaste: { title: (n) => `${plural(n, 'password field stops', 'password fields stop')} pasting`, why: 'A password manager, or a code copied from a message, is how many people sign in without having to remember or retype it.', fix: 'Let the field take paste: remove the handler that cancels it (onpaste, preventDefault on paste).' },
+  authfill: { title: (n) => `${plural(n, 'password field turns', 'password fields turn')} autofill off`, why: 'Turning autocomplete off tells a password manager not to fill the field, so people have to remember and type it.', fix: 'Use autocomplete="current-password" (or "new-password", "one-time-code"), never "off".' },
+  fakelink: { title: (n) => `${plural(n, 'link acts', 'links act')} as a button`, why: 'A link with nowhere to go (href="#", javascript:) that runs an action is announced as a link, so a screen reader user expects a new page, and Space does nothing on it.', fix: 'Use a <button type="button"> for an action, and keep <a href> for a place to go.' },
   status: { title: (n) => `${plural(n, 'message is', 'messages are')} not announced`, why: 'A toast, a "saved" message or a loader appears without a screen reader being told, so people who cannot see it miss it.', fix: 'Put it in role="status" (role="alert" for errors) or aria-live="polite", present on the page before the message arrives.' },
 };
 
-// The criterion each finding kind fails.
-export const WCAG21_KIND = Object.fromEntries(WCAG21.flatMap((c) => (c.kinds ?? []).map((k) => [k, c.sc])).reverse());
+// The criterion each finding kind fails, in WCAG 2.2 (a duplicate id is under 4.1.2 there). WCAG21_KIND is its older name.
+export const WCAG_KIND = Object.fromEntries(WCAG22.flatMap((c) => (c.kinds ?? []).map((k) => [k, c.sc])).reverse());
+export const WCAG21_KIND = WCAG_KIND;
 
 // The in-page checks, as source the audit injects and the style guide carries.
 export const WCAG_PAGE_SOURCE = readFileSync(fileURLToPath(new URL('./wcag-page.js', import.meta.url)), 'utf8');
