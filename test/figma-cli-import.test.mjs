@@ -81,3 +81,15 @@ test('a hidden stroke paint is not a stroke', async () => {
   assert.equal(structureFromComponent({ t: 'COMPONENT', h: 24, strokes: [{ type: 'SOLID', visible: false }] }).strokeOnDefault, false);
   assert.equal(structureFromComponent({ t: 'COMPONENT', h: 24, strokes: [{ type: 'SOLID' }] }).strokeOnDefault, true);
 });
+
+test('a variable that points at one no longer in the file is recorded; one into a library collection is not', () => {
+  const d = tidepoolDesign();
+  const col = d.variables.find((c) => (c.variables ?? []).some((v) => Object.values(v.values ?? {}).some((x) => x && typeof x === 'object' && 'alias' in x)));
+  const v = col.variables.find((x) => Object.values(x.values ?? {}).some((y) => y && typeof y === 'object' && 'alias' in y));
+  const mode = Object.keys(v.values).find((m) => v.values[m] && typeof v.values[m] === 'object' && 'alias' in v.values[m]);
+  assert.deepEqual(varsFromDesign(d, tpCfg).brokenAliases, []);
+  const target = v.values[mode].alias;
+  for (const c of d.variables) c.variables = c.variables.filter((x) => x.name !== target);   // the variable it points at, deleted
+  v.values = { ...v.values, other: { alias: 'surface/base', collection: 'A shared library' } };   // a library's: left alone
+  assert.deepEqual(varsFromDesign(d, tpCfg).brokenAliases.filter((b) => b.name === v.name), [{ name: v.name, mode, target }]);
+});

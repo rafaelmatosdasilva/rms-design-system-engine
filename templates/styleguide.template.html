@@ -117,7 +117,15 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sg-space-xl); margin-bottom: var(--sg-space-xxl); }
 @media (max-width: 1100px) { .sg-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 860px) { .sg-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sg-space-l); } }
-@media (max-width: 480px) { .sg-card-grid { grid-template-columns: 1fr; } }
+/* On a phone two cards side by side, each shorter, so more of the system fits the screen; what a picture holds is scaled
+   to fit it (fitThumb), and the foundations' samples shrink with it. */
+@media (max-width: 480px) {
+  .sg-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sg-space-m); margin-bottom: var(--sg-space-xl); }
+  .sg-card-grid .sg-thumb { height: 104px; gap: var(--sg-space-xs); }
+  .sg-card-grid .sg-card > h3 { font-size: var(--sg-m); padding: var(--sg-space-s) var(--sg-space-m); }
+  .sg-card-grid .sg-thumb-dot { width: 20px; height: 20px; }
+  .sg-card-grid .sg-thumb-box { width: 24px; height: 24px; }
+}
 /* Each overview link is the system's own card (DATA.ui.card); with none, a plain block link. Never a box of the page's. */
 .sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
 .sg-card[hidden], .sg-section[hidden], .sg-hr[hidden], .sg-nav a[hidden] { display: none; }

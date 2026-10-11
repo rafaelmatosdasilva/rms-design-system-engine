@@ -654,7 +654,19 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const built = readdirSync(cdir).filter((f) => f.endsWith('.contract.json')).map((f) => ({ name: f.replace(/\.contract\.json$/, ''), contract: readJson(relative(ROOT, join(cdir, f))) })).filter((b) => b.contract);
         if (built.length) users = (await import('./contract-gen.mjs')).tokenUsers(built);
       }
-      view.systemTodo = tokenTodos({ vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, users, primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
+      // A token in the code that points at one declared nowhere (the system's code and its products'), with the commit
+      // that removed it when the history has one.
+      const { danglingCodeAliases } = await import('./system-advice.mjs');
+      const { sourceFiles } = await import('./code-roots.mjs');
+      let asked = 0;
+      const removed = (t) => {
+        if (asked++ >= 30) return null;
+        const r = spawnSync('git', ['log', `-S${t}:`, '-1', '--format=%h %as'], { cwd: ROOT, encoding: 'utf8', timeout: 5000 });
+        const [sha, date] = String(r.stdout ?? '').trim().split(' ');
+        return r.status === 0 && sha ? { sha, date } : null;
+      };
+      const dangling = danglingCodeAliases(sourceFiles(ROOT, cfg), { removed });
+      view.systemTodo = tokenTodos({ vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, users, dangling, primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
     } catch { /* advice: the page builds without it */ }
     // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a

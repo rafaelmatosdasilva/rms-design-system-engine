@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Aliases to a removed token, in Figma and in the code (continuous evaluation)
+
+What changed since the entry below (engine baae26a): The Figma capture records a variable that points at one no longer in the file; the audit and the style guide's To do list it, and a token in the code that points at one declared nowhere, with the commit that removed it. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `bcd578feda05` · Project measured: `13d811a9d668`
+
+| Haiku, engine b27d0fd | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.057 |
+| Input a run | 116k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 116k. Records: `records/2026-10-11-removed-token-aliases`.
+
 ## 2026-10: What the tokens owe, on the style guide's To do (continuous evaluation)
 
 What changed since the entry below (engine 09ee19f): The style guide's To do lists under The system the semantic tokens with no description in Figma, the same value written by hand in two tokens and the tokens one component uses; tokens that share a primitive are never listed. The guide changed in `reference/config.md`, `reference/usage.md`.

@@ -12,6 +12,8 @@
 //     other (after several are built at once, this is where they drift into copies);
 //   • tokens named by look (I17): a semantic token named for its colour or a scale step (blue-500) rather than its role
 //     (text/subtle), which agents then pick by appearance.
+//   • aliases to a removed token: a Figma variable that points at a variable no longer in the file (the capture records it,
+//     brokenAliases), and a token in the code that points at one declared nowhere, so it always shows its fallback.
 
 import { sameInEveryMode } from './prune-check.mjs';
 
@@ -136,13 +138,47 @@ export function namedByLook(names, { primitivePrefix = 'primitives/' } = {}) {
   return out;
 }
 
+// A Figma variable that points at a variable no longer in the file, as the capture recorded it (vars.brokenAliases:
+// [{ name, mode, target }], target the missing variable's name, or its id when only that is known). → the same list.
+export function brokenFigmaAliases(vars) {
+  return (Array.isArray(vars?.brokenAliases) ? vars.brokenAliases : []).filter((b) => b && b.name).map((b) => ({ name: b.name, mode: b.mode ?? null, target: b.target ?? b.id ?? null }));
+}
+
+// A token in the code that points at a token declared nowhere: var(--x, fallback) whose --x no file declares (as --x: or
+// setProperty('--x')), so it always shows its fallback. Listed in a token's own definition (--a: var(--x, #fff)), and
+// anywhere else when --x was declared once (removed(--x) finds it in the history: { sha, date }). Without a fallback the
+// Clean CSS gate already fails it. files: [{ file, text }]. → [{ file, line, token, target, removed }].
+export function danglingCodeAliases(files, { removed = () => null } = {}) {
+  const declared = new Set();
+  for (const { text } of files ?? []) {
+    for (const m of String(text ?? '').matchAll(/(--[\w-]+)\s*:/g)) declared.add(m[1]);
+    for (const m of String(text ?? '').matchAll(/setProperty\(\s*['"](--[\w-]+)['"]/g)) declared.add(m[1]);
+  }
+  const out = [], asked = new Map();
+  const wasDeclared = (t) => { if (!asked.has(t)) asked.set(t, removed(t) ?? null); return asked.get(t); };
+  for (const { file, text } of files ?? []) {
+    const src = String(text ?? '').replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+    for (const m of src.matchAll(/var\(\s*(--[\w-]+)\s*,/g)) {
+      const target = m[1];
+      if (declared.has(target)) continue;
+      // The declaration it sits in: a token's own definition when the property before it is a custom property.
+      const before = src.slice(Math.max(0, src.lastIndexOf(';', m.index) + 1, src.lastIndexOf('{', m.index) + 1), m.index);
+      const def = /(--[\w-]+)\s*:[^:]*$/.exec(before);
+      const was = wasDeclared(target);
+      if (!def && !was) continue;
+      out.push({ file, line: lineOf(src, m.index), token: def ? def[1] : null, target, removed: was });
+    }
+  }
+  return out;
+}
+
 // The style guide's To do rows for the tokens (F8, L9), under The system: the semantic tokens with no description, for
 // whoever keeps Figma; the same value written by hand in two tokens and the tokens one component uses, a decision each. vars: the vars
 // snapshot. users: token → [component, …] (contract-gen tokenUsers), or null when no contracts were written.
 // → [{ kind, who, say, todo }], none when there is nothing to do.
 const some = (list, n = 4, more = 'more') => list.slice(0, n).join(list.some((x) => x.includes(',')) ? '; ' : ', ') + (list.length > n ? `${list.some((x) => x.includes(',')) ? ';' : ','} and ${list.length - n} ${more}` : '');
 const group = (g) => (g.length > 3 ? `${g.slice(0, 2).join(', ')}, and ${g.length - 2} more` : g.length === 3 ? `${g[0]}, ${g[1]}, and ${g[2]}` : g.join(' and '));
-export function tokenTodos({ vars = {}, users = null, primitivePrefix = 'primitives/' } = {}) {
+export function tokenTodos({ vars = {}, users = null, dangling = [], primitivePrefix = 'primitives/' } = {}) {
   const out = [];
   const ud = undescribedTokens(vars, { primitivePrefix });
   if (ud.missing.length) out.push({ kind: 'Description', who: 'figma',
@@ -152,6 +188,13 @@ export function tokenTodos({ vars = {}, users = null, primitivePrefix = 'primiti
   if (same.length) out.push({ kind: 'Same value', who: 'both',
     say: `${same.length} group${same.length === 1 ? ' of tokens holds' : 's of tokens hold'} the same value written by hand rather than pointing at one primitive (${some(same.map(group), 3, 'more groups')}).`,
     todo: 'Decide for each group whether one is enough. Keep one in Figma and point the others at it, or keep them apart when they are meant to differ later. Ask Claude for every group.' });
+  const broken = brokenFigmaAliases(vars);
+  if (broken.length) out.push({ kind: 'Broken alias', who: 'figma',
+    say: `${broken.length} Figma variable${broken.length === 1 ? ' points' : 's point'} at a variable that is no longer in the file (${some([...new Set(broken.map((b) => b.name + (b.target && !/^VariableID:/.test(b.target) ? ` to ${b.target}` : '')))])}).`,
+    todo: 'Point each one at the variable that replaced it in Figma, or give it its own value.' });
+  if (dangling?.length) out.push({ kind: 'Broken alias', who: 'code',
+    say: `${dangling.length} token${dangling.length === 1 ? ' in the code points' : 's in the code point'} at a token declared nowhere, so ${dangling.length === 1 ? 'it shows' : 'they show'} only ${dangling.length === 1 ? 'its' : 'their'} fallback (${some(dangling.map((d) => `${d.token ?? d.file + ':' + d.line} to ${d.target}${d.removed ? `, removed in ${d.removed.sha}` : ''}`))}).`,
+    todo: 'Point each one at the token that replaced it. Tell Claude to do it.' });
   const single = [...(users ?? new Map())].filter(([, who]) => who.length === 1).map(([t, who]) => `${t.replace(/\./g, '/')} in ${who[0]}`).sort();
   if (single.length) out.push({ kind: 'Single use', who: 'both',
     say: `${single.length} token${single.length === 1 ? ' is' : 's are'} used by one component only (${some(single, 8)}).`,
