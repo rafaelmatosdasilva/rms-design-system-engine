@@ -1012,7 +1012,15 @@ wrong, why it matters to a real person, and what to do about it. Three audiences
 the default is the plain human summary; **`--a11y`** adds the exact elements (still plain); **`--json`** emits
 the same findings as a machine-readable record (selector, contrast ratio, theme, role, and the fix) for an
 agent or CI. When it runs against anything other than the styleguide it ends with a one-line tip on how to
-get the deepest, per-state result. `ds-config.json → a11yStrict: true` promotes findings to a hard fail. It
+get the deepest, per-state result. **Each finding says how sure the check is of it** (W5): a **blocker** is measured
+on the rendered page against a WCAG 2.1 A or AA criterion (a contrast, the name the accessibility tree gives, a key
+pressed and nothing happening); a **warning** is read from the code, the contract or a Figma note, or is a pattern
+that usually fails (a placeholder as the only label, an action on pointerdown), so it can be wrong; an **advisory**
+is beyond AA (a focus ring under 2px, motion left on when the person asked for less) or for a person to judge (text
+on an image). The report lists blockers first and ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory
+· WCAG 2.1 AA` (`· not all of it checked` when a page could not be read or opened); `--json` carries `severity` on
+each issue and the same counts in `verdict`. `ds-config.json → a11yStrict: true` promotes blockers and warnings to
+a hard fail; an advisory never stops a run. It
 runs inside the audit and standalone: `node a11y-check.mjs [--component A,B|.selector] [--url <page>] [--a11y|--json] [--axe] [--states]`
 (`--component` scopes the sweep and accepts a raw CSS selector too). **Skips cleanly** (exit 0) with no
 browser, never a false fail. Deps: Node >= 22 (built-in WebSocket), Chrome/Chromium (or `CHROME_PATH`), and
@@ -1225,7 +1233,11 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   included) — a single letter, number or sign as a shortcut on the whole page with no Ctrl, Alt or Cmd (2.1.4);
   something hidden, closed or removed by itself after 1 to 20 seconds, unless its timer stops while it has the
   pointer or the focus (2.2.1); a gesture with two fingers or more (2.5.1); an action on shaking or tilting the
-  device (2.5.4). Printed with the rest of the code's accessibility in the audit.
+  device (2.5.4). Printed with the rest of the code's accessibility in the audit. A rule that takes the focus
+  outline off a class in every state (`.quiet { outline: none }`) counts as put back when a more specific rule shows
+  focus on every element of a kind (`button:focus-visible` beats one class) and the markup, or the markup a script
+  writes, puts the class only on elements of that kind (E36); a class also put on a `<div>`, or a rule as specific as
+  the one taking the outline off, is still reported.
 - **State contrast, no browser needed** — from the code capture: each component's text against its own
   background in every mode and every state the capture produced (hover, selected, error…). Disabled states
   are exempt. A see-through background (a tint made with opacity or `color-mix()`) is blended over what
