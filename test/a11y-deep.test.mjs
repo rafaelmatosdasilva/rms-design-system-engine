@@ -485,7 +485,8 @@ test('page: focus by outline colour alone, a faint ring on ::after, and a two-to
 // E19: a field whose frame shows its focus (WCAG 2.4.7 takes an indicator around the control), even when the frame's
 // border eases in, passes; the frame's ring is measured like a ring on the control (1.4.11, its thickness for 2.4.13); a
 // radio whose circle beside it shows the focus passes too; a control inside an inert thumbnail takes no focus to judge;
-// a field with no focus style anywhere is still found.
+// a field with no focus style anywhere is still found. A frame that also holds a part the Tab key never reaches (a clear
+// button with tabindex="-1", hidden until there is a value) still shows the field's focus (T14).
 test('page: a field whose frame shows its focus with an easing border passes, and its ring is measured', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
   const page = `<!doctype html><html lang="en"><head><style>body { font: 16px sans-serif; background: #fff; color: #000; }
     .wrap { display: inline-flex; border: 2px solid #8a8a8a; padding: 4px; margin: 8px; transition: border-color 0.15s ease; }
@@ -496,6 +497,7 @@ test('page: a field whose frame shows its focus with an easing border passes, an
     .dot { width: 14px; height: 14px; border: 2px solid #333; border-radius: 50%; } .pick input:focus-visible + .dot { outline: 2px solid #0050c8; outline-offset: 2px; }</style></head><body><main><h1>Fields</h1>
     <label class="wrap good">Name <input id="good"></label><label class="wrap faint">Code <input id="faint"></label>
     <label class="wrap good thin">City <input id="thin"></label><label>Note <input id="bare" class="bare"></label>
+    <label class="wrap good">Find <input id="cleared"><button type="button" tabindex="-1" aria-label="Clear" style="display:none">x</button></label>
     <label class="pick"><input type="radio" name="f" id="dotted"><span class="dot"></span>PDF</label>
     <label class="pick plain"><input type="checkbox" id="plain"><span class="dot"></span>Bleed</label>
     <label class="pick"><input type="checkbox" id="tipped"><span class="dot"></span>Crop <button type="button" aria-label="About crop">?</button></label>
