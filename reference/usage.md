@@ -301,8 +301,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   and a component only the code has are rows of their own. The To do page holds the open rows of every component in
   that table, one card per component, with a filter by area (Parity, Accessibility, System and the page's own items when
   it has any) that hides the cards left empty. Under The system, what the tokens owe (`tokenTodos`, area System): the
-  semantic tokens with no description in Figma (You in Figma), the same value written by hand in two tokens and the
-  tokens one component uses, read from the contracts the last audit wrote (You decide), each one row with its first names. Open rows first, a count of each status above it, a filter by type (props, variables, values, other), its head kept in
+  semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
+  (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
+  hand in two tokens and the tokens one component uses, read from the contracts the last audit wrote (You decide), each
+  one row with its first names. Open rows first, a count of each status above it, a filter by type (props, variables, values, other), its head kept in
   view under the areas as the rows scroll by (on a phone the table scrolls sideways instead); in the Playground's card
   table. The code is as tall as
   what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it

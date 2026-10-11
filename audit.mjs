@@ -3958,6 +3958,20 @@ function reportFull(label, items, shown) {
       if (sb.length) { lines.push(`${sb.length} Storybook preview rule${sb.length === 1 ? '' : 's'} style a component, so the catalogue shows it right while products draw it as the code does (fix the component):`); for (const f of sb.slice(0, 8)) lines.push(`   · ${f.file}:${f.line}  ${f.selector} (${f.component})`); }
       const near = sa.nearDuplicateComponents(theme, classes);
       for (const n of near.slice(0, 8)) lines.push(`${n.a} and ${n.b} are nearly the same (${n.same} of ${n.of} declarations): one may be a variant of the other.`);
+      // Aliases to a removed token: in Figma (what the capture recorded), and in the code (a var() with a fallback whose
+      // token is declared nowhere), each with the commit that removed it when the history has one.
+      const broken = sa.brokenFigmaAliases(vsnap);
+      if (broken.length) { lines.push(`${broken.length} Figma variable${broken.length === 1 ? ' points' : 's point'} at a variable no longer in the file (point each at the one that replaced it):`); for (const x of broken.slice(0, 8)) lines.push(`   · ${x.name}${x.mode ? ` (${x.mode})` : ''} → ${x.target ?? 'a removed variable'}`); }
+      let asked = 0;
+      const removed = (t) => {
+        if (asked++ >= 30) return null;
+        const r = spawnSync('git', ['log', `-S${t}:`, '-1', '--format=%h %as'], { cwd: ROOT, encoding: 'utf8', timeout: 5000 });
+        const [sha, date] = String(r.stdout ?? '').trim().split(' ');
+        return r.status === 0 && sha ? { sha, date } : null;
+      };
+      const allFiles = (await import('./code-roots.mjs')).sourceFiles(ROOT, cfg);
+      const dangling = sa.danglingCodeAliases(allFiles, { removed });
+      if (dangling.length) { lines.push(`${dangling.length} token${dangling.length === 1 ? '' : 's'} in the code point at a token declared nowhere, so only the fallback shows (point each at the token that replaced it):`); for (const x of dangling.slice(0, 8)) lines.push(`   · ${x.file}:${x.line}  ${x.token ? `${x.token} → ` : ''}${x.target}${x.removed ? ` (removed in ${x.removed.sha}, ${x.removed.date})` : ''}`); }
       const look = sa.namedByLook([...colourNames, ...Object.keys(vsnap.sizing ?? {})], { primitivePrefix: prefix });
       if (look.length) lines.push(`${look.length} semantic token${look.length === 1 ? ' is' : 's are'} named by look rather than role (${look.slice(0, 5).map((x) => x.name).join(', ')}${look.length > 5 ? ', …' : ''}): agents then pick them by appearance.`);
       if (lines.length) {
