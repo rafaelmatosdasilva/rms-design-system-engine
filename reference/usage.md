@@ -91,6 +91,8 @@ rms-design-system-engine --rename-sweep                  # a token renamed in Fi
 rms-design-system-engine --rename-sweep --since v2.3.0   # the renames since that git ref, not since the last committed read of Figma; --no-keep-old drops the old names
 rms-design-system-engine --figma-motion                  # write the read-only script that reads, on every page, Figma's prototype transitions between variants, each component's Motion keyframes and animation styles, and the overlays its prototype opens, to run with use_figma
 rms-design-system-engine --figma-motion <answer.json>    # keep its answer as the motion snapshot (paths.snapshotMotion) and say each transition the code makes otherwise (at once, another duration, another curve), and each component's loop, opening and closing that differ (motion-components.mjs)
+rms-design-system-engine --figma-effects                 # write the read-only script that reads each component's shadows and blurs, gradient and image fills, Clip content, blend mode and opacity, on it and its layers two levels deep, to run with use_figma
+rms-design-system-engine --figma-effects <answer.json>   # keep its answer as the effects snapshot (paths.snapshotEffects) and say each one the code draws otherwise (effects-parity.mjs)
 rms-design-system-engine --figma-screens                 # write the read-only script that reads the screens ds-config.json names (frames and screens), to run with use_figma
 rms-design-system-engine --figma-screens <answer.json>   # keep its answer as the screen layout snapshot (paths.screenLayout) and compare each product's page with its screens
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
@@ -266,16 +268,17 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   curve, named as Figma's motion variable of the same value (`figma.motion.explicit`, else the naming convention),
   each with a dot that crosses its track on Play (a duration at a steady pace, an easing over the longest duration,
   its curve drawn beside it; at once for a person who asks for less motion); where the system answers
-  `prefers-reduced-motion` and what it ends, or that it does not yet; and each transition Figma's prototype animates
-  (`figma-motion.snapshot.json`) with what the code does for it (`prototypeTransitions`, from the last audit's
-  `motion.json`). When the code has durations or easings and Figma has no motion variables at all, the system's
-  tasks say so, for You in Figma: add them to a variable collection named Motion (`motionTodos`). How each component
-  moves on its own (`componentMotionRows`, `motion-components.mjs`): its loop (a spinner turning), its opening and its
-  closing, the code's (its `@keyframes` on it or a part of it, a transition an open or closed state plays, a size it
-  transitions) beside Figma's (its Motion keyframes and animation styles, an overlay its prototype opens, played
-  backwards as it closes, variants that lead to each other after a delay and back), or that Figma's Motion is not
-  read yet. Each that differs is a Motion row of the component's Parity area: one Figma animates and the code does
-  not, Claude's; one the code animates and Figma does not, You in Figma.
+  `prefers-reduced-motion` and what it ends, or that it does not yet; and every component's motion in one table, the
+  rows of each component's Motion area with a column for the component (`motionSpec`, `motion-components.mjs`): its
+  loop (a spinner turning), its opening and its closing, the code's (its `@keyframes` on it or a part of it, a
+  transition an open or closed state plays, a size it transitions) beside Figma's (its Motion keyframes and animation
+  styles, an overlay its prototype opens, played backwards as it closes, variants that lead to each other after a delay
+  and back); each transition Figma's prototype animates between its variants against each one the code plays then,
+  compared from the code as it is now (`projectMotion`, the last audit's `motion.json` when it cannot be read); and
+  every other transition or animation the code gives it. When the code has durations or easings and Figma has no motion
+  variables at all, the system's tasks say so, for You in Figma: add them to a variable collection named Motion
+  (`motionTodos`). Each loop, opening or closing that differs is a Motion row of the component's Parity area: one Figma
+  animates and the code does not, Claude's; one the code animates and Figma does not, You in Figma.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its source renders: a React component's return, a Vue component as the project's own build
   (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its
@@ -316,11 +319,12 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
   top too), and every table's head under them on every page: the card's head, then the table's own head row
   (`stickHeight` measures how far the bars reach, `--pg-areas-h`, and a card's head, `--pg-card-head-h`); Parity carries the system's alert icon (an icon named warning or alert) before its label while its table
-  marks something (a row that differs, one only in Figma or only in code, a prop not built), and Accessibility while a
-  problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Documentation and Details in Documentation, Accessibility) is one of the
+  marks something (a row that differs, one only in Figma or only in code, a prop not built), Accessibility while a
+  problem stands (the last browser check's or the audit's), and Documentation while a kind is not written yet (`docOpen`),
+  what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Details in Documentation) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
-  table as the Tasks page's Parity (`issueTableHTML`, `ISSUE_COLS`): Issue nr (the Tasks page's number, open rows
+  table as the Tasks page's Parity (`issueTableHTML`, `ISSUE_COLS`): Task nr (the Tasks page's number, open rows
   only), Type, Figma (its name and value), Code (its name and value, and where in the
   code a difference is), What to do (who acts above it) and Status (a sign and the system's colour, To fix, To check,
   Done or Not compared, with what it is under any but Done, differs from Figma, only in Figma, only in code, both not
@@ -329,11 +333,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   and a component only the code has are rows of their own. The Tasks page holds the open rows of every component,
   each kind in a table of its own shape, one card per component, one kind shown at a time with a filter (Parity,
   Accessibility, Documentation, Migration, Products, System and the page's own items, each when it has any; no All):
-  Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Issue nr, WCAG criterion, Figma
-  states, Found, What to do, Status), Documentation's the Documentation table itself (Kind, What is written, From, the
-  card each component's Documentation area shows), one card for each component with a kind
-  not written yet (`docRows`), where to write it above them, and the rest Issue nr, Where or Type, What to do and
-  Status. The count at the top is the shown kind's; Documentation's kinds are counted, not numbered. Under The system, what the tokens owe (`tokenTodos`, area System): the
+  Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Task nr, WCAG criterion, Figma
+  states, Found, What to do, Status), Documentation's the Documentation area's (Task nr, Kind, What is written, What to
+  do, Status), only its kinds not written yet (`docRows`), and the rest Task nr, Where or Type, What to do and
+  Status. The count at the top is the shown kind's, and every open row is numbered, Documentation's too. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
   (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
   hand in two tokens and the tokens one component uses, read from the contracts the last audit wrote (You decide), each
@@ -347,7 +350,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   label edit writes only its words into its part. An option the contract maps to another element's selector (a
   product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
   the component's own `:checked` rule, and an option the code does not build is offered as not built.
-- **Documentation** (its first card): a table, the same one the Tasks page's Documentation shows for every component with a kind not written yet (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#tasks/documentation`), its columns Kind, What is written and From, its rows the same kinds in the same order (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), each with what was written and where, or said as missing; then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
+- **Documentation** (its first card): the table every task shares (`docIssueRows`, `ISSUE_COLS.Documentation`), as Parity and Accessibility are, a count of each status above it (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#tasks/documentation`). Its columns are Task nr, Kind, What is written, What to do (who writes it above it, You in Figma, and where) and Status (To fix, or Done with where it was written), one row for every kind (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), what is still to write first; the Tasks page's Documentation shows the same rows, only those still to write, under the same numbers. Then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
@@ -462,8 +465,19 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
+- **Motion**, between Documentation and Accessibility: everything that moves in the component in one table (`motionSpec`,
+  the same rows the motion page lists with a column for the component): What happens (Repeats, Opens, Closes, On hover,
+  On press, On focus, or When a state it names changes, with what moves under it: turns a full circle, fades in and
+  slides in from below, color changes), Part (the selector it moves, `.modal-card`, `.modal.is-closing .modal-overlay`),
+  Code (its duration, curve and delay, the variables it is written with and the rule's file and line), Figma (its
+  duration and curve, and where in Figma: its Motion timeline, an animation style, the overlay its prototype opens or a
+  transition between its variants), Less motion (Stops when a prefers-reduced-motion rule that wins sets it to none or to
+  no time, else Keeps moving) and Status (Same as Figma, Differs from Figma, None in Figma for a loop, an opening or a
+  closing Figma does not animate, Not in the code, Only in the code for a hover or focus Figma's prototype does not
+  animate, Figma not read yet). A component shown in an overlay is read with the overlay it opens in, its backdrop too;
+  one that does not move says so.
 - **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as the Tasks page's Accessibility, in
-  the same card as the Playground's tables: Issue nr (open rows only), Area (Accessibility, with the criterion and its
+  the same card as the Playground's tables: Task nr (open rows only), Area (Accessibility, with the criterion and its
   level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
   panel's own pop-up, Escape closing it), Figma (what Figma's annotations state for it), Code (what was found, each
   finding or duty on its own line with its sign, naming the component, its variant or its part, `onWhat`, and what
@@ -1080,7 +1094,7 @@ names the kind of difference (radius, height, width, padding, gap, colour, props
 #### Accessibility check (I18, advisory, from the render)
 
 A mechanical, agnostic accessibility pass (`a11y-check.mjs`) that reuses the Gate 22 CDP/headless-Chrome
-flow. It reports **WCAG AA contrast** per theme (computed `color` vs the effective composited background),
+flow. It reports **WCAG AA contrast** per theme (computed `color` vs the background really painted behind the text: the layers at its centre in paint order, a sibling laid under it or a `::before` that covers its box included, not only its ancestors),
 **accessible name + role** (interactive nodes from the accessibility tree — a component that never exposes
 aria), **visible focus** (a computed style change when focused **and** that change actually visible — the focus ring's colour has ≥ 3:1 contrast against its background, WCAG 1.4.11; a field whose frame shows its focus (`:focus-within` on the box around it, when it holds only that control) passes, its frame's ring measured the same way, as does a part beside it in that box (a radio's circle, a switch's track); a native checkbox or radio hidden under such a part is judged by it, a control that takes no focus (inside an inert thumbnail) is not judged, and a style that eases in or out is read where its transition ends), **state exposure** (an element whose state
 is shown only by a CSS class — `.selected` / `.checked` / `.disabled` / `.invalid` / … — with no matching
@@ -1225,7 +1239,9 @@ there, never a failure.
   them. A focus style drawn with a background change, an underline or on `::before`/`::after` counts; a ring
   drawn outside the element is measured against the parent's background.
 - **Target size (2.5.8)** — a control under 24×24 whose 24px circle, on its centre, touches another control or
-  another small control's circle, in every mode (one finding per control, with the modes it is small in). Links in
+  another small control's circle, in every mode, at the page's own width and again on a 320px screen, where a control
+  that shrinks is measured too (one finding per control, with the modes it is small in; one small only on the narrow
+  screen says `320px wide`). Links in
   running text, and inputs whose label is the target, are exempt. A control between 24 and 44 pixels is an advisory
   (`target44`, 2.5.5): a finger covers about 44 on a touch screen.
 - **Keyboard walk** — a real Tab walk, then the same with Shift+Tab: a focus trap (one control three presses running,
@@ -1415,9 +1431,8 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **axe-core** is cached in `~/.cache/rms-design-system-engine` after the first download (or `a11y.axePath`
   points at a local copy), and is scoped to the checked components.
 
-**Not yet:** text laid over a sibling's or a pseudo-element's background is measured against its ancestors' background;
-contrast is measured in each mode the system declares, not in every combination of two switches (dark with high
-contrast); and the Figma side (contrast and target size measured on Figma's own screens, findings pinned there) is not
+**Not yet:** a component's contrast is measured in each mode the system declares (the system's text and background pairs
+are also checked in every combination of two switches, the `🎛` check, `modeCombinations` in config.md); and the Figma side (contrast and target size measured on Figma's own screens, findings pinned there) is not
 read.
 
 #### Evals (I7, a separate entry point — measures agent OUTPUT, never gates the repo)

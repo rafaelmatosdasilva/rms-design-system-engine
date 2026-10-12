@@ -4,7 +4,7 @@
 // does not is for whoever keeps Figma; both with another duration or curve, Claude's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { animationsOf, keyframesWhat, keyframesIn, codeMotions, figmaMotions, componentMotionFindings, componentMotionRows } from '../motion-components.mjs';
+import { animationsOf, keyframesWhat, keyframesIn, codeMotions, figmaMotions, componentMotionFindings, componentMotionRows, componentTransitions, motionSpec } from '../motion-components.mjs';
 import { MOTION_CAPTURE_JS, motionCaptureScript, motionSnapshot } from '../motion-parity.mjs';
 
 const CSS = [{ file: 'theme.css', text: `:root { --modal-duration: 280ms; --modal-easing: cubic-bezier(0.22, 1, 0.36, 1); --modal-offset: 8px; }
@@ -91,6 +91,32 @@ test('each component\'s own motion, Figma\'s against the code\'s, and who acts o
   assert.deepEqual(componentMotionFindings({ components: {} }, CSS, classFor, ['modal']), []);
   const rows = componentMotionRows({ components: {} }, CSS, classFor, ['loader', 'button']);
   assert.deepEqual(rows.map((r) => [r.component, r.motion, r.status]), [['loader', 'loop', 'unread']]);
+});
+
+test('everything that moves in a component, in one list: when it plays, the part, the code\'s timing and rule, Figma\'s and where, less motion', () => {
+  const css = [{ file: 'theme.css', text: `:root { --fast: 100ms; }
+.list { color: #000; transition: color var(--fast) ease; }
+.list::before { transition: background 100ms ease; }
+.list:hover { color: red; } .list:hover::before { background: #eee; } .list:focus-visible { color: blue; }
+.modal-overlay { animation: bg-in 280ms ease-out both; } .modal-card { animation: modal-in 280ms ease-out both; }
+.modal.is-closing .modal-card { animation: modal-out 160ms ease-in both; }
+@keyframes bg-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes modal-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .modal-card, .modal-overlay { animation: none; } }` }];
+  assert.deepEqual(componentTransitions(css, 'list').map((t) => [t.selector, t.prop, t.ms, t.vars.join(), t.calm, t.at]), [['.list', 'color', 100, '--fast', false, 'theme.css:2'], ['.list::before', 'background', 100, '', false, 'theme.css:3']]);
+  const snap = { version: 2, components: { list: [{ from: { State: 'Default' }, to: { State: 'Hover' }, trigger: 'ON_HOVER', type: 'SMART_ANIMATE', duration: 0.3, easing: { type: 'EASE_OUT' } }] }, motion: {}, overlays: [] };
+  const said = (cls, name) => motionSpec(snap, css, cls, name).map((r) => [r.when, r.what, r.part, r.code && `${r.code.ms} ${r.code.easing}`, r.figma && `${r.figma.ms} ${r.figma.easing} ${r.figma.from}`, r.code && r.code.calm, r.status]);
+  assert.deepEqual(said('list', 'list'), [
+    ['On hover and focus', 'color changes', '.list', '100 ease', '300 ease-out its prototype, State Default to Hover', false, 'differs'],
+    ['On hover', 'background changes', '.list::before', '100 ease', '300 ease-out its prototype, State Default to Hover', false, 'differs'],
+  ], 'each part that plays on hover against the transition Figma\'s prototype gives it');
+  assert.deepEqual(said('modal', 'modal'), [
+    ['Opens', 'fades in and slides in from below', '.modal-card', '280 ease-out', null, true, 'figma-none'],
+    ['Opens', 'fades in', '.modal-overlay', '280 ease-out', null, true, 'figma-none'],
+    ['Closes', 'fades out', '.modal.is-closing .modal-card', '160 ease-in', null, false, 'figma-none'],
+  ], 'the card and its backdrop, each; stopped for less motion where a reduced-motion rule says so');
+  assert.deepEqual(motionSpec(null, css, 'list', 'list').map((r) => r.status), ['unread', 'unread'], 'before Figma is read');
 });
 
 test('the capture reads every page, Motion keyframes and overlays too, and changes nothing; the snapshot keeps them', () => {

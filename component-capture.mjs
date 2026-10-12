@@ -495,9 +495,10 @@ export async function captureComponents(ctx) {
       return perSel;
     };
     // States, batched: each mode is switched once, and every state is put on and taken off inside it.
-    // The winning rules are traced in the first mode, where the state's reported values come from.
+    // The winning rules are traced in the first mode, where the state's reported values come from, and again in every
+    // other mode (A10): a state a dark-mode rule draws is pointed at that rule, not at the light one.
     const measureStates = async (jobs) => {
-      const sMode = jobs.map(() => ({})), sTrace = jobs.map(() => ({})), sLayers = jobs.map(() => null);
+      const sMode = jobs.map(() => ({})), sTrace = jobs.map(() => ({})), sTraceModes = jobs.map(() => ({})), sLayers = jobs.map(() => null);
       for (const [mi, mode] of modes.entries()) {
         const sw = modeSwitch(mode, { styleguide: !!page.generated });
         if (sw.unsupported) continue;
@@ -513,6 +514,7 @@ export async function captureComponents(ctx) {
             const textColor = (await send('Runtime.evaluate', { expression: `(() => { const t = document.querySelector('[data-design-system-engine-part~="${j.i}-text"]'); return t ? getComputedStyle(t).color : null; })()`, returnByValue: true }, sessionId)).result?.value;
             if (textColor && sMode[ji][mode.snapshotKey]?.cs) sMode[ji][mode.snapshotKey].textColor = textColor;
             if (mi === 0) sTrace[ji] = await trace(j.nodeId);
+            else sTraceModes[ji][mode.snapshotKey] = await trace(j.nodeId);
             if (mi === 0 && j.childParts?.length) sLayers[ji] = (await send('Runtime.evaluate', { expression: layersExpression(capSel(j.i), j.childParts), returnByValue: true }, sessionId)).result?.value ?? null;
           } finally { await applyRecipe(send, sessionId, j.i, j.nodeId, j.how, false).catch(() => {}); }
         }
@@ -520,24 +522,35 @@ export async function captureComponents(ctx) {
         if (sw.viewport) await setWidth(1280);
       }
       await backToFirstMode();
-      return { sMode, sTrace, sLayers };
+      return { sMode, sTrace, sTraceModes, sLayers };
     };
     const setWidth = (width) => send('Emulation.setDeviceMetricsOverride', { width: Math.round(width), height: 900, deviceScaleFactor: ctx.deviceScaleFactor ?? 2, mobile: false }, sessionId);
-    // The component at each Figma breakpoint width, in the first mode: the values a responsive token
-    // changes (padding, gap, radius, font, height).
+    // The component at each Figma breakpoint width: the values a responsive token changes (padding, gap, radius, font,
+    // height), in the first mode, and in every other mode that does not set the width itself (A10: a dark mode that pads
+    // a phone otherwise is said). → { [breakpoint]: { width, height, …props, byMode?: { [mode]: { …props that differ } } } }
     const measureAt = async (sel, bps) => {
       const out = {};
-      const sw = modeSwitch(modes[0], { styleguide: !!page.generated });
-      if (sw.unsupported) return out;
-      await send('Emulation.setEmulatedMedia', { features: sw.media }, sessionId);
-      if (sw.apply) await send('Runtime.evaluate', { expression: sw.apply }, sessionId);
-      for (const bp of bps) {
-        await setWidth(bp.width);
-        const m = (await send('Runtime.evaluate', { expression: measureExpression(sel), returnByValue: true }, sessionId)).result?.value;
-        if (m?.cs) out[bp.name] = { width: bp.width, height: m.rect?.height, ...Object.fromEntries(BREAKPOINT_PROPS.map((k) => [k, m.cs[k]])) };
+      for (const [mi, mode] of modes.entries()) {
+        const sw = modeSwitch(mode, { styleguide: !!page.generated });
+        if (sw.unsupported || (mi > 0 && sw.viewport)) continue;
+        await send('Emulation.setEmulatedMedia', { features: sw.media }, sessionId);
+        if (sw.apply) await send('Runtime.evaluate', { expression: sw.apply }, sessionId);
+        try {
+          for (const bp of bps) {
+            await setWidth(bp.width);
+            const m = (await send('Runtime.evaluate', { expression: measureExpression(sel), returnByValue: true }, sessionId)).result?.value;
+            if (!m?.cs) continue;
+            const vals = { height: m.rect?.height, ...Object.fromEntries(BREAKPOINT_PROPS.map((k) => [k, m.cs[k]])) };
+            if (mi === 0) { out[bp.name] = { width: bp.width, ...vals }; continue; }
+            const base = out[bp.name], diff = base ? Object.fromEntries(Object.entries(vals).filter(([k, v]) => v !== base[k])) : null;
+            if (diff && Object.keys(diff).length) (base.byMode ??= {})[mode.snapshotKey] = diff;
+          }
+        } finally {
+          await setWidth(1280);
+          if (sw.undo) await send('Runtime.evaluate', { expression: sw.undo }, sessionId);
+        }
       }
-      await setWidth(1280);
-      if (sw.undo) await send('Runtime.evaluate', { expression: sw.undo }, sessionId);
+      await backToFirstMode();
       return out;
     };
     const evaluate = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result?.value;
@@ -633,9 +646,22 @@ export async function captureComponents(ctx) {
     }
     return out;
   };
-  const stateEntry = (st, produced, sMode, sTrace, props, layers = null) => {
+  const stateEntry = (st, produced, sMode, sTrace, props, layers = null, traceModes = {}) => {
     const changed = {};
     const sb = sMode[firstMode] ?? {};
+    // Each other mode where the state draws a value of its own (not the first mode's): that value and the rule that
+    // wins there, so a difference in that mode points at its own rule.
+    const byMode = {};
+    for (const [mk, tr] of Object.entries(traceModes ?? {})) {
+      const cs = sMode[mk]?.cs ?? {};
+      for (const prop of Object.keys(TRACE)) {
+        if (cs[prop] == null || cs[prop] === sb?.cs?.[prop] || !tr?.[prop]?.rule) continue;
+        const own = { value: cs[prop], var: tr[prop].var ?? undefined, rule: tr[prop].rule, at: tr[prop].at ?? undefined };
+        const sd = staticDeclFor(ruleIndex, own.rule, prop, staticRootVars);
+        if (sd?.at && own.at && sd.at !== own.at) { own.renderedAt = own.at; own.at = sd.at; }
+        (byMode[mk] ??= {})[prop] = own;
+      }
+    }
     for (const prop of Object.keys(TRACE)) {
       const v = sb?.cs?.[prop];
       if (v != null && v !== props[prop]?.value && v !== props[prop]?.drawn) changed[prop] = { value: v, var: sTrace[prop]?.var ?? undefined, rule: sTrace[prop]?.rule ?? undefined, at: sTrace[prop]?.at ?? undefined };
@@ -645,7 +671,7 @@ export async function captureComponents(ctx) {
       if (s?.at && c.at && s.at !== c.at) { c.renderedAt = c.at; c.at = s.at; }
     }
     const matched = Object.values(changed).some((c) => c.rule && c.rule.replace(/\s+/g, ' ').includes(st.selector.replace(/\s+/g, ' ')));
-    return { selector: st.selector, produced, changed, colors: colorsOf(sMode), ruleMatched: matched, ...(sb?.rect ? { size: { height: sb.rect.height, width: sb.rect.width } } : {}), ...(layers ? { layers } : {}) };
+    return { selector: st.selector, produced, changed, ...(Object.keys(byMode).length ? { byMode } : {}), colors: colorsOf(sMode), ruleMatched: matched, ...(sb?.rect ? { size: { height: sb.rect.height, width: sb.rect.width } } : {}), ...(layers ? { layers } : {}) };
   };
 
   // Pass 1: every component, and the states that can be produced on its instance.
@@ -674,7 +700,7 @@ export async function captureComponents(ctx) {
     }
     if (stateJobs.length) {
       try {
-        const { sMode, sTrace, sLayers } = await P.measureStates(stateJobs);
+        const { sMode, sTrace, sTraceModes, sLayers } = await P.measureStates(stateJobs);
         stateJobs.forEach((j, ji) => {
           if (j.guard) {
             // A state the user cannot reach is not a leak: no hover when pointer-events is none, and no
@@ -688,7 +714,7 @@ export async function captureComponents(ctx) {
             (j.entry.disabledGuard ??= []).push({ state: j.guard.state, force: j.guard.force, changed });
             return;
           }
-          const e = stateEntry(j.st, j.how.describe, sMode[ji], sTrace[ji], j.props, sLayers[ji]);
+          const e = stateEntry(j.st, j.how.describe, sMode[ji], sTrace[ji], j.props, sLayers[ji], sTraceModes[ji]);
           if (j.combo) (j.entry.combos ??= {})[j.combo] = e; else (j.entry.states ??= {})[j.st.label] = e;
         });
       } catch (e) { notes.push(`states on ${page.label}: could not be measured (${String(e.message || e).split('\n')[0]})`); }

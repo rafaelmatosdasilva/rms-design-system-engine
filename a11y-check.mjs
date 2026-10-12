@@ -847,6 +847,31 @@ function sweepExpression(roots, doFocus, stateMap) {
     // element itself when it is one), so a bare "button" still says where it is.
     const ownerOf = (el) => { if (!roots) return ''; let best = null, depth = -1; for (const s of roots) { let r; try { r = el.closest(s); } catch { continue; } if (!r) continue; let d = 0; for (let n = r; n; n = n.parentElement) d++; if (d > depth) { depth = d; best = s; } } return best ? ' in ' + best : ''; };
     const textEls = [];
+    const alpha = (b) => { const mm = String(b).match(/^rgba?\\(([^)]+)\\)/); const parts = mm ? mm[1].split(',') : null; return parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0; };
+    // The backgrounds behind an element, nearest first: its own, then its ancestors' up to the first opaque one.
+    const ancestorLayers = (el) => { const layers = []; let node = el; while (node && node.nodeType===1) { const b = getComputedStyle(node).backgroundColor; layers.push(b); if (alpha(b) === 1) break; node = node.parentElement; } return layers; };
+    // A ::before that covers its element and paints a background: a layer laid over the element's own background.
+    const coverOf = (n) => { const p = getComputedStyle(n, '::before'); if (!p || p.content === 'none' || p.display === 'none' || alpha(p.backgroundColor) === 0) return null; const r = n.getBoundingClientRect(); const fits = Math.abs(parseFloat(p.width) - r.width) < 2 && Math.abs(parseFloat(p.height) - r.height) < 2; const inset = /absolute|fixed/.test(p.position) && p.top === '0px' && p.left === '0px' && p.right === '0px' && p.bottom === '0px'; return fits || inset ? p.backgroundColor : null; };
+    // What is painted behind the text where it sits (A8): the elements under its middle in paint order, a sibling laid
+    // under it by its position included, and a ::before that covers one; not only its ancestors. Off screen, it is
+    // scrolled into view first; where nothing can be read there (a bar stuck over it), its ancestors as before.
+    const back = { x: scrollX, y: scrollY };
+    const layersAt = (el) => {
+      const tn = [...el.childNodes].find(n => n.nodeType===3 && n.textContent.trim());
+      if (!tn || !document.elementsFromPoint) return ancestorLayers(el);
+      const range = document.createRange(); range.selectNodeContents(tn);
+      let rr = range.getBoundingClientRect();
+      if (!rr.width || !rr.height) return ancestorLayers(el);
+      if (rr.top < 0 || rr.left < 0 || rr.bottom > innerHeight || rr.right > innerWidth) { el.scrollIntoView({ block: 'center', inline: 'center' }); rr = range.getBoundingClientRect(); }
+      const stack = document.elementsFromPoint(rr.left + rr.width / 2, rr.top + rr.height / 2), at = stack.indexOf(el);
+      if (at < 0) return ancestorLayers(el);
+      const layers = [];
+      for (const n of stack.slice(at)) {
+        const c = coverOf(n); if (c) { layers.push(c); if (alpha(c) === 1) return layers; }
+        const b = getComputedStyle(n).backgroundColor; layers.push(b); if (alpha(b) === 1) return layers;
+      }
+      return layers;
+    };
     for (const el of scope) {
       if (seen.has(el)) continue; seen.add(el);
       // Text in a disabled control is exempt (WCAG 1.4.3) wherever in the control it sits: <button disabled><span>.
@@ -854,15 +879,7 @@ function sweepExpression(roots, doFocus, stateMap) {
       const hasText = [...el.childNodes].some(n => n.nodeType===3 && n.textContent.trim());
       if (!hasText) continue;
       const cs = getComputedStyle(el);
-      const layers = []; let node = el;
-      while (node && node.nodeType===1) {
-        const b = getComputedStyle(node).backgroundColor; layers.push(b);
-        const mm = b.match(/^rgba?\\(([^)]+)\\)/);
-        const parts = mm ? mm[1].split(',') : null;
-        const a = parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0;
-        if (a === 1) break;
-        node = node.parentElement;
-      }
+      const layers = layersAt(el);
       const cls = (el.className && typeof el.className==='string') ? '.'+el.className.trim().split(/\\s+/).join('.') : '';
       textEls.push({
         desc: (el.tagName.toLowerCase() + (el.id?('#'+el.id):'') + cls).slice(0,80) + ownerOf(el),
@@ -872,6 +889,7 @@ function sweepExpression(roots, doFocus, stateMap) {
         bgImage: !!(cs.backgroundImage && cs.backgroundImage !== 'none'),
       });
     }
+    scrollTo(back.x, back.y);   // where the page was before any text was scrolled into view
     // A placeholder on show is text (WCAG 1.4.3): its own colour against the field.
     for (const el of scope) {
       if (!el.matches || !el.matches('input[placeholder],textarea[placeholder]') || !el.getAttribute('placeholder').trim() || el.value || !vis(el) || el.closest(':disabled,[aria-disabled="true"]')) continue;
@@ -2111,27 +2129,36 @@ async function main() {
     const STAGE = target.styleguide ? '.pg-preview' : null;
     const media0 = modes[0].sw.media;
     const step = makeStep(findings, unfinished, label);
-    // Target size in every mode (a density mode can shrink a control): one finding per control, with the modes it is small in.
+    // Target size in every mode (a density mode can shrink a control), at the page's own width and again on a 320px
+    // screen (A6: a control that shrinks on a phone is measured there too): one finding per control, with the modes it
+    // is small in; one small only on the narrow screen says so ("Dark, 320px wide").
     await step(async () => {
-      const seen = new Map();
-      for (const mode of modes) {
-        await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
-        if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
-        try {
-          const r = (await evalv(deepSweepExpression(roots, 'targets'))) ?? {};
-          const nth = new Map();   // two controls read alike (two button.tiny) stay two findings
-          for (const [kind, list] of [['target', r.small ?? []], ['target44', r.roomy ?? []]]) {
-            for (const x of list) {
-              const base = `${kind}|${x.desc}|${x.size}`, n = (nth.get(base) ?? 0) + 1;
-              nth.set(base, n);
-              const k = `${base}|${n}`, had = seen.get(k);
-              if (had) { if (had.modes && !had.modes.includes(mode.name)) had.modes.push(mode.name); continue; }
-              const nf = { kind, plugin: label, ...x, ...(modes.length > 1 ? { modes: [mode.name] } : {}) };
-              seen.set(k, nf); findings.push(nf);
+      const seen = new Map(), small = new Set();   // small: each control already found at the page's own width
+      const sweep = async (narrow) => {
+        for (const mode of modes) {
+          await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
+          if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
+          try {
+            const r = (await evalv(deepSweepExpression(roots, 'targets'))) ?? {};
+            const nth = new Map();   // two controls read alike (two button.tiny) stay two findings
+            for (const [kind, list] of [['target', r.small ?? []], ['target44', r.roomy ?? []]]) {
+              for (const x of list) {
+                const base = `${kind}|${x.desc}`, n = (nth.get(base) ?? 0) + 1;
+                nth.set(base, n);
+                if (narrow && small.has(`${base}|${n}`)) continue;   // small at the page's own width already: said once
+                const k = narrow ? `${base}|${n}|narrow` : `${base}|${x.size}|${n}`, had = seen.get(k), where = narrow ? (modes.length > 1 ? `${mode.name}, 320px wide` : '320px wide') : mode.name;
+                if (!narrow) small.add(`${base}|${n}`);
+                if (had) { if (had.modes && !had.modes.includes(where)) had.modes.push(where); continue; }
+                const nf = { kind, plugin: label, ...x, ...(modes.length > 1 || narrow ? { modes: [where] } : {}), ...(narrow ? { narrow: true } : {}) };
+                seen.set(k, nf); findings.push(nf);
+              }
             }
-          }
-        } finally { if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); }
-      }
+          } finally { if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); }
+        }
+      };
+      await sweep(false);
+      await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 1, mobile: false }, sessionId);
+      try { await sweep(true); } finally { await send('Emulation.clearDeviceMetricsOverride', {}, sessionId); }
       await send('Emulation.setEmulatedMedia', { features: modes[0].sw.media }, sessionId);
       if (modes[0].sw.apply) await send('Runtime.evaluate', { expression: modes[0].sw.apply }, sessionId);
       ranChecks.add('targets');

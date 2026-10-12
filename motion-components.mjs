@@ -13,7 +13,7 @@
 
 import { blankComments, walkCss } from './css-source.mjs';
 import { bezierOf, sameEasing, timeMs } from './css-values.mjs';
-import { figmaEasing, transitionsOf } from './motion-parity.mjs';
+import { figmaEasing, transitionsOf, STATE, TRIGGER_WORD } from './motion-parity.mjs';
 
 export const MOTIONS = ['loop', 'open', 'close'];
 
@@ -298,4 +298,106 @@ export function componentMotionRows(snap, sources, classFor = () => null, names 
     }
   }
   return rows.sort((a, b) => a.component.localeCompare(b.component) || MOTIONS.indexOf(a.motion) - MOTIONS.indexOf(b.motion));
+}
+
+// Every motion the code gives a component, for its Motion area: each transition and animation on its own rules and its
+// parts' (a hover's included), what it moves, how long, its curve and delay, the variables it is written with, where,
+// and whether it stops for a person who asks for less motion (a prefers-reduced-motion rule that sets it to none or to
+// no time, on it or on everything). sources: [{ file, text }].
+// → [{ via: 'transition'|'animation', selector, prop, name, ms, delay, easing, infinite, vars: ['--…'], calm, at }]
+export function componentTransitions(sources = [], cls, { resolve = null } = {}) {
+  const c = String(cls ?? '').replace(/^\./, '');
+  if (!c || /[^\w-]/.test(c)) return [];
+  resolve ??= customProps(sources);
+  const all = sources.flatMap((src) => rulesIn(src).map((r) => ({ r, file: src.file })));
+  // A rule that stops it: none, or a duration of no time (0s, 0.01ms), in a prefers-reduced-motion block.
+  const stops = (d) => { if (!/^(transition|animation)(-duration)?$/.test(d.prop)) return false; const v = d.value.trim(); if (/^none\b/i.test(v)) return true; const t = v.split(/[\s,]+/).map(timeMs).find((x) => x != null); return t != null && t <= 1; };
+  const calmRules = all.filter(({ r }) => (r.atRules ?? []).some((a) => /prefers-reduced-motion\s*:\s*reduce/.test(a)) && r.decls.some(stops));
+  // It stops when such a rule wins over the one that moves it: the same selector, or one on the same element at least as
+  // specific, or one marked !important (a rule on everything, * or *::before, only so).
+  const spec = (x) => (x.match(/\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+(\([^)]*\))?|#[\w-]+/g) ?? []).length;
+  const lastOf = (x) => classesOf(x.split(' ').at(-1) ?? '');
+  const calmFor = (s) => calmRules.some(({ r }) => { const imp = r.decls.some((d) => stops(d) && d.important); return r.selectors.some((x) => { const t = x.trim().replace(/\s+/g, ' '); if (t === s) return true; if (/^\*/.test(t)) return imp; return lastOf(t).some((k) => lastOf(s).includes(k)) && (imp || spec(t) >= spec(s)); }); });
+  const varsIn = (v) => [...String(v).matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]);
+  const out = [];
+  for (const { r, file } of all) {
+    if (skipped(r)) continue;
+    const decls = r.decls.filter((d) => /^(transition|animation)(-|$)/.test(d.prop));
+    if (!decls.length) continue;
+    for (const sel of r.selectors) {
+      const s = sel.trim().replace(/\s+/g, ' ');
+      if (!classesOf(s).some((k) => partOf(c, k))) continue;
+      const vars = [...new Set(decls.flatMap((d) => varsIn(d.value)))], at = `${file}:${r.line}`, calm = calmFor(s);
+      for (const t of transitionsOf(decls.map((d) => ({ ...d, value: resolve(d.value) })))) if (t.ms > 0) out.push({ via: 'transition', selector: s, prop: t.prop, name: null, ms: t.ms, delay: t.delay, easing: t.easing, infinite: false, vars, calm, at });
+      for (const a of animationsOf(decls, resolve)) if (a.ms > 0) out.push({ via: 'animation', selector: s, prop: null, name: a.name, ms: a.ms, delay: a.delay, easing: a.easing, infinite: a.infinite, vars, calm, at });
+    }
+  }
+  return out;
+}
+
+// Everything that moves in a component, in one list for its Motion area: what repeats while it shows, how it opens and
+// closes, what plays on hover, press or focus, and any other change it eases. Each row says when it plays and what moves,
+// the part it moves, the code's timing with the variables and the rule it is written in, Figma's timing with where in
+// Figma it comes from (its Motion timeline, an animation style, an overlay or a transition of its prototype), whether it
+// stops for a person who asks for less motion, and how the two compare.
+// → [{ when, what, part, code: { ms, easing, delay, vars, at, calm } | null, figma: { ms, easing, from } | null,
+//      status: 'same'|'differs'|'figma-none'|'code-none'|'code-only'|'unread' }]
+const PSEUDO = { hover: 'hover', active: 'press', focus: 'focus', 'focus-visible': 'focus', 'focus-within': 'focus', checked: 'checked', disabled: 'disabled' };
+const WHEN_OF = { loop: 'Repeats', open: 'Opens', close: 'Closes' };
+const ORDER = ['Repeats', 'Opens', 'Closes', 'On hover', 'On press', 'On focus'];
+export function motionSpec(snap, sources = [], cls, component) {
+  const c = String(cls ?? '').replace(/^\./, '');
+  const resolve = customProps(sources);
+  const all = c ? componentTransitions(sources, c, { resolve }) : [], used = new Set(), rows = [], frames = keyframesIn(sources, resolve);
+  const read = !!(snap?.motion || snap?.overlays);
+  const codeOf = (t, k) => ({ ms: k?.ms ?? t.ms, easing: k?.easing ?? t.easing, delay: t?.delay ?? 0, vars: t?.vars ?? [], at: t?.at ?? (k ? `${k.file}:${k.line}` : null), calm: t?.calm ?? null });
+  const compare = (k, f) => (Math.abs(k.ms - f.ms) > 10 || (bezierOf(f.easing) && sameEasing(k.easing, f.easing) === false) ? 'differs' : 'same');
+  // When a transition plays: the states whose rules change what it eases (.chip:hover sets the colour it eases), else
+  // whatever changes it (a script that widens a panel).
+  const rules = sources.flatMap((src) => rulesIn(src)).filter((r) => !skipped(r));
+  const statesOf = (t) => {
+    const out = new Set();
+    for (const r of rules) {
+      if (!r.decls.some((d) => t.prop === 'all' || d.prop === t.prop || d.prop.startsWith(t.prop + '-') || t.prop.startsWith(d.prop + '-'))) continue;
+      for (const sel of r.selectors) {
+        const s = sel.trim().replace(/\s+/g, ' ');
+        if (s === t.selector || !classesOf(s).some((k) => partOf(c, k))) continue;
+        for (const m of s.matchAll(/:([\w-]+)/g)) if (PSEUDO[m[1]]) out.add(PSEUDO[m[1]]);
+        const rest = s.replace(/\.(-?[A-Za-z_][\w-]*)/g, (m, k) => (partOf(c, k) ? ' ' : m)).replace(/:[\w-]+(\([^)]*\))?/g, ' ');
+        if (OPEN_WORD.test(rest)) out.add('open'); else if (CLOSE_WORD.test(rest)) out.add('close');
+        else { const w = /\.(?:is-|has-)?([\w-]+)|\[(?:aria-|data-)?([\w-]+)/.exec(rest); if (w) out.add(w[1] ?? w[2]); }
+      }
+    }
+    return [...out];
+  };
+  const whenWords = (states) => { const on = states.filter((s) => ['hover', 'press', 'focus'].includes(s)); return on.length ? `On ${on.join(' and ')}` : states.length ? `When ${states.join(' or ')}` : 'When it changes'; };
+  // Its loop, opening and closing, the code's beside Figma's.
+  for (const r of componentMotionRows(snap, sources, () => cls, [component]).filter((x) => x.component === component)) {
+    const t = r.code ? all.find((x) => x.selector === r.code.selector && x.ms === r.code.ms) ?? all.find((x) => x.selector === r.code.selector) : null;
+    if (t) used.add(t);
+    rows.push({ when: WHEN_OF[r.motion], what: r.what, part: r.code?.selector ?? null, code: r.code ? codeOf(t, r.code) : null, figma: r.figma ? { ms: r.figma.ms, easing: r.figma.easing, from: r.figma.from } : null, status: r.status });
+  }
+  // What Figma's prototype animates between its variants on hover or press, against each transition that plays then.
+  const seen = new Set();
+  for (const m of snap?.components?.[component] ?? []) {
+    if (!m || m.trigger === 'AFTER_TIMEOUT' || m.type === 'INSTANT' || !(m.duration > 0)) continue;
+    const word = TRIGGER_WORD[m.trigger] ?? String(m.trigger ?? '').toLowerCase(), state = STATE[m.trigger];
+    const change = Object.keys(m.to ?? {}).filter((p) => String(m.from?.[p]) !== String(m.to[p])).map((p) => `${p} ${m.from?.[p] ?? '?'} to ${m.to[p]}`).join(', ') || 'to another variant';
+    if (seen.has(word + change)) continue;
+    seen.add(word + change);
+    const fe = figmaEasing(m.easing), figma = { ms: Math.round(m.duration * 1000), easing: fe.css ?? fe.spring, from: `its prototype, ${change}` };
+    const plays = all.filter((t) => !used.has(t) && t.via === 'transition' && statesOf(t).includes(word === 'press' ? 'press' : state === 'hover' ? 'hover' : word));
+    if (!plays.length) rows.push({ when: `On ${word}`, what: change, part: null, code: null, figma, status: 'code-none' });
+    for (const t of plays) { used.add(t); rows.push({ when: whenWords(statesOf(t)), what: t.prop === 'all' ? 'everything changes' : `${t.prop} changes`, part: t.selector, code: codeOf(t), figma, status: compare(t, figma) }); }
+  }
+  // Every other transition or animation its code has: a part that loops, opens or closes too (the backdrop behind a
+  // modal's card) is Figma's to animate as the rest; what plays on hover or focus that Figma's prototype does not
+  // animate is the code's alone.
+  for (const t of all) {
+    if (used.has(t)) continue;
+    const when = t.via === 'animation' ? (t.infinite ? 'Repeats' : CLOSE_WORD.test(`${t.selector} ${t.name}`) ? 'Closes' : 'Opens') : whenWords(statesOf(t));
+    rows.push({ when, what: t.via === 'animation' ? keyframesWhat(frames.get(t.name)) ?? `plays ${t.name}` : t.prop === 'all' ? 'everything changes' : `${t.prop} changes`, part: t.selector, code: codeOf(t), figma: null, status: !(read || snap?.components) ? 'unread' : WHEN_OF.loop === when || WHEN_OF.open === when || WHEN_OF.close === when ? (read ? 'figma-none' : 'unread') : 'code-only' });
+  }
+  const rank = (w) => { const i = ORDER.findIndex((o) => w === o || w.startsWith(o + ' ')); return i < 0 ? ORDER.length : i; };
+  return rows.map((r, i) => [r, i]).sort((a, b) => rank(a[0].when) - rank(b[0].when) || a[1] - b[1]).map((x) => x[0]);
 }
