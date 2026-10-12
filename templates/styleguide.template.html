@@ -253,8 +253,6 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-motion-curve .sg-motion-axis { stroke: var(--sg-muted); stroke-width: 1; }
 .sg-thumb .sg-motion-curve { width: 36px; height: 36px; }
 .sg-motion-proto { margin-top: var(--sg-space-m); }
-.sg-motion-use { display: block; }   /* each component that moves so, on a line of its own */
-.sg-motion-use + .sg-motion-use { margin-top: var(--sg-space-xs); }
 .sg-motion-system .sg-motion-sample { display: block; margin-bottom: var(--sg-space-xs); }
 /* Narrow cards (a phone, a tablet beside the menu): a shorter track under its curve, the names given the room. */
 @container (max-width: 560px) {
@@ -1286,7 +1284,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var MOTION = DATA.motion || null;
   // The system's motion as its fundamentals, in one table: each timing its components move with, from the fastest, a dot
   // that crosses its track on Play, the variables it is written with and their Figma names, what it is used for, the
-  // components and parts that move so, Figma's timing for them, and what the system could do (a purpose that has other
+  // components that move so (each once), Figma's timing for them, and what the system could do (a purpose that has other
   // timings too, a timing several components share, one written as values, a variable nothing uses).
   if (MOTION && (MOTION.overview || []).length) {
     hr(); foundationLink('motion', 'motion');
@@ -1311,7 +1309,9 @@ a.pg-usage-name { color: var(--sg-text); }
       var timing = r.ms != null ? r.ms + 'ms' + (r.easing ? ', ' + r.easing : '') + (r.delay ? ', after ' + r.delay + 'ms' : '') : r.easing;
       var dot = track(' data-ms="' + (r.ms || baseMs) + '" data-ease="' + esc(r.easing || 'linear') + '"');
       var vars = r.vars.length ? r.vars.map(function (v) { return '<code>' + esc(v.var) + '</code><span class="pg-par-val">' + esc(v.figma || 'not in Figma') + '</span>'; }).join('') : esc('Written as values');
-      var uses = r.uses.length ? r.uses.map(function (u) { return '<span class="sg-motion-use">' + (known(u.component) ? '<a class="sg-uses-link" href="#' + esc(cid(u.component)) + '/motion">' + esc(u.component) + '</a>' : esc(u.component)) + '<span class="pg-par-val">' + esc(u.purpose + ', ' + u.what + (u.part ? ', ' + u.part : '')) + '</span></span>'; }).join('') : esc('Nothing');
+      // The components that move so, each once and linked to its Motion tab: what moves and how is on that tab.
+      var users = r.uses.map(function (u) { return u.component; }).filter(function (n, i, all) { return all.indexOf(n) === i; });
+      var uses = users.length ? users.map(function (n) { return known(n) ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/motion">' + esc(n) + '</a>' : esc(n); }).join(', ') : esc('Nothing');
       return '<tr' + (r.unused ? ' data-unused' : '') + '><td>' + dot + '<code>' + esc(timing) + '</code></td><td>' + vars + '</td><td>' + esc(r.purposes.join(', ') || 'Nothing yet') + '</td><td>' + uses + '</td><td>' + esc(FIGMA_SAYS[r.figma] || '') + (r.figmaTiming && r.figma === 'differs' ? '<span class="pg-par-val">' + esc(r.figmaTiming) + '</span>' : '') + '</td><td>' + esc(systemSays(r)) + '</td></tr>';
     }), 'sg-motion-system');
     while (mc.firstChild) mo.appendChild(mc.firstChild);

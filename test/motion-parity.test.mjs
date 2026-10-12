@@ -133,7 +133,7 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
       const page = JSON.parse(await run2(`JSON.stringify({ heads: [...document.querySelectorAll('#motion thead th')].map((th) => th.textContent).join('|'), rows: [...document.querySelectorAll('#motion tbody tr')].map((tr) => tr.textContent), tables: document.querySelectorAll('#motion table').length, lead: document.querySelector('#motion > p').textContent, card: !!document.querySelector('#overview a[href="#motion"]') })`));
       assert.equal(page.heads, 'Timing|Variables|For|Used by|Figma|For the system');
       assert.equal(page.tables, 1, 'one table');
-      assert.ok(page.rows.some((r) => /^200ms, ease-outWritten as valuesOpensbuttonOpens, fades in, \.buttonNone in Figma.*Written as values: make it a variable\.$/.test(r)), JSON.stringify(page.rows));
+      assert.ok(page.rows.some((r) => /^200ms, ease-outWritten as valuesOpensbuttonNone in Figma.*Written as values: make it a variable\.$/.test(r)), JSON.stringify(page.rows));
       assert.ok(page.rows.some((r) => /--motion-quick.*Nothing yetNothing.*No component uses it/.test(r)), JSON.stringify(page.rows));
       assert.match(page.lead, /does not stop its motion yet when a person asks for less/);
       assert.ok(page.card, 'a card on the overview');
