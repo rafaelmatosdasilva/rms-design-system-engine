@@ -91,5 +91,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `documentation-page` | The 21 guide tasks on Haiku (engine 53b5844) | "Coverage becomes Documentation, the same cards as each component's" |
 | `vue-builds` | The 21 guide tasks on Haiku (engine e27cbc3) | "Vue components rendered with whatever builds them" |
 | `gate-measures-motion-page` | The 21 guide tasks on Haiku (engine 856fd1a) | "The structure gate measures tokens, icons and nesting, and a motion page in the foundations" |
+| `todo-kinds-usage` | The 21 guide tasks on Haiku (engine 7a6b367) | "A wider disabled guard, text styles in full, where each component lives, and the To do page by kind" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
