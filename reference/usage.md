@@ -67,7 +67,7 @@ rms-design-system-engine --trend                         # show last 20 audit ru
 rms-design-system-engine --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
 rms-design-system-engine --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
 rms-design-system-engine --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
-rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) or a token's variable, values per mode and, for a text colour, the surfaces it reads on
+rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
 rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
@@ -749,7 +749,11 @@ A generator (an AI agent, a small model in the browser, a template tool) compose
 only when it is told exactly what exists, and its output is checked every time. Every run writes
 `contracts/catalog.json` beside the contracts: each component with its props (allowed values, defaults,
 and the code prop name when known), the components it may contain (from Figma's composition and the
-nesting the code capture saw), what it must never contain, and its status. `llms.txt` gets the same
+nesting the code capture saw), what it must never contain, its status, and where it lives (`livesIn`, also
+in each contract): the products whose code uses it, with how many files and uses (a page built from a source
+beside it counted once), the system's own pages that show it, the components it sits inside and the ones it
+holds, and the Figma screens that draw it. `--query` prints it, and `differences.md` names it under each
+component, so a difference in a component five products use reads as the larger change it is. `llms.txt` gets the same
 catalog as an aligned table (`Badge  Tone=info|warn  Text=text`), because small models read aligned
 tables far better than JSON Schema. Interaction states (hover, focus) are not props a generator sets:
 the component owns them. When the code capture is fresh, each entry also has `rendered`: its size on a
