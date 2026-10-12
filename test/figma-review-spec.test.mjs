@@ -30,7 +30,9 @@ test('review: one pin per layer with all its issues, a summary per screen, what 
   assert.match(both, /^\*\*Accessibility Review\*\*\n/);
   assert.match(both, /"Cancel".*WCAG 1\.4\.3/);
   assert.match(both, /iconButton.*WCAG 2\.5\.8/, 'a layer with two issues lists both');
-  assert.match(start.summary, /3 to fix \(contrast 1, target size 1, no surface 1\)\. Each is pinned on its layer\./);
+  assert.match(start.summary, /3 to fix \(contrast 1, target size 1, no surface 1\)\. Each one on a layer is pinned there\./);
+  assert.match(reviewEdits(FINDINGS.slice(0, 2), SCREENS.slice(0, 1))[0].screens[0].summary, /2 to fix \(contrast 1, target size 1\)\. Each is pinned on its layer\.$/);
+  assert.match(pinWords({ ...FINDINGS[2], count: 1 }), /^1 text or icon has nothing drawn behind it \(/);
   assert.match(start.summary, /nothing drawn behind them/, 'the screen-wide finding is said in the summary');
   assert.equal(ex2.name, 'Export (10:2)', 'two screens with one name are told apart by their ids');
   assert.equal(ex2.pins.length, 0);

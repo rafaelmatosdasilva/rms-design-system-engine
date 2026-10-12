@@ -199,7 +199,7 @@ export function pinWords(f) {
   const what = f.kind === 'contrast' ? `${f.what}${times} is ${f.ratio}:1 (${f.fg} on ${f.bg}), and needs ${f.need}:1.`
     : f.kind === 'plate' ? `${f.what}${times} sits on an image or a gradient, so its contrast cannot be measured.`
       : f.kind === 'target' ? `${f.what}${times} is drawn ${f.size}, under 24×24.`
-        : `${f.count ?? f.n} text${(f.count ?? f.n) === 1 ? ' or icon has' : 's and icons have'} nothing drawn behind them (the screen has no fill).`;
+        : `${f.count ?? f.n} text${(f.count ?? f.n) === 1 ? ' or icon has nothing drawn behind it' : 's and icons have nothing drawn behind them'} (the screen has no fill).`;
   return `${what} WCAG ${f.criterion}. Fix: ${f.fix}.`;
 }
 // findings: screenA11yFindings (each with its screenId and the layers it is on); screens: the screens read ({ id, name }).
@@ -218,7 +218,7 @@ export function reviewEdits(findings = [], screens = []) {
     // What has no layer to pin it on (no fill behind the screen, or a capture older than the layer ids) is said in the summary.
     const loose = mine.filter((f) => !(f.nodes ?? []).length);
     const summary = mine.length
-      ? [`${REVIEW_HEAD}: ${mine.length} to fix (${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ')}).${loose.length < mine.length ? ' Each is pinned on its layer.' : ''}`, ...loose.map(pinWords)].join('\n\n')
+      ? [`${REVIEW_HEAD}: ${mine.length} to fix (${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ')}).${!loose.length ? ' Each is pinned on its layer.' : loose.length < mine.length ? ' Each one on a layer is pinned there.' : ''}`, ...loose.map(pinWords)].join('\n\n')
       : `${REVIEW_HEAD}: nothing to fix. Every text and icon read passes contrast, and every control is at least 24×24.`;
     return { id: sc.id, name: named[sc.name] > 1 ? `${sc.name} (${sc.id})` : sc.name, count: mine.length, summary, pins: [...byNode].map(([node, list]) => ({ node, label: `${REVIEW_HEAD}\n${list.join('\n\n')}` })) };
   });
