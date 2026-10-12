@@ -109,7 +109,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* ── Health: the dashboard ───────────────────────────────────────────────── */
 /* Tiles for each area's number, then cards for where what is left gathers. Every box is the system's card (its line,
    corners and shadow), every bar a track and a fill in the system's own colours. */
-.sg-health p, .sg-health h3, .sg-health ol { margin: 0; }
+:where(.sg-health-tile, .sg-health-card, .sg-health-list > li, .sg-health) > :where(p, h3, ol) { margin: 0; }
 .sg-health-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sg-space-l); margin-bottom: var(--sg-space-l); }
 @media (max-width: 640px) { .sg-health-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .sg-health-tile, .sg-health-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); padding: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-s); min-width: 0; }
@@ -130,7 +130,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-health-comps td { font-variant-numeric: tabular-nums; }
 
 /* ── Overview ────────────────────────────────────────────────────────────── */
-.sg-hero { margin-bottom: var(--sg-space-xxl); }
+.sg-hero { margin-bottom: var(--sg-space-s); }   /* what follows the overview's title sits as close as under every page's title */
+#overview > .pg-links { margin: 0 0 var(--sg-space-xl); }   /* its links as a page's lead: as far from the groups as a lead from its content */
 .sg-hero > h1 { font-size: var(--sg-title); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; }   /* the overview's title as every page's */
 .sg-hero > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); max-width: 500px; }
 .sg-pending { font-size: var(--sg-m); color: var(--sg-text); background: color-mix(in srgb, var(--sg-warning) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sg-warning) 40%, transparent); border-radius: var(--sg-radius); padding: var(--sg-space-s) var(--sg-space-m); margin: 0 0 var(--sg-space-xl); max-width: 720px; }
@@ -296,6 +297,7 @@ a.pg-usage-name { color: var(--sg-text); }
    is one kind: the page's background, 8px above and below, and a line under the lowest one once it is stuck, faded in. */
 .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head { position: sticky; z-index: 15; background: var(--sg-bg); padding-top: var(--sg-space-s); padding-bottom: var(--sg-space-s); box-shadow: 0 1px 0 0 transparent; transition: box-shadow 0.15s ease; }
 .sg-sticky-edge { box-shadow: 0 1px 0 0 var(--sg-border); }
+.sg-section > h2 ~ .sg-size-switch { padding-top: 0; }   /* right under a title, as a page's lead is: the title's own space is enough */
 /* A foundation's title stays at the top as its page scrolls. */
 .sg-section:not(.pg-card-section) > h2 { position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); margin: calc(-1 * var(--sg-space-s)) 0 0; padding: var(--sg-space-s) 0; }
 /* On the Tasks page its counts and filter stay at the top instead, so the long list keeps the room the title would take
@@ -501,6 +503,13 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-preview-col > .pg-anatomy .pg-anat-num, .pg-preview-col > .pg-anatomy .pg-anat-lead { display: none; }   /* the inspector names what is clicked, not a numbered list */
 .pg-stage-mode .sg-mode-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pg-preview-col > .pg-preview { flex: 1; }
+/* Room above and below the component on the Playground's stage, whatever it draws (the component, Inspect, a width):
+   100px on a wide screen, 64px on a tablet or a narrow laptop, 40px on a phone. The page's own layout, as the stage's
+   least width is, not one of the system's spaces. */
+.pg-preview-card { --pg-stage-room: 100px; }
+@media (max-width: 1100px) { .pg-preview-card { --pg-stage-room: 64px; } }
+@media (max-width: 720px) { .pg-preview-card { --pg-stage-room: 40px; } }
+.pg-preview-col > .pg-preview, .pg-preview-col > .pg-anatomy, .pg-preview-col > .pg-frame { padding-top: var(--pg-stage-room); padding-bottom: var(--pg-stage-room); }
 .pg-preview-col > .pg-frame { flex: 1; }
 .pg-frame { display: flex; align-items: safe center; justify-content: safe center; min-width: 0; min-height: 140px; padding: var(--sg-space-l); }
 .pg-frame-device { display: flex; flex-direction: column; gap: var(--sg-space-xs); max-width: 100%; }

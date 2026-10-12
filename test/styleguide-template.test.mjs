@@ -1099,12 +1099,6 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.equal(coverageOf({ total: {} }, 'src/components/Chip.jsx'), null);
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /card\(cGrid, cid\(c\.name\), 'Components', c\.name, about\(c\), '', c\.status\)/);
-  // Where a person reports a problem: the team's tracker with the component's name, else the repository's own.
-  const { issueLink } = await import('../styleguide-data.mjs');
-  assert.equal(issueLink({ template: 'https://redmine.example.com/projects/ds/issues/new?issue[subject]={title}', name: 'Chip' }), 'https://redmine.example.com/projects/ds/issues/new?issue[subject]=Chip%3A%20');
-  assert.equal(issueLink({ repo: 'https://github.com/acme/ds', name: 'Chip' }), 'https://github.com/acme/ds/issues/new?title=Chip%3A%20');
-  assert.equal(issueLink({ repo: 'https://gitlab.acme.com/ds/core', name: null }), 'https://gitlab.acme.com/ds/core/-/issues/new?issue[title]=Style%20guide%3A%20');
-  assert.equal(issueLink({ repo: 'https://bitbucket.org/acme/ds', name: 'Chip' }), null);
   assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
   assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
   assert.doesNotMatch(tpl, /'Status: ' \+ kinds|Usage written: |Open the To do list/, 'the overview counts nothing of its own');
@@ -1322,4 +1316,18 @@ test('Health: each area\'s share done, weighted into one number once accessibili
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
+});
+
+test('room around the Playground\'s component, what follows each title as close on every page, no feedback link', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  // 100px above and below the component on a wide screen, 64px on a tablet or a narrow laptop, 40px on a phone.
+  assert.match(tpl, /\.pg-preview-card \{ --pg-stage-room: 100px; \}/);
+  assert.match(tpl, /@media \(max-width: 1100px\) \{ \.pg-preview-card \{ --pg-stage-room: 64px; \} \}/);
+  assert.match(tpl, /@media \(max-width: 720px\) \{ \.pg-preview-card \{ --pg-stage-room: 40px; \} \}/);
+  assert.match(tpl, /\.pg-preview-col > \.pg-preview, \.pg-preview-col > \.pg-anatomy, \.pg-preview-col > \.pg-frame \{ padding-top: var\(--pg-stage-room\); padding-bottom: var\(--pg-stage-room\); \}/);
+  // The overview's links as a page's text under its title, a foundation's size switch too.
+  assert.match(tpl, /\.sg-hero \{ margin-bottom: var\(--sg-space-s\); \}/);
+  assert.match(tpl, /#overview > \.pg-links \{ margin: 0 0 var\(--sg-space-xl\); \}/);
+  assert.match(tpl, /\.sg-section > h2 ~ \.sg-size-switch \{ padding-top: 0; \}/);
+  assert.doesNotMatch(readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8'), /Send feedback/);
 });
