@@ -99,5 +99,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `modes-effects-motion-tab` | The 21 guide tasks on Haiku (engine 8bf7f93) | "Every mode, effects, a Motion tab" |
 | `tasks-motion-page` | The 21 guide tasks on Haiku (engine 8f2202f) | "Tasks by kind, motion as one system table" |
 | `2026-10-12-a-fill-figma-does-not` | The 21 guide tasks on Haiku (engine 250c635) | "A fill Figma does not have; a row's free space allows for text; screens framed by a product, or cut" |
+| `2026-10-12-health-how-far-each-area` | The 21 guide tasks on Haiku (engine 647b009) | "Health: how far each area has come, weighted into one number, and where what is left gathers" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
