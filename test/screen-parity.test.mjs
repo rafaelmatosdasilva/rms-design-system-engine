@@ -8,7 +8,8 @@ import { spawnSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeFixture } from './helpers.mjs';
-import { readingOrder, screenFindings, productOfScreen, projectScreens, screenTodos } from '../screen-parity.mjs';
+import { readingOrder, screenFindings, productOfScreen, projectScreens, screenTodos, mergeScreens, screenSnapshot, screenScopes } from '../screen-parity.mjs';
+import { screenCaptureScript } from '../screen-layout.mjs';
 import { findChrome } from '../cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -36,6 +37,51 @@ test('which and how many, their order, the space between neighbours and their al
   assert.deepEqual(screenFindings('Tree', [b('actionBar', 0, 0, 360, 48), ...list(3, 64)], [b('actionBar', 0, 0, 360, 48), ...list(7, 64)]), []);
   assert.deepEqual(screenFindings('Tree', [b('actionBar', 0, 0, 360, 48), ...list(3, 64)], [b('actionBar', 0, 0, 360, 48), ...list(2, 80)]).map((x) => x.message), ['the space between actionBar and the node below it is 32px on the page, 16px on "Tree"']);
   assert.deepEqual(screenFindings('Tree', [b('actionBar', 0, 0, 360, 48), ...list(4, 64)], [b('actionBar', 0, 0, 360, 48)]).map((x) => x.message), ['"Tree" has a list of node; the page shows none']);
+});
+
+test('two columns side by side have no order between them; one column turned round on the page is out of order', () => {
+  // A list beside an empty state: the list is longer on the page, so the empty state sorts among its rows. Not an order.
+  const figma = [b('list', 0, 0, 200, 40), b('item', 0, 48, 200, 40), b('empty', 300, 60, 200, 80), b('row', 0, 96, 200, 40)];
+  const page = [b('list', 0, 0, 200, 40), b('item', 0, 48, 200, 40), b('row', 0, 96, 200, 40), b('empty', 300, 120, 200, 80)];
+  assert.deepEqual(screenFindings('Tree', figma, page).filter((f) => f.kind === 'order'), []);
+  const turned = [b('list', 0, 0, 200, 40), b('row', 0, 48, 200, 40), b('item', 0, 96, 200, 40), b('empty', 300, 60, 200, 80)];
+  assert.deepEqual(screenFindings('Tree', figma, turned).filter((f) => f.kind === 'order').map((f) => f.component), ['item']);
+});
+
+test('neighbours share a scope; a component\'s own parts are its own; two of one component are paired by place', () => {
+  // A status bar holds a badge and a switch in its slot and draws its own divider; a side panel holds another switch.
+  const divider = { kind: 'instance', component: 'dividerLine', x: 300, y: 46, w: 500, h: 2, absolute: true };
+  const bar = { kind: 'instance', component: 'statusBar', x: 300, y: 0, w: 500, h: 48, children: [
+    { kind: 'frame', type: 'SLOT', children: [{ kind: 'instance', component: 'badge', x: 316, y: 14, w: 40, h: 20 }, { kind: 'instance', component: 'segmentedControl', x: 700, y: 12, w: 80, h: 24 }] }, divider] };
+  const panel = { kind: 'instance', component: 'panel', x: 0, y: 0, w: 280, h: 400, children: [{ kind: 'frame', type: 'SLOT', children: [{ kind: 'instance', component: 'segmentedControl', x: 16, y: 14, w: 248, h: 24 }] }] };
+  const { scope, own } = screenScopes({ kind: 'instance', component: 'Screen', children: [panel, bar] });
+  assert.deepEqual([own.has(divider), scope.get(bar.children[0].children[0]), scope.get(panel)], [true, bar, null]);
+  // The page sits 40px higher (no title bar), its two switches a few pixels off one row: paired by place, and the badge
+  // and the side panel's switch, in other scopes, never neighbours.
+  const fig = [b('panel', 0, 40, 280, 400), b('statusBar', 300, 40, 500, 48), { ...b('badge', 316, 54, 40, 20), scope: 'bar' }, { ...b('segmentedControl', 700, 52, 80, 24), scope: 'bar' }, { ...b('segmentedControl', 16, 54, 248, 24), scope: 'panel' }];
+  const page = [b('panel', 0, 0, 280, 400), b('statusBar', 300, 0, 500, 48), b('badge', 316, 14, 40, 20), b('segmentedControl', 700, 9, 80, 24), b('segmentedControl', 16, 14, 248, 24)];
+  assert.deepEqual(screenFindings('Tree', fig, page), []);
+});
+
+test('the capture keeps a list to its first three and each answer under use_figma\'s 20 KB, the rest left for the next run', async () => {
+  const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+  const node = (id, type, name, x, y, w, h, extra = {}) => ({ id, type, name, x, y, width: w, height: h, visible: true, absoluteBoundingBox: { x, y, width: w, height: h }, boundVariables: {}, fills: [], strokes: [], ...extra });
+  const row = (i) => node(`r${i}`, 'INSTANCE', 'row', 0, 40 * i, 200, 40, { componentProperties: {}, getMainComponentAsync: async () => ({ name: 'Size=M', remote: false, parent: { type: 'COMPONENT_SET', name: 'row' } }), findOne: () => null, findAll: () => [] });
+  const list = node('1:1', 'FRAME', 'List', 0, 0, 200, 400, { layoutMode: 'VERTICAL', itemSpacing: 0, children: Array.from({ length: 10 }, (_, i) => row(i)) });
+  // A screen of 400 named layers: too large for one answer on its own, so it is cut, and the next screen waits.
+  const big = (id) => node(id, 'FRAME', 'Big', 0, 0, 800, 800, { layoutMode: 'VERTICAL', children: Array.from({ length: 400 }, (_, i) => node(`b${i}`, 'FRAME', `Section with a long name ${i}`, 0, i, 800, 1, { layoutMode: 'NONE', children: [] })) });
+  const small = node('3:3', 'FRAME', 'Small', 0, 0, 100, 100, { children: [] });
+  const nodes = { '1:1': list, '2:2': big('2:2'), '3:3': small, '4:4': big('4:4') };
+  const figma = { getNodeByIdAsync: async (id) => nodes[id] ?? null, getStyleByIdAsync: async () => null, variables: { getVariableByIdAsync: async () => null, getVariableCollectionByIdAsync: async () => null } };
+  const run = (ids) => new AsyncFunction('figma', screenCaptureScript(ids))(figma);
+  const a = await run(['1:1']);
+  assert.deepEqual([a.screens[0].tree.children.length, a.screens[0].tree.more, a.left], [3, 7, undefined]);
+  const c = await run(['2:2', '3:3', '4:4']);
+  assert.ok(JSON.stringify(c).length < 20480, `${JSON.stringify(c).length} characters`);
+  assert.deepEqual([c.screens.map((s) => s.id), c.screens[0].cut, c.screens[0].tree.more > 0, c.left], [['2:2', '3:3'], true, true, ['4:4']]);
+  // The engine keeps each answer with the ones before, in ds-config's order, and only the screens it still names.
+  assert.deepEqual(screenSnapshot({ result: c }).left, ['4:4']);
+  assert.deepEqual(mergeScreens([{ id: '9:9' }, { id: '1:1', v: 1 }], [{ id: '2:2' }, { id: '1:1', v: 2 }], ['2-2', '1-1', '3-3']), [{ id: '2:2' }, { id: '1:1', v: 2 }]);
 });
 
 test('the product a screen is for: ds-config\'s screens, the screen components snapshot, else its name', () => {
