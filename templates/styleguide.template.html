@@ -923,7 +923,7 @@ a.pg-usage-name { color: var(--sg-text); }
 
   /* ── Overview ─────────────────────────────────────────────────────────────────────────────────────────────── */
   // The menu's first group under its own label, as Foundations and Components are under theirs.
-  (function () { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'Start here'; nav.appendChild(lab); })();
+  (function () { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'System'; nav.appendChild(lab); })();
   navLink('overview', 'overview');
   var ov = document.getElementById('overview');
   document.getElementById('sg-hero-title').textContent = DATA.title || 'Design system';
@@ -3956,7 +3956,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
     links.forEach(function (a) { var on = a.getAttribute('href').slice(1) === target.id; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (target.id === 'overview') Object.keys(THUMBS).forEach(function (k) { fitThumb(THUMBS[k]); });
-    // Its tag says the menu group it sits under (Start here, Foundations, Components), whatever that label says.
+    // Its tag says the menu group it sits under (System, Foundations, Components), whatever that label says.
     var tLink = nav.querySelector('a[href="#' + target.id + '"]'), tGroup = tLink && tLink.previousElementSibling;
     while (tGroup && !tGroup.classList.contains('sg-nav-label')) tGroup = tGroup.previousElementSibling;
     var tTag = target.querySelector('.sg-section-badge'); if (tTag && tGroup) tTag.textContent = tGroup.textContent;
