@@ -10,8 +10,9 @@ Part of the rms-design-system-engine reference (`rms-design-system-engine --refe
 At the start of every run, read `./ds-config.json` from the project root.
 
 **If it doesn't exist** (or `--init` flag is passed), the **engine runs its own setup
-interview** - you do not conduct it or write `ds-config.json` by hand. It needs these
-inputs (auto-detecting what it can):
+interview** - you do not conduct it or write `ds-config.json` by hand. A project that already
+has one keeps it: `--init` there writes nothing and says so, and only `--init --reconfigure`
+sets it up again from scratch, replacing it. It needs these inputs (auto-detecting what it can):
 
 1. **Where the code is** *(required)* - this folder (`--project=.`), another folder or a git link (`--project=<it>`), or the token file here (`--theme-css`). Never guessed: without it setup writes nothing and its NEXT line asks the person.
 2. **Main Design System Figma file** *(optional)* - the full browser URL of the DS file. The engine extracts the file key (path segment after `/design/` or `/file/`). Pass the URL, never a raw key. Without it `figmaFileKey` is empty, each run checks the code alone (the accessibility check) and says nothing was compared with Figma; add the key to compare. A project that already has Figma snapshots committed is still compared with them, as they are: nothing can refresh them without the link, so their age is said (Gate [1]) and never a failure, and the summary says the link is what refreshes them.

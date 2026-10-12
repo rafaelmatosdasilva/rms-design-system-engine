@@ -2,7 +2,8 @@
 // Run from project root: node scripts/audit.mjs [--trend]
 //
 // --trend: print the last 20 audit runs and exit (no new run)
-// --init:  run first-time setup (scaffold config files) and exit without auditing
+// --init:  run first-time setup (scaffold config files) and exit without auditing; a project already set up keeps its
+//          ds-config.json unless --reconfigure is added
 //
 // First run: if ds-config.json is missing, asks a few questions (Figma URL, token CSS
 // path, and whether it is a consumer file) then auto-detects collection structure via the
@@ -1713,6 +1714,12 @@ async function bootstrapConfig() {
 
   let cfg = {};
   if (INIT_ONLY) {
+    // A project already set up keeps its config: setup again replaces it only when asked to (--reconfigure).
+    if (existsSync(join(ROOT, 'ds-config.json')) && !process.argv.includes('--reconfigure')) {
+      console.log('This project is already set up (ds-config.json); nothing was written.');
+      console.log('NEXT: run the audit (rms-design-system-engine), or answer a question with rms-design-system-engine --query <name>. To set it up again from scratch, replacing ds-config.json, add --reconfigure.');
+      process.exit(0);
+    }
     await bootstrapConfig();
     process.exit(0);
   }
