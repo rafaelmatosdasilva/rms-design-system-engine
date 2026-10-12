@@ -1,0 +1,199 @@
+// gitlab-source.mjs - read the project straight from GitLab, on gitlab.com or any company-hosted GitLab.
+//
+// `--project=https://<host>/<group>/<project>` (with or without .git, or /-/tree/<branch> for a branch other than
+// the default one) keeps a local mirror of the branch's latest commit beside where the engine runs, through the
+// GitLab REST API: no git, no clone, no SSH key. Every run asks GitLab for the branch's latest commit and fetches
+// the archive again only when it has moved, so the engine always checks what is on GitLab now. Files the engine
+// writes in the mirror (ds-config.json, snapshots, its output) are kept across refreshes; a file removed on GitLab
+// is removed from the mirror.
+//
+// Token: GITLAB_TOKEN (read_api is enough), from the environment or a .env where the engine runs (else in the
+// mirror), never logged. It is only ever sent to gitlab.com or a host named in GITLAB_HOST (gitlab-fetch.mjs's rule),
+// so a mistyped or hostile link cannot receive it. A public project needs no token.
+//
+// GitLab cannot be reached (offline, VPN down): the mirror already there is used, and the run says from which
+// commit. The pure parts are exported for tests; network goes through an injectable fetch.
+
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, rmdirSync } from 'fs';
+import { join, dirname, resolve, sep } from 'path';
+import { gunzipSync } from 'zlib';
+import { tokenAllowedFor } from './gitlab-fetch.mjs';
+
+export const STATE_FILE = '.gitlab-source.json';
+const TIMEOUT_MS = Math.max(1000, parseInt(process.env.GITLAB_FETCH_TIMEOUT_MS, 10) || 30000);
+
+const hostsIn = (env) => String(env.GITLAB_HOST ?? '').split(',').map((h) => h.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase()).filter(Boolean);
+
+// Is this link a GitLab project? gitlab.com, a host named in GITLAB_HOST, a host called gitlab.<something>, or a
+// link carrying GitLab's own "/-/" segment. → { origin, host, path, ref } (ref null = the default branch), else null.
+// A GitHub link, an SSH link or anything else stays with the plain git clone.
+export function parseGitlabProject(input, env = process.env) {
+  let u;
+  try { u = new URL(String(input ?? '').trim()); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol) || u.username || u.password) return null;
+  const host = u.host.toLowerCase();
+  const parts = u.pathname.split('/').filter(Boolean).map((p) => decodeURIComponent(p));
+  const dash = parts.indexOf('-');
+  const before = (dash >= 0 ? parts.slice(0, dash) : parts);
+  if (before.length) before[before.length - 1] = before[before.length - 1].replace(/\.git$/i, '');
+  const looksGitlab = host === 'gitlab.com' || hostsIn(env).includes(host) || /^gitlab\./.test(host) || dash >= 0;
+  if (!looksGitlab || before.length < 2 || host === 'github.com') return null;
+  let ref = null;
+  if (dash >= 0 && ['tree', 'commits'].includes(parts[dash + 1]) && parts.length > dash + 2) ref = parts.slice(dash + 2).join('/');
+  return { origin: `${u.protocol}//${u.host}`, host, path: before.join('/'), ref };
+}
+
+// The folder the mirror lives in: beside where the engine runs, named for the project.
+export const mirrorDir = (from, p) => join(from, p.path.split('/').pop().replace(/[^\w.-]/g, '') || 'project');
+
+// A .env value: a quoted one up to its closing quote, else up to an inline " #" comment.
+function envValue(raw) {
+  const v = String(raw).trim(); const q = v[0];
+  if (q === '"' || q === "'") { const end = v.indexOf(q, 1); return end > 0 ? v.slice(1, end) : v.slice(1); }
+  const h = v.indexOf(' #'); return (h >= 0 ? v.slice(0, h) : v).trim();
+}
+
+// GITLAB_TOKEN from the environment, else from a .env in one of the folders given (first that has it).
+export function tokenFrom(env, folders = []) {
+  if (env.GITLAB_TOKEN) return env.GITLAB_TOKEN;
+  for (const d of folders) {
+    let text; try { text = readFileSync(join(d, '.env'), 'utf8'); } catch { continue; }
+    for (const line of text.split('\n')) {
+      const m = line.match(/^\s*GITLAB_TOKEN\s*=\s*(.*)$/);
+      if (!m) continue;
+      const v = envValue(m[1]);
+      if (v) return v;
+    }
+  }
+  return '';
+}
+
+// GITLAB_HOST from the environment, else from a .env in one of the folders (so a project's .env can name its host).
+export function hostEnvFrom(env, folders = []) {
+  if (env.GITLAB_HOST) return env.GITLAB_HOST;
+  for (const d of folders) {
+    let text; try { text = readFileSync(join(d, '.env'), 'utf8'); } catch { continue; }
+    const m = text.match(/^\s*GITLAB_HOST\s*=(.*)$/m);
+    if (m && envValue(m[1])) return envValue(m[1]);
+  }
+  return '';
+}
+
+// A tar archive (already gunzipped) → [{ path, data }] for its regular files, the archive's top folder dropped.
+// Long names (pax "path", GNU "L") are honoured; links, devices and anything that would land outside are skipped.
+export function untar(buf) {
+  const out = [];
+  let off = 0, longName = null, paxPath = null;
+  const str = (b) => { const z = b.indexOf(0); return b.subarray(0, z < 0 ? b.length : z).toString('utf8'); };
+  while (off + 512 <= buf.length) {
+    const h = buf.subarray(off, off + 512);
+    if (h.every((x) => x === 0)) break;
+    const size = parseInt(str(h.subarray(124, 136)).trim() || '0', 8) || 0;
+    const type = String.fromCharCode(h[156] || 48);
+    const data = buf.subarray(off + 512, off + 512 + size);
+    off += 512 + Math.ceil(size / 512) * 512;
+    if (type === 'x') { const m = data.toString('utf8').match(/\d+ path=([^\n]*)\n/); paxPath = m ? m[1] : null; continue; }
+    if (type === 'g') continue;
+    if (type === 'L') { longName = str(data); continue; }
+    const prefix = str(h.subarray(345, 500));
+    let name = paxPath ?? longName ?? (prefix ? `${prefix}/${str(h.subarray(0, 100))}` : str(h.subarray(0, 100)));
+    paxPath = null; longName = null;
+    if (type !== '0' && type !== '\0' && type !== '7') continue;          // a regular file only
+    const rel = name.split('/').slice(1).join('/');                         // drop "<project>-<ref>-<sha>/"
+    if (!rel || rel.split('/').some((s) => s === '..' || s === '') || rel.startsWith('/')) continue;
+    out.push({ path: rel, data: Buffer.from(data) });
+  }
+  return out;
+}
+
+// What a failed response means, in words the person can act on (never the token).
+function why(status, host) {
+  if (status === 401) return 'GitLab did not accept the token (401): check GITLAB_TOKEN - wrong, expired or revoked';
+  if (status === 403) return 'GitLab refused (403): the token needs the read_api scope and access to this project';
+  if (status === 404) return `not found on ${host} (404): check the link, or the project is private and no token was sent (set GITLAB_TOKEN, and GITLAB_HOST=${host} for a company GitLab)`;
+  return `GitLab answered ${status}`;
+}
+
+// Bring the mirror up to the branch's latest commit. opts: { from, env, fetchImpl, offline }.
+// → { dir, path, ref, sha, title, committedAt, changed, stale?, warning?, error? }
+export async function syncGitlab(p, opts = {}) {
+  const from = opts.from ?? process.cwd();
+  const dir = opts.dir ?? mirrorDir(from, p);
+  const statePath = join(dir, STATE_FILE);
+  let state = null; try { state = JSON.parse(readFileSync(statePath, 'utf8')); } catch { /* first run */ }
+  const env = { ...(opts.env ?? process.env) };
+  env.GITLAB_HOST = hostEnvFrom(env, [from, dir]);
+  const token = tokenFrom(env, [from, dir]);
+  const send = token && tokenAllowedFor(p.host, env);
+  const headers = send ? { 'PRIVATE-TOKEN': token } : {};
+  const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+  const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
+  const cached = (warning) => state?.sha && existsSync(dir)
+    ? { dir, path: p.path, ref: state.ref, sha: state.sha, title: state.title, committedAt: state.committedAt, changed: false, stale: true, warning }
+    : { dir: null, path: p.path, error: warning };
+  if (opts.offline) return cached('not checked against GitLab this run');
+  const notSent = token && !send ? `; a GITLAB_TOKEN is set but not sent to ${p.host}: add GITLAB_HOST=${p.host} to .env to allow it` : '';
+  const get = async (url) => {
+    const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined;
+    try { return await fetchImpl(url, { headers, signal }); } catch (e) { return { ok: false, status: 0, error: e }; }
+  };
+  try {
+    let ref = p.ref;
+    if (!ref) {
+      const r = await get(base);
+      if (!r.ok) return cached(r.status ? why(r.status, p.host) + notSent : `could not reach ${p.host}`);
+      ref = (await r.json())?.default_branch || 'main';
+    }
+    const c = await get(`${base}/repository/commits/${encodeURIComponent(ref)}`);
+    if (!c.ok) return cached(c.status ? why(c.status, p.host) + notSent : `could not reach ${p.host}`);
+    const head = await c.json();
+    const sha = String(head?.id ?? '');
+    if (!/^[0-9a-f]{7,64}$/i.test(sha)) return cached('GitLab gave no commit for this branch');
+    const info = { dir, path: p.path, ref, sha, title: String(head.title ?? ''), committedAt: String(head.committed_date ?? '') };
+    if (state?.sha === sha && existsSync(dir)) return { ...info, changed: false };
+    const a = await get(`${base}/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}`);
+    if (!a.ok) return cached(a.status ? why(a.status, p.host) + notSent : `could not reach ${p.host}`);
+    // The project cannot write the mirror's own record (a .gitlab-source.json committed upstream would otherwise say
+    // which host the next run talks to).
+    const files = untar(gunzipSync(Buffer.from(await a.arrayBuffer()))).filter((f) => f.path !== STATE_FILE);
+    if (!files.length) return cached('the archive GitLab sent holds no files');
+    const root = resolve(dir) + sep;
+    mkdirSync(dir, { recursive: true });
+    const now = new Set(files.map((f) => f.path));
+    for (const old of state?.files ?? []) {                                  // gone on GitLab: gone here (only files GitLab put here)
+      if (now.has(old)) continue;
+      const fp = resolve(dir, old);
+      if (!fp.startsWith(root)) continue;
+      try { rmSync(fp, { force: true }); } catch { /* leave it */ }
+      let d = dirname(fp);
+      while (d.startsWith(root) && d !== resolve(dir)) { try { if (readdirSync(d).length) break; rmdirSync(d); } catch { break; } d = dirname(d); }
+    }
+    for (const f of files) {
+      const fp = resolve(dir, f.path);
+      if (!fp.startsWith(root)) continue;
+      mkdirSync(dirname(fp), { recursive: true });
+      writeFileSync(fp, f.data);
+    }
+    const next = { source: `${p.origin}/${p.path}`, origin: p.origin, host: p.host, path: p.path, branch: p.ref, ref, sha, title: info.title, committedAt: info.committedAt, fetchedAt: new Date().toISOString(), files: [...now].sort() };
+    writeFileSync(statePath, JSON.stringify(next, null, 2) + '\n');
+    return { ...info, changed: true, previous: state?.sha ?? null };
+  } catch (e) {
+    return cached(`could not read ${p.host}: ${e.message}`);
+  }
+}
+
+// The project a mirror follows, from its state file (the branch it was told, else the default one).
+export function projectFromState(dir) {
+  let st; try { st = JSON.parse(readFileSync(join(dir, STATE_FILE), 'utf8')); } catch { return null; }
+  if (!st?.origin || !st?.host || !st?.path) return null;
+  return { origin: st.origin, host: st.host, path: st.path, ref: st.branch ?? null };
+}
+
+// One line for the person: which GitLab commit this run checks.
+export function describe(r) {
+  if (r.error) return `❌ GitLab: ${r.path}: ${r.error}`;
+  const when = r.committedAt ? ` (${r.committedAt.slice(0, 10)})` : '';
+  const what = `${r.path} @ ${r.ref} ${r.sha.slice(0, 8)}${when}`;
+  if (r.stale) return `⚠️  GitLab: ${r.warning} - checking the copy of ${what}`;
+  return `🦊 GitLab: ${what} - ${r.changed ? (r.previous ? `fetched (was ${r.previous.slice(0, 8)})` : 'fetched') : 'up to date'}`;
+}

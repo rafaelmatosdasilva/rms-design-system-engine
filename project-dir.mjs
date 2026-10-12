@@ -1,11 +1,14 @@
 // Where the project is. The engine works on the folder it runs in, unless told another: `--project=<folder>` or
-// `--project=<git link>` (cloned beside where it runs, once). The answer is remembered in the folder it ran from
-// (.design-system-engine-project), so every later run there goes to the same project without being told again.
+// `--project=<git link>` (cloned beside where it runs, once), or `--project=<GitLab project link>` (read through the
+// GitLab API into a mirror beside where it runs, brought up to the branch's latest commit on every run:
+// gitlab-source.mjs). The answer is remembered in the folder it ran from (.design-system-engine-project), so every
+// later run there goes to the same project without being told again.
 // Imported for its effect, before anything reads the working folder.
 import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve, basename } from 'path';
 import { homedir } from 'os';
 import { spawnSync } from 'child_process';
+import { parseGitlabProject, syncGitlab, projectFromState, describe, hostEnvFrom, STATE_FILE } from './gitlab-source.mjs';
 
 export const POINTER = '.design-system-engine-project';
 const CODE_EXT = /\.(css|scss|sass|less|html|js|jsx|ts|tsx|mjs|vue|svelte)$/i;
@@ -54,13 +57,32 @@ export const PROJECT_FROM = process.cwd();
 const asked = arg('--project');
 // Whether the person has said where the code is: told now (--project, `.` for this folder) or remembered from before.
 export let PROJECT_GIVEN = Boolean(asked);
+// The GitLab commit this run checks, when the project is read from GitLab (null otherwise).
+export let GITLAB_SOURCE = null;
+// Commands that only print (a recipe, the router, the version) use the mirror as it is, without asking GitLab.
+const PRINT_ONLY = ['--version', '--route', '--recipe', '--reference', '--summary', '--help'];
+const printOnly = process.argv.slice(2).some((a) => PRINT_ONLY.some((f) => a === f || a.startsWith(f + '=')));
+async function fromGitlab(p, dir) {
+  const r = await syncGitlab(p, { from: PROJECT_FROM, dir, offline: printOnly });
+  console.error(describe(r));
+  if (r.dir) GITLAB_SOURCE = { path: r.path, ref: r.ref, sha: r.sha, committedAt: r.committedAt, stale: Boolean(r.stale) };
+  return r;
+}
 if (asked) {
-  const p = projectFor(asked, PROJECT_FROM);
+  const gl = parseGitlabProject(asked, { ...process.env, GITLAB_HOST: hostEnvFrom(process.env, [PROJECT_FROM]) });
+  const p = gl ? await fromGitlab(gl) : projectFor(asked, PROJECT_FROM);
   if (!p.dir || !existsSync(p.dir)) { console.error(`❌ No project at ${asked}${p.error ? `: ${p.error}` : ''}.\nNEXT: ask the person where their code is (a folder on this computer or a git link), then run again with --project=<it>`); process.exit(2); }
   if (p.cloned) console.log(`⬇  Cloned ${p.url} into ${p.dir}`);
   if (resolve(p.dir) !== resolve(PROJECT_FROM)) { try { writeFileSync(join(PROJECT_FROM, POINTER), resolve(p.dir) + '\n'); } catch { /* read-only: not remembered */ } }
   process.chdir(p.dir);
 } else if (!existsSync(join(PROJECT_FROM, 'ds-config.json')) && existsSync(join(PROJECT_FROM, POINTER))) {
   const dir = readFileSync(join(PROJECT_FROM, POINTER), 'utf8').trim();
-  if (dir && existsSync(dir)) { process.chdir(dir); PROJECT_GIVEN = true; console.error(`📁 Project: ${dir}`); }
+  if (dir && existsSync(dir)) {
+    const gl = existsSync(join(dir, STATE_FILE)) ? projectFromState(dir) : null;
+    if (gl) await fromGitlab(gl, dir);                                    // a GitLab mirror: up to the latest commit first
+    process.chdir(dir); PROJECT_GIVEN = true; console.error(`📁 Project: ${dir}`);
+  }
+} else if (existsSync(join(PROJECT_FROM, STATE_FILE))) {                 // run inside a GitLab mirror: refresh it in place
+  const gl = projectFromState(PROJECT_FROM);
+  if (gl) await fromGitlab(gl, PROJECT_FROM);
 }
