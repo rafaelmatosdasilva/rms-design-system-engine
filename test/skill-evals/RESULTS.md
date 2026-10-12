@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Motion variables in the To do, and no Documentation page of its own (continuous evaluation)
+
+What changed since the entry below (engine 2b6482d): when the code has durations or easings and Figma has no motion variables at all, the system's To do says so for whoever keeps Figma; the style guide has no Documentation page, its tables live on the To do page and old links open them there. The guide changed in `reference/usage.md`.
+
+Guide set measured: `6ef441bcecd8` · Project measured: `13d811a9d668`
+
+| Haiku, engine eed8da2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.058 |
+| Input a run | 120k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 120k. Records: `records/motion-todo-no-doc-page`.
+
 ## 2026-10: The To do page shows Documentation in the Documentation table (continuous evaluation)
 
 What changed since the entry below (engine 7a6b367): the To do page's Documentation kind is the Documentation table itself (Kind, What is written, From), one card per component with a kind not written yet, counted rather than numbered. The guide changed in `reference/usage.md`.
