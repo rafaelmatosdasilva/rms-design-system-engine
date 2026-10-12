@@ -7,39 +7,105 @@
 // animates and the code makes at once, a duration or a curve that differs. A spring in Figma (Gentle, Quick, Bouncy) has
 // no CSS curve: only its duration is compared, and the line says so. Whether each animation stops for someone who asks
 // for less motion is the accessibility check's (prefers-reduced-motion, in the browser and in the code).
+// How a component moves on its own (a spinner turning, a panel opening and closing) is motion-components.mjs's (C7), from
+// the same capture: its Motion keyframes and the overlays its prototype opens.
 
 import { walkCss } from './css-source.mjs';
 import { bezierOf, sameEasing, timeMs } from './css-values.mjs';
 
-// Run with use_figma or figma-cli on the file, once per page that holds components (PAGE_ID: the page's id, null for
-// the page open). It only reads: every component set's variants, each prototype reaction that changes one variant into
-// another, with its trigger and transition.
+// Run with use_figma or figma-cli on the file, once (PAGE_IDS: the pages to read, null for every page). It only reads:
+// every component set's variants and each prototype reaction that changes one variant into another, with its trigger
+// (and the delay of an After delay) and transition; each component's Motion keyframes (its timeline's tracks, on it and
+// its layers) and animation styles; and each overlay a prototype opens, with the component it shows and its transition.
 export const MOTION_CAPTURE_JS = `
-const PAGE_ID = __PAGE_ID__;
-const page = PAGE_ID ? await figma.getNodeByIdAsync(PAGE_ID) : figma.currentPage;
-if (PAGE_ID) await figma.setCurrentPageAsync(page);
-const out = {};
-const sets = page.findAllWithCriteria({ types: ['COMPONENT_SET'] });
-for (const set of sets) {
+const PAGE_IDS = __PAGE_IDS__;
+const pages = PAGE_IDS ? (await Promise.all(PAGE_IDS.map((id) => figma.getNodeByIdAsync(id)))).filter(Boolean) : figma.root.children;
+const out = {}, motion = {}, overlays = [], seen = new Set();
+const FIELDS = ['ROTATION', 'OPACITY', 'TRANSLATION_X', 'TRANSLATION_Y', 'TRANSLATION_XY', 'SCALE_X', 'SCALE_Y', 'SCALE_XY'];
+const ownerOf = async (n) => {
+  if (n.type === 'COMPONENT') return n.parent && n.parent.type === 'COMPONENT_SET' ? n.parent.name : n.name;
+  if (n.type === 'INSTANCE') { const m = await n.getMainComponentAsync(); return m ? (m.parent && m.parent.type === 'COMPONENT_SET' ? m.parent.name : m.name) : null; }
+  return null;
+};
+const shown = async (d) => {
+  if (d.type === 'COMPONENT' || d.type === 'INSTANCE') return ownerOf(d);
+  if (!('findAllWithCriteria' in d)) return null;
+  const near = d.findAllWithCriteria({ types: ['INSTANCE'] }).filter((i) => { let p = i.parent, k = 0; while (p && p !== d) { if (p.type === 'INSTANCE') return false; p = p.parent; k++; } return k <= 2; });
+  near.sort((a, b) => b.width * b.height - a.width * a.height);
+  return near.length ? ownerOf(near[0]) : null;
+};
+const valueOf = (v) => (v && typeof v.value === 'number' ? v.value : v && v.value && typeof v.value === 'object' && 'x' in v.value ? { x: v.value.x, y: v.value.y } : null);
+const motionOf = (root, variant) => {
   const list = [];
-  for (const v of set.children) {
-    for (const r of (v.reactions || [])) {
-      const actions = r.actions || (r.action ? [r.action] : []);
-      for (const a of actions) {
-        if (!a || a.type !== 'NODE' || !a.destinationId) continue;
-        const to = set.children.find((c) => c.id === a.destinationId);
-        if (!to) continue;
-        const t = a.transition || null;
-        list.push({ from: v.variantProperties || {}, to: to.variantProperties || {}, trigger: r.trigger ? r.trigger.type : null, type: t ? t.type : 'INSTANT', duration: t && typeof t.duration === 'number' ? t.duration : 0, easing: t && t.easing ? t.easing : null });
-      }
+  const visit = (n, path, depth) => {
+    if (list.length >= 20) return;
+    let anim = null, styles = [];
+    try { anim = n.animations; } catch (e) { anim = null; }
+    try { styles = (n.animationStyles || []).map((s) => ({ styleId: s.styleId, name: s.name, type: s.type, duration: s.duration, offset: s.timelineOffset, props: s.props })); } catch (e) { styles = []; }
+    const tracks = {};
+    for (const f of FIELDS) {
+      const b = anim && anim[f];
+      if (!b || !b.tracks || !b.tracks.length) continue;
+      const kf = [];
+      for (const t of b.tracks) for (const k of (t.keyframes || [])) kf.push({ t: k.timelinePosition, v: valueOf(k.value), e: k.easing || null });
+      kf.sort((a, b2) => a.t - b2.t);
+      const base = valueOf(b.baseValue), rec = (vals) => ({ base: vals(base), duration: b.timelineDuration, op: b.tracks[0].keyframeOperation, keyframes: kf.slice(0, 12).map((k) => ({ t: k.t, v: vals(k.v), e: k.e })) });
+      if (f === 'TRANSLATION_XY') { tracks.TRANSLATION_X = rec((v) => (v ? v.x : null)); tracks.TRANSLATION_Y = rec((v) => (v ? v.y : null)); }
+      else tracks[f] = rec((v) => v);
     }
+    if (Object.keys(tracks).length || styles.length) list.push({ layer: path, variant, tracks, styles });
+    if ('children' in n && depth < 4) for (const c of n.children) visit(c, path + '/' + c.name, depth + 1);
+  };
+  visit(root, root.name, 0);
+  return list;
+};
+for (const page of pages) {
+  await figma.setCurrentPageAsync(page);
+  const sets = page.findAllWithCriteria({ types: ['COMPONENT_SET'] });
+  for (const set of sets) {
+    const list = [];
+    for (const v of set.children) {
+      for (const r of (v.reactions || [])) {
+        const actions = r.actions || (r.action ? [r.action] : []);
+        for (const a of actions) {
+          if (!a || a.type !== 'NODE' || !a.destinationId) continue;
+          const to = set.children.find((c) => c.id === a.destinationId);
+          if (!to) continue;
+          const t = a.transition || null;
+          list.push({ from: v.variantProperties || {}, to: to.variantProperties || {}, trigger: r.trigger ? r.trigger.type : null, timeout: r.trigger && r.trigger.type === 'AFTER_TIMEOUT' ? r.trigger.timeout : undefined, type: t ? t.type : 'INSTANT', duration: t && typeof t.duration === 'number' ? t.duration : 0, easing: t && t.easing ? t.easing : null });
+        }
+      }
+      const m = motionOf(v, v.name);
+      if (m.length) motion[set.name] = (motion[set.name] || []).concat(m);
+    }
+    if (list.length) out[set.name] = (out[set.name] || []).concat(list);
   }
-  if (list.length) out[set.name] = list;
+  for (const c of page.findAllWithCriteria({ types: ['COMPONENT'] })) {
+    if (c.parent && c.parent.type === 'COMPONENT_SET') continue;
+    const m = motionOf(c, null);
+    if (m.length) motion[c.name] = (motion[c.name] || []).concat(m);
+  }
+  const opens = page.findAll((n) => 'reactions' in n && (n.reactions || []).some((r) => (r.actions || (r.action ? [r.action] : [])).some((a) => a && a.type === 'NODE' && (a.navigation === 'OVERLAY' || a.navigation === 'SWAP'))));
+  for (const n of opens) for (const r of n.reactions) for (const a of (r.actions || (r.action ? [r.action] : []))) {
+    if (!a || a.type !== 'NODE' || !(a.navigation === 'OVERLAY' || a.navigation === 'SWAP') || !a.destinationId) continue;
+    const dest = await figma.getNodeByIdAsync(a.destinationId);
+    const component = dest ? await shown(dest) : null;
+    if (!component) continue;
+    const t = a.transition || null;
+    const rec = { component, frame: dest.name, from: (await ownerOf(n)) || n.name, trigger: r.trigger ? r.trigger.type : null, navigation: a.navigation, position: 'overlayPositionType' in dest ? dest.overlayPositionType : null, transition: t ? { type: t.type, direction: t.direction || null, duration: t.duration, easing: t.easing || null } : null };
+    const key = JSON.stringify([component, rec.transition]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    overlays.push(rec);
+  }
 }
-return { _captured: new Date().toISOString(), _note: 'Read-only capture of prototype transitions between variants (motion-parity.mjs).', components: out };
+return { _captured: new Date().toISOString(), _note: 'Read-only capture of prototype transitions between variants, Motion keyframes and overlays (motion-parity.mjs).', version: 2, components: out, motion, overlays };
 `;
 
-export const motionCaptureScript = (pageId = null) => MOTION_CAPTURE_JS.replace('__PAGE_ID__', JSON.stringify(pageId ? String(pageId).replace('-', ':') : null)).trim() + '\n';
+export const motionCaptureScript = (pageIds = null) => {
+  const ids = pageIds == null ? null : [pageIds].flat().filter(Boolean).map((id) => String(id).replace('-', ':'));
+  return MOTION_CAPTURE_JS.replace('__PAGE_IDS__', JSON.stringify(ids && ids.length ? ids : null)).trim() + '\n';
+};
 
 // Figma's easing as CSS: its presets are cubic-bezier curves; a spring has none (null, with its name).
 const FIGMA_EASE = { LINEAR: 'linear', EASE_IN: 'ease-in', EASE_OUT: 'ease-out', EASE_IN_AND_OUT: 'ease-in-out', EASE_IN_BACK: 'cubic-bezier(0.3, -0.05, 0.7, -0.5)', EASE_OUT_BACK: 'cubic-bezier(0.45, 1.45, 0.8, 1)', EASE_IN_AND_OUT_BACK: 'cubic-bezier(0.7, -0.4, 0.4, 1.4)' };
@@ -116,6 +182,7 @@ export function motionFindings(snapshot, sources, classFor = () => null) {
     const seen = new Set();
     for (const m of list) {
       if (!m || m.type === 'INSTANT' || !(m.duration > 0)) continue;   // Figma changes it at once: nothing to compare
+      if (m.trigger === 'AFTER_TIMEOUT') continue;   // a variant that leads on by itself: a loop, motion-components.mjs's
       const state = STATE[m.trigger] ?? null;
       const key = `${state}|${m.duration}|${JSON.stringify(m.easing)}`;
       if (seen.has(key)) continue;
@@ -165,10 +232,22 @@ export async function projectMotion(ROOT, cfg = {}) {
   try { snap = JSON.parse(readFileSync(resolve(ROOT, file), 'utf8')); } catch { return null; }
   const { loadCssSources } = await import('./css-source.mjs');
   const { loadLocator } = await import('./component-locator.mjs');
-  const sources = loadCssSources(ROOT, [cfg.paths?.themeCSS ?? [], ...[cfg.paths?.componentCSS ?? []]].flat()).files;
+  // The theme and the component sheets ds-config.json names, and every other sheet of the system's own code (a
+  // component's own button.css), never a product's.
+  const named = loadCssSources(ROOT, [cfg.paths?.themeCSS ?? [], ...[cfg.paths?.componentCSS ?? []]].flat()).files;
+  const { sourceFiles } = await import('./code-roots.mjs');
+  const have = new Set(named.map((f) => f.file));
+  const sources = [...named, ...sourceFiles(ROOT, cfg).filter((f) => /\.css$/i.test(f.file) && !f.file.startsWith('..') && !have.has(f.file))];
   const locator = await loadLocator(ROOT, cfg);
   const findings = motionFindings(snap, sources, (n) => locator.classFor(n));
-  return { findings, compared: Object.values(snap.components ?? {}).reduce((k, l) => k + l.length, 0), file };
+  // How each component moves on its own (C7): its loop, its opening and its closing, Figma's against the code's.
+  const { componentMotionFindings } = await import('./motion-components.mjs');
+  // Every component the system has: Figma's (its props snapshot), the contract's and the configured ones.
+  let figmaNames = [];
+  try { figmaNames = Object.keys(JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8'))).filter((n) => !n.startsWith('_')); } catch { /* none yet */ }
+  const own = componentMotionFindings(snap, sources, (n) => locator.classFor(n), [...new Set([...locator.names(), ...figmaNames])]);
+  const compared = Object.values(snap.components ?? {}).reduce((k, l) => k + l.length, 0) + Object.values(snap.motion ?? {}).reduce((k, l) => k + l.length, 0) + (snap.overlays ?? []).length;
+  return { findings: [...findings, ...own], compared, file, motionRead: !!(snap.motion || snap.overlays) };
 }
 
 // The motion snapshot from a capture's answer (what use_figma returned, saved as a file).
@@ -176,5 +255,5 @@ export function motionSnapshot(answer) {
   const a = typeof answer === 'string' ? JSON.parse(answer) : answer;
   const body = a?.components ? a : a?.result?.components ? a.result : null;
   if (!body) throw new Error('not a motion capture (no "components")');
-  return { _updated: new Date().toISOString(), _note: 'Prototype transitions between variants, read from Figma (motion-parity.mjs MOTION_CAPTURE_JS).', components: body.components };
+  return { _updated: new Date().toISOString(), _note: 'Prototype transitions between variants, Motion keyframes and overlays, read from Figma (motion-parity.mjs MOTION_CAPTURE_JS).', ...(body.version ? { version: body.version } : {}), components: body.components, ...(body.motion ? { motion: body.motion } : {}), ...(body.overlays ? { overlays: body.overlays } : {}) };
 }

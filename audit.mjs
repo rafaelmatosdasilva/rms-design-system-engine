@@ -276,9 +276,10 @@ if (process.argv.includes('--summary')) {
   process.exit(2);
 }
 
-// ── --figma-motion: Figma's prototype transitions between variants, for the motion check (C5) ──
+// ── --figma-motion: Figma's prototype transitions between variants, its Motion keyframes and its overlays (C5, C7) ──
 // Without a file: writes the read-only capture script to run with the Figma tool of the session. With the file its
-// answer was saved to: keeps it as the motion snapshot, then compares it with the code's transitions.
+// answer was saved to: keeps it as the motion snapshot, then compares it with the code's transitions and animations
+// (a spinner's turn, a panel's or a modal's opening and closing).
 if (process.argv.includes('--figma-motion')) {
   let mcfg = {};
   try { mcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
@@ -287,7 +288,7 @@ if (process.argv.includes('--figma-motion')) {
   const capDir = join(ROOT, OUT_DIR, 'figma-capture');
   if (!file) {
     mkdirSync(capDir, { recursive: true });
-    writeFileSync(join(capDir, 'motion-capture.js'), mp.motionCaptureScript(mcfg.figma?.componentsPage ?? null));
+    writeFileSync(join(capDir, 'motion-capture.js'), mp.motionCaptureScript(null));   // every page: overlays live on the screens
     console.log(`Motion capture script → ${relative(ROOT, join(capDir, 'motion-capture.js'))} (read-only: it changes nothing in Figma).`);
     console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${relative(ROOT, join(capDir, 'motion.json'))}, then run rms-design-system-engine --figma-motion ${relative(ROOT, join(capDir, 'motion.json'))}`);
     process.exit(0);
@@ -298,10 +299,11 @@ if (process.argv.includes('--figma-motion')) {
   mkdirSync(dirname(join(ROOT, target)), { recursive: true });
   writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
   const n = Object.values(snap.components).reduce((k, l) => k + l.length, 0);
-  console.log(`✓ ${n} transition${n === 1 ? '' : 's'} on ${Object.keys(snap.components).length} component${Object.keys(snap.components).length === 1 ? '' : 's'} read from Figma → ${target}`);
+  const plural = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  console.log(`✓ ${plural(n, 'transition', 'transitions')} on ${plural(Object.keys(snap.components).length, 'component', 'components')}, ${plural(Object.keys(snap.motion ?? {}).length, 'component', 'components')} with Motion keyframes and ${plural((snap.overlays ?? []).length, 'overlay', 'overlays')} read from Figma → ${target}`);
   const r = await mp.projectMotion(ROOT, mcfg);
   if (r?.findings?.length) { console.log(`🎞  ${r.findings.length} difference${r.findings.length === 1 ? '' : 's'} in motion between Figma and the code:`); for (const f of r.findings.slice(0, 20)) console.log(`   ${f.message}`); }
-  else console.log('✓ The code moves as Figma does, wherever Figma animates a change.');
+  else console.log('✓ The code moves as Figma does: its changes between variants, its loops, and how it opens and closes.');
   process.exit(0);
 }
 
@@ -4164,7 +4166,9 @@ function reportFull(label, items, shown) {
   // ── Motion against Figma (C5, advisory) ─────────────────────────────────────────
   _section('advice');
   // Where Figma animates a change between variants (its prototype's transitions, --figma-motion), the code's transition
-  // into that state: none, another duration, another curve. Runs once the motion snapshot exists.
+  // into that state: none, another duration, another curve. And how each component moves on its own (C7): a loop (a
+  // spinner turning), its opening and its closing, Figma's Motion keyframes and overlays against the code's animations,
+  // and the code's motion Figma has none of. Runs once the motion snapshot exists.
   if (!ONLY && !NO_FIGMA) {
     try {
       const { projectMotion } = await import('./motion-parity.mjs');
@@ -4173,9 +4177,10 @@ function reportFull(label, items, shown) {
         mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
         writeFileSync(join(ROOT, OUT_DIR, 'motion.json'), JSON.stringify({ at: new Date().toISOString(), compared: r.compared, findings: r.findings }, null, 1) + '\n');
         if (r.findings.length) {
-          console.log(C.yellow(`\n🎞  Motion against Figma: ${r.findings.length} change${r.findings.length === 1 ? '' : 's'} the code animates differently from Figma's prototype. Advisory.`));
+          console.log(C.yellow(`\n🎞  Motion against Figma: ${r.findings.length} change${r.findings.length === 1 ? '' : 's'} the code animates otherwise than Figma (its prototype, its Motion keyframes). Advisory.`));
           for (const f of r.findings.slice(0, 12)) console.log(C.yellow(`     ${f.message}`));
-        } else if (r.compared) console.log(`\nℹ️  Motion against Figma: the ${r.compared} transition${r.compared === 1 ? '' : 's'} Figma's prototype animates move the same in the code.`);
+        } else if (r.compared) console.log(`\nℹ️  Motion against Figma: the ${r.compared} motion${r.compared === 1 ? '' : 's'} Figma has (its prototype's transitions and overlays, its Motion keyframes) move the same in the code.`);
+        if (!r.motionRead) console.log(C.dim(`     Figma's Motion keyframes and overlays (a spinner's turn, a panel opening and closing) are not read yet: capture again with --figma-motion.`));
       }
     } catch { /* advisory: never fails */ }
   }
