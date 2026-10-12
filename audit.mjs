@@ -357,11 +357,29 @@ if (process.argv.includes('--figma-screens')) {
   let snap;
   try { snap = sp.screenSnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
   const target = scfg.paths?.screenLayout ?? join(dirname(scfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-layout.snapshot.json');
+  // One answer holds as many screens as fit (use_figma returns at most 20 KB): each answer is added to the screens kept
+  // so far, and the ones it left get a script of their own.
+  const ids = [...new Set([...(scfg.frames ?? []), ...(scfg.screens ?? [])].map((f) => f.nodeId).filter(Boolean))];
+  let prev = null;
+  try { prev = JSON.parse(readFileSync(join(ROOT, target), 'utf8')); } catch { /* the first answer */ }
+  const { left = [], ...kept } = snap;
+  const merged = { ...kept, screens: sp.mergeScreens(prev?.screens ?? [], snap.screens, ids) };
   mkdirSync(dirname(join(ROOT, target)), { recursive: true });
-  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
-  console.log(`✓ ${snap.screens.length} screen${snap.screens.length === 1 ? '' : 's'} read from Figma → ${target}`);
+  writeFileSync(join(ROOT, target), JSON.stringify(merged, null, 1) + '\n');
+  const cut = snap.screens.filter((s) => s.cut).map((s) => `"${s.name}"`);
+  console.log(`✓ ${snap.screens.length} screen${snap.screens.length === 1 ? '' : 's'} read from Figma → ${target}${left.length ? ` (${merged.screens.length} of ${ids.length} so far)` : ''}`);
+  if (cut.length) console.log(`ℹ️  Too large for one answer, read without its words or its deepest layers: ${cut.join(', ')}.`);
+  if (left.length) {
+    const { screenCaptureScript } = await import('./screen-layout.mjs');
+    mkdirSync(capDir, { recursive: true });
+    writeFileSync(join(capDir, 'screen-capture.js'), screenCaptureScript(left).trim() + '\n');
+    console.log(`NEXT: ${left.length} screen${left.length === 1 ? '' : 's'} did not fit in that answer. Run ${relative(ROOT, join(capDir, 'screen-capture.js'))} the same way (unchanged, with use_figma), save what it returns as ${relative(ROOT, join(capDir, 'screens.json'))}, then run rms-design-system-engine --figma-screens ${relative(ROOT, join(capDir, 'screens.json'))} again.`);
+    process.exit(0);
+  }
   const { findChrome } = await import('./cdp.mjs');
-  const r = await sp.projectScreens(ROOT, scfg, { chromePath: process.env.CHROME_PATH || findChrome() });
+  let r = null;
+  try { r = await sp.projectScreens(ROOT, scfg, { chromePath: process.env.CHROME_PATH || findChrome() }); }
+  catch (e) { r = { screens: [], notCompared: [`every screen (Chrome did not start: ${String(e.message).split('\n').filter(Boolean).slice(0, 2).join(' ')}; set CHROME_PATH to a Chrome that runs)`] }; }
   for (const s of r?.screens ?? []) {
     if (s.findings.length) { console.log(`🖼  ${s.product}'s page against "${s.name}" (${s.width}px), ${s.findings.length} difference${s.findings.length === 1 ? '' : 's'}:`); for (const f of s.findings.slice(0, 12)) console.log(`   ${f.message}`); }
     else console.log(`✓ ${s.product}'s page is laid out as "${s.name}".`);

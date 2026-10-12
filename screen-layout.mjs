@@ -33,7 +33,17 @@ async function frameFacts(n) {
   out.radius = typeof n.cornerRadius === 'number' ? n.cornerRadius : null; out.radiusVar = await bound(n, 'topLeftRadius');
   return out;
 }
-async function kids(n, depth) { const out = []; if ('children' in n && depth < 14) for (const k of n.children) { const c = await walk(k, depth + 1); if (c) out.push(c); } return out; }
+// A list (more than three of one component in a row) keeps its first three: how many it shows is its data, and a long
+// one would not fit in one answer. The ones left out are counted (more).
+async function kids(n, depth) {
+  const out = []; let more = 0, run = null, count = 0;
+  if ('children' in n && depth < 14) for (const k of n.children) {
+    const c = await walk(k, depth + 1); if (!c) continue;
+    if (c.kind === 'instance' && run === c.component) { count++; if (count > 3) { more++; continue; } } else { run = c.kind === 'instance' ? c.component : null; count = 1; }
+    out.push(c);
+  }
+  return { children: out, ...(more ? { more } : {}) };
+}
 // Where each node sits on its screen (x, y from the screen's top left corner), and whether it fills its parent.
 let origin = null;
 function placeOf(n) {
@@ -58,12 +68,12 @@ async function walk(n, depth) {
     const holds = depth === 0 || (n.width * n.height > 20000 && !!(n.findOne && n.findOne((x) => x.type === 'INSTANCE')));
     // The words a small instance shows (its overrides included), for the drawing to write where no option does.
     const texts = holds || !n.findAll ? [] : n.findAll((x) => x.type === 'TEXT' && x.visible !== false).slice(0, 8).map((x) => String(x.characters || '').trim()).filter(Boolean);
-    return { kind: 'instance', ...base, component: set ? set.name : (main ? main.name : n.name), remote: main ? !!main.remote : null, props, ...(texts.length ? { texts } : holds ? {} : { textless: true }), ...(holds ? { ...(await frameFacts(n)), children: await kids(n, depth) } : {}) };
+    return { kind: 'instance', ...base, component: set ? set.name : (main ? main.name : n.name), remote: main ? !!main.remote : null, props, ...(texts.length ? { texts } : holds ? {} : { textless: true }), ...(holds ? { ...(await frameFacts(n)), ...(await kids(n, depth)) } : {}) };
   }
   if (n.type === 'TEXT') {
     return { kind: 'text', ...base, text: String(n.characters || '').slice(0, 160), style: await styleName(n.textStyleId), size: typeof n.fontSize === 'number' ? n.fontSize : null, weight: typeof n.fontWeight === 'number' ? n.fontWeight : null, fill: await paintVar(n, 'fills') };
   }
-  if ('children' in n) return { kind: 'frame', ...base, type: n.type, ...(await frameFacts(n)), children: await kids(n, depth) };
+  if ('children' in n) return { kind: 'frame', ...base, type: n.type, ...(await frameFacts(n)), ...(await kids(n, depth)) };
   return { kind: 'shape', ...base, type: n.type };
 }
 // Defaults left out, so a whole window fits in one answer: no fill, no padding, no variable, square corners.
@@ -88,8 +98,28 @@ async function modesOf(node) {
   }
   return out;
 }
-for (const id of SCREEN_IDS) { const node = await figma.getNodeByIdAsync(id); if (node) { origin = node.absoluteBoundingBox; screens.push({ id, name: node.name, modes: await modesOf(node), tree: prune(await walk(node, 0)) }); } }
-return { _captured: new Date().toISOString(), _note: 'Read-only capture of designed screens (screen-layout.mjs).', screens };
+// One answer holds at most BUDGET characters (use_figma returns at most 20 KB): the screens that do not fit are left
+// for the next run (left). A screen too large on its own is cut: its words first, then its deepest layers (cut), then
+// its last layers (more).
+const BUDGET = 19000;
+const size = (o) => JSON.stringify(o).length;
+function wordless(o) { if (Array.isArray(o)) return o.map(wordless); if (!o || typeof o !== 'object') return o; const out = {}; for (const [k, v] of Object.entries(o)) { if (k === 'texts') continue; out[k] = k === 'text' && typeof v === 'string' ? v.slice(0, 24) : wordless(v); } return out; }
+function cutAt(o, depth, d) { if (!o || typeof o !== 'object' || !o.children) return o; const out = { ...o }; if (d >= depth) { delete out.children; delete out.more; out.cut = true; } else out.children = o.children.map((k) => cutAt(k, depth, d + 1)); return out; }
+const left = [];
+let used = 300;
+for (const id of SCREEN_IDS) {
+  if (left.length) { left.push(id); continue; }
+  const node = await figma.getNodeByIdAsync(id); if (!node) continue;
+  origin = node.absoluteBoundingBox;
+  const s = { id, name: node.name, modes: await modesOf(node), tree: prune(await walk(node, 0)) };
+  if (size(s) > BUDGET - 300) { s.tree = wordless(s.tree); s.cut = true; }
+  for (let d = 12; d >= 1 && size(s) > BUDGET - 300; d--) s.tree = cutAt(s.tree, d, 0);
+  // Still too large (a screen of very many layers side by side): its first layers, as many as fit; the rest counted.
+  while (size(s) > BUDGET - 300 && s.tree.children && s.tree.children.length > 1) { const k = s.tree.children.length, keep = Math.floor(k / 2); s.tree = { ...s.tree, children: s.tree.children.slice(0, keep), more: (s.tree.more || 0) + k - keep }; }
+  if (screens.length && used + size(s) > BUDGET) { left.push(id); continue; }
+  screens.push(s); used += size(s) + 1;
+}
+return { _captured: new Date().toISOString(), _note: 'Read-only capture of designed screens (screen-layout.mjs).', screens, ...(left.length ? { left } : {}) };
 `;
 
 export function screenCaptureScript(ids) {
