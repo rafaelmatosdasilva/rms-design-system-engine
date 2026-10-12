@@ -245,6 +245,72 @@ export function cvdFindings(textEls, theme) {
   return out;
 }
 
+// V2: how far apart two colours look (CIE76 ΔE in Lab, D65), as normal vision sees them or as one deficiency does.
+function cvdLinear({ r, g, b }, kind) {
+  const c = [linear(r), linear(g), linear(b)];
+  if (!kind) return c;
+  return CVD[kind].m.map((row) => Math.min(1, Math.max(0, row[0] * c[0] + row[1] * c[1] + row[2] * c[2])));
+}
+function labOf([R, G, B]) {
+  const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+  const x = f((0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047), y = f(0.2126 * R + 0.7152 * G + 0.0722 * B), z = f((0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+export function colourDistance(a, b, kind = null) {
+  const p = labOf(cvdLinear(a, kind)), q = labOf(cvdLinear(b, kind));
+  return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+}
+// Two variants of a component told apart by colour alone (the same text, shape, borders, weight and parts) that one
+// deficiency sees as one: their colours (background, text, border) clearly apart for most people (ΔE 25 or more on one
+// of them) and all within ΔE 18 for that deficiency, too close to tell apart at a glance (a usual success green and error
+// red come out between 14 and 18 for people who do not see green). An advisory, as cvdcontrast is. groups: [{ name, variants: [{ label, shape, colours: [colour strings] }] }]
+// → [{ desc, vision }], one per pair, the deficiency that merges them most.
+export const CVD_APART = 25, CVD_ALIKE = 18;
+export function cvdVariantFindings(groups = []) {
+  const out = [];
+  for (const g of groups) {
+    const vs = g.variants ?? [];
+    for (let i = 0; i < vs.length; i++) for (let j = i + 1; j < vs.length; j++) {
+      const a = vs[i], b = vs[j];
+      if (a.shape !== b.shape || a.label === b.label) continue;
+      const pairs = a.colours.map((c, k) => [parseColor(c), parseColor(b.colours[k])]).filter(([x, y]) => x && y && x.a > 0 && y.a > 0);
+      if (!pairs.length || a.colours.some((c, k) => !!parseColor(c)?.a !== !!parseColor(b.colours[k])?.a)) continue;
+      const apart = Math.max(...pairs.map(([x, y]) => colourDistance(x, y)));
+      if (apart < CVD_APART) continue;
+      let worst = null;
+      for (const kind of Object.keys(CVD)) {
+        const d = Math.max(...pairs.map(([x, y]) => colourDistance(x, y, kind)));
+        if (d < CVD_ALIKE && (!worst || d < worst.d)) worst = { kind, d };
+      }
+      if (worst) out.push({ desc: `${g.name}: ${a.label} and ${b.label} differ only by colour, and look alike to ${CVD[worst.kind].says}`, vision: worst.kind });
+    }
+  }
+  return out;
+}
+// What each variant of each checked component draws, for cvdVariantFindings: the instances of one component (its root
+// class) whose class lists differ are its variants; each gives its modifier classes, the colours of its background, text
+// and border, and the rest of what it draws (its text, borders, weight, decoration and the parts it shows).
+export function variantLooksExpression(roots) {
+  return `(() => {
+    const vis = (e) => { const s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const cls = (e) => (typeof e.className === 'string' ? e.className.trim().split(/\\s+/).filter(Boolean) : []);
+    const shapeOf = (e) => { const s = getComputedStyle(e); return [e.tagName, ['Top', 'Right', 'Bottom', 'Left'].map((x) => s['border' + x + 'Style'] + parseFloat(s['border' + x + 'Width'])).join('|'), s.fontWeight, s.textDecorationLine, (e.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 40), [...e.querySelectorAll('*')].filter(vis).map((k) => k.tagName).join(',')].join(';'); };
+    const colours = (e) => { const s = getComputedStyle(e); const bw = ['Top', 'Right', 'Bottom', 'Left'].some((x) => s['border' + x + 'Style'] !== 'none' && parseFloat(s['border' + x + 'Width']) > 0); return [s.backgroundColor, s.color, bw ? s.borderTopColor : 'rgba(0, 0, 0, 0)']; };
+    const roots = ${JSON.stringify(roots ?? [])};
+    const out = [];
+    for (const r of roots) {
+      let els = [];
+      try { els = [...document.querySelectorAll(r)].filter((e) => vis(e) && !e.closest('[aria-hidden="true"]')); } catch (e) { continue; }
+      const byKey = new Map();
+      for (const e of els) { const k = cls(e).slice().sort().join(' '); if (!byKey.has(k)) byKey.set(k, e); }
+      if (byKey.size < 2) continue;
+      const common = [...byKey.keys()].map((k) => k.split(' ')).reduce((a, b) => a.filter((x) => b.includes(x)));
+      const variants = [...byKey].slice(0, 12).map(([k, e]) => ({ label: k.split(' ').filter((x) => !common.includes(x)).join(' ') || 'its default', shape: shapeOf(e), colours: colours(e) }));
+      out.push({ name: r.replace(/^\\./, ''), variants });
+    }
+    return out;
+  })()`;
+}
 // Turn one theme's captured text leaves into contrast findings (pure; the heart of the gate).
 export function contrastFindings(textEls, theme) {
   const out = [];
@@ -386,6 +452,31 @@ export const A11Y_GUIDE = {
     why: 'A positive tabindex makes the Tab key visit this control out of reading order, which is confusing to follow.',
     fix: 'Use tabindex="0" (or none) and put the control where it belongs in the page order.',
   },
+  unannounced: {
+    title: (n) => `${plural(n, 'message shows', 'messages show')} without a screen reader being told`,
+    why: 'Something that appears after an action (a toast, an alert, an error) is seen but not heard: it sits in no live region and the focus does not go to it, so a screen reader user never learns it is there. A live region put in the page already holding its words is not said by most screen readers either.',
+    fix: 'Keep a live region in the page from the start (role="status" for news, role="alert" for an error) and put the message\'s words into it; or move the focus to the message.',
+  },
+  cvdvariant: {
+    title: (n) => `${plural(n, 'pair of variants differs', 'pairs of variants differ')} only by a colour some people cannot tell apart`,
+    why: 'Two variants that are the same but for their colour (a success and an error badge, say) look like one to a person who does not see red, green or blue: the colour is the only thing that tells them apart (WCAG 1.4.1).',
+    fix: 'Tell them apart by more than the colour: an icon, a word, a border or a pattern; or pick colours far enough apart in lightness that every kind of colour vision tells them apart.',
+  },
+  forcedstate: {
+    title: (n) => `${plural(n, 'state looks', 'states look')} like the rest in high-contrast mode`,
+    why: 'Windows high-contrast mode replaces the page\'s colours with the reader\'s own. A selected, checked, pressed or current item drawn only by its background or text colour then looks exactly like the items beside it, so the reader cannot tell which one is chosen.',
+    fix: 'Give the state something the mode keeps: a border or an outline, a check mark or an icon, a heavier weight or an underline; or keep its colours with forced-color-adjust: none and the system colour Highlight.',
+  },
+  modalescape: {
+    title: (n) => `${plural(n, 'modal dialog lets', 'modal dialogs let')} Tab leave it for the page behind`,
+    why: 'A modal dialog covers the page and takes the focus. When Tab moves past its last control to the page it covers, a keyboard or screen reader user is lost behind it, acting on what they cannot see.',
+    fix: 'Keep the focus inside the dialog while it is open: show it with showModal(), or make the page behind it inert, or move the focus back to its first control after its last.',
+  },
+  tapcontent: {
+    title: (n) => `${plural(n, 'tip shows', 'tips show')} on hover but never on a tap`,
+    why: 'A touch screen has no hover. What a tip says is lost to everyone on a phone or a tablet when a tap never shows it (often because the tap also closes it as it opens).',
+    fix: 'Show the tip on a tap (on the click that follows a touch), and close it on a second tap or a tap elsewhere.',
+  },
   escape: {
     title: (n) => `${plural(n, 'dialog does', 'dialogs do')} not close with Escape`,
     why: 'People who use the keyboard expect Escape to close a dialog; without it they can get stuck.',
@@ -486,16 +577,16 @@ export const A11Y_GUIDE = {
 // person asked to reduce) or only a person can judge it (text on an image, measured by eye). A kind not listed is a
 // warning.
 export const A11Y_BLOCKER = new Set(['contrast', 'hovercontrast', 'statecontrast', 'stateedge', 'iconcontrast', 'boundary', 'focuscontrast', 'name', 'focus', 'keyboard', 'tabtrap', 'target', 'zoom', 'reflow', 'spacing', 'obscured',
-  'escape', 'focusreturn', 'activate', 'arrows', 'textalt', 'captions', 'autoaudio', 'dupid', 'aria', 'emptylabel', 'labelname', 'context', 'hovercontent', 'onfocus', 'oninput', 'pause', 'flash', 'authpaste']);
-export const A11Y_ADVISORY = new Set(['focusthin', 'motion', 'target44', 'cvdcontrast']);
+  'escape', 'modalescape', 'tapcontent', 'focusreturn', 'activate', 'arrows', 'textalt', 'captions', 'autoaudio', 'dupid', 'aria', 'emptylabel', 'labelname', 'context', 'hovercontent', 'onfocus', 'oninput', 'pause', 'flash', 'authpaste']);
+export const A11Y_ADVISORY = new Set(['focusthin', 'motion', 'target44', 'cvdcontrast', 'cvdvariant']);
 export const severityOf = (kind) => (A11Y_BLOCKER.has(kind) ? 'blocker' : A11Y_ADVISORY.has(kind) ? 'advisory' : 'warning');
 // A bucket's severity: an axe-core rule carries its own (from its impact), every other kind the one above.
 export const bucketSeverity = (kind, list = []) => list[0]?.severity ?? severityOf(kind);
 const SEVERITY_ORDER = { blocker: 0, warning: 1, advisory: 2 };
 // The order the report lists the kinds in, within each severity; a kind not listed comes after these.
 export const A11Y_ORDER = ['contrast', 'hovercontrast', 'statecontrast', 'iconcontrast', 'name', 'focus', 'focuscontrast', 'ariastate', 'keyboard', 'tooltipname', 'target', 'tabtrap', 'tabindex', 'pageorder', 'focushidden',
-  'escape', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole',
-  'behaviour', 'statefollows', 'forcedcontrast', 'target44', 'cvdcontrast'];
+  'escape', 'modalescape', 'tapcontent', 'unannounced', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole',
+  'behaviour', 'statefollows', 'forcedcontrast', 'forcedstate', 'target44', 'cvdcontrast', 'cvdvariant'];
 // The kinds whose same element failing the same way in many places is one finding with a count.
 export const A11Y_GROUPED = new Set(['contrast', 'hovercontrast', 'statecontrast', 'iconcontrast', 'cvdcontrast']);
 const SEVERITY_WORD = { blocker: 'Blocker', warning: 'Warning', advisory: 'Advisory' };
@@ -561,6 +652,134 @@ export function focusFlow(boxes = []) {
   }
   if (first >= 0 && !boxes[first].shown) out.unshift({ kind: 'focushidden', desc: boxes[first].d });
   return out;
+}
+// V5: where the focus went on each Tab inside an open modal dialog (null while it stays inside, 'page' on the page
+// itself, else the element it reached). The first press that reaches an element outside is the escape; a modal keeps the
+// focus inside it, round and round (a round inside one is not a trap, see tabTrap). → the element reached, or null
+export function modalEscape(walk = []) { return walk.find((w) => w && w !== 'page' && w !== 'closed') ?? null; }
+// The open modal dialog that lies over the page (a dialog shown with showModal, or one that says aria-modal and is
+// fixed over the page, itself or its overlay), as an expression for the page; undefined when none is open. A modal drawn
+// in the flow of a page (a style guide's preview of one) covers nothing, so Tab leaving it is not judged.
+export const OPEN_MODAL = `[...document.querySelectorAll('dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true]')].find((d) => { const r = d.getBoundingClientRect(); if (!r.width || !r.height) return false; try { if (d.matches(':modal')) return true; } catch (e) {} if (d.getAttribute('aria-modal') !== 'true') return false; for (let e = d; e && e !== document.body; e = e.parentElement) if (getComputedStyle(e).position === 'fixed') return true; return false; })`;
+export const FOCUS_IN_MODAL = `(() => { const d = ${OPEN_MODAL}; const a = document.activeElement; if (!d) return 'closed'; if (!a || a === document.body || a === document.documentElement) return 'page'; if (d.contains(a)) return null; const t = (a.textContent || a.getAttribute('aria-label') || '').trim().replace(/\\s+/g, ' ').slice(0, 30); return a.tagName.toLowerCase() + (a.id ? '#' + a.id : '') + (typeof a.className === 'string' && a.className.trim() ? '.' + a.className.trim().split(/\\s+/)[0] : '') + (t ? ' "' + t + '"' : ''); })()`;
+// V6: what a tip trigger shows, tried with a pointer that hovers and then with a tap. The triggers are the elements made
+// to show a tip (data-tip, data-tooltip, or a description that is a tooltip) that are not links or fields, and buttons
+// only when they exist for the tip (named or classed tip, info, help or hint): a tap on any other control does its own
+// work. Never one whose words delete, send or save. 'list' tags them (data-dse-tap) and says where each is; 'pops' lists
+// what is showing over the page (positioned, or a tooltip, dialog, menu or list box), each tagged once.
+export function tapProbeExpression(roots, what) {
+  return `(() => {
+    const vis = (e) => { const s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const desc = (e) => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/)[0] : '');
+    if (${JSON.stringify(what)} === 'pops') {
+      window.__dsePopN = window.__dsePopN || 0;
+      return [...document.querySelectorAll('body *')].filter((e) => vis(e) && (/^(fixed|absolute)$/.test(getComputedStyle(e).position) || /^(tooltip|dialog|menu|listbox)$/.test(e.getAttribute('role') || ''))).map((e) => { if (!e.dataset.dsePop) e.dataset.dsePop = String(++window.__dsePopN); return { id: e.dataset.dsePop, desc: desc(e), tip: (e.textContent || '').trim().slice(0, 40) }; });
+    }
+    const RISKY = /\\b(delete|remove|log ?out|sign ?out|submit|save|send|pay|buy|purchase|reset|clear|discard|apagar|eliminar|remover|sair|enviar|guardar)\\b/i;
+    const roots = ${JSON.stringify(roots ?? null)};
+    const scope = roots ? roots.flatMap((r) => { try { return [...document.querySelectorAll(r)]; } catch (e) { return []; } }) : [document.body];
+    const seen = new Set(), out = [];
+    for (const root of scope) for (const el of [root, ...root.querySelectorAll('[data-tip],[data-tooltip],[aria-describedby]')]) {
+      if (seen.has(el) || !el.matches || !el.matches('[data-tip],[data-tooltip],[aria-describedby]') || !vis(el)) continue;
+      seen.add(el);
+      const tipDesc = el.hasAttribute('data-tip') || el.hasAttribute('data-tooltip') || (el.getAttribute('aria-describedby') || '').split(/\\s+/).some((id) => { const d = id && document.getElementById(id); return d && d.getAttribute('role') === 'tooltip'; });
+      if (!tipDesc) continue;
+      const words = [el.getAttribute('aria-label') || '', el.textContent || '', el.dataset.tip || '', el.getAttribute('data-tooltip') || ''].join(' ');
+      if (RISKY.test(words)) continue;
+      if (el.matches('a[href],input,select,textarea,[contenteditable]')) continue;
+      if (el.matches('button,[role=button]') && !/tip|info|help|hint/i.test((typeof el.className === 'string' ? el.className : '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('title') || ''))) continue;
+      el.dataset.dseTap = String(out.length);
+      out.push({ i: out.length, desc: desc(el) });
+      if (out.length >= 8) break;
+    }
+    return out;
+  })()`;
+}
+// V4: a state shown only by colours that high-contrast mode replaces. Each element that says it is selected, checked,
+// pressed or current (its ARIA state, or a state word in its class) is put beside a sibling of the same kind at rest, and
+// what the two draw under forced colours is compared: their colours as the mode leaves them, borders, outline, text weight
+// and decoration, opacity, and every part each shows (a check mark, an icon). Alike → the state is lost in that mode. A
+// native checkbox or radio is drawn by the system, which keeps its state. → ['desc (state)']
+export function forcedStateExpression(roots) {
+  return `(() => {
+    const vis = (e) => { const s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const WORD = /(^|[-_\\s])(selected|checked|pressed|current)([-_\\s]|$)/i;
+    const cls = (e) => (typeof e.className === 'string' ? e.className : '');
+    const stateOf = (e) => { for (const a of ['aria-selected', 'aria-checked', 'aria-pressed']) { const v = e.getAttribute(a); if (v === 'true' || v === 'mixed') return a.slice(5); } const c = e.getAttribute('aria-current'); if (c && c !== 'false') return 'current'; const m = WORD.exec(cls(e)); return m ? m[2].toLowerCase() : null; };
+    const base = (e) => cls(e).split(/\\s+/).filter((k) => k && !WORD.test(k))[0] || '';
+    const look = (e) => { const s = getComputedStyle(e); const side = (x) => s['border' + x + 'Style'] !== 'none' && parseFloat(s['border' + x + 'Width']) > 0 ? s['border' + x + 'Width'] + s['border' + x + 'Style'] + s['border' + x + 'Color'] : ''; return [s.color, s.backgroundColor, ['Top', 'Right', 'Bottom', 'Left'].map(side).join('|'), s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0 ? s.outlineWidth + s.outlineStyle + s.outlineColor : '', s.fontWeight, s.textDecorationLine, s.opacity, s.backgroundImage === 'none' ? '' : 'image'].join(';'); };
+    const sig = (e) => [look(e)].concat([...e.querySelectorAll('*')].filter(vis).map((k) => k.tagName + ':' + look(k))).join('#');
+    const desc = (e) => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (cls(e).trim() ? '.' + cls(e).trim().split(/\\s+/)[0] : '') + ((e.textContent || '').trim() ? ' "' + e.textContent.trim().replace(/\\s+/g, ' ').slice(0, 24) + '"' : '');
+    const roots = ${JSON.stringify(roots ?? null)};
+    const scope = roots ? roots.flatMap((r) => { try { return [...document.querySelectorAll(r)]; } catch (e) { return []; } }) : [document.body];
+    const out = [], seen = new Set();
+    for (const root of scope) for (const el of [root, ...root.querySelectorAll('*')]) {
+      if (seen.has(el)) continue; seen.add(el);
+      const st = stateOf(el);
+      if (!st || !vis(el) || el.matches('input[type=checkbox],input[type=radio],option') || !el.parentElement) continue;
+      const rest = [...el.parentElement.children].find((k) => k !== el && k.tagName === el.tagName && base(k) === base(el) && !stateOf(k) && vis(k));
+      if (rest && sig(rest) === sig(el)) out.push(desc(el) + ' (' + st + ')');
+      if (out.length >= 20) break;
+    }
+    return out;
+  })()`;
+}
+// V3: what a screen reader says when something changes. A recorder put in the page before an action (a press that opens
+// a component, a trigger that opens a dialog or a menu) and read after it: the words each live region (role=status,
+// role=alert, aria-live, output) took that it did not have, said politely or at once; where the focus went (a screen
+// reader reads what takes it); and each message that appeared (a toast, an alert, an error) that neither was said nor took
+// the focus. A live region put in the page already holding its words is not said by most screen readers (only role=alert
+// is): it counts as unheard. window.__dseAnnounce.start() / .stop() → { said: [{ how, text }], focus, unheard: [{ desc, text }] }
+export const ANNOUNCE_JS = `(() => {
+  if (window.__dseAnnounce) return true;
+  const LIVE = '[role=status],[role=alert],[role=log],[aria-live]:not([aria-live=off]),output';
+  const STATUSY = /toast|snack|notif|alert|banner|status|message|feedback|error|invalid/i;
+  const vis = (e) => { const s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const cls = (e) => (typeof e.className === 'string' ? e.className : '');
+  const text = (e) => (e.innerText || e.textContent || '').trim().replace(/\\s+/g, ' ');
+  const desc = (e) => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (cls(e).trim() ? '.' + cls(e).trim().split(/\\s+/)[0] : '');
+  const how = (e) => (e.getAttribute('role') === 'alert' || e.getAttribute('aria-live') === 'assertive' ? 'at once' : 'politely');
+  const statusy = (e) => STATUSY.test(cls(e) + ' ' + (e.id || '') + ' ' + (e.getAttribute('role') || ''));
+  let rec = null;
+  window.__dseAnnounce = {
+    start() {
+      const regions = new Map([...document.querySelectorAll(LIVE)].map((e) => [e, vis(e) ? text(e) : '']));
+      rec = { regions, shown: new Set([...document.querySelectorAll('body *')].filter((e) => vis(e) && statusy(e))), focus: document.activeElement, pressed: null };
+      // The control pressed keeps the focus a press gives it: that is no move.
+      rec.onPress = (e) => { if (rec) rec.pressed = e.target; };
+      document.addEventListener('pointerdown', rec.onPress, true); document.addEventListener('click', rec.onPress, true);
+      return true;
+    },
+    stop() {
+      if (!rec) return null;
+      const said = [], unheard = [];
+      for (const r of document.querySelectorAll(LIVE)) {
+        if (!vis(r) || (r.parentElement && r.parentElement.closest(LIVE))) continue;
+        const now = text(r), known = rec.regions.has(r), was = rec.regions.get(r) || '';
+        if (!now || now === was) continue;
+        if (known || r.getAttribute('role') === 'alert') said.push({ how: how(r), text: now.slice(0, 120) });
+        else unheard.push({ desc: desc(r), text: now.slice(0, 80), why: 'put in the page already holding its words' });
+      }
+      document.removeEventListener('pointerdown', rec.onPress, true); document.removeEventListener('click', rec.onPress, true);
+      const a = document.activeElement, pressedIt = a && rec.pressed && (a === rec.pressed || a.contains(rec.pressed));
+      const name = (e) => (e.getAttribute('aria-label') || (e.getAttribute('aria-labelledby') && (document.getElementById(e.getAttribute('aria-labelledby')) || {}).textContent) || text(e)).toString().trim().slice(0, 40);
+      const focus = a && a !== rec.focus && a !== document.body && !pressedIt ? (a.getAttribute('role') || a.tagName.toLowerCase()) + (name(a) ? ' "' + name(a) + '"' : '') : null;
+      const fresh = [...document.querySelectorAll('body *')].filter((e) => vis(e) && !rec.shown.has(e) && statusy(e) && text(e));
+      for (const e of fresh.filter((e) => !fresh.some((o) => o !== e && o.contains(e)))) {
+        if (e.matches(LIVE) || e.closest(LIVE) || e.querySelector(LIVE) || (a && e.contains(a))) continue;
+        unheard.push({ desc: desc(e), text: text(e).slice(0, 80), why: 'in no live region, and the focus does not go to it' });
+      }
+      rec = null;
+      return { said, focus, unheard };
+    }
+  };
+  return true;
+})()`;
+// One change in words: what a screen reader says, and where the focus goes. → 'says "Saved" politely; the focus goes to dialog "Export"'
+export function changeLine({ said = [], focus = null } = {}) {
+  const parts = said.map((x) => `says "${x.text}" ${x.how}`);
+  if (focus) parts.push(`the focus goes to ${focus}`);
+  return parts.length ? parts.join('; ') : 'says nothing, and the focus stays where it was';
 }
 // What has the focus, where it is on the page and whether anyone can see it (for focusFlow).
 export const FOCUS_BOX = `(() => {
@@ -1579,11 +1798,14 @@ export function fileFromTgz(buf, wanted) {
   }
   return null;
 }
-async function fetchAxeSource(cfg = {}) {
+// Where the pinned copy is kept, and whether it is there and whole (V1: the install and --update fetch it, so a first
+// accessibility check offline still runs every rule).
+export const axeCachePath = (home = homedir()) => join(home, '.cache', 'rms-design-system-engine', `axe-${AXE_VERSION}.min.js`);
+export function axeCached(home = homedir()) { try { return axeIntact(readFileSync(axeCachePath(home), 'utf8')) ? axeCachePath(home) : null; } catch { return null; } }
+export async function fetchAxeSource(cfg = {}) {
   const looksLikeAxe = (s) => typeof s === 'string' && s.length > 100000 && s.includes('axe.run');
   if (cfg.a11y?.axePath) { try { const s = readFileSync(resolve(cfg.a11y.axePath), 'utf8'); if (looksLikeAxe(s)) return s; } catch { /* fall through */ } }
-  const cacheDir = join(homedir(), '.cache', 'rms-design-system-engine');
-  const cached = join(cacheDir, `axe-${AXE_VERSION}.min.js`);
+  const cached = axeCachePath(), cacheDir = dirname(cached);
   try { const s = readFileSync(cached, 'utf8'); if (axeIntact(s)) return s; } catch { /* not cached yet */ }
   const sources = [
     async () => { const r = await fetch(`https://cdnjs.cloudflare.com/ajax/libs/axe-core/${AXE_VERSION}/axe.min.js`, { signal: AbortSignal.timeout(15000) }); return r.ok ? r.text() : null; },
@@ -1914,6 +2136,7 @@ async function main() {
   const unrendered = [], unread = [], unfinished = [], notJudged = [];
   const accounted = [];   // every element measured, with its verdict
   const heard = new Map();   // what a screen reader says for each component (its first instance), or the page
+  const changes = [];   // V3: what it says when something changes (a press that opens a component, a trigger that opens a dialog)
   const instances = new Map();   // per component: how many it has on the pages, and how many the WCAG checks tried
   let axeSource = null;
   if (RUN_AXE) {
@@ -1978,10 +2201,21 @@ async function main() {
       let tried = await evalIn(revealExpression(roots, words, 'list')) ?? [];
       pressed = tried.length > 0;
       for (let k = 0; k < tried.length; k++) {
+        await evalIn(ANNOUNCE_JS); await evalIn('window.__dseAnnounce.start()');
         if (!(await evalIn(revealExpression(roots, words, 'press', k)))) continue;
         let what = null;
         for (let n = 0; n < 10 && !what; n++) { await new Promise((res) => setTimeout(res, 100)); what = await evalIn(revealExpression(roots, words, 'shown')); }
-        if (what) { opened.push(`${components.join(', ')} on ${label}: opened by pressing "${tried[k]}"`); revealedBy = tried[k]; shown = true; break; }
+        if (what) {
+          opened.push(`${components.join(', ')} on ${label}: opened by pressing "${tried[k]}"`); revealedBy = tried[k]; shown = true;
+          // V3: what a screen reader says as it opens.
+          await new Promise((res) => setTimeout(res, 300));
+          const heardNow = await evalIn('window.__dseAnnounce.stop()');
+          if (heardNow) {
+            changes.push({ page: label, what: `pressing "${tried[k]}" shows ${components.join(', ')}`, ...heardNow });
+            for (const u of heardNow.unheard ?? []) findings.push({ kind: 'unannounced', plugin: label, desc: `${u.desc} "${u.text}" (shown by pressing "${tried[k]}"): ${u.why}` });
+          }
+          break;
+        }
         // Nothing showed: whatever the press opened is closed (Escape); a page it left is loaded again, its controls listed anew.
         await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId).catch(() => {});
         await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId).catch(() => {});
@@ -2085,6 +2319,8 @@ async function main() {
       // Colour vision (the way Stark and Chrome's own simulator show it): text that passes, read as people who do not see
       // red, green or blue see it.
       for (const f of cvdFindings(textEls, mode.name)) findings.push({ plugin: label, ...f });
+      // V2: two variants of a component told apart by colour alone that one deficiency sees as one.
+      if (roots) { const vg = (await send('Runtime.evaluate', { expression: variantLooksExpression(roots), returnByValue: true }, sessionId).catch(() => null))?.result?.value ?? []; for (const f of cvdVariantFindings(vg)) note('cvdvariant', f.desc, mode.name, { vision: f.vision }); ranChecks.add('cvdvariant'); }
       for (const desc of noFocus) note('focus', desc, mode.name);
       // Focus indicator visible? (WCAG 1.4.11 for the focus ring — computed in Node)
       for (const f of faintFocus) {
@@ -2356,6 +2592,57 @@ async function main() {
       ranChecks.add('tabtrap');
     });
     await step(async () => {
+      // V5: a modal dialog keeps the focus inside it. Tab and Shift+Tab are pressed round it from its first control, and
+      // the first press that lands on the page behind it (a control the dialog covers) is said, with where it went.
+      const start = await evalv(`(() => { const d = ${OPEN_MODAL}; if (!d) return null; const f = [...d.querySelectorAll('button,a[href],input:not([type=hidden]),select,textarea,[tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.getClientRects().length); (f[0] || d).focus?.(); const h = d.getAttribute('aria-label') || (d.querySelector('h1,h2,h3,[class*=title]') || {}).textContent || ''; return { n: f.length, desc: (d.tagName.toLowerCase() + (typeof d.className === 'string' && d.className.trim() ? '.' + d.className.trim().split(/\\s+/)[0] : '') + (h.trim() ? ' "' + h.trim().slice(0, 40) + '"' : '')) }; })()`);
+      if (!start) return;
+      ranChecks.add('modalescape');
+      for (const [mods, how] of [[0, ''], [8, ' (with Shift+Tab)']]) {
+        const walk = [];
+        for (let i = 0; i < start.n + 2; i++) { await pressKey('Tab', 'Tab', 9, undefined, mods); walk.push(await evalv(FOCUS_IN_MODAL)); }
+        const out = modalEscape(walk);
+        if (out) { findings.push({ kind: 'modalescape', plugin: label, desc: `${start.desc}: Tab leaves it for ${out}, on the page behind it${how}` }); break; }
+        await evalv(`(() => { const d = ${OPEN_MODAL}; const f = d && d.querySelector('button,a[href],input:not([type=hidden]),select,textarea,[tabindex]:not([tabindex="-1"])'); (f || d)?.focus?.(); })()`);
+      }
+    });
+    await step(async () => {
+      // V6: what shows on hover shows on a tap too. Each tip trigger is hovered with the pointer; one that shows something
+      // is then tapped with a touch screen emulated, and one whose tap never shows it (or closes it as it opens) is said.
+      const triggers = (await evalv(tapProbeExpression(roots, 'list'))) ?? [];
+      if (!triggers.length) return;
+      const centre = async (i) => evalv(`(() => { const el = document.querySelector('[data-dse-tap="${i}"]'); if (!el) return null; el.scrollIntoView({ block: 'center', inline: 'center' }); const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+      const fresh = async (before) => ((await evalv(tapProbeExpression(roots, 'pops'))) ?? []).filter((p) => !before.has(p.id));
+      const waitFor = async (before, ms) => { for (let t = 0; t < ms; t += 100) { const f = await fresh(before); if (f.length) return f[0]; await new Promise((r) => setTimeout(r, 100)); } return null; };
+      const block = `window.__dseTapNav = window.__dseTapNav || ((e) => { const a = e.target.closest && e.target.closest('a[href]'); if (a) e.preventDefault(); }); document.addEventListener('click', window.__dseTapNav, true); true`;
+      await evalv(block);
+      try {
+        for (const t of triggers) {
+          const at = await centre(t.i);
+          if (!at) continue;
+          const before = new Set(((await evalv(tapProbeExpression(roots, 'pops'))) ?? []).map((p) => p.id));
+          await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at[0], y: at[1] }, sessionId);
+          const hover = await waitFor(before, 1800);
+          await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 }, sessionId);
+          await pressKey('Escape', 'Escape', 27);
+          await evalv(`document.activeElement && document.activeElement.blur && document.activeElement.blur()`);
+          if (!hover) continue;
+          ranChecks.add('tapcontent');
+          await new Promise((r) => setTimeout(r, 600));
+          const before2 = new Set(((await evalv(tapProbeExpression(roots, 'pops'))) ?? []).map((p) => p.id));
+          await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 }, sessionId);
+          try {
+            await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: at[0], y: at[1] }] }, sessionId);
+            await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }, sessionId);
+            const tap = await waitFor(before2, 1800);
+            if (!tap) findings.push({ kind: 'tapcontent', plugin: label, desc: `${t.desc}: what it shows on hover (${hover.desc}${hover.tip ? ` "${hover.tip}"` : ''}) never shows on a tap` });
+            await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 2, y: 2 }] }, sessionId);
+            await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }, sessionId);
+          } finally { await send('Emulation.setTouchEmulationEnabled', { enabled: false }, sessionId).catch(() => {}); }
+          await pressKey('Escape', 'Escape', 27);
+        }
+      } finally { await evalv(`document.removeEventListener('click', window.__dseTapNav, true); document.querySelectorAll('[data-dse-tap]').forEach((e) => e.removeAttribute('data-dse-tap')); true`); }
+    });
+    await step(async () => {
       // Escape is judged on a dialog that lies over the page; one drawn open in its flow, with nothing that opened it,
       // is said not judged here (where a control opens it, the opener check below judges it). One a press opened before
       // the check (E31) was opened by a control, so it is judged wherever it lies.
@@ -2385,6 +2672,9 @@ async function main() {
       const once = new Set();
       for (const f of iconContrastFindings(r2?.iconEls ?? [], 'high contrast')) if (!iconAtRest.has(f.desc) && !once.has(f.desc)) { once.add(f.desc); findings.push({ kind: 'forcedcontrast', plugin: label, desc: f.desc, ratio: f.ratio, threshold: 3, what: 'icon' }); }
       for (const f of contrastFindings(r2?.textEls ?? [], 'high contrast')) if (!f.cannotCompute && !textAtRest.has(`${f.desc}|${f.text}`)) findings.push({ kind: 'forcedcontrast', plugin: label, desc: f.desc, text: f.text, ratio: f.ratio, threshold: f.threshold, what: 'text' });
+      // V4: a state drawn only by colours the mode replaces looks like the rest there.
+      for (const d of (await evalv(forcedStateExpression(roots))) ?? []) findings.push({ kind: 'forcedstate', plugin: label, desc: d });
+      ranChecks.add('forcedstate');
     });
     await send('Emulation.setEmulatedMedia', { features: media0 }, sessionId).catch(() => {});
     await step(async () => {
@@ -2618,11 +2908,19 @@ async function main() {
     await step(async () => {
       // A dialog or menu opened from its trigger closes on Escape and gives the focus back to the trigger (I78).
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      await evalv(ANNOUNCE_JS);
       for (const t of (await evalv(deepSweepExpression(roots, 'openers', STAGE))) ?? []) {
+        await evalv('window.__dseAnnounce.start()');
         if (!(await evalv(openerExpression(t.i, 'open')))) continue;
         await wait(200);
         const what = await evalv(openerExpression(t.i, 'opened'));
+        const heardNow = await evalv('window.__dseAnnounce.stop()');
         if (!what) { await evalv(openerExpression(t.i, 'done')); continue; }   // nothing opened that the page shows: not judged
+        // V3: what a screen reader says as it opens (the focus going into it, or its words in a live region).
+        if (heardNow) {
+          changes.push({ page: label, what: `${t.desc} opens ${what}`, ...heardNow });
+          for (const u of heardNow.unheard ?? []) findings.push({ kind: 'unannounced', plugin: label, desc: `${u.desc} "${u.text}" (opened by ${t.desc}): ${u.why}` });
+        }
         await pressKey('Escape', 'Escape', 27);
         await wait(200);
         const after = await evalv(openerExpression(t.i, 'after'));
@@ -2665,6 +2963,9 @@ async function main() {
   if (behavioursNotChecked.size) console.log(`ℹ️  [a11y] behaviours not checked for ${[...behavioursNotChecked].join(', ')}: the style guide draws markup without the components' script. List the system's scripts in ds-config.json → systemScripts, or point a11y.urls (or --url) at a page that runs them (Storybook, the app), to check them.`);
 
   // ── Report ────────────────────────────────────────────────────────────────────
+  // A message V3 saw appear unheard is said once, with what showed it: the in-page status check's line for it goes.
+  const unheardEls = new Set(findings.filter((f) => f.kind === 'unannounced').map((f) => `${f.plugin}|${elementKey(f.desc)}`));
+  for (let i = findings.length - 1; i >= 0; i--) if (findings[i].kind === 'status' && unheardEls.has(`${findings[i].plugin}|${elementKey(findings[i].desc)}`)) findings.splice(i, 1);
   const cannot   = findings.filter((f) => f.kind === 'contrast' && f.cannotCompute);
   const measured = findings.filter((f) => !(f.kind === 'contrast' && f.cannotCompute));
   const themes   = [...new Set(modes.map((m) => m.name))];
@@ -2746,6 +3047,8 @@ async function main() {
     measured: measuredInfo,
     // What a screen reader says for each component (its first instance), or for the page: for a person to judge the words.
     ...(heard.size ? { heard: Object.fromEntries([...heard].map(([sel, l]) => [sel === 'body' ? 'page' : bySel.get(sel) ?? sel, l])) } : {}),
+    // V3: what it says when something changes: each press that opened something, the words said and where the focus went.
+    ...(changes.length ? { heardOnChange: changes.map((c) => ({ page: c.page, what: c.what, says: changeLine(c), said: c.said, focus: c.focus })) } : {}),
     // Each element measured, with its verdict: in the file the audit keeps, and with --a11y on the screen.
     ...(withElements ? { elements: accounted } : {}),
   });
@@ -2796,6 +3099,10 @@ async function main() {
     console.log(`\nWhat a screen reader says (VoiceOver and NVDA read the same tree), so a person can judge the words:`);
     for (const [sel, l] of heard) console.log(`  ${sel === 'body' ? 'The page' : bySel.get(sel) ?? sel}: ${l.join(' · ')}`);
   }
+  if (changes.length && (VERBOSE || (components.length && components.length <= 5))) {
+    console.log(`\nWhat a screen reader says when something changes:`);
+    for (const c of changes.slice(0, 20)) console.log(`  ${c.what}: ${changeLine(c)}`);
+  }
 
   // ── axe-core: its rules ran on the same page; what only it found is listed above, each with its rule ──
   const els = (n) => (n === 1 ? 'the element' : `the ${n} elements`), are = (n) => (n === 1 ? 'is' : 'are');
@@ -2826,9 +3133,12 @@ async function main() {
   process.exit(0);
 }
 
-// Only run when invoked directly — importing for tests has no side effects.
+// Only run when invoked directly — importing for tests has no side effects. --fetch-axe only fetches the pinned
+// axe-core into the cache (the install and --update run it), so the first check offline still runs every rule.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((e) => { console.error('⏭  [a11y] skipped - ' + e.message); process.exit(0); });
+  if (process.argv.includes('--fetch-axe')) {
+    fetchAxeSource().then((s) => { console.log(s ? `✅ axe-core ${AXE_VERSION} is ready for the accessibility check (${axeCachePath()}).` : `⚠️  axe-core ${AXE_VERSION} could not be fetched now (offline or blocked). The accessibility check fetches it on its first run, or set a11y.axePath to a local copy.`); process.exit(0); });
+  } else main().catch((e) => { console.error('⏭  [a11y] skipped - ' + e.message); process.exit(0); });
 }
 
 // F12: the style guide's To do rows for what the browser check found on each product's own page, one row per product.

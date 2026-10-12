@@ -11,6 +11,13 @@
 //   • each Figma annotation no check reads (annotationUses gives it no use) goes on the same page, in a frame
 //     "Annotations no check reads": its component and layer, its words, and the wording a check reads when the engine
 //     can tell what it means ("button" → "Role: button"). The annotation itself is never changed.
+//   • W2: each designed screen read for accessibility (screen-a11y.mjs) gets its findings pinned where they are, one
+//     annotation per failing layer listing all its issues (plain words first, the WCAG number second, the fix) and one
+//     summary on the screen with the counts, in an "Accessibility Review" category; both replaced on each run, so what
+//     is fixed clears.
+//   • W3: each component whose code the engine reads gets its accessibility spec as the code gives it (its role, what
+//     names it, the states it says, the keys its role owes, what a screen reader says), in the "Accessibility"
+//     category, for whoever builds it; replaced on each run.
 // What needs a person's words or a design decision (descriptions, missing components, layout) is never written here:
 // the to do list only names the need, for the design team to decide.
 //
@@ -23,6 +30,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { roleWord } from './role-markup.mjs';
+import { behaviourSheetLines } from './behaviour-contract.mjs';
 import { noteIsTodo } from './annotation-categories.mjs';
 
 const attr = (attrs, name) => { const m = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|\\{\\s*["']?([^}"']*)["']?\\s*\\})`, 'i').exec(attrs); return m ? (m[1] ?? m[2] ?? m[3] ?? '').trim() : null; };
@@ -169,6 +177,7 @@ export function annotationEdits(propsSnap = {}, usesOf = () => [], cats = null, 
     if (name.startsWith('_') || !entry || typeof entry !== 'object') continue;
     for (const u of usesOf(entry, { cats, cfg })) {
       if (u.uses.length) continue;
+      if (/^\s*[*_]*\s*accessibility (spec|review)\b/i.test(String(u.text ?? ''))) continue;   // the engine's own, rewritten on each run
       const wording = u.kind && u.kind !== 'accessibility' ? null : annotationWording(u.text, u.layer ?? null);
       if (!noteIsTodo(u.kind ?? null, wording)) continue;
       items.push({ component: name, ...(u.layer ? { layer: u.layer } : {}), text: u.text, wording });
@@ -180,6 +189,104 @@ export function annotationEdits(propsSnap = {}, usesOf = () => [], cats = null, 
 }
 const noteText = (n) => [n.layer ? `on the layer "${n.layer}"` : 'on the component', `says: ${n.text}`, n.wording ? `a check reads it written as: ${n.wording}` : 'an accessibility note no check reads yet: write it as Role: button, Alt: what it shows, Heading level 2, Escape closes, or Role: label on a layer'].join(' · ');
 
+// ── W2: the screens' accessibility findings, pinned in Figma ─────────────────────────────────────────────────────────
+export const REVIEW_CATEGORY = 'Accessibility Review', SPEC_CATEGORY = 'Accessibility';
+const REVIEW_HEAD = `**${REVIEW_CATEGORY}**`, SPEC_HEAD = '**Accessibility spec**';
+const KIND_WORDS = { contrast: 'contrast', plate: 'text on a picture', target: 'target size', bare: 'no surface' };
+// One finding in words: what is wrong, then its WCAG number, then the fix.
+export function pinWords(f) {
+  const times = f.n > 1 ? ` (${f.n} times)` : '';
+  const what = f.kind === 'contrast' ? `${f.what}${times} is ${f.ratio}:1 (${f.fg} on ${f.bg}), and needs ${f.need}:1.`
+    : f.kind === 'plate' ? `${f.what}${times} sits on an image or a gradient, so its contrast cannot be measured.`
+      : f.kind === 'target' ? `${f.what}${times} is drawn ${f.size}, under 24×24.`
+        : `${f.count ?? f.n} text${(f.count ?? f.n) === 1 ? ' or icon has nothing drawn behind it' : 's and icons have nothing drawn behind them'} (the screen has no fill).`;
+  return `${what} WCAG ${f.criterion}. Fix: ${f.fix}.`;
+}
+// findings: screenA11yFindings (each with its screenId and the layers it is on); screens: the screens read ({ id, name }).
+// → [] or [{ kind: 'review', category, screens: [{ id, name, count, summary, pins: [{ node, label }] }], why }]
+export function reviewEdits(findings = [], screens = []) {
+  const read = (screens ?? []).filter((x) => x?.id);
+  if (!read.length) return [];
+  // Two screens with one name (the same window in two themes) are told apart by their node ids, as the findings are.
+  const named = {}; for (const sc of read) named[sc.name] = (named[sc.name] || 0) + 1;
+  const out = read.map((sc) => {
+    const mine = findings.filter((f) => f.screenId === sc.id);
+    const counts = {};
+    for (const f of mine) counts[KIND_WORDS[f.kind] ?? f.kind] = (counts[KIND_WORDS[f.kind] ?? f.kind] ?? 0) + 1;
+    const byNode = new Map();
+    for (const f of mine) for (const id of (f.nodes ?? []).slice(0, 6)) { if (!byNode.has(id)) byNode.set(id, []); byNode.get(id).push(pinWords(f)); }
+    // What has no layer to pin it on (no fill behind the screen, or a capture older than the layer ids) is said in the summary.
+    const loose = mine.filter((f) => !(f.nodes ?? []).length);
+    const summary = mine.length
+      ? [`${REVIEW_HEAD}: ${mine.length} to fix (${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ')}).${!loose.length ? ' Each is pinned on its layer.' : loose.length < mine.length ? ' Each one on a layer is pinned there.' : ''}`, ...loose.map(pinWords)].join('\n\n')
+      : `${REVIEW_HEAD}: nothing to fix. Every text and icon read passes contrast, and every control is at least 24×24.`;
+    return { id: sc.id, name: named[sc.name] > 1 ? `${sc.name} (${sc.id})` : sc.name, count: mine.length, summary, pins: [...byNode].map(([node, list]) => ({ node, label: `${REVIEW_HEAD}\n${list.join('\n\n')}` })) };
+  });
+  const total = out.reduce((n, x) => n + x.count, 0);
+  return [{ kind: 'review', category: REVIEW_CATEGORY, screens: out, why: `${total} to fix on ${read.length} screen${read.length === 1 ? '' : 's'}, each pinned on its layer, with a summary on each screen` }];
+}
+
+// ── W3: each component's accessibility spec, as the code gives it ─────────────────────────────────────────────────────
+const STATE_ATTRS = [['aria-pressed', 'pressed (aria-pressed)'], ['aria-checked', 'checked (aria-checked)'], ['checked', 'checked'], ['aria-expanded', 'expanded (aria-expanded)'],
+  ['aria-selected', 'selected (aria-selected)'], ['aria-current', 'current (aria-current)'], ['aria-invalid', 'invalid (aria-invalid)'], ['aria-disabled', 'disabled (aria-disabled)'],
+  ['disabled', 'disabled'], ['aria-required', 'required (aria-required)'], ['required', 'required'], ['aria-busy', 'busy (aria-busy)'], ['aria-valuenow', 'its value (aria-valuenow)']];
+// The keys each role owes (the ARIA practices the browser checks hold a page to), said for whoever builds it.
+const KEYS_OWED = {
+  button: 'Tab reaches it; Enter and Space press it', togglebutton: 'Tab reaches it; Enter and Space flip it', link: 'Tab reaches it; Enter follows it',
+  checkbox: 'Tab reaches it; Space checks and unchecks it', switch: 'Tab reaches it; Space flips it', textbox: 'Tab reaches it; typing writes into it',
+  radio: 'Tab reaches the checked option of its group; the arrow keys move between the options and check them',
+  spinbutton: 'Tab reaches it; the up and down arrows change its value', tab: 'Tab reaches the selected tab; the arrow keys move between the tabs',
+  disclosure: 'Tab reaches it; Enter and Space show or hide its panel',
+  dialog: 'the focus moves into it when it opens and Tab keeps it inside; Escape closes it and the focus goes back to what opened it',
+};
+// What names a component, read from its markup: the first of an aria-labelledby, an aria-label, a <label>, its own words.
+export function nameSource(markups = []) {
+  const all = markups.filter(Boolean).join('\n');
+  if (!all) return null;
+  const al = /\baria-label\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(all);
+  if (/\baria-labelledby\s*=/i.test(all)) return 'the element its aria-labelledby points to';
+  if (al) return `aria-label ("${(al[1] ?? al[2] ?? '').slice(0, 40)}")`;
+  if (/<label\b/i.test(all) || /\bfor\s*=/i.test(all)) return 'its label';
+  if (/\balt\s*=\s*"[^"]+"/i.test(all)) return 'its alt text';
+  const words = all.replace(/<svg[\s\S]*?<\/svg>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (words) return 'its words';
+  if (/\btitle\s*=/i.test(all)) return 'only its title, a tooltip a touch screen never shows: give it words or an aria-label';
+  return 'nothing yet: give it words or an aria-label';
+}
+export function statesOf(markups = []) {
+  const all = markups.filter(Boolean).join('\n');
+  return STATE_ATTRS.filter(([a]) => new RegExp(`\\s${a}(\\s*=|[\\s>/])`, 'i').test(all)).map(([, w]) => w).filter((w, i, xs) => !xs.slice(0, i).some((x) => x.split(' ')[0] === w.split(' ')[0]));
+}
+// propsSnap, components: as figmaEdits; heard: what a screen reader says for each component (the last accessibility
+// check, a11y.json heard). → [{ kind: 'spec', component, nodeId, role, label, why }]
+export function specEdits(propsSnap = {}, components = [], { heard = {} } = {}) {
+  const byName = new Map(components.map((c) => [c.name, c]));
+  const out = [];
+  for (const [name, entry] of Object.entries(propsSnap ?? {})) {
+    if (name.startsWith('_') || !entry?.nodeId) continue;
+    const c = byName.get(name);
+    if (!c || !FROM_CODE.has(c.markupFrom)) continue;
+    const markups = [c.markup, ...(c.markups ?? [])].filter(Boolean);
+    const found = componentRole(markups);
+    const figmaRole = roleWord((entry.annotations ?? []).filter((a) => !String(a?.labelMarkdown ?? a?.label ?? '').startsWith(SPEC_HEAD)));
+    const differs = found && figmaRole && figmaRole !== found.role && !(figmaRole === 'textfield' && found.role === 'textbox');
+    const states = statesOf(markups), named = nameSource(markups), keys = found ? KEYS_OWED[found.role] ?? null : null;
+    const does = found ? behaviourSheetLines(found.role).filter((l) => !keys?.includes(l)) : [];
+    const says = (heard[name] ?? []).slice(0, 4).join(' · ');
+    if (!found && !states.length) continue;   // a wrapper of several controls with no state of its own: nothing to state
+    const lines = [`${SPEC_HEAD} (from the code, replaced on each run)`,
+      found ? (differs ? `The role is a decision still open: Figma says ${figmaRole}, the code renders a ${found.role}.` : `Role: ${found.role}`) : null,
+      named ? `Name: ${named}` : null,
+      states.length ? `States: ${states.join(', ')}` : null,
+      keys ? `Keys: ${keys}` : null,
+      does.length ? `Behaviour: ${does.join('; ')}` : null,
+      says ? `A screen reader says: ${says}` : null].filter(Boolean);
+    out.push({ kind: 'spec', component: name, nodeId: entry.nodeId, role: found && !differs ? found.role : null, label: lines.join('\n'),
+      why: [found ? `${/^[aeiou]/.test(found.role) ? 'an' : 'a'} ${found.role}` : 'a composite', named ? `named by ${named.split(':')[0]}` : null, states.length ? `${states.length} state${states.length === 1 ? '' : 's'}` : null].filter(Boolean).join(', ') });
+  }
+  return out;
+}
+
 // The Figma plugin script for the edits a person approved (decisions are never in it). Idempotent: a node that
 // already states a role is left as it is. Returns { changed, skipped, missing } for the agent to report.
 export function applyScript(edits = []) {
@@ -190,9 +297,48 @@ export function applyScript(edits = []) {
   const noteCards = notes ? notes.items.map((n) => ({ title: n.component, text: noteText(n) })) : null;
   const pageName = (list ?? notes)?.page;
   const renames = edits.filter((e) => e.kind === 'rename' && e.nodeId).map((e) => ({ id: e.nodeId, component: e.component, what: e.what, prop: e.prop, from: e.from, to: e.to }));
+  const review = edits.find((e) => e.kind === 'review');
+  const specs = edits.filter((e) => e.kind === 'spec' && e.nodeId).map((e) => ({ id: e.nodeId, component: e.component, label: e.label }));
   return `// Written by rms-design-system-engine --figma-edits. Run it with the Figma MCP's use_figma only after the person said yes.
 const edits = ${JSON.stringify(todo, null, 2)};
 const changed = [], skipped = [], missing = [];
+// An annotation kept as it is, rebuilt in the form the API takes back.
+const keep = (a) => (a.labelMarkdown ? { labelMarkdown: a.labelMarkdown } : { label: a.label || '' });
+const keepAll = (a) => ({ ...keep(a), ...(a.properties ? { properties: a.properties } : {}), ...(a.categoryId ? { categoryId: a.categoryId } : {}) });
+const category = async (label, color) => { const all = await figma.annotations.getAnnotationCategoriesAsync(); return all.find((c) => String(c.label).toLowerCase() === label.toLowerCase()) || await figma.annotations.addAnnotationCategoryAsync({ label, color }); };
+const pageOf = async (n) => { let p = n; while (p && p.type !== 'PAGE') p = p.parent; if (p && p.loadAsync) await p.loadAsync(); };
+${review ? `// W2: the screens' accessibility findings. What the last run pinned goes first, so what is fixed clears.
+const review = ${JSON.stringify(review.screens.map((x) => ({ id: x.id, name: x.name, summary: x.summary, pins: x.pins })), null, 2)};
+const reviewCat = await category(${JSON.stringify(REVIEW_CATEGORY)}, 'red');
+for (const s of review) {
+  const screen = await figma.getNodeByIdAsync(s.id);
+  if (!screen || !('annotations' in screen)) { missing.push(s.name); continue; }
+  await pageOf(screen);
+  const outside = (n) => { for (let p = n.parent; p && p !== screen; p = p.parent) if (p.type === 'INSTANCE') return false; return true; };
+  for (const n of [screen, ...(screen.findAll ? screen.findAll((x) => 'annotations' in x && outside(x)) : [])]) {
+    const now = n.annotations || [];
+    if (now.some((a) => a.categoryId === reviewCat.id)) n.annotations = now.filter((a) => a.categoryId !== reviewCat.id).map(keepAll);
+  }
+  screen.annotations = [...(screen.annotations || []).map(keepAll), { labelMarkdown: s.summary, categoryId: reviewCat.id }];
+  let pinned = 0;
+  for (const p of s.pins) {
+    const node = await figma.getNodeByIdAsync(p.node);
+    if (!node || !('annotations' in node)) { missing.push(s.name + ' › ' + p.node); continue; }
+    try { node.annotations = [...(node.annotations || []).map(keepAll), { labelMarkdown: p.label, categoryId: reviewCat.id }]; pinned++; } catch (e) { missing.push(s.name + ' › ' + node.name + ' (' + String(e && e.message || e) + ')'); }
+  }
+  changed.push(s.name + ': review summary and ' + pinned + ' pinned');
+}
+` : ''}${specs.length ? `// W3: each component's accessibility spec from the code, replacing the one the last run wrote.
+const specs = ${JSON.stringify(specs, null, 2)};
+const specCat = await category(${JSON.stringify(SPEC_CATEGORY)}, 'blue');
+for (const sp of specs) {
+  const node = await figma.getNodeByIdAsync(sp.id);
+  if (!node || !('annotations' in node)) { missing.push(sp.component); continue; }
+  const now = (node.annotations || []).filter((a) => !String(a.labelMarkdown || a.label || '').startsWith(${JSON.stringify(SPEC_HEAD)}));
+  node.annotations = [...now.map(keepAll), { labelMarkdown: sp.label, categoryId: specCat.id }];
+  changed.push(sp.component + ' → accessibility spec');
+}
+` : ''}
 ${renames.length ? `// Names written as the rest of the system writes them: options first (in each variant's name), then properties.
 const renames = ${JSON.stringify(renames, null, 2)};
 for (const r of renames.filter((x) => x.what === 'option')) {
@@ -262,15 +408,18 @@ export function editLines(edits, { fileKey = null } = {}) {
   const roles = edits.filter((e) => e.kind === 'role'), todo = edits.find((e) => e.kind === 'todo'), decide = edits.filter((e) => e.decision);
   const notes = edits.find((e) => e.kind === 'notes');
   const renames = edits.filter((e) => e.kind === 'rename');
+  const review = edits.find((e) => e.kind === 'review'), specs = edits.filter((e) => e.kind === 'spec');
   const apply = edits.filter((e) => !e.decision);
   if (!edits.length) return ['✅ Figma states every role the code has, writes its names one way, every annotation is read by a check, and no prototype needs anything the system lacks: nothing to send back.'];
   return [
-    ...(roles.length ? [`Figma changes the engine can make (${roles.length}), each read from the code:`, ...roles.map((e) => `   • ${e.component}: add the annotation "${e.label}" (${e.why})`)] : ['✅ Figma states every role the code has.']),
+    ...(roles.length ? [`Figma changes the engine can make (${roles.length}), each read from the code:`, ...roles.map((e) => `   • ${e.component}: add the annotation "${e.label}" (${e.why})`)] : specs.some((e) => e.role) ? [] : ['✅ Figma states every role the code has.']),
+    ...(specs.length ? [`Accessibility specs from the code (${specs.length}), one annotation per component in the category "${SPEC_CATEGORY}", replacing the one the last run wrote:`, ...specs.map((e) => `   • ${e.component}: ${e.why}`)] : []),
+    ...(review ? [`Accessibility findings pinned on the screens in Figma (${review.why}), in the category "${review.category}", replacing the last run's:`, ...review.screens.map((x) => `   • ${x.name}: ${!x.count ? 'nothing to fix' : x.pins.length ? `${x.count} to fix, pinned on ${x.pins.length} layer${x.pins.length === 1 ? '' : 's'}` : `${x.count} to fix, said in the screen's summary (read the screens again with --figma-a11y to pin each on its layer)`}`)] : []),
     ...(renames.length ? [`Names written as the rest of the system writes them (${renames.length}):`, ...renames.map((e) => `   • ${e.component}: ${e.what === 'option' ? `${e.prop}=${e.from} → ${e.to}` : `"${e.from}" → "${e.to}"`}`), '   Each component\'s code contract follows the new names once Figma is read again.'] : []),
     ...(todo ? [`The design team's to do list in Figma, page "${todo.page}", frame "${todo.frame}" (${todo.why}), written afresh:`, ...todo.items.map((g) => `   • ${g.need}: ${todoText(g)}`)] : []),
     ...(notes ? [`Annotations no check reads, listed in Figma on the page "${notes.page}", frame "${notes.frame}" (${notes.why}); the annotations themselves are not changed:`, ...notes.items.map((n) => `   • ${n.component}${n.layer ? ` › ${n.layer}` : ''}: "${n.text}"${n.wording ? ` → write it as "${n.wording}"` : ' (an accessibility note: write it as Role:, Alt:, Heading level or a key, so a check reads it)'}`)] : []),
     ...(decide.length ? [`For a person to decide (${decide.length}), never applied:`, ...decide.map((e) => `   • ${e.component}: ${e.why}`)] : []),
-    ...(apply.length ? [`NEXT: show the person the ${[roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : '', renames.length ? `${renames.length} rename${renames.length === 1 ? '' : 's'}` : '', todo ? 'to do list' : '', notes ? 'annotations no check reads' : ''].filter(Boolean).join(' and ')} above and ask; only when they say yes, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
+    ...(apply.length ? [`NEXT: show the person the ${[roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : '', renames.length ? `${renames.length} rename${renames.length === 1 ? '' : 's'}` : '', specs.length ? `${specs.length} accessibility spec${specs.length === 1 ? '' : 's'}` : '', review ? 'accessibility review' : '', todo ? 'to do list' : '', notes ? 'annotations no check reads' : ''].filter(Boolean).join(' and ')} above and ask; only when they say yes, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
   ];
 }
 

@@ -34,7 +34,7 @@ export const WCAG21 = [
   { sc: '1.4.10', name: 'Reflow', level: 'AA', how: 'audit', kinds: ['reflow', 'zoom'], says: 'It fits a narrow screen (320 pixels) without scrolling sideways.' },
   { sc: '1.4.11', name: 'Non-text Contrast', level: 'AA', how: 'auto', kinds: ['boundary', 'focuscontrast', 'iconcontrast', 'stateedge'], ran: ['boundary'], says: 'The edge of a control, an icon and the focus ring stand out 3:1 from what is around them.' },
   { sc: '1.4.12', name: 'Text Spacing', level: 'AA', how: 'audit', kinds: ['spacing'], says: 'Nothing is cut off when a reader widens the spacing between letters, words and lines.' },
-  { sc: '1.4.13', name: 'Content on Hover or Focus', level: 'AA', how: 'auto', kinds: ['hovercontent'], ran: ['hovercontent'], says: 'What shows on hover or focus closes with Escape, stays while the pointer is on it, and stays until the person moves away.' },
+  { sc: '1.4.13', name: 'Content on Hover or Focus', level: 'AA', how: 'auto', kinds: ['hovercontent', 'tapcontent'], ran: ['hovercontent', 'tapcontent'], says: 'What shows on hover or focus closes with Escape, stays while the pointer is on it, and stays until the person moves away.' },
   { sc: '2.1.1', name: 'Keyboard', level: 'A', how: 'auto', kinds: ['keyboard', 'activate', 'arrows', 'behaviour', 'escape'], says: 'Everything it does can be done with the keyboard.' },
   { sc: '2.1.2', name: 'No Keyboard Trap', level: 'A', how: 'audit', kinds: ['tabtrap'], says: 'Tab never gets stuck in it.' },
   { sc: '2.1.4', name: 'Character Key Shortcuts', level: 'A', how: 'static', kinds: ['shortcut'], says: 'No shortcut is a single letter or number alone (one can be turned off or changed).' },
@@ -43,7 +43,7 @@ export const WCAG21 = [
   { sc: '2.3.1', name: 'Three Flashes or Below Threshold', level: 'A', how: 'auto', kinds: ['flash'], ran: ['moving'], says: 'Nothing flashes more than three times a second.' },
   { sc: '2.4.1', name: 'Bypass Blocks', level: 'A', how: 'page', says: 'The page lets a person skip past repeated blocks.' },
   { sc: '2.4.2', name: 'Page Titled', level: 'A', how: 'page', says: 'The page has a title that says what it is.' },
-  { sc: '2.4.3', name: 'Focus Order', level: 'A', how: 'auto', kinds: ['order', 'tabindex', 'focusreturn', 'pageorder'], ran: ['order'], says: 'Tab moves through it in an order that makes sense, and the focus comes back after a dialog closes.' },
+  { sc: '2.4.3', name: 'Focus Order', level: 'A', how: 'auto', kinds: ['order', 'tabindex', 'focusreturn', 'pageorder', 'modalescape'], ran: ['order', 'modalescape'], says: 'Tab moves through it in an order that makes sense, and the focus comes back after a dialog closes.' },
   { sc: '2.4.4', name: 'Link Purpose (In Context)', level: 'A', how: 'auto', kinds: ['link'], ran: ['link'], says: 'A link says where it goes.' },
   { sc: '2.4.5', name: 'Multiple Ways', level: 'AA', how: 'page', says: 'The product offers more than one way to find a page.' },
   { sc: '2.4.6', name: 'Headings and Labels', level: 'AA', how: 'auto', kinds: ['emptylabel'], ran: ['emptylabel'], person: 'Each heading and label says what follows it.', says: 'Headings and labels are there and say what they are for.' },
@@ -64,7 +64,7 @@ export const WCAG21 = [
   { sc: '3.3.4', name: 'Error Prevention (Legal, Financial, Data)', level: 'AA', how: 'page', says: 'A form that commits money, law or data can be checked or undone.' },
   { sc: '4.1.1', name: 'Parsing', level: 'A', how: 'auto', kinds: ['dupid'], ran: ['aria'], says: 'Each id is used once.' },
   { sc: '4.1.2', name: 'Name, Role, Value', level: 'A', how: 'auto', kinds: ['name', 'aria', 'ariastate', 'rolecontract', 'semantics', 'statefollows', 'fakelink'], ran: ['aria'], says: 'Each control has a name, a role and a state a screen reader can tell.' },
-  { sc: '4.1.3', name: 'Status Messages', level: 'AA', how: 'auto', kinds: ['status'], ran: ['status'], says: 'A message, a toast or a loader is announced without taking the focus.' },
+  { sc: '4.1.3', name: 'Status Messages', level: 'AA', how: 'auto', kinds: ['status', 'unannounced'], ran: ['status'], says: 'A message, a toast or a loader is announced without taking the focus.' },
 ];
 
 // WCAG 2.2 at level A and AA, the engine's target: the 2.1 criteria without 4.1.1 Parsing (2.2 removed it: a duplicate id
