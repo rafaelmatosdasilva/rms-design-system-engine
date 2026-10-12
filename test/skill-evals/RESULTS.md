@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Every mode, effects, a Motion tab (continuous evaluation)
+
+What changed since the entry below (engine 9b4a9c5): Target size on a 320px screen; contrast against what is painted behind the text; each component's shadows, blurs, fills, clipping and blending against Figma (--figma-effects); sizes, type, breakpoints and states in every mode; Documentation as the task table with a status; a Motion tab with everything that moves in one table. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `a789688ad4c9` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8bf7f93 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.060 |
+| Input a run | 119k | 114k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 114k a run against 119k. Records: `records/modes-effects-motion-tab`.
+
 ## 2026-10: How each component moves on its own (continuous evaluation)
 
 What changed since the entry below (engine 1e7192e): The motion check compares each component's loop, opening and closing (spinner, loader, panel, modal, toast): the code's animations against Figma's Motion keyframes and overlays. The guide changed in `reference/config.md`, `reference/usage.md`.
