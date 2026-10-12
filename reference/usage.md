@@ -324,7 +324,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Accessibility, Documentation, Migration, Products, System and the page's own items, each when it has any; no All):
   Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Issue nr, WCAG criterion, Figma
   states, Found, What to do, Status), Documentation's the Documentation table itself (Kind, What is written, From, the
-  card each component's Documentation area and the Documentation page show), one card for each component with a kind
+  card each component's Documentation area shows), one card for each component with a kind
   not written yet (`docRows`), where to write it above them, and the rest Issue nr, Where or Type, What to do and
   Status. The count at the top is the shown kind's; Documentation's kinds are counted, not numbered. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
@@ -340,7 +340,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   label edit writes only its words into its part. An option the contract maps to another element's selector (a
   product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
   the component's own `:checked` rule, and an option the code does not build is offered as not built.
-- **Documentation** (its first card): a table, the same one the Documentation page gathers for every component (one per component, the thinnest first, an old `#coverage` link opening it), its columns Kind, What is written and From, its rows the same kinds in the same order (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), each with what was written and where, or said as missing; then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
+- **Documentation** (its first card): a table, the same one the To do page's Documentation shows for every component with a kind not written yet (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#todo/documentation`), its columns Kind, What is written and From, its rows the same kinds in the same order (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), each with what was written and where, or said as missing; then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
