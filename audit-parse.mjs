@@ -24,7 +24,21 @@ export function parseGateOutput(r, summaryRe, { maxDetails = 20 } = {}) {
   const rows = out.split('\n');
   // A divider ("─── Values not verified ──") heads a list in the script's own output; it is never a result line.
   const summary = rows.filter((l) => l.trim() && !/^\s*─/.test(l) && (summaryRe.test(l) || SKIP_RE.test(l))).filter(keep).map((l) => l.trim());
-  const failDetails = pass ? [] : rows.filter((l) => /🚨|❌/.test(l)).filter(keep).map((l) => '  ' + l.trim()).slice(0, maxDetails);
+  // Each failing line with the lines indented under it (what it names: a file and line, a variable, a selector), so a
+  // count never stands alone in the report.
+  const failDetails = [];
+  if (!pass) {
+    const indent = (l) => l.match(/^\s*/)[0].length;
+    for (let i = 0; i < rows.length && failDetails.length < maxDetails; i++) {
+      if (!/🚨|❌/.test(rows[i])) continue;
+      // A failing line the summary already shows is not repeated; what is under it still is.
+      if (keep(rows[i])) failDetails.push('  ' + rows[i].trim());
+      for (let j = i + 1; j < rows.length && failDetails.length < maxDetails; j++) {
+        if (!rows[j].trim() || indent(rows[j]) <= indent(rows[i]) || /🚨|❌|✅|⏭/.test(rows[j])) break;
+        if (keep(rows[j])) failDetails.push('    ' + rows[j].trim());
+      }
+    }
+  }
   if (pass && !summary.length) summary.push('⚠️  this gate printed no result line, so its outcome is not visible here');
   if (!pass && !summary.length && !failDetails.length) {
     const last = rows.map((l) => l.trim()).filter(Boolean).slice(-3);

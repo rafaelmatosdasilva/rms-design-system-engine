@@ -57,7 +57,9 @@ mkdirSync(REFS_DIR, { recursive: true });
 const nodeIds   = FRAMES.map(f => f.nodeId.replace(/-/, ':')); // only first dash → colon
 const idsParam  = encodeURIComponent(nodeIds.join(','));
 const SCALE     = cfg.visualRefScale ?? 2;
-const apiUrl    = `https://api.figma.com/v1/images/${FILE_KEY}?ids=${idsParam}&format=png&scale=${SCALE}`;
+// DESIGN_SYSTEM_ENGINE_FIGMA_API points the images call at a stand-in (the planted-fault test, H5); Figma's otherwise.
+const API_BASE  = (process.env.DESIGN_SYSTEM_ENGINE_FIGMA_API || 'https://api.figma.com').replace(/\/$/, '');
+const apiUrl    = `${API_BASE}/v1/images/${FILE_KEY}?ids=${idsParam}&format=png&scale=${SCALE}`;
 
 let imageUrls = {};
 try {

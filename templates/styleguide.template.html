@@ -117,12 +117,14 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 @media (max-width: 640px) { .sg-health-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .sg-health-tile, .sg-health-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); padding: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-s); min-width: 0; }
 .sg-health-card > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }
+.sg-health-card + .sg-health-card { margin-top: var(--sg-space-l); }
 .sg-health-label { font-size: var(--sg-s); color: var(--sg-muted); }
 .sg-health-num { font-size: calc(var(--sg-h1) * 2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); font-variant-numeric: tabular-nums; }
 .sg-health-num small { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); margin-left: var(--sg-space-xs); }
 .sg-health-sub { font-size: var(--sg-s); color: var(--sg-text-2); }
-.sg-health-bar { display: block; height: calc(var(--sg-space-xs) * 2); border-radius: var(--sg-radius-pill); background: color-mix(in srgb, var(--sg-border) 30%, transparent); overflow: hidden; }
+.sg-health-bar { display: flex; height: calc(var(--sg-space-xs) * 2); border-radius: var(--sg-radius-pill); background: color-mix(in srgb, var(--sg-border) 30%, transparent); overflow: hidden; }
 .sg-health-bar > span { display: block; height: 100%; background: var(--sg-text); }
+.sg-health-bar > span + span { background: color-mix(in srgb, var(--sg-text) 35%, transparent); }
 .sg-health-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); }
 .sg-health-list > li { display: flex; flex-direction: column; gap: var(--sg-space-xs); }
 .sg-health-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sg-space-s); font-size: var(--sg-m); color: var(--sg-text); }
@@ -1274,7 +1276,7 @@ a.pg-usage-name { color: var(--sg-text); }
         code: r.code ? '<code>' + esc(timing(r.code)) + '</code>' + val(r.code.vars.join(', ')) + val(r.code.at) + val(r.code.calm ? 'Stops for less motion' : 'Keeps moving for less motion') : '<span class="pg-par-none">None</span>',
         figma: r.figma ? '<code>' + esc(motionTiming(r.figma)) + '</code>' + val(capital(r.figma.from)) : '<span class="pg-par-none">' + esc(r.status === 'unread' ? 'Not read yet' : 'None') + '</span>',
         todo: esc(todo), who: st === 'todo' ? (r.status === 'figma-none' ? WHO.figma : WHO.code) : '', st: st,
-        rel: r.status === 'code-only' ? 'Only in the code' : r.status === 'unread' ? 'Figma not read yet' : r.status === 'figma-none' ? PAR_REL.code : r.status === 'code-none' ? PAR_REL.figma : r.status === 'differs' ? PAR_REL.differs : '', at: at0 };
+        rel: r.status === 'code-only' ? 'Only in the code' : r.status === 'unread' ? 'Figma not read yet' : r.status === 'figma-none' ? PAR_REL.code : r.status === 'code-none' ? PAR_REL.figma : r.status === 'differs' ? PAR_REL.differs : '', at: at0, unrun: r.status === 'unread' };
     });
   }
   function motionOpen(c) { var n = motionIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
@@ -2429,19 +2431,26 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   // What an agent needs to pick a component right: what it is, when to use it and when not, its role.
   var READY_KINDS = ['What it is', 'When to use', 'When not to use', 'Role'];
-  function healthRowsOf(c, withA11y) {
+  // Every row a check owes the component, those that did not run included (not compared, not reached, Figma not read).
+  function healthAllRows(c, withA11y) {
     var rows = [];
     try { rows = rows.concat(parityIssueRows(c), motionIssueRows(c), docIssueRows(c)); } catch (e) { /* read on its own page */ }
     if (withA11y) try {
       var tried = c.__a11y;
       rows = rows.concat(a11yIssueRows(c, tried ? tried.items : c.a11y ? a11yStaticItems(c) : [], tried ? tried.live : null), unreadRows(c));
     } catch (e) { /* its accessibility is read on its own page */ }
-    return rows.filter(function (r) { return r.st in HEALTH_PART && !r.extra; });
+    return rows.filter(function (r) { return !r.extra && (r.st in HEALTH_PART || r.st === 'skip' || r.unrun); });
   }
+  // The rows each area counts, as before; a check that did not run is also said apart, as what was not checked (G15):
+  // one still to run counts as to check here, so it never reads as passed.
+  var notRun = function (r) { return r.st === 'skip' || !!r.unrun; };
+  // Each component's checks that did not run, with why: for whoever asks what Checked leaves out.
+  window.__sgNotRun = function () { var o = {}; COMPONENTS.forEach(function (c) { var rows = healthAllRows(c, true).filter(notRun); if (rows.length) o[c.name] = rows.map(function (r) { return [r.area, r.kind, r.st, String(r.rel || r.note || '').replace(/<[^>]+>/g, '').slice(0, 120)]; }); }); return o; };
+  function healthRowsOf(all) { return all.filter(function (r) { return r.st in HEALTH_PART; }); }
   function fillHealth() {
     if (!hl) return;
     var tried = COMPONENTS.filter(function (c) { return c.__a11y; }), wait = !ALL && tried.length < COMPONENTS.length;
-    var per = COMPONENTS.map(function (c) { return { c: c, rows: healthRowsOf(c, !wait) }; });
+    var per = COMPONENTS.map(function (c) { var all = healthAllRows(c, !wait); return { c: c, all: all, rows: healthRowsOf(all) }; });
     var pct = function (x) { return Math.round(x * 100); };
     var areas = HEALTH_AREAS.map(function (a) {
       var each = per.map(function (p) { var rows = p.rows.filter(function (r) { return r.area === a[0]; }); return { rows: rows, s: healthStanding(rows, a[0]) }; }).filter(function (x) { return x.s != null; });
@@ -2515,19 +2524,43 @@ a.pg-usage-name { color: var(--sg-text); }
         by[a[0]] = pct(healthStanding(rows, a[0]));
         if (a[1] > 0) { ws += a[1]; wv += by[a[0]] * a[1]; }
       });
-      return { c: p.c, by: by, score: ws ? Math.round(wv / ws) : null };
+      // What was checked (G15): of every check it owes, the share that ran.
+      var of = p.all.length, ran = p.all.filter(function (r) { return !notRun(r); }).length;
+      return { c: p.c, by: by, score: ws ? Math.round(wv / ws) : null, ran: ran, of: of };
     }).filter(function (x) { return x.score != null; }).sort(function (a, b) { return a.score - b.score || a.c.name.localeCompare(b.c.name); });
+    // Accessibility by WCAG criterion (G10): how many components fail each, and how many wait on a person's check, so a
+    // fix that clears many components at once comes first. Once every component is tried, as the area's number.
+    var crit = {};
+    if (!wait) per.forEach(function (p) {
+      p.rows.forEach(function (r) {
+        if (r.area !== 'Accessibility' || !r.k || notRun(r) || (r.st !== 'todo' && r.st !== 'check')) return;
+        var e = crit[r.k.sc] = crit[r.k.sc] || { sc: r.k.sc, name: r.k.name, level: r.k.level, fail: 0, check: 0 };
+        if (r.st === 'todo') e.fail++; else e.check++;
+      });
+    });
+    var critList = Object.keys(crit).map(function (k) { return crit[k]; }).sort(function (a, b) { return b.fail - a.fail || b.check - a.check || (a.sc < b.sc ? -1 : 1); });
+    var critOf = Math.max(1, per.filter(function (p) { return p.rows.some(function (r) { return r.area === 'Accessibility'; }); }).length);
+    var bar2 = function (a, b) { var x = Math.max(0, Math.min(100, a)), y = Math.max(0, Math.min(100 - x, b)); return '<span class="sg-health-bar" aria-hidden="true"><span style="width:' + x + '%"></span><span style="width:' + y + '%"></span></span>'; };
+    var critHTML = wait ? '' : critList.length ? '<ol class="sg-health-list">' + critList.map(function (x) {
+      var say = [x.fail ? x.fail + ' fail' : '', x.check ? x.check + ' to check' : ''].filter(Boolean).join(', ');
+      return '<li><div class="sg-health-row"><span>' + esc(x.sc + ' ' + x.name + (x.level ? ' (' + x.level + ')' : '')) + '</span><span>' + esc(say) + '</span></div>' + bar2(pct(x.fail / critOf), pct(x.check / critOf)) + '</li>';
+    }).join('') + '</ol><p class="sg-health-sub">Of ' + critOf + (critOf === 1 ? ' component' : ' components') + ' tried. The dark part fails, the light part waits on a person\'s check.</p>' : '<p class="sg-health-sub">No component fails a criterion, and none waits on a person\'s check.</p>';
     var cell = function (v, label) { return '<td data-label="' + esc(label) + '">' + (v == null ? '<span class="pg-par-none">–</span>' : v + '%') + '</td>'; };
     var compHTML = compScores.length ? '<div class="pg-par-card sg-health-comps"><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>Health</th>' +
-      HEALTH_AREAS.map(function (a) { return '<th>' + esc(a[0]) + '</th>'; }).join('') + '<th>AI readiness</th></tr></thead><tbody>' +
+      HEALTH_AREAS.map(function (a) { return '<th>' + esc(a[0]) + '</th>'; }).join('') + '<th>AI readiness</th><th>Checked</th></tr></thead><tbody>' +
       compScores.map(function (x) {
-        return '<tr><td data-label="Component"><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a></td><td data-label="Health"><div class="sg-health-cell"><span>' + x.score + '%</span>' + bar(x.score) + '</div></td>' +
-          HEALTH_AREAS.map(function (a) { return cell(x.by[a[0]], a[0]); }).join('') + cell(x.c.name in readyOf ? readyOf[x.c.name] : null, 'AI readiness') + '</tr>';
+        var few = x.of && x.ran / x.of < 0.5;
+        return '<tr><td data-label="Component"><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a></td><td data-label="Health"><div class="sg-health-cell"><span>' + x.score + '%</span>' + bar(x.score) +
+          (few ? '<span class="sg-health-sub">On few checks</span>' : '') + '</div></td>' +
+          HEALTH_AREAS.map(function (a) { return cell(x.by[a[0]], a[0]); }).join('') + cell(x.c.name in readyOf ? readyOf[x.c.name] : null, 'AI readiness') +
+          '<td data-label="Checked">' + (x.of ? '<div class="sg-health-cell"><span>' + pct(x.ran / x.of) + '%</span><span class="sg-health-sub">' + x.ran + ' of ' + x.of + '</span></div>' : '<span class="pg-par-none">–</span>') + '</td></tr>';
       }).join('') + '</tbody></table></div></div>' : '';
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div>' +
       '<div class="sg-health-card"><h3>Components with the most left</h3>' + painHTML + '</div>' +
+      (critHTML ? '<div class="sg-health-card sg-health-crit"><h3>Accessibility by WCAG criterion</h3>' + critHTML + '</div>' : '') +
       (compHTML ? '<h3 class="sg-health-head">Each component</h3>' + compHTML : '') + '<p class="pg-wcag-note sg-health-note">Parity and accessibility count each component, whole when nothing in it is left, half when only checks are left, nothing while something is to fix. Documentation and motion count each item, done whole, to check half, to fix nothing. Every component counts the same; what is left is weighed by its area. ' +
       'AI readiness counts what it is, when to use it and when not, its role and agreeing with Figma, and is not in the weighted number. ' +
+      'Checked is the share of a component\'s checks that ran (a value not compared, a criterion the last audit did not reach and Figma not read yet did not); under half, its number is said to rest on few checks. ' +
       (wait ? 'Accessibility joins once every component is tried in this browser.' : '') + '</p></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';
@@ -2745,7 +2778,9 @@ a.pg-usage-name { color: var(--sg-text); }
       if (!src.length) src.push(WCAG_SRC[r.k.how] || r.how || '');
       return { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : '<button type="button" class="sg-token-link pg-wcag-tip" data-wcag="' + esc(r.k.sc) + '" aria-expanded="false" aria-haspopup="dialog">' + esc(name) + '</button>',
         figma: r.fig.map(function (x) { return '<div>' + esc(x) + '</div>'; }).join(''), code: found, todo: todos.map(function (x) { return '<div>' + x + '</div>'; }).join(''),
-        who: r.st === 'todo' || r.st === 'check' ? (r.k.extra ? WHO.both : own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: at, src: src, extra: !!r.k.extra, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note };
+        who: r.st === 'todo' || r.st === 'check' ? (r.k.extra ? WHO.both : own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: at, src: src, extra: !!r.k.extra, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,
+        // To check only because its check has not run yet (no audit, not reached, not built, not opened): not a check that ran.
+        unrun: r.st === 'check' && (/^(Run the audit|Build .* in the code: the audit|The last audit did not|Tried on .* when its Accessibility area is open|Read once the audit runs)/.test(act || r.note || '') || r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) };
     });
   }
 

@@ -69,6 +69,7 @@ rms-design-system-engine --code-drift                    # list props that exist
 rms-design-system-engine --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
 rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
+rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line
 rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
@@ -887,7 +888,10 @@ The rules are `--check-ui`'s, plus:
   wide, or as high in a row, as what holds it) or `"grow": true` (the room left). A component the system makes fill its
   container (Figma sizes it to fill across, or its CSS gives its own class `width: 100%` or `flex: 1`) fills the
   arrangement it is in, and an arrangement holding one fills its own, up to the page; one Figma sizes to fill down (a
-  panel) takes the height left in a column. A Row that lines its parts up at the end, the centre or apart takes the
+  panel) takes the height left in a column. When the products' screens are read (`--figma-screens`), what they do
+  decides (X1): a component most of whose instances fill their parent's width there (a status bar fixed in its master,
+  stretched across every window) fills it in a prototype, and one fixed on every screen stays its own size, whatever
+  its Figma master says; a component no screen shows keeps its master's sizing. A Row that lines its parts up at the end, the centre or apart takes the
   width to do it.
 - **Slots.** A Figma slot is a place for other components, shown in the catalog as `<its children>`: it takes any
   component unless Figma lists the few it takes. A component given children is drawn from the plainest copy with a part
@@ -1115,6 +1119,32 @@ to drop with the next `--baseline --findings`. A failing gate with no `❌` line
 line, and adds them to the file (nothing accepted before is dropped): `--component chip --baseline --findings
 --match radi` accepts the chip's radius and keeps its prop names failing. The router adds it when the person
 names the kind of difference (radius, height, width, padding, gap, colour, props).
+
+#### Values written by hand (M1, `--census`)
+
+`rms-design-system-engine --census` reads every style file the project has (`.css`, `.scss`, `.less`, the `<style>`
+blocks of `.vue`, `.svelte` and pages) and lists each literal a token should carry, with its line and the token to use
+when the theme has one with that value (`raw-census.mjs`): a colour (an error, a token or not), a spacing (padding,
+margin, gap: an error, when the theme names spacing), a corner radius or a font size (an error when a token holds the
+value, a warning when none does), a duration (a warning, with its token when one holds it), a z-index other than -1, 0
+or 1 and a shadow written out (warnings). The theme files' custom properties are the tokens themselves and are not
+counted; their other rules are. 0, a 1px hairline, a pill's 999px radius, `calc()` and a value inside `var()` are left
+alone; the same value written twice on one line counts once. Files are listed with the ones that guess most first.
+
+The first run writes the count as the baseline (`design-system-engine-census.json`, committed with the change); a run
+with fewer errors lowers it; a run where a file has more errors than the baseline names the file and exits 1, so the
+count only falls. Every full audit prints the totals and the file with the most (`🧮`, advisory); `"census": false` in
+`ds-config.json` leaves that line out.
+
+#### Every check tested with a planted mistake (H5)
+
+`test/planted-faults.test.mjs` runs each of the 25 checks on a copy of the demo design system, set up so it has
+something to read, once clean and once with one known mistake (a token with another value, a dark value removed, a
+variable Figma does not have, a hover removed, a prop renamed, a border Figma does not draw, a transition slower than
+the contract, a frame changed in Figma, a component drawn at another height in the browser…): it must pass the first
+and fail the second, naming the mistake. A check with nothing to read says so: in the gate list it is **Not run**, with
+its reason, never Pass (a check whose every part was skipped is counted as not run, in the summary and in the
+scorecard's gate health).
 
 #### Accessibility check (I18, advisory, from the render)
 

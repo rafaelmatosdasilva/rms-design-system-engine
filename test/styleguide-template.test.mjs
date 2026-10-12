@@ -1321,9 +1321,21 @@ test('Health: each area counted by component, weighted into one number once acce
     assert.match(how[1][1], /^Each component counts the same\. One counts 100 when every prop, variable and value it has matches Figma, 50 when only rows to check are left, and 0 while one difference is still to fix, however many others match\. The number is the average over the 2 components compared\.$/);
     assert.match(how[0][1], /\(Parity 35, Accessibility 30, Documentation 20, Motion 0\)/);
     assert.match(tiles[5][2], /^\d of 2 components ready$/);
-    // One card: the five components with the most left, at most.
-    assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left']);
-    assert.ok(await run(`document.querySelectorAll('#health .sg-health-card .sg-health-list > li').length`) <= 5);
+    // The five components with the most left, at most; then each WCAG criterion that fails or waits on a person, the
+    // one that fails in most components first (G10).
+    assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left', 'Accessibility by WCAG criterion']);
+    assert.ok(await run(`document.querySelectorAll('#health .sg-health-card:not(.sg-health-crit) .sg-health-list > li').length`) <= 5);
+    const crit = await run(`[...document.querySelectorAll('#health .sg-health-crit .sg-health-list > li')].map((li) => [li.querySelector('.sg-health-row > span').textContent, li.querySelector('.sg-health-row > span:last-child').textContent, li.querySelectorAll('.sg-health-bar > span').length])`);
+    assert.ok(crit.length > 0, 'a criterion to fix or to check');
+    const fails = crit.map((x) => Number((/(\d+) fail/.exec(x[1]) ?? [0, 0])[1]));
+    for (const [name, say, segs] of crit) { assert.match(name, /^\d\.\d+\.\d+ .+ \(A+\)$/); assert.match(say, /^(\d+ fail)?(, )?(\d+ to check)?$/); assert.ok(Number(/\d+/.exec(say)[0]) <= 2); assert.equal(segs, 2); }
+    assert.deepEqual(fails, [...fails].sort((a, b) => b - a), 'the criterion that fails in most components first');
+    assert.match(await run(`document.querySelector('#health .sg-health-crit > p.sg-health-sub').textContent`), /^Of 2 components tried\. The dark part fails, the light part waits on a person's check\.$/);
+    // What was checked (G15): of every check each component owes, the share that ran, with the count.
+    const checked = await run(`[...document.querySelectorAll('#health .sg-health-comps tbody tr')].map((tr) => tr.querySelector('td[data-label="Checked"]').textContent)`);
+    for (const v of checked) assert.match(v, /^(\d{1,3})%(\d+) of (\d+)$/);
+    for (const v of checked) { const [, p, ran, of] = /^(\d+)%(\d+) of (\d+)$/.exec(v).map(Number); assert.equal(p, Math.round(ran / of * 100)); assert.ok(ran <= of); }
+    assert.match(await run(`document.querySelector('#health .sg-health-note').textContent`), /Checked is the share of a component's checks that ran/);
     // Each component, the weakest first; a link to its own page; no task listed (they are on the Tasks page).
     const comps = await run(`[...document.querySelectorAll('#health .sg-health-comps tbody tr')].map((tr) => [tr.querySelector('a').getAttribute('href'), parseInt(tr.children[1].textContent, 10)])`);
     assert.deepEqual(comps.map((x) => x[0]).sort(), ['#c-button', '#c-chip']);

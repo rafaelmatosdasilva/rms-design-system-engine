@@ -103,5 +103,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-12-a-colour-asked-for-or` | The 21 guide tasks on Haiku (engine 4754507) | "A colour asked for, or a design token to add, is not a secret" |
 | `2026-10-12-the-designed-screens-checked-for` | The 21 guide tasks on Haiku (engine b053e48) | "The designed screens checked for accessibility (W1)" |
 | `a11y-checks-and-figma-review` | The 21 guide tasks on Haiku (engine d5be7e8) | "Accessibility checks V1 to V6, findings and specs handed to Figma" |
+| `census-planted-faults-health` | The 21 guide tasks on Haiku (engine 2b17d2c) | "Raw value census, prototypes sized as screens, planted-fault tests, Health by criterion" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
