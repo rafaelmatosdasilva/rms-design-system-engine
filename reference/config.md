@@ -144,6 +144,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 - `knownUnusedVars` - CSS variables that are kept on purpose although nothing uses them.
 - `knownPropExceptions` - `"Component/prop"` pairs the props gate does not compare.
 - `knownPhantomBorderExceptions` - selectors allowed to draw a border Figma does not have.
+- `knownPhantomFillExceptions` - selectors allowed to paint a background on a component Figma draws with no fill.
 - `knownPluginOverrides` - theme variables an app may redeclare on purpose; `knownPluginSelectors` - app selectors that need no contract entry.
 - `exemptionCheck.alwaysNative` - extra element names treated as native controls by the exemption check.
 - `pluginDirs` - `{ "<app>": "path/from/root" }` when an app does not live in `apps/<app>`. A path outside the project (`"../gallery-app"`, a product in its own repository checked out beside the design system) is read as the project's own code by every source scan, so a variable or class only that product uses is not unused and a value it hard-codes is still found; a folder that is not there is skipped.
