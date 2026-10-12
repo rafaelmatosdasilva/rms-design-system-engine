@@ -361,13 +361,15 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-diff-list b { white-space: normal; }
 .pg-todo { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-text-2); }
 .sg-todo { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one card table per component */
+.sg-todo-kind { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one kind at a time, its cards spaced as the list's */
+.sg-todo-kind.pg-footer { margin-top: 0; }   /* Documentation's cards start where every other kind's do */
+.sg-todo-kind[hidden] { display: none; }
 /* One table for every issue, on the To do page and in a component's Parity and Accessibility areas: the same columns at
    the same widths everywhere, so they line up down the page and read the same in each place. */
 .sg-issues { table-layout: fixed; }
-/* Each kind's own columns: six for Parity and Accessibility, five for Documentation, four for the rest. */
+/* Each kind's own columns: six for Parity and Accessibility, four for the rest. */
 .sg-issues th:nth-child(1) { width: 7%; }
 .sg-cols-6 th:nth-child(2) { width: 13%; } .sg-cols-6 th:nth-child(3) { width: 14%; } .sg-cols-6 th:nth-child(4) { width: 21%; } .sg-cols-6 th:nth-child(5) { width: 28%; } .sg-cols-6 th:nth-child(6) { width: 17%; }
-.sg-cols-5 th:nth-child(2) { width: 16%; } .sg-cols-5 th:nth-child(3) { width: 24%; } .sg-cols-5 th:nth-child(4) { width: 36%; } .sg-cols-5 th:nth-child(5) { width: 17%; }
 .sg-cols-4 th:nth-child(2) { width: 26%; } .sg-cols-4 th:nth-child(3) { width: 50%; } .sg-cols-4 th:nth-child(4) { width: 17%; }
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
@@ -1819,8 +1821,8 @@ a.pg-usage-name { color: var(--sg-text); }
   function isOpen(r) { return r.st === 'todo' || r.st === 'check'; }
   function statusHTML(st, sub) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
   // Each kind of issue in a table of its own shape: Parity compares Figma with the code, Accessibility a criterion with
-  // what Figma states and what was found, Documentation a kind with what is written, and the rest where it is and what
-  // to do. A component's own Parity and Accessibility areas show the same tables as the To do page.
+  // what Figma states and what was found, and the rest where it is and what to do (Documentation is the Documentation
+  // table itself). A component's own Parity and Accessibility areas show the same tables as the To do page.
   var ISSUE_CELL = {
     no: function (r) { var n = isOpen(r) ? TODO_NO[r.key] : null; return '<td class="pg-par-type sg-todo-no" data-todo-key="' + esc(encodeURIComponent(r.key)) + '">' + (n || '') + '</td>'; },
     kind: function (r) { return '<td class="sg-todo-area">' + (r.kindHTML || esc(r.kind || '')) + '</td>'; },
@@ -1833,7 +1835,6 @@ a.pg-usage-name { color: var(--sg-text); }
   var ISSUE_COLS = {
     Parity: [['Issue nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status']],
     Accessibility: [['Issue nr', 'no'], ['WCAG criterion', 'kind'], ['Figma states', 'figma'], ['Found', 'code'], ['What to do', 'todo'], ['Status', 'status']],
-    Documentation: [['Issue nr', 'no'], ['Kind', 'kind'], ['What is written', 'code'], ['What to do', 'todo'], ['Status', 'status']],
     Migration: [['Issue nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
     Products: [['Issue nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
     System: [['Issue nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status']],
@@ -2182,19 +2183,11 @@ a.pg-usage-name { color: var(--sg-text); }
         who: m.toName ? WHO.code : WHO.both, st: m.toName ? 'todo' : 'check', rel: '', at: DATA.builtAt || null };
     });
   }
-  // Documentation not written yet (the kinds its Documentation area says are missing), one row each: what to write and
-  // where to write it.
-  var DOC_TODO = {
-    'What it is': 'Write what it is in Figma, as the component\'s description.',
-    'Do and don\'t': 'Draw a Do and a Don\'t example of it in Figma, and name their frames in contract.authored.json under examples.',
-    'Role': 'State its role in Figma, as an annotation on the component, or in the contract.'
-  };
+  // Documentation not written yet: each kind its Documentation area says is missing (shown on the To do page in that
+  // same table).
   function docRows(c) {
     if (c.codeOnly) return [];
-    return KNOW.filter(function (k) { return !k[1](c); }).map(function (k) {
-      var todo = DOC_TODO[k[0]] || ('Write it in Figma, as a line of the component\'s description that starts with ' + k[0] + ': …, or in contract.authored.json under guidance.');
-      return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], code: '<p class="pg-missing">' + esc(k[4]) + '</p>', todo: esc(todo), who: WHO.figma, st: 'todo', rel: '', at: DATA.builtAt || null };
-    });
+    return KNOW.filter(function (k) { return !k[1](c); }).map(function (k) { return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], st: 'todo' }; });
   }
   // A class a product styles almost as this component (I83): a decision, one row each, to use the component or to add
   // the new one to the system on purpose.
@@ -2245,12 +2238,12 @@ a.pg-usage-name { color: var(--sg-text); }
     });
     var no = 0;
     Object.keys(TODO_NO).forEach(function (k) { delete TODO_NO[k]; });
-    byKind.forEach(function (k) { k.groups.forEach(function (g) { g.rows.forEach(function (r) { r.no = ++no; TODO_NO[r.key] = r.no; }); }); });
+    byKind.forEach(function (k) { if (k.area !== 'Documentation') k.groups.forEach(function (g) { g.rows.forEach(function (r) { r.no = ++no; TODO_NO[r.key] = r.no; }); }); });
+    var all = byKind.reduce(function (n, k) { return n + k.groups.reduce(function (m, g) { return m + g.rows.length; }, 0); }, 0);
     Array.prototype.forEach.call(document.querySelectorAll('.sg-todo-no[data-todo-key]'), function (el) {
       var tr = el.closest('tr'), n = TODO_NO[decodeURIComponent(el.dataset.todoKey)];
       el.textContent = n && tr && (tr.dataset.status === 'todo' || tr.dataset.status === 'check') ? n : '';
     });
-    var all = no;
     var link = nav.querySelector('a[href="#todo"]');
     var box = td.querySelector('.sg-todo') || td.appendChild(document.createElement('div')); box.className = 'sg-todo';
     var tried = COMPONENTS.filter(function (c) { return c.__a11y; }), last = tried.reduce(function (m, c) { var at = c.__a11y.live && c.__a11y.live.at; return at && (!m || at > m) ? at : m; }, null);
@@ -2270,8 +2263,15 @@ a.pg-usage-name { color: var(--sg-text); }
     if (!byKind.some(function (k) { return k.area === todoArea; })) todoArea = byKind[0].area;
     var filter = '<div class="pg-par-filter sg-todo-filter">' + segHTML(byKind.map(function (k) { return { label: k.area + ' (' + count(k) + ')', v: k.area }; }), 'Show') + '</div>';
     box.innerHTML = note + '<div class="sg-todo-head"><p class="pg-par-sum sg-todo-sum"></p>' + filter + '</div>' + byKind.map(function (k) {
+      var link = function (g) { return g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system'; };
+      // Documentation in the table each component's Documentation area and the Documentation page show: every kind,
+      // what is written and where it comes from, a kind not written yet saying so.
+      if (k.area === 'Documentation') return '<div class="sg-todo-kind pg-footer" data-area="Documentation"><p class="pg-from">' + esc(WRITE_HINT) + '</p>' + k.groups.map(function (g) {
+        var c = COMPONENTS.filter(function (x) { return x.name === g.name; })[0];
+        return c ? knowledgeHTML(c, link(g)) : '';
+      }).join('') + '</div>';
       return '<div class="sg-todo-kind" data-area="' + esc(k.area) + '">' + k.groups.map(function (g) {
-        return issueTableHTML(g.rows, '', g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system', k.area);
+        return issueTableHTML(g.rows, '', link(g), k.area);
       }).join('') + '</div>';
     }).join('');
     var seg = box.querySelector('.sg-todo-filter');
@@ -2291,7 +2291,8 @@ a.pg-usage-name { color: var(--sg-text); }
     if (seg) segItems(seg).forEach(function (b) { segSelect(b, b.dataset.v === todoArea); });
     var shown = null;
     Array.prototype.forEach.call(box.querySelectorAll('.sg-todo-kind'), function (k) { k.hidden = k.dataset.area !== todoArea; if (!k.hidden) shown = k; });
-    var rows = shown ? shown.querySelectorAll('tbody tr') : [], fix = Array.prototype.filter.call(rows, function (tr) { return tr.dataset.status === 'todo'; }).length;
+    var rows = shown ? shown.querySelectorAll(todoArea === 'Documentation' ? 'tbody tr[data-have="0"]' : 'tbody tr') : [];
+    var fix = Array.prototype.filter.call(rows, function (tr) { return tr.dataset.status === 'todo' || tr.dataset.have === '0'; }).length;
     var sign = function (st, text) { var x = STATUS[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(text) + '</span>'; };
     var sum = box.querySelector('.sg-todo-sum');
     if (sum) sum.innerHTML = [fix ? sign('todo', fix + ' to fix') : '', rows.length - fix ? sign('check', (rows.length - fix) + ' to check or decide') : ''].filter(Boolean).join(' ');
