@@ -690,6 +690,8 @@ if (process.argv.includes('--styleguide')) {
       console.log(b.skipped ? `   Accessibility not tried while building (${b.skipped}): a browser that opens the page tries it and keeps what it finds.`
         : `♿ Accessibility tried in a browser: ${b.tried} of ${b.of} components, every variant, kept in the page (${Math.round(b.ms / 1000)}s)${b.tried < b.of ? `; the other ${b.of - b.tried} are tried by the browser that opens it` : ''}.`);
       for (const e of b.errors ?? []) console.log(`   ⚠️  The page threw while trying: ${e}`);
+      // A page whose own script stopped shows nothing that works: never kept as built, so a publish keeps the last good one.
+      if (b.dead) { console.error(`❌ The style guide's script stopped while the page was drawn${b.errors?.length ? `: ${b.errors[0]}` : ''}. Fix it before publishing.`); process.exit(1); }
     }
     // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
     const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
