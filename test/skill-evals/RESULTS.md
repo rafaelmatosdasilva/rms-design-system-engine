@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Raw value census, prototypes sized as screens, planted-fault tests, Health by criterion (continuous evaluation)
+
+What changed since the entry below (engine d5be7e8): The usage reference documents --census (values written by hand, a baseline so the count only falls), prototypes sized as the products' screens, the planted-fault tests, and a check that read nothing shown as Not run; the config reference documents census: false. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `709215713155` · Project measured: `13d811a9d668`
+
+| Haiku, engine 2b17d2c | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.059 |
+| Input a run | 113k | 109k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 109k a run against 113k. Records: `records/census-planted-faults-health`.
+
 ## 2026-10: Accessibility checks V1 to V6, findings and specs handed to Figma (continuous evaluation)
 
 What changed since the entry below (engine b053e48): The guide row and the figma-edits recipe name the screens' accessibility findings pinned in Figma and each component's accessibility spec; the usage reference documents the new browser checks (modal focus, tap, forced-colour states, colour-vision variants, what a screen reader says on a change) and axe-core fetched at install. The guide changed in `cookbook/figma-edits.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
