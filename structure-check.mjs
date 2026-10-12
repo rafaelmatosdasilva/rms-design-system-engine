@@ -861,11 +861,14 @@ const BORDER_PROP_RE = /\b(border(?:-(?:top|right|bottom|left|color|width|style)
 // Catches: "none", "0", "0px", "transparent", "1px solid transparent", "var(--x) solid transparent"
 const TRANSPARENT_VAL_RE = /\btransparent\b|^\s*(?:none|0(?:px)?)\s*(?:!important)?\s*$/i;
 
-if (Object.keys(COMPONENT_CSS_SELECTORS).length && Object.keys(components).length) {
+if (Object.keys(components).length) {
   // Build flat list of (selector, block) from allIndex once, reuse per component.
   const allRules = allRuleList; // [selector, declarations] for every rule, @media overrides included
 
-  for (const [comp, selCfg] of Object.entries(COMPONENT_CSS_SELECTORS)) {
+  // Every component Figma has, found in the code as the other checks find it: the contract's selector, else the
+  // shared component finder (a component with no entry of its own, a panel drawn by its class alone, is checked too).
+  const located = Object.keys(components).filter((c) => !c.startsWith('_')).map((comp) => [comp, COMPONENT_CSS_SELECTORS[comp] ?? { main: LOCATOR.selectorFor(comp) }]).filter(([, sc]) => sc?.main && /^[.]/.test(sc.main));
+  for (const [comp, selCfg] of located) {
     const snapComp = components[comp];
     if (!snapComp) continue;
 
