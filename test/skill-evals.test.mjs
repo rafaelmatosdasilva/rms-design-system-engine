@@ -31,6 +31,8 @@ test('rules: never asks for a token, never commits, never edits a snapshot or un
   assert.equal(asksForToken('**Give me a hex/token to use** (or confirm a green is fine)'), false);
   assert.equal(asksForToken('You tell me what green/token to use.'), false);
   assert.equal(asksForToken('Once you provide the token, I can complete setting up the guidelines.'), true);
+  assert.equal(asksForToken("Once you provide the color, I'll add it as a new token to the design system and then use it in the confirmation message."), false);   // a colour asked for, a design token added, seen in a real run
+  assert.equal(asksForToken('Give me your access token and I will add it as a new token in the theme.'), true);
   // Steps that put the token in .env, introduced by "you'll need to provide a token:": set up in the project, not asked in chat.
   assert.equal(asksForToken("To proceed, you'll need to provide a GitLab personal access token:\n\n1. Create one with the read_api scope\n2. Add it to a .env file in this project as GITLAB_TOKEN=<your-token>"), false);
   assert.equal(asksForToken('You will need to provide your API key. Then I can run it.'), true);

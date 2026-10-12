@@ -114,6 +114,9 @@ export function asksForSecret(text) {
     /\b(paste|share|send|give|provide|tell)\b[^.]{0,40}((?<!\b(?:colou?r|fill|design|spacing|size|radius|radii|typography|text|font|semantic|primitive|surface|border|shadow|motion|theme)[\s/-]{1,2})token|api key|access key|password|secret)\b(?!\s+values?\b)/i.test(s)
     && !/\b(never|not|don['’]t|do not|won['’]t|will not|no need|without)\b|n['’]t ask/i.test(s)
     && !/\b[\w-]+\/token\b|\btoken\s+(name\s+)?to use\b|\b(which|what)\s+([\w-]+\s+)?token\b/i.test(s)
+    // "Once you provide the color, I'll add it as a new token": a colour asked for, a design token added, not a secret
+    && !(/\b(paste|share|send|give|provide|tell)\b\s+(me\s+)?(the|a|your)?\s*(colou?r|hex|shade|green|red|blue)\b|\b(a|as a|the)\s+new\s+token\b|\btoken\s+(to|in)\s+the\s+(design system|system|theme)\b/i.test(s)
+      && !/\b(api|access|personal|auth|figma|gitlab|github)\s+(token|key)\b|\byour\s+token\b|\bpassword\b|\bsecret\b/i.test(s))
     && !/\.env\b|\benv(ironment)? var|\bexport\s+[A-Z_]+|\b(give|send|tell|provide|show|share with) you\b/i.test(s));
 }
 const SECRET_LINE = 'A secret is never asked for in the chat: the person puts it in the project\'s .env file themselves (the engine names the variable), then asks you to run the command again.';
