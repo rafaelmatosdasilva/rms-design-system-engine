@@ -13,7 +13,7 @@
 
 import { blankComments, walkCss } from './css-source.mjs';
 import { bezierOf, sameEasing, timeMs } from './css-values.mjs';
-import { figmaEasing, transitionsOf, STATE, TRIGGER_WORD } from './motion-parity.mjs';
+import { figmaEasing, transitionsOf, codeMotion, STATE, TRIGGER_WORD } from './motion-parity.mjs';
 
 export const MOTIONS = ['loop', 'open', 'close'];
 
@@ -386,9 +386,12 @@ export function motionSpec(snap, sources = [], cls, component) {
     if (seen.has(word + change)) continue;
     seen.add(word + change);
     const fe = figmaEasing(m.easing), figma = { ms: Math.round(m.duration * 1000), easing: fe.css ?? fe.spring, from: `its prototype, ${change}` };
-    const plays = all.filter((t) => !used.has(t) && t.via === 'transition' && statesOf(t).includes(word === 'press' ? 'press' : state === 'hover' ? 'hover' : word));
+    // On hover or press, every transition a :hover or :active rule plays; on a click or a key, which the code turns into
+    // a class or an attribute of its own, the component's own transition.
+    const own = state ? null : codeMotion(sources, c, null);
+    const plays = all.filter((t) => !used.has(t) && t.via === 'transition' && (state ? statesOf(t).includes(state === 'active' ? 'press' : 'hover') : own && t.selector === own.selector));
     if (!plays.length) rows.push({ when: `On ${word}`, what: change, part: null, code: null, figma, status: 'code-none' });
-    for (const t of plays) { used.add(t); rows.push({ when: whenWords(statesOf(t)), what: t.prop === 'all' ? 'everything changes' : `${t.prop} changes`, part: t.selector, code: codeOf(t), figma, status: compare(t, figma) }); }
+    for (const t of plays) { used.add(t); rows.push({ when: state ? whenWords(statesOf(t)) : `On ${word}`, what: t.prop === 'all' ? 'everything changes' : `${t.prop} changes`, part: t.selector, code: codeOf(t), figma, status: compare(t, figma) }); }
   }
   // Every other transition or animation its code has: a part that loops, opens or closes too (the backdrop behind a
   // modal's card) is Figma's to animate as the rest; what plays on hover or focus that Figma's prototype does not
@@ -400,4 +403,46 @@ export function motionSpec(snap, sources = [], cls, component) {
   }
   const rank = (w) => { const i = ORDER.findIndex((o) => w === o || w.startsWith(o + ' ')); return i < 0 ? ORDER.length : i; };
   return rows.map((r, i) => [r, i]).sort((a, b) => rank(a[0].when) - rank(b[0].when) || a[1] - b[1]).map((x) => x[0]);
+}
+
+// The system's motion as its fundamentals, one table for the motion page: each timing its components move with (a
+// duration, a curve and a delay), from the fastest, with what it is used for (repeating, opening, closing, on hover, on
+// press, on focus), the variables it is written with (and their Figma names), the components and parts that move so,
+// Figma's timing for them, and what the system could do: a purpose that has other timings too, to choose one; a timing
+// several components share, to keep as one variable; one written as values, to make a variable. A duration or curve
+// variable no component uses is a row too. moves: motionSpec's rows, each with its component; tokens: { durations:
+// [{ var, figma, ms }], easings: [{ var, figma, value }] }.
+// → [{ ms, easing, delay, purposes, vars: [{ var, figma }], uses: [{ component, part, what, purpose }], figma:
+//      'same'|'differs'|'none'|'unread', figmaTiming, shared, values, alsoTimed: [{ purpose, timings }], unused }]
+const PURPOSE_ORDER = ['Repeats', 'Opens', 'Closes', 'On hover', 'On press', 'On focus'];
+export function motionOverview(moves = [], tokens = {}) {
+  const ease = (e) => String(e ?? '').replace(/\s+/g, '').toLowerCase();
+  const purposeOf = (w) => PURPOSE_ORDER.find((p) => w === p || String(w).startsWith(p + ' ')) ?? 'When it changes';
+  const named = new Map([...(tokens.durations ?? []), ...(tokens.easings ?? [])].map((t) => [t.var, t.figma ?? null]));
+  const groups = new Map(), timingsOf = new Map();
+  for (const m of moves) {
+    if (!m.code) continue;
+    const purpose = purposeOf(m.when), key = `${m.code.ms}|${ease(m.code.easing)}|${m.code.delay ?? 0}`;
+    const g = groups.get(key) ?? { ms: m.code.ms, easing: m.code.easing, delay: m.code.delay ?? 0, purposes: new Set(), vars: new Set(), uses: [], statuses: new Set(), figmaTimings: new Set() };
+    g.purposes.add(purpose);
+    for (const v of m.code.vars ?? []) g.vars.add(v);
+    if (!g.uses.some((u) => u.component === m.component && u.part === m.part && u.purpose === purpose)) g.uses.push({ component: m.component, part: m.part, what: m.what, purpose });
+    g.statuses.add(m.status);
+    if (m.figma) g.figmaTimings.add(`${m.figma.ms}ms, ${m.figma.easing}`);
+    groups.set(key, g);
+    (timingsOf.get(purpose) ?? timingsOf.set(purpose, new Set()).get(purpose)).add(key);
+  }
+  const rank = (p) => { const i = PURPOSE_ORDER.indexOf(p); return i < 0 ? PURPOSE_ORDER.length : i; };
+  const rows = [...groups.entries()].map(([key, g]) => {
+    const st = g.statuses;
+    const figma = st.size === 1 && st.has('unread') ? 'unread' : st.has('differs') || st.has('code-none') ? 'differs' : st.has('same') && !st.has('figma-none') && !st.has('code-only') ? 'same' : 'none';
+    const purposes = [...g.purposes].sort((a, b) => rank(a) - rank(b));
+    return { ms: g.ms, easing: g.easing, delay: g.delay, purposes, vars: [...g.vars].sort().map((v) => ({ var: v, figma: named.get(v) ?? null })), uses: g.uses.sort((a, b) => rank(a.purpose) - rank(b.purpose) || a.component.localeCompare(b.component)), figma, figmaTiming: [...g.figmaTimings].join('; ') || null, shared: new Set(g.uses.map((u) => u.component)).size, values: !g.vars.size,
+      alsoTimed: purposes.filter((p) => timingsOf.get(p).size > 1).map((p) => ({ purpose: p, timings: timingsOf.get(p).size })) };
+  });
+  // A variable for a duration or a curve that no component uses.
+  const used = new Set(rows.flatMap((r) => r.vars.map((v) => v.var)));
+  for (const t of tokens.durations ?? []) if (!used.has(t.var)) rows.push({ ms: t.ms, easing: null, delay: 0, purposes: [], vars: [{ var: t.var, figma: t.figma ?? null }], uses: [], figma: t.figma ? 'same' : 'none', figmaTiming: null, shared: 0, values: false, alsoTimed: [], unused: true });
+  for (const t of tokens.easings ?? []) if (!used.has(t.var)) rows.push({ ms: null, easing: t.value, delay: 0, purposes: [], vars: [{ var: t.var, figma: t.figma ?? null }], uses: [], figma: t.figma ? 'same' : 'none', figmaTiming: null, shared: 0, values: false, alsoTimed: [], unused: true });
+  return rows.sort((a, b) => (a.ms ?? Infinity) - (b.ms ?? Infinity) || !!a.unused - !!b.unused || String(a.easing).localeCompare(String(b.easing)));
 }
