@@ -276,6 +276,34 @@ if (process.argv.includes('--summary')) {
   process.exit(2);
 }
 
+// ── --figma-effects: each component's shadows, blurs, gradient and image fills, clipping and blend mode (A9) ──
+// Without a file: writes the read-only capture script to run with the Figma tool of the session. With the file its
+// answer was saved to: keeps it as the effects snapshot, then compares it with the code's own rules.
+if (process.argv.includes('--figma-effects')) {
+  let ecfg = {};
+  try { ecfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const ep = await import('./effects-parity.mjs');
+  const at = process.argv.indexOf('--figma-effects'), file = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  if (!file) {
+    mkdirSync(capDir, { recursive: true });
+    writeFileSync(join(capDir, 'effects-capture.js'), ep.effectsCaptureScript(ecfg.figma?.componentsPage ?? null));
+    console.log(`Effects capture script → ${relative(ROOT, join(capDir, 'effects-capture.js'))} (read-only: it changes nothing in Figma).`);
+    console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${relative(ROOT, join(capDir, 'effects.json'))}, then run rms-design-system-engine --figma-effects ${relative(ROOT, join(capDir, 'effects.json'))}`);
+    process.exit(0);
+  }
+  let snap;
+  try { snap = ep.effectsSnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  const target = ecfg.paths?.snapshotEffects ?? join(dirname(ecfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-effects.snapshot.json');
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  console.log(`✓ the effects of ${Object.keys(snap.components).length} component${Object.keys(snap.components).length === 1 ? '' : 's'} read from Figma → ${target}`);
+  const r = await ep.projectEffects(ROOT, ecfg);
+  if (r?.findings?.length) { console.log(`🌫  ${r.findings.length} difference${r.findings.length === 1 ? '' : 's'} in shadows, blurs, fills, clipping or blending between Figma and the code:`); for (const f of r.findings.slice(0, 20)) console.log(`   ${f.message}`); }
+  else console.log('✓ The code draws the shadows, blurs, fills, clipping and blending Figma has.');
+  process.exit(0);
+}
+
 // ── --figma-motion: Figma's prototype transitions between variants, its Motion keyframes and its overlays (C5, C7) ──
 // Without a file: writes the read-only capture script to run with the Figma tool of the session. With the file its
 // answer was saved to: keeps it as the motion snapshot, then compares it with the code's transitions and animations
@@ -4181,6 +4209,25 @@ function reportFull(label, items, shown) {
           for (const f of r.findings.slice(0, 12)) console.log(C.yellow(`     ${f.message}`));
         } else if (r.compared) console.log(`\nℹ️  Motion against Figma: the ${r.compared} motion${r.compared === 1 ? '' : 's'} Figma has (its prototype's transitions and overlays, its Motion keyframes) move the same in the code.`);
         if (!r.motionRead) console.log(C.dim(`     Figma's Motion keyframes and overlays (a spinner's turn, a panel opening and closing) are not read yet: capture again with --figma-motion.`));
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Effects against Figma (A9, advisory) ─────────────────────────────────────────
+  _section('advice');
+  // Each component's shadows, blurs, gradient or image fill, clipping and blend mode (--figma-effects), against its own
+  // rule in the code and its parts of the same name. Runs once the effects snapshot exists.
+  if (!ONLY && !NO_FIGMA) {
+    try {
+      const { projectEffects } = await import('./effects-parity.mjs');
+      const r = await projectEffects(ROOT, cfg);
+      if (r) {
+        mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+        writeFileSync(join(ROOT, OUT_DIR, 'effects.json'), JSON.stringify({ at: new Date().toISOString(), compared: r.compared, findings: r.findings }, null, 1) + '\n');
+        if (r.findings.length) {
+          console.log(C.yellow(`\n🌫  Effects against Figma: ${r.findings.length} shadow, blur, fill, clipping or blending difference${r.findings.length === 1 ? '' : 's'}. Advisory.`));
+          for (const f of r.findings.slice(0, 12)) console.log(C.yellow(`     ${f.message}`));
+        } else if (r.compared) console.log(`\nℹ️  Effects against Figma: the ${r.compared} component${r.compared === 1 ? '' : 's'} read draw their shadows, blurs, fills, clipping and blending as Figma does.`);
       }
     } catch { /* advisory: never fails */ }
   }

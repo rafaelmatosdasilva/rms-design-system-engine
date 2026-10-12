@@ -289,7 +289,7 @@ test('in the browser: no script error, a control changes the real component, the
     // number, the area with the criterion, what Figma states, what was found, what to do with who acts, the status with
     // when and where it was read; a count above it and when the audit last ran. Only what applies. No separate table of
     // sources.
-    assert.match(a11y, /Issue nr.*WCAG criterion.*Figma states.*Found.*What to do.*Status/);
+    assert.match(a11y, /Task nr.*WCAG criterion.*Figma states.*Found.*What to do.*Status/);
     assert.doesNotMatch(a11y, /What it means|Where it is read from/);
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
     // What a criterion means opens from its name, by a click (the focus in it, Escape gives it back) or a rest of the pointer.
@@ -335,7 +335,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || (c.offsetHeight <= t.offsetHeight + 1 && c.offsetHeight < t.offsetHeight - 2); })()`), true, 'one line of code is not stretched to the tokens');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Documentation,Accessibility,Parity,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Documentation,Motion,Accessibility,Parity,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
@@ -344,7 +344,7 @@ test('in the browser: no script error, a control changes the real component, the
     const parRows = await run(`[...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].map((r) => r.dataset.type + ':' + r.dataset.status)`);
     assert.ok(parRows.some((r) => /^Prop:/.test(r)) && parRows.some((r) => /^Variable:/.test(r)), 'props and variables: ' + parRows);
     const parityText = await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`);
-    assert.match(parityText, /Parity.*Issue nr.*Type.*Figma.*Code.*What to do.*Status.*Updated/s);
+    assert.match(parityText, /Parity.*Task nr.*Type.*Figma.*Code.*What to do.*Status.*Updated/s);
     assert.doesNotMatch(parityText, /Of \d+, \d+ the same/, 'no line counting what is the same, what differs and what is on one side');
     assert.deepEqual(await run(`[...document.querySelectorAll('#c-chip [data-area="parity"] tr[data-status="done"]')].filter((tr) => /Same/.test(tr.lastElementChild.textContent)).length`), 0, 'a row that is done says nothing more under Done');
     // The filter shows one type at a time.
@@ -423,9 +423,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="docs"] .pg-anatomy')`), false, 'Documentation draws nothing of its own');
     // Do and Don't from the references, each with its caption, the do first.
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
-    // Each section of rows in the Playground's tables: its title the head (Documentation, a table as the page it matches,
-    // then Details).
-    assert.equal(await run(`document.querySelector('#c-chip [data-area="docs"] .pg-footer > .pg-doc .pg-inspect-head > h3').textContent`), 'Documentation');
+    // Its Documentation first, in the table every task shares (as Parity and Accessibility are), then each section of
+    // rows in the Playground's tables, its title the head (Details).
+    assert.equal(await run(`document.querySelector('#c-chip [data-area="docs"] .pg-footer > .pg-doc').matches('.pg-knowledge') && !!document.querySelector('#c-chip [data-area="docs"] .pg-knowledge table.sg-issues')`), true);
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /^Details/);
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-anatomy-doc')`), false, 'no Anatomy card under the Playground');
     // Its header: only its version and when it last changed (with the time), its links at the top right, no issue link.
@@ -459,15 +459,15 @@ test('in the browser: no script error, a control changes the real component, the
     }
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
-    // Its Documentation is a table holding exactly what the To do page's Documentation shows for it, under the same
-    // names, in the same order, each with where it was written; a missing one said. Where it is used is its own area,
-    // never a kind of documentation.
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Kind|What is written|From');
-    const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:first-child')].map((d) => d.textContent).join('|')`);
-    assert.equal(kinds, 'What it is|When to use|When not to use|Common mistakes|Limitations|Do and don\'t|Role');
-    assert.equal(await run(`document.querySelector('#c-chip .pg-knowledge .pg-inspect-head').textContent`), 'Documentation');
-    const pageCard = `[...document.querySelectorAll('#tasks .sg-todo-kind[data-area="Documentation"] .pg-knowledge')].find((k) => k.querySelector('.pg-inspect-head a').textContent === 'chip')`;
-    assert.equal(await run(`${pageCard}.querySelector('table').outerHTML`), await run(`document.querySelector('#c-chip .pg-knowledge table').outerHTML`));
+    // Its Documentation is the table every task shares: each kind with what is written, what to do and its status, every
+    // kind here, written or not, what is to write first; the Tasks page lists the same rows, only those not written yet.
+    // Where it is used is its own area, never a kind of documentation.
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Kind|What is written|What to do|Status');
+    const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:nth-child(2)')].map((d) => d.textContent).sort().join('|')`);
+    assert.equal(kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role'].sort().join('|'));
+    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( done)*$/, 'what is to write first, what is written after');
+    assert.match(await run(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]').textContent`), /(Not written yet\.|No pictures yet\.)You in Figma.+To fix/);
+    assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, \d+ to fix$/, 'its area says what is still to write, as Parity and Accessibility do');
     assert.match(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet/);
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
     assert.equal(await run(`document.getElementById('sg-menu').textContent + '|' + document.getElementById('sg-nav-close').textContent`), 'Menu|Close menu');
@@ -502,20 +502,22 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].some((b) => b.dataset.v === 'all')`), false, 'no All');
     assert.deepEqual(await shownKind(), ['Parity']);
     assert.equal(await run(`(() => { const h = document.querySelector('#tasks .sg-todo-head'); return [...h.children].map((e) => e.classList.contains('sg-todo-filter') ? 'filter' : e.classList.contains('sg-todo-sum') ? 'counts' : '?').join(','); })()`), 'filter,counts', 'the counts under the filter, since they are the chosen kind\'s');
-    assert.match(await shownHead(), /^Issue nr\s*Type\s*Figma\s*Code\s*What to do\s*Status$/);
+    assert.match(await shownHead(), /^Task nr\s*Type\s*Figma\s*Code\s*What to do\s*Status$/);
     await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Accessibility"]').click()`);
     assert.deepEqual(await shownKind(), ['Accessibility']);
     assert.equal(await run(`location.hash`), '#tasks/accessibility', 'each kind has its own address to send');
-    assert.match(await shownHead(), /^Issue nr\s*WCAG criterion\s*Figma states\s*Found\s*What to do\s*Status$/);
+    assert.match(await shownHead(), /^Task nr\s*WCAG criterion\s*Figma states\s*Found\s*What to do\s*Status$/);
     assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#tasks .sg-todo-kind:not([hidden]) tbody tr')].map((tr) => tr.dataset.area))]`), ['Accessibility']);
     assert.equal(await run(`(() => { const k = document.querySelector('#tasks .sg-todo-kind:not([hidden])'); return k.firstElementChild.classList.contains('sg-todo-note') && k.querySelector('.sg-todo-note').getClientRects().length > 0; })()`), true, 'the note first under the Accessibility filter');
-    // Documentation is on the To do page too, in the Documentation table itself (Kind, What is written, From), one card
-    // for each component with a kind not written yet, and where to write it above them.
+    // Documentation is on the Tasks page too, in the table each component's Documentation area shows, one card for each
+    // component with a kind not written yet, only those rows, under the numbers its own area shows.
     await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Documentation"]').click()`);
-    assert.match(await shownHead(), /^Kind\s*What is written\s*From$/);
-    assert.match(await run(`document.querySelector('#tasks .sg-todo-kind:not([hidden]) tbody tr[data-have="0"]').textContent`), /^(What it is|When to use|When not to use|Common mistakes|Limitations|Do and don't|Role)(Not written yet\.|No pictures yet\.)$/);
-    assert.match(await run(`document.querySelector('#tasks .sg-todo-kind:not([hidden]) > .pg-from').textContent`), /^Write a missing one in Figma/);
-    const missing = await run(`document.querySelectorAll('#tasks .sg-todo-kind:not([hidden]) tr[data-have="0"]').length`);
+    assert.match(await shownHead(), /^Task nr\s*Kind\s*What is written\s*What to do\s*Status$/);
+    assert.match(await run(`document.querySelector('#tasks .sg-todo-kind:not([hidden]) tbody tr').textContent`), /^\d+(What it is|When to use|When not to use|Common mistakes|Limitations|Do and don't|Role)(Not written yet\.|No pictures yet\.)You in Figma/);
+    assert.equal(await run(`document.querySelectorAll('#tasks .sg-todo-kind:not([hidden]) tbody tr:not([data-status="todo"])').length`), 0, 'only what is still to write');
+    const chipCard = `[...document.querySelectorAll('#tasks .sg-todo-kind:not([hidden]) .sg-todo-card')].find((k) => k.querySelector('.pg-inspect-head a').textContent === 'chip')`;
+    assert.deepEqual(await run(`[...${chipCard}.querySelectorAll('tbody tr')].map((tr) => tr.outerHTML)`), await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr[data-status="todo"]')].map((tr) => tr.outerHTML)`), 'the same rows, numbers and all');
+    const missing = await run(`document.querySelectorAll('#tasks .sg-todo-kind:not([hidden]) tbody tr').length`);
     assert.equal(await run(`document.querySelector('#tasks .sg-todo-sum').textContent`), `✕${missing} to fix`, 'the count is the kind\'s own');
     assert.match(await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Documentation"]').textContent`), new RegExp(`^Documentation \\(${missing}\\)$`));
     assert.deepEqual(await shownKind(), ['Documentation'], 'only the kind chosen is drawn');

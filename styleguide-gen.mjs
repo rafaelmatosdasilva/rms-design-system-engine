@@ -824,11 +824,16 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         for (const c of new Set([...(view.allComponents ?? []), ...view.components])) if (mv.components[c.name]) c.migration = mv.components[c.name];
       }
     } catch { /* the page builds without it */ }
-    // Where the code moves otherwise than Figma's prototype (C5), from the last audit: rows of its Parity area.
+    // Where the code draws a shadow, a blur, a fill, clipping or blending otherwise than Figma (A9), from the last audit.
     try {
-      const motion = readJson(join(OUT_DIR, 'motion.json'));
-      for (const c of new Set([...(view.allComponents ?? []), ...view.components])) { const own = (motion?.findings ?? []).filter((f) => f.component === c.name); if (own.length) c.motionDiffs = own; }
-    } catch { /* no motion read */ }
+      const fx = readJson(join(OUT_DIR, 'effects.json'));
+      for (const c of new Set([...(view.allComponents ?? []), ...view.components])) { const own = (fx?.findings ?? []).filter((f) => f.component === c.name); if (own.length) c.effectDiffs = own; }
+    } catch { /* no effects read */ }
+    // Where the code moves otherwise than Figma's prototype (C5), read again from the code as it is now (the last audit's
+    // when it cannot be): rows of its Parity area, and what the motion page and each Motion area say the code does.
+    let motionFound = [];
+    try { const { projectMotion } = await import('./motion-parity.mjs'); const r = await projectMotion(ROOT, cfg); motionFound = r ? r.findings : readJson(join(OUT_DIR, 'motion.json'))?.findings ?? []; } catch { motionFound = readJson(join(OUT_DIR, 'motion.json'))?.findings ?? []; }
+    for (const c of new Set([...(view.allComponents ?? []), ...view.components])) { const own = motionFound.filter((f) => f.component === c.name); if (own.length) c.motionDiffs = own; }
     // The foundations' motion page (C6): the system's durations and easings, what it does for a person who asks for less
     // motion, each transition Figma's prototype animates, with what the code does for it, and how each component moves
     // on its own (C7).
@@ -836,14 +841,18 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { motionTokens, motionTodos } = await import('./styleguide-data.mjs');
       const { prototypeTransitions } = await import('./motion-parity.mjs');
       const snapMotion = readJson(cfg.paths?.snapshotMotion ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-motion.snapshot.json'));
-      const findings = readJson(join(OUT_DIR, 'motion.json'))?.findings ?? [];
+      const findings = motionFound;
       const files = [...themeFiles, ...pluginCSS].filter((f) => f && !/^https?:/.test(f)).map((file) => ({ file, text: readText(file) })).filter((f) => f.text);
       let m = await motionTokens(allCss, { figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, cfg, files, transitions: snapMotion ? prototypeTransitions(snapMotion, findings) : [] });
       // How each component moves on its own (C7): its loop, its opening and its closing, the code's beside Figma's.
-      const { componentMotionRows } = await import('./motion-components.mjs');
+      const { componentMotionRows, motionSpec } = await import('./motion-components.mjs');
       const every = view.allComponents ?? view.components, clsOf = new Map(every.map((c) => [c.name, c.cls]));
+      // Its Motion area: everything that moves in it, in one table, the code's beside Figma's, with where each comes from;
+      // a component shown in an overlay read with the overlay it opens in (.modal for .modal-card, its backdrop too).
+      const moves = [];
+      for (const c of new Set([...every, ...view.components])) { const t = motionSpec(snapMotion, files, c.motion?.overlay?.container ?? c.cls, c.name); if (t.length) { c.moves = t; for (const r of t) moves.push({ component: c.name, ...r }); } }
       const rows = componentMotionRows(snapMotion, files, (n) => clsOf.get(n) ?? null, every.map((c) => c.name));
-      if (rows.length) m = { ...(m ?? { durations: [], easings: [], reduced: null, transitions: [], figmaHas: false }), components: rows };
+      if (rows.length || moves.length) m = { ...(m ?? { durations: [], easings: [], reduced: null, transitions: [], figmaHas: false }), components: rows, moves: moves.sort((a, b) => a.component.localeCompare(b.component)) };
       if (m) view.motion = m;
       // Motion the code has and Figma has no variables for: a row of the system's To do.
       const mt = motionTodos(m);

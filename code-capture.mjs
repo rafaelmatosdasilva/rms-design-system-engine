@@ -27,7 +27,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync, readdirSy
 import { join, resolve, dirname, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { allModes, modeSwitchFor } from './mode-resolver.mjs';
+import { allModes, breakpointModes, modeSwitchFor } from './mode-resolver.mjs';
 import { loadCssSources, rootTokens, resolveVars, canonValue } from './css-source.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './cdp.mjs';
 import { captureComponents, staticComponentReading } from './component-capture.mjs';
@@ -142,10 +142,11 @@ export const READ_ROOT_VARS = `(() => {
 })()`;
 
 // The Figma breakpoint collection as widths to measure at: each mode's viewport/min-width (the
-// smallest mode, usually 0, is measured at 375px, a phone). Empty when the file has no breakpoints.
+// smallest mode, usually 0, is measured at 375px, a phone). A sizing collection whose modes each set the viewport's
+// width (Desktop and Phone) counts too. Empty when the file has no breakpoints.
 export function breakpointWidths(ROOT, cfg) {
   let bp = {};
-  try { bp = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')).breakpoints ?? {}; } catch { return []; }
+  try { bp = breakpointModes(JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8'))); } catch { return []; }
   return Object.entries(bp).map(([name, t]) => {
     const w = parseFloat(t?.['viewport/min-width'] ?? t?.['viewport/width'] ?? '0') || 0;
     return { name, width: w > 0 ? w : 375 };
