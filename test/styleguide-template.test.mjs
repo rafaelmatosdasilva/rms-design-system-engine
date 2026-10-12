@@ -194,6 +194,10 @@ test('in the browser: no script error, a control changes the real component, the
   writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify({ components: { button: { status: 'deprecated', supersededBy: 'chip', since: '2.0' } } }));
   mkdirSync(join(dir, 'src', 'pages'), { recursive: true });
   writeFileSync(join(dir, 'src', 'pages', 'Home.jsx'), "import { Button } from '../components/Button';\nexport const Home = () => <Button Label=\"Save\" />;\n");
+  // What the last audit found the chip drawing otherwise than Figma (A9): an Effect row of its Parity. The page runs with
+  // it as with any other row (a row built in the wrong place once stopped the page's script, and its build with it).
+  mkdirSync(join(dir, '.design-system-engine-out'), { recursive: true });
+  writeFileSync(join(dir, '.design-system-engine-out', 'effects.json'), JSON.stringify({ findings: [{ component: 'chip', part: null, what: 'shadow offset', figma: 'draws a shadow 0 4', code: 'draws a shadow 0 2', at: 'src/components/chip.css:1', side: 'code', message: 'chip shadow offset' }] }));
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
   const c = await launchChrome(chromePath);
   try {
@@ -554,11 +558,19 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await note(), /when this page was built/, 'a refresh shows the results the page was built with');
     assert.deepEqual(await run(`[...document.querySelectorAll('#tasks .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`), nums, 'the same list at once');
     // Try again in this browser: every component tried afresh here, then kept in this browser, so a refresh tries nothing.
-    // While it runs, no list and no count that would change in front of the reader: how far it has got, then the list.
+    // While it runs, only Accessibility waits (how far it has got under it, no count in its filter, none in the menu);
+    // every other kind is there at once, with the numbers it had.
     await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Accessibility"]').click()`);
+    const others = `[...document.querySelectorAll('#tasks .sg-todo-kind:not([data-area="Accessibility"]) .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`;
+    const othersBefore = await run(others);
     await run(`document.querySelector('#tasks [data-a11y-again]').click()`);
-    assert.match(await run(`document.querySelector('#tasks .sg-todo-wait').textContent`), /^Trying the components for accessibility in this browser, \d+ of \d+\. The tasks show once every one is tried/);
-    assert.deepEqual(await run(`[document.querySelectorAll('#tasks .sg-todo-kind, #tasks .sg-todo-filter').length, document.querySelector('nav a[href="#tasks"]').textContent.trim()]`), [0, 'tasks']);
+    assert.match(await run(`document.querySelector('#tasks .sg-todo-kind[data-area="Accessibility"]:not([hidden]) .sg-todo-wait').textContent`), /^Trying the components for accessibility in this browser, \d+ of \d+\. Its tasks show once every one is tried/);
+    assert.deepEqual(await run(`[document.querySelector('#tasks .sg-todo-filter [data-v="Accessibility"]').textContent, document.querySelector('nav a[href="#tasks"]').textContent.trim(), document.querySelectorAll('#tasks .sg-todo-kind[data-area="Accessibility"] table').length]`), ['Accessibility', 'tasks', 0]);
+    assert.ok(othersBefore.length > 0);
+    assert.deepEqual(await run(others), othersBefore, 'every other kind at once, its numbers as they were');
+    await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Parity"]').click()`);
+    assert.deepEqual(await run(`[!!document.querySelector('#tasks .sg-todo-kind[data-area="Parity"]:not([hidden]) table'), [...document.querySelectorAll('#tasks .sg-todo-wait')].filter((p) => p.getClientRects().length).length]`), [true, 0], 'the try is said under Accessibility only');
+    await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Accessibility"]').click()`);
     let again = ''; for (let n = 0; n < 480 && !/Every component was tried in this browser/.test(again); n++) { if (n) await new Promise((r) => setTimeout(r, 250)); again = await note(); }
     assert.match(again, /Every component was tried in this browser/);
     await send('Page.reload', {}, sessionId);

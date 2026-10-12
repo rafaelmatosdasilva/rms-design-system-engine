@@ -268,16 +268,21 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   curve, named as Figma's motion variable of the same value (`figma.motion.explicit`, else the naming convention),
   each with a dot that crosses its track on Play (a duration at a steady pace, an easing over the longest duration,
   its curve drawn beside it; at once for a person who asks for less motion); where the system answers
-  `prefers-reduced-motion` and what it ends, or that it does not yet; and every component's motion in one table, the
-  rows of each component's Motion area with a column for the component (`motionSpec`, `motion-components.mjs`): its
-  loop (a spinner turning), its opening and its closing, the code's (its `@keyframes` on it or a part of it, a
-  transition an open or closed state plays, a size it transitions) beside Figma's (its Motion keyframes and animation
-  styles, an overlay its prototype opens, played backwards as it closes, variants that lead to each other after a delay
-  and back); each transition Figma's prototype animates between its variants against each one the code plays then,
-  compared from the code as it is now (`projectMotion`, the last audit's `motion.json` when it cannot be read); and
-  every other transition or animation the code gives it. When the code has durations or easings and Figma has no motion
+  `prefers-reduced-motion` and what it ends, or that it does not yet; and the system's motion as its fundamentals, in
+  one table (`motionOverview`, `motion-components.mjs`): each timing its components move with (a duration, a curve and a
+  delay), from the fastest, each with a dot that crosses its track on Play, the variables it is written with and their
+  Figma names, what it is for (Repeats, Opens, Closes, On hover, On press, On focus), the components and parts that move
+  so (each linked to its Motion tab), Figma's timing for them, and For the system: a purpose with several timings
+  (choose one for every component), a timing several components share (keep it as one variable), one written as values
+  (make it a variable); a duration or curve variable no component uses is a row too (use it, or remove it). The rows
+  come from each component's own (`motionSpec`): its loop (a spinner turning), its opening and its closing, the code's
+  (its `@keyframes` on it or a part of it, a transition an open or closed state plays, a size it transitions) beside
+  Figma's (its Motion keyframes and animation styles, an overlay its prototype opens, played backwards as it closes,
+  variants that lead to each other after a delay and back); each transition Figma's prototype animates between its
+  variants against each one the code plays then, compared from the code as it is now (`projectMotion`, the last audit's
+  `motion.json` when it cannot be read); and every other transition or animation the code gives it. When the code has durations or easings and Figma has no motion
   variables at all, the system's tasks say so, for You in Figma: add them to a variable collection named Motion
-  (`motionTodos`). Each loop, opening or closing that differs is a Motion row of the component's Parity area: one Figma
+  (`motionTodos`). Each that differs is a row of the component's Motion tab and of the Tasks page's Motion: one Figma
   animates and the code does not, Claude's; one the code animates and Figma does not, You in Figma.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its source renders: a React component's return, a Vue component as the project's own build
@@ -331,8 +336,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   compared, New in the last audit when the last audit found it first, and when it last held). Each difference the audit found is merged into
   the row it is about (`parityIssueRows`); what it found beyond those rows, a prop Figma has that the code does not build
   and a component only the code has are rows of their own. The Tasks page holds the open rows of every component,
-  each kind in a table of its own shape, one card per component, one kind shown at a time with a filter (Parity,
-  Accessibility, Documentation, Migration, Products, System and the page's own items, each when it has any; no All):
+  each kind in a table of its own shape, one card per component, one kind shown at a time with a filter (Parity, Motion,
+  Documentation, Migration, Products, System, the page's own items and Accessibility last, each when it has any; no
+  All), numbered in that order, so what the browser still tries is numbered after the rest and no other number moves:
   Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Task nr, WCAG criterion, Figma
   states, Found, What to do, Status), Documentation's the Documentation area's (Task nr, Kind, What is written, What to
   do, Status), only its kinds not written yet (`docRows`), and the rest Task nr, Where or Type, What to do and
@@ -435,8 +441,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   `contract.authored.json` → `components.<name>.links`, as buttons at the top right of its header. The overview adds Send
   feedback (`styleguide.feedback`, else `styleguide.issues`, the tracker's new-issue address with `{name}` and `{title}`,
   else the repository's own on GitHub or GitLab, with a Style guide title, `issueLink`).
-- **At a glance** (`factsOf`), under its name: Version (the release its last change shipped in) and Last changed, its
-  date and time. How it stands with Figma and with accessibility is on those areas (their alert icons) and on its
+- **At a glance** (`factsOf`), under its name, on one line: its class (`.modal-card`), Version (the release its last
+  change shipped in), Last changed, its date and time, and how to import it. How it stands with Figma and with accessibility is on those areas (their alert icons) and on its
   overview card, in one line, a fact that needs work marked with ! and in bold, never by colour alone.
 - **Variants**, an area of its own when a variant prop has two options built or an on/off prop is built: each option of
   each variant prop and both sides of each on/off prop (false, true), one per row with its name, drawn by the Playground itself (the other props as it sets them) and copied still and inert,
@@ -465,17 +471,19 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Motion**, between Documentation and Accessibility: everything that moves in the component in one table (`motionSpec`,
-  the same rows the motion page lists with a column for the component): What happens (Repeats, Opens, Closes, On hover,
-  On press, On focus, or When a state it names changes, with what moves under it: turns a full circle, fades in and
-  slides in from below, color changes), Part (the selector it moves, `.modal-card`, `.modal.is-closing .modal-overlay`),
-  Code (its duration, curve and delay, the variables it is written with and the rule's file and line), Figma (its
-  duration and curve, and where in Figma: its Motion timeline, an animation style, the overlay its prototype opens or a
-  transition between its variants), Less motion (Stops when a prefers-reduced-motion rule that wins sets it to none or to
-  no time, else Keeps moving) and Status (Same as Figma, Differs from Figma, None in Figma for a loop, an opening or a
-  closing Figma does not animate, Not in the code, Only in the code for a hover or focus Figma's prototype does not
-  animate, Figma not read yet). A component shown in an overlay is read with the overlay it opens in, its backdrop too;
-  one that does not move says so.
+- **Motion**, between Documentation and Accessibility: everything that moves in the component in the table every task
+  shares (`motionSpec`, `motionIssueRows`, `ISSUE_COLS.Motion`), a count of each status above it: Task nr, What happens
+  (Repeats, Opens, Closes, On hover, On press, On focus, or When a state it names changes, with what moves and the part
+  under it: turns a full circle, `.modal-card`, `.modal.is-closing .modal-overlay`), Code (its duration, curve and delay,
+  the variables it is written with, the rule's file and line, and whether a prefers-reduced-motion rule that wins stops
+  it), Figma (its duration and curve, and where in Figma: its Motion timeline, an animation style, the overlay its
+  prototype opens or a transition between its variants), What to do (Claude in the code when the code differs from Figma
+  or does not animate what Figma does; You in Figma when the code animates a loop, an opening or a closing Figma does
+  not) and Status (Done when the two match; To fix; Only in the code, nothing to do, for a hover or focus Figma's
+  prototype does not animate; Figma not read yet). Its tab carries the alert icon while a row is to fix (`motionOpen`),
+  and the Tasks page's Motion lists those rows under the same numbers; with this table, motion is no longer a row of
+  Parity. A component shown in an overlay is read with the overlay it opens in, its backdrop too; one that does not move
+  says so.
 - **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as the Tasks page's Accessibility, in
   the same card as the Playground's tables: Task nr (open rows only), Area (Accessibility, with the criterion and its
   level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
@@ -539,8 +547,9 @@ every variant of every component as its Accessibility area does, then keeps what
 results at once on the Tasks page and in every Accessibility area, the final ones, with nothing running in their
 browser; a component's area never tries again on its own. A component the build could not try (no Chrome there, its
 signature changed) is tried in the viewer's browser and kept there (`localStorage`). Until every component is tried,
-the Tasks page lists nothing and the menu shows no count, only how far the try has got (`.sg-todo-wait`): no number
-changes in front of the reader; then the list is drawn once, final. What was tried and when, with Try again in this
+only Accessibility waits: every other kind is listed at once with its final numbers (Accessibility is numbered last,
+so no other number moves), Accessibility's filter has no count and its panel only how far the try has got
+(`.sg-todo-wait`), and the menu shows no count; then Accessibility's list is drawn once, final. What was tried and when, with Try again in this
 browser (every component afresh), is said under the Accessibility filter alone (`.sg-todo-note`). `--no-a11y-bake` (or `styleguide.bakeA11y: false`) builds the page
 without it; without Chrome it is skipped and said, and a script error the page throws while trying is printed
 under the count.

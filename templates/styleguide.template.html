@@ -229,6 +229,9 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-motion-curve .sg-motion-axis { stroke: var(--sg-muted); stroke-width: 1; }
 .sg-thumb .sg-motion-curve { width: 36px; height: 36px; }
 .sg-motion-proto { margin-top: var(--sg-space-m); }
+.sg-motion-use { display: block; }   /* each component that moves so, on a line of its own */
+.sg-motion-use + .sg-motion-use { margin-top: var(--sg-space-xs); }
+.sg-motion-system .sg-motion-sample { display: block; margin-bottom: var(--sg-space-xs); }
 /* Narrow cards (a phone, a tablet beside the menu): a shorter track under its curve, the names given the room. */
 @container (max-width: 560px) {
   .pg-inspect.sg-token-card td.sg-token-sample:has(.sg-motion-sample) { width: calc(var(--sg-space-xxl) * 2); }
@@ -252,6 +255,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-usage-name { font-size: var(--sg-s); color: var(--sg-text-2); }
 a.pg-usage-name { color: var(--sg-text); }
 .pg-selector { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xxs) 0 var(--sg-space-s); }
+.pg-meta > .pg-selector { margin: 0; }   /* the class first on the line with its version */
 /* A component's page in areas (playground, documentation, accessibility, parity), switched by the system's own
    segmented control; how a product imports it and what it is built with, above them. */
 /* The areas stay at the top while the component's page scrolls, under the top bar when one shows. */
@@ -882,13 +886,6 @@ a.pg-usage-name { color: var(--sg-text); }
     (c.differences || []).forEach(function (x) { TODO.push({ kind: 'parity', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.a11yFindings || []).forEach(function (x) { TODO.push({ kind: 'a11y', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.unbuilt || []).forEach(function (u) { TODO.push({ kind: 'parity', who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell Claude to do it.' }); });
-    // What it draws past its colours (A9): a shadow, a blur, a gradient or image fill, clipping, blending, opacity. One
-    // Figma has is the code's to follow; one only the code has, or Figma's clipping, is a decision.
-    (c.effectDiffs || []).forEach(function (e) {
-      var fig = '<span class="pg-par-val">' + esc(capital(e.figma)) + '</span>', code = '<span class="pg-par-val">' + esc(capital(e.code)) + '</span><span class="pg-par-val">' + esc(e.at) + '</span>';
-      var todo = e.side === 'code' ? 'Draw it as Figma does. Tell Claude to do it.' : 'Decide which one is right: add it to Figma, or change the code.';
-      out.push({ key: c.name + '\u0000effect:' + (e.part || '') + ':' + e.what, area: 'Parity', kind: 'Effect', type: 'Other', figma: fig, code: code, todo: esc(capital((e.part ? e.part + ' ' : '') + e.what) + '. ' + todo), who: e.side === 'code' ? WHO.code : WHO.both, st: e.side === 'code' ? 'todo' : 'check', rel: PAR_REL.differs, at: at0 });
-    });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
     if (c.codeOnly && c.codeOnly.figma) TODO.push({ kind: 'parity', who: 'figma', comp: c.name, say: 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it.', todo: 'Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.' });
   });
@@ -965,7 +962,8 @@ a.pg-usage-name { color: var(--sg-text); }
     return '<svg class="sg-motion-curve" viewBox="0 0 40 40" aria-hidden="true"><path class="sg-motion-axis" d="M2 2V38H38"/><path d="M' + x(0) + ' ' + y(0) + 'C' + x(b[0]) + ' ' + y(b[1]) + ' ' + x(b[2]) + ' ' + y(b[3]) + ' ' + x(1) + ' ' + y(1) + '"/></svg>';
   }
   var MOT = DATA.motion || null, motN = MOT ? (MOT.durations || []).length + (MOT.easings || []).length : 0;
-  if (MOT && (motN || (MOT.transitions || []).length)) card(fGrid, 'motion', 'Foundations', 'motion', motN ? motN + ' duration and easing tokens.' : (MOT.transitions || []).length + ' transitions in Figma\'s prototype.', (MOT.easings || []).slice(0, 3).map(function (t) { return motionCurve(t.bezier); }).join(''));
+  var motTimings = MOT ? (MOT.overview || []).filter(function (r) { return !r.unused; }).length : 0;
+  if (MOT && (MOT.overview || []).length) card(fGrid, 'motion', 'Foundations', 'motion', motTimings ? motTimings + (motTimings === 1 ? ' timing' : ' timings') + ' the components move with.' : motN + ' duration and easing tokens.', (MOT.easings || []).slice(0, 3).map(function (t) { return motionCurve(t.bezier); }).join(''));
   if ((DATA.icons || []).length) card(fGrid, 'icons', 'Foundations', 'icons', DATA.icons.length + ' icons from the system\'s sheet.', DATA.icons.slice(0, 5).map(function (id) { return '<svg width="24" height="24" aria-hidden="true"><use href="#' + esc(id) + '"/></svg>'; }).join(''));
   var cGrid = COMPONENTS.length ? group('Components', GROUPS.components || 'Each one drawn from the code itself, with what Figma and the code agree on. Open one to try it, read how to use it and see where it is used.') : null;
   // Its Figma description, else its note, else the props it offers.
@@ -1219,67 +1217,78 @@ a.pg-usage-name { color: var(--sg-text); }
   // straight to their end, as the system's own rule has it.
   var motionTiming = function (m) { return m.ms + 'ms, ' + m.easing; };
   function motionCard(head, cols, rows, cls) {
-    return '<div class="pg-par-card sg-motion-proto' + (cls ? ' ' + cls : '') + '"><div class="pg-inspect-head">' + head + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr>' + cols.map(function (x) { return '<th>' + esc(x) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div></div>';
+    return '<div class="pg-par-card sg-motion-proto' + (cls ? ' ' + cls : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table"><thead><tr>' + cols.map(function (x) { return '<th>' + esc(x) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div></div>';
   }
-  // Everything that moves, one row each, the same on the motion page and in each component's Motion area: when it plays
-  // and what moves; the part; the code's timing, the variables it is written with and the rule it is in; Figma's timing
-  // and where in Figma it comes from; whether it stops for a person who asks for less motion; and how the two compare.
-  // Each status with the sign and the colour the other tables give it (the motion page is drawn before them).
-  var MOTION_STATUS = { same: ['✓', 'Same as Figma', 'match'], differs: ['✕', 'Differs from Figma', 'differs'], 'figma-none': ['!', 'None in Figma', 'figma'], 'code-none': ['✕', 'Not in the code', 'differs'], 'code-only': ['–', 'Only in the code', 'none'], unread: ['–', 'Figma not read yet', 'none'] };
-  var MOTION_COLS = ['What happens', 'Part', 'Code', 'Figma', 'Less motion', 'Status'];
-  function motionRowHTML(r, first) {
-    var st = MOTION_STATUS[r.status] || MOTION_STATUS.unread;
+  // Its Motion, one row for everything that moves in it, in the table every task shares: what happens (when it plays,
+  // what moves and the part), the code's timing with its variables, the rule it is in and whether it stops for less
+  // motion, Figma's timing and where in Figma it comes from, what to do and who does it, and its status. The component
+  // shows every row; the Tasks page only those still to do, under the same numbers.
+  function motionIssueRows(c) {
+    var at0 = DATA.builtAt || null, val = function (t) { return t ? '<span class="pg-par-val">' + esc(t) + '</span>' : ''; };
     var timing = function (m) { return motionTiming(m) + (m.delay ? ', after ' + m.delay + 'ms' : ''); };
-    var val = function (t) { return t ? '<span class="pg-par-val">' + esc(t) + '</span>' : ''; };
-    return '<tr data-status="' + esc(r.status) + '">' + (first || '') + '<td>' + esc(r.when) + val(r.what) + '</td><td>' + (r.part ? '<code>' + esc(r.part) + '</code>' : esc('The whole component')) + '</td>' +
-      '<td>' + (r.code ? '<code>' + esc(timing(r.code)) + '</code>' + val(r.code.vars.join(', ')) + val(r.code.at) : esc('None')) + '</td>' +
-      '<td>' + (r.figma ? '<code>' + esc(motionTiming(r.figma)) + '</code>' + val(capital(r.figma.from)) : esc(r.status === 'unread' ? 'Not read yet' : 'None')) + '</td>' +
-      '<td>' + esc(!r.code ? '' : r.code.calm ? 'Stops' : 'Keeps moving') + '</td>' +
-      '<td><span class="pg-par-status pg-par--' + st[2] + '"><span class="pg-par-sign" aria-hidden="true">' + st[0] + '</span>' + esc(st[1]) + '</span></td></tr>';
+    return (c.moves || []).map(function (r) {
+      var anim = /^(Repeats|Opens|Closes)$/.test(r.when) ? 'an animation' : 'a transition';
+      var todo = r.status === 'differs' ? 'Make it ' + r.figma.ms + 'ms, ' + r.figma.easing + ', as Figma has it (' + r.figma.from + '). Tell Claude to do it.'
+        : r.status === 'figma-none' ? 'Animate it in Figma as the code does (' + r.what + ', ' + r.code.ms + 'ms, ' + r.code.easing + '), on its Motion timeline or in its prototype, or tell Claude to stop it in the code.'
+        : r.status === 'code-none' ? 'Give it ' + anim + ' of ' + r.figma.ms + 'ms, ' + r.figma.easing + ', as Figma has it (' + r.figma.from + '). Tell Claude to do it.' : '';
+      var st = r.status === 'same' ? 'done' : r.status === 'differs' || r.status === 'figma-none' || r.status === 'code-none' ? 'todo' : 'none';
+      return { key: c.name + '\u0000motion:' + r.when + ':' + (r.part || '') + ':' + r.what, area: 'Motion', kind: r.when, kindHTML: esc(r.when) + val(r.what) + (r.part ? '<span class="pg-par-val"><code>' + esc(r.part) + '</code></span>' : ''),
+        code: r.code ? '<code>' + esc(timing(r.code)) + '</code>' + val(r.code.vars.join(', ')) + val(r.code.at) + val(r.code.calm ? 'Stops for less motion' : 'Keeps moving for less motion') : '<span class="pg-par-none">None</span>',
+        figma: r.figma ? '<code>' + esc(motionTiming(r.figma)) + '</code>' + val(capital(r.figma.from)) : '<span class="pg-par-none">' + esc(r.status === 'unread' ? 'Not read yet' : 'None') + '</span>',
+        todo: esc(todo), who: st === 'todo' ? (r.status === 'figma-none' ? WHO.figma : WHO.code) : '', st: st,
+        rel: r.status === 'code-only' ? 'Only in the code' : r.status === 'unread' ? 'Figma not read yet' : r.status === 'figma-none' ? PAR_REL.code : r.status === 'code-none' ? PAR_REL.figma : r.status === 'differs' ? PAR_REL.differs : '', at: at0 };
+    });
   }
-  // Its Motion area: everything that moves in it, in that one table; what does not move said so.
+  function motionOpen(c) { var n = motionIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
+  // Its Motion area: that table under the area's own title, a count of each status above it; what does not move said so.
   function motionHTML(c) {
-    var rows = c.moves || [];
+    var rows = byStatus(motionIssueRows(c));
     if (!rows.length) return '<div class="pg-doc"><p class="pg-parity-sum">It does not move: no transition or animation in its code, and none in Figma.</p></div>';
-    return '<div class="pg-doc pg-motion">' + motionCard('Everything that moves', MOTION_COLS, rows.map(function (r) { return motionRowHTML(r); }), 'sg-motion-all') + '</div>';
+    return '<div class="pg-doc pg-par pg-motion"><div class="pg-par-sum">' + statusSum(rows) + '</div>' + issueTableHTML(rows, '', '', 'Motion') + '</div>';
   }
   var MOTION = DATA.motion || null;
-  if (MOTION && ((MOTION.durations || []).length || (MOTION.easings || []).length || (MOTION.moves || []).length)) {
+  // The system's motion as its fundamentals, in one table: each timing its components move with, from the fastest, a dot
+  // that crosses its track on Play, the variables it is written with and their Figma names, what it is used for, the
+  // components and parts that move so, Figma's timing for them, and what the system could do (a purpose that has other
+  // timings too, a timing several components share, one written as values, a variable nothing uses).
+  if (MOTION && (MOTION.overview || []).length) {
     hr(); foundationLink('motion', 'motion');
     var less = MOTION.reduced
       ? 'When a person asks for less motion, the system ends every ' + MOTION.reduced.ends.join(' and ') + ' at once (' + MOTION.reduced.at + ').'
       : 'The system does not stop its motion yet when a person asks for less (prefers-reduced-motion); the accessibility check lists where it moves.';
     var mo = section('motion', 'Foundations', 'Motion', less);
-    var longest = (MOTION.durations || []).slice(-1)[0], baseMs = longest ? Math.max(longest.ms, 200) : 300;
-    var track = function (attrs, before) { return '<span class="sg-motion-sample">' + (before || '') + '<span class="sg-motion-track"><span class="sg-motion-dot"' + attrs + '></span></span></span>'; };
-    var name = function (t) { return { figma: t.figma || 'not in Figma', var: t.var }; };
-    var mc = document.createElement('div'); mc.className = 'sg-token-cards';
-    mc.innerHTML = ((MOTION.durations || []).length ? tokenCard('durations', MOTION.durations.map(function (t) { return { sample: track(' data-ms="' + t.ms + '" data-ease="linear"'), t: name(t), value: t.value }; })) : '') +
-      ((MOTION.easings || []).length ? tokenCard('easings', MOTION.easings.map(function (t) { return { sample: track(' data-ms="' + baseMs + '" data-ease="' + esc(t.value) + '"', motionCurve(t.bezier)), t: name(t), value: t.value }; })) : '');
-    if (mc.innerHTML) {
-      var bar = document.createElement('div'); bar.className = 'sg-motion-bar';
-      bar.innerHTML = sysButton('button', 'Play', ' data-motion-play');
-      mo.appendChild(bar); mo.appendChild(mc);
-      bar.querySelector('[data-motion-play]').addEventListener('click', function () {
-        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        Array.prototype.forEach.call(mc.querySelectorAll('.sg-motion-dot'), function (d) {
-          var end = d.parentNode.clientWidth - d.offsetWidth, frames = [{ transform: 'translateX(0)' }, { transform: 'translateX(' + end + 'px)' }];
-          if (d._run) d._run.cancel();
-          if (calm || !d.animate) { d.style.transform = 'translateX(' + end + 'px)'; return; }
-          d.style.transform = '';
-          d._run = d.animate(frames, { duration: Number(d.getAttribute('data-ms')) || 300, easing: d.getAttribute('data-ease') || 'linear', fill: 'forwards' });
-        });
+    var longest = MOTION.overview.reduce(function (m, r) { return Math.max(m, r.ms || 0); }, 0), baseMs = Math.max(longest, 200);
+    var track = function (attrs) { return '<span class="sg-motion-sample"><span class="sg-motion-track"><span class="sg-motion-dot"' + attrs + '></span></span></span>'; };
+    var known = function (n) { return COMPONENTS.some(function (c) { return c.name === n; }); };
+    var PURPOSE_WORD = { Repeats: 'repeating', Opens: 'opening', Closes: 'closing', 'On hover': 'a hover', 'On press': 'a press', 'On focus': 'the focus' };
+    var FIGMA_SAYS = { same: 'Same', differs: 'Differs', none: 'None in Figma', unread: 'Not read yet' };
+    var systemSays = function (r) {
+      if (r.unused) return 'No component uses it: use it, or remove it.';
+      var out = r.alsoTimed.map(function (a) { return capital(PURPOSE_WORD[a.purpose] || a.purpose.toLowerCase()) + ' has ' + a.timings + ' timings: choose one for every component.'; });
+      if (r.shared > 1) out.push('Shared by ' + r.shared + ' components' + (r.values ? ': make it one variable.' : '.'));
+      else if (r.values) out.push('Written as values: make it a variable.');
+      return out.join(' ');
+    };
+    var mc = document.createElement('div');
+    mc.innerHTML = '<div class="sg-motion-bar">' + sysButton('button', 'Play', ' data-motion-play') + '</div>' + motionCard('', ['Timing', 'Variables', 'For', 'Used by', 'Figma', 'For the system'], MOTION.overview.map(function (r) {
+      var timing = r.ms != null ? r.ms + 'ms' + (r.easing ? ', ' + r.easing : '') + (r.delay ? ', after ' + r.delay + 'ms' : '') : r.easing;
+      var dot = track(' data-ms="' + (r.ms || baseMs) + '" data-ease="' + esc(r.easing || 'linear') + '"');
+      var vars = r.vars.length ? r.vars.map(function (v) { return '<code>' + esc(v.var) + '</code><span class="pg-par-val">' + esc(v.figma || 'not in Figma') + '</span>'; }).join('') : esc('Written as values');
+      var uses = r.uses.length ? r.uses.map(function (u) { return '<span class="sg-motion-use">' + (known(u.component) ? '<a class="sg-uses-link" href="#' + esc(cid(u.component)) + '/motion">' + esc(u.component) + '</a>' : esc(u.component)) + '<span class="pg-par-val">' + esc(u.purpose + ', ' + u.what + (u.part ? ', ' + u.part : '')) + '</span></span>'; }).join('') : esc('Nothing');
+      return '<tr' + (r.unused ? ' data-unused' : '') + '><td>' + dot + '<code>' + esc(timing) + '</code></td><td>' + vars + '</td><td>' + esc(r.purposes.join(', ') || 'Nothing yet') + '</td><td>' + uses + '</td><td>' + esc(FIGMA_SAYS[r.figma] || '') + (r.figmaTiming && r.figma === 'differs' ? '<span class="pg-par-val">' + esc(r.figmaTiming) + '</span>' : '') + '</td><td>' + esc(systemSays(r)) + '</td></tr>';
+    }), 'sg-motion-system');
+    while (mc.firstChild) mo.appendChild(mc.firstChild);
+    labelCells(mo);
+    mo.querySelector('[data-motion-play]').addEventListener('click', function () {
+      var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      Array.prototype.forEach.call(mo.querySelectorAll('.sg-motion-dot'), function (d) {
+        var end = d.parentNode.clientWidth - d.offsetWidth, frames = [{ transform: 'translateX(0)' }, { transform: 'translateX(' + end + 'px)' }];
+        if (d._run) d._run.cancel();
+        if (calm || !d.animate) { d.style.transform = 'translateX(' + end + 'px)'; return; }
+        d.style.transform = '';
+        d._run = d.animate(frames, { duration: Number(d.getAttribute('data-ms')) || 300, easing: d.getAttribute('data-ease') || 'linear', fill: 'forwards' });
       });
-    }
-    // Every component's motion in the one table each component's Motion area shows, a column for the component first.
-    if ((MOTION.moves || []).length) {
-      var known = function (n) { return COMPONENTS.some(function (c) { return c.name === n; }); };
-      var cm = document.createElement('div');
-      cm.innerHTML = motionCard('Every component\'s motion', ['Component'].concat(MOTION_COLS), MOTION.moves.map(function (r) {
-        return motionRowHTML(r, '<td>' + (known(r.component) ? '<a class="sg-uses-link" href="#' + esc(cid(r.component)) + '">' + esc(r.component) + '</a>' : esc(r.component)) + '</td>');
-      }), 'sg-motion-all');
-      cm = cm.firstChild; mo.appendChild(cm); labelCells(cm);
-    }
+    });
   }
 
   /* ── Icons: every icon is a real one from the system's symbol sheet, referenced by id ───────────────────────── */
@@ -1888,6 +1897,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var ISSUE_COLS = {
     Parity: [['Task nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status']],
     Accessibility: [['Task nr', 'no'], ['WCAG criterion', 'kind'], ['Figma states', 'figma'], ['Found', 'code'], ['What to do', 'todo'], ['Status', 'status']],
+    Motion: [['Task nr', 'no'], ['What happens', 'kind'], ['Code', 'code'], ['Figma', 'figma'], ['What to do', 'todo'], ['Status', 'status']],
     Documentation: [['Task nr', 'no'], ['Kind', 'kind'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status']],
     Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
     Products: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
@@ -1962,7 +1972,8 @@ a.pg-usage-name { color: var(--sg-text); }
     // duration, another curve. The prototype is the design: the code follows it.
     // How it moves on its own (C7): a loop, its opening, its closing; one Figma has and the code does not is Claude's, one
     // the code has and Figma does not is for whoever keeps Figma to animate there.
-    (c.motionDiffs || []).forEach(function (m) {
+    // With its Motion area's table (c.moves), these are rows of Motion, not of Parity.
+    (c.moves ? [] : c.motionDiffs || []).forEach(function (m) {
       var fig = m.figma ? '<code>' + esc(m.figma.ms + 'ms') + '</code><span class="pg-par-val">' + esc(m.figma.easing + (m.motion ? ', ' + m.figma.what : ', on ' + m.trigger)) + '</span>' : side(null);
       var code = m.code ? '<code>' + esc(m.code.ms + 'ms') + '</code><span class="pg-par-val">' + esc(m.code.easing + (m.code.what ? ', ' + m.code.what : '') + ' · ' + m.code.selector + ' · ' + m.code.file + ':' + m.code.line) + '</span>' : side(null);
       var anim = m.motion === 'loop' ? 'an animation that repeats' : m.motion ? 'an animation as it ' + (m.motion === 'open' ? 'opens' : 'closes') : 'a transition';
@@ -2289,6 +2300,7 @@ a.pg-usage-name { color: var(--sg-text); }
       } catch (e) { /* its accessibility is read on its own page */ }
       migrationRows(c).forEach(function (r) { rows.push(r); });
       copyRows(c).forEach(function (r) { rows.push(r); });
+      motionIssueRows(c).filter(isOpen).forEach(function (r) { rows.push(r); });
       docRows(c).forEach(function (r) { rows.push(r); });
       if (rows.length) order.push({ name: c.name, rows: rows });
     });
@@ -2298,9 +2310,15 @@ a.pg-usage-name { color: var(--sg-text); }
     var kindsSeen = [];
     order.forEach(function (g) { g.rows.forEach(function (r) { if (kindsSeen.indexOf(r.area) < 0) kindsSeen.push(r.area); }); });
     var kinds = TODO_KINDS.filter(function (a) { return kindsSeen.indexOf(a) >= 0; }).concat(kindsSeen.filter(function (a) { return TODO_KINDS.indexOf(a) < 0; }));
+    // Until every component is tried in this browser, Accessibility waits on its own: the other kinds show at once, with
+    // their final numbers, and Accessibility is listed without rows or a count, how far the try has got under it.
+    var tried = COMPONENTS.filter(function (c) { return c.__a11y; });
+    var wait = !ALL && tried.length < COMPONENTS.length;
+    kinds = kinds.filter(function (a) { return a !== 'Accessibility'; }).concat(wait || kinds.indexOf('Accessibility') >= 0 ? ['Accessibility'] : []);
     var byKind = kinds.map(function (a) {
-      return { area: a, groups: order.map(function (g) { return { name: g.name, rows: byStatus(g.rows.filter(function (r) { return r.area === a; })) }; }).filter(function (g) { return g.rows.length; }) };
+      return { area: a, wait: wait && a === 'Accessibility', groups: wait && a === 'Accessibility' ? [] : order.map(function (g) { return { name: g.name, rows: byStatus(g.rows.filter(function (r) { return r.area === a; })) }; }).filter(function (g) { return g.rows.length; }) };
     });
+    // Numbered in the order the kinds show, Accessibility last, so no other number moves when its rows come in.
     var no = 0;
     Object.keys(TODO_NO).forEach(function (k) { delete TODO_NO[k]; });
     byKind.forEach(function (k) { k.groups.forEach(function (g) { g.rows.forEach(function (r) { r.no = ++no; TODO_NO[r.key] = r.no; }); }); });
@@ -2311,8 +2329,8 @@ a.pg-usage-name { color: var(--sg-text); }
     });
     var link = nav.querySelector('a[href="#tasks"]');
     var box = td.querySelector('.sg-todo') || td.appendChild(document.createElement('div')); box.className = 'sg-todo';
-    var tried = COMPONENTS.filter(function (c) { return c.__a11y; }), last = tried.reduce(function (m, c) { var at = c.__a11y.live && c.__a11y.live.at; return at && (!m || at > m) ? at : m; }, null);
-    var wait = !ALL && tried.length < COMPONENTS.length, baked = !wait && tried.length && tried.every(function (c) { return c.__a11y.baked || !c.__a11y.live; }) && BAKED;
+    var last = tried.reduce(function (m, c) { var at = c.__a11y.live && c.__a11y.live.at; return at && (!m || at > m) ? at : m; }, null);
+    var baked = !wait && tried.length && tried.every(function (c) { return c.__a11y.baked || !c.__a11y.live; }) && BAKED;
     // When what the Accessibility list shows was tried: while the page was built (the final results, nothing runs here),
     // else in this browser, kept so a refresh lists it at once. Said under the filter of Accessibility alone, the kind it
     // is about, with a button to try every component again in this browser.
@@ -2320,24 +2338,25 @@ a.pg-usage-name { color: var(--sg-text); }
       ? 'Every variant of every component was tried in a browser when this page was built, on ' + when(BAKED.at) + '. These are its results; nothing runs while you read them.'
       : 'Every component was tried in this browser' + (last ? ', the last on ' + when(last) : '') + '. A refresh lists what was found without trying again, and a component that changes is tried again on its own.') + '</p>' +
       sysButton('button', 'Try again in this browser', ' data-a11y-again') + '</div>';
-    // Until every component is tried, no list and no count anywhere: each would change in front of the reader as one more
-    // is tried. Only how far the try has got, then the list once, with its final numbers.
+    // The menu's count waits for every kind, so it never changes in front of the reader.
     if (link) link.lastChild.textContent = wait ? 'tasks' : 'tasks (' + all + ')';
-    if (wait) {
-      box.innerHTML = '<p class="pg-wcag-note sg-todo-wait" role="status">Trying the components for accessibility in this browser, ' + tried.length + ' of ' + COMPONENTS.length + '. The tasks show once every one is tried, and what is tried is kept for the next visit.</p>';
-      return;
-    }
-    if (!all) { box.innerHTML = note + '<p class="pg-par-sum">Nothing open: Figma and the code agree, and nothing fails for accessibility.</p>'; return; }
+    if (!all && !wait) { box.innerHTML = note + '<p class="pg-par-sum">Nothing open: Figma and the code agree, and nothing fails for accessibility.</p>'; box._drawn = null; return; }
     // One kind shown at a time, chosen with the filter (no list of every kind at once); kept as the list is drawn again.
     var count = function (k) { return k.groups.reduce(function (n, g) { return n + g.rows.length; }, 0); };
     if (!byKind.some(function (k) { return k.area === todoArea; })) todoArea = byKind[0].area;
-    var filter = '<div class="pg-par-filter sg-todo-filter">' + segHTML(byKind.map(function (k) { return { label: k.area + ' (' + count(k) + ')', v: k.area }; }), 'Show') + '</div>';
-    box.innerHTML = '<div class="sg-todo-head">' + filter + '<p class="pg-par-sum sg-todo-sum"></p></div>' + byKind.map(function (k) {
+    var filter = '<div class="pg-par-filter sg-todo-filter">' + segHTML(byKind.map(function (k) { return { label: k.wait ? k.area : k.area + ' (' + count(k) + ')', v: k.area }; }), 'Show') + '</div>';
+    var waitLine = 'Trying the components for accessibility in this browser, ' + tried.length + ' of ' + COMPONENTS.length + '. Its tasks show once every one is tried, and what is tried is kept for the next visit.';
+    var html = '<div class="sg-todo-head">' + filter + '<p class="pg-par-sum sg-todo-sum"></p></div>' + byKind.map(function (k) {
       var link = function (g) { return g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system'; };
+      if (k.wait) return '<div class="sg-todo-kind" data-area="Accessibility"><p class="pg-wcag-note sg-todo-wait" role="status"></p></div>';
       return '<div class="sg-todo-kind" data-area="' + esc(k.area) + '">' + (k.area === 'Accessibility' ? note : '') + k.groups.map(function (g) {
         return issueTableHTML(g.rows, '', link(g), k.area);
       }).join('') + '</div>';
     }).join('');
+    // While Accessibility is being tried, the rest is drawn once: each component tried changes only how far it has got.
+    if (wait && box._drawn === html) { box.querySelector('.sg-todo-wait').textContent = waitLine; return; }
+    box.innerHTML = html; box._drawn = wait ? html : null;
+    if (wait) box.querySelector('.sg-todo-wait').textContent = waitLine;
     var seg = box.querySelector('.sg-todo-filter');
     if (seg) segItems(seg).forEach(function (b) { b.addEventListener('click', function () { todoArea = b.dataset.v; showTodoArea(box); todoLink(); }); });
     showTodoArea(box);
@@ -2347,7 +2366,8 @@ a.pg-usage-name { color: var(--sg-text); }
   // Each card's head row sticks under the filter and the counts, whatever their height at this width.
   function todoHeadHeight() { stickHeight(document.getElementById('tasks')); }
   // Only the kind chosen, its own tables, and its own count of what is to fix and to check; the numbers stay as they are.
-  var TODO_KINDS = ['Parity', 'Accessibility', 'Documentation', 'Migration', 'Products', 'System', 'Page'];
+  // Accessibility last: what a browser still has to try is numbered after the rest, so no other number moves.
+  var TODO_KINDS = ['Parity', 'Motion', 'Documentation', 'Migration', 'Products', 'System', 'Page', 'Accessibility'];
   var todoArea = 'Parity';
   // Each kind has its own address to send someone to (#tasks/accessibility): choosing one writes it, opening it opens it.
   function todoLink() { if (ALL || hashParts().id !== 'tasks') return; var h = '#tasks/' + todoArea.toLowerCase(); if (h !== location.hash) history.replaceState(null, '', h); }
@@ -2643,21 +2663,20 @@ a.pg-usage-name { color: var(--sg-text); }
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         // Its name, and at its top right where else it lives (its Figma node, its code, the team's pages).
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2>' + headLinksHTML(c.links) + '</div>' +
-        (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') +
         // A component only the code has: said at its top, so nothing on its page reads as agreed with Figma.
         (c.codeOnly ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">Only in the code</span><span>' + (c.codeOnly.figma ? 'Figma has no component for it: compared with nothing in Figma.' : 'No Figma data yet: compared with nothing in Figma.') + '</span></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
         // Retired and still in use: what replaces it and how much still moves, each place a row of the Tasks page.
         (c.migration ? '<p class="pg-status pg-migration">' + (c.status ? '' : statusPill({ kind: 'deprecated', status: 'Deprecated' })) + '<span>' + esc((c.migration.toName ? 'Use ' + c.migration.toName + ' instead. ' : 'Nothing replaces it yet. ') + 'Still used in ' + c.migration.count + (c.migration.count === 1 ? ' place' : ' places') + ' (' + c.migration.products.map(function (p) { return p.name + ' ' + p.count; }).join(', ') + '), each on the ') + '<a href="#tasks">Tasks</a> page.</span></p>' : '') +
-        // Its version, when it last changed and how to import it: one line, wrapping only when the room runs out.
-        '<div class="pg-meta">' + (ALL ? '' : factsHTML(c)) + importHTML(c) + '</div>' +
+        // Its class, its version, when it last changed and how to import it: one line, wrapping only when the room runs out.
+        '<div class="pg-meta">' + (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') + (ALL ? '' : factsHTML(c)) + importHTML(c) + '</div>' +
       '</div>' +
       // What is left to do is marked on its area, the system's alert icon before the label and what it is said to a
       // screen reader: Parity while something differs from Figma or is not built, Accessibility while a problem stands
-      // (the last browser check's and the audit's), the same counts as its overview card, and Documentation while a kind
-      // is not written yet.
+      // (the last browser check's and the audit's), the same counts as its overview card, Documentation while a kind
+      // is not written yet, and Motion while something moves otherwise than Figma.
       '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)); }).map(function (a) {
-        var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? a11yOpen(c) : a[0] === 'docs' ? docOpen(c) : null, warn = !!(f && f.todo);
+        var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? a11yOpen(c) : a[0] === 'docs' ? docOpen(c) : a[0] === 'motion' ? motionOpen(c) : null, warn = !!(f && f.todo);
         return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
       })) + '</div></div>' +
       // Playground: the component drawn, its controls, the tokens behind what is drawn and its code.

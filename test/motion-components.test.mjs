@@ -4,7 +4,7 @@
 // does not is for whoever keeps Figma; both with another duration or curve, Claude's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { animationsOf, keyframesWhat, keyframesIn, codeMotions, figmaMotions, componentMotionFindings, componentMotionRows, componentTransitions, motionSpec } from '../motion-components.mjs';
+import { animationsOf, keyframesWhat, keyframesIn, codeMotions, figmaMotions, componentMotionFindings, componentMotionRows, componentTransitions, motionSpec, motionOverview } from '../motion-components.mjs';
 import { MOTION_CAPTURE_JS, motionCaptureScript, motionSnapshot } from '../motion-parity.mjs';
 
 const CSS = [{ file: 'theme.css', text: `:root { --modal-duration: 280ms; --modal-easing: cubic-bezier(0.22, 1, 0.36, 1); --modal-offset: 8px; }
@@ -117,6 +117,26 @@ test('everything that moves in a component, in one list: when it plays, the part
     ['Closes', 'fades out', '.modal.is-closing .modal-card', '160 ease-in', null, false, 'figma-none'],
   ], 'the card and its backdrop, each; stopped for less motion where a reduced-motion rule says so');
   assert.deepEqual(motionSpec(null, css, 'list', 'list').map((r) => r.status), ['unread', 'unread'], 'before Figma is read');
+});
+
+test('the system\'s motion as its fundamentals: each timing from the fastest, what it is for, who uses it, and what the system could do', () => {
+  const m = (component, when, what, part, ms, easing, vars = [], status = 'figma-none') => ({ component, when, what, part, code: { ms, easing, delay: 0, vars, at: 'theme.css:1', calm: true }, figma: null, status });
+  const moves = [
+    m('loader', 'Repeats', 'turns a full circle', '.loader-spinner', 800, 'linear'),
+    m('toast', 'Repeats', 'turns a full circle', '.toast-spinner', 800, 'linear'),
+    m('modal', 'Opens', 'fades in', '.modal-card', 280, 'cubic-bezier(0.22, 1, 0.36, 1)', ['--modal-duration']),
+    m('toast', 'Opens', 'fades in', '.toast', 220, 'cubic-bezier(0.16,0.84,0.44,1)'),
+    { component: 'list', when: 'On hover and focus', what: 'color changes', part: '.list', code: { ms: 100, easing: 'ease', delay: 0, vars: [], calm: false }, figma: { ms: 300, easing: 'ease-out', from: 'its prototype' }, status: 'differs' },
+  ];
+  const rows = motionOverview(moves, { durations: [{ var: '--modal-duration', figma: 'motion/modal', ms: 280 }, { var: '--slow', figma: null, ms: 400 }], easings: [] });
+  assert.deepEqual(rows.map((r) => [r.ms, r.purposes.join(), r.uses.map((u) => u.component).join(), r.figma, r.shared, r.values, r.alsoTimed.map((a) => a.purpose + a.timings).join(), !!r.unused]), [
+    [100, 'On hover', 'list', 'differs', 1, true, '', false],
+    [220, 'Opens', 'toast', 'none', 1, true, 'Opens2', false],
+    [280, 'Opens', 'modal', 'none', 1, false, 'Opens2', false],
+    [400, '', '', 'none', 0, false, '', true],
+    [800, 'Repeats', 'loader,toast', 'none', 2, true, '', false],
+  ]);
+  assert.deepEqual(rows[2].vars, [{ var: '--modal-duration', figma: 'motion/modal' }], 'its variable with its Figma name');
 });
 
 test('the capture reads every page, Motion keyframes and overlays too, and changes nothing; the snapshot keeps them', () => {
