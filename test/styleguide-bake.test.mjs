@@ -21,3 +21,22 @@ test('what a component holds never closes the script it is kept in', () => {
   assert.equal(out.match(/<\/script>/g).length, 1);
   assert.equal(JSON.parse(out.match(/<script[^>]*>([\s\S]*?)<\/script>/)[1]).results.x.items[0].html, '</script><img src=x onerror=alert(1)>');
 });
+
+test('a page whose script stops is said at once, never waited out for an hour', { timeout: 120000 }, async (t) => {
+  const { findChrome } = await import('../cdp.mjs');
+  if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { bakeA11y } = await import('../styleguide-bake.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'sg-dead-'));
+  try {
+    const file = join(dir, 'index.html');
+    writeFileSync(file, '<html><body><script type="application/json" id="sg-data">{"components":[{"name":"chip"}]}</script><script>rows.push(1); window.__sgA11yResults = function () { return {}; };</script></body></html>');
+    const t0 = Date.now();
+    const r = await bakeA11y(file, { jobs: 1, timeoutMs: 60 * 60 * 1000 });
+    assert.equal(r.dead, true, JSON.stringify(r));
+    assert.ok(Date.now() - t0 < 60000, 'said within a minute');
+    assert.match(r.errors.join(), /rows is not defined/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

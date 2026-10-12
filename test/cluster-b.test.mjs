@@ -194,6 +194,17 @@ test('[regression structure] a no-stroke component with a real border is flagged
   assert.match(out, /Gate \[3c\]/);
 });
 
+test('[bugfix structure] a component with no selector entry of its own is checked by its class: a panel Figma draws without a border', () => {
+  // The panel had no COMPONENT_CSS_SELECTORS entry, so its border-right was never compared with Figma's no stroke.
+  const fx = structFixture({ themeCSS: 'theme.css', snapComp: { strokeOnAnyState: false },
+    extra: { 'theme.css': `:root {}\n.widget { color: red; }\n.panel { border-right: 1px solid red; }\n.panel.panel--right { border-left: 1px solid red; }` } });
+  fx['snap.json'].components.panel = { strokeOnAnyState: false };
+  const { code, out } = runGate(STRUCT_GATE, fx);
+  assert.equal(code, 1, out);
+  assert.match(out, /panel: "\.panel" has `border-right/);
+  assert.match(out, /panel: "\.panel\.panel--right" has `border-left/);
+});
+
 test('[bugfix structure] array themeCSS resolves without crashing; a strokeful component keeps its border', () => {
   const { code, out } = runGate(STRUCT_GATE, structFixture({
     themeCSS: ['theme.css', 'extra.css'],           // array form - used to crash
