@@ -465,7 +465,7 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
   if (undecided) said.push(`${undecided} value${undecided === 1 ? '' : 's'} where Figma and the code differ`);
   if (unrealized) said.push(`${unrealized} Figma propert${unrealized === 1 ? 'y' : 'ies'} the code does not build yet`);
   if (waiting.length) said.push(`${waiting.length} component${waiting.length === 1 ? '' : 's'} the code does not have yet (${waiting.map((w) => w.replace(/ \(not built yet\)$/, '')).join(', ')})`);
-  const line = said.length ? `Left off this page until Figma and the code agree: ${said.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Each one is in the To do list, with who does it and what to do.` : 'Figma and the code agree on everything this page shows.';
+  const line = said.length ? `Left off this page until Figma and the code agree: ${said.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Each one is on the Tasks page, with who does it and what to do.` : 'Figma and the code agree on everything this page shows.';
   const onlyCode = components.filter((c) => c.codeOnly).length;
   // Before Figma's data is captured, every component is the code's alone: said so, never "Figma and the code agree".
   const shownLine = !figmaHas && onlyCode ? `No Figma data yet: these are the ${onlyCode} component${onlyCode === 1 ? '' : 's'} the code has, compared with nothing in Figma. Capture Figma's data (rms-design-system-engine --recipe refresh-figma) to compare them.`

@@ -765,7 +765,7 @@ if (process.argv.includes('--annotation-categories')) {
         by[k] = (by[k] ?? 0) + 1;
       }
     }
-    if (Object.keys(by).length) console.log(`   The component notes: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ')}. Accessibility and uncategorised notes are requirements; the rest is design intent, never a To do.`);
+    if (Object.keys(by).length) console.log(`   The component notes: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ')}. Accessibility and uncategorised notes are requirements; the rest is design intent, never a task.`);
     console.log('NEXT: rms-design-system-engine (the audit, reading each note as a requirement or as design intent)');
     process.exit(0);
   } catch (e) { console.error(`❌ Annotation categories not kept: ${e.message}`); process.exit(1); }

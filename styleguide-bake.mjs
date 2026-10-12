@@ -1,11 +1,11 @@
 // styleguide-bake.mjs - the style guide's accessibility, tried once in a browser while the page is built.
 //
-// Each component's Accessibility area (and the To do page) tries every variant in a browser: the Tab stops, names,
+// Each component's Accessibility area (and the Tasks page) tries every variant in a browser: the Tab stops, names,
 // focus, text contrast in every colour mode, the WCAG 2.1 page checks and what it does when used. Done in the viewer's
 // browser, that takes minutes for a whole system and shows results that are not final yet. Here --styleguide opens the
-// page it just wrote in Chrome, has it try every component (shared among a few pages at once, #todo?bake=i/n), and
+// page it just wrote in Chrome, has it try every component (shared among a few pages at once, #tasks?bake=i/n), and
 // keeps what each found in the page itself (<script id="sg-a11y-baked">). The page then shows those results at once,
-// on the To do page and in every Accessibility area, with nothing running while it is read. A component the page could
+// on the Tasks page and in every Accessibility area, with nothing running while it is read. A component the page could
 // not try here (no Chrome, a time limit) is tried in the viewer's browser as before.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
@@ -42,7 +42,7 @@ export async function bakeA11y(file, { chromePath = process.env.CHROME_PATH || f
     const errors = new Set();
     on('Runtime.exceptionThrown', (p) => errors.add(String(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text ?? '').split('\n')[0]));
     const parts = await Promise.all(Array.from({ length: jobs }, async (_, i) => {
-      const { sessionId } = await openPage(send, `file://${file}#todo?bake=${i}/${jobs}`);
+      const { sessionId } = await openPage(send, `file://${file}#tasks?bake=${i}/${jobs}`);
       // Each page as if it had the focus and a desktop window, so none is held back as a page out of view.
       await send('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
       await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId).catch(() => {});

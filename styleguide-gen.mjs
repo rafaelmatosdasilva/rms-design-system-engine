@@ -665,7 +665,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const every = view.allComponents ?? view.components;
     view.ui = { segmented: segmentedUi(every) ?? radioGroupUi(every, systemCss) ?? buttonsAsSegmentedUi(every, systemCss), tabs: tabsUi(every), field: fieldUi(every, systemCss), button: buttonUi(every, systemCss, sh.ui?.button ?? null), card: cardUi(every, systemCss), iconButton: iconButtonUi(every, systemCss), overlay: every.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
     view.ui.gaps = standInGaps(view.ui);
-    // What the tokens owe (F8, L9), rows of the To do page under The system: descriptions to write in Figma, tokens equal
+    // What the tokens owe (F8, L9), rows of the Tasks page under The system: descriptions to write in Figma, tokens equal
     // in every mode and tokens one component uses, a decision each. The single-use ones come from the contracts the last
     // audit wrote, so the page and the audit count the same; with none written, that row waits for an audit.
     if (cfg.systemHealth !== false && !opts.only?.length) try {
