@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Tasks by kind, motion as one system table (continuous evaluation)
+
+What changed since the entry below (engine 8bf7f93): The Tasks page shows every kind at once except Accessibility, which alone waits while the components are tried; motion is a kind of its own with what each component needs; a component's Motion tab is the same task table; the motion page is one table of the system's timings, which components use each, and what the system should make of them; the component's class sits on its Version line. The guide changed in `reference/usage.md`.
+
+Guide set measured: `7380f6e9fb1c` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8f2202f | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.057 |
+| Input a run | 114k | 95k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 95k a run against 114k. Records: `records/tasks-motion-page`.
+
 ## 2026-10: Every mode, effects, a Motion tab (continuous evaluation)
 
 What changed since the entry below (engine 9b4a9c5): Target size on a 320px screen; contrast against what is painted behind the text; each component's shadows, blurs, fills, clipping and blending against Figma (--figma-effects); sizes, type, breakpoints and states in every mode; Documentation as the task table with a status; a Motion tab with everything that moves in one table. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
