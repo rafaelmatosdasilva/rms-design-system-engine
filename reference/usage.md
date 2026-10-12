@@ -735,11 +735,13 @@ dropped, then `design-system-engine-map` `EXPLICIT` / `EXPLICIT_SIZING`, then th
 value, font against the first text element, background as "paints or not" (Figma often paints on a child
 layer, code on the element). On a project whose parity is green this is a calibration: every difference is
 either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)
-runs the same token, icon and nesting comparison on every audit, after the components: `MEASURED TOKENS` (a
-Figma token the code resolves to another value, per mode), `MEASURED ICONS` (an icon whose viewBox or path data
-differs from Figma's, or one Figma has and the sprite lacks) and `MEASURED NESTING` (a component Figma nests that
-the code never shows inside its parent), each line with what to do. Advisory like the rest of `MEASURED`;
-`renderedParityStrict` (and build mode) makes them fail the gate.
+runs the same token, icon and nesting comparison on every audit, after the components. `MEASURED TOKENS` lists a
+Figma token the page resolves to another value only where the browser alone read it (a script, or a stylesheet
+the page loads that Gate 3 does not read), with what sets it to look for. Everything else is already listed by its
+own gate (tokens by Gate 3, icons by the icon check, nesting by the sub-component check), so one line counts it
+(`📋 measured too: tokens 346 match · icons 40 match`, with how many differ and which check lists
+them) and nothing is listed twice. Advisory like the rest of `MEASURED`; `renderedParityStrict` (and build mode)
+makes a listed token fail the gate.
 
 #### The component catalog and `--check-ui` (for UI generators)
 
