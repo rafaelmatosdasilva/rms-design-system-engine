@@ -474,6 +474,14 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect tr:last-child td { border-bottom: none; }
 /* A section of the documentation as one of these tables: its title the head, each row a name and its text. */
 .pg-inspect-head > h3 { font: inherit; color: inherit; margin: 0; }
+/* Documentation as a table: the kind, what was written, where; its paragraphs as tight as a cell's one line. */
+.pg-know-table td > p { margin: 0; }
+.pg-know-table td > p + p { margin-top: var(--sg-space-xs); }
+@media (min-width: 721px) {
+  .pg-know-table td:first-child { width: 24%; color: var(--sg-muted); }
+  .pg-know-table td:last-child { width: 22%; color: var(--sg-text-2); }
+}
+.pg-knowledge > .pg-from { margin: var(--sg-space-s) 0 0; }
 .pg-cards { display: flex; flex-direction: column; gap: var(--sg-space-m); }
 .pg-cards .pg-inspect td:last-child { word-break: normal; overflow-wrap: anywhere; }   /* a commit's words wrap between words */
 .pg-doc-card > .pg-updated { gap: 0; margin: 0; font-size: var(--sg-m); color: var(--sg-text); }
@@ -979,34 +987,37 @@ a.pg-usage-name { color: var(--sg-text); }
   var KNOW_FROM = function (from) { return /^Figma/.test(from || '') ? 'Figma' : /^the code$/i.test(from || '') ? 'The code' : /authored|contract/i.test(from || '') ? 'The contract' : from ? 'The last audit' : ''; };
   // Each kind once, for the Documentation page and each component's Documentation area alike, so the two always show the
   // same things under the same names, in the same order: [name, where it was written (or '' when nobody wrote it), what
-  // was written, what to say when it is missing].
+  // was written, where in full, what to say when it is missing].
   var guideOf = function (c, key) { return ((c.guidance || {}).sections || []).filter(function (x) { return x.key === key; })[0] || null; };
   var paras = function (list) { return list.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join(''); };
   var figmaWhat = function (c) { return (c.description || '').replace(/@\w+/g, '').trim(); };
   var guideKind = function (key, title) {
     return [title, function (c) { var s = guideOf(c, key); return s && s.text ? KNOW_FROM(s.from) : ''; },
-      function (c) { var s = guideOf(c, key); return paras(s.text) + '<p class="pg-from">From ' + esc(s.from) + '</p>'; }, 'Not written yet.'];
+      function (c) { return paras(guideOf(c, key).text); }, function (c) { var f = guideOf(c, key).from; return /^[\w-]+\.\w/.test(f) ? f : f.charAt(0).toUpperCase() + f.slice(1); }, 'Not written yet.'];
   };
+  var roleFrom = function (a) { return a.roleFrom === 'figma' ? 'Figma' : a.roleFrom === 'contract' ? 'The contract' : 'The code'; };
   var KNOW = [
     ['What it is', function (c) { return figmaWhat(c) ? 'Figma' : (c.note || '').trim() ? 'The code' : ''; },
-      function (c) { return figmaWhat(c) ? paras([figmaWhat(c)]) + '<p class="pg-from">From Figma, its description</p>' : paras([c.note.trim()]) + '<p class="pg-from">From the code</p>'; }, 'Not written yet.'],
+      function (c) { return paras([figmaWhat(c) || c.note.trim()]); }, function (c) { return figmaWhat(c) ? 'Figma, its description' : 'The code'; }, 'Not written yet.'],
     guideKind('whenToUse', 'When to use'),
     guideKind('whenNotToUse', 'When not to use'),
     guideKind('mistakes', 'Common mistakes'),
     guideKind('limitations', 'Limitations'),
     ['Do and don\'t', function (c) { var n = (c.examples || []).length; return n ? n + (n === 1 ? ' picture' : ' pictures') : ''; },
-      function (c) { return examplesGrid(c) + '<p class="pg-from">From Figma</p>'; }, 'No pictures yet.'],
-    ['Role', function (c) { var a = c.a11y || {}; return a.role ? (a.roleFrom === 'figma' ? 'Figma' : a.roleFrom === 'contract' ? 'The contract' : 'The code') : ''; },
-      function (c) { var a = c.a11y; return paras([a.role]) + '<p class="pg-from">From ' + (a.roleFrom === 'figma' ? 'Figma, its annotation' : a.roleFrom === 'contract' ? 'the contract' : 'the code') + '</p>'; }, 'Not written yet.']
+      function (c) { return examplesGrid(c); }, function () { return 'Figma'; }, 'No pictures yet.'],
+    ['Role', function (c) { var a = c.a11y || {}; return a.role ? roleFrom(a) : ''; },
+      function (c) { return paras([c.a11y.role]); }, function (c) { return c.a11y.roleFrom === 'figma' ? 'Figma, its annotation' : roleFrom(c.a11y); }, 'Not written yet.']
   ];
-  // Its Documentation, kind by kind: what was written and where, or that it is missing. head: the card's title (the
-  // component's own area says Documentation; the Documentation page names the component, linked to it).
+  // Its Documentation, a table of every kind: what was written and where, or that it is missing. head: the card's title
+  // (the component's own area says Documentation; the Documentation page names the component, linked to it).
   var WRITE_HINT = 'Write a missing one in Figma, as a line of the component\'s description that starts with its name (When to use: …), or in contract.authored.json under guidance.';
   function knowledgeHTML(c, head) {
     var missing = KNOW.filter(function (k) { return !k[1](c); });
-    return '<div class="pg-doc pg-knowledge"><h3>' + (head || 'Documentation') + '</h3><dl class="pg-updated">' + KNOW.map(function (k) {
-      return '<div><dt>' + esc(k[0]) + '</dt><dd>' + (k[1](c) ? k[2](c) : '<p class="pg-missing">' + esc(k[3]) + '</p>') + '</dd></div>';
-    }).join('') + '</dl>' + (!head && missing.some(function (k) { return /^(What it is|When|Common|Limitations)/.test(k[0]); }) ? '<p class="pg-from">' + esc(WRITE_HINT) + '</p>' : '') + '</div>';
+    return '<div class="pg-doc pg-knowledge"><div class="pg-par-card"><div class="pg-inspect-head"><h3>' + (head || 'Documentation') + '</h3></div><div class="pg-par-scroll"><table class="pg-par-table pg-know-table">' +
+      '<thead><tr><th>Kind</th><th>What is written</th><th>From</th></tr></thead><tbody>' + KNOW.map(function (k) {
+        var has = !!k[1](c);
+        return '<tr data-have="' + (has ? 1 : 0) + '"><td>' + esc(k[0]) + '</td><td>' + (has ? k[2](c) : '<p class="pg-missing">' + esc(k[4]) + '</p>') + '</td><td>' + (has ? esc(k[3](c)) : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>' + (!head && missing.some(function (k) { return /^(What it is|When|Common|Limitations)/.test(k[0]); }) ? '<p class="pg-from">' + esc(WRITE_HINT) + '</p>' : '') + '</div>';
   }
   // Documentation, Accessibility and the rest in the Playground's tables: a section of rows (Usage, Documentation,
   // Accessibility, Anatomy) becomes a card whose head is its title, each row a name and its text. The same on a
@@ -1029,10 +1040,10 @@ a.pg-usage-name { color: var(--sg-text); }
       .sort(function (a, b) { return a.have - b.have || a.c.name.localeCompare(b.c.name); });
     var whole = rowsK.filter(function (r) { return r.have === KNOW.length; }).length;
     var kbox = document.createElement('div'); kbox.className = 'pg-footer sg-doc-all'; kv.appendChild(kbox);
-    // The same card each component's Documentation area shows, its name as the card's title, linked to its page.
+    // The same table each component's Documentation area shows, its name as the card's title, linked to its page.
     kbox.innerHTML = '<p class="pg-par-sum">' + esc(whole + ' of ' + KNOWN.length + ' components have every kind written. ' + KNOW.map(function (k, i) { return k[0] + ' ' + rowsK.filter(function (r) { return r.cells[i]; }).length; }).join(', ') + '.') + '</p>' +
       rowsK.map(function (r) { return knowledgeHTML(r.c, '<a class="sg-uses-link" href="#' + esc(cid(r.c.name)) + '">' + esc(r.c.name) + '</a>').replace('class="pg-doc pg-knowledge"', 'class="pg-doc pg-knowledge" data-have="' + r.have + '"'); }).join('');
-    docCards(kbox);
+    labelCells(kbox);
   }
   if ((DATA.screens || []).length) {
     hr(); navLink('in-use', 'in use');

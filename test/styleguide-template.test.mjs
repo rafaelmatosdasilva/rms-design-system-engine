@@ -423,8 +423,10 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="docs"] .pg-anatomy')`), false, 'Documentation draws nothing of its own');
     // Do and Don't from the references, each with its caption, the do first.
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
-    // Each section of rows in the Playground's tables: its title the head (Documentation, as the page it matches, then Details).
-    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /^Documentation,/);
+    // Each section of rows in the Playground's tables: its title the head (Documentation, a table as the page it matches,
+    // then Details).
+    assert.equal(await run(`document.querySelector('#c-chip [data-area="docs"] .pg-footer > .pg-doc .pg-inspect-head > h3').textContent`), 'Documentation');
+    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-doc-card > .pg-inspect-head > h3')].map((h) => h.textContent).join()`), /^Details/);
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="play"] .pg-anatomy-doc')`), false, 'no Anatomy card under the Playground');
     // Its header: only its version and when it last changed (with the time), its links at the top right, no issue link.
     assert.doesNotMatch(await run(`(document.querySelector('#c-chip .pg-facts') || {}).textContent || ''`), /Figma|Accessibility|Used in/);
@@ -457,13 +459,15 @@ test('in the browser: no script error, a control changes the real component, the
     }
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
-    // Its Documentation card holds exactly what the Documentation page shows for it, under the same names, in the same
-    // order; a missing one said. Where it is used is its own area, never a kind of documentation.
-    const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge dt')].map((d) => d.textContent).join('|')`);
+    // Its Documentation is a table holding exactly what the Documentation page shows for it, under the same names, in
+    // the same order, each with where it was written; a missing one said. Where it is used is its own area, never a kind
+    // of documentation.
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Kind|What is written|From');
+    const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:first-child')].map((d) => d.textContent).join('|')`);
     assert.equal(kinds, 'What it is|When to use|When not to use|Common mistakes|Limitations|Do and don\'t|Role');
     assert.equal(await run(`document.querySelector('#c-chip .pg-knowledge .pg-inspect-head').textContent`), 'Documentation');
     const pageCard = `[...document.querySelectorAll('#documentation .pg-knowledge')].find((k) => k.querySelector('.pg-inspect-head a').textContent === 'chip')`;
-    assert.equal(await run(`${pageCard}.querySelector('dl').innerHTML`), await run(`document.querySelector('#c-chip .pg-knowledge dl').innerHTML`));
+    assert.equal(await run(`${pageCard}.querySelector('table').outerHTML`), await run(`document.querySelector('#c-chip .pg-knowledge table').outerHTML`));
     assert.match(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet/);
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
     assert.equal(await run(`document.getElementById('sg-menu').textContent + '|' + document.getElementById('sg-nav-close').textContent`), 'Menu|Close menu');
@@ -534,7 +538,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await rowOf('1.4.5'), /^check\|.*Checked it\? Tell Claude chip 1\.4\.5 is checked\./s);
     // The Documentation page: every component's card, its name on the head as on the To do page, the thinnest first;
     // an old link to the Coverage page opens it.
-    const docs = JSON.parse(await run(`JSON.stringify((() => { const cards = [...document.querySelectorAll('#documentation .pg-knowledge')]; return { rows: cards.map((k) => ({ name: k.querySelector('.pg-inspect-head a').textContent, have: +k.dataset.have, kinds: [...k.querySelectorAll('dt')].map((d) => d.textContent) })), sum: document.querySelector('#documentation .pg-par-sum').textContent, nav: [...document.querySelectorAll('#sg-sidebar a')].map((a) => a.textContent.trim()).filter((t) => /documentation|coverage/.test(t)) }; })())`));
+    const docs = JSON.parse(await run(`JSON.stringify((() => { const cards = [...document.querySelectorAll('#documentation .pg-knowledge')]; return { rows: cards.map((k) => ({ name: k.querySelector('.pg-inspect-head a').textContent, have: +k.dataset.have, kinds: [...k.querySelectorAll('tbody td:first-child')].map((d) => d.textContent) })), sum: document.querySelector('#documentation .pg-par-sum').textContent, nav: [...document.querySelectorAll('#sg-sidebar a')].map((a) => a.textContent.trim()).filter((t) => /documentation|coverage/.test(t)) }; })())`));
     assert.deepEqual(docs.rows[0].kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role']);
     assert.ok(docs.rows.some((r) => r.name === 'chip'));
     assert.deepEqual(docs.rows.map((r) => r.have), docs.rows.map((r) => r.have).slice().sort((a, b) => a - b), 'the thinnest first');
