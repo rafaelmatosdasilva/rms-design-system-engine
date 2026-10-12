@@ -113,6 +113,37 @@ test('structure gate: renderedParityStrict makes a measured difference fail the 
   assert.equal(r.code, 1);
 });
 
+test('structure gate: tokens, icons and nesting as the capture read them, against Figma (A11)', async () => {
+  const files = {
+    'ds-config.json': JSON.stringify({ paths: { themeCSS: 'theme.css', snapshotStructure: 'figma-structure.snapshot.json', snapshotVars: 'figma-vars.snapshot.json', snapshotIcons: 'figma-icons.snapshot.json' } }),
+    'theme.css': ':root { --brand: #ff0000; --ink: #111111; }\n.chip { height: 32px; }',
+    'figma-structure.snapshot.json': JSON.stringify({ components: { chip: { h: 32 } } }),
+    'figma-vars.snapshot.json': JSON.stringify({ color: { light: { brand: '#0000ff', ink: '#111111' } } }),
+    'figma-icons.snapshot.json': JSON.stringify({ _updated: 'x', star: { viewBox: '0 0 24 24', paths: ['M1 1'] }, bell: { viewBox: '0 0 24 24', paths: ['M2 2'] } }),
+    'component-composition.snapshot.json': JSON.stringify({ Card: ['Badge', 'Button'] }),
+    'structure-contract.mjs': "export const CONTRACT = { chip: { h: 32 } }; export const COMPONENT_CSS_SELECTORS = { chip: { main: '.chip' } };",
+  };
+  const { dir } = await withSnapshot(files, (s) => {
+    s.icons = { star: { viewBox: '0 0 16 16', pathHash: 'x', paths: 1, definedAt: ['icons.svg:3'] } };
+    s.nesting = { Card: { instancesSeen: 2, contains: { Badge: { instances: 2 } } } };
+  });
+  const r = run(dir, 'structure-check.mjs');
+  assert.match(r.out, /⚠️  MEASURED TOKENS 1 .*advisory/, r.out);
+  assert.match(r.out, /brand \[light\] → --brand: Figma #0000ff, code #ff0000/);
+  assert.match(r.out, /⚠️  MEASURED ICONS 2/);
+  assert.match(r.out, /#star: viewBox Figma 0 0 24 24, code 0 0 16 16/);
+  assert.match(r.out, /#bell: Figma has it, the code's sprite does not/);
+  assert.match(r.out, /⚠️  MEASURED NESTING 1/);
+  assert.match(r.out, /Card → Button: Figma nests it, the code not inside any of 2 rendered instance\(s\)/);
+  assert.equal(r.code, 0, 'advisory only');
+  // ds-config.json → renderedParityStrict: true makes them fail the gate.
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, renderedParityStrict: true }));
+  const strict = run(dir, 'structure-check.mjs');
+  assert.match(strict.out, /❌ MEASURED TOKENS 1/, strict.out);
+  assert.equal(strict.code, 1);
+});
+
 test('docs truth: a documentation surface that is not there is not a pass, and a moved style guide is named', () => {
   const cfg = { paths: { themeCSS: 'theme.css' }, docs: { surfaces: ['apps/styleguide/index.html'] }, styleguide: { out: 'apps/style-guide/index.html' } };
   const r = runGate('docs-truth-check.mjs', { 'ds-config.json': cfg, 'theme.css': ':root { --a: 1px; }', 'apps/style-guide/index.html': '<p>doc</p>' });
