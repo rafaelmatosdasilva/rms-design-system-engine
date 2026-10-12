@@ -1804,9 +1804,9 @@ async function main() {
     }
   }
 
-  // A Vue design system's components, rendered with the project's own Vite in each of their variants (Figma's, else
-  // the code's props), beside whatever pages are checked: every variant, every run, wherever its pages show it or not
-  // (E28). Scoped to the components asked for; a11y.harness:false turns it off.
+  // A Vue design system's components, rendered with the project's own build (Vite, Nuxt, Vue CLI or webpack) in each
+  // of their variants (Figma's, else the code's props), beside whatever pages are checked: every variant, every run,
+  // wherever its pages show it or not (E28, E34). Scoped to the components asked for; a11y.harness:false turns it off.
   if (!urlList.length && !harness && cfg.a11y?.harness !== false && findChrome()) {   // without Chrome nothing is tried
     try {
       const { componentSourceFiles, resolveComponentFile, textReader, codeComponents } = await import('./component-source.mjs');
@@ -1826,8 +1826,8 @@ async function main() {
         const v = await startVueHarness(ROOT, cfg, names, { propsSnap, read, locate: (n) => ownFile.get(n) ?? locate(n) });
         if (v.url) {
           const before = stopServer; stopServer = () => { before?.(); v.close(); };
-          targets.push({ label: 'the Vue components, rendered with the project\'s own Vite', url: v.url, ready: 'window.__dseHarnessReady === true', harness: true });
-          console.log(`ℹ️  [a11y] target: ${v.groups.length} Vue component(s) rendered with the project's own Vite in each variant (${v.groups.map((g) => `${g.name}: ${g.cases.length} from ${g.from === 'figma' ? 'Figma' : 'its props'}`).join(', ')})`);
+          targets.push({ label: `the Vue components, rendered with the project's own ${v.build}`, url: v.url, ready: 'window.__dseHarnessReady === true', harness: true });
+          console.log(`ℹ️  [a11y] target: ${v.groups.length} Vue component(s) rendered with the project's own ${v.build} in each variant (${v.groups.map((g) => `${g.name}: ${g.cases.length} from ${g.from === 'figma' ? 'Figma' : 'its props'}`).join(', ')})`);
           for (const m of v.missing) console.log(`ℹ️  [a11y] not rendered: ${m}`);
         } else if (v.why) console.log(`ℹ️  [a11y] the Vue components were not rendered from their code: ${v.why}.`);
       }

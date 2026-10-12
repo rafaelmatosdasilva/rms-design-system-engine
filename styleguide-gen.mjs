@@ -302,6 +302,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // A component the pages do not show: the markup its own source renders, as the code capture draws it (what a React
     // component returns, a Vue component's template).
     const jsx = {};
+    const vueRenders = {};   // a Vue component's every variant as its build renders it: [{ props, markup }] (E35)
     const fileOf = {};   // each component's own file, read for the components it nests (a scoped page, E27)
     // The components the code has that Figma does not list (every one, before Figma's data is captured): each with its
     // file, the props its code declares and the markup its source renders (codeComponents, E26).
@@ -336,20 +337,37 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         fileOf[k.name] = abs;
         if (/\.vue$/.test(k.file)) vueFiles[k.name] = abs;
       }
-      // A Vue component drawn from what the project's own Vite renders, its SCSS compiled (vue-harness.mjs), once its
-      // packages are installed; the markup read from its template stays when it cannot be rendered.
+      // A Vue component drawn from what the project's own build renders (Vite, Nuxt, Vue CLI or webpack), its SCSS
+      // compiled (vue-harness.mjs), once its packages are installed; the markup read from its template stays when it
+      // cannot be rendered.
       // ds-config.json → styleguide.renderVue: false keeps the template read.
-      if (Object.keys(vueFiles).length && cfg.styleguide?.renderVue !== false) {
+      // A page for one component (opts.only) renders only it and what it nests, followed in turn (E35), read from their
+      // sources before anything is rendered.
+      let toRender = Object.keys(vueFiles);
+      if (opts.only?.length && toRender.length) {
+        const { nestedComponents, scopeView } = await import('./styleguide-data.mjs');
+        const own = (n) => codeOnly.find((k) => k.name === n);
+        const all = [...new Set([...drawNames.filter((n) => !n.startsWith('_')), ...codeOnly.map((k) => k.name)])].map((n) => ({ name: n, cls: String(own(n)?.cls ?? locator.classFor(n) ?? '').replace(/^\./, '') || null, markup: jsx[n] ?? own(n)?.markup ?? '' }));
+        const tags = Object.fromEntries(Object.entries(fileOf).map(([n, f]) => [n, [basename(f).replace(/\.\w+$/, '')]]));
+        const kept = new Set(scopeView(all, opts.only, (c, names) => nestedComponents({ name: c.name, cls: c.cls, markup: c.markup, text: fileOf[c.name] ? read(resolve(ROOT, fileOf[c.name])) : '', names, tags })).components.map((c) => c.name));
+        toRender = toRender.filter((n) => kept.has(n));
+      }
+      if (toRender.length && cfg.styleguide?.renderVue !== false) {
         const { renderedVue } = await import('./vue-harness.mjs');
-        const r = await renderedVue(ROOT, cfg, Object.keys(vueFiles), { propsSnap, read, locate: (n) => vueFiles[n] ?? null });
+        // Every variant it has (Figma's, else its own props'), so the Playground draws each as it renders (E35).
+        const r = await renderedVue(ROOT, cfg, toRender, { propsSnap, read, locate: (n) => vueFiles[n] ?? null, max: cfg.a11y?.maxVariants ?? 16 });
         const holds = (m, cls) => !cls || new RegExp(`class="[^"]*(?<![\\w-])${String(cls).replace(/^\./, '').replace(/[^\w-]/g, '')}(?![\\w-])`).test(m.slice(0, m.indexOf('>') + 1));
         for (const [name, m] of Object.entries(r.markup)) {
           const own = codeOnly.find((k) => k.name === name);
           if (own) { if (holds(m, own.cls)) { own.markup = m; own.from = 'vue-build'; } }
-          else if (holds(m, locator.classFor(name))) jsx[name] = m;
+          else if (holds(m, locator.classFor(name))) {
+            jsx[name] = m;
+            const each = (r.cases[name] ?? []).filter((c) => holds(c.markup, locator.classFor(name)));
+            if (new Set(each.map((c) => c.markup)).size > 1) vueRenders[name] = each.map((c) => ({ props: c.props, markup: c.markup }));
+          }
         }
         vueCss = r.css;
-        vueRender = { rendered: Object.keys(r.markup).length, of: Object.keys(vueFiles).length, why: r.why ?? null, failed: r.failed };
+        vueRender = { rendered: Object.keys(r.markup).length, of: toRender.length, why: r.why ?? null, failed: r.failed, build: r.build ?? null };
       }
     } catch { /* no component sources */ }
     // The token check's own result: each token equal to Figma, with its CSS variable. Run it, read it, tidy up.
@@ -373,7 +391,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const { loadCategories, requirementEntry, noteIsTodo } = await import('./annotation-categories.mjs');
     const cats = loadCategories(ROOT, cfg);
     const view = agreedView({ cats, propsSnap, rows, agreedRecord: loadAgreed(ROOT), classFor: (n) => locator.classFor(n), cssText, probes, probeList, unbuilt: [...await inProgressNames(ROOT, cfg)], cfg,
-      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, codeOnly, alsoNames: [...new Set([...(opts.names ?? []), ...structNames])], themeCss: themeFiles.map(readText).join('\n'),
+      check, figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, pages, usage, notes: code, icons, title, jsx, renders: vueRenders, codeOnly, alsoNames: [...new Set([...(opts.names ?? []), ...structNames])], themeCss: themeFiles.map(readText).join('\n'),
       // A contract entry named apart from its Figma component (figmaName) maps that component's props too.
       propertyMaps: Object.fromEntries(Object.entries(contract.CONTRACT ?? {}).filter(([, c]) => c?.propertyMap).flatMap(([n, c]) => [[n, c.propertyMap], ...(c.figmaName && c.figmaName !== n && !contract.CONTRACT[c.figmaName]?.propertyMap ? [[c.figmaName, c.propertyMap]] : [])])),
       // An option heard on a part (heardOn: the field disabled inside its wrapper), set with the option's look.
