@@ -9,7 +9,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseGitlabProject, untar, syncGitlab, describe, mirrorDir, projectFromState, STATE_FILE } from '../gitlab-source.mjs';
+import { parseGitlabProject, untar, syncGitlab, describe, mirrorDir, projectFromState, plainGet, STATE_FILE } from '../gitlab-source.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -168,6 +168,8 @@ test('the engine run end to end: --project=<GitLab link> sets up the mirror, rem
   const server = createServer((req, res) => {
     seen.push({ url: req.url, token: req.headers['private-token'] ?? null });
     const u = new URL(req.url, 'http://x');
+    // As GitLab does: an archive asked for with the browser header Node's fetch adds is refused.
+    if (u.pathname.endsWith('/repository/archive.tar.gz') && req.headers['sec-fetch-mode']) { res.statusCode = 406; res.end('{"message":"406 Not Acceptable"}'); return; }
     if (u.pathname.endsWith('/repository/archive.tar.gz')) { res.end(archives[u.searchParams.get('sha')]); return; }
     res.setHeader('content-type', 'application/json');
     if (u.pathname.includes('/repository/commits/')) { res.end(JSON.stringify({ id: head, title: 'Release', committed_date: '2026-05-06T07:08:09Z' })); return; }
@@ -192,4 +194,28 @@ test('the engine run end to end: --project=<GitLab link> sets up the mirror, rem
     assert.match(again.out, /fetched \(was ffffffff\)/, 'a remembered GitLab project is brought up to date before the run');
     assert.equal(readFileSync(join(from, 'ui-kit', 'src', 'theme.css'), 'utf8'), ':root { --a: #000; }');
   } finally { server.close(); }
+});
+
+test('the mirror downloads with a plain GET: no browser headers, redirects followed, the token kept to its own host', async () => {
+  const seen = [];
+  const other = createServer((req, res) => { seen.push({ at: 'other', token: req.headers['private-token'] ?? null }); res.end('moved here'); });
+  await new Promise((ok) => other.listen(0, '127.0.0.1', ok));
+  const server = createServer((req, res) => {
+    seen.push({ at: 'main', url: req.url, token: req.headers['private-token'] ?? null, fetchMode: req.headers['sec-fetch-mode'] ?? null });
+    if (req.url === '/same') { res.statusCode = 302; res.setHeader('location', '/json'); res.end(); return; }
+    if (req.url === '/away') { res.statusCode = 302; res.setHeader('location', `http://localhost:${other.address().port}/x`); res.end(); return; }
+    res.setHeader('content-type', 'application/json'); res.end('{"a":1}');
+  });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  const at = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const r = await plainGet(`${at}/same`, { headers: { 'PRIVATE-TOKEN': 'glpat-x' } });
+    assert.equal(r.status, 200); assert.deepEqual(await r.json(), { a: 1 });
+    assert.ok(seen.filter((s) => s.at === 'main').every((s) => s.token === 'glpat-x' && s.fetchMode === null), 'the token on its own host, and no Sec-Fetch-Mode');
+    const away = await plainGet(`${at}/away`, { headers: { 'PRIVATE-TOKEN': 'glpat-x' } });
+    assert.equal(Buffer.from(await away.arrayBuffer()).toString(), 'moved here');
+    assert.deepEqual(seen.filter((s) => s.at === 'other').map((s) => s.token), [null], 'a redirect to another host does not carry the token');
+    const missing = await plainGet('http://127.0.0.1:1/', {}).catch((e) => e);
+    assert.ok(missing instanceof Error, 'a refused connection is an error the caller turns into "could not reach"');
+  } finally { server.close(); other.close(); }
 });
