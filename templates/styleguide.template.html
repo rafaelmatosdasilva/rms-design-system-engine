@@ -111,7 +111,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
    corners and shadow), every bar a track and a fill in the system's own colours. */
 :where(.sg-health-tile, .sg-health-top, .sg-health-card, .sg-health-list > li, .sg-health) > :where(p, h3, ol) { margin: 0; }
 /* Each card's label, and at its top right the system's own tip trigger saying how its number is counted. */
-.sg-health-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sg-space-s); }
+.sg-health-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); }
 .sg-health-how { font-size: var(--sg-s); color: var(--sg-text-2); }
 .sg-health-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sg-space-l); margin-bottom: var(--sg-space-l); }
 @media (max-width: 640px) { .sg-health-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -121,7 +121,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-health-num { font-size: calc(var(--sg-h1) * 2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); font-variant-numeric: tabular-nums; }
 .sg-health-num small { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); margin-left: var(--sg-space-xs); }
 .sg-health-sub { font-size: var(--sg-s); color: var(--sg-text-2); }
-.sg-health-bar { display: block; height: var(--sg-space-xs); border-radius: var(--sg-radius-pill); background: color-mix(in srgb, var(--sg-border) 30%, transparent); overflow: hidden; }
+.sg-health-bar { display: block; height: calc(var(--sg-space-xs) * 2); border-radius: var(--sg-radius-pill); background: color-mix(in srgb, var(--sg-border) 30%, transparent); overflow: hidden; }
 .sg-health-bar > span { display: block; height: 100%; background: var(--sg-text); }
 .sg-health-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); }
 .sg-health-list > li { display: flex; flex-direction: column; gap: var(--sg-space-xs); }
@@ -1043,10 +1043,10 @@ a.pg-usage-name { color: var(--sg-text); }
   // components with the most left (fillHealth, from the rows the Tasks page lists). No task is listed here: they are
   // on the Tasks page.
   hr(); navLink('health', 'health');
-  var hl = section('health', 'Health', 'How the system is doing', 'How far each area has come, weighted into one number, how ready the components are for AI agents, and the components with the most left. The tasks themselves are on the Tasks page.');
+  var hl = section('health', 'Health', 'How the system is doing', 'Each area\'s progress and the components with the most left. The tasks are on the Tasks page.');
   // The Tasks page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
   hr(); navLink('tasks', 'tasks');
-  var td = section('tasks', 'Tasks', 'What to do', 'Every open task, one kind at a time (parity, motion, documentation, accessibility and the rest), by component, with who handles each one (you in Figma, Claude in code, or a check by hand). Then tell Claude which ones to do, for example, do 3 and 7.');
+  var td = section('tasks', 'Tasks', 'What to do', 'Everything still open, by component, with who does each one. Tell Claude which to do, for example do 3 and 7.');
   // Changelog: every component's changes gathered by the release they shipped in, newest first, each a table of
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
