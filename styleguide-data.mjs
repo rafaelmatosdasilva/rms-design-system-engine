@@ -1503,19 +1503,6 @@ export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], 
   return rows;
 }
 
-// ── Where a person reports a problem: an issue about one component, or feedback on the page ────────────────────────
-// template: ds-config styleguide.issues, the tracker's new-issue address with {name} for the component and {title} for a
-// ready title ("https://redmine.example.com/projects/ds/issues/new?issue[subject]={title}"). Without one, the repository's
-// own tracker when it is on GitHub or GitLab. name: the component, or null for the page. → url | null
-export function issueLink({ template = null, repo = null, name = null } = {}) {
-  const title = name ? `${name}: ` : 'Style guide: ';
-  if (template) return String(template).replace(/\{name\}/g, encodeURIComponent(name ?? '')).replace(/\{title\}/g, encodeURIComponent(title));
-  if (!repo) return null;
-  if (/github\.com/i.test(repo)) return `${repo.replace(/\/$/, '')}/issues/new?title=${encodeURIComponent(title)}`;
-  if (/gitlab/i.test(repo)) return `${repo.replace(/\/$/, '')}/-/issues/new?issue[title]=${encodeURIComponent(title)}`;
-  return null;
-}
-
 // ── How a product brings the component in ─────────────────────────────────────────────────────────────────────────
 // tag, syntax: component-api.mjs callName · file: its path from the project root · text: its source · pkg: { name, dir }
 // of the package the file belongs to, when it is not the project itself · template: ds-config styleguide.importFrom

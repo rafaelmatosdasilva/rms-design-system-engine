@@ -910,6 +910,48 @@ if (Object.keys(components).length) {
   }
 }
 
+// ── Gate [3c], fills: a surface Figma does not have ─────────────────────────
+// The fill counterpart of phantom borders. A component Figma draws with no fill in any variant (no fill on it or on a
+// layer behind its content, no fill variable in any state) that a rule paints a background on: the component itself,
+// its ::before or ::after, in any state, from the system's CSS or a product's (a product rule that gives the system's
+// empty state a band of colour). A rule on a part inside the component is the part's, not the component's surface.
+// Exceptions: add selector strings to ds-config.json → knownPhantomFillExceptions.
+const PHANTOM_FILL_FAIL = [], PHANTOM_FILL_PASS = [];
+const PHANTOM_FILL_SKIP = new Set(cfg.knownPhantomFillExceptions ?? []);
+// No paint: none, transparent, or a value that takes the paint from elsewhere.
+const NO_FILL_VAL_RE = /^\s*(?:none|transparent|inherit|initial|unset|revert)\s*(?:!important)?\s*$|^\s*(?:none\s+)?transparent\b/i;
+// A variant with a Background layer has a fill there, bound to a variable or not (a swatch's colour is the page's).
+const drawsNoFill = (snap) => snap.fillStructure === 'none' && !(snap.fills?.length) && !snap.colors?.fill
+  && !Object.values(snap.variants ?? {}).some((v) => (v.layers ?? []).some((l) => /^background$/i.test(String(l).trim())));
+// The components Figma nests in one (its switches show them: a status bar's dividerLine). A paint made only of a nested
+// component's tokens is that part, drawn by CSS (a divider as a ::after line), not the component's surface.
+const partKeys = (snap) => [...new Set(Object.values(snap.toggles ?? {}).flat().map((n) => String(n).toLowerCase().replace(/[^a-z0-9]/g, '')).filter(Boolean))];
+const paintsAPart = (val, parts) => { const vars = [...val.matchAll(/var\(\s*--([\w-]+)/g)].map((m) => m[1].toLowerCase().replace(/[^a-z0-9]/g, '')); return vars.length > 0 && vars.every((v) => parts.some((p) => v.startsWith(p))); };
+
+if (Object.keys(components).length) {
+  const located = Object.keys(components).filter((c) => !c.startsWith('_')).map((comp) => [comp, COMPONENT_CSS_SELECTORS[comp] ?? { main: LOCATOR.selectorFor(comp) }]).filter(([, sc]) => sc?.main && /^[.]/.test(sc.main));
+  for (const [comp, selCfg] of located) {
+    const snapComp = components[comp];
+    if (!snapComp || !drawsNoFill(snapComp)) continue;
+    const baseClass = selCfg.main.match(/(\.[a-zA-Z][\w-]*)/)?.[1];
+    if (!baseClass) continue;
+    const ownClass = new RegExp(baseClass.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])');
+    let found = false;
+    for (const [sel, block] of allRuleList) {
+      // The rule's subject (its last compound) must be the component itself, its ::before or its ::after.
+      const subject = sel.split(/\s*[\s>+~]\s*(?![^[(]*[\])])/).pop() ?? '';
+      if (!ownClass.test(subject)) continue;
+      if (PHANTOM_FILL_SKIP.has(sel)) { PHANTOM_FILL_PASS.push(`${comp}: "${sel}" (exempted)`); continue; }
+      const parts = partKeys(snapComp);
+      const paint = [...block.matchAll(/\bbackground(?:-color|-image)?\s*:\s*([^;]+)/gi)].map((m) => [m[0].split(':')[0].trim(), m[1].trim()]).find(([, v]) => !NO_FILL_VAL_RE.test(v) && !paintsAPart(v, parts));
+      if (!paint) continue;
+      found = true;
+      PHANTOM_FILL_FAIL.push(`${comp}: "${sel}" has \`${paint[0]}: ${paint[1].slice(0, 60)}\` - Figma draws ${comp} with no fill in any variant`);
+    }
+    if (!found) PHANTOM_FILL_PASS.push(`${comp} (no fill Figma lacks)`);
+  }
+}
+
 // ── Gate [3k]: Stroke-width token binding ────────────────────────────────────
 // Components with strokeOnDefault=true must use a CSS var for the border-width
 // segment, not a hardcoded literal like "1.5px". Checks the default-state selector.
@@ -1577,6 +1619,17 @@ if (Object.keys(COMPONENT_CSS_SELECTORS).length) {
     console.log('   Exemptions: add the selector string to ds-config.json → knownPhantomBorderExceptions');
   }
 
+  if (PHANTOM_FILL_PASS.length + PHANTOM_FILL_FAIL.length > 0) {
+    console.log(`\n✅ PASS  ${PHANTOM_FILL_PASS.length} component(s) - no fill Figma does not have`);
+    console.log(`❌ FAIL  ${PHANTOM_FILL_FAIL.length} phantom fill(s)`);
+    if (PHANTOM_FILL_FAIL.length) {
+      console.log('\n─── Gate [3c] - CSS paints a background but Figma has no fill ──────');
+      for (const f of PHANTOM_FILL_FAIL) console.log(`  ❌ ${f}`);
+      console.log('   Fix: remove the background from CSS, or add the fill to Figma.');
+      console.log('   Exemptions: add the selector string to ds-config.json → knownPhantomFillExceptions');
+    }
+  }
+
   if (STROKE_WIDTH_PASS.length || STROKE_WIDTH_FAIL.length) {
     const swTotal = STROKE_WIDTH_PASS.length + STROKE_WIDTH_FAIL.length;
     console.log(`\n✅ PASS  ${STROKE_WIDTH_PASS.length}/${swTotal} stroke-width token bindings`);
@@ -1884,7 +1937,7 @@ if (STATE_GEOM_PASS.length + STATE_GEOM_FAIL.length > 0) {
 
 const anyFail = FAIL.length > 0 || MISSING.length > 0 || UNCONTRACTED.length > 0 || CSS_FAIL.length > 0
              || VAR_FAIL.length > 0 || SELECTOR_FAIL.length > 0 || PROP_FAIL.length > 0
-             || PHANTOM_FAIL.length > 0 || PILL_FAIL.length > 0
+             || PHANTOM_FAIL.length > 0 || PHANTOM_FILL_FAIL.length > 0 || PILL_FAIL.length > 0
              || BSIDES_FAIL.length > 0 || ASSERT_FAIL.length > 0 || CHILD_FAIL.length > 0
              || CPROP_FAIL.length > 0 || CANN_FAIL.length > 0 || SURF_FAIL.length > 0
              || BCLASS_FAIL.length > 0 || STATE_GEOM_FAIL.length > 0

@@ -28,13 +28,15 @@ function lcs(a, b) {
 
 // Each instance on a screen with the instance it sits in (its scope), and the ones that are that instance's own parts:
 // a component inside another and outside its slots is drawn by that component (a status bar's divider), not placed by
-// the screen; what a slot holds is the screen's. The screen itself, even when it is an instance, is no one's scope.
-export function screenScopes(tree) {
+// the screen; what a slot holds is the screen's. The screen itself, even when it is an instance, is no one's scope, and
+// so is a product's own frame drawn as an instance (isSystem says which instances are the system's components): what
+// it holds is the screen's.
+export function screenScopes(tree, { isSystem = null } = {}) {
   const scope = new Map(), own = new Set();
   const walk = (n, owner, inSlot, depth) => {
     if (!n || typeof n !== 'object') return;
     if (depth > 0 && n.kind === 'instance') { scope.set(n, owner); if (owner && !inSlot) own.add(n); }
-    const holder = depth > 0 && n.kind === 'instance';
+    const holder = depth > 0 && n.kind === 'instance' && (!isSystem || isSystem(n.component));
     for (const k of n.children ?? []) walk(k, holder ? n : owner, holder ? false : inSlot || n.type === 'SLOT', depth + 1);
   };
   walk(tree, null, false, 0);
@@ -45,16 +47,40 @@ export function screenScopes(tree) {
 // components, both from the screen's top left corner); a screen's instance may name its scope (screenScopes), and only
 // components in the same scope are neighbours: a switch in the side panel and a badge in the status bar beside it are
 // not. → [{ kind, component, message }]
-export function screenFindings(screenName, figma, page, { tolerance = 2 } = {}) {
+// How far the page as a whole sits from the screen (a window title bar Figma draws above the page): the shift the
+// components found once on each side share. → { dx, dy }
+export function pageShift(figma, page) {
+  const names = [...new Set([...figma, ...page].map((b) => b.component))];
+  const median = (v) => { const a = [...v].sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
+  const once = names.filter((n) => figma.filter((b) => b.component === n).length === 1 && page.filter((b) => b.component === n).length === 1);
+  return {
+    dx: median(once.map((n) => page.find((b) => b.component === n).x - figma.find((b) => b.component === n).x)),
+    dy: median(once.map((n) => page.find((b) => b.component === n).y - figma.find((b) => b.component === n).y)),
+  };
+}
+
+// Where a screen's answer was cut (too large for one answer, read without its deepest layers): the places the screen
+// does not say what holds. → [{ x, y, w, h }]
+export function cutPlaces(tree) {
+  const out = [];
+  const walk = (n, depth) => {
+    if (!n || typeof n !== 'object') return;
+    if (depth > 0 && n.cut && [n.x, n.y, n.w, n.h].every(Number.isFinite)) out.push({ x: n.x, y: n.y, w: n.w, h: n.h });
+    for (const k of n.children ?? []) walk(k, depth + 1);
+  };
+  walk(tree, 0);
+  return out;
+}
+
+// maxGap: the widest gap the screen's layouts use. A wider space between two side by side is a row's free space, its
+// two ends pushed apart, and takes up whatever the text before it draws wider or narrower in Chrome than in Figma (each
+// word a fraction of a pixel): it is allowed 2% of what sits before it in its row, past the tolerance. A gap stays exact.
+export function screenFindings(screenName, figma, page, { tolerance = 2, maxGap = 32 } = {}) {
   const out = [];
   const F = readingOrder(figma), P = readingOrder(page);
   const names = [...new Set([...F, ...P].map((b) => b.component))];
-  // How far the page as a whole sits from the screen (a window title bar Figma draws above the page): the shift the
-  // components found once on each side share, taken off before same-named ones are paired by where they sit.
-  const median = (v) => { const a = [...v].sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
-  const once = names.filter((n) => F.filter((b) => b.component === n).length === 1 && P.filter((b) => b.component === n).length === 1);
-  const dx = median(once.map((n) => P.find((b) => b.component === n).x - F.find((b) => b.component === n).x));
-  const dy = median(once.map((n) => P.find((b) => b.component === n).y - F.find((b) => b.component === n).y));
+  // The page's shift is taken off before same-named ones are paired by where they sit.
+  const { dx, dy } = pageShift(F, P);
   const pairs = [];
   for (const name of names) {
     const f = F.filter((b) => b.component === name), p = P.filter((b) => b.component === name);
@@ -112,7 +138,9 @@ export function screenFindings(screenName, figma, page, { tolerance = 2 } = {}) 
       if (Math.abs(A.f.x - B.f.x) <= 1 && Math.abs(A.p.x - B.p.x) > tolerance) out.push({ kind: 'align', component: B.component, message: `${B.component} starts ${round(B.p.x - A.p.x)}px from ${A.component}'s left edge on the page; on "${screenName}" they line up` });
     } else if (along && B.f.x >= A.f.x + A.f.w - 1) {   // side by side
       const fg = B.f.x - (A.f.x + A.f.w), pg = B.p.x - (A.p.x + A.p.w);
-      if (Math.abs(fg - pg) > tolerance) out.push({ kind: 'space', component: B.component, message: `the space between ${A.component} and the ${B.component} beside it is ${round(pg)}px on the page, ${round(fg)}px on "${screenName}"` });
+      const rowStart = Number.isFinite(B.f.scope?.x) ? B.f.scope.x : 0;
+      const slack = fg > maxGap ? 0.02 * Math.max(0, A.f.x + A.f.w - rowStart) : 0;
+      if (Math.abs(fg - pg) > tolerance + slack) out.push({ kind: 'space', component: B.component, message: `the space between ${A.component} and the ${B.component} beside it is ${round(pg)}px on the page, ${round(fg)}px on "${screenName}"` });
     }
   }
   return out;
@@ -199,7 +227,8 @@ export async function projectScreens(ROOT, cfg = {}, { chromePath = null } = {})
       if (typeof setup === 'string' && /^[\w./-]+\.m?js$/.test(setup.trim()) && existsSync(resolve(ROOT, setup.trim()))) setup = readFileSync(resolve(ROOT, setup.trim()), 'utf8');
       const found = await readPageComponents(send, pathToFileURL(page.file).href, { width: s.tree?.w, height: s.tree?.h, sw: colour ? modeSwitch(colour) : null, classes, setup });
       if (!found) { out.notCompared.push(`"${s.name}" (${page.file} did not load)`); continue; }
-      const { scope, own } = screenScopes(s.tree ?? {});
+      const isSystem = (c) => names.some((n) => key(n) === key(c));
+      const { scope, own } = screenScopes(s.tree ?? {}, { isSystem });
       // A screen that is itself one of the system's components (an overlay holding a modal or a loader) is a layer
       // drawn over the page: only what it holds is compared, and on the page only what sits inside that.
       const layer = s.tree?.kind === 'instance' && names.some((n) => key(n) === key(s.tree.component));
@@ -209,14 +238,25 @@ export async function projectScreens(ROOT, cfg = {}, { chromePath = null } = {})
       // The same parts on the page: a component inside one whose own part it is on the screen (the button an empty
       // state draws) is that component's, not the page's.
       const ownParts = new Set([...own].map((n) => `${key(scope.get(n)?.component)}>${key(n.component)}`));
-      const pageFound = found.filter((b) => !(b.inside && ownParts.has(`${key(b.inside)}>${key(b.component)}`)))
+      let pageFound = found.filter((b) => !(b.inside && ownParts.has(`${key(b.inside)}>${key(b.component)}`)))
         .filter((b) => !held || held.has(key(b.component)) || (b.within ?? []).some((w) => held.has(key(w))));
+      // Where the screen's answer was cut, the screen does not say what is there: what the page draws in those places
+      // is left out too, its shift from the screen taken off.
+      const cuts = cutPlaces(s.tree ?? {});
+      if (cuts.length) {
+        const { dx, dy } = pageShift(figma, pageFound);
+        const inCut = (b) => { const cx = b.x + b.w / 2 - dx, cy = b.y + b.h / 2 - dy; return cuts.some((c) => cx >= c.x && cx <= c.x + c.w && cy >= c.y && cy <= c.y + c.h); };
+        pageFound = pageFound.filter((b) => !inCut(b));
+      }
+      // The widest gap the screen's layouts use: a wider space is a row's free space.
+      let maxGap = 32;
+      (function gaps(n) { if (!n || typeof n !== 'object') return; if (Number.isFinite(n.gap) && n.gap > maxGap) maxGap = n.gap; for (const k of n.children ?? []) gaps(k); })(s.tree);
       // A page that opens in another state than the screen (empty before its data comes, a screen drawn with a list
       // loaded) would list every difference of that state: said once instead, with how to give it the screen's state.
       const kinds = new Set(figma.map((b) => b.component)), shown = new Set(pageFound.map((b) => b.component));
       const both = [...kinds].filter((k) => shown.has(k)).length, gone = kinds.size - both;
       if (gone >= 3 && gone / kinds.size > 1 / 3) { out.notCompared.push(`"${s.name}" (${product}'s page opens in another state: it shows ${both} of the screen's ${kinds.size} components${setup ? ', after its setup' : ''}. Give the screen a setup in ds-config.json (its frames or screens entry), a script that puts the page in the screen's state)`); continue; }
-      out.screens.push({ name: s.name, product, page: page.file.replace(ROOT + '/', ''), width: s.tree?.w ?? null, findings: screenFindings(s.name, figma, pageFound.map(({ inside, within, ...b }) => b)) });
+      out.screens.push({ name: s.name, product, page: page.file.replace(ROOT + '/', ''), width: s.tree?.w ?? null, findings: screenFindings(s.name, figma, pageFound.map(({ inside, within, ...b }) => b), { maxGap }) });
     }
     close();
   } finally { browser.kill(); }
