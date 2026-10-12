@@ -9,11 +9,12 @@ import {
   styleguideTarget, A11Y_GUIDE, a11yItemLine, a11yFindingRecord, summarizeAxe,
   iconContrastFindings, namedByTitleOnly, SETTLE_TRANSITIONS, STATE_CLASSES, stateHeard,
 } from '../a11y-check.mjs';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { join, dirname } from 'node:path';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('[axe] summarizeAxe collapses per-node rows into one per rule, busiest first', () => {
   const s = summarizeAxe([
@@ -314,4 +315,16 @@ test('a component looked for by a class the code never gives an element is said 
   assert.equal(classInCode(code, '.button-primary'), true, 'a CSS selector');
   assert.equal(classInCode(code, '.segmented button'), true, 'not one plain class: taken as present');
   assert.deepEqual(classesLike(code, ['modal']), ['.modal-wrapper', '.modal-title']);
+});
+
+test('[axe] V1: the pinned copy is kept under the home cache and fetched by --fetch-axe, which the install and --update run', async () => {
+  const { axeCachePath, axeCached } = await import('../a11y-check.mjs');
+  const home = mkdtempSync(join(tmpdir(), 'axe-home-'));
+  assert.match(axeCachePath(home), /\.cache\/rms-design-system-engine\/axe-[\d.]+\.min\.js$/);
+  assert.equal(axeCached(home), null, 'nothing kept yet');
+  mkdirSync(dirname(axeCachePath(home)), { recursive: true });
+  writeFileSync(axeCachePath(home), 'not axe');
+  assert.equal(axeCached(home), null, 'a file that is not the pinned one does not count');
+  assert.match(readFileSync(join(ENGINE, 'install.sh'), 'utf8'), /node "\$CLONE_DIR\/a11y-check\.mjs" --fetch-axe \|\| true/);
+  assert.match(readFileSync(join(ENGINE, 'audit.mjs'), 'utf8'), /'a11y-check\.mjs'\), '--fetch-axe'\]/);
 });

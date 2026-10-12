@@ -61,7 +61,7 @@ export function printDoc(engineDir, kind, name, log = console.log) {
 }
 
 // The install, row by row: [{ ok, what, fix }].
-export function doctor({ engineDir, projectDir, home = process.env.HOME ?? '', nodeVersion = process.versions.node, findChrome = () => null, hooksStatus = () => ({ installed: false }) } = {}) {
+export function doctor({ engineDir, projectDir, home = process.env.HOME ?? '', nodeVersion = process.versions.node, findChrome = () => null, hooksStatus = () => ({ installed: false }), axeReady = null } = {}) {
   const rows = [];
   const add = (ok, what, fix) => rows.push({ ok, what, fix: ok ? null : fix });
   const major = Number(String(nodeVersion).split('.')[0]);
@@ -79,6 +79,8 @@ export function doctor({ engineDir, projectDir, home = process.env.HOME ?? '', n
   add(!indexed || recipes.length > 0, indexed ? `${recipes.length} recipes beside the engine` : 'the guide holds everything (no recipes in this version)', 'the cookbook/ folder is missing: run rms-design-system-engine --update');
   const chrome = findChrome();
   add(!!chrome, chrome ? `Chrome: ${chrome}` : 'Chrome not found', 'install Chrome or Chromium, or set CHROME_PATH (the browser reading and the accessibility check need it)');
+  // The accessibility scanner, kept beside the engine so a check offline still runs every rule.
+  if (axeReady) { const at = axeReady(); add(!!at, at ? `axe-core: ${at}` : 'axe-core not fetched yet', 'run rms-design-system-engine --update (it fetches axe-core, the scanner the accessibility check runs beside its own rules)'); }
   if (projectDir && existsSync(join(projectDir, 'ds-config.json'))) {
     let cfg = {};
     try { cfg = JSON.parse(readFileSync(join(projectDir, 'ds-config.json'), 'utf8')); } catch { add(false, 'ds-config.json', 'ds-config.json is not valid JSON; fix it'); }

@@ -37,6 +37,10 @@ exec node "$CLONE_DIR/audit.mjs" "\$@"
 LAUNCH
 chmod +x "$BIN_DIR/rms-design-system-engine"
 
+# 4. The accessibility scanner (axe-core, pinned and checked), fetched now so the first check runs every rule even
+#    offline. A failure here is not an install failure: the check fetches it on its first run.
+if command -v node >/dev/null; then node "$CLONE_DIR/a11y-check.mjs" --fetch-axe || true; fi
+
 echo ""
 echo "✅  Installed. Command: /rms-design-system-engine   ·   Terminal: rms-design-system-engine"
 if ! echo ":$PATH:" | grep -q ":$BIN_DIR:"; then

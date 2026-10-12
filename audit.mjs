@@ -177,6 +177,8 @@ function updateSkill() {
     console.log(`      git -C "${SCRIPT_DIR}" pull`);
   }
   linkCommand();
+  // The accessibility scanner the check runs (axe-core, pinned), fetched now so a run offline still checks everything.
+  spawnSync(process.execPath, [join(SCRIPT_DIR, 'a11y-check.mjs'), '--fetch-axe'], { stdio: 'inherit', timeout: 60000 });
   const head = describeHead();
   console.log(`\n✅ Done. You are on the latest${head ? `:\n   ${head}` : '.'}`);
   console.log('   Run /rms-design-system-engine to use it.');
@@ -244,7 +246,8 @@ if (process.argv.includes('--guide')) {
 if (process.argv.includes('--doctor')) {
   const { hooksStatus } = await import('./hooks-install.mjs');
   const { findChrome } = await import('./cdp.mjs');
-  const rows = doctor({ engineDir: SCRIPT_DIR, projectDir: ROOT, findChrome: () => findChrome({ playwright: true }), hooksStatus });
+  const { axeCached } = await import('./a11y-check.mjs');
+  const rows = doctor({ engineDir: SCRIPT_DIR, projectDir: ROOT, findChrome: () => findChrome({ playwright: true }), hooksStatus, axeReady: () => axeCached() });
   for (const r of rows) console.log(`${r.ok ? '✅' : '⚠️ '} ${r.what}${r.fix ? `\n   fix: ${r.fix}` : ''}`);
   const bad = rows.filter((r) => !r.ok);
   console.log(bad.length ? `NEXT: ${bad[0].fix}` : 'NEXT: rms-design-system-engine');
@@ -800,7 +803,7 @@ if (process.argv.includes('--figma-edits')) {
   let feConfig = {};
   try { feConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   try {
-    const { figmaEdits, gapEdits, renameEdits, annotationEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const { figmaEdits, gapEdits, renameEdits, annotationEdits, reviewEdits, specEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
     const { annotationUses } = await import('./a11y-check.mjs');
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
     // What the prototypes needed and the system lacks: the design team's to do list.
@@ -813,7 +816,22 @@ if (process.argv.includes('--figma-edits')) {
     let renames = [];
     if (propsSnap && feConfig.namingConsistency !== false) { const { namingFindings } = await import('./naming-consistency.mjs'); renames = renameEdits(propsSnap, namingFindings(propsSnap).findings); }
     const { loadCategories } = await import('./annotation-categories.mjs');
-    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []) : []), ...renames, ...gapEdits(gaps), ...(propsSnap ? annotationEdits(propsSnap, annotationUses, loadCategories(ROOT, feConfig), feConfig) : [])];
+    // W3: each component's accessibility spec as the code gives it, with what a screen reader said (the last check).
+    let heard = {};
+    try { heard = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'a11y.json'), 'utf8')).heard ?? {}; } catch { /* no accessibility check yet */ }
+    const specs = propsSnap ? specEdits(propsSnap, parts.view?.components ?? [], { heard }) : [];
+    const specRole = new Set(specs.filter((e) => e.role).map((e) => e.component));
+    // W2: the designed screens' accessibility findings (--figma-a11y), pinned on their layers.
+    let review = [];
+    try {
+      const sa = await import('./screen-a11y.mjs');
+      const snap = JSON.parse(readFileSync(join(ROOT, feConfig.paths?.screenA11y ?? join(dirname(feConfig.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-a11y.snapshot.json')), 'utf8'));
+      const { annotatedRole } = await import('./design-a11y.mjs');
+      const roles = Object.fromEntries(Object.entries(propsSnap ?? {}).filter(([k, v]) => !k.startsWith('_') && v && typeof v === 'object').map(([k, v]) => [k, annotatedRole(v)]).filter(([, r]) => r));
+      review = reviewEdits(sa.screenA11yFindings(snap, { roles }), snap.screens ?? []);
+    } catch { /* the screens not read for accessibility yet (--figma-a11y) */ }
+    // A role the spec states is not added twice.
+    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []).filter((e) => !(e.kind === 'role' && specRole.has(e.component))) : []), ...specs, ...review, ...renames, ...gapEdits(gaps), ...(propsSnap ? annotationEdits(propsSnap, annotationUses, loadCategories(ROOT, feConfig), feConfig) : [])];
     const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits);
     for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null })) console.log(l);
     if (edits.length) console.log(`   (${relative(ROOT, files.json)} · ${relative(ROOT, files.script)})`);
