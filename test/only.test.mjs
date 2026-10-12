@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
+import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { readGateLabels, parseOnly, onlyWords, onlyHelp } from '../only.mjs';
 import { route, onlyPart } from '../route.mjs';
@@ -103,11 +104,14 @@ test('on the demo design system: one gate, the accessibility check alone, a word
   assert.doesNotMatch(one.out, /♿|🧩|📉/);
   assert.match(one.out, /Only \[3\] Token values ran in this run; nothing else was checked\./);
 
+  // The designed screens, once read (--figma-a11y), are part of accessibility too.
+  writeFileSync(join(dir, 'src', 'figma-screen-a11y.snapshot.json'), JSON.stringify({ screens: [{ id: '1:1', name: 'Checkout', inks: [{ k: 't', fg: [176, 176, 176, 1], on: [[255, 255, 255, 1]], s: 14, w: 400, ex: 'Total', n: 1 }], small: [] }] }));
   const a11y = audit('--only', 'accessibility');
   assert.equal(a11y.code, 0);
   assert.deepEqual(a11y.gates, []);
   assert.match(a11y.out, /ONLY THE ACCESSIBILITY CHECK RAN/);
   assert.match(a11y.out, /♿ Accessibility from the code/);
+  assert.match(a11y.out, /♿ Figma screens, accessibility \(advisory, for whoever keeps the Figma file\): 1 to fix\n\s+Checkout: "Total" is 2\.\d+:1/);
   assert.doesNotMatch(a11y.out, /GATE SUMMARY|🧩/);
 
   const parity = audit('--only', 'parity');

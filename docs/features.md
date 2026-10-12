@@ -171,6 +171,8 @@ Each finding names the component it is in, and the style guide shows each compon
 
 What the design itself owes is listed for whoever keeps the Figma file: an interactive component with no focus state (so the code invents the focus ring), an error state with no message (an error shown by colour alone), a control under 24px. Meanwhile Claude writes a visible focus ring and leaves an error message's words to you.
 
+**The designed screens too.** `rms-design-system-engine --figma-a11y` reads the screens `ds-config.json` names (read only) the way a person sees them: every text and icon on its own, inside every instance, against what is really drawn behind it, see-through layers blended and each colour variable resolved as that layer uses it. Text below 4.5:1 (3:1 when large) and an icon below 3:1 are listed, words on a photo or a gradient are listed to check by eye, and a control drawn under 24 by 24 is listed with its sizes, told from an ornament by its role in your Figma annotations or its name. Notes, specs and redlines laid over a screen, what lies outside it and a disabled control (its Disabled variant, or the whole of it faded to half or less) are left out, as WCAG allows. A screen with no fill of its own is said once, since what sits on it cannot be measured. Every audit with accessibility lists them again until the screens are read afresh.
+
 ## Good to know
 
 - **Which TypeScript reads your components.** Your project's own, else one installed for the whole machine (a global npm folder, `NODE_PATH`, `tsc` on the PATH). Set `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` to use only the project's own, so a run depends on the project alone; the engine's tests do this where they expect none.

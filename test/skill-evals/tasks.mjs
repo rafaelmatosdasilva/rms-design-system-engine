@@ -11,9 +11,11 @@ import { hasEngineRun } from './lib.mjs';
 
 const has = (text, ...parts) => parts.every((p) => (p instanceof RegExp ? p.test(text) : String(text).toLowerCase().includes(String(p).toLowerCase())));
 const check = (name, ok, detail = '') => ({ name, ok: !!ok, detail });
-// The two heights together on one line, not two loose numbers anywhere in the reply. (Not "one sentence":
-// a selector like .tp-chip.tp-chip--l has dots.)
-export const COMBO = /\b36\s*(px)?\b[^\n]{0,160}\b32\s*(px)?\b|\b32\s*(px)?\b[^\n]{0,160}\b36\s*(px)?\b/i;
+// The two heights together on one line, or on two lines in a row when both are in px (Figma: 32px, then
+// Rendered: 36px), not two loose numbers anywhere in the reply. (Not "one sentence": a selector like
+// .tp-chip.tp-chip--l has dots.)
+const pair = (a, b) => `\\b${a}\\s*(px)?\\b[^\\n]{0,160}\\b${b}\\s*(px)?\\b|\\b${a}\\s*px\\b[^\\n]{0,160}\\n[^\\n]{0,160}\\b${b}\\s*px\\b`;
+export const COMBO = new RegExp(`${pair(36, 32)}|${pair(32, 36)}`, 'i');
 const scoped = (ctx, name) => hasEngineRun(ctx, (c) => new RegExp(`--components?(=|\\s+)\\S*\\b${name}\\b`, 'i').test(c));
 const unscoped = (ctx) => hasEngineRun(ctx, (c, f) => !f.some((x) => /^--(component|components|summary|recipe|reference|doctor|help)/.test(x)));
 
