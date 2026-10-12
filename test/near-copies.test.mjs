@@ -89,13 +89,13 @@ test('the audit says it under System health, and the style guide puts it in the 
     const c = await launchChrome(chromePath);
     try {
       const { send, close } = await connectCDP(c.wsUrl);
-      const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}#todo`);
+      const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}#tasks`);
       await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
       const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
       let row = '';
-      for (let n = 0; n < 100 && !row; n++) { if (n) await new Promise((r) => setTimeout(r, 100)); row = await run(`(document.querySelector('#todo tr[data-area="Products"]') || {}).textContent || ''`); }
+      for (let n = 0; n < 100 && !row; n++) { if (n) await new Promise((r) => setTimeout(r, 100)); row = await run(`(document.querySelector('#tasks tr[data-area="Products"]') || {}).textContent || ''`); }
       assert.match(row, /^\d+[\w-]+-shop\.shopButton shop\.css:2You decide[\w-]+-shop's \.shopButton is nearly button \(\d+ of \d+ declarations alike; it differs in background[^)]*\)\.Decide: use button in [\w-]+-shop, with a new option if it needs one, or add \.shopButton to the system on purpose\. Tell Claude which\./);
-      assert.match(await run(`document.querySelector('#todo tr[data-area="Products"]').closest('.pg-par-card').querySelector('.pg-inspect-head').textContent`), /^button$/);
+      assert.match(await run(`document.querySelector('#tasks tr[data-area="Products"]').closest('.pg-par-card').querySelector('.pg-inspect-head').textContent`), /^button$/);
       close();
     } finally { c.kill(); }
     const audit = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
