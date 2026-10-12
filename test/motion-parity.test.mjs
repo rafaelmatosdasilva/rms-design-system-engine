@@ -7,7 +7,8 @@ import { join, dirname } from 'node:path';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { figmaEasing, transitionsOf, codeMotion, motionFindings, motionSnapshot, MOTION_CAPTURE_JS, motionCaptureScript } from '../motion-parity.mjs';
+import { figmaEasing, transitionsOf, codeMotion, motionFindings, motionSnapshot, MOTION_CAPTURE_JS, motionCaptureScript, prototypeTransitions } from '../motion-parity.mjs';
+import { motionTokens } from '../styleguide-data.mjs';
 import { fixtureProject } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -54,11 +55,26 @@ test('each transition Figma animates against the code\'s: none, another duration
   assert.throws(() => motionSnapshot('{"x":1}'), /not a motion capture/);
 });
 
+test('the motion page\'s data (C6): durations and easings as the theme declares them, Figma\'s names, less motion, the prototype', async () => {
+  const css = `:root { --motion-fast: 120ms; --motion-slow: .4s; --motion-ease: cubic-bezier(.2, 0, 0, 1); --alias: var(--motion-fast); --gap: 8px; --leave: ease-in; }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: 0.01ms !important; } }`;
+  const m = await motionTokens(css, { figmaVars: { motion: { 'motion/fast': '120ms', 'motion/ease': 'cubic-bezier(0.2,0,0,1)' } }, files: [{ file: 'theme.css', text: 'a {}\n' + css }] });
+  assert.deepEqual(m.durations.map((t) => [t.figma, t.var, t.ms]), [['motion/fast', '--motion-fast', 120], [null, '--alias', 120], [null, '--motion-slow', 400]]);
+  assert.deepEqual(m.easings.map((t) => [t.figma, t.var, t.bezier]), [['motion/ease', '--motion-ease', [0.2, 0, 0, 1]], [null, '--leave', [0.42, 0, 1, 1]]]);
+  assert.deepEqual(m.reduced, { at: 'theme.css:3', ends: ['transition'] });
+  assert.equal(await motionTokens(':root { --gap: 8px; }'), null, 'no motion, no page');
+  const snap = { components: { button: [{ from: { State: 'Default' }, to: { State: 'Hover' }, trigger: 'ON_HOVER', type: 'SMART_ANIMATE', duration: 0.2, easing: { type: 'EASE_OUT' } }, { from: { State: 'Default' }, to: { State: 'Pressed' }, trigger: 'ON_PRESS', type: 'INSTANT', duration: 0 }] } };
+  assert.deepEqual(prototypeTransitions(snap, [{ component: 'button', change: 'State Default to Hover', trigger: 'hover', kind: 'duration', code: { ms: 300 } }]),
+    [{ component: 'button', change: 'State Default to Hover', trigger: 'hover', ms: 200, easing: 'ease-out', code: '300ms' }]);
+});
+
 test('--figma-motion writes the capture script, keeps the answer as the snapshot and says what differs; the style guide lists it under the component', { timeout: 300000 }, async (t) => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-motion-');
   try {
     const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
     for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
+    // The system's own motion, for the foundations' motion page (C6).
+    writeFileSync(join(dir, 'src/styles/tokens.css'), readFileSync(join(dir, 'src/styles/tokens.css'), 'utf8') + '\n:root { --motion-quick: 150ms; --motion-ease: cubic-bezier(0.2, 0, 0, 1); }\n');
     const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
     const a = run('--figma-motion');
     assert.match(a.stdout, /Motion capture script → \.design-system-engine-out\/figma-capture\/motion-capture\.js \(read-only/);
@@ -88,6 +104,19 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
       let row = '';
       for (let n = 0; n < 100 && !row; n++) { if (n) await new Promise((r) => setTimeout(r, 100)); row = await run2(`([...document.querySelectorAll('#c-button tr[data-area="Parity"]')].find((tr) => /Motion/.test(tr.textContent)) || {}).textContent || ''`); }
       assert.match(row, /Motion.*250ms.*ease-out, on hover.*State Default to Hover\. (Give it a transition of 250ms, ease-out|Make the transition 250ms), as Figma has it\. Tell Claude to do it\./);
+      // The foundations' motion page: the system's duration and easing, played on demand, and Figma's prototype.
+      await run2(`location.hash = '#motion'`); await new Promise((r) => setTimeout(r, 300));
+      const page = JSON.parse(await run2(`JSON.stringify({ vars: [...document.querySelectorAll('#motion .sg-token-card td:nth-child(3)')].map((td) => td.textContent), proto: [...document.querySelectorAll('#motion .sg-motion-proto tbody tr')].map((tr) => tr.textContent), lead: document.querySelector('#motion > p').textContent, card: !!document.querySelector('#overview a[href="#motion"]') })`));
+      assert.deepEqual(page.vars, ['--motion-quick', '--motion-ease']);
+      assert.match(page.proto[0], /^buttonState Default to Hoverhover250ms, ease-outDiffers: (changes at once|\d+ms)/);
+      assert.match(page.lead, /does not stop its motion yet when a person asks for less/);
+      assert.ok(page.card, 'a card on the overview');
+      const at = `[...document.querySelectorAll('#motion .sg-motion-dot')].map((d) => Math.round(d.getBoundingClientRect().left - d.parentNode.getBoundingClientRect().left))`;
+      assert.deepEqual(await run2(at), [0, 0], 'nothing moves until Play');
+      await run2(`document.querySelector('#motion [data-motion-play]').click()`);
+      await new Promise((r) => setTimeout(r, 700));
+      const moved = await run2(at);
+      assert.ok(moved.every((x) => x > 20), `each dot crossed its track: ${JSON.stringify(moved)} ${await run2(`JSON.stringify([getComputedStyle(document.getElementById('motion')).display, [...document.querySelectorAll('#motion .sg-motion-track')].map((t) => t.clientWidth)])`)}`);
       close();
     } finally { c.kill(); }
   } finally { rmSync(dir, { recursive: true, force: true }); }

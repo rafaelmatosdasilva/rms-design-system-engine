@@ -829,6 +829,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const motion = readJson(join(OUT_DIR, 'motion.json'));
       for (const c of new Set([...(view.allComponents ?? []), ...view.components])) { const own = (motion?.findings ?? []).filter((f) => f.component === c.name); if (own.length) c.motionDiffs = own; }
     } catch { /* no motion read */ }
+    // The foundations' motion page (C6): the system's durations and easings, what it does for a person who asks for less
+    // motion, and each transition Figma's prototype animates, with what the code does for it.
+    if (!opts.only?.length) try {
+      const { motionTokens } = await import('./styleguide-data.mjs');
+      const { prototypeTransitions } = await import('./motion-parity.mjs');
+      const snapMotion = readJson(cfg.paths?.snapshotMotion ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-motion.snapshot.json'));
+      const findings = readJson(join(OUT_DIR, 'motion.json'))?.findings ?? [];
+      const files = [...themeFiles, ...pluginCSS].filter((f) => f && !/^https?:/.test(f)).map((file) => ({ file, text: readText(file) })).filter((f) => f.text);
+      const m = await motionTokens(allCss, { figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, cfg, files, transitions: snapMotion ? prototypeTransitions(snapMotion, findings) : [] });
+      if (m) view.motion = m;
+    } catch { /* the page builds without it */ }
     // A class a product styles almost as the system styles one of its components (I83): a decision in that component's
     // To do rows, to use the component (a new option if it needs one) or to add the new one to the system on purpose.
     if (!opts.only?.length && cfg.systemHealth !== false) try {

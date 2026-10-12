@@ -262,6 +262,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   changes with a mode shows the value of the mode its section's size switch picks (the switch, with no visible label
   and room below it, changes only the samples and their values, never the page around them); icons from the icon sheet. The
   colours sit six a row, each as wide as the room, so its Figma name and variable read whole (three on a phone).
+  Motion (`motionTokens`, `styleguide-data.mjs`): every custom property whose value is a duration or an easing
+  curve, named as Figma's motion variable of the same value (`figma.motion.explicit`, else the naming convention),
+  each with a dot that crosses its track on Play (a duration at a steady pace, an easing over the longest duration,
+  its curve drawn beside it; at once for a person who asks for less motion); where the system answers
+  `prefers-reduced-motion` and what it ends, or that it does not yet; and each transition Figma's prototype animates
+  (`figma-motion.snapshot.json`) with what the code does for it (`prototypeTransitions`, from the last audit's
+  `motion.json`).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its source renders: a React component's return, a Vue component as the project's own build
   (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its
