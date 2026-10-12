@@ -254,8 +254,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   their markup (a row of the same element where one carries the selected class). A control the system lacks gets
   its nearest stand-in from the system (a segmented control: its tabs, then its radio group, then its buttons side by
   side, the selected one in its primary look or, with one button, in it and the others plain; a text field: its
-  search field), else a plain control drawn with its tokens, and each one is said on the overview and in the To do
-  list (`ui.gaps`: "This system has no segmented control, so the page uses its tabs."). A role the system has no
+  search field), else a plain control drawn with its tokens, and each one is said on the overview and on the Tasks
+  page (`ui.gaps`: "This system has no segmented control, so the page uses its tabs."). A role the system has no
   token for is left to the browser's own and listed, never given a value of the engine's.
 - **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; a size that
@@ -268,7 +268,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   its curve drawn beside it; at once for a person who asks for less motion); where the system answers
   `prefers-reduced-motion` and what it ends, or that it does not yet; and each transition Figma's prototype animates
   (`figma-motion.snapshot.json`) with what the code does for it (`prototypeTransitions`, from the last audit's
-  `motion.json`).
+  `motion.json`). When the code has durations or easings and Figma has no motion variables at all, the system's
+  tasks say so, for You in Figma: add them to a variable collection named Motion (`motionTodos`).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its source renders: a React component's return, a Vue component as the project's own build
   (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its
@@ -281,7 +282,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   installed, no build tool). The components the code has that Figma
   does not list (each file whose first element carries a class of its own, in its `components` folder when it has
   one) are shown too, with their file and the props their code declares, marked **Only in the code** and compared with
-  nothing in Figma; each is a To do for Figma while Figma has components of its own. Before Figma's data is captured,
+  nothing in Figma; each is a task for Figma while Figma has components of its own. Before Figma's data is captured,
   every component is listed that way, and the run says so (`3 only in the code`) instead of counting them agreed. Its controls are the props Gate [15] (Component props match Figma)
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
@@ -307,23 +308,24 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
   `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
   page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
-  top too); Parity carries the system's alert icon (an icon named warning or alert) before its label while its table
+  top too), and every table's head under them on every page: the card's head, then the table's own head row
+  (`stickHeight` measures how far the bars reach, `--pg-areas-h`, and a card's head, `--pg-card-head-h`); Parity carries the system's alert icon (an icon named warning or alert) before its label while its table
   marks something (a row that differs, one only in Figma or only in code, a prop not built), and Accessibility while a
   problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Documentation and Details in Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
-  table as the To do page's Parity (`issueTableHTML`, `ISSUE_COLS`): Issue nr (the To do page's number, open rows
+  table as the Tasks page's Parity (`issueTableHTML`, `ISSUE_COLS`): Issue nr (the Tasks page's number, open rows
   only), Type, Figma (its name and value), Code (its name and value, and where in the
   code a difference is), What to do (who acts above it) and Status (a sign and the system's colour, To fix, To check,
   Done or Not compared, with what it is under any but Done, differs from Figma, only in Figma, only in code, both not
   compared, New in the last audit when the last audit found it first, and when it last held). Each difference the audit found is merged into
   the row it is about (`parityIssueRows`); what it found beyond those rows, a prop Figma has that the code does not build
-  and a component only the code has are rows of their own. The To do page holds the open rows of every component,
+  and a component only the code has are rows of their own. The Tasks page holds the open rows of every component,
   each kind in a table of its own shape, one card per component, one kind shown at a time with a filter (Parity,
   Accessibility, Documentation, Migration, Products, System and the page's own items, each when it has any; no All):
   Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Issue nr, WCAG criterion, Figma
   states, Found, What to do, Status), Documentation's the Documentation table itself (Kind, What is written, From, the
-  card each component's Documentation area and the Documentation page show), one card for each component with a kind
+  card each component's Documentation area shows), one card for each component with a kind
   not written yet (`docRows`), where to write it above them, and the rest Issue nr, Where or Type, What to do and
   Status. The count at the top is the shown kind's; Documentation's kinds are counted, not numbered. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
@@ -339,7 +341,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   label edit writes only its words into its part. An option the contract maps to another element's selector (a
   product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
   the component's own `:checked` rule, and an option the code does not build is offered as not built.
-- **Documentation** (its first card): a table, the same one the Documentation page gathers for every component (one per component, the thinnest first, an old `#coverage` link opening it), its columns Kind, What is written and From, its rows the same kinds in the same order (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), each with what was written and where, or said as missing; then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
+- **Documentation** (its first card): a table, the same one the Tasks page's Documentation shows for every component with a kind not written yet (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#tasks/documentation`), its columns Kind, What is written and From, its rows the same kinds in the same order (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), each with what was written and where, or said as missing; then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
@@ -454,7 +456,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as the To do page's Accessibility, in
+- **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as the Tasks page's Accessibility, in
   the same card as the Playground's tables: Issue nr (open rows only), Area (Accessibility, with the criterion and its
   level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
   panel's own pop-up, Escape closing it), Figma (what Figma's annotations state for it), Code (what was found, each
@@ -511,13 +513,15 @@ A project's own template is filled through markers:
 - `{{THEME_CSS}}` ← the token CSS inlined verbatim, with its `@media (prefers-color-scheme: dark)` guarded to `:root:not([data-color])` so the manual light/dark toggle wins; `{{COMPONENT_CSS}}` ← the component stylesheets outside the theme.
 
 **Its accessibility is tried while it is built.** After writing the page, `--styleguide` opens it in Chrome
-(`styleguide-bake.mjs`, four pages at once, each trying a share of the components, `#todo?bake=1/4`) and has it try
+(`styleguide-bake.mjs`, four pages at once, each trying a share of the components, `#tasks?bake=1/4`) and has it try
 every variant of every component as its Accessibility area does, then keeps what each found in the page
 (`<script id="sg-a11y-baked">`, with when it ran and each component's signature). Whoever opens the page reads those
-results at once on the To do page and in every Accessibility area, the final ones, with nothing running in their
+results at once on the Tasks page and in every Accessibility area, the final ones, with nothing running in their
 browser; a component's area never tries again on its own. A component the build could not try (no Chrome there, its
-signature changed) is tried in the viewer's browser and kept there (`localStorage`), and Try again in this browser,
-on the To do page, tries every component afresh. `--no-a11y-bake` (or `styleguide.bakeA11y: false`) builds the page
+signature changed) is tried in the viewer's browser and kept there (`localStorage`). Until every component is tried,
+the Tasks page lists nothing and the menu shows no count, only how far the try has got (`.sg-todo-wait`): no number
+changes in front of the reader; then the list is drawn once, final. What was tried and when, with Try again in this
+browser (every component afresh), is said under the Accessibility filter alone (`.sg-todo-note`). `--no-a11y-bake` (or `styleguide.bakeA11y: false`) builds the page
 without it; without Chrome it is skipped and said, and a script error the page throws while trying is printed
 under the count.
 
@@ -1125,7 +1129,7 @@ whatever surface the project serves, in this order:
    **Each product's own page** comes after the guide (a run on the whole guide, no `--component`): the built page
    of each product in `paths.plugins` (`ui.html` beside the `pluginCSS` source, else `<product>/ui.html`), opened
    whole, with every rule, axe-core's page rules (heading order, landmarks) included. Each finding carries its
-   product (`product` in `a11y.json`) and the style guide lists them in the To do list under Products, one row per
+   product (`product` in `a11y.json`) and the style guide lists them on the Tasks page under Products, one row per
    product. `a11y.products: false` leaves them out.
    **The components rendered from their own code** (`component-harness.mjs`) — in build mode, or when there is no
    page to open: each React component (`.jsx`/`.tsx`) in each of its Figma variants on one served page, its CSS
@@ -1285,8 +1289,8 @@ a standalone component), in the **Accessibility** category. One fact per line, o
 
 | Category | What the engine does with the note |
 |---|---|
-| Accessibility | A requirement: the accessibility check verifies it, and one no check reads is a To do (rewrite it so a check reads it) |
-| Intent, Implementation, Content, Authoring | Design intent: the agents read it; never a requirement, never a To do, never acknowledged in Gate [13] (Structure) |
+| Accessibility | A requirement: the accessibility check verifies it, and one no check reads is a task (rewrite it so a check reads it) |
+| Intent, Implementation, Content, Authoring | Design intent: the agents read it; never a requirement, never a task, never acknowledged in Gate [13] (Structure) |
 | No category, or one the file deleted | Read as before: the text decides (a note the engine reads no accessibility in is design intent) |
 
 The REST API does not return a note's category, so it is captured apart with the Plugin API:

@@ -465,7 +465,7 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
   if (undecided) said.push(`${undecided} value${undecided === 1 ? '' : 's'} where Figma and the code differ`);
   if (unrealized) said.push(`${unrealized} Figma propert${unrealized === 1 ? 'y' : 'ies'} the code does not build yet`);
   if (waiting.length) said.push(`${waiting.length} component${waiting.length === 1 ? '' : 's'} the code does not have yet (${waiting.map((w) => w.replace(/ \(not built yet\)$/, '')).join(', ')})`);
-  const line = said.length ? `Left off this page until Figma and the code agree: ${said.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Each one is in the To do list, with who does it and what to do.` : 'Figma and the code agree on everything this page shows.';
+  const line = said.length ? `Left off this page until Figma and the code agree: ${said.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Each one is on the Tasks page, with who does it and what to do.` : 'Figma and the code agree on everything this page shows.';
   const onlyCode = components.filter((c) => c.codeOnly).length;
   // Before Figma's data is captured, every component is the code's alone: said so, never "Figma and the code agree".
   const shownLine = !figmaHas && onlyCode ? `No Figma data yet: these are the ${onlyCode} component${onlyCode === 1 ? '' : 's'} the code has, compared with nothing in Figma. Capture Figma's data (rms-design-system-engine --recipe refresh-figma) to compare them.`
@@ -1650,5 +1650,20 @@ export async function motionTokens(cssText = '', { figmaVars = {}, cfg = {}, fil
     break;
   }
   if (!durations.length && !easings.length && !transitions.length) return null;
-  return { durations, easings, reduced, transitions };
+  return { durations, easings, reduced, transitions, figmaHas: figmaOf.size > 0 };
+}
+
+// The motion the code has and Figma has none of (C6): one row of the system's To do, for whoever keeps Figma, since
+// nothing compares the system's motion with Figma until Figma has its variables. m: motionTokens(…).
+// → [{ kind, type, who, say, todo }], none when Figma has motion variables or the code has no motion.
+export function motionTodos(m) {
+  if (!m || m.figmaHas) return [];
+  const d = m.durations ?? [], e = m.easings ?? [];
+  if (!d.length && !e.length) return [];
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  const list = [...d, ...e].map((t) => `${t.var} ${t.value}`);
+  const what = [d.length ? n(d.length, 'duration', 'durations') : '', e.length ? n(e.length, 'easing', 'easings') : ''].filter(Boolean).join(' and ');
+  return [{ kind: 'Motion variables', type: 'Motion, variables', who: 'figma',
+    say: `Figma has no motion variables, while the code has ${what} (${list.slice(0, 6).join(', ')}${list.length > 6 ? `, and ${list.length - 6} more` : ''}). Nothing compares the system's motion with Figma until Figma has them.`,
+    todo: 'Add them in Figma to a variable collection named Motion: each duration a number in milliseconds, each easing its curve as text (cubic-bezier(…) or ease-out), named as the code names them. The next refresh of the Figma data reads them, and the motion page names each one.' }];
 }
