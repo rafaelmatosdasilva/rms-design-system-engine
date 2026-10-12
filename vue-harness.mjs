@@ -263,7 +263,8 @@ onMounted(() => { window.__dseParentApp = app; import(${JSON.stringify(join(dir,
     kit = await import(pb.kit);
     quiet(true);
     nuxt = await kit.loadNuxt({ cwd: ROOT, dev: true, ready: false, overrides: {
-      ssr: false, logLevel: 'silent', telemetry: false, devtools: { enabled: false }, buildDir: join(ROOT, OUT_DIR, 'nuxt-build'),
+      // Its types too (Nuxt 4.6 writes them apart from the build, in the project's own .nuxt unless told where).
+      ssr: false, logLevel: 'silent', telemetry: false, devtools: { enabled: false }, buildDir: join(ROOT, OUT_DIR, 'nuxt-build'), typesDir: join(ROOT, OUT_DIR, 'nuxt-build'),
       vite: { clearScreen: false, logLevel: 'silent', cacheDir: join(ROOT, OUT_DIR, 'vite-cache'), server: { hmr: false } },
       hooks: { 'app:resolve': (app) => { app.mainComponent = main; } },
     } });
