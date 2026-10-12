@@ -64,13 +64,16 @@ for (const id of SCREEN_IDS) {
   let docs = 0, off = 0;
   // What is drawn behind a point: the fills that cover it, from the last opaque one up.
   const behind = (x, y) => { const at = under.filter((u) => contains(u.b, x, y)); let from = 0; at.forEach((u, i) => { if (u.p.some(opaque)) from = i; }); return at.slice(from).flatMap((u) => { const k = u.p.map(opaque).lastIndexOf(true); return k > 0 ? u.p.slice(k) : u.p; }); };
-  const ink = (kind, fg, b, extra) => {
+  // Each entry keeps up to 6 of the layers it was found on that can carry an annotation (ids): the outermost instance it
+  // sits in, or the layer itself when it sits in none, so the findings can be pinned where they are (--figma-edits).
+  const addHost = (e, host) => { if (!host) return; e.ids = e.ids || []; if (e.ids.length < 6 && e.ids.indexOf(host) < 0) e.ids.push(host); };
+  const ink = (kind, fg, b, extra, host) => {
     const on = behind(b[0] + b[2] / 2, b[1] + b[3] / 2);
     const k = JSON.stringify([kind, fg, on, extra.s || 0, extra.w || 0]);
     const e = inks.get(k);
-    if (e) e.n++; else inks.set(k, { k: kind, fg, on, ...extra, n: 1, at: [b[0], b[1]] });
+    if (e) { e.n++; addHost(e, host); } else { const f = { k: kind, fg, on, ...extra, n: 1, at: [b[0], b[1]] }; addHost(f, host); inks.set(k, f); }
   };
-  async function walk(n, alpha, isRoot, dim) {
+  async function walk(n, alpha, isRoot, dim, inst) {
     if (!n || n.visible === false) return;
     if (!isRoot && DOC.test(n.name || '')) { docs++; return; }
     const a = alpha * (n.opacity == null ? 1 : n.opacity);
@@ -86,7 +89,7 @@ for (const id of SCREEN_IDS) {
       if (s === figma.mixed) { try { s = n.getRangeFontSize(0, 1); } catch (e) { s = 0; } }
       if (w === figma.mixed) { try { w = n.getRangeFontWeight(0, 1); } catch (e) { w = 400; } }
       const fg = await paints(n, 'fills', a);
-      if (fg.length) ink('t', fg[fg.length - 1], b, { s: Math.round((s || 0) * 100) / 100, w: w || 400, ex: text.slice(0, 32) });
+      if (fg.length) ink('t', fg[fg.length - 1], b, { s: Math.round((s || 0) * 100) / 100, w: w || 400, ex: text.slice(0, 32) }, inst || n.id);
       return;
     }
     // A control drawn smaller than 24 by 24: its component, for the engine to tell a control from an ornament.
@@ -94,7 +97,7 @@ for (const id of SCREEN_IDS) {
       let name = n.name;
       try { const m = await n.getMainComponentAsync(); name = m ? (m.parent && m.parent.type === 'COMPONENT_SET' ? m.parent.name : m.name) : n.name; } catch (e) {}
       const k = name + ' ' + b[2] + 'x' + b[3];
-      const e = small.get(k); if (e) e.n++; else small.set(k, { c: name, w: b[2], h: b[3], n: 1, at: [b[0], b[1]] });
+      const e = small.get(k); if (e) { e.n++; addHost(e, inst || n.id); } else { const f = { c: name, w: b[2], h: b[3], n: 1, at: [b[0], b[1]] }; f.ids = [inst || n.id]; small.set(k, f); }
     }
     // An icon: its colour is its first drawn shape's; it counts when no words sit beside it in its parent.
     if (b && ICON.test(n.name || '') && b[2] <= 64 && b[3] <= 64 && n.type !== 'TEXT') {
@@ -103,17 +106,17 @@ for (const id of SCREEN_IDS) {
       const words = parent && typeof parent.findOne === 'function' && parent.findOne((x) => x.type === 'TEXT' && x.visible !== false && String(x.characters || '').trim());
       if (!words) {
         const shape = typeof n.findOne === 'function' ? n.findOne((x) => x.visible !== false && /^(VECTOR|BOOLEAN_OPERATION|STAR|POLYGON|ELLIPSE|LINE|RECTANGLE)$/.test(x.type) && ((Array.isArray(x.fills) && x.fills.some((p) => p.visible !== false && p.type === 'SOLID')) || (Array.isArray(x.strokes) && x.strokes.some((p) => p.visible !== false && p.type === 'SOLID')))) : null;
-        if (shape) { const fill = await paints(shape, 'fills', a), stroke = await paints(shape, 'strokes', a); const fg = (fill.length ? fill : stroke).filter(Array.isArray); if (fg.length) { let name = n.name; if (n.type === 'INSTANCE') { try { const m = await n.getMainComponentAsync(); if (m) name = m.parent && m.parent.type === 'COMPONENT_SET' ? m.parent.name : m.name; } catch (e) {} } ink('i', fg[fg.length - 1], b, { ex: String(name).slice(0, 32) }); } }
+        if (shape) { const fill = await paints(shape, 'fills', a), stroke = await paints(shape, 'strokes', a); const fg = (fill.length ? fill : stroke).filter(Array.isArray); if (fg.length) { let name = n.name; if (n.type === 'INSTANCE') { try { const m = await n.getMainComponentAsync(); if (m) name = m.parent && m.parent.type === 'COMPONENT_SET' ? m.parent.name : m.name; } catch (e) {} } ink('i', fg[fg.length - 1], b, { ex: String(name).slice(0, 32) }, inst || n.id); } }
       }
       return;
     }
     if (b && SURFACE.test(n.type) && !n.isMask) { const p = await paints(n, 'fills', a); if (p.length) under.push({ b, p }); }
-    if ('children' in n) for (const k of n.children) await walk(k, a, false, isOff);
+    if ('children' in n) for (const k of n.children) await walk(k, a, false, isOff, inst || (n.type === 'INSTANCE' ? n.id : null));
   }
-  await walk(root, 1, true, false);
+  await walk(root, 1, true, false, null);
   const s = { id, name: root.name, w: Math.round(o.width), h: Math.round(o.height), inks: [...inks.values()], small: [...small.values()], ...(docs ? { docs } : {}), ...(off ? { off } : {}) };
   // Too large for one answer on its own: its examples' words first, then its rarest combinations (counted, cut).
-  if (JSON.stringify(s).length > BUDGET - 300) { s.inks = s.inks.map((x) => ({ ...x, ex: x.ex ? x.ex.slice(0, 8) : x.ex })); s.cut = true; }
+  if (JSON.stringify(s).length > BUDGET - 300) { s.inks = s.inks.map((x) => ({ ...x, ex: x.ex ? x.ex.slice(0, 8) : x.ex, ...(x.ids ? { ids: x.ids.slice(0, 2) } : {}) })); s.cut = true; }
   while (JSON.stringify(s).length > BUDGET - 300 && s.inks.length > 1) { s.inks.sort((p, q) => q.n - p.n); s.more = (s.more || 0) + s.inks.length - Math.floor(s.inks.length * 0.8); s.inks = s.inks.slice(0, Math.floor(s.inks.length * 0.8)); }
   const size = JSON.stringify(s).length;
   if (screens.length && used + size > BUDGET) { left.push(id); continue; }
@@ -173,7 +176,7 @@ export function screenA11yFindings(snapshot = {}, { roles = {} } = {}) {
       if (!(x.on ?? []).length) { bare += x.n || 1; continue; }
       const bg = surfaceOf(x.on);
       if (!bg) {
-        if (x.k === 't') out.push({ screen: s.name, kind: 'plate', what, n: x.n, criterion: '1.4.3',
+        if (x.k === 't') out.push({ screen: s.name, screenId: raw.id, nodes: x.ids ?? [], kind: 'plate', what, n: x.n, criterion: '1.4.3',
           fix: 'put a solid plate (a surface colour) behind the words, so they read whatever the picture or gradient shows' });
         continue;
       }
@@ -181,12 +184,12 @@ export function screenA11yFindings(snapshot = {}, { roles = {} } = {}) {
       const ratio = contrastRatio(fg, bg);
       const need = x.k === 'i' ? 3 : aaThreshold(x.s || 0, x.w || 400);
       if (ratio + 1e-9 < need) {
-        out.push({ screen: s.name, kind: 'contrast', what, n: x.n, ratio: Math.round(ratio * 100) / 100, need, fg: hex(fg), bg: hex(bg),
+        out.push({ screen: s.name, screenId: raw.id, nodes: x.ids ?? [], kind: 'contrast', what, n: x.n, ratio: Math.round(ratio * 100) / 100, need, fg: hex(fg), bg: hex(bg),
           criterion: x.k === 'i' ? '1.4.11' : '1.4.3', size: x.s, large: x.k === 't' ? isLargeText(x.s || 0, x.w || 400) : undefined,
           fix: x.k === 'i' ? `make the icon reach ${need}:1 against what is behind it` : `make the text reach ${need}:1 against what is behind it (a darker or lighter colour token, or a different surface)` });
       }
     }
-    if (bare) out.push({ screen: s.name, kind: 'bare', what: `${bare} text${bare === 1 ? '' : 's'} and icons`, n: 1, count: bare, criterion: '1.4.3',
+    if (bare) out.push({ screen: s.name, screenId: raw.id, nodes: [], kind: 'bare', what: `${bare} text${bare === 1 ? '' : 's'} and icons`, n: 1, count: bare, criterion: '1.4.3',
       fix: 'give the screen the surface colour the product draws behind it, so what sits on it can be measured' });
     // Each control once a screen, every size it is drawn at under 24 by 24.
     const targets = new Map();
@@ -194,10 +197,10 @@ export function screenA11yFindings(snapshot = {}, { roles = {} } = {}) {
       const role = roleOf(t.c);
       const control = role ? INTERACTIVE.test(norm(role)) : CONTROL_NAME.test(t.c);
       if (!control) continue;
-      const e = targets.get(t.c) ?? { sizes: [], n: 0 };
-      e.sizes.push(`${t.w}×${t.h}`); e.n += t.n || 1; targets.set(t.c, e);
+      const e = targets.get(t.c) ?? { sizes: [], n: 0, nodes: [] };
+      e.sizes.push(`${t.w}×${t.h}`); e.n += t.n || 1; for (const id of t.ids ?? []) if (!e.nodes.includes(id)) e.nodes.push(id); targets.set(t.c, e);
     }
-    for (const [c, e] of targets) out.push({ screen: s.name, kind: 'target', what: c, n: e.n, size: e.sizes.join(', '), criterion: '2.5.8',
+    for (const [c, e] of targets) out.push({ screen: s.name, screenId: raw.id, nodes: e.nodes, kind: 'target', what: c, n: e.n, size: e.sizes.join(', '), criterion: '2.5.8',
       fix: 'make it at least 24×24, or keep 24px of space around it on the screen' });
   }
   return out;
