@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: A fill Figma does not have; a row's free space allows for text; screens framed by a product, or cut (continuous evaluation)
+
+What changed since the entry below (engine 8f2202f): Template test: Accessibility is the last kind on the Tasks page; A fill Figma does not have; a row's free space allows for text; screens framed by a product, or cut. The guide changed in `reference/config.md`.
+
+Guide set measured: `906a5368fbbf` · Project measured: `13d811a9d668`
+
+| Haiku, engine 250c635 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.057 |
+| Input a run | 95k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 95k. Records: `records/2026-10-12-a-fill-figma-does-not`.
+
 ## 2026-10: Tasks by kind, motion as one system table (continuous evaluation)
 
 What changed since the entry below (engine 8bf7f93): The Tasks page shows every kind at once except Accessibility, which alone waits while the components are tried; motion is a kind of its own with what each component needs; a component's Motion tab is the same task table; the motion page is one table of the system's timings, which components use each, and what the system should make of them; the component's class sits on its Version line. The guide changed in `reference/usage.md`.

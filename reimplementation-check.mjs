@@ -42,6 +42,7 @@ import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import { loadLocator } from './component-locator.mjs';
 import { usedClasses } from './class-use.mjs';
+import { screenScopes } from './screen-parity.mjs';
 
 const ROOT = process.cwd();
 let cfg = {};
@@ -262,8 +263,25 @@ if (!screenSnap?.screens) {
   // it is said once per screen as not checked, not counted as a product's gap.
   const unbuilt = new Set(cfg.knownUnimplementedComponents ?? []);
   const notBuilt = new Map();
-  for (const scr of Object.values(screenSnap.screens)) {
+  // Where a screen's layout is read too (--figma-screens), a component it draws only as another component's own part
+  // (a status bar's divider, outside its slots) is that component's: the code draws it with that component.
+  let layouts = [];
+  try {
+    const lp = cfg.paths?.screenLayout ?? join(dirname(cfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-layout.snapshot.json');
+    layouts = JSON.parse(readFileSync(join(ROOT, lp), 'utf8')).screens ?? [];
+  } catch { /* not read */ }
+  const ownOnly = (id) => {
+    const lay = layouts.find((l) => String(l.id ?? '').replace('-', ':') === String(id).replace('-', ':'));
+    if (!lay?.tree) return new Set();
+    const { own } = screenScopes(lay.tree, { isSystem: (c) => structNames.has(c) || !!(cfg.componentSelectors ?? {})[c] });
+    const all = new Map();
+    const walk = (n) => { if (!n || typeof n !== 'object') return; if (n.kind === 'instance' && n !== lay.tree) { const e = all.get(n.component) ?? { n: 0, own: 0 }; e.n++; if (own.has(n)) e.own++; all.set(n.component, e); } for (const k of n.children ?? []) walk(k); };
+    walk(lay.tree);
+    return new Set([...all].filter(([, e]) => e.n > 0 && e.own === e.n).map(([c]) => c));
+  };
+  for (const [scrId, scr] of Object.entries(screenSnap.screens)) {
     if (!scr?.plugin) continue;
+    const parts = ownOnly(scrId);
     const files = filesOf(scr.plugin);
     if (!files.length) { unread.add(scr.plugin); continue; }
     const used = new Set();
@@ -274,6 +292,7 @@ if (!screenSnap?.screens) {
       const token = String(sel ?? '').replace(/^[.#]/, '');
       if (!token || /[\s>+~[\]:]/.test(token)) continue;   // no single class to look for
       if (used.has(token)) continue;
+      if (parts.has(comp)) continue;   // drawn only as another component's own part on this screen
       if (KNOWN.has(`${scr.plugin}/${comp}`)) continue;
       if (unbuilt.has(comp)) { const k = `${scr.plugin}|${comp}`; if (!notBuilt.has(k)) notBuilt.set(k, { plugin: scr.plugin, screen: scr.name ?? '', comp }); continue; }
       gaps.push({ plugin: scr.plugin, screen: scr.name ?? '', comp, sel });

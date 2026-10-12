@@ -67,8 +67,8 @@ test('a row\'s free space allows for the text before it; a gap stays exact (E37)
   // A status bar: a title and a badge on the left, a button pushed to the right. Chrome draws the title 4px narrower, so
   // the free space before the right-hand button is 4px wider: 2% of the 240px before it allows that, on top of 2px.
   const bar = { x: 0 };
-  const fig = [{ ...b('badge', 160, 12, 40, 20), scope: bar }, { ...b('buttonTertiary', 208, 10, 24, 24), scope: bar }, { ...b('buttonQuaternary', 400, 10, 24, 24), scope: bar }];
-  const page = [{ ...b('badge', 156, 12, 40, 20), scope: bar }, { ...b('buttonTertiary', 204, 10, 24, 24), scope: bar }, { ...b('buttonQuaternary', 400, 10, 24, 24), scope: bar }];
+  const fig = [{ ...b('badge', 160, 12, 40, 20), scope: bar }, { ...b('buttonTertiary', 208, 10, 24, 24), scope: bar }, { ...b('iconButton', 400, 10, 24, 24), scope: bar }];
+  const page = [{ ...b('badge', 156, 12, 40, 20), scope: bar }, { ...b('buttonTertiary', 204, 10, 24, 24), scope: bar }, { ...b('iconButton', 400, 10, 24, 24), scope: bar }];
   assert.deepEqual(screenFindings('Bar', fig, page), []);
   // Two buttons a gap apart (12 in Figma, 8 on the page): a gap the layout names is exact, whatever text is before it.
   const fig2 = [{ ...b('buttonSecondary', 600, 10, 62, 24), scope: bar }, { ...b('buttonPrimary', 674, 10, 76, 24), scope: bar }];

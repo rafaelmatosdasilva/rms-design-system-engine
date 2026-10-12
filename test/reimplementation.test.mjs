@@ -137,6 +137,23 @@ test('[reimplementation] a component the Figma screen uses and the code never us
   assert.doesNotMatch(out, /Icon-plus/, 'only DS components count');
 });
 
+test('[reimplementation] a component a screen draws only as another one\'s own part is that component\'s', () => {
+  // A status bar draws its divider (outside its slots): the code draws it with the status bar, as a ::after line.
+  const ds = { componentSelectors: { statusBar: '.statusBar', dividerLine: '.dividerLine' }, pluginDirs: { app: 'app' } };
+  const files = {
+    'ds-config.json': ds,
+    'figma-screen-components.snapshot.json': screenSnap({ statusBar: 1, dividerLine: 1 }),
+    'app/ui.src.html': `<div class="statusBar"></div>\n`,
+  };
+  const layout = { screens: [{ id: '1:2', name: 'Main', tree: { kind: 'instance', component: 'Main', children: [
+    { kind: 'instance', component: 'statusBar', children: [{ kind: 'instance', component: 'dividerLine' }] }] } }] };
+  const read = runGate(GATE, { ...files, 'figma-screen-layout.snapshot.json': JSON.stringify(layout) });
+  assert.equal(read.code, 0, read.out);
+  // Without the screen's layout read, nothing says the divider is the status bar's own.
+  const unread = runGate(GATE, files);
+  assert.match(unread.out, /uses dividerLine; the code never uses \.dividerLine/);
+});
+
 test('[reimplementation] a class added from script counts as a use', () => {
   const { code, out } = runGate(GATE, {
     'ds-config.json': SCREEN_DS,

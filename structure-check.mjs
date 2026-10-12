@@ -921,7 +921,7 @@ const PHANTOM_FILL_SKIP = new Set(cfg.knownPhantomFillExceptions ?? []);
 // No paint: none, transparent, or a value that takes the paint from elsewhere.
 const NO_FILL_VAL_RE = /^\s*(?:none|transparent|inherit|initial|unset|revert)\s*(?:!important)?\s*$|^\s*(?:none\s+)?transparent\b/i;
 // A variant with a Background layer has a fill there, bound to a variable or not (a swatch's colour is the page's).
-const drawsNoFill = (snap) => (snap.fillStructure ?? 'none') === 'none' && !(snap.fills?.length) && !snap.colors?.fill
+const drawsNoFill = (snap) => snap.fillStructure === 'none' && !(snap.fills?.length) && !snap.colors?.fill
   && !Object.values(snap.variants ?? {}).some((v) => (v.layers ?? []).some((l) => /^background$/i.test(String(l).trim())));
 // The components Figma nests in one (its switches show them: a status bar's dividerLine). A paint made only of a nested
 // component's tokens is that part, drawn by CSS (a divider as a ::after line), not the component's surface.
