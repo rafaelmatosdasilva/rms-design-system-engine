@@ -106,6 +106,32 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-subsection > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-s); }   /* a title with no line under it */
 .sg-hr { border: none; border-top: var(--sg-line); margin: var(--sg-space-xxl) 0; }
 
+/* ── Health: the dashboard ───────────────────────────────────────────────── */
+/* Tiles for each area's number, then cards for where what is left gathers. Every box is the system's card (its line,
+   corners and shadow), every bar a track and a fill in the system's own colours. */
+.sg-health p, .sg-health h3, .sg-health ol { margin: 0; }
+.sg-health-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sg-space-l); margin-bottom: var(--sg-space-l); }
+@media (max-width: 1100px) { .sg-health-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .sg-health-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sg-health-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sg-space-l); }
+@media (max-width: 860px) { .sg-health-grid { grid-template-columns: minmax(0, 1fr); } }
+.sg-health-tile, .sg-health-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); padding: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-s); min-width: 0; }
+.sg-health-card > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }
+.sg-health-label { font-size: var(--sg-s); color: var(--sg-muted); }
+.sg-health-num { font-size: calc(var(--sg-h1) * 2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); font-variant-numeric: tabular-nums; }
+.sg-health-num small { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); margin-left: var(--sg-space-xs); }
+.sg-health-sub { font-size: var(--sg-s); color: var(--sg-text-2); }
+.sg-health-bar { display: block; height: var(--sg-space-xs); border-radius: var(--sg-radius-pill); background: color-mix(in srgb, var(--sg-border) 30%, transparent); overflow: hidden; }
+.sg-health-bar > span { display: block; height: 100%; background: var(--sg-text); }
+.sg-health-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); }
+.sg-health-list > li { display: flex; flex-direction: column; gap: var(--sg-space-xs); }
+.sg-health-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sg-space-s); font-size: var(--sg-m); color: var(--sg-text); }
+.sg-health-row > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--sg-text-2); }
+.sg-health-note { margin-top: var(--sg-space-l); }
+.sg-health .sg-health-head { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); margin: var(--sg-space-xl) 0 var(--sg-space-s); }
+.sg-health-cell { display: flex; flex-direction: column; gap: var(--sg-space-xxs); min-width: calc(var(--sg-space-xxl) * 2); font-variant-numeric: tabular-nums; }
+.sg-health-comps td { font-variant-numeric: tabular-nums; }
+
 /* ── Overview ────────────────────────────────────────────────────────────── */
 .sg-hero { margin-bottom: var(--sg-space-xxl); }
 .sg-hero > h1 { font-size: var(--sg-title); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; }   /* the overview's title as every page's */
@@ -1006,6 +1032,10 @@ a.pg-usage-name { color: var(--sg-text); }
     var tx = (a.left + a.right) / 2 - cx - f * ((L + R) / 2 - cx), ty = (a.top + a.bottom) / 2 - cy - f * ((T + B) / 2 - cy);
     if (f < 1 || Math.abs(tx) > 0.5 || Math.abs(ty) > 0.5) k.style.transform = 'translate(' + tx.toFixed(1) + 'px, ' + ty.toFixed(1) + 'px) scale(' + f.toFixed(3) + ')';
   }
+  // Health: the system as a dashboard, how far each area has come weighted into one number and where what is left
+  // gathers (fillHealth, from the rows the Tasks page lists). No task is listed here: they are on the Tasks page.
+  hr(); navLink('health', 'health');
+  var hl = section('health', 'Health', 'How the system is doing', 'How far each area has come, weighted into one number, and where what is left gathers: the components that hold the most, the problems that come up most and who it waits on. The tasks themselves are on the Tasks page.');
   // The Tasks page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
   hr(); navLink('tasks', 'tasks');
   var td = section('tasks', 'Tasks', 'What to do', 'Every open task, one kind at a time (parity, motion, documentation, accessibility and the rest), by component, with who handles each one (you in Figma, Claude in code, or a check by hand). Then tell Claude which ones to do, for example, do 3 and 7.');
@@ -2279,6 +2309,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // then its Accessibility rows (a criterion the browser has not tried yet waits for that try); the system's own items
   // first. Numbered in the order the page shows them, and each component's areas show the same numbers.
   function fillTodo() {
+    fillHealth();
     var order = [];
     // The system's own items (a control the page needs and the system lacks, a component only Figma has): rows of the
     // same table, the system's first.
@@ -2365,6 +2396,132 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   // Each card's head row sticks under the filter and the counts, whatever their height at this width.
   function todoHeadHeight() { stickHeight(document.getElementById('tasks')); }
+
+  // ── Health: the dashboard ────────────────────────────────────────────────────────────────────────────────────────
+  // Every row of each area, as each component's own areas show it: a row done counts whole, one to check half (nothing
+  // is known to be wrong, someone has to look), one to fix nothing; what is not compared or not needed is left out. An
+  // area's score is what its rows count over how many there are, the system's the areas' scores weighted
+  // (styleguide.health.weights in ds-config.json changes the weights). Accessibility waits, as on the Tasks page, until
+  // every component is tried in this browser, and the system's number with it, so no number moves in front of the reader.
+  var HEALTH_AREAS = [['Parity', 35], ['Accessibility', 30], ['Documentation', 20], ['Motion', 15]].map(function (a) {
+    var w = DATA.healthWeights && DATA.healthWeights[a[0]]; return [a[0], typeof w === 'number' && w >= 0 ? w : a[1]];
+  });
+  var HEALTH_PART = { done: 1, check: 0.5, todo: 0 };
+  // What an agent needs to pick a component right: what it is, when to use it and when not, its role.
+  var READY_KINDS = ['What it is', 'When to use', 'When not to use', 'Role'];
+  function whoKey(w) { return Object.keys(WHO).filter(function (k) { return WHO[k] === w; })[0] || 'both'; }
+  function healthRowsOf(c, withA11y) {
+    var rows = [];
+    try { rows = rows.concat(parityIssueRows(c), motionIssueRows(c), docIssueRows(c)); } catch (e) { /* read on its own page */ }
+    if (withA11y) try {
+      var tried = c.__a11y;
+      rows = rows.concat(a11yIssueRows(c, tried ? tried.items : c.a11y ? a11yStaticItems(c) : [], tried ? tried.live : null), unreadRows(c));
+    } catch (e) { /* its accessibility is read on its own page */ }
+    return rows.filter(function (r) { return r.st in HEALTH_PART && !r.extra; });
+  }
+  function fillHealth() {
+    if (!hl) return;
+    var tried = COMPONENTS.filter(function (c) { return c.__a11y; }), wait = !ALL && tried.length < COMPONENTS.length;
+    var per = COMPONENTS.map(function (c) { return { c: c, rows: healthRowsOf(c, !wait) }; });
+    var pct = function (x) { return Math.round(x * 100); };
+    var areas = HEALTH_AREAS.map(function (a) {
+      var rows = [], got = 0;
+      per.forEach(function (p) { p.rows.forEach(function (r) { if (r.area === a[0]) { rows.push(r); got += HEALTH_PART[r.st]; } }); });
+      return { name: a[0], weight: a[1], n: rows.length, done: rows.filter(function (r) { return r.st === 'done'; }).length, score: rows.length ? pct(got / rows.length) : null, wait: wait && a[0] === 'Accessibility' };
+    });
+    var counted = areas.filter(function (a) { return a.score != null && !a.wait && a.weight > 0; });
+    var wsum = counted.reduce(function (s, a) { return s + a.weight; }, 0);
+    var overall = !wait && wsum ? Math.round(counted.reduce(function (s, a) { return s + a.score * a.weight; }, 0) / wsum) : null;
+    var bar = function (x) { return '<span class="sg-health-bar" aria-hidden="true"><span style="width:' + Math.max(0, Math.min(100, x)) + '%"></span></span>'; };
+    var tile = function (label, num, of, sub) {
+      return '<div class="sg-health-tile"><p class="sg-health-label">' + esc(label) + '</p><p class="sg-health-num">' + (num == null ? '–' : num) + '<small>' + esc(of) + '</small></p>' + bar(num || 0) + '<p class="sg-health-sub">' + esc(sub) + '</p></div>';
+    };
+    var weights = areas.map(function (a) { return a.name + ' ' + a.weight; }).join(', ');
+    var tiles = tile('Health', overall, 'of 100', overall == null ? 'Once every component is tried for accessibility' : 'Weighted as ' + weights) +
+      areas.map(function (a) {
+        if (a.wait) return tile(a.name, null, '%', 'Trying the components in this browser, ' + tried.length + ' of ' + COMPONENTS.length);
+        return tile(a.name, a.score, '%', a.n ? a.done + ' of ' + a.n + ' done' : 'Nothing to measure yet');
+      }).join('');
+    // What is left, weighed as the system's number weighs it: a row to fix in an area counts that area's weight, one to
+    // check half of it.
+    var weightOf = {}; HEALTH_AREAS.forEach(function (a) { weightOf[a[0]] = a[1]; });
+    var openW = function (r) { return (weightOf[r.area] || 0) * (1 - HEALTH_PART[r.st]); };
+    var pain = per.map(function (p) {
+      var open = p.rows.filter(isOpen), by = {};
+      open.forEach(function (r) { by[r.area] = (by[r.area] || 0) + 1; });
+      return { c: p.c, w: open.reduce(function (s, r) { return s + openW(r); }, 0), n: open.length, by: by };
+    }).filter(function (x) { return x.w > 0; }).sort(function (a, b) { return b.w - a.w || b.n - a.n; });
+    var topW = pain.length ? pain[0].w : 1;
+    var painHTML = pain.length ? '<ol class="sg-health-list">' + pain.slice(0, 8).map(function (x) {
+      return '<li><div class="sg-health-row"><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a><span>' + x.n + ' open</span></div>' + bar(pct(x.w / topW)) +
+        '<p class="sg-health-sub">' + esc(HEALTH_AREAS.filter(function (a) { return x.by[a[0]]; }).map(function (a) { return a[0] + ' ' + x.by[a[0]]; }).join(', ')) + '</p></li>';
+    }).join('') + '</ol>' : '<p class="sg-health-sub">No component has anything open.</p>';
+    // The same problem in many components: one kind of row (a criterion, a token, a prop) open in each.
+    var kinds = {};
+    per.forEach(function (p) { p.rows.filter(isOpen).forEach(function (r) {
+      var k = r.area + '\u0000' + (r.kind || 'Other'), e = kinds[k] || (kinds[k] = { area: r.area, kind: r.kind || 'Other', comps: {}, n: 0, w: 0 });
+      e.comps[p.c.name] = 1; e.n++; e.w += openW(r);
+    }); });
+    var recur = Object.keys(kinds).map(function (k) { var e = kinds[k]; e.m = Object.keys(e.comps).length; return e; })
+      .sort(function (a, b) { return b.m - a.m || b.w - a.w; }).slice(0, 8);
+    var recurHTML = recur.length ? '<ol class="sg-health-list">' + recur.map(function (e) {
+      return '<li><div class="sg-health-row"><a class="sg-uses-link" href="#tasks/' + esc(e.area.toLowerCase()) + '">' + esc(e.area + ', ' + e.kind) + '</a><span>' + e.m + (e.m === 1 ? ' component' : ' components') + '</span></div>' +
+        bar(pct(e.m / COMPONENTS.length)) + '<p class="sg-health-sub">' + e.n + (e.n === 1 ? ' time' : ' times') + '</p></li>';
+    }).join('') + '</ol>' : '<p class="sg-health-sub">Nothing comes up twice.</p>';
+    // Who what is left waits on, weighed the same way.
+    var who = {}, whoAll = 0;
+    per.forEach(function (p) { p.rows.filter(isOpen).forEach(function (r) { var k = whoKey(r.who); who[k] = who[k] || { n: 0, w: 0 }; who[k].n++; who[k].w += openW(r); whoAll += openW(r); }); });
+    var whoHTML = whoAll ? '<ol class="sg-health-list">' + Object.keys(who).sort(function (a, b) { return who[b].w - who[a].w; }).map(function (k) {
+      return '<li><div class="sg-health-row"><span>' + esc(WHO[k]) + '</span><span>' + pct(who[k].w / whoAll) + '%</span></div>' + bar(pct(who[k].w / whoAll)) + '<p class="sg-health-sub">' + who[k].n + ' open</p></li>';
+    }).join('') + '</ol>' : '<p class="sg-health-sub">Nothing waits on anyone.</p>';
+    // Ready for agents: what it is, when to use it and when not and its role written, and nothing open with Figma.
+    var built = COMPONENTS.filter(function (c) { return !c.codeOnly; }), lack = {}, ready = 0;
+    built.forEach(function (c) {
+      var miss = docIssueRows(c).filter(function (r) { return READY_KINDS.indexOf(r.kind) >= 0 && r.st !== 'done'; }).map(function (r) { return r.kind; });
+      var rows = (per.filter(function (p) { return p.c === c; })[0] || { rows: [] }).rows;
+      if (rows.some(function (r) { return r.area === 'Parity' && isOpen(r); })) miss.push('Agrees with Figma');
+      miss.forEach(function (m) { lack[m] = (lack[m] || 0) + 1; });
+      if (!miss.length) ready++;
+    });
+    var lacks = Object.keys(lack).sort(function (a, b) { return lack[b] - lack[a]; });
+    var readyHTML = '<p class="sg-health-num">' + ready + '<small>of ' + built.length + '</small></p>' + bar(built.length ? pct(ready / built.length) : 0) +
+      '<p class="sg-health-sub">Components an agent can pick right on its own, with what each is, when to use it and when not, and its role written, and agreeing with Figma.</p>' +
+      (lacks.length ? '<ol class="sg-health-list">' + lacks.map(function (m) { return '<li><div class="sg-health-row"><span>' + esc(m === 'Agrees with Figma' ? 'Differs from Figma' : m + ' not written') + '</span><span>' + lack[m] + '</span></div></li>'; }).join('') + '</ol>' : '');
+    // Each component's own progress: its number weighted as the system's, its share done in each area and whether an
+    // agent can pick it right, the weakest first. Numbers only: what is open is on the Tasks page and its own areas.
+    var readyOf = {};
+    built.forEach(function (c) {
+      var miss = docIssueRows(c).some(function (r) { return READY_KINDS.indexOf(r.kind) >= 0 && r.st !== 'done'; });
+      var rows = (per.filter(function (p) { return p.c === c; })[0] || { rows: [] }).rows;
+      readyOf[c.name] = !miss && !rows.some(function (r) { return r.area === 'Parity' && isOpen(r); });
+    });
+    var compScores = per.map(function (p) {
+      var by = {}, ws = 0, wv = 0;
+      HEALTH_AREAS.forEach(function (a) {
+        var rows = p.rows.filter(function (r) { return r.area === a[0]; });
+        if (!rows.length || (wait && a[0] === 'Accessibility')) { by[a[0]] = null; return; }
+        by[a[0]] = pct(rows.reduce(function (s, r) { return s + HEALTH_PART[r.st]; }, 0) / rows.length);
+        if (a[1] > 0) { ws += a[1]; wv += by[a[0]] * a[1]; }
+      });
+      return { c: p.c, by: by, score: ws ? Math.round(wv / ws) : null };
+    }).filter(function (x) { return x.score != null; }).sort(function (a, b) { return a.score - b.score || a.c.name.localeCompare(b.c.name); });
+    var cell = function (v, label) { return '<td data-label="' + esc(label) + '">' + (v == null ? '<span class="pg-par-none">–</span>' : v + '%') + '</td>'; };
+    var compHTML = compScores.length ? '<div class="pg-par-card sg-health-comps"><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>Health</th>' +
+      HEALTH_AREAS.map(function (a) { return '<th>' + esc(a[0]) + '</th>'; }).join('') + '<th>Ready for agents</th></tr></thead><tbody>' +
+      compScores.map(function (x) {
+        return '<tr><td data-label="Component"><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a></td><td data-label="Health"><div class="sg-health-cell"><span>' + x.score + '%</span>' + bar(x.score) + '</div></td>' +
+          HEALTH_AREAS.map(function (a) { return cell(x.by[a[0]], a[0]); }).join('') +
+          '<td data-label="Ready for agents">' + (x.c.name in readyOf ? (readyOf[x.c.name] ? 'Yes' : 'No') : '<span class="pg-par-none">–</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>' : '';
+    var card = function (title, body) { return '<div class="sg-health-card"><h3>' + esc(title) + '</h3>' + body + '</div>'; };
+    var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div><div class="sg-health-grid">' +
+      card('Components with the most left', painHTML) + card('What comes up most', recurHTML) + card('Who it waits on', whoHTML) + card('Ready for agents', readyHTML) +
+      '</div>' + (compHTML ? '<h3 class="sg-health-head">Each component</h3>' + compHTML : '') + '<p class="pg-wcag-note sg-health-note">A row done counts whole, one to check half, one to fix nothing; what is left is weighed by its area. ' +
+      (wait ? 'Accessibility joins once every component is tried in this browser.' : '') + '</p></div>';
+    var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
+    box.className = 'sg-health-box';
+    if (box._drawn !== html) { box.innerHTML = html; box._drawn = html; }
+  }
   // Only the kind chosen, its own tables, and its own count of what is to fix and to check; the numbers stay as they are.
   // Accessibility last: what a browser still has to try is numbered after the rest, so no other number moves.
   var TODO_KINDS = ['Parity', 'Motion', 'Documentation', 'Migration', 'Products', 'System', 'Page', 'Accessibility'];
@@ -2433,7 +2590,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (BAKING && share) list = list.filter(function (c, i) { return i % +share[2] === +share[1]; });
     sweeping = true;
     (function next() {
-      if (sweepAt >= list.length || hashParts().id !== 'tasks') { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
+      if (sweepAt >= list.length || !/^(tasks|health)$/.test(hashParts().id)) { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
       var c = list[sweepAt++], id = cid(c.name);
       if (c.__a11y && (c.__a11y.live || c.__a11y.baked)) return setTimeout(next, 0);
       var sec = null; try { sec = document.getElementById(id) || (BUILDERS[id] && BUILDERS[id]()); } catch (e) { setTimeout(next, 0); throw e; }
@@ -3834,6 +3991,7 @@ a.pg-usage-name { color: var(--sg-text); }
     while (tGroup && !tGroup.classList.contains('sg-nav-label')) tGroup = tGroup.previousElementSibling;
     var tTag = target.querySelector('.sg-section-badge'); if (tTag && tGroup) tTag.textContent = tGroup.textContent;
     if (target.id === 'tasks') { openTodoKind(at.slug); setTimeout(a11ySweep, 300); }
+    if (target.id === 'health') setTimeout(a11ySweep, 300);   // its accessibility number waits on the same try
     // A foundation's size switch stays in view under its title as the page scrolls.
     var tTitle = target.querySelector(':scope > h2'), tSwitch = target.querySelector('.sg-size-switch');
     if (tTitle && tSwitch) tSwitch.style.top = 'calc(var(--sg-sticky-top, 0px) + ' + tTitle.offsetHeight + 'px)';

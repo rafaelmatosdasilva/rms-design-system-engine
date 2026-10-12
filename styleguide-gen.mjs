@@ -812,6 +812,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       }
       if (cfg.styleguide?.groups) view.groups = cfg.styleguide.groups;
     } catch { /* no status, no coverage */ }
+    // How much each area weighs in the Health page's one number (styleguide.health.weights); the page's own otherwise.
+    if (cfg.styleguide?.health?.weights && typeof cfg.styleguide.health.weights === 'object') view.healthWeights = cfg.styleguide.health.weights;
     // What the system retired that is still in use (K12): each deprecated component on its own page and in its To do
     // rows, product by product; each retired token in the system's To do, a swap or a decision.
     if (!opts.only?.length) try {
