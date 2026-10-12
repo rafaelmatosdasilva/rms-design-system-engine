@@ -2444,6 +2444,8 @@ a.pg-usage-name { color: var(--sg-text); }
   // The rows each area counts, as before; a check that did not run is also said apart, as what was not checked (G15):
   // one still to run counts as to check here, so it never reads as passed.
   var notRun = function (r) { return r.st === 'skip' || !!r.unrun; };
+  // Each component's checks that did not run, with why: for whoever asks what Checked leaves out.
+  window.__sgNotRun = function () { var o = {}; COMPONENTS.forEach(function (c) { var rows = healthAllRows(c, true).filter(notRun); if (rows.length) o[c.name] = rows.map(function (r) { return [r.area, r.kind, r.st, String(r.rel || r.note || '').replace(/<[^>]+>/g, '').slice(0, 120)]; }); }); return o; };
   function healthRowsOf(all) { return all.filter(function (r) { return r.st in HEALTH_PART; }); }
   function fillHealth() {
     if (!hl) return;
