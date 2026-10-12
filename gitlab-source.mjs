@@ -17,6 +17,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, rmdirSync } from 'fs';
 import { join, dirname, resolve, sep } from 'path';
 import { gunzipSync } from 'zlib';
+import { request as httpRequest } from 'http';
+import { request as httpsRequest } from 'https';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 
 export const STATE_FILE = '.gitlab-source.json';
@@ -106,6 +108,35 @@ export function untar(buf) {
   return out;
 }
 
+// A plain GET with Node's own http(s), the mirror's default. Node's fetch always sends the browser header
+// Sec-Fetch-Mode: cors, and GitLab answers 406 to an archive download that carries it (the project and commit calls
+// pass, so the run fails only at the download). Follows up to 5 redirects; the token goes no further than the host
+// it was meant for. → { ok, status, json(), arrayBuffer() }, the part of a fetch Response the mirror reads.
+export function plainGet(url, { headers = {}, signal } = {}, hops = 5) {
+  return new Promise((ok, fail) => {
+    const u = new URL(url);
+    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, { method: 'GET', headers, signal }, (res) => {
+      const status = res.statusCode ?? 0;
+      if (status >= 300 && status < 400 && res.headers.location && hops > 0) {
+        res.resume();
+        const next = new URL(res.headers.location, u);
+        const keep = next.host === u.host ? headers : Object.fromEntries(Object.entries(headers).filter(([k]) => k.toLowerCase() !== 'private-token'));
+        ok(plainGet(next.href, { headers: keep, signal }, hops - 1));
+        return;
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('error', fail);
+      res.on('end', () => {
+        const body = Buffer.concat(chunks);
+        ok({ ok: status >= 200 && status < 300, status, json: async () => JSON.parse(body.toString('utf8')), arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) });
+      });
+    });
+    req.on('error', fail);
+    req.end();
+  });
+}
+
 // What a failed response means, in words the person can act on (never the token).
 function why(status, host) {
   if (status === 401) return 'GitLab did not accept the token (401): check GITLAB_TOKEN - wrong, expired or revoked';
@@ -126,7 +157,7 @@ export async function syncGitlab(p, opts = {}) {
   const token = tokenFrom(env, [from, dir]);
   const send = token && tokenAllowedFor(p.host, env);
   const headers = send ? { 'PRIVATE-TOKEN': token } : {};
-  const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+  const fetchImpl = opts.fetchImpl ?? plainGet;
   const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
   const cached = (warning) => state?.sha && existsSync(dir)
     ? { dir, path: p.path, ref: state.ref, sha: state.sha, title: state.title, committedAt: state.committedAt, changed: false, stale: true, warning }
