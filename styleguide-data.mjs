@@ -357,9 +357,10 @@ export function realizedControls({ name, defs = {}, cls = null, propertyMap = {}
 // propertyMaps: { name: the contract's propertyMap (Figma prop → option → selector) } · heardOn: { name: { prop: { option: selector } } }
 // (the part a state is heard on) · parts: { name: [{ name, selector }] }
 // from the contract's children. · jsx: { name: the markup a React component's own JSX returns (jsx-markup.mjs) }, used
-// when neither the contract nor a page has it.
+// when neither the contract nor a page has it. · renders: { name: [{ props, markup }] }, a Vue component in each of its
+// variants as its own build renders them (vue-harness.mjs), kept when its markup is that build's.
 export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, classFor = () => null, cssText = '', probes = {}, probeList = [], unbuilt = [], cfg = {},
-  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, heardOn = {}, parts = {}, jsx = {}, alsoNames = [], themeCss = '', cats = null, codeOnly = [] } = {}) {
+  check = null, figmaVars = {}, pages = [], usage = {}, notes = {}, icons = [], title = '', propertyMaps = {}, heardOn = {}, parts = {}, jsx = {}, renders = {}, alsoNames = [], themeCss = '', cats = null, codeOnly = [] } = {}) {
   const byComponent = new Map();
   for (const r of rows) { if (!byComponent.has(r.component)) byComponent.set(r.component, []); byComponent.get(r.component).push(r); }
   const components = [], waiting = [];
@@ -440,7 +441,8 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     // in a design-intent category.
     addHeard(controls, heardOn[name]);
     components.push({ name, cls, role: roleWord(requirementEntry(entry, cats, cfg).annotations), description: entry.description ?? '', note: notes[name.toLowerCase()] ?? notes[name] ?? '',
-      markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls, ...(propsNotBuilt.length ? { unbuilt: propsNotBuilt } : {}) });
+      markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', ...(renders[name] && chosen?.from === 'jsx' && chosen.markup === jsx[name] ? { renders: renders[name] } : {}),
+      usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls, ...(propsNotBuilt.length ? { unbuilt: propsNotBuilt } : {}) });
   }
   // The components the code has that Figma does not list (every one, before Figma's data is captured): shown with
   // their file and the props their code declares, each said to be compared with nothing in Figma. Drawn from an

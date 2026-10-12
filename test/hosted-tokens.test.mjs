@@ -52,7 +52,9 @@ test('setup takes every hosted mode file it is given, writes them to one local f
   // Found in the code, with no file given: taken all the same.
   const found = await init([]);
   assert.match(found.text, /Took 6 hosted token stylesheet\(s\)/, found.text);
-  const out = await init([`--theme-css=${SIX.map(([c, s]) => `${base}/${c}-${s}.css`).join(',')}`]);
+  // Set up already: again only when asked to (--reconfigure); a plain --init keeps the config it has.
+  assert.match((await init([])).text, /This project is already set up \(ds-config\.json\); nothing was written\./);
+  const out = await init(['--reconfigure', `--theme-css=${SIX.map(([c, s]) => `${base}/${c}-${s}.css`).join(',')}`]);
   server.close();
   assert.match(out.text, /Took 6 hosted token stylesheet\(s\), every mode \(light, dark × desktop, laptop, tablet\), into src\/styles\/tokens\.hosted\.css/, out.text);
   const css = readFileSync(join(dir, 'src/styles/tokens.hosted.css'), 'utf8');
