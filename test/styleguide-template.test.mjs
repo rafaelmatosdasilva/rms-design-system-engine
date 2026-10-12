@@ -503,7 +503,7 @@ test('in the browser: no script error, a control changes the real component, the
     // One kind at a time, each in its own table, chosen with the filter; no list of every kind at once.
     const shownKind = () => run(`[...document.querySelectorAll('#tasks .sg-todo-kind')].filter((k) => k.getClientRects().length).map((k) => k.dataset.area)`);
     const shownHead = () => run(`document.querySelector('#tasks .sg-todo-kind:not([hidden]) thead').textContent`);
-    assert.match((await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^Parity \(\d+\)\|Accessibility \(\d+\)\|Documentation \(\d+\)/);
+    assert.match((await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^Parity \(\d+\)\|(Motion \(\d+\)\|)?Documentation \(\d+\)\|.*Accessibility \(\d+\)$/, 'Accessibility last, the kind that waits');
     assert.equal(await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].some((b) => b.dataset.v === 'all')`), false, 'no All');
     assert.deepEqual(await shownKind(), ['Parity']);
     assert.equal(await run(`(() => { const h = document.querySelector('#tasks .sg-todo-head'); return [...h.children].map((e) => e.classList.contains('sg-todo-filter') ? 'filter' : e.classList.contains('sg-todo-sum') ? 'counts' : '?').join(','); })()`), 'filter,counts', 'the counts under the filter, since they are the chosen kind\'s');
