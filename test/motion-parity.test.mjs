@@ -114,7 +114,8 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
       const at = `[...document.querySelectorAll('#motion .sg-motion-dot')].map((d) => Math.round(d.getBoundingClientRect().left - d.parentNode.getBoundingClientRect().left))`;
       assert.deepEqual(await run2(at), [0, 0], 'nothing moves until Play');
       await run2(`document.querySelector('#motion [data-motion-play]').click()`);
-      await new Promise((r) => setTimeout(r, 700));
+      // Measured once each dot's animation has finished (a busy machine draws its frames late), never after a fixed wait.
+      await send('Runtime.evaluate', { expression: `Promise.race([Promise.all(document.getAnimations().map((a) => a.finished)), new Promise((r) => setTimeout(r, 10000))]).then(() => true)`, awaitPromise: true, returnByValue: true }, sessionId);
       const moved = await run2(at);
       assert.ok(moved.every((x) => x > 20), `each dot crossed its track: ${JSON.stringify(moved)} ${await run2(`JSON.stringify([getComputedStyle(document.getElementById('motion')).display, [...document.querySelectorAll('#motion .sg-motion-track')].map((t) => t.clientWidth)])`)}`);
       close();

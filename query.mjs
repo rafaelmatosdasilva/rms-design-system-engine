@@ -6,7 +6,8 @@
 // drifts. Read-only, over what every audit run already writes (contracts/catalog.json, contracts/tokens.json):
 //   • a component: its selector and code file, each prop with its values and default as the code writes
 //     them, Figma's own names where they differ (that is a parity difference), the names an agent is
-//     likely to guess wrong, slots, what it must never contain, when not to use it and what to use instead;
+//     likely to guess wrong, slots, what it must never contain, when not to use it and what to use instead, and where
+//     it lives (the products and files that use it, what it sits inside and holds, the Figma screens that draw it);
 //   • a token: its CSS variable, its value in each mode, and for a text colour the surfaces it can be read on;
 //   • anything else: the closest component and token names.
 // Several terms answer in one call. With no catalog yet it runs the audit once to write it. Exit 0 when every term
@@ -18,6 +19,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
 import { envVar } from './names.mjs';
+import { usageLines } from './usage-map.mjs';
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -76,6 +78,8 @@ export function answerLines(a) {
   if (e.neverCombineWith?.length) lines.push(`  never contains: ${e.neverCombineWith.join(', ')}`);
   if (e.whenNotToUse) lines.push(`  when not to use: ${e.whenNotToUse}`);
   if (e.useInstead?.length) lines.push(`  use instead: ${e.useInstead.join(', ')}`);
+  // Where it lives (I82): the products that use it, what it sits inside and holds, the Figma screens that draw it.
+  if (e.livesIn) lines.push(...usageLines(e.livesIn));
   return lines;
 }
 

@@ -361,11 +361,16 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-diff-list b { white-space: normal; }
 .pg-todo { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-text-2); }
 .sg-todo { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one card table per component */
+.sg-todo-kind { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one kind at a time, its cards spaced as the list's */
+.sg-todo-kind.pg-footer { margin-top: 0; }   /* Documentation's cards start where every other kind's do */
+.sg-todo-kind[hidden] { display: none; }
 /* One table for every issue, on the To do page and in a component's Parity and Accessibility areas: the same columns at
    the same widths everywhere, so they line up down the page and read the same in each place. */
 .sg-issues { table-layout: fixed; }
-.sg-issues th:nth-child(1) { width: 7%; } .sg-issues th:nth-child(2) { width: 13%; } .sg-issues th:nth-child(3) { width: 14%; }
-.sg-issues th:nth-child(4) { width: 21%; } .sg-issues th:nth-child(5) { width: 28%; } .sg-issues th:nth-child(6) { width: 17%; }
+/* Each kind's own columns: six for Parity and Accessibility, four for the rest. */
+.sg-issues th:nth-child(1) { width: 7%; }
+.sg-cols-6 th:nth-child(2) { width: 13%; } .sg-cols-6 th:nth-child(3) { width: 14%; } .sg-cols-6 th:nth-child(4) { width: 21%; } .sg-cols-6 th:nth-child(5) { width: 28%; } .sg-cols-6 th:nth-child(6) { width: 17%; }
+.sg-cols-4 th:nth-child(2) { width: 26%; } .sg-cols-4 th:nth-child(3) { width: 50%; } .sg-cols-4 th:nth-child(4) { width: 17%; }
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
 .sg-issues th, .sg-issues td { padding-left: var(--sg-space-s); padding-right: var(--sg-space-s); }
@@ -982,7 +987,7 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   // The To do page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
   hr(); navLink('todo', 'to do');
-  var td = section('todo', 'To do', 'What to do', 'List all open parity and accessibility issues by component, showing who handles each one (you in Figma, Claude in code, or manual check). Then tell Claude which ones to do, for example, do 3 and 7.');
+  var td = section('todo', 'To do', 'What to do', 'List all open parity, accessibility and documentation issues, one kind at a time, by component, showing who handles each one (you in Figma, Claude in code, or manual check). Then tell Claude which ones to do, for example, do 3 and 7.');
   // Changelog: every component's changes gathered by the release they shipped in, newest first, each a table of
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
@@ -1813,19 +1818,37 @@ a.pg-usage-name { color: var(--sg-text); }
      the open ones under the same numbers. A row: { key, area, kind, kindHTML, type, figma, code, todo (html), who, st,
      rel, at, src, extra }. */
   var STATUS = { todo: ['✕', 'To fix', 'differs'], check: ['!', 'To check', 'figma'], done: ['✓', 'Done', 'match'], none: ['–', 'Not needed', 'none'], skip: ['–', 'Not compared', 'none'] };
-  var ISSUE_HEAD = '<thead><tr><th>Issue nr</th><th>Area</th><th>Figma</th><th>Code</th><th>What to do</th><th>Status</th></tr></thead>';
   function isOpen(r) { return r.st === 'todo' || r.st === 'check'; }
   function statusHTML(st, sub) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
-  function issueRowHTML(r) {
-    var n = isOpen(r) ? TODO_NO[r.key] : null;
+  // Each kind of issue in a table of its own shape: Parity compares Figma with the code, Accessibility a criterion with
+  // what Figma states and what was found, and the rest where it is and what to do (Documentation is the Documentation
+  // table itself). A component's own Parity and Accessibility areas show the same tables as the To do page.
+  var ISSUE_CELL = {
+    no: function (r) { var n = isOpen(r) ? TODO_NO[r.key] : null; return '<td class="pg-par-type sg-todo-no" data-todo-key="' + esc(encodeURIComponent(r.key)) + '">' + (n || '') + '</td>'; },
+    kind: function (r) { return '<td class="sg-todo-area">' + (r.kindHTML || esc(r.kind || '')) + '</td>'; },
+    figma: function (r) { return '<td>' + (r.figma || '') + '</td>'; },
+    code: function (r) { return '<td>' + (r.code || '') + '</td>'; },
+    where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
+    todo: function (r) { return '<td>' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (r.todo || '') + '</td>'; },
+    status: function (r) { return '<td>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel) + (r.fresh && isOpen(r) ? '<span class="pg-par-val">New in the last audit</span>' : '') + (r.at ? '<span class="pg-at-date">Updated ' + esc(when(r.at)) + '</span>' : '') + (r.src || []).filter(Boolean).map(function (x) { return '<span class="pg-a11y-from">' + esc(x) + '</span>'; }).join('') + '</td>'; }
+  };
+  var ISSUE_COLS = {
+    Parity: [['Issue nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status']],
+    Accessibility: [['Issue nr', 'no'], ['WCAG criterion', 'kind'], ['Figma states', 'figma'], ['Found', 'code'], ['What to do', 'todo'], ['Status', 'status']],
+    Migration: [['Issue nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
+    Products: [['Issue nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
+    System: [['Issue nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status']],
+    Page: [['Issue nr', 'no'], ['Kind', 'kind'], ['What to do', 'todo'], ['Status', 'status']]
+  };
+  var colsOf = function (area) { return ISSUE_COLS[area] || ISSUE_COLS.System; };
+  function issueRowHTML(r, area) {
     return '<tr data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
-      '<td class="pg-par-type sg-todo-no" data-todo-key="' + esc(encodeURIComponent(r.key)) + '">' + (n || '') + '</td>' +
-      '<td class="sg-todo-area">' + esc(r.area) + (r.kindHTML || r.kind ? '<span class="pg-par-val">' + (r.kindHTML || esc(r.kind)) + '</span>' : '') + '</td>' +
-      '<td>' + (r.figma || '') + '</td><td>' + (r.code || '') + '</td>' +
-      '<td>' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (r.todo || '') + '</td>' +
-      '<td>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel) + (r.fresh && isOpen(r) ? '<span class="pg-par-val">New in the last audit</span>' : '') + (r.at ? '<span class="pg-at-date">Updated ' + esc(when(r.at)) + '</span>' : '') + (r.src || []).filter(Boolean).map(function (x) { return '<span class="pg-a11y-from">' + esc(x) + '</span>'; }).join('') + '</td></tr>';
+      colsOf(area || r.area).map(function (col) { return ISSUE_CELL[col[1]](r); }).join('') + '</tr>';
   }
-  function issueTableHTML(rows, bodyCls, head) { return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues">' + ISSUE_HEAD + '<tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(issueRowHTML).join('') + '</tbody></table></div></div>'; }
+  function issueTableHTML(rows, bodyCls, head, area) {
+    var cols = colsOf(area || ((rows || [])[0] || {}).area);
+    return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + '"><thead><tr>' + cols.map(function (col) { return '<th>' + esc(col[0]) + '</th>'; }).join('') + '</tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
+  }
   // A count of each status above a table, as the To do page counts them.
   function statusSum(rows) {
     var n = {}; rows.forEach(function (r) { if (!r.extra) n[r.st] = (n[r.st] || 0) + 1; });
@@ -1901,7 +1924,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var types = ['Prop', 'Variable', 'Value', 'Other'].filter(function (t) { return rows.some(function (r) { return r.type === t; }); });
     var plural = { Prop: 'Props', Variable: 'Variables', Value: 'Values', Other: 'Other' };
     var filter = types.length > 1 ? '<div class="pg-par-filter">' + segHTML([{ label: 'All (' + rows.length + ')', v: 'all' }].concat(types.map(function (t) { return { label: plural[t] + ' (' + rows.filter(function (r) { return r.type === t; }).length + ')', v: t }; })), 'Show') + '</div>' : '';
-    return '<div class="pg-doc pg-par"><div class="pg-par-sum">' + statusSum(rows) + '</div>' + filter + issueTableHTML(rows) + '</div>';
+    return '<div class="pg-doc pg-par"><div class="pg-par-sum">' + statusSum(rows) + '</div>' + filter + issueTableHTML(rows, '', '', 'Parity') + '</div>';
   }
   // Each cell of a table of several columns carries the name of its column (data-label), shown above its value on a
   // phone where each row is a block; the table keeps its roles there, as a phone's browser drops them for a block.
@@ -1995,7 +2018,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
     var id = j < 0 ? path : path.slice(0, j);
-    return { id: id === 'whats-new' ? 'changelog' : id === 'coverage' ? 'documentation' : id, area: area, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // a link from when it was What's new
+    return { id: id === 'whats-new' ? 'changelog' : id === 'coverage' ? 'documentation' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // a link from when it was What's new
   }
   function copyText(text, btn, said) {
     var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
@@ -2081,7 +2104,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // last audit ran; in it, as rows of their own, what Figma and the team wrote that no check reads.
   function a11yHTML(c) {
     var a = c.a11y; if (!a) return '';
-    return '<div class="pg-doc pg-par pg-a11y"><div class="pg-par-sum pg-a11y-sum"></div><p class="pg-wcag-note pg-a11y-note"></p>' + issueTableHTML([], 'pg-a11y-rows') + '</div>';
+    return '<div class="pg-doc pg-par pg-a11y"><div class="pg-par-sum pg-a11y-sum"></div><p class="pg-wcag-note pg-a11y-note"></p>' + issueTableHTML([], 'pg-a11y-rows', '', 'Accessibility') + '</div>';
   }
   // What no check reads, each a row: each Figma annotation on it a check does not read (with the wording one reads, when
   // the engine can tell what it means) and the team's guidelines, which the agents read as design intent. One that states
@@ -2155,15 +2178,23 @@ a.pg-usage-name { color: var(--sg-text); }
     var m = c.migration; if (!m) return [];
     return m.products.map(function (p) {
       return { key: c.name + '\u0000migration:' + p.name, area: 'Migration', kind: 'Retired', figma: '', code: '<code>' + esc(p.name) + '</code><span class="pg-par-val">' + esc(p.count + (p.count === 1 ? ' place' : ' places')) + '</span>',
+        where: esc(p.name) + '<span class="pg-par-val">' + esc(p.count + (p.count === 1 ? ' place' : ' places') + ': ' + p.at.join(', ') + (p.count > p.at.length ? ', and ' + (p.count - p.at.length) + ' more' : '')) + '</span>',
         todo: esc('Move ' + (p.name === 'This system' ? 'this system' : p.name) + ' off ' + c.name + ' (' + p.at.join(', ') + (p.count > p.at.length ? ', and ' + (p.count - p.at.length) + ' more' : '') + ').') + '<span class="pg-todo">' + esc((m.toName ? 'Use ' + m.toName + ' instead. ' : 'Decide what replaces it first. ') + 'Every place is in migrations.md. Tell Claude to do it.') + '</span>',
         who: m.toName ? WHO.code : WHO.both, st: m.toName ? 'todo' : 'check', rel: '', at: DATA.builtAt || null };
     });
+  }
+  // Documentation not written yet: each kind its Documentation area says is missing (shown on the To do page in that
+  // same table).
+  function docRows(c) {
+    if (c.codeOnly) return [];
+    return KNOW.filter(function (k) { return !k[1](c); }).map(function (k) { return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], st: 'todo' }; });
   }
   // A class a product styles almost as this component (I83): a decision, one row each, to use the component or to add
   // the new one to the system on purpose.
   function copyRows(c) {
     return (c.copies || []).map(function (x) {
       return { key: c.name + '\u0000copy:' + x.product + ':' + x.cls, area: 'Products', kind: 'Near copy', figma: '', code: '<code>.' + esc(x.cls) + '</code><span class="pg-par-val">' + esc(x.product + ', ' + x.file + ':' + x.line) + '</span>',
+        where: esc(x.product) + '<span class="pg-par-val"><code>.' + esc(x.cls) + '</code> ' + esc(x.file + ':' + x.line) + '</span>',
         todo: esc(x.product + '\'s .' + x.cls + ' is nearly ' + c.name + ' (' + x.same + ' of ' + x.of + ' declarations alike' + (x.differ.length ? '; it differs in ' + x.differ.slice(0, 4).join(', ') : '') + ').') + '<span class="pg-todo">' + esc('Decide: use ' + c.name + ' in ' + x.product + ', with a new option if it needs one, or add .' + x.cls + ' to the system on purpose. Tell Claude which.') + '</span>',
         who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null };
     });
@@ -2193,21 +2224,26 @@ a.pg-usage-name { color: var(--sg-text); }
       } catch (e) { /* its accessibility is read on its own page */ }
       migrationRows(c).forEach(function (r) { rows.push(r); });
       copyRows(c).forEach(function (r) { rows.push(r); });
+      docRows(c).forEach(function (r) { rows.push(r); });
       if (rows.length) order.push({ name: c.name, rows: rows });
     });
-    // Numbered in the order the page shows them, top to bottom: the system first, then each component by name, in each
-    // what is to fix before what is to check. A component's own areas name the same numbers.
+    // Each kind on its own, in its own table: Parity, Accessibility, Documentation and the rest, each by component, the
+    // system's first. Numbered in the order the kinds and their tables show them, in each what is to fix before what is
+    // to check; a component's own areas name the same numbers.
+    var kindsSeen = [];
+    order.forEach(function (g) { g.rows.forEach(function (r) { if (kindsSeen.indexOf(r.area) < 0) kindsSeen.push(r.area); }); });
+    var kinds = TODO_KINDS.filter(function (a) { return kindsSeen.indexOf(a) >= 0; }).concat(kindsSeen.filter(function (a) { return TODO_KINDS.indexOf(a) < 0; }));
+    var byKind = kinds.map(function (a) {
+      return { area: a, groups: order.map(function (g) { return { name: g.name, rows: byStatus(g.rows.filter(function (r) { return r.area === a; })) }; }).filter(function (g) { return g.rows.length; }) };
+    });
     var no = 0;
     Object.keys(TODO_NO).forEach(function (k) { delete TODO_NO[k]; });
-    order.forEach(function (g) {
-      g.rows = byStatus(g.rows);
-      g.rows.forEach(function (r) { r.no = ++no; TODO_NO[r.key] = r.no; });
-    });
+    byKind.forEach(function (k) { if (k.area !== 'Documentation') k.groups.forEach(function (g) { g.rows.forEach(function (r) { r.no = ++no; TODO_NO[r.key] = r.no; }); }); });
+    var all = byKind.reduce(function (n, k) { return n + k.groups.reduce(function (m, g) { return m + g.rows.length; }, 0); }, 0);
     Array.prototype.forEach.call(document.querySelectorAll('.sg-todo-no[data-todo-key]'), function (el) {
       var tr = el.closest('tr'), n = TODO_NO[decodeURIComponent(el.dataset.todoKey)];
       el.textContent = n && tr && (tr.dataset.status === 'todo' || tr.dataset.status === 'check') ? n : '';
     });
-    var all = no, fix = order.reduce(function (n, g) { return n + g.rows.filter(function (r) { return r.st === 'todo'; }).length; }, 0);
     var link = nav.querySelector('a[href="#todo"]');
     var box = td.querySelector('.sg-todo') || td.appendChild(document.createElement('div')); box.className = 'sg-todo';
     var tried = COMPONENTS.filter(function (c) { return c.__a11y; }), last = tried.reduce(function (m, c) { var at = c.__a11y.live && c.__a11y.live.at; return at && (!m || at > m) ? at : m; }, null);
@@ -2222,17 +2258,24 @@ a.pg-usage-name { color: var(--sg-text); }
       (wait ? '' : sysButton('button', 'Try again in this browser', ' data-a11y-again')) + '</div>';
     if (link) link.lastChild.textContent = wait ? 'to do' : 'to do (' + all + ')';   // its count once every component is tried
     if (!all) { box.innerHTML = note + '<p class="pg-par-sum">Nothing open: Figma and the code agree, and nothing fails for accessibility.</p>'; return; }
-    var sign = function (st) { var x = STATUS[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>'; };
-    // A filter by area: every row, or only Parity's, Accessibility's or the page's own; kept as the list is drawn again.
-    var areas = {}; order.forEach(function (g) { g.rows.forEach(function (r) { areas[r.area] = (areas[r.area] || 0) + 1; }); });
-    var kinds = ['Parity', 'Accessibility', 'Migration', 'Products', 'System', 'Page'].filter(function (a) { return areas[a]; });
-    if (todoArea !== 'all' && !areas[todoArea]) todoArea = 'all';
-    var filter = kinds.length > 1 ? '<div class="pg-par-filter sg-todo-filter">' + segHTML([{ label: 'All (' + all + ')', v: 'all' }].concat(kinds.map(function (a) { return { label: a + ' (' + areas[a] + ')', v: a }; })), 'Show') + '</div>' : '';
-    box.innerHTML = note + '<div class="sg-todo-head"><p class="pg-par-sum">' + sign('todo').replace('To fix', fix + ' to fix') + ' ' + sign('check').replace('To check', (all - fix) + ' to check or decide') + '</p>' + filter + '</div>' + order.map(function (g) {
-      return issueTableHTML(g.rows, '', g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system');
+    // One kind shown at a time, chosen with the filter (no list of every kind at once); kept as the list is drawn again.
+    var count = function (k) { return k.groups.reduce(function (n, g) { return n + g.rows.length; }, 0); };
+    if (!byKind.some(function (k) { return k.area === todoArea; })) todoArea = byKind[0].area;
+    var filter = '<div class="pg-par-filter sg-todo-filter">' + segHTML(byKind.map(function (k) { return { label: k.area + ' (' + count(k) + ')', v: k.area }; }), 'Show') + '</div>';
+    box.innerHTML = note + '<div class="sg-todo-head"><p class="pg-par-sum sg-todo-sum"></p>' + filter + '</div>' + byKind.map(function (k) {
+      var link = function (g) { return g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system'; };
+      // Documentation in the table each component's Documentation area and the Documentation page show: every kind,
+      // what is written and where it comes from, a kind not written yet saying so.
+      if (k.area === 'Documentation') return '<div class="sg-todo-kind pg-footer" data-area="Documentation"><p class="pg-from">' + esc(WRITE_HINT) + '</p>' + k.groups.map(function (g) {
+        var c = COMPONENTS.filter(function (x) { return x.name === g.name; })[0];
+        return c ? knowledgeHTML(c, link(g)) : '';
+      }).join('') + '</div>';
+      return '<div class="sg-todo-kind" data-area="' + esc(k.area) + '">' + k.groups.map(function (g) {
+        return issueTableHTML(g.rows, '', link(g), k.area);
+      }).join('') + '</div>';
     }).join('');
     var seg = box.querySelector('.sg-todo-filter');
-    if (seg) segItems(seg).forEach(function (b) { b.addEventListener('click', function () { todoArea = b.dataset.v; showTodoArea(box); }); });
+    if (seg) segItems(seg).forEach(function (b) { b.addEventListener('click', function () { todoArea = b.dataset.v; showTodoArea(box); todoLink(); }); });
     showTodoArea(box);
     labelCells(td);
     todoHeadHeight();
@@ -2240,13 +2283,28 @@ a.pg-usage-name { color: var(--sg-text); }
   // Each card's head row sticks under the counts and the filter, whatever their height at this width.
   function todoHeadHeight() { var h = document.querySelector('#todo .sg-todo-head'); if (h) document.getElementById('todo').style.setProperty('--pg-areas-h', h.offsetHeight + 'px'); }
   window.addEventListener('resize', todoHeadHeight);
-  // Only the rows of the area chosen, and only the cards that still hold one; the numbers stay as they are.
-  var todoArea = 'all';
+  // Only the kind chosen, its own tables, and its own count of what is to fix and to check; the numbers stay as they are.
+  var TODO_KINDS = ['Parity', 'Accessibility', 'Documentation', 'Migration', 'Products', 'System', 'Page'];
+  var todoArea = 'Parity';
+  // Each kind has its own address to send someone to (#todo/accessibility): choosing one writes it, opening it opens it.
+  function todoLink() { if (ALL || hashParts().id !== 'todo') return; var h = '#todo/' + todoArea.toLowerCase(); if (h !== location.hash) history.replaceState(null, '', h); }
+  function openTodoKind(slug) {
+    var k = TODO_KINDS.filter(function (a) { return a.toLowerCase() === String(slug || '').toLowerCase(); })[0], box = td.querySelector('.sg-todo');
+    if (!k || k === todoArea) return;
+    todoArea = k;
+    if (box && box.querySelector('.sg-todo-kind[data-area="' + k + '"]')) showTodoArea(box);
+  }
   function showTodoArea(box) {
     var seg = box.querySelector('.sg-todo-filter');
     if (seg) segItems(seg).forEach(function (b) { segSelect(b, b.dataset.v === todoArea); });
-    Array.prototype.forEach.call(box.querySelectorAll('.pg-par-table tbody tr'), function (tr) { tr.hidden = todoArea !== 'all' && tr.dataset.area !== todoArea; });
-    Array.prototype.forEach.call(box.querySelectorAll('.pg-par-card'), function (card) { card.hidden = !card.querySelector('tbody tr:not([hidden])'); });
+    var shown = null;
+    Array.prototype.forEach.call(box.querySelectorAll('.sg-todo-kind'), function (k) { k.hidden = k.dataset.area !== todoArea; if (!k.hidden) shown = k; });
+    var rows = shown ? shown.querySelectorAll(todoArea === 'Documentation' ? 'tbody tr[data-have="0"]' : 'tbody tr') : [];
+    var fix = Array.prototype.filter.call(rows, function (tr) { return tr.dataset.status === 'todo' || tr.dataset.have === '0'; }).length;
+    var sign = function (st, text) { var x = STATUS[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(text) + '</span>'; };
+    var sum = box.querySelector('.sg-todo-sum');
+    if (sum) sum.innerHTML = [fix ? sign('todo', fix + ' to fix') : '', rows.length - fix ? sign('check', (rows.length - fix) + ' to check or decide') : ''].filter(Boolean).join(' ');
+    todoHeadHeight();
   }
   // What the browser found on each component. Tried once while the page was built (--styleguide opens it in a browser
   // and keeps the results in it, sg-a11y-baked): the To do page and every Accessibility area show those results at
@@ -2955,7 +3013,7 @@ a.pg-usage-name { color: var(--sg-text); }
       if (live !== undefined) liveNow = live;
       var tp = textParts(); if (tp.length || !c.__textParts) c.__textParts = tp;   // before it is drawn: the parts kept with its results
       if (liveNow && !liveNow.at) liveNow.at = new Date().toISOString();
-      a11yEl.innerHTML = a11yIssueRows(c, staticItems.concat(liveItems), liveNow).concat(unreadRows(c)).map(issueRowHTML).join('');
+      a11yEl.innerHTML = a11yIssueRows(c, staticItems.concat(liveItems), liveNow).concat(unreadRows(c)).map(function (r) { return issueRowHTML(r, 'Accessibility'); }).join('');
       if (liveNow) { c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice(), baked: !!(c.__a11y && c.__a11y.baked && c.__a11y.live === liveNow) }; fillTodo(); if (!checking) keepA11y(); }   // the To do page lists what it shows
       // Its switch carries the alert icon while anything on it is to fix or to check, as the area counts it.
       var open = a11yOpen(c, staticItems.concat(liveItems), liveNow);
@@ -3687,7 +3745,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var tLink = nav.querySelector('a[href="#' + target.id + '"]'), tGroup = tLink && tLink.previousElementSibling;
     while (tGroup && !tGroup.classList.contains('sg-nav-label')) tGroup = tGroup.previousElementSibling;
     var tTag = target.querySelector('.sg-section-badge'); if (tTag && tGroup) tTag.textContent = tGroup.textContent;
-    if (target.id === 'todo') setTimeout(a11ySweep, 300);
+    if (target.id === 'todo') { openTodoKind(at.slug); setTimeout(a11ySweep, 300); }
     // A foundation's size switch stays in view under its title as the page scrolls.
     var tTitle = target.querySelector(':scope > h2'), tSwitch = target.querySelector('.sg-size-switch');
     if (tTitle && tSwitch) tSwitch.style.top = 'calc(var(--sg-sticky-top, 0px) + ' + tTitle.offsetHeight + 'px)';

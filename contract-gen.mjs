@@ -697,6 +697,18 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   ensureDir(dirname(schemaOut));
   writeFileSync(schemaOut, JSON.stringify(CONTRACT_SCHEMA, null, 2) + '\n');
 
+  // Where each component lives (I82): the products' files that use it, what it sits inside and holds, the Figma screens
+  // that draw it. Read from the same files the catalog's real examples come from, and written into each contract.
+  let code = null, selectorFor = null, classFor = null, files = [], lives = {};
+  try { code = await (await import('./code-capture.mjs')).readFreshSnapshot(ROOT, cfg); } catch { /* optional */ }
+  try { const loc = await loadLocator(ROOT, cfg); selectorFor = loc.selectorFor; classFor = loc.classFor; } catch { /* optional */ }
+  try {
+    const { productFiles, usageMap } = await import('./usage-map.mjs');
+    files = productFiles(ROOT, cfg);
+    const screens = readJSON(resolve(ROOT, paths.snapshotScreenComponents || 'figma-screen-components.snapshot.json')) || {};
+    lives = usageMap(targets, { files, classFor, composition, codeNesting: code?.nesting ?? {}, screens });
+  } catch { /* best-effort */ }
+
   // 3) Per-component contracts + validate + change/reference detection.
   ensureDir(outDir);
   const emitted = [];
@@ -710,6 +722,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     const file = join(outDir, name + '.contract.json');
     const prev = readJSON(file);                                              // previous emit (for the diff)
     const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars });
+    if (lives[name]) contract.livesIn = lives[name];
     const errs = validateContract(contract);
     mkdirSync(dirname(file), { recursive: true });   // a component named with a slash (table/row) gets its folder
     writeFileSync(file, JSON.stringify(contract, null, 2) + '\n');
@@ -737,29 +750,9 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   // snapshot's prop names and nesting when it still matches the code.
   let catalog = null;
   try {
-    let code = null, selectorFor = null;
-    try { code = await (await import('./code-capture.mjs')).readFreshSnapshot(ROOT, cfg); } catch { /* optional */ }
-    let classFor = null;
-    try { const loc = await loadLocator(ROOT, cfg); selectorFor = loc.selectorFor; classFor = loc.classFor; } catch { /* optional */ }
     // A real use of each component from the code (I26): the products' code first, then the system's own pages.
     const examples = {};
     try {
-      const { codeRoots } = await import('./code-roots.mjs');
-      const { readdirSync } = await import('node:fs');
-      const roots = codeRoots(ROOT, cfg);
-      const files = [];
-      const walk = (dir, product, depth = 0) => {
-        if (depth > 8 || files.length > 4000) return;
-        let list = [];
-        try { list = readdirSync(dir, { withFileTypes: true }); } catch { return; }
-        for (const e of list) {
-          if (e.name.startsWith('.') || /^(node_modules|dist|build|coverage|out|style-?guide)$/.test(e.name)) continue;
-          const p = join(dir, e.name);
-          if (e.isDirectory()) walk(p, product, depth + 1);
-          else if (/\.(jsx|tsx|vue|svelte|mdx|html?)$/i.test(e.name) && !/\.(test|spec)\./.test(e.name) && !/\.min\./.test(e.name)) { try { files.push({ file: relative(ROOT, p), text: readFileSync(p, 'utf8'), product }); } catch { /* unreadable */ } }
-        }
-      };
-      roots.forEach((r, i) => walk(r, i > 0));
       const { realExample } = await import('./ui-catalog.mjs');
       for (const { name } of built) {
         const ex = realExample(name, classFor ? classFor(name) : null, files);
@@ -767,6 +760,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
       }
     } catch { /* optional */ }
     catalog = buildCatalog(built, { code, selectorFor, examples });
+    for (const [name, e] of Object.entries(catalog.components ?? {})) if (lives[name]) e.livesIn = lives[name];
     writeFileSync(join(outDir, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
   } catch { /* best-effort */ }
   const llmsOut = cc.llmsOut ? resolve(ROOT, cc.llmsOut) : join(outDir, 'llms.txt');

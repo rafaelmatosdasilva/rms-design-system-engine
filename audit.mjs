@@ -4910,7 +4910,10 @@ function reportFull(label, items, shown) {
         const records = findingRecords(now, names, { prev: prev?.findings ?? null, rules, failing: gr.filter((g) => g.verdict === 'fails').map((g) => g.check) });
         writeFileSync(join(ROOT, OUT_DIR, 'findings.json'), JSON.stringify({ at: new Date().toISOString(), gates: gr, findings: records }, null, 1) + '\n');
       } catch { /* a convenience */ }
-      writeFileSync(join(ROOT, OUT_DIR, 'differences.md'), differencesMarkdown(d, { at: new Date().toISOString().slice(0, 16).replace('T', ' '), handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') } }));
+      // Where each component lives (I82), from the catalog this run wrote: its heading in the list says so.
+      let livesIn = {};
+      try { livesIn = Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(ROOT, cfg.contracts?.out ?? 'contracts', 'catalog.json'), 'utf8')).components ?? {}).filter(([, e]) => e.livesIn).map(([n, e]) => [n, e.livesIn])); } catch { /* no catalog this run */ }
+      writeFileSync(join(ROOT, OUT_DIR, 'differences.md'), differencesMarkdown(d, { at: new Date().toISOString().slice(0, 16).replace('T', ' '), handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, livesIn }));
       console.log(`\n📋 Differences between Figma and the code: ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list → ${OUT_DIR}/differences.md`);
     } catch { /* a convenience */ }
     // The components only the code has (I72): what to build in Figma, with their props and the tokens their styles use.

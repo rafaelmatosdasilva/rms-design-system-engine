@@ -337,6 +337,26 @@ browserTest('disabled wins: hover and press must not change a disabled component
   assert.deepEqual(r.differ.filter((d) => /while disabled/.test(d.field)).map((d) => `${d.component} ${d.field}: ${d.code}`), ['btn hover while disabled (isDisabled=True): changes background']);
 });
 
+browserTest('disabled wins: every border side, the shadow and the outline, and no border that only follows the text colour', async () => {
+  const dir = makeFixture({
+    // .tab draws its bottom border only; its hover changes that side, a shadow and an outline. .link has no border, so
+    // its border colour follows the text colour its hover changes: only the text colour is a change.
+    'theme.css': '.tab { color: rgb(0, 0, 0); border: 0 solid; border-bottom: 2px solid rgb(0, 0, 0); }\n.tab.tab--off { color: rgb(150, 150, 150); }\n.tab:hover { border-bottom-color: rgb(0, 0, 255); box-shadow: 0 1px 2px rgb(0, 0, 0); outline: 2px solid rgb(0, 0, 255); }\n.link { color: rgb(0, 0, 0); }\n.link.link--off { color: rgb(150, 150, 150); }\n.link:hover { color: rgb(0, 0, 255); }\n',
+    'apps/app/ui.html': '<!doctype html><html><head><link rel="stylesheet" href="../../theme.css"></head><body><div class="tab">Tab</div><a class="link">Link</a></body></html>',
+    'structure-contract.mjs': "export const CONTRACT = { tab: { propertyMap: { isDisabled: { True: '.tab.tab--off' } } }, link: { propertyMap: { isDisabled: { True: '.link.link--off' } } } };",
+    'struct.json': { components: { tab: {}, link: {} } },
+  });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: [], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const hover = (c) => snapshot.components[c].disabledGuard.find((g) => g.force === 'hover');
+  assert.deepEqual(Object.keys(hover('tab').changed), ['borderBottomColor', 'boxShadow', 'outlineColor', 'outlineWidth', 'outlineStyle']);
+  assert.equal(hover('tab').changed.outlineStyle.rule, '.tab:hover');
+  assert.deepEqual(Object.keys(hover('link').changed), ['color']);
+  const { compareComponents } = await import('../capture-compare.mjs');
+  const r = compareComponents(snapshot, { tab: {}, link: {} }, {}, {}, { EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: new Set(), NULL_TOKENS: new Set(), KNOWN_NULL: new Set(), SIZING_SKIP: new Map(), TYPO: {} });
+  assert.deepEqual(r.differ.filter((d) => /hover while disabled/.test(d.field)).map((d) => `${d.component}: ${d.code}`), ['tab: changes bottom border colour, shadow, outline colour, outline width, outline', 'link: changes text colour']);
+});
+
 browserTest('disabled wins: a state the user cannot reach is not a leak', async () => {
   const dir = makeFixture({
     'theme.css': '.btn { background: rgb(0, 0, 255); }\n.btn:disabled { background: rgb(200, 200, 200); pointer-events: none; }\n.btn:hover, .btn:active { background: rgb(0, 0, 128); }\n',

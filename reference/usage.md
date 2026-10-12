@@ -67,7 +67,7 @@ rms-design-system-engine --trend                         # show last 20 audit ru
 rms-design-system-engine --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
 rms-design-system-engine --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
 rms-design-system-engine --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
-rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) or a token's variable, values per mode and, for a text colour, the surfaces it reads on
+rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
 rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
@@ -312,15 +312,20 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Documentation and Details in Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
-  table as the Accessibility area's and the To do page's (`issueTableHTML`): Issue nr (the To do page's number, open rows
-  only), Area (Parity, with the type under it), Figma (its name and value), Code (its name and value, and where in the
+  table as the To do page's Parity (`issueTableHTML`, `ISSUE_COLS`): Issue nr (the To do page's number, open rows
+  only), Type, Figma (its name and value), Code (its name and value, and where in the
   code a difference is), What to do (who acts above it) and Status (a sign and the system's colour, To fix, To check,
   Done or Not compared, with what it is under any but Done, differs from Figma, only in Figma, only in code, both not
   compared, New in the last audit when the last audit found it first, and when it last held). Each difference the audit found is merged into
   the row it is about (`parityIssueRows`); what it found beyond those rows, a prop Figma has that the code does not build
-  and a component only the code has are rows of their own. The To do page holds the open rows of every component in
-  that table, one card per component, with a filter by area (Parity, Accessibility, System and the page's own items when
-  it has any) that hides the cards left empty. Under The system, what the tokens owe (`tokenTodos`, area System): the
+  and a component only the code has are rows of their own. The To do page holds the open rows of every component,
+  each kind in a table of its own shape, one card per component, one kind shown at a time with a filter (Parity,
+  Accessibility, Documentation, Migration, Products, System and the page's own items, each when it has any; no All):
+  Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Issue nr, WCAG criterion, Figma
+  states, Found, What to do, Status), Documentation's the Documentation table itself (Kind, What is written, From, the
+  card each component's Documentation area and the Documentation page show), one card for each component with a kind
+  not written yet (`docRows`), where to write it above them, and the rest Issue nr, Where or Type, What to do and
+  Status. The count at the top is the shown kind's; Documentation's kinds are counted, not numbered. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
   (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
   hand in two tokens and the tokens one component uses, read from the contracts the last audit wrote (You decide), each
@@ -449,7 +454,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as Parity's and the To do page's, in
+- **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as the To do page's Accessibility, in
   the same card as the Playground's tables: Issue nr (open rows only), Area (Accessibility, with the criterion and its
   level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
   panel's own pop-up, Escape closing it), Figma (what Figma's annotations state for it), Code (what was found, each
@@ -749,7 +754,11 @@ A generator (an AI agent, a small model in the browser, a template tool) compose
 only when it is told exactly what exists, and its output is checked every time. Every run writes
 `contracts/catalog.json` beside the contracts: each component with its props (allowed values, defaults,
 and the code prop name when known), the components it may contain (from Figma's composition and the
-nesting the code capture saw), what it must never contain, and its status. `llms.txt` gets the same
+nesting the code capture saw), what it must never contain, its status, and where it lives (`livesIn`, also
+in each contract): the products whose code uses it, with how many files and uses (a page built from a source
+beside it counted once), the system's own pages that show it, the components it sits inside and the ones it
+holds, and the Figma screens that draw it. `--query` prints it, and `differences.md` names it under each
+component, so a difference in a component five products use reads as the larger change it is. `llms.txt` gets the same
 catalog as an aligned table (`Badge  Tone=info|warn  Text=text`), because small models read aligned
 tables far better than JSON Schema. Interaction states (hover, focus) are not props a generator sets:
 the component owns them. When the code capture is fresh, each entry also has `rendered`: its size on a

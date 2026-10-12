@@ -1,5 +1,35 @@
 # Skill evaluation results
 
+## 2026-10: The To do page shows Documentation in the Documentation table (continuous evaluation)
+
+What changed since the entry below (engine 7a6b367): the To do page's Documentation kind is the Documentation table itself (Kind, What is written, From), one card per component with a kind not written yet, counted rather than numbered. The guide changed in `reference/usage.md`.
+
+Guide set measured: `d60b0d32a1d6` · Project measured: `13d811a9d668`
+
+| Haiku, engine 2b6482d | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.061 |
+| Input a run | 106k | 120k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 120k a run against 106k. Records: `records/todo-documentation-table`.
+
+## 2026-10: A wider disabled guard, text styles in full, where each component lives, and the To do page by kind (continuous evaluation)
+
+What changed since the entry below (engine 856fd1a): the disabled guard reads every border side, the shadow and the outline; Gate 24 checks letter spacing and text case and puts each mode on as the project does; --query, the contracts and the differences list say where each component lives; the To do page holds documentation too and shows one kind at a time, each in a table of its own shape. The guide changed in `cookbook/ask-the-system.md`, `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `f581340817d9` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7a6b367 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.059 |
+| Input a run | 110k | 106k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 106k a run against 110k. Records: `records/todo-kinds-usage`.
+
 ## 2026-10: The structure gate measures tokens, icons and nesting, and a motion page in the foundations (continuous evaluation)
 
 What changed since the entry below (engine e27cbc3): Gate 13 compares tokens, icons and nesting on every audit and lists only what the browser alone reads; the style guide gets a motion page with durations, easings, a Play button and Figma's prototype transitions. The guide changed in `reference/config.md`, `reference/usage.md`.

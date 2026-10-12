@@ -157,6 +157,22 @@ export function insetRingOf(shadow) {
   return null;
 }
 
+// What a hover or press changed on a disabled component, in words: the four sides' colours (or widths) as one when all
+// four changed, each side by name otherwise.
+const GUARD_LABEL = { color: 'text colour', backgroundColor: 'background', boxShadow: 'shadow', outlineColor: 'outline colour', outlineWidth: 'outline width', outlineStyle: 'outline', opacity: 'opacity' };
+export function guardLabels(props) {
+  const out = [];
+  for (const p of props) {
+    const side = p.match(/^border(Top|Right|Bottom|Left)(Color|Width)$/);
+    if (!side) { out.push(GUARD_LABEL[p] ?? p); continue; }
+    const what = side[2] === 'Color' ? 'colour' : 'width';
+    const all = ['Top', 'Right', 'Bottom', 'Left'].every((s) => props.includes(`border${s}${side[2]}`));
+    const label = all ? `border ${what}` : `${side[1].toLowerCase()} border ${what}`;
+    if (!out.includes(label)) out.push(label);
+  }
+  return out;
+}
+
 export function compareComponents(code, structure, vars, cfg, maps) {
   const spec = resolveNamingSpec(cfg);
   const sizeVar = (t) => (t ? maps.EXPLICIT_SIZING[t] ?? tokenToVar(t, spec, { raw: true }) : null);
@@ -601,12 +617,11 @@ export function compareComponents(code, structure, vars, cfg, maps) {
 
     // Disabled wins (I40): hover or press must not change a disabled component. The capture put the
     // disabled state on with :hover (and :active) forced; any visible change is a missing guard.
-    const LABEL = { color: 'text colour', backgroundColor: 'background', borderTopColor: 'border colour', opacity: 'opacity' };
     for (const g of c.disabledGuard ?? []) {
       if (g.unreachable) continue;   // the user cannot hover or press it: nothing to guard
       const props = Object.keys(g.changed ?? {});
       const first = g.changed?.[props[0]];
-      settle(!props.length, { component: name, field: `${g.force} while disabled (${g.state})`, figma: 'no change', code: props.length ? `changes ${props.map((p) => LABEL[p] ?? p).join(', ')}` : 'no change', rule: first?.rule, at: first?.at, confidence: 'single-source' });
+      settle(!props.length, { component: name, field: `${g.force} while disabled (${g.state})`, figma: 'no change', code: props.length ? `changes ${guardLabels(props).join(', ')}` : 'no change', rule: first?.rule, at: first?.at, confidence: 'single-source' });
     }
 
     // Background: does the component paint one? Figma often draws it on a child layer and code on the

@@ -65,9 +65,25 @@ export const TRACE = {
   fontStyle: ['font-style', 'font'],
   textAlign: ['text-align'],
 };
-const MEASURED = [...Object.keys(TRACE), 'maxHeight', 'display', 'boxSizing', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
+// Read for the disabled guard only (A12): an outline a hover or press draws on a disabled component.
+const GUARD_TRACE = { outlineColor: ['outline-color', 'outline'], outlineWidth: ['outline-width', 'outline'], outlineStyle: ['outline-style', 'outline'] };
+const MEASURED = [...Object.keys(TRACE), ...Object.keys(GUARD_TRACE), 'maxHeight', 'display', 'boxSizing', 'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle'];
 const COLOR_PROPS = new Set(['color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor']);
-const GUARD_PROPS = ['color', 'backgroundColor', 'borderTopColor', 'opacity'];
+const SIDES = ['Top', 'Right', 'Bottom', 'Left'];
+export const GUARD_PROPS = ['color', 'backgroundColor', ...SIDES.map((s) => `border${s}Color`), ...SIDES.map((s) => `border${s}Width`), 'boxShadow', 'outlineColor', 'outlineWidth', 'outlineStyle', 'opacity'];
+// A change the eye can see: a side's colour only where that side is drawn, an outline's colour and width only where one
+// is drawn, in either reading (a colour that follows the text colour is not a border of its own).
+const drawnSide = (cs, side) => cs[`border${side}Style`] !== 'none' && cs[`border${side}Style`] !== 'hidden' && parseFloat(cs[`border${side}Width`]) > 0;
+const drawnOutline = (cs) => cs.outlineStyle != null && cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0;
+export function guardChanges(was, now) {
+  return GUARD_PROPS.filter((p) => {
+    if (now[p] == null || was[p] == null || now[p] === was[p]) return false;
+    const side = p.match(/^border(Top|Right|Bottom|Left)Color$/)?.[1];
+    if (side) return drawnSide(was, side) || drawnSide(now, side);
+    if (p === 'outlineColor' || p === 'outlineWidth') return drawnOutline(was) || drawnOutline(now);
+    return true;
+  });
+}
 const BREAKPOINT_PROPS = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'columnGap', 'rowGap', 'borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius', 'fontSize', 'lineHeight'];
 const INHERITED = new Set(['color', 'fontSize', 'fontWeight', 'lineHeight', 'fontFamily', 'letterSpacing', 'textTransform', 'fontStyle', 'textAlign']);
 
@@ -112,13 +128,19 @@ export function partFor(declName, value, prop) {
     if (/Color$/.test(prop)) return [...parts].reverse().find((p) => !/^(\d|\.|none|solid|dashed|dotted|double|groove|ridge|inset|outset|hidden|thin|medium|thick)/.test(p)) ?? value;
   }
   if (declName === 'background' && prop === 'backgroundColor') return [...parts].reverse().find((p) => /^(#|rgb|hsl|var\(|transparent|[a-z]+$)/i.test(p) && !/url\(/.test(p)) ?? value;
+  if (declName === 'outline') {
+    const STYLE = /^(none|auto|solid|dashed|dotted|double|groove|ridge|inset|outset|hidden)$/i;
+    if (prop === 'outlineStyle') return parts.find((p) => STYLE.test(p)) ?? 'none';
+    if (prop === 'outlineWidth') return parts.find((p) => /^(\d|\.|thin|medium|thick)/.test(p)) ?? 'medium';
+    if (prop === 'outlineColor') return parts.find((p) => !STYLE.test(p) && !/^(\d|\.|thin|medium|thick)/.test(p)) ?? 'currentcolor';
+  }
   return value;
 }
 export const firstVar = (text) => String(text ?? '').match(/var\(\s*(--[\w-]+)/)?.[1] ?? null;
 
 // The declaration that won for `prop` among matched rules (ascending cascade order) and inline style.
 export function winningDecl(matched, inlineStyle, prop) {
-  const names = TRACE[prop] ?? [];
+  const names = TRACE[prop] ?? GUARD_TRACE[prop] ?? [];
   let normal = null, important = null;
   const consider = (style, rule) => {
     for (const p of style?.cssProperties ?? []) {
@@ -415,7 +437,7 @@ export async function captureComponents(ctx) {
     const trace = async (nodeId) => {
       const m = await send('CSS.getMatchedStylesForNode', { nodeId }, sessionId);
       const out = {};
-      for (const prop of Object.keys(TRACE)) {
+      for (const prop of [...Object.keys(TRACE), ...Object.keys(GUARD_TRACE)]) {
         let w = winningDecl(m.matchedCSSRules, m.inlineStyle, prop), inherited = false;
         // An inherited property no rule sets on the element comes from the nearest ancestor that sets it.
         if (!w && INHERITED.has(prop)) {
@@ -661,7 +683,7 @@ export async function captureComponents(ctx) {
             const unreachable = base.pointerEvents === 'none' ? 'pointer-events: none' : (j.guard.force === 'active' && base.nativeDisabled ? 'a disabled control cannot be pressed' : null);
             if (unreachable) { (j.entry.disabledGuard ??= []).push({ state: j.guard.state, force: j.guard.force, changed: {}, unreachable }); return; }
             const now = sMode[ji]?.[firstMode]?.cs ?? {}, was = base.cs ?? {};
-            const changed = Object.fromEntries(GUARD_PROPS.filter((p) => now[p] != null && was[p] != null && now[p] !== was[p])
+            const changed = Object.fromEntries(guardChanges(was, now)
               .map((p) => [p, { from: was[p], to: now[p], rule: sTrace[ji]?.[p]?.rule, at: sTrace[ji]?.[p]?.at }]));
             (j.entry.disabledGuard ??= []).push({ state: j.guard.state, force: j.guard.force, changed });
             return;
