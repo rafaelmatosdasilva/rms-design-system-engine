@@ -268,7 +268,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   its curve drawn beside it; at once for a person who asks for less motion); where the system answers
   `prefers-reduced-motion` and what it ends, or that it does not yet; and each transition Figma's prototype animates
   (`figma-motion.snapshot.json`) with what the code does for it (`prototypeTransitions`, from the last audit's
-  `motion.json`).
+  `motion.json`). When the code has durations or easings and Figma has no motion variables at all, the system's To do
+  says so, for You in Figma: add them to a variable collection named Motion (`motionTodos`).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its source renders: a React component's return, a Vue component as the project's own build
   (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its

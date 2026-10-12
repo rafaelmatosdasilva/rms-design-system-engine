@@ -8,7 +8,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { figmaEasing, transitionsOf, codeMotion, motionFindings, motionSnapshot, MOTION_CAPTURE_JS, motionCaptureScript, prototypeTransitions } from '../motion-parity.mjs';
-import { motionTokens } from '../styleguide-data.mjs';
+import { motionTokens, motionTodos } from '../styleguide-data.mjs';
 import { fixtureProject } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -63,6 +63,16 @@ test('the motion page\'s data (C6): durations and easings as the theme declares 
   assert.deepEqual(m.easings.map((t) => [t.figma, t.var, t.bezier]), [['motion/ease', '--motion-ease', [0.2, 0, 0, 1]], [null, '--leave', [0.42, 0, 1, 1]]]);
   assert.deepEqual(m.reduced, { at: 'theme.css:3', ends: ['transition'] });
   assert.equal(await motionTokens(':root { --gap: 8px; }'), null, 'no motion, no page');
+  // Figma has motion variables: nothing for the system's To do (a value that differs is the token check's to say).
+  assert.deepEqual(motionTodos(m), []);
+  // Figma has none while the code has motion: one row for whoever keeps Figma, naming what to add and where.
+  const none = await motionTokens(css, { figmaVars: { animation: {} } });
+  const [row, ...rest] = motionTodos(none);
+  assert.equal(rest.length, 0);
+  assert.deepEqual([row.type, row.who], ['Motion, variables', 'figma']);
+  assert.match(row.say, /^Figma has no motion variables, while the code has 3 durations and 2 easings \(--alias 120ms, --motion-fast 120ms, --motion-slow \.4s, --motion-ease cubic-bezier\(\.2, 0, 0, 1\), --leave ease-in\)\./);
+  assert.match(row.todo, /variable collection named Motion: each duration a number in milliseconds, each easing its curve as text/);
+  assert.deepEqual(motionTodos(null), []);
   const snap = { components: { button: [{ from: { State: 'Default' }, to: { State: 'Hover' }, trigger: 'ON_HOVER', type: 'SMART_ANIMATE', duration: 0.2, easing: { type: 'EASE_OUT' } }, { from: { State: 'Default' }, to: { State: 'Pressed' }, trigger: 'ON_PRESS', type: 'INSTANT', duration: 0 }] } };
   assert.deepEqual(prototypeTransitions(snap, [{ component: 'button', change: 'State Default to Hover', trigger: 'hover', kind: 'duration', code: { ms: 300 } }]),
     [{ component: 'button', change: 'State Default to Hover', trigger: 'hover', ms: 200, easing: 'ease-out', code: '300ms' }]);
