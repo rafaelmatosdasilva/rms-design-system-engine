@@ -727,7 +727,12 @@ dropped, then `design-system-engine-map` `EXPLICIT` / `EXPLICIT_SIZING`, then th
 `height` rule compared as the drawn box, a `min-height` by its value), padding, gap and radius by token or
 value, font against the first text element, background as "paints or not" (Figma often paints on a child
 layer, code on the element). On a project whose parity is green this is a calibration: every difference is
-either a capture bug to fix or a real fact about the code that no gate looks at yet.
+either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)
+runs the same token, icon and nesting comparison on every audit, after the components: `MEASURED TOKENS` (a
+Figma token the code resolves to another value, per mode), `MEASURED ICONS` (an icon whose viewBox or path data
+differs from Figma's, or one Figma has and the sprite lacks) and `MEASURED NESTING` (a component Figma nests that
+the code never shows inside its parent), each line with what to do. Advisory like the rest of `MEASURED`;
+`renderedParityStrict` (and build mode) makes them fail the gate.
 
 #### The component catalog and `--check-ui` (for UI generators)
 
