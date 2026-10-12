@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Tasks page and sticky table heads (continuous evaluation)
+
+What changed since the entry below (engine eed8da2): To do renamed Tasks; counts under the filter; no list or count until every component is tried; the browser-tried note under Accessibility alone; every table head sticky. The guide changed in `cookbook/a11y-notes.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `7c2699b14586` · Project measured: `13d811a9d668`
+
+| Haiku, engine 1e7192e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.061 |
+| Input a run | 103k | 127k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 127k a run against 103k. Records: `records/tasks-page-sticky-heads`.
+
 ## 2026-10: Motion variables in the To do, and no Documentation page of its own (continuous evaluation)
 
 What changed since the entry below (engine 2b6482d): when the code has durations or easings and Figma has no motion variables at all, the system's To do says so for whoever keeps Figma; the style guide has no Documentation page, its tables live on the To do page and old links open them there. The guide changed in `reference/usage.md`.
