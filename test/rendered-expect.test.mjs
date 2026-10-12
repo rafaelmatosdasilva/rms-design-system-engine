@@ -1,7 +1,7 @@
 // Gate [24] (E4): a rendered assertion's expected colour taken from its Figma variable, never typed and left to go stale.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { expandFigmaVars, renderedMatches } from '../rendered-expect.mjs';
+import { expandFigmaVars, renderedMatches, textStyleExpectations, schemeSwitch } from '../rendered-expect.mjs';
 
 const modes = [{ name: 'Light', snapshotKey: 'light' }, { name: 'Dark', snapshotKey: 'dark' }];
 const color = { light: { 'input/border/default/color': '#adadad', 'scrim/color': '#00000080' }, dark: { 'input/border/default/color': '#5e5e5e' } };
@@ -36,6 +36,26 @@ test('rendered values: the same text, or the same colour written another way', (
   assert.equal(renderedMatches('56px', '40px'), false);
 });
 
+test('a text style in full: size, weight, line height, letter spacing (px or em of its size) and text case', () => {
+  assert.deepEqual(textStyleExpectations({ size: '12px', weight: '600', lh: '16px', ls: '0.05em', textTransform: 'uppercase' }),
+    { fontSize: '12px', fontWeight: '600', lineHeight: '16px', letterSpacing: '0.6px', textTransform: 'uppercase' });
+  // No letter spacing and the original case: normal and none, as the browser gives them. No line height: left out.
+  assert.deepEqual(textStyleExpectations({ size: '14px', weight: '400' }), { fontSize: '14px', fontWeight: '400', letterSpacing: 'normal', textTransform: 'none' });
+  assert.equal(textStyleExpectations({ size: '14px', ls: '-0.2px' }).letterSpacing, '-0.2px');
+  assert.equal(renderedMatches('0px', 'normal'), true);
+  assert.equal(renderedMatches('0.6px', '0.6000001px'), true);
+  assert.equal(renderedMatches('1px', 'normal'), false);
+});
+
+test('a mode is put on as the project puts it on: its class, its data attribute, its media query', () => {
+  const modes = [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }, { name: 'Dark', snapshotKey: 'dark', cssSelector: 'class:theme-dark' }, { name: 'Dim', snapshotKey: 'dim', cssSelector: 'data:theme=dim' }];
+  assert.equal(schemeSwitch('Dark', modes).apply, 'document.documentElement.classList.add("theme-dark")');
+  assert.deepEqual(schemeSwitch('dark', modes).media.find((f) => f.name === 'prefers-color-scheme'), { name: 'prefers-color-scheme', value: 'light' });
+  assert.equal(schemeSwitch('dim', modes).apply, 'document.documentElement.setAttribute("data-theme", "dim")');
+  // No mode by that name: the colour scheme, as before.
+  assert.deepEqual(schemeSwitch('dark', []).media, [{ name: 'prefers-color-scheme', value: 'dark' }]);
+});
+
 // The gate itself: the colour follows the Figma snapshot, so a variable that moved fails on the new value.
 import { runGate } from './helpers.mjs';
 import { findChrome } from '../cdp.mjs';
@@ -63,4 +83,22 @@ test('[rendered-check] rendered.auto asserts a fixed height and leaves a hugging
   });
   assert.match(r.out, /generated 1 height assertion/, r.out);
   assert.match(r.out, /PASS {2}1\/1 rendered assertions/, r.out);
+});
+
+// A13: a text style is checked in full, letter spacing and text case too, and a dark mode the project puts on with a
+// class is put on with that class.
+test('[rendered-check] a text style in full, and a mode put on with its own class', { skip: CHROME && typeof WebSocket !== 'undefined' ? false : 'no Chrome available' }, () => {
+  const files = (css) => ({
+    'ds-config.json': { figma: { modes: [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }, { name: 'Dark', snapshotKey: 'dark', cssSelector: 'class:theme-dark' }] }, paths: { plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotVars: 'figma-vars.snapshot.json' } },
+    'app/ui.html': `<!doctype html><style>${css}</style><span class="eyebrow">New</span>`,
+    'structure-contract.mjs': "export const RENDERED_ASSERTIONS = [{ plugin: 'app', selector: '.eyebrow', textStyle: 'caps' }, { plugin: 'app', selector: '.eyebrow', prop: 'color', expected: 'rgb(255, 255, 255)', colorScheme: 'Dark' }];",
+    'figma-vars.snapshot.json': { typography: { caps: { size: '12px', weight: '600', lh: '16px', ls: '0.05em', textTransform: 'uppercase' } } },
+  });
+  const base = '.eyebrow { font-size: 12px; font-weight: 600; line-height: 16px; color: rgb(0, 0, 0); } :root.theme-dark .eyebrow { color: rgb(255, 255, 255); }';
+  const ok = runGate('rendered-check.mjs', files(`${base} .eyebrow { letter-spacing: 0.05em; text-transform: uppercase; }`));
+  assert.match(ok.out, /PASS {2}6\/6 rendered assertions/, ok.out);
+  const off = runGate('rendered-check.mjs', files(base));
+  assert.match(off.out, /\.eyebrow → letterSpacing: rendered "normal" ≠ expected "0\.6px"/, off.out);
+  assert.match(off.out, /\.eyebrow → textTransform: rendered "none" ≠ expected "uppercase"/, off.out);
+  assert.doesNotMatch(off.out, /→ color: rendered/, off.out);
 });

@@ -143,7 +143,7 @@ Each check is called a gate. To run just one, use its number or its name, for ex
 | 21 | Transitions match | Durations and easing |
 | 22 | Motion matches | When your design defines it |
 | 23 | Shadows match | When your design defines them |
-| 24 | Renders correctly in a browser | Checked on the real page, not only the code. Heights made for you (`rendered.auto`) are only the ones Figma fixes, never a component that hugs its content |
+| 24 | Renders correctly in a browser | Checked on the real page, not only the code. Heights made for you (`rendered.auto`) are only the ones Figma fixes, never a component that hugs its content. A text style is checked in full, its size, weight, line height, letter spacing and case, and each mode is put on as your project puts it on (a class, a data attribute or a media query), not only by the colour scheme |
 | 25 | What this audit actually checked | So you can see that nothing slipped through |
 
 **How it moves, as Figma has it.** Gate 21 holds the code to the transitions your team wrote down. Figma's prototype says it too: a variant that leads to another on hover or press, with its duration and curve (Smart animate, 300ms, ease out). `rms-design-system-engine --figma-motion` writes a read-only script that reads those transitions from the file, and once its answer is kept, each is compared with the code's: a change Figma animates and the code makes at once, another duration, another curve. Each is a Motion row in the component's Parity area and its To do.
