@@ -1970,6 +1970,35 @@ try {
       for (const m of v.missing) console.log(`   ⚠️  ${m.component}: ${m.axis}=${m.value} has no counterpart in code (add it, or map it in the contract's propertyMap)`);
     } else if (v.built) console.log(`\n✅ VARIANTS  every Figma variant value has a counterpart in code (${v.built})`);
   }
+  // Tokens, icons and nesting as the capture read them (A11), on every audit. A token only the browser reads (set by a
+  // script, or a stylesheet the token check does not read) is listed here when it differs from Figma; what the token,
+  // icon and sub-component checks already read is counted, never listed twice. Advisory like the rest of the measured
+  // check; renderedParityStrict (and build mode) makes a listed difference fail the gate.
+  if (cap) {
+    const { loadParityMaps, compareTokens, compareIcons, compareNesting } = await import('./capture-compare.mjs');
+    const readJson = (f) => { try { return JSON.parse(readFileSync(join(ROOT, f), 'utf8')); } catch { return null; } };
+    const vars = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
+    const strict = cfg.renderedParityStrict === true || (cfg.build === true && cfg.renderedParityStrict !== false);
+    const mark = strict ? '❌' : '⚠️ ';
+    const t = compareTokens(cap, vars, cfg, await loadParityMaps(ROOT, cfg));
+    const browserOnly = t.differ.filter((d) => cap.tokens?.[d.cssVar]?.modes?.[d.mode]?.readBy === 'browser');
+    if (browserOnly.length) {
+      console.log(`\n${mark} MEASURED TOKENS ${browserOnly.length}  (the page resolves a Figma token to another value, read only in the browser${strict ? '' : ' - advisory'})`);
+      for (const d of browserOnly.slice(0, 30)) console.log(`   ${mark} ${d.token} [${d.mode}] → ${d.cssVar}: Figma ${d.figma}, rendered ${d.code}  → find what sets ${d.cssVar} at run time (a script, a stylesheet loaded by the page) and give it ${d.figma}`);
+      if (strict) measuredFail = true;
+    }
+    const figmaIcons = cfg.paths?.snapshotIcons ? readJson(cfg.paths.snapshotIcons) : null;
+    const ic = figmaIcons ? compareIcons(cap, figmaIcons) : null;
+    const composition = readJson(cfg.paths?.compositionSnapshot ?? 'component-composition.snapshot.json');
+    const n = composition ? compareNesting(cap, composition) : null;
+    const part = (label, match, off, by) => `${label} ${match} match${off ? `, ${off} differ (listed by ${by})` : ''}`;
+    const parts = [
+      ...(t.match || t.differ.length ? [part('tokens', t.match, t.differ.length - browserOnly.length, 'the token check')] : []),
+      ...(ic && (ic.match || ic.differ.length || ic.missingInCode.length) ? [part('icons', ic.match, ic.differ.length + ic.missingInCode.length, 'the icon check')] : []),
+      ...(n && (n.match || n.differ.length) ? [part('nesting', n.match, n.differ.length, 'the sub-component check')] : []),
+    ];
+    if (parts.length) console.log(`   📋 measured too: ${parts.join(' · ')}`);
+  }
 } catch { /* the capture is optional */ }
 
 if (!anyFail && !measuredFail) { console.log('\nAll structural checks pass. ✓\n'); process.exit(0); }
