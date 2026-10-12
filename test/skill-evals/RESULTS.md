@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Accessibility checks V1 to V6, findings and specs handed to Figma (continuous evaluation)
+
+What changed since the entry below (engine b053e48): The guide row and the figma-edits recipe name the screens' accessibility findings pinned in Figma and each component's accessibility spec; the usage reference documents the new browser checks (modal focus, tap, forced-colour states, colour-vision variants, what a screen reader says on a change) and axe-core fetched at install. The guide changed in `cookbook/figma-edits.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `65b5d3e94d56` · Project measured: `13d811a9d668`
+
+| Haiku, engine d5be7e8 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.060 |
+| Input a run | 98k | 113k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 113k a run against 98k. Records: `records/a11y-checks-and-figma-review`.
+
 ## 2026-10: The designed screens checked for accessibility (W1) (continuous evaluation)
 
 What changed since the entry below (engine 4754507): Nuxt 4.6 writes its types in the engine's output too; The designed screens checked for accessibility (W1). The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
