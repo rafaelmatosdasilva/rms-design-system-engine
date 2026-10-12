@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Vue components rendered with whatever builds them (continuous evaluation)
+
+What changed since the entry below (engine 53b5844): E34 and E35: the Vue harness renders with Nuxt, Vue CLI or webpack as well as Vite; the style guide draws each Vue variant as it renders and scopes a one-component page; each component's Documentation is a table; setup keeps an existing ds-config.json unless --reconfigure. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `03319a2472be` · Project measured: `13d811a9d668`
+
+| Haiku, engine e27cbc3 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.057 |
+| Input a run | 109k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 109k. Records: `records/vue-builds`.
+
 ## 2026-10: Coverage becomes Documentation, the same cards as each component's (continuous evaluation)
 
 What changed since the entry below (engine c739389): The style guide's Coverage page is renamed Documentation and gathers each component's own Documentation card, so the two always hold the same thing; Used in is no longer a kind of documentation. reference/usage.md describes it. The guide changed in `reference/usage.md`.
