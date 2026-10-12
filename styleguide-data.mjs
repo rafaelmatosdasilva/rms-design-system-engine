@@ -1650,5 +1650,20 @@ export async function motionTokens(cssText = '', { figmaVars = {}, cfg = {}, fil
     break;
   }
   if (!durations.length && !easings.length && !transitions.length) return null;
-  return { durations, easings, reduced, transitions };
+  return { durations, easings, reduced, transitions, figmaHas: figmaOf.size > 0 };
+}
+
+// The motion the code has and Figma has none of (C6): one row of the system's To do, for whoever keeps Figma, since
+// nothing compares the system's motion with Figma until Figma has its variables. m: motionTokens(…).
+// → [{ kind, type, who, say, todo }], none when Figma has motion variables or the code has no motion.
+export function motionTodos(m) {
+  if (!m || m.figmaHas) return [];
+  const d = m.durations ?? [], e = m.easings ?? [];
+  if (!d.length && !e.length) return [];
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  const list = [...d, ...e].map((t) => `${t.var} ${t.value}`);
+  const what = [d.length ? n(d.length, 'duration', 'durations') : '', e.length ? n(e.length, 'easing', 'easings') : ''].filter(Boolean).join(' and ');
+  return [{ kind: 'Motion variables', type: 'Motion, variables', who: 'figma',
+    say: `Figma has no motion variables, while the code has ${what} (${list.slice(0, 6).join(', ')}${list.length > 6 ? `, and ${list.length - 6} more` : ''}). Nothing compares the system's motion with Figma until Figma has them.`,
+    todo: 'Add them in Figma to a variable collection named Motion: each duration a number in milliseconds, each easing its curve as text (cubic-bezier(…) or ease-out), named as the code names them. The next refresh of the Figma data reads them, and the motion page names each one.' }];
 }
