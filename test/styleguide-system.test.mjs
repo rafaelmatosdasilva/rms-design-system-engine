@@ -2,7 +2,7 @@
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { modeAxes, realizedControls, chromeRoles, segmentedUi, tabsUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi } from '../styleguide-data.mjs';
+import { modeAxes, realizedControls, chromeRoles, segmentedUi, tabsUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } from '../styleguide-data.mjs';
 import { checkStyleguidePage, failures, missingRoles, controlClasses } from '../styleguide-check.mjs';
 import { differences, differencesMarkdown, plainDifference, plainAction } from '../run-diff.mjs';
 import { appDir } from '../code-roots.mjs';
@@ -230,4 +230,15 @@ test('a switch whose selector adds a negative class on a layer (no-divider-top::
   const c = r.controls.find((k) => k.label === 'Show Line');
   assert.deepEqual(c.off?.add, ['no-line']);
   assert.equal(c.on, undefined);
+});
+
+test('the system\'s own tip trigger, for what the page explains on demand: a component whose root carries data-tip', () => {
+  const css = '.tip{} .bText{}';
+  const comps = [
+    { name: 'bText', role: 'button', markup: '<button class="bText"><span>Go</span></button>' },
+    { name: 'infoTip', role: 'button', markup: '<button type="button" class="tip product-only" data-tip="Tooltip" aria-label="Tooltip"><svg aria-hidden="true"><use href="#icon-info"/></svg></button>' },
+  ];
+  assert.deepEqual(tipUi(comps, css), { from: 'infoTip', markup: '<button class="tip" type="button" data-tip="{tip}" aria-label="{name}"><svg aria-hidden="true"><use href="#icon-info"/></svg></button>' }, 'its words and name left to fill, only the system\'s classes kept');
+  assert.equal(tipUi([comps[0]], css), null, 'no data-tip: no tip trigger');
+  assert.equal(tipUi([{ name: 'x', markup: '<span class="unstyled" data-tip="a">i</span>' }], css), null, 'a class the system does not style is no trigger');
 });
