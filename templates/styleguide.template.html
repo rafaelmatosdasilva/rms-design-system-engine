@@ -2018,7 +2018,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
     var id = j < 0 ? path : path.slice(0, j);
-    return { id: id === 'whats-new' ? 'changelog' : id === 'coverage' ? 'documentation' : id, area: area, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // a link from when it was What's new
+    return { id: id === 'whats-new' ? 'changelog' : id === 'coverage' ? 'documentation' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // a link from when it was What's new
   }
   function copyText(text, btn, said) {
     var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
@@ -2275,7 +2275,7 @@ a.pg-usage-name { color: var(--sg-text); }
       }).join('') + '</div>';
     }).join('');
     var seg = box.querySelector('.sg-todo-filter');
-    if (seg) segItems(seg).forEach(function (b) { b.addEventListener('click', function () { todoArea = b.dataset.v; showTodoArea(box); }); });
+    if (seg) segItems(seg).forEach(function (b) { b.addEventListener('click', function () { todoArea = b.dataset.v; showTodoArea(box); todoLink(); }); });
     showTodoArea(box);
     labelCells(td);
     todoHeadHeight();
@@ -2286,6 +2286,14 @@ a.pg-usage-name { color: var(--sg-text); }
   // Only the kind chosen, its own tables, and its own count of what is to fix and to check; the numbers stay as they are.
   var TODO_KINDS = ['Parity', 'Accessibility', 'Documentation', 'Migration', 'Products', 'System', 'Page'];
   var todoArea = 'Parity';
+  // Each kind has its own address to send someone to (#todo/accessibility): choosing one writes it, opening it opens it.
+  function todoLink() { if (ALL || hashParts().id !== 'todo') return; var h = '#todo/' + todoArea.toLowerCase(); if (h !== location.hash) history.replaceState(null, '', h); }
+  function openTodoKind(slug) {
+    var k = TODO_KINDS.filter(function (a) { return a.toLowerCase() === String(slug || '').toLowerCase(); })[0], box = td.querySelector('.sg-todo');
+    if (!k || k === todoArea) return;
+    todoArea = k;
+    if (box && box.querySelector('.sg-todo-kind[data-area="' + k + '"]')) showTodoArea(box);
+  }
   function showTodoArea(box) {
     var seg = box.querySelector('.sg-todo-filter');
     if (seg) segItems(seg).forEach(function (b) { segSelect(b, b.dataset.v === todoArea); });
@@ -3737,7 +3745,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var tLink = nav.querySelector('a[href="#' + target.id + '"]'), tGroup = tLink && tLink.previousElementSibling;
     while (tGroup && !tGroup.classList.contains('sg-nav-label')) tGroup = tGroup.previousElementSibling;
     var tTag = target.querySelector('.sg-section-badge'); if (tTag && tGroup) tTag.textContent = tGroup.textContent;
-    if (target.id === 'todo') setTimeout(a11ySweep, 300);
+    if (target.id === 'todo') { openTodoKind(at.slug); setTimeout(a11ySweep, 300); }
     // A foundation's size switch stays in view under its title as the page scrolls.
     var tTitle = target.querySelector(':scope > h2'), tSwitch = target.querySelector('.sg-size-switch');
     if (tTitle && tSwitch) tSwitch.style.top = 'calc(var(--sg-sticky-top, 0px) + ' + tTitle.offsetHeight + 'px)';

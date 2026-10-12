@@ -500,6 +500,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await shownHead(), /^Issue nr\s*Type\s*Figma\s*Code\s*What to do\s*Status$/);
     await run(`document.querySelector('#todo .sg-todo-filter [data-v="Accessibility"]').click()`);
     assert.deepEqual(await shownKind(), ['Accessibility']);
+    assert.equal(await run(`location.hash`), '#todo/accessibility', 'each kind has its own address to send');
     assert.match(await shownHead(), /^Issue nr\s*WCAG criterion\s*Figma states\s*Found\s*What to do\s*Status$/);
     assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#todo .sg-todo-kind:not([hidden]) tbody tr')].map((tr) => tr.dataset.area))]`), ['Accessibility']);
     // Documentation is on the To do page too, in the Documentation table itself (Kind, What is written, From), one card
@@ -514,6 +515,12 @@ test('in the browser: no script error, a control changes the real component, the
     assert.deepEqual(await shownKind(), ['Documentation'], 'only the kind chosen is drawn');
     await run(`document.querySelector('#todo .sg-todo-filter [data-v="Parity"]').click()`);
     assert.deepEqual(await shownKind(), ['Parity'], 'Documentation\'s cards go when another kind is chosen');
+    // Opening a kind's address opens that kind, its tab chosen.
+    await run(`location.hash = '#c-chip'`); await shownIs('c-chip');
+    await run(`location.hash = '#todo/documentation'`); await shownIs('todo');
+    assert.deepEqual(await shownKind(), ['Documentation']);
+    assert.match(await run(`document.querySelector('#todo .sg-todo-sum').textContent`), /^✕\d+ to fix$/, 'its own count');
+    await run(`document.querySelector('#todo .sg-todo-filter [data-v="Parity"]').click()`);
     // What the tokens owe is a row of The system: the descriptions to write, for whoever keeps Figma.
     assert.match(await run(`[...document.querySelectorAll('#todo tr[data-area="System"]')].map((tr) => tr.textContent).join('|')`), /Tokens, description.*You in Figma.*semantic tokens have no description in Figma.*Write what each one is for/);
     // A retired component still in use: a row for each place it is used, under its name, with what replaces it.
