@@ -1970,44 +1970,34 @@ try {
       for (const m of v.missing) console.log(`   ⚠️  ${m.component}: ${m.axis}=${m.value} has no counterpart in code (add it, or map it in the contract's propertyMap)`);
     } else if (v.built) console.log(`\n✅ VARIANTS  every Figma variant value has a counterpart in code (${v.built})`);
   }
-  // Tokens, icons and nesting as the capture read them (A11): each Figma token's value as the code resolves it in each
-  // mode, each Figma icon against the code's symbol of the same id, each component Figma nests inside another against
-  // what the code shows inside it. Advisory like the rest of the measured check; renderedParityStrict (and build mode)
-  // makes a difference fail the gate.
+  // Tokens, icons and nesting as the capture read them (A11), on every audit. A token only the browser reads (set by a
+  // script, or a stylesheet the token check does not read) is listed here when it differs from Figma; what the token,
+  // icon and sub-component checks already read is counted, never listed twice. Advisory like the rest of the measured
+  // check; renderedParityStrict (and build mode) makes a listed difference fail the gate.
   if (cap) {
     const { loadParityMaps, compareTokens, compareIcons, compareNesting } = await import('./capture-compare.mjs');
     const readJson = (f) => { try { return JSON.parse(readFileSync(join(ROOT, f), 'utf8')); } catch { return null; } };
     const vars = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
     const strict = cfg.renderedParityStrict === true || (cfg.build === true && cfg.renderedParityStrict !== false);
     const mark = strict ? '❌' : '⚠️ ';
-    const said = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     const t = compareTokens(cap, vars, cfg, await loadParityMaps(ROOT, cfg));
-    if (t.differ.length) {
-      console.log(`\n${mark} MEASURED TOKENS ${t.differ.length}  (the code resolves a Figma token to another value${strict ? '' : ' - advisory'})`);
-      for (const d of t.differ.slice(0, 30)) console.log(`   ${mark} ${d.token} [${d.mode}] → ${d.cssVar}: Figma ${d.figma}, code ${d.code}${d.at ? `  (${d.at})` : ''}  → set ${d.cssVar} to ${d.figma}`);
-      if (t.differ.length > 30) console.log(`   … ${t.differ.length - 30} more`);
-    } else if (t.match) console.log(`\n✅ MEASURED TOKENS  every Figma token the code resolves has Figma's value (${t.match}${t.missingInCode.length ? `; ${said(t.missingInCode.length, 'token', 'tokens')} not read in the code, listed by the token check` : ''})`);
+    const browserOnly = t.differ.filter((d) => cap.tokens?.[d.cssVar]?.modes?.[d.mode]?.readBy === 'browser');
+    if (browserOnly.length) {
+      console.log(`\n${mark} MEASURED TOKENS ${browserOnly.length}  (the page resolves a Figma token to another value, read only in the browser${strict ? '' : ' - advisory'})`);
+      for (const d of browserOnly.slice(0, 30)) console.log(`   ${mark} ${d.token} [${d.mode}] → ${d.cssVar}: Figma ${d.figma}, rendered ${d.code}  → find what sets ${d.cssVar} at run time (a script, a stylesheet loaded by the page) and give it ${d.figma}`);
+      if (strict) measuredFail = true;
+    }
     const figmaIcons = cfg.paths?.snapshotIcons ? readJson(cfg.paths.snapshotIcons) : null;
-    if (figmaIcons) {
-      const ic = compareIcons(cap, figmaIcons);
-      const off = ic.differ.length + ic.missingInCode.length;
-      if (off) {
-        console.log(`\n${mark} MEASURED ICONS ${off}  (an icon drawn otherwise in the code than in Figma, or not in it${strict ? '' : ' - advisory'})`);
-        for (const d of ic.differ.slice(0, 20)) console.log(`   ${mark} #${d.id}: ${d.what}${d.at ? `  (${d.at})` : ''}  → export it again from Figma into the sprite`);
-        for (const id of ic.missingInCode.slice(0, 20)) console.log(`   ${mark} #${id}: Figma has it, the code's sprite does not  → add it to the sprite`);
-      } else if (ic.match) console.log(`\n✅ MEASURED ICONS  every Figma icon is drawn the same in the code (${ic.match})`);
-      if (off && strict) measuredFail = true;
-    }
+    const ic = figmaIcons ? compareIcons(cap, figmaIcons) : null;
     const composition = readJson(cfg.paths?.compositionSnapshot ?? 'component-composition.snapshot.json');
-    if (composition) {
-      const n = compareNesting(cap, composition);
-      if (n.differ.length) {
-        console.log(`\n${mark} MEASURED NESTING ${n.differ.length}  (a component Figma nests that the code does not show inside it${strict ? '' : ' - advisory'})`);
-        for (const d of n.differ.slice(0, 20)) console.log(`   ${mark} ${d.parent} → ${d.child}: Figma nests it, the code ${d.code}  → use ${d.child} inside ${d.parent}, or take it out in Figma`);
-      } else if (n.match) console.log(`\n✅ MEASURED NESTING  every component Figma nests is inside its parent in the code (${n.match}${n.notComparable.length ? `; ${said(n.notComparable.length, 'parent', 'parents')} not seen in the code` : ''})`);
-      if (n.differ.length && strict) measuredFail = true;
-    }
-    if (t.differ.length && strict) measuredFail = true;
+    const n = composition ? compareNesting(cap, composition) : null;
+    const part = (label, match, off, by) => `${label} ${match} match${off ? `, ${off} differ (listed by ${by})` : ''}`;
+    const parts = [
+      ...(t.match || t.differ.length ? [part('tokens', t.match, t.differ.length - browserOnly.length, 'the token check')] : []),
+      ...(ic && (ic.match || ic.differ.length || ic.missingInCode.length) ? [part('icons', ic.match, ic.differ.length + ic.missingInCode.length, 'the icon check')] : []),
+      ...(n && (n.match || n.differ.length) ? [part('nesting', n.match, n.differ.length, 'the sub-component check')] : []),
+    ];
+    if (parts.length) console.log(`   📋 measured too: ${parts.join(' · ')}`);
   }
 } catch { /* the capture is optional */ }
 
