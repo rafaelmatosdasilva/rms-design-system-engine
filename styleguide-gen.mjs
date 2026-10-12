@@ -830,14 +830,20 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const c of new Set([...(view.allComponents ?? []), ...view.components])) { const own = (motion?.findings ?? []).filter((f) => f.component === c.name); if (own.length) c.motionDiffs = own; }
     } catch { /* no motion read */ }
     // The foundations' motion page (C6): the system's durations and easings, what it does for a person who asks for less
-    // motion, and each transition Figma's prototype animates, with what the code does for it.
+    // motion, each transition Figma's prototype animates, with what the code does for it, and how each component moves
+    // on its own (C7).
     if (!opts.only?.length) try {
       const { motionTokens, motionTodos } = await import('./styleguide-data.mjs');
       const { prototypeTransitions } = await import('./motion-parity.mjs');
       const snapMotion = readJson(cfg.paths?.snapshotMotion ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-motion.snapshot.json'));
       const findings = readJson(join(OUT_DIR, 'motion.json'))?.findings ?? [];
       const files = [...themeFiles, ...pluginCSS].filter((f) => f && !/^https?:/.test(f)).map((file) => ({ file, text: readText(file) })).filter((f) => f.text);
-      const m = await motionTokens(allCss, { figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, cfg, files, transitions: snapMotion ? prototypeTransitions(snapMotion, findings) : [] });
+      let m = await motionTokens(allCss, { figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, cfg, files, transitions: snapMotion ? prototypeTransitions(snapMotion, findings) : [] });
+      // How each component moves on its own (C7): its loop, its opening and its closing, the code's beside Figma's.
+      const { componentMotionRows } = await import('./motion-components.mjs');
+      const every = view.allComponents ?? view.components, clsOf = new Map(every.map((c) => [c.name, c.cls]));
+      const rows = componentMotionRows(snapMotion, files, (n) => clsOf.get(n) ?? null, every.map((c) => c.name));
+      if (rows.length) m = { ...(m ?? { durations: [], easings: [], reduced: null, transitions: [], figmaHas: false }), components: rows };
       if (m) view.motion = m;
       // Motion the code has and Figma has no variables for: a row of the system's To do.
       const mt = motionTodos(m);

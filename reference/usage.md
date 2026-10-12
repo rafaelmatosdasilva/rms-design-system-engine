@@ -89,8 +89,8 @@ rms-design-system-engine --checked badge 1.3.3 --by "Ana"  # the person checked 
 rms-design-system-engine --unchecked badge 1.3.3          # take it back: to check again
 rms-design-system-engine --rename-sweep                  # a token renamed in Figma, renamed everywhere in one change: one patch for the system and one per product, every rule, script and doc, the old name kept in the theme pointing at the new one (nothing applied)
 rms-design-system-engine --rename-sweep --since v2.3.0   # the renames since that git ref, not since the last committed read of Figma; --no-keep-old drops the old names
-rms-design-system-engine --figma-motion                  # write the read-only script that reads Figma's prototype transitions between variants (figma.componentsPage, else the page open), to run with use_figma
-rms-design-system-engine --figma-motion <answer.json>    # keep its answer as the motion snapshot (paths.snapshotMotion) and say each transition the code makes otherwise (at once, another duration, another curve)
+rms-design-system-engine --figma-motion                  # write the read-only script that reads, on every page, Figma's prototype transitions between variants, each component's Motion keyframes and animation styles, and the overlays its prototype opens, to run with use_figma
+rms-design-system-engine --figma-motion <answer.json>    # keep its answer as the motion snapshot (paths.snapshotMotion) and say each transition the code makes otherwise (at once, another duration, another curve), and each component's loop, opening and closing that differ (motion-components.mjs)
 rms-design-system-engine --figma-screens                 # write the read-only script that reads the screens ds-config.json names (frames and screens), to run with use_figma
 rms-design-system-engine --figma-screens <answer.json>   # keep its answer as the screen layout snapshot (paths.screenLayout) and compare each product's page with its screens
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
@@ -269,7 +269,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   `prefers-reduced-motion` and what it ends, or that it does not yet; and each transition Figma's prototype animates
   (`figma-motion.snapshot.json`) with what the code does for it (`prototypeTransitions`, from the last audit's
   `motion.json`). When the code has durations or easings and Figma has no motion variables at all, the system's
-  tasks say so, for You in Figma: add them to a variable collection named Motion (`motionTodos`).
+  tasks say so, for You in Figma: add them to a variable collection named Motion (`motionTodos`). How each component
+  moves on its own (`componentMotionRows`, `motion-components.mjs`): its loop (a spinner turning), its opening and its
+  closing, the code's (its `@keyframes` on it or a part of it, a transition an open or closed state plays, a size it
+  transitions) beside Figma's (its Motion keyframes and animation styles, an overlay its prototype opens, played
+  backwards as it closes, variants that lead to each other after a delay and back), or that Figma's Motion is not
+  read yet. Each that differs is a Motion row of the component's Parity area: one Figma animates and the code does
+  not, Claude's; one the code animates and Figma does not, You in Figma.
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its source renders: a React component's return, a Vue component as the project's own build
   (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its

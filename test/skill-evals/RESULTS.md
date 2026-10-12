@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: How each component moves on its own (continuous evaluation)
+
+What changed since the entry below (engine 1e7192e): The motion check compares each component's loop, opening and closing (spinner, loader, panel, modal, toast): the code's animations against Figma's Motion keyframes and overlays. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `eec766e099ae` · Project measured: `13d811a9d668`
+
+| Haiku, engine 9b4a9c5 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.062 |
+| Input a run | 127k | 119k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 119k a run against 127k. Records: `records/component-motion`.
+
 ## 2026-10: Tasks page and sticky table heads (continuous evaluation)
 
 What changed since the entry below (engine eed8da2): To do renamed Tasks; counts under the filter; no list or count until every component is tried; the browser-tried note under Accessibility alone; every table head sticky. The guide changed in `cookbook/a11y-notes.md`, `reference/config.md`, `reference/usage.md`.

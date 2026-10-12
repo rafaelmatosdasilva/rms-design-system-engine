@@ -95,5 +95,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `todo-documentation-table` | The 21 guide tasks on Haiku (engine 2b6482d) | "The To do page shows Documentation in the Documentation table" |
 | `motion-todo-no-doc-page` | The 21 guide tasks on Haiku (engine eed8da2) | "Motion variables in the To do, and no Documentation page of its own" |
 | `tasks-page-sticky-heads` | The 21 guide tasks on Haiku (engine 1e7192e) | "Tasks page and sticky table heads" |
+| `component-motion` | The 21 guide tasks on Haiku (engine 9b4a9c5) | "How each component moves on its own" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
