@@ -28,7 +28,8 @@ export function withBaked(html, baked) {
 export function withoutBaked(html) { return html.replace(BAKED_RE, ''); }
 
 // Try every component of the page at file in Chrome and keep the results in it. jobs: pages trying at once.
-// → { tried, of, unfinished, errors, ms } | { skipped: why }. errors: each script error the page threw while trying, once.
+// → { tried, of, unfinished, dead, errors, ms } | { skipped: why }. errors: each script error the page threw while trying,
+// once; dead: the page's script stopped before it could try anything.
 export async function bakeA11y(file, { chromePath = process.env.CHROME_PATH || findChrome({ playwright: true }), jobs = Math.max(1, Math.min(4, cpus().length)), timeoutMs = 60 * 60 * 1000 } = {}) {
   if (!chromePath) return { skipped: 'no Chrome found (set CHROME_PATH)' };
   if (typeof WebSocket === 'undefined') return { skipped: 'this Node has no WebSocket (Node 22 or later)' };
@@ -47,6 +48,9 @@ export async function bakeA11y(file, { chromePath = process.env.CHROME_PATH || f
       await send('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
       await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId).catch(() => {});
       await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { attempts: 1200, tolerateErrors: true });
+      // A page whose script stopped while it was being drawn never tries anything: said at once, never waited out.
+      const alive = await send('Runtime.evaluate', { expression: "typeof window.__sgA11yResults === 'function'", returnByValue: true }, sessionId).catch(() => null);
+      if (alive?.result?.value !== true) return { done: false, dead: true, results: {}, of: 0 };
       const done = await waitForTrue(send, sessionId, 'window.__sgSweepDone === true', { attempts: Math.ceil(timeoutMs / 1000), intervalMs: 1000, tolerateErrors: true });
       const r = await send('Runtime.evaluate', { expression: 'JSON.stringify(window.__sgA11yResults ? window.__sgA11yResults() : {})', returnByValue: true }, sessionId).catch(() => null);
       let results = {};
@@ -57,6 +61,6 @@ export async function bakeA11y(file, { chromePath = process.env.CHROME_PATH || f
     close();
     const results = Object.assign({}, ...parts.map((p) => p.results));
     writeFileSync(file, withBaked(readFileSync(file, 'utf8'), { at: new Date().toISOString(), results }));
-    return { tried: Object.keys(results).length, of: Math.max(0, ...parts.map((p) => p.of)), unfinished: parts.filter((p) => !p.done).length, errors: [...errors], ms: Date.now() - t0 };
+    return { tried: Object.keys(results).length, of: Math.max(0, ...parts.map((p) => p.of)), unfinished: parts.filter((p) => !p.done).length, dead: parts.some((p) => p.dead), errors: [...errors], ms: Date.now() - t0 };
   } finally { kill(); }
 }
