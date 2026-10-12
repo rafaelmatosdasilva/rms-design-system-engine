@@ -2405,15 +2405,25 @@ a.pg-usage-name { color: var(--sg-text); }
   function todoHeadHeight() { stickHeight(document.getElementById('tasks')); }
 
   // ── Health: the dashboard ────────────────────────────────────────────────────────────────────────────────────────
-  // Every row of each area, as each component's own areas show it: a row done counts whole, one to check half (nothing
-  // is known to be wrong, someone has to look), one to fix nothing; what is not compared or not needed is left out. An
-  // area's score is what its rows count over how many there are, the system's the areas' scores weighted
-  // (styleguide.health.weights in ds-config.json changes the weights). Accessibility waits, as on the Tasks page, until
-  // every component is tried in this browser, and the system's number with it, so no number moves in front of the reader.
+  // Every row of each area, as each component's own areas show it; what is not compared or not needed is left out. Each
+  // component counts the same in an area, and the area's score is their average, the system's the areas' scores
+  // weighted (styleguide.health.weights in ds-config.json changes the weights). Accessibility waits, as on the Tasks page,
+  // until every component is tried in this browser, and the system's number with it, so no number moves in front of the
+  // reader.
   var HEALTH_AREAS = [['Parity', 35], ['Accessibility', 30], ['Documentation', 20], ['Motion', 15]].map(function (a) {
     var w = DATA.healthWeights && DATA.healthWeights[a[0]]; return [a[0], typeof w === 'number' && w >= 0 ? w : a[1]];
   });
   var HEALTH_PART = { done: 1, check: 0.5, todo: 0 };
+  // Parity and accessibility count the component: whole when nothing in it is left, half when only checks are left
+  // (nothing is known to be wrong, someone has to look), nothing while one thing is to fix. Counted by row, the hundreds
+  // of values that match and criteria that pass would hide the few that do not. Documentation and motion count each
+  // item (done whole, to check half, to fix nothing): each is written or built by someone, none passes by itself.
+  var HEALTH_WHOLE = { Parity: true, Accessibility: true };
+  function healthStanding(rows, area) {
+    if (!rows.length) return null;
+    if (HEALTH_WHOLE[area]) return rows.some(function (r) { return r.st === 'todo'; }) ? 0 : rows.some(function (r) { return r.st === 'check'; }) ? 0.5 : 1;
+    return rows.reduce(function (s, r) { return s + HEALTH_PART[r.st]; }, 0) / rows.length;
+  }
   // What an agent needs to pick a component right: what it is, when to use it and when not, its role.
   var READY_KINDS = ['What it is', 'When to use', 'When not to use', 'Role'];
   function healthRowsOf(c, withA11y) {
@@ -2431,9 +2441,10 @@ a.pg-usage-name { color: var(--sg-text); }
     var per = COMPONENTS.map(function (c) { return { c: c, rows: healthRowsOf(c, !wait) }; });
     var pct = function (x) { return Math.round(x * 100); };
     var areas = HEALTH_AREAS.map(function (a) {
-      var rows = [], got = 0;
-      per.forEach(function (p) { p.rows.forEach(function (r) { if (r.area === a[0]) { rows.push(r); got += HEALTH_PART[r.st]; } }); });
-      return { name: a[0], weight: a[1], n: rows.length, done: rows.filter(function (r) { return r.st === 'done'; }).length, score: rows.length ? pct(got / rows.length) : null, wait: wait && a[0] === 'Accessibility' };
+      var each = per.map(function (p) { var rows = p.rows.filter(function (r) { return r.area === a[0]; }); return { rows: rows, s: healthStanding(rows, a[0]) }; }).filter(function (x) { return x.s != null; });
+      var rows = [].concat.apply([], each.map(function (x) { return x.rows; }));
+      return { name: a[0], weight: a[1], whole: !!HEALTH_WHOLE[a[0]], comps: each.length, clean: each.filter(function (x) { return x.s === 1; }).length, checking: each.filter(function (x) { return x.s === 0.5; }).length,
+        n: rows.length, done: rows.filter(function (r) { return r.st === 'done'; }).length, score: each.length ? pct(each.reduce(function (s, x) { return s + x.s; }, 0) / each.length) : null, wait: wait && a[0] === 'Accessibility' };
     });
     var counted = areas.filter(function (a) { return a.score != null && !a.wait && a.weight > 0; });
     var wsum = counted.reduce(function (s, a) { return s + a.weight; }, 0);
@@ -2456,7 +2467,8 @@ a.pg-usage-name { color: var(--sg-text); }
     var tiles = tile('Health', overall, 'of 100', overall == null ? 'Once every component is tried for accessibility' : 'Weighted as ' + weights) +
       areas.map(function (a) {
         if (a.wait) return tile(a.name, null, '%', 'Trying the components in this browser, ' + tried.length + ' of ' + COMPONENTS.length);
-        return tile(a.name, a.score, '%', a.n ? a.done + ' of ' + a.n + ' done' : 'Nothing to measure yet');
+        if (!a.comps) return tile(a.name, null, '%', 'Nothing to measure yet');
+        return tile(a.name, a.score, '%', a.whole ? a.clean + ' of ' + a.comps + (a.comps === 1 ? ' component' : ' components') + ' done' + (a.checking ? ', ' + a.checking + ' to check' : '') : a.done + ' of ' + a.n + ' done');
       }).join('') +
       tile('AI readiness', readyAll ? pct(readyGot / readyAll) : null, '%', built.length ? readyN + ' of ' + built.length + (built.length === 1 ? ' component ready' : ' components ready') : 'Nothing to measure yet');
     // The components with the most left, weighed as the system's number weighs it: a row to fix in an area counts that
@@ -2473,14 +2485,14 @@ a.pg-usage-name { color: var(--sg-text); }
       return '<li><div class="sg-health-row"><a class="sg-uses-link" href="#' + esc(cid(x.c.name)) + '">' + esc(x.c.name) + '</a><span>' + x.n + ' open</span></div>' + bar(pct(x.w / topW)) +
         '<p class="sg-health-sub">' + esc(HEALTH_AREAS.filter(function (a) { return x.by[a[0]]; }).map(function (a) { return a[0] + ' ' + x.by[a[0]]; }).join(', ')) + '</p></li>';
     }).join('') + '</ol>' : '<p class="sg-health-sub">No component has anything open.</p>';
-    // Each component's own progress: its number weighted as the system's, its share done in each area and its AI
-    // readiness, the weakest first. Numbers only: what is open is on the Tasks page and its own areas.
+    // Each component's own progress: its number weighted as the system's, its standing in each area counted as the
+    // system's is and its AI readiness, the weakest first. Numbers only: what is open is on the Tasks page and its own areas.
     var compScores = per.map(function (p) {
       var by = {}, ws = 0, wv = 0;
       HEALTH_AREAS.forEach(function (a) {
         var rows = p.rows.filter(function (r) { return r.area === a[0]; });
         if (!rows.length || (wait && a[0] === 'Accessibility')) { by[a[0]] = null; return; }
-        by[a[0]] = pct(rows.reduce(function (s, r) { return s + HEALTH_PART[r.st]; }, 0) / rows.length);
+        by[a[0]] = pct(healthStanding(rows, a[0]));
         if (a[1] > 0) { ws += a[1]; wv += by[a[0]] * a[1]; }
       });
       return { c: p.c, by: by, score: ws ? Math.round(wv / ws) : null };
@@ -2494,7 +2506,7 @@ a.pg-usage-name { color: var(--sg-text); }
       }).join('') + '</tbody></table></div></div>' : '';
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div>' +
       '<div class="sg-health-card"><h3>Components with the most left</h3>' + painHTML + '</div>' +
-      (compHTML ? '<h3 class="sg-health-head">Each component</h3>' + compHTML : '') + '<p class="pg-wcag-note sg-health-note">A row done counts whole, one to check half, one to fix nothing; what is left is weighed by its area. ' +
+      (compHTML ? '<h3 class="sg-health-head">Each component</h3>' + compHTML : '') + '<p class="pg-wcag-note sg-health-note">Parity and accessibility count each component, whole when nothing in it is left, half when only checks are left, nothing while something is to fix. Documentation and motion count each item, done whole, to check half, to fix nothing. Every component counts the same; what is left is weighed by its area. ' +
       'AI readiness counts what it is, when to use it and when not, its role and agreeing with Figma, and is not in the weighted number. ' +
       (wait ? 'Accessibility joins once every component is tried in this browser.' : '') + '</p></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
