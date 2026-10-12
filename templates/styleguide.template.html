@@ -1204,7 +1204,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // curve drawn beside it. Nothing moves until Play is pressed, and for a person who asks for less motion the dots go
   // straight to their end, as the system's own rule has it.
   var MOTION = DATA.motion || null;
-  if (MOTION && ((MOTION.durations || []).length || (MOTION.easings || []).length || (MOTION.transitions || []).length)) {
+  if (MOTION && ((MOTION.durations || []).length || (MOTION.easings || []).length || (MOTION.transitions || []).length || (MOTION.components || []).length)) {
     hr(); foundationLink('motion', 'motion');
     var less = MOTION.reduced
       ? 'When a person asks for less motion, the system ends every ' + MOTION.reduced.ends.join(' and ') + ' at once (' + MOTION.reduced.at + ').'
@@ -1237,6 +1237,23 @@ a.pg-usage-name { color: var(--sg-text); }
       tc.innerHTML = '<div class="pg-inspect-head">In Figma\'s prototype</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>Change</th><th>Trigger</th><th>Figma</th><th>Code</th></tr></thead><tbody>' +
         MOTION.transitions.map(function (r) { return '<tr><td>' + esc(r.component) + '</td><td>' + esc(r.change) + '</td><td>' + esc(r.trigger) + '</td><td>' + esc(r.ms + 'ms, ' + r.easing) + '</td><td>' + esc(r.code ? 'Differs: ' + r.code : 'Same') + '</td></tr>'; }).join('') + '</tbody></table></div>';
       mo.appendChild(tc); labelCells(tc);
+    }
+    // How each component moves on its own (C7): what repeats while it shows (a spinner turning), how it opens and how it
+    // closes, the code's beside Figma's (its Motion keyframes, the overlay its prototype opens).
+    if ((MOTION.components || []).length) {
+      var KIND = { loop: 'Repeats', open: 'Opens', close: 'Closes' };
+      var FIG = { same: 'Same', 'figma-none': 'None in Figma', unread: 'Not read yet' };
+      var timing = function (m) { return m.ms + 'ms, ' + m.easing; };
+      var known = function (n) { return COMPONENTS.some(function (c) { return c.name === n; }); };
+      var cm = document.createElement('div'); cm.className = 'pg-par-card sg-motion-proto sg-motion-own';
+      cm.innerHTML = '<div class="pg-inspect-head">How each component moves</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>Motion</th><th>Code</th><th>Figma</th></tr></thead><tbody>' +
+        MOTION.components.map(function (r) {
+          var comp = known(r.component) ? '<a class="sg-uses-link" href="#' + esc(cid(r.component)) + '">' + esc(r.component) + '</a>' : esc(r.component);
+          var code = r.code ? '<code>' + esc(timing(r.code)) + '</code><span class="pg-par-val">' + esc(r.code.selector) + '</span>' : esc('None in the code');
+          var fig = r.figma ? '<code>' + esc(timing(r.figma)) + '</code><span class="pg-par-val">' + esc((r.status === 'same' ? 'Same, ' : r.status === 'differs' ? 'Differs, ' : '') + r.figma.what) + '</span>' : esc(FIG[r.status] || 'None in Figma');
+          return '<tr data-motion="' + esc(r.motion) + '" data-status="' + esc(r.status) + '"><td>' + comp + '</td><td>' + esc(KIND[r.motion] + ': ' + r.what) + '</td><td>' + code + '</td><td>' + fig + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+      mo.appendChild(cm); labelCells(cm);
     }
   }
 
@@ -1916,11 +1933,16 @@ a.pg-usage-name { color: var(--sg-text); }
     });
     // Where it moves otherwise than Figma's prototype (C5): a change Figma animates and the code makes at once, another
     // duration, another curve. The prototype is the design: the code follows it.
+    // How it moves on its own (C7): a loop, its opening, its closing; one Figma has and the code does not is Claude's, one
+    // the code has and Figma does not is for whoever keeps Figma to animate there.
     (c.motionDiffs || []).forEach(function (m) {
-      var fig = '<code>' + esc(m.figma.ms + 'ms') + '</code><span class="pg-par-val">' + esc(m.figma.easing + ', on ' + m.trigger) + '</span>';
-      var code = m.code ? '<code>' + esc(m.code.ms + 'ms') + '</code><span class="pg-par-val">' + esc(m.code.easing + ' · ' + m.code.selector + ' · ' + m.code.file + ':' + m.code.line) + '</span>' : side(null);
-      var todo = m.kind === 'none' ? 'Give it a transition of ' + m.figma.ms + 'ms, ' + m.figma.easing + ', as Figma has it.' : m.kind === 'duration' ? 'Make the transition ' + m.figma.ms + 'ms, as Figma has it.' : 'Ease it ' + m.figma.easing + ', as Figma does.';
-      out.push({ key: c.name + '\u0000motion:' + m.kind + ':' + m.trigger + ':' + m.change, area: 'Parity', kind: 'Motion', type: 'Other', figma: fig, code: code, todo: esc(capital(m.change) + '. ' + todo + ' Tell Claude to do it.'), who: WHO.code, st: 'todo', rel: PAR_REL.differs, at: at0 });
+      var fig = m.figma ? '<code>' + esc(m.figma.ms + 'ms') + '</code><span class="pg-par-val">' + esc(m.figma.easing + (m.motion ? ', ' + m.figma.what : ', on ' + m.trigger)) + '</span>' : side(null);
+      var code = m.code ? '<code>' + esc(m.code.ms + 'ms') + '</code><span class="pg-par-val">' + esc(m.code.easing + (m.code.what ? ', ' + m.code.what : '') + ' · ' + m.code.selector + ' · ' + m.code.file + ':' + m.code.line) + '</span>' : side(null);
+      var anim = m.motion === 'loop' ? 'an animation that repeats' : m.motion ? 'an animation as it ' + (m.motion === 'open' ? 'opens' : 'closes') : 'a transition';
+      var todo = m.kind === 'figma-none' ? 'Animate it in Figma as the code does (' + m.code.what + ', ' + m.code.ms + 'ms, ' + m.code.easing + '), on its Motion timeline or in its prototype, or tell the code team to stop it.'
+        : m.kind === 'none' ? 'Give it ' + anim + ' of ' + m.figma.ms + 'ms, ' + m.figma.easing + ', as Figma has it' + (m.motion ? ' (' + m.figma.what + ')' : '') + '. Tell Claude to do it.'
+        : m.kind === 'duration' ? 'Make ' + (m.motion ? 'its animation' : 'the transition') + ' ' + m.figma.ms + 'ms, as Figma has it. Tell Claude to do it.' : 'Ease it ' + m.figma.easing + ', as Figma does. Tell Claude to do it.';
+      out.push({ key: c.name + '\u0000motion:' + m.kind + ':' + m.trigger + ':' + m.change, area: 'Parity', kind: 'Motion', type: 'Other', figma: fig, code: code, todo: esc(capital(m.change) + '. ' + todo), who: m.kind === 'figma-none' ? WHO.figma : WHO.code, st: 'todo', rel: m.kind === 'figma-none' ? PAR_REL.code : PAR_REL.differs, at: at0 });
     });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
     if (c.codeOnly && c.codeOnly.figma) out.push({ key: c.name + '\u0000codeOnly', area: 'Parity', kind: 'Component', type: 'Other', figma: side(null), code: side({ name: c.name, value: c.codeOnly.file }), todo: esc('Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.'), who: WHO.figma, st: 'todo', rel: PAR_REL.code, at: at0 });
