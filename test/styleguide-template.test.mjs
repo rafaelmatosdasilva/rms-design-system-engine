@@ -1279,7 +1279,7 @@ test('a page title: the system\'s own heading when it has a large one, else its 
   assert.match(tpl, /\.sg-section > h2, \.pg-head > h2 \{ font-size: var\(--sg-title\);/);
 });
 
-test('Health: each area\'s share done, weighted into one number once accessibility is tried; where what is left gathers; each component weakest first', { timeout: 300000 }, async (t) => {
+test('Health: each area\'s share done, weighted into one number once accessibility is tried; AI readiness; the five components with the most left; each component weakest first', { timeout: 300000 }, async (t) => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   // A row done counts whole, one to check half, one to fix nothing; the weights are the team's when it gives them.
   assert.match(tpl, /var HEALTH_PART = \{ done: 1, check: 0\.5, todo: 0 \};/);
@@ -1306,11 +1306,14 @@ test('Health: each area\'s share done, weighted into one number once accessibili
     // Accessibility waits until every component is tried in this browser, and the system's number with it.
     await waitForTrue(send, sessionId, `!/joins once/.test((document.querySelector('#health .sg-health-note') || {}).textContent || 'joins once')`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#health .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').firstChild.textContent, t.querySelector('.sg-health-sub').textContent])`);
-    assert.deepEqual(tiles.map((x) => x[0]), ['Health', 'Parity', 'Accessibility', 'Documentation', 'Motion'], errors.join('\n'));
-    for (const [label, num] of tiles.slice(0, 4)) assert.match(num, /^\d{1,3}$/, `${label} has a number`);
+    assert.deepEqual(tiles.map((x) => x[0]), ['Health', 'Parity', 'Accessibility', 'Documentation', 'Motion', 'AI readiness'], errors.join('\n'));
+    for (const [label, num] of [...tiles.slice(0, 4), tiles[5]]) assert.match(num, /^\d{1,3}$/, `${label} has a number`);
     assert.match(tiles[0][2], /^Weighted as Parity 35, Accessibility 30, Documentation 20, Motion 0$/, 'the team\'s weight replaces the page\'s');
     assert.match(tiles[1][2], /^\d+ of \d+ done$/);
-    assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left', 'What comes up most', 'Who it waits on', 'Ready for agents']);
+    assert.match(tiles[5][2], /^\d of 2 components ready$/);
+    // One card: the five components with the most left, at most.
+    assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left']);
+    assert.ok(await run(`document.querySelectorAll('#health .sg-health-card .sg-health-list > li').length`) <= 5);
     // Each component, the weakest first; a link to its own page; no task listed (they are on the Tasks page).
     const comps = await run(`[...document.querySelectorAll('#health .sg-health-comps tbody tr')].map((tr) => [tr.querySelector('a').getAttribute('href'), parseInt(tr.children[1].textContent, 10)])`);
     assert.deepEqual(comps.map((x) => x[0]).sort(), ['#c-button', '#c-chip']);
