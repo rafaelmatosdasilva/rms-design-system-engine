@@ -22,7 +22,7 @@ test('Figma\'s easing as CSS, a spring said as one; a transition read from the s
   assert.deepEqual(transitionsOf([{ prop: 'transition', value: 'none' }]), []);
   assert.match(MOTION_CAPTURE_JS, /page\.findAllWithCriteria\(\{ types: \['COMPONENT_SET'\] \}\)/);
   assert.doesNotMatch(MOTION_CAPTURE_JS, /loadAllPagesAsync/, 'a page at a time');
-  assert.match(motionCaptureScript('1-439'), /^const PAGE_ID = "1:439";/m);
+  assert.match(motionCaptureScript('1-439'), /^const PAGE_IDS = \["1:439"\];/m);
   assert.doesNotMatch(MOTION_CAPTURE_JS, /\.(remove|resize|setProperties|appendChild)\(|\.reactions\s*=/, 'read only');
 });
 
@@ -85,14 +85,17 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
     for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
     // The system's own motion, for the foundations' motion page (C6).
     writeFileSync(join(dir, 'src/styles/tokens.css'), readFileSync(join(dir, 'src/styles/tokens.css'), 'utf8') + '\n:root { --motion-quick: 150ms; --motion-ease: cubic-bezier(0.2, 0, 0, 1); }\n');
+    // And how the button moves on its own (C7): it fades in as it appears, which Figma does not animate.
+    writeFileSync(join(dir, 'src/components/button.css'), readFileSync(join(dir, 'src/components/button.css'), 'utf8') + '\n.button { animation: button-in 200ms ease-out; }\n@keyframes button-in { from { opacity: 0; } to { opacity: 1; } }\n');
     const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
     const a = run('--figma-motion');
     assert.match(a.stdout, /Motion capture script → \.design-system-engine-out\/figma-capture\/motion-capture\.js \(read-only/);
     assert.ok(existsSync(join(dir, '.design-system-engine-out/figma-capture/motion-capture.js')));
-    writeFileSync(join(dir, 'motion.json'), JSON.stringify({ components: { button: [{ from: { State: 'Default' }, to: { State: 'Hover' }, trigger: 'ON_HOVER', type: 'SMART_ANIMATE', duration: 0.25, easing: { type: 'EASE_OUT' } }] } }));
+    writeFileSync(join(dir, 'motion.json'), JSON.stringify({ version: 2, components: { button: [{ from: { State: 'Default' }, to: { State: 'Hover' }, trigger: 'ON_HOVER', type: 'SMART_ANIMATE', duration: 0.25, easing: { type: 'EASE_OUT' } }] }, motion: {}, overlays: [] }));
     const b = run('--figma-motion', 'motion.json');
-    assert.match(b.stdout, /✓ 1 transition on 1 component read from Figma → src\/figma\/figma-motion\.snapshot\.json/);
+    assert.match(b.stdout, /✓ 1 transition on 1 component, 0 components with Motion keyframes and 0 overlays read from Figma → src\/figma\/figma-motion\.snapshot\.json/);
     assert.match(b.stdout, /button State Default to Hover on hover: (Figma animates it \(250ms, ease-out\); the code changes it at once|the code takes \d+ms .*Figma 250ms)/);
+    assert.match(b.stdout, /button opens: the code animates it \(fades in, 200ms, ease-out, \.button, src\/components\/button\.css:\d+\); Figma has no motion for it/);
     // The audit keeps it for the style guide, which lists it in the button's Parity area.
     run();
     const saved = JSON.parse(readFileSync(join(dir, '.design-system-engine-out/motion.json'), 'utf8'));
@@ -114,11 +117,16 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
       let row = '';
       for (let n = 0; n < 100 && !row; n++) { if (n) await new Promise((r) => setTimeout(r, 100)); row = await run2(`([...document.querySelectorAll('#c-button tr[data-area="Parity"]')].find((tr) => /Motion/.test(tr.textContent)) || {}).textContent || ''`); }
       assert.match(row, /Motion.*250ms.*ease-out, on hover.*State Default to Hover\. (Give it a transition of 250ms, ease-out|Make the transition 250ms), as Figma has it\. Tell Claude to do it\./);
+      // Its own opening, which Figma does not animate: for whoever keeps Figma.
+      const own = await run2(`([...document.querySelectorAll('#c-button tr[data-area="Parity"]')].find((tr) => /Opens\./.test(tr.textContent)) || {}).textContent || ''`);
+      assert.match(own, /Motion.*Not there.*200ms.*ease-out, fades in.*You in Figma.*Opens\. Animate it in Figma as the code does \(fades in, 200ms, ease-out\), on its Motion timeline or in its prototype/);
       // The foundations' motion page: the system's duration and easing, played on demand, and Figma's prototype.
       await run2(`location.hash = '#motion'`); await new Promise((r) => setTimeout(r, 300));
       const page = JSON.parse(await run2(`JSON.stringify({ vars: [...document.querySelectorAll('#motion .sg-token-card td:nth-child(3)')].map((td) => td.textContent), proto: [...document.querySelectorAll('#motion .sg-motion-proto tbody tr')].map((tr) => tr.textContent), lead: document.querySelector('#motion > p').textContent, card: !!document.querySelector('#overview a[href="#motion"]') })`));
       assert.deepEqual(page.vars, ['--motion-quick', '--motion-ease']);
       assert.match(page.proto[0], /^buttonState Default to Hoverhover250ms, ease-outDiffers: (changes at once|\d+ms)/);
+      // How each component moves on its own: the code's beside Figma's.
+      assert.deepEqual(await run2(`[...document.querySelectorAll('#motion .sg-motion-own tbody tr')].map((tr) => tr.textContent)`), ['buttonOpens: fades in200ms, ease-out.buttonNone in Figma']);
       assert.match(page.lead, /does not stop its motion yet when a person asks for less/);
       assert.ok(page.card, 'a card on the overview');
       const at = `[...document.querySelectorAll('#motion .sg-motion-dot')].map((d) => Math.round(d.getBoundingClientRect().left - d.parentNode.getBoundingClientRect().left))`;
