@@ -1070,9 +1070,25 @@ Implementation, Content, Authoring), or one the engine reads nothing in, is for 
 (see *Annotation categories*). The annotations themselves are never changed. With gaps and no Figma snapshot, only the
 gaps list is written.
 
+Two accessibility edits come with them, each in an annotation category of its own and replaced on each run, so what is
+fixed clears and nothing doubles:
+- **The screens' findings, pinned where they are** (once the screens are read with `--figma-a11y`): each failing layer
+  gets one annotation listing all its issues (what is wrong in plain words, then its WCAG number, then the fix), and
+  each screen a summary with the counts, in the category "Accessibility Review" (red). A layer inside an instance cannot
+  carry an annotation, so the capture records the outermost instance it sits in. What has no layer to pin it on (a
+  screen with no fill behind its text, or a snapshot read before layer ids were kept) is said in the screen's summary.
+- **Each component's accessibility spec, as the code gives it**: its role (or, when Figma says otherwise, that the
+  role is a decision still open), what names it (`aria-labelledby`, `aria-label`, a label, its words, or only a
+  tooltip), the states its markup says (`aria-pressed`, `aria-expanded`, `disabled`…), the keys its role owes (Tab
+  reaches it; Enter and Space press a button; Escape closes a dialog and the focus goes back), and what a screen reader
+  says for it (`heard`, from the last accessibility check), in the category "Accessibility" (blue), for whoever builds
+  it. A component whose spec states its role gets no separate `Role:` edit. A wrapper of several controls with no
+  state of its own has nothing to state and is left out. The engine's own notes are never listed among the
+  annotations no check reads.
+
 It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its Figma node, what it adds and why) and
 `figma-apply.js`, a Figma plugin script that makes exactly those edits, leaves a component that already states a role
-as it is, and returns `{ changed, skipped, missing }` (and `todo`, the list it wrote). The agent shows the list, and only when the person says yes runs
+as it is, keeps every annotation a person wrote, and returns `{ changed, skipped, missing }` (and `todo`, the list it wrote). The agent shows the list, and only when the person says yes runs
 the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
 and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
 Descriptions, missing components and layout are never written: they stay in `figma-changes.md`.
@@ -1221,8 +1237,10 @@ bespoke app that exposes no page index is the only case that needs a `--url` / `
   both report is reported once, by the engine; what only axe-core found is a finding of its own, one per rule
   (`axe:<rule>` in `--json`, with `rule`, `wcag`, `url` and its `elements`), a blocker for a serious or critical WCAG
   rule, a warning for a moderate one, an advisory for a minor one or a best practice. The report ends with how many
-  of the elements axe-core failed are its own and how many were already the engine's. It cannot be downloaded
-  (offline, blocked) and no copy is cached: said as not checked, never clean (`a11y.axePath` points at a local copy).
+  of the elements axe-core failed are its own and how many were already the engine's. The install and every
+  `--update` fetch it into the cache (`node a11y-check.mjs --fetch-axe`, the same pinned hash), so the first check
+  needs no network, and `--doctor` says whether it is there. It cannot be downloaded (offline, blocked) and no copy is
+  cached: said as not checked, never clean (`a11y.axePath` points at a local copy).
 - **Every control hovered, focused and pressed**, in every colour mode (the pseudo-class forced through the DevTools
   protocol, as a pointer or the keyboard sets it): its text measured again (`hovercontrast`, `statecontrast` with its
   `state`, 1.4.3) and the edge of a field, a checkbox, a radio or a switch (`stateedge`, 1.4.11). Only what reads fine
@@ -1238,6 +1256,14 @@ bespoke app that exposes no page index is the only case that needs a `--url` / `
   and NVDA read from the same accessibility tree: `checkbox, Remember me, not checked · button, Bold, not pressed`.
   Words for a person to judge (whether a name says what it does), shown for a run about a few components or with
   `--a11y`, and in `--json` as `heard`.
+- **What a screen reader says when something changes** — each press that shows something (a reveal button, a control
+  that opens a dialog or a menu) is recorded as it happens: the words each live region takes, said politely or at once
+  (`role="alert"`, `aria-live="assertive"`), and where the focus goes. Printed as one line per press, for a run about
+  a few components or with `--a11y` (`Export opens dialog: the focus goes to dialog "Export"`, `pressing "Save" shows
+  toast: says "Saved" politely`), and in `--json` as `heardOnChange` (`{ page, what, says, said, focus }`). A message that appears with no
+  live region and no focus moving to it, or in a live region put in the page already holding its words, which most
+  screen readers never say, is a finding (`unannounced`, 4.1.3) naming the press that showed it; the in-page status
+  check then says the same element once.
 
 **Deeper checks (every run, every page).** Each is isolated: a check that cannot run on a page is skipped
 there, never a failure.
@@ -1276,6 +1302,9 @@ there, never a failure.
   and a form does not submit while it runs. A dialog already open as the page loads is judged when it lies over
   the page (in the top layer, or fixed); one drawn in the page's flow with nothing that opened it (a specimen on a
   style guide) is listed as not judged (`notJudged` in `--json`), never failed.
+- **A modal keeps the focus** — each modal dialog that opens (one shown with `showModal()`, or one with
+  `aria-modal="true"` lying over the page) is walked with Tab past its last control and Shift+Tab past its first: the focus must stay inside it
+  (`modalescape`, 2.4.3). A non-modal dialog may let the focus go.
 - **One main heading** — an app page (a `--url` page or a route found on its own, not the styleguide or a
   story) has one `h1`, which a screen reader jumps to. The code part flags a page file with text and no `h1`,
   or several.
@@ -1358,10 +1387,18 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   animates.
 - **Forced colours** — under `forced-colors: active` (Windows high contrast), a focus indicator that
   disappears because it was only a shadow or a background, and an icon or a text the mode makes vanish
-  (`forcedcontrast`: an icon drawn as a background colour, a CSS mask, takes the page's colour).
+  (`forcedcontrast`: an icon drawn as a background colour, a CSS mask, takes the page's colour). A selected, checked,
+  pressed or current item (`aria-selected`, `aria-checked`, `aria-pressed`, `aria-current`, or a state word in its
+  class) that, in the mode, draws exactly what an item of the same kind beside it at rest draws (the colours the mode
+  leaves, borders, outline, weight, decoration, opacity, and every part, a check mark or an icon) is a finding
+  (`forcedstate`, 1.4.11). A native checkbox or radio is drawn by the system, which keeps its state.
 - **Colour vision** — text that passes WCAG, read as people who do not see red, green or blue see it (the
   matrices Chrome's own vision simulator uses): one that falls below its ratio for one of them is an advisory
-  (`cvdcontrast`, with the `vision` that loses it; red on black is the usual case).
+  (`cvdcontrast`, with the `vision` that loses it; red on black is the usual case). Two variants of one component
+  that are drawn the same but for their colour (the same text, borders, weight and parts) and stand clearly apart in
+  normal vision (a colour difference, ΔE, of 25 or more on their background, text or border) but all within 18 under
+  one simulation are an advisory too (`cvdvariant`, 1.4.1, with the `vision`): a success badge and an error badge with nothing but red and
+  green between them.
 - **Text spacing (1.4.12)** — the spacing a reader may set (line height 1.5, letter spacing 0.12em, word
   spacing 0.16em); text that becomes cut off, or that spills out of a box that keeps its height onto what is
   next to it (the same at 200% zoom). A box that scrolls keeps its text reachable.
@@ -1391,7 +1428,9 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   with no matching `autocomplete` (1.3.5); the edge of a field, a checkbox, a radio or a switch under 3:1 against what
   is around it, a field's wrapper counted as its edge and a field with no edge drawn left alone (1.4.11); what
   shows on hover or focus that Escape does not close, that goes when the pointer moves onto it, or that goes by
-  itself (1.4.13, a trigger with `data-tip` or `aria-describedby` given 1.6 seconds to show its tip); an
+  itself (1.4.13, a trigger with `data-tip` or `aria-describedby` given 1.6 seconds to show its tip); a tip that
+  shows on hover but not when the same trigger is tapped with a touch screen emulated (`tapcontent`, 1.4.13), often
+  because the tap opens and closes it at once; an
   animation that runs more than 5 seconds with no pause, a loader excepted, or flashes more than three times a
   second (2.2.2, 2.3.1); a link with no words or with "click here" (2.4.4); an empty heading, label or legend
   (2.4.6); a control whose `aria-label` leaves out the words it shows (2.5.3); a control that acts on the press
@@ -1441,8 +1480,9 @@ Example of one note: `Role: button. aria-label: Close dialog`.
   points at a local copy), and is scoped to the checked components.
 
 **Not yet:** a component's contrast is measured in each mode the system declares (the system's text and background pairs
-are also checked in every combination of two switches, the `🎛` check, `modeCombinations` in config.md); and the Figma side (contrast and target size measured on Figma's own screens, findings pinned there) is not
-read.
+are also checked in every combination of two switches, the `🎛` check, `modeCombinations` in config.md). The Figma side
+is read by `--figma-a11y` (contrast and target size on Figma's own screens) and its findings are pinned there by
+`--figma-edits`.
 
 #### Evals (I7, a separate entry point — measures agent OUTPUT, never gates the repo)
 

@@ -1304,10 +1304,10 @@ export function apiView(api, file = api?.file) {
 // a11y-static.mjs added from wcag21.mjs).
 const A11Y_WCAG_OWN = {
   contrast: '1.4.3', hovercontrast: '1.4.3', focuscontrast: '1.4.11', iconcontrast: '1.4.11', name: '4.1.2', focus: '2.4.7', ariastate: '4.1.2', keyboard: '2.1.1',
-  target: '2.5.8', tabtrap: '2.1.2', tabindex: '2.4.3', escape: '2.1.1', focusreturn: '2.4.3', heading: '1.3.1', motion: '2.3.3', forcedfocus: '2.4.7',
+  target: '2.5.8', tabtrap: '2.1.2', tabindex: '2.4.3', escape: '2.1.1', modalescape: '2.4.3', tapcontent: '1.4.13', unannounced: '4.1.3', focusreturn: '2.4.3', heading: '1.3.1', motion: '2.3.3', forcedfocus: '2.4.7',
   spacing: '1.4.12', activate: '2.1.1', arrows: '2.1.1', zoom: '1.4.4', obscured: '2.4.11', focusthin: '2.4.13', rolecontract: '4.1.2', annotation: '4.1.2',
   reflow: '1.4.10', partrole: '1.3.1', behaviour: '2.1.1', statefollows: '4.1.2', semantics: '4.1.2',
-  statecontrast: '1.4.3', stateedge: '1.4.11', target44: '2.5.5', forcedcontrast: '1.4.11',
+  statecontrast: '1.4.3', stateedge: '1.4.11', target44: '2.5.5', forcedcontrast: '1.4.11', forcedstate: '1.4.11', cvdvariant: '1.4.1',
 };
 export const A11Y_WCAG = { ...WCAG21_KIND, ...A11Y_WCAG_OWN };
 // The criteria the page names, with their WCAG title and level (every WCAG 2.2 criterion at A and AA, and the AAA ones
