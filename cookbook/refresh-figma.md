@@ -477,8 +477,10 @@ comparable and their main reason. A clean result is only as good as its reach. T
 is written to `.design-system-engine-out/census.json`.
 
 **Disabled wins.** For every component with a disabled state, the capture also puts `:hover` and `:active` on the
-disabled instance. Any visible change against disabled alone (text colour, background, border colour, opacity)
-is listed under MEASURED as `hover while disabled`: the hover or press style lacks a `:not(:disabled)` guard.
+disabled instance. Any visible change against disabled alone (text colour, background, each border side's colour
+and width, shadow, outline, opacity) is listed under MEASURED as `hover while disabled`: the hover or press style
+lacks a `:not(:disabled)` guard. A side's colour counts only where that side is drawn, so a border colour that only
+follows the text colour is not listed again.
 A state the user cannot reach is not listed: no hover when the disabled state has `pointer-events: none`, and no
 press on a natively disabled control.
 Combinations such as selected with hover are compared whenever Figma has that variant (see below).
@@ -755,14 +757,15 @@ once auto-checks all its box geometry against the live frame; no per-prop hand-a
 *renders* the wrong type: a rule can set `font-size` from the right token yet inherit a heavier
 `font-weight` from a container (the checkbox label that inherited the `s` weight 700 while the DS
 uses style `m`, 600) - every token value is individually correct, so gates [3]/[11] stay green. An
-assertion tagged `textStyle: '<name>'` sources the expected `font-size`/`font-weight`/`line-height`
-from that named DS text style in the **typography snapshot** (`figma-vars.snapshot.json → typography`,
-e.g. `m: { size, weight, lh }`) and expands into one computed-style assertion per facet (a tier with
-no line-height - an auto-leading style - omits that one). Point it at the **real** selector, not a
+assertion tagged `textStyle: '<name>'` sources the expected `font-size`/`font-weight`/`line-height`/
+`letter-spacing`/`text-transform` from that named DS text style in the **typography snapshot**
+(`figma-vars.snapshot.json → typography`, e.g. `m: { size, weight, lh, ls, textTransform }`) and expands into
+one computed-style assertion per facet (a tier with no line-height - an auto-leading style - omits that one; a
+style with no letter spacing expects `normal`, and one in its original case expects `none`). Point it at the **real** selector, not a
 `probe`, so the element is measured inside its actual container and the inheritance is what gets
 checked. Opt-in per assertion, so it never false-positives on rules that correctly inherit. Rule of
 thumb: every text element that maps to a DS named style should carry a `textStyle` assertion -
-matching size/weight/line-height by hand silently drifts and drops line-height.
+matching size/weight/line-height by hand silently drifts and drops line-height, letter spacing and case.
 
 **Cross-plugin consistency (`CROSS_PLUGIN_CONSISTENCY`, Gate [24] (Renders correctly in a browser)).** A `theme.css` base
 component must compute the same values in every plugin that uses it. Each entry -

@@ -27,7 +27,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync, readdirSy
 import { join, resolve, dirname, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { allModes } from './mode-resolver.mjs';
+import { allModes, modeSwitchFor } from './mode-resolver.mjs';
 import { loadCssSources, rootTokens, resolveVars, canonValue } from './css-source.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './cdp.mjs';
 import { captureComponents, staticComponentReading } from './component-capture.mjs';
@@ -166,31 +166,6 @@ export function modeSwitch(mode, { styleguide = false } = {}) {
   return { ...sw, apply: sw.apply ? `${sw.apply}; ${set}` : set, undo: sw.undo ? `${sw.undo}; ${reset}` : reset };
 }
 
-function modeSwitchFor(mode) {
-  const sel = mode.cssSelector ?? 'root';
-  const base = [{ name: 'prefers-color-scheme', value: 'light' }, { name: 'prefers-contrast', value: 'no-preference' }];
-  if (sel === 'root') return { media: base };
-  if (sel === 'dark-media') return { media: [{ name: 'prefers-color-scheme', value: 'dark' }, base[1]] };
-  if (sel === 'high-contrast-media') return { media: [base[0], { name: 'prefers-contrast', value: 'more' }] };
-  if (sel.startsWith('class:')) {
-    const c = JSON.stringify(sel.slice(6));
-    return { media: base, apply: `document.documentElement.classList.add(${c})`, undo: `document.documentElement.classList.remove(${c})` };
-  }
-  if (sel.startsWith('data:')) {
-    const [attr, val = ''] = sel.slice(5).split('=');
-    const a = JSON.stringify(attr.startsWith('data-') ? attr : `data-${attr}`);
-    return { media: base, apply: `document.documentElement.setAttribute(${a}, ${JSON.stringify(val)})`, undo: `document.documentElement.removeAttribute(${a})` };
-  }
-  if (sel.startsWith('media:')) {
-    const cond = sel.slice(6);
-    const feats = [...cond.matchAll(/\(\s*(prefers-color-scheme|prefers-contrast|prefers-reduced-motion|forced-colors)\s*:\s*([\w-]+)\s*\)/g)].map((m) => ({ name: m[1], value: m[2] }));
-    const width = cond.match(/\(\s*min-width\s*:\s*(\d+)px\s*\)/)?.[1] ?? cond.match(/\(\s*max-width\s*:\s*(\d+)px\s*\)/)?.[1];
-    const rest = cond.replace(/\(\s*(prefers-color-scheme|prefers-contrast|prefers-reduced-motion|forced-colors|min-width|max-width)\s*:[^)]*\)/g, '').replace(/\band\b|\s/g, '');
-    if (rest) return { unsupported: `cannot emulate media condition ${cond}` };
-    return { media: feats.length ? feats : base, viewport: width ? +width : null };
-  }
-  return { unsupported: `unknown mode switch ${sel}` };
-}
 
 // A throwaway page holding only the theme CSS, so the browser resolves the theme alone. The files
 // are inlined in cascade order (imports already come first), because Chrome treats a file://

@@ -33,7 +33,7 @@ import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from './cdp.mjs';
 import { inProgressNames } from './in-progress.mjs';   // I52: work in progress is not drift
-import { expandFigmaVars, renderedMatches } from './rendered-expect.mjs';
+import { expandFigmaVars, renderedMatches, textStyleExpectations, schemeSwitch } from './rendered-expect.mjs';
 import { loadModes } from './mode-resolver.mjs';
 
 const ROOT = process.cwd();
@@ -130,11 +130,11 @@ try {
 } catch { /* frame-geometry snapshot optional */ }
 
 // DS-sourced text styles: an assertion with `textStyle: '<name>'` verifies the element's
-// COMPUTED font-size, font-weight and line-height all match that named DS text style from
-// the typography snapshot. This catches the class of bug a static CSS scan can't see - an
+// COMPUTED font-size, font-weight, line-height, letter-spacing and text-transform all match that
+// named DS text style from the typography snapshot. This catches the class of bug a static CSS scan can't see - an
 // element whose own rule looks fine but that inherits a heavier weight or a different size
 // from a container (a partial/hardcoded text style), and any drift from the DS type scale.
-// One entry expands into up to three per-property assertions; a style with no line-height
+// One entry expands into up to five per-property assertions; a style with no line-height
 // (e.g. an auto-leading tier) simply omits that one. Opt-in, so it never false-positives.
 try {
   const varsPath = cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json';
@@ -147,9 +147,7 @@ try {
       console.log(`⚠️  [16] ${a.plugin} ${a.selector}: textStyle '${a.textStyle}' not in the typography snapshot - assertion skipped`);
       continue;
     }
-    const byProp = { fontSize: style.size, fontWeight: style.weight, lineHeight: style.lh };
-    for (const [prop, expected] of Object.entries(byProp)) {
-      if (expected == null) continue;   // tier without this facet (e.g. auto line-height)
+    for (const [prop, expected] of Object.entries(textStyleExpectations(style))) {
       expanded.push({
         plugin: a.plugin, selector: a.selector, probe: a.probe, colorScheme: a.colorScheme, pseudo: a.pseudo,
         prop, expected: String(expected),
@@ -227,6 +225,7 @@ if (!ASSERTIONS.length) {
 // Default from ds-config (`rendered.colorScheme`), else 'light' (the :root base and
 // the headless default). An assertion overrides it with its own `colorScheme` field.
 const DEFAULT_SCHEME = cfg.rendered?.colorScheme ?? 'light';
+const RENDER_MODES = loadModes(cfg);
 
 // ── Find + launch Chrome (shared plumbing in cdp.mjs) ─────────────────────────
 const CHROME = findChrome();
@@ -284,8 +283,12 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
   await send('Runtime.evaluate', { expression: `(() => { if (document.getElementById('__designSystemEngine_no_transitions__')) return; const s = document.createElement('style'); s.id = '__designSystemEngine_no_transitions__'; s.textContent = '*,*::before,*::after{transition:none !important;animation:none !important}'; document.head.appendChild(s); })()` }, sessionId);
   const indexed = asserts.map((a, i) => ({ a, i })).filter(x => !x.a.forcePseudo);
   for (const scheme of [...new Set(indexed.map(x => schemeOf(x.a)))]) {
-    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] }, sessionId);
     const group = indexed.filter(x => schemeOf(x.a) === scheme);
+    // The mode put on as the project puts it on (a class, a data attribute, a media query), not only by the colour scheme.
+    const sw = schemeSwitch(scheme, RENDER_MODES);
+    if (sw.unsupported) { group.forEach((x) => { got[x.i] = `(mode '${scheme}' cannot be put on: ${sw.unsupported})`; }); continue; }
+    await send('Emulation.setEmulatedMedia', { features: sw.media }, sessionId);
+    if (sw.apply) await send('Runtime.evaluate', { expression: sw.apply }, sessionId);
     const expr = `(() => {
       const asserts = ${JSON.stringify(group.map(x => ({ selector: x.a.selector, probe: x.a.probe, prop: x.a.prop, pseudo: x.a.pseudo ?? null })))};
       // Probes render inside an absolutely-positioned host so the app shell's own
@@ -309,6 +312,7 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
       return out;
     })()`;
     const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true }, sessionId);
+    if (sw.undo) await send('Runtime.evaluate', { expression: sw.undo }, sessionId);
     const vals = r.result.value ?? [];
     group.forEach((x, k) => { got[x.i] = vals[k]; });
   }
@@ -356,7 +360,10 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
     }, sessionId);
     const { root } = await send('DOM.getDocument', {}, sessionId);
     for (const a of pseudoAsserts) {
-      await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: a.colorScheme ?? DEFAULT_SCHEME }] }, sessionId);
+      const sw = schemeSwitch(a.colorScheme ?? DEFAULT_SCHEME, RENDER_MODES);
+      if (sw.unsupported) { FAIL.push(`${plugin} ${a.selector} → ${a.prop}: mode '${a.colorScheme ?? DEFAULT_SCHEME}' cannot be put on (${sw.unsupported})`); continue; }
+      await send('Emulation.setEmulatedMedia', { features: sw.media }, sessionId);
+      if (sw.apply) await send('Runtime.evaluate', { expression: sw.apply }, sessionId);
       // forcePseudoOn lets the pseudo-class land on a DIFFERENT element than the one
       // measured - e.g. hovering a row and asserting a button inside it keeps its own
       // colour. Without it a parent-hover rule can silently outrank a child rule and
@@ -364,13 +371,14 @@ for (const [plugin, asserts] of Object.entries(byPlugin)) {
       const forceSel = a.forcePseudoOn || a.selector;
       const label = `${plugin} ${forceSel}:${a.forcePseudo.join(':')} → ${a.selector} ${a.prop}`;
       const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: forceSel }, sessionId);
-      if (!nodeId) { FAIL.push(`${label}: selector not found (probe missing?)`); continue; }
+      if (!nodeId) { if (sw.undo) await send('Runtime.evaluate', { expression: sw.undo }, sessionId); FAIL.push(`${label}: selector not found (probe missing?)`); continue; }
       await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: a.forcePseudo }, sessionId);
       const pr = await send('Runtime.evaluate', {
         expression: `getComputedStyle(document.querySelector(${JSON.stringify(a.selector)}))[${JSON.stringify(a.prop)}]`,
         returnByValue: true,
       }, sessionId);
       await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] }, sessionId);
+      if (sw.undo) await send('Runtime.evaluate', { expression: sw.undo }, sessionId);
       const val = pr.result.value;
       if (renderedMatches(val, a.expected)) PASS.push(label);
       else FAIL.push(`${label}: rendered "${val}" ≠ expected "${a.expected}"${a.note ? `  [${a.note}]` : ''}`);

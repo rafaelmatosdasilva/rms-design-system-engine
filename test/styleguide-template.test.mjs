@@ -289,7 +289,7 @@ test('in the browser: no script error, a control changes the real component, the
     // number, the area with the criterion, what Figma states, what was found, what to do with who acts, the status with
     // when and where it was read; a count above it and when the audit last ran. Only what applies. No separate table of
     // sources.
-    assert.match(a11y, /Issue nr.*Area.*Figma.*Code.*What to do.*Status/);
+    assert.match(a11y, /Issue nr.*WCAG criterion.*Figma states.*Found.*What to do.*Status/);
     assert.doesNotMatch(a11y, /What it means|Where it is read from/);
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
     // What a criterion means opens from its name, by a click (the focus in it, Escape gives it back) or a rest of the pointer.
@@ -344,7 +344,7 @@ test('in the browser: no script error, a control changes the real component, the
     const parRows = await run(`[...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].map((r) => r.dataset.type + ':' + r.dataset.status)`);
     assert.ok(parRows.some((r) => /^Prop:/.test(r)) && parRows.some((r) => /^Variable:/.test(r)), 'props and variables: ' + parRows);
     const parityText = await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`);
-    assert.match(parityText, /Parity.*Issue nr.*Area.*Figma.*Code.*What to do.*Status.*Updated/s);
+    assert.match(parityText, /Parity.*Issue nr.*Type.*Figma.*Code.*What to do.*Status.*Updated/s);
     assert.doesNotMatch(parityText, /Of \d+, \d+ the same/, 'no line counting what is the same, what differs and what is on one side');
     assert.deepEqual(await run(`[...document.querySelectorAll('#c-chip [data-area="parity"] tr[data-status="done"]')].filter((tr) => /Same/.test(tr.lastElementChild.textContent)).length`), 0, 'a row that is done says nothing more under Done');
     // The filter shows one type at a time.
@@ -491,18 +491,40 @@ test('in the browser: no script error, a control changes the real component, the
     const note = () => run(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`);
     assert.match(await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0), /Every variant of every component was tried in a browser when this page was built, on \d{4}-\d\d-\d\d.*nothing runs while you read them/);
     assert.equal(await run(`!!document.getElementById('sg-a11y-baked') && document.querySelectorAll('.pg-offstage').length`), 0, 'nothing tried here');
-    assert.match(await run(`document.querySelector('#todo thead').textContent`), /^Issue nr\s*Area\s*Figma\s*Code\s*What to do\s*Status$/);
-    // A filter by area: every row, or only Parity's or Accessibility's; the cards with none left go too.
-    assert.match((await run(`[...document.querySelectorAll('#todo .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^All \(\d+\)\|Parity \(\d+\)\|Accessibility \(\d+\)/);
+    // One kind at a time, each in its own table, chosen with the filter; no list of every kind at once.
+    const shownKind = () => run(`[...document.querySelectorAll('#todo .sg-todo-kind')].filter((k) => k.getClientRects().length).map((k) => k.dataset.area)`);
+    const shownHead = () => run(`document.querySelector('#todo .sg-todo-kind:not([hidden]) thead').textContent`);
+    assert.match((await run(`[...document.querySelectorAll('#todo .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^Parity \(\d+\)\|Accessibility \(\d+\)\|Documentation \(\d+\)/);
+    assert.equal(await run(`[...document.querySelectorAll('#todo .sg-todo-filter [data-v]')].some((b) => b.dataset.v === 'all')`), false, 'no All');
+    assert.deepEqual(await shownKind(), ['Parity']);
+    assert.match(await shownHead(), /^Issue nr\s*Type\s*Figma\s*Code\s*What to do\s*Status$/);
     await run(`document.querySelector('#todo .sg-todo-filter [data-v="Accessibility"]').click()`);
-    assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#todo tbody tr')].filter((tr) => !tr.hidden).map((tr) => tr.dataset.area))]`), ['Accessibility']);
-    assert.equal(await run(`[...document.querySelectorAll('#todo .pg-par-card')].every((c) => c.hidden || c.querySelector('tbody tr:not([hidden])'))`), true);
-    await run(`document.querySelector('#todo .sg-todo-filter [data-v="all"]').click()`);
-    assert.equal(await run(`[...document.querySelectorAll('#todo tbody tr')].every((tr) => !tr.hidden)`), true);
+    assert.deepEqual(await shownKind(), ['Accessibility']);
+    assert.equal(await run(`location.hash`), '#todo/accessibility', 'each kind has its own address to send');
+    assert.match(await shownHead(), /^Issue nr\s*WCAG criterion\s*Figma states\s*Found\s*What to do\s*Status$/);
+    assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#todo .sg-todo-kind:not([hidden]) tbody tr')].map((tr) => tr.dataset.area))]`), ['Accessibility']);
+    // Documentation is on the To do page too, in the Documentation table itself (Kind, What is written, From), one card
+    // for each component with a kind not written yet, and where to write it above them.
+    await run(`document.querySelector('#todo .sg-todo-filter [data-v="Documentation"]').click()`);
+    assert.match(await shownHead(), /^Kind\s*What is written\s*From$/);
+    assert.match(await run(`document.querySelector('#todo .sg-todo-kind:not([hidden]) tbody tr[data-have="0"]').textContent`), /^(What it is|When to use|When not to use|Common mistakes|Limitations|Do and don't|Role)(Not written yet\.|No pictures yet\.)$/);
+    assert.match(await run(`document.querySelector('#todo .sg-todo-kind:not([hidden]) > .pg-from').textContent`), /^Write a missing one in Figma/);
+    const missing = await run(`document.querySelectorAll('#todo .sg-todo-kind:not([hidden]) tr[data-have="0"]').length`);
+    assert.equal(await run(`document.querySelector('#todo .sg-todo-sum').textContent`), `✕${missing} to fix`, 'the count is the kind\'s own');
+    assert.match(await run(`document.querySelector('#todo .sg-todo-filter [data-v="Documentation"]').textContent`), new RegExp(`^Documentation \\(${missing}\\)$`));
+    assert.deepEqual(await shownKind(), ['Documentation'], 'only the kind chosen is drawn');
+    await run(`document.querySelector('#todo .sg-todo-filter [data-v="Parity"]').click()`);
+    assert.deepEqual(await shownKind(), ['Parity'], 'Documentation\'s cards go when another kind is chosen');
+    // Opening a kind's address opens that kind, its tab chosen.
+    await run(`location.hash = '#c-chip'`); await shownIs('c-chip');
+    await run(`location.hash = '#todo/documentation'`); await shownIs('todo');
+    assert.deepEqual(await shownKind(), ['Documentation']);
+    assert.match(await run(`document.querySelector('#todo .sg-todo-sum').textContent`), /^✕\d+ to fix$/, 'its own count');
+    await run(`document.querySelector('#todo .sg-todo-filter [data-v="Parity"]').click()`);
     // What the tokens owe is a row of The system: the descriptions to write, for whoever keeps Figma.
     assert.match(await run(`[...document.querySelectorAll('#todo tr[data-area="System"]')].map((tr) => tr.textContent).join('|')`), /Tokens, description.*You in Figma.*semantic tokens have no description in Figma.*Write what each one is for/);
     // A retired component still in use: a row for each place it is used, under its name, with what replaces it.
-    assert.match(await run(`[...document.querySelectorAll('#todo tr[data-area="Migration"]')].map((tr) => tr.textContent).join('|')`), /^\d+MigrationRetired.*This system3 places.*Claude in the code.*Move this system off button \(figma-mcp\/settings\.md:105, src\/components\/system\.js:1, src\/pages\/Home\.jsx:2\)\..*Use chip instead\. Every place is in migrations\.md\. Tell Claude to do it\./);
+    assert.match(await run(`[...document.querySelectorAll('#todo tr[data-area="Migration"]')].map((tr) => tr.textContent).join('|')`), /^\d+This system3 places: .*Claude in the code.*Move this system off button \(figma-mcp\/settings\.md:105, src\/components\/system\.js:1, src\/pages\/Home\.jsx:2\)\..*Use chip instead\. Every place is in migrations\.md\. Tell Claude to do it\./);
     const nums = await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`);
     assert.ok(nums.length > 0 && nums.every(([, n], i) => +n === i + 1), 'numbered 1, 2, 3 down the page');
     const byNo = (a) => a.slice().sort((p, q) => p[1] - q[1]);

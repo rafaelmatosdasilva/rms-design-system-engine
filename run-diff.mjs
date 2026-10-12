@@ -192,13 +192,24 @@ export function verificationLine(v) {
   const few = (list) => (list.length && list.length <= 5 ? ` (${list.join(', ')})` : '');
   return `**Components: ${v.passing.length} passing · ${v.drifting.length} drifting${few(v.drifting)} · ${v.notChecked.length} not checked${few(v.notChecked)}.**${v.measured ? '' : ' Nothing was measured in a browser this run, so passing means the checks that ran found no difference.'}`;
 }
-export function differencesMarkdown(d, { at = '', handback = {} } = {}) {
+// One line on where a component lives, for the differences list: the products and how many files, what it sits inside.
+export function livesLine(u) {
+  if (!u) return null;
+  const where = (u.products ?? []).map((p) => `${p.name ?? "the system's own pages"} (${p.files} ${p.files === 1 ? 'file' : 'files'})`);
+  const parts = [where.length ? `Lives in ${where.join(', ')}` : 'No product code uses it yet', ...(u.inside?.length ? [`inside ${u.inside.join(', ')}`] : [])];
+  return `_${parts.join('; ')}._`;
+}
+// livesIn: { <component>: the usage map's entry } (contracts' livesIn): each component's heading says where it lives, so
+// a difference in a component five products use reads as the larger change it is.
+export function differencesMarkdown(d, { at = '', handback = {}, livesIn = {} } = {}) {
   const out = ['# Differences between Figma and the code', '',
     `${d.total} open${d.fresh ? `, ${d.fresh} new since the last run` : ''}${at ? ` · ${at}` : ''}. Written by rms-design-system-engine on every full audit: the one list to work from. Each line says what differs and where; fix the side that is wrong, or accept a difference on purpose (\`--baseline --findings\`), and the next run takes it off.`];
   if (d.notChecked?.length) out.push('', `Not checked this run, so a difference there would not show: ${d.notChecked.map((n) => `${n.check} (${n.why})`).join('; ')}.`);
   if (handback.code || handback.figma) out.push('', `How each side would change: ${[handback.code && `the code, \`${handback.code}\` (apply only when you ask)`, handback.figma && `Figma, \`${handback.figma}\``].filter(Boolean).join('; ')}.`);
   for (const g of d.groups) {
     out.push('', `## ${g.component ?? 'The whole system'} (${g.items.length})`, '');
+    const lives = g.component ? livesLine(livesIn[g.component]) : null;
+    if (lives) out.push(lives, '');
     for (const it of g.items) out.push(`- ${it.new ? '**new** ' : ''}${it.check ? `${it.check}: ` : ''}${it.what}${it.side === 'figma' ? ' _(in Figma)_' : ''}`);
   }
   return out.join('\n') + '\n';
