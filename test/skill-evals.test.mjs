@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { context, decisionPoints } from './skill-evals/lib.mjs';
 import { globalChecks, asksForToken } from './skill-evals/rules.mjs';
-import { DEV, chipFixed, radiusAccepted, burndownTop, figmaRolesScore } from './skill-evals/tasks.mjs';
+import { DEV, COMBO, chipFixed, radiusAccepted, burndownTop, figmaRolesScore } from './skill-evals/tasks.mjs';
 import { HELDOUT } from './skill-evals/heldout.mjs';
 import { makeFixture } from './helpers.mjs';
 
@@ -250,4 +250,12 @@ test('figma-roles: the engine\'s list shown and a yes asked for passes; a claim 
   assert.equal(run('I added Role: textbox to the field in Figma, and the chip is a togglebutton question for you.'), false);
   assert.equal(run(good, 'rms-design-system-engine --component field'), false);
   assert.equal(run('field: Role: textbox. Want me to apply it?'), false, 'the chip split is not mentioned');
+});
+
+test('the chip\'s 36 against 32 counts on one line, or on two lines in a row when both are in px', () => {
+  assert.ok(COMBO.test('chip height (Size=L, Icon=True): Figma 32, rendered 36px'));
+  assert.ok(COMBO.test('Height mismatch when Size=L and Icon=True:\n- Figma: 32px\n- Rendered: 36px (from `.tp-chip.tp-chip--l.tp-chip--icon`)'), 'seen in a real run');
+  assert.ok(!COMBO.test('The button is 32px tall.\n\nThe card is 36px wide.'));
+  assert.ok(!COMBO.test('320 and 360'));
+  assert.ok(!COMBO.test('36 components were checked.\nAll 32 passing gates look fine for now.'));
 });

@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The designed screens checked for accessibility (W1) (continuous evaluation)
+
+What changed since the entry below (engine 4754507): Nuxt 4.6 writes its types in the engine's output too; The designed screens checked for accessibility (W1). The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `135ea0d34f49` · Project measured: `13d811a9d668`
+
+| Haiku, engine b053e48 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.057 |
+| Input a run | 102k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 102k. One `audit-chip` run first scored as a miss though it named both heights (Figma 32px and rendered 36px, on two lines in a row of one list); the scorer took the pair only on one line, now takes two lines in a row when both carry px, and every run was scored again (`rescore.mjs`). Records: `records/2026-10-12-the-designed-screens-checked-for`.
+
 ## 2026-10: A colour asked for, or a design token to add, is not a secret (continuous evaluation)
 
 What changed since the entry below (engine 647b009): Health: AI readiness among the top numbers; the five components with the most left; The style guide's first menu group is System; Room around the Playground's component; each title as close to what follows; no feedback link; The motion page lists the components that move so, by name; A colour asked for, or a design token to add, is not a secret. The guide changed in `reference/usage.md`.
