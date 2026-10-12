@@ -271,8 +271,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   `prefers-reduced-motion` and what it ends, or that it does not yet; and the system's motion as its fundamentals, in
   one table (`motionOverview`, `motion-components.mjs`): each timing its components move with (a duration, a curve and a
   delay), from the fastest, each with a dot that crosses its track on Play, the variables it is written with and their
-  Figma names, what it is for (Repeats, Opens, Closes, On hover, On press, On focus), the components and parts that move
-  so (each linked to its Motion tab), Figma's timing for them, and For the system: a purpose with several timings
+  Figma names, what it is for (Repeats, Opens, Closes, On hover, On press, On focus), the components that move so,
+  each once and linked to its Motion tab, Figma's timing for them, and For the system: a purpose with several timings
   (choose one for every component), a timing several components share (keep it as one variable), one written as values
   (make it a variable); a duration or curve variable no component uses is a row too (use it, or remove it). The rows
   come from each component's own (`motionSpec`): its loop (a spinner turning), its opening and its closing, the code's
@@ -438,9 +438,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
   `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`),
-  `contract.authored.json` → `components.<name>.links`, as buttons at the top right of its header. The overview adds Send
-  feedback (`styleguide.feedback`, else `styleguide.issues`, the tracker's new-issue address with `{name}` and `{title}`,
-  else the repository's own on GitHub or GitLab, with a Style guide title, `issueLink`).
+  `contract.authored.json` → `components.<name>.links`, as buttons at the top right of its header.
 - **At a glance** (`factsOf`), under its name, on one line: its class (`.modal-card`), Version (the release its last
   change shipped in), Last changed, its date and time, and how to import it. How it stands with Figma and with accessibility is on those areas (their alert icons) and on its
   overview card, in one line, a fact that needs work marked with ! and in bold, never by colour alone.

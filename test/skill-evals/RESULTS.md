@@ -1,5 +1,50 @@
 # Skill evaluation results
 
+## 2026-10: A colour asked for, or a design token to add, is not a secret (continuous evaluation)
+
+What changed since the entry below (engine 647b009): Health: AI readiness among the top numbers; the five components with the most left; The style guide's first menu group is System; Room around the Playground's component; each title as close to what follows; no feedback link; The motion page lists the components that move so, by name; A colour asked for, or a design token to add, is not a secret. The guide changed in `reference/usage.md`.
+
+Guide set measured: `740b2dba6aed` · Project measured: `13d811a9d668`
+
+| Haiku, engine 4754507 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.058 |
+| Input a run | 108k | 102k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 108k. Records: `records/2026-10-12-a-colour-asked-for-or`.
+
+## 2026-10: Health: how far each area has come, weighted into one number, and where what is left gathers (continuous evaluation)
+
+What changed since the entry below (engine 250c635): A part another component draws is that component's; the fill check reads only a recorded no-fill; Health: how far each area has come, weighted into one number, and where what is left gathers. The guide changed in `reference/config.md`.
+
+Guide set measured: `4053022b4f2f` · Project measured: `13d811a9d668`
+
+| Haiku, engine 647b009 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 98k | 108k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 98k. Records: `records/2026-10-12-health-how-far-each-area`.
+
+## 2026-10: A fill Figma does not have; a row's free space allows for text; screens framed by a product, or cut (continuous evaluation)
+
+What changed since the entry below (engine 8f2202f): Template test: Accessibility is the last kind on the Tasks page; A fill Figma does not have; a row's free space allows for text; screens framed by a product, or cut. The guide changed in `reference/config.md`.
+
+Guide set measured: `906a5368fbbf` · Project measured: `13d811a9d668`
+
+| Haiku, engine 250c635 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.057 |
+| Input a run | 95k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 95k. Records: `records/2026-10-12-a-fill-figma-does-not`.
+
 ## 2026-10: Tasks by kind, motion as one system table (continuous evaluation)
 
 What changed since the entry below (engine 8bf7f93): The Tasks page shows every kind at once except Accessibility, which alone waits while the components are tried; motion is a kind of its own with what each component needs; a component's Motion tab is the same task table; the motion page is one table of the system's timings, which components use each, and what the system should make of them; the component's class sits on its Version line. The guide changed in `reference/usage.md`.

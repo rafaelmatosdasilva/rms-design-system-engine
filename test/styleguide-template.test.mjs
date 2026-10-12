@@ -1099,12 +1099,6 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.equal(coverageOf({ total: {} }, 'src/components/Chip.jsx'), null);
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /card\(cGrid, cid\(c\.name\), 'Components', c\.name, about\(c\), '', c\.status\)/);
-  // Where a person reports a problem: the team's tracker with the component's name, else the repository's own.
-  const { issueLink } = await import('../styleguide-data.mjs');
-  assert.equal(issueLink({ template: 'https://redmine.example.com/projects/ds/issues/new?issue[subject]={title}', name: 'Chip' }), 'https://redmine.example.com/projects/ds/issues/new?issue[subject]=Chip%3A%20');
-  assert.equal(issueLink({ repo: 'https://github.com/acme/ds', name: 'Chip' }), 'https://github.com/acme/ds/issues/new?title=Chip%3A%20');
-  assert.equal(issueLink({ repo: 'https://gitlab.acme.com/ds/core', name: null }), 'https://gitlab.acme.com/ds/core/-/issues/new?issue[title]=Style%20guide%3A%20');
-  assert.equal(issueLink({ repo: 'https://bitbucket.org/acme/ds', name: 'Chip' }), null);
   assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
   assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
   assert.doesNotMatch(tpl, /'Status: ' \+ kinds|Usage written: |Open the To do list/, 'the overview counts nothing of its own');
@@ -1277,4 +1271,63 @@ test('a page title: the system\'s own heading when it has a large one, else its 
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /--sg-title: calc\(var\(--sg-h1\) \* var\(--sg-title-scale\)\)/);
   assert.match(tpl, /\.sg-section > h2, \.pg-head > h2 \{ font-size: var\(--sg-title\);/);
+});
+
+test('Health: each area\'s share done, weighted into one number once accessibility is tried; AI readiness; the five components with the most left; each component weakest first', { timeout: 300000 }, async (t) => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  // A row done counts whole, one to check half, one to fix nothing; the weights are the team's when it gives them.
+  assert.match(tpl, /var HEALTH_PART = \{ done: 1, check: 0\.5, todo: 0 \};/);
+  assert.match(tpl, /var w = DATA\.healthWeights && DATA\.healthWeights\[a\[0\]\]; return \[a\[0\], typeof w === 'number' && w >= 0 \? w : a\[1\]\];/);
+  assert.match(readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8'), /view\.healthWeights = cfg\.styleguide\.health\.weights;/);
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const chromePath = findChrome({ playwright: true });
+  if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-health-');
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p))); }
+  const cfgFile = join(dir, 'ds-config.json'), cfg = JSON.parse(readFileSync(cfgFile, 'utf8'));
+  writeFileSync(cfgFile, JSON.stringify({ ...cfg, styleguide: { ...(cfg.styleguide ?? {}), health: { weights: { Motion: 0 } } } }, null, 2));
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const c = await launchChrome(chromePath);
+  try {
+    const { send, on, close } = await connectCDP(c.wsUrl);
+    const errors = []; on('Runtime.exceptionThrown', (p) => errors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
+    const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}#health`);
+    await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
+    const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
+    assert.equal(await run(`!!document.querySelector('.sg-nav a[href="#health"]')`), true, 'its own entry in the side panel');
+    // Accessibility waits until every component is tried in this browser, and the system's number with it.
+    await waitForTrue(send, sessionId, `!/joins once/.test((document.querySelector('#health .sg-health-note') || {}).textContent || 'joins once')`, { attempts: 400 });
+    const tiles = await run(`[...document.querySelectorAll('#health .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').firstChild.textContent, t.querySelector('.sg-health-sub').textContent])`);
+    assert.deepEqual(tiles.map((x) => x[0]), ['Health', 'Parity', 'Accessibility', 'Documentation', 'Motion', 'AI readiness'], errors.join('\n'));
+    for (const [label, num] of [...tiles.slice(0, 4), tiles[5]]) assert.match(num, /^\d{1,3}$/, `${label} has a number`);
+    assert.match(tiles[0][2], /^Weighted as Parity 35, Accessibility 30, Documentation 20, Motion 0$/, 'the team\'s weight replaces the page\'s');
+    assert.match(tiles[1][2], /^\d+ of \d+ done$/);
+    assert.match(tiles[5][2], /^\d of 2 components ready$/);
+    // One card: the five components with the most left, at most.
+    assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left']);
+    assert.ok(await run(`document.querySelectorAll('#health .sg-health-card .sg-health-list > li').length`) <= 5);
+    // Each component, the weakest first; a link to its own page; no task listed (they are on the Tasks page).
+    const comps = await run(`[...document.querySelectorAll('#health .sg-health-comps tbody tr')].map((tr) => [tr.querySelector('a').getAttribute('href'), parseInt(tr.children[1].textContent, 10)])`);
+    assert.deepEqual(comps.map((x) => x[0]).sort(), ['#c-button', '#c-chip']);
+    assert.ok(comps[0][1] <= comps[1][1], 'the weakest first');
+    assert.equal(await run(`document.querySelectorAll('#health .sg-todo-no').length`), 0);
+    assert.deepEqual(errors, []);
+    close();
+  } finally { c.kill(); }
+});
+
+test('room around the Playground\'s component, what follows each title as close on every page, no feedback link', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  // 100px above and below the component on a wide screen, 64px on a tablet or a narrow laptop, 40px on a phone.
+  assert.match(tpl, /\.pg-preview-card \{ --pg-stage-room: 100px; \}/);
+  assert.match(tpl, /@media \(max-width: 1100px\) \{ \.pg-preview-card \{ --pg-stage-room: 64px; \} \}/);
+  assert.match(tpl, /@media \(max-width: 720px\) \{ \.pg-preview-card \{ --pg-stage-room: 40px; \} \}/);
+  assert.match(tpl, /\.pg-preview-col > \.pg-preview, \.pg-preview-col > \.pg-anatomy, \.pg-preview-col > \.pg-frame \{ padding-top: var\(--pg-stage-room\); padding-bottom: var\(--pg-stage-room\); \}/);
+  // The overview's links as a page's text under its title, a foundation's size switch too.
+  assert.match(tpl, /\.sg-hero \{ margin-bottom: var\(--sg-space-s\); \}/);
+  assert.match(tpl, /#overview > \.pg-links \{ margin: 0 0 var\(--sg-space-xl\); \}/);
+  assert.match(tpl, /\.sg-section > h2 ~ \.sg-size-switch \{ padding-top: 0; \}/);
+  assert.doesNotMatch(readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8'), /Send feedback/);
 });

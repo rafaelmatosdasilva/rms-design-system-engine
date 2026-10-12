@@ -61,6 +61,9 @@ test('a reply that asks the person for a secret goes back once, whatever the rou
   const root = mkdtempSync(join(tmpdir(), 'secret-'));
   assert.equal(asksForSecret('Once you provide the token, I can complete setting up the guidelines from that URL.'), true);
   assert.equal(asksForSecret('Give me a hex/token to use, or confirm a green is fine.'), false);
+  // A colour asked for and a design token to add, seen in a real run: not a secret, never sent back.
+  assert.equal(asksForSecret("What hex color should I add for the success state? Once you provide the color, I'll add it as a new token to the design system and then use it."), false);
+  assert.equal(asksForSecret('Please paste your API token here and I will add it to the design system.'), true);
   assert.equal(asksForSecret('Put GITLAB_TOKEN in the project\'s .env, never paste it here.'), false);
   const back = stopCheck({ session_id: 's', last_assistant_message: 'Saved the link. Once you provide the token, I can finish.' }, { root });
   assert.match(back ?? '', /asks the person for a secret in the chat[\s\S]*\.env/);

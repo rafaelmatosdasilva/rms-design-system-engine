@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeFixture } from './helpers.mjs';
-import { readingOrder, screenFindings, productOfScreen, projectScreens, screenTodos, mergeScreens, screenSnapshot, screenScopes } from '../screen-parity.mjs';
+import { readingOrder, screenFindings, productOfScreen, projectScreens, screenTodos, mergeScreens, screenSnapshot, screenScopes, cutPlaces, pageShift } from '../screen-parity.mjs';
 import { screenCaptureScript } from '../screen-layout.mjs';
 import { findChrome } from '../cdp.mjs';
 
@@ -61,6 +61,32 @@ test('neighbours share a scope; a component\'s own parts are its own; two of one
   const fig = [b('panel', 0, 40, 280, 400), b('statusBar', 300, 40, 500, 48), { ...b('badge', 316, 54, 40, 20), scope: 'bar' }, { ...b('segmentedControl', 700, 52, 80, 24), scope: 'bar' }, { ...b('segmentedControl', 16, 54, 248, 24), scope: 'panel' }];
   const page = [b('panel', 0, 0, 280, 400), b('statusBar', 300, 0, 500, 48), b('badge', 316, 14, 40, 20), b('segmentedControl', 700, 9, 80, 24), b('segmentedControl', 16, 14, 248, 24)];
   assert.deepEqual(screenFindings('Tree', fig, page), []);
+});
+
+test('a row\'s free space allows for the text before it; a gap stays exact (E37)', () => {
+  // A status bar: a title and a badge on the left, a button pushed to the right. Chrome draws the title 4px narrower, so
+  // the free space before the right-hand button is 4px wider: 2% of the 240px before it allows that, on top of 2px.
+  const bar = { x: 0 };
+  const fig = [{ ...b('badge', 160, 12, 40, 20), scope: bar }, { ...b('buttonTertiary', 208, 10, 24, 24), scope: bar }, { ...b('iconButton', 400, 10, 24, 24), scope: bar }];
+  const page = [{ ...b('badge', 156, 12, 40, 20), scope: bar }, { ...b('buttonTertiary', 204, 10, 24, 24), scope: bar }, { ...b('iconButton', 400, 10, 24, 24), scope: bar }];
+  assert.deepEqual(screenFindings('Bar', fig, page), []);
+  // Two buttons a gap apart (12 in Figma, 8 on the page): a gap the layout names is exact, whatever text is before it.
+  const fig2 = [{ ...b('buttonSecondary', 600, 10, 62, 24), scope: bar }, { ...b('buttonPrimary', 674, 10, 76, 24), scope: bar }];
+  const page2 = [{ ...b('buttonSecondary', 604, 10, 62, 24), scope: bar }, { ...b('buttonPrimary', 674, 10, 76, 24), scope: bar }];
+  assert.match(screenFindings('Footer', fig2, page2).map((f) => f.message).join(), /8px on the page, 12px on "Footer"/);
+});
+
+test('a product\'s own frame is no one\'s scope; where an answer was cut is left out (E38)', () => {
+  // A screen whose window is a product's own instance: what it holds is the screen's, not the frame's own parts.
+  const card = { kind: 'instance', component: 'card', x: 16, y: 120, w: 300, h: 200, children: [] };
+  const app = { kind: 'instance', component: '.My App', x: 0, y: 0, w: 820, h: 520, children: [{ kind: 'frame', name: 'Body', children: [card] }] };
+  const isSystem = (c) => ['card'].includes(c);
+  const { own } = screenScopes({ kind: 'frame', name: 'Screen', children: [app] }, { isSystem });
+  assert.equal(own.has(card), false);
+  assert.equal(screenScopes({ kind: 'frame', name: 'Screen', children: [app] }).own.has(card), true);
+  // The places a cut answer does not describe, and the page's shift from the screen.
+  assert.deepEqual(cutPlaces({ kind: 'frame', children: [{ kind: 'frame', x: 400, y: 160, w: 358, h: 24, cut: true }, card] }), [{ x: 400, y: 160, w: 358, h: 24 }]);
+  assert.deepEqual(pageShift([b('panel', 0, 40, 280, 400), b('badge', 300, 54, 40, 20)], [b('panel', 0, 0, 280, 400), b('badge', 300, 14, 40, 20)]), { dx: 0, dy: -40 });
 });
 
 test('the capture keeps a list to its first three and each answer under use_figma\'s 20 KB, the rest left for the next run', async () => {
