@@ -278,6 +278,26 @@ export function screenToPrototype(screen, { catalog = { components: {} }, scales
   return { prototype, gaps: [...gaps, ...notes].map((g) => ({ ...g, from: where })) };
 }
 
+// X1: how the products' screens size each system component, from every instance on them: how many there are, how many
+// fill their parent's width and how many its height. A status bar fixed in its Figma master that fills the window on
+// every screen is drawn filling it in a prototype. → { component: { n, fillW, fillH } }
+export function screenSizing(screens = [], catalog = { components: {} }) {
+  const byKey = new Map(Object.keys(catalog.components ?? {}).map((n) => [key(n), n]));
+  const out = {};
+  const visit = (node, depth) => {
+    if (!node) return;
+    if (node.kind === 'instance' && depth > 0 && !node.absolute) {
+      const name = byKey.get(key(node.component)) ?? byKey.get(key(String(node.component).split('/').pop()));
+      if (name) { const e = out[name] ??= { n: 0, fillW: 0, fillH: 0 }; e.n++; if (node.fillW) e.fillW++; if (node.fillH) e.fillH++; }
+    }
+    for (const k of node.children ?? []) visit(k, depth + 1);
+  };
+  for (const sc of screens ?? []) visit(sc.tree, 0);
+  return out;
+}
+// Fills along an axis when most of its instances on the screens do; null when no screen shows it.
+export const screenFills = (s, axis) => (s?.n ? s[axis] * 2 > s.n : null);
+
 // The arrangement of a composition as a short signature: what a template made from it would hold.
 function signature(node, depth = 0) {
   if (!node) return '';

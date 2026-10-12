@@ -43,10 +43,11 @@ try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } ca
   console.error('❌ ds-config.json not found at project root.'); process.exit(1);
 }
 
-let ASSERTIONS = [], FRAME_GEOMETRY_MAP = [], CROSS_PLUGIN = [];
+let ASSERTIONS = [], FRAME_GEOMETRY_MAP = [], CROSS_PLUGIN = [], CONTRACT_SELECTORS = {};
 try {
   const m = await import(pathToFileURL(join(ROOT, 'structure-contract.mjs')).href);
   if (Array.isArray(m.RENDERED_ASSERTIONS))     ASSERTIONS         = m.RENDERED_ASSERTIONS;
+  if (m.COMPONENT_CSS_SELECTORS && typeof m.COMPONENT_CSS_SELECTORS === 'object') CONTRACT_SELECTORS = m.COMPONENT_CSS_SELECTORS;
   if (Array.isArray(m.FRAME_GEOMETRY_MAP))       FRAME_GEOMETRY_MAP = m.FRAME_GEOMETRY_MAP;
   if (Array.isArray(m.CROSS_PLUGIN_CONSISTENCY)) CROSS_PLUGIN       = m.CROSS_PLUGIN_CONSISTENCY;
 } catch { /* structure-contract.mjs optional */ }
@@ -194,7 +195,9 @@ if (cfg.rendered?.auto) {
         // Only a height Figma fixes: one that hugs its content or fills its parent is no height of the component's own,
         // and an empty probe has neither content nor parent to measure it by.
         if (c.sizingV === 'HUG' || c.sizingV === 'FILL') continue;
-        const sel = selectors[name] ?? ('.' + name.charAt(0).toLowerCase() + name.slice(1));
+        // The component's own selector: the config's, else the contract's (its main class), else its name as a class.
+        const own = CONTRACT_SELECTORS[name], main = typeof own === 'string' ? own : own?.main;
+        const sel = selectors[name] ?? main ?? ('.' + name.charAt(0).toLowerCase() + name.slice(1));
         const cls = /^\.([A-Za-z][\w-]*)$/.exec(sel)?.[1];   // only class selectors get a bare probe
         for (const plugin of plugins) {
           if (manual.has(`${plugin}|${sel}|height`)) continue;   // manual override wins

@@ -372,6 +372,10 @@ function walk(ROOT, exts, limit = 4000) {
   return files;
 }
 
+// Every style file of the project (.css, .scss, .less, and .vue and .svelte files for their <style> blocks); with html,
+// its pages too, for their <style> blocks.
+export const projectStyleFiles = (ROOT, { html = false } = {}) => walk(ROOT, html ? new Set([...STYLE, '.html', '.htm']) : STYLE);
+
 // Every style file of the project as one text (a component file's <style> blocks only): a focus style put back in
 // another file counts.
 export function projectStyleText(ROOT) {

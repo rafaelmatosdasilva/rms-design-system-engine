@@ -26,7 +26,8 @@ export function notCheckedLines(gates) {
   const out = [];
   for (const g of gates ?? []) {
     const skips = (g.lines ?? []).map(clean).filter((t) => t.startsWith('⏭'));
-    if (g.notRun) out.push(`${gateName(g.label)}: ${why(g.notRun)}`);
+    // A check that read nothing (every part skipped) says each part's own reason, as its lines do.
+    if (g.notRun && !(g.readNothing && skips.length)) out.push(`${gateName(g.label)}: ${why(g.notRun)}`);
     else if (skips.length) for (const t of skips) out.push(`${gateName(g.label)}: ${why(t)}`);
     else if (g.planLimited) out.push(`${gateName(g.label)}: ${why(g.why ?? 'not run')}`);
   }

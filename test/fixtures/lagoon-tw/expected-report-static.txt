@@ -9,7 +9,7 @@
        figma/props.snapshot.json ✓ (updated today)
        ⏭ No plugins configured in ds-config.json - skipped
 
-✅  [2] Figma frame unchanged  (live frame vs saved reference screenshot)
+⏭   [2] Figma frame unchanged  (live frame vs saved reference screenshot)
        ⏭ No frames configured in ds-config.json - visual regression skipped
 
 ❌  [3] Token values  (color · sizing · typography · breakpoints · text)
@@ -19,7 +19,7 @@
        ❌ [sizing/-] stroke/default → --stroke-default: CSS var not declared
          Fix:  Add --stroke-default: 1px to src/app.css
 
-✅  [4] Tokens used in screens exist in CSS  (every token bound in a DS screen has a CSS variable)
+⏭   [4] Tokens used in screens exist in CSS  (every token bound in a DS screen has a CSS variable)
        ⏭ SKIPPED - no frames[] configured in ds-config.json.
           Bound-token coverage checks tokens bound in usage frames (screens with instances).
           Add ds-config.json frames[] to enable it; auditing a COMPONENT_SET definition needs none.
@@ -27,13 +27,13 @@
 ✅  [5] Every mode is covered  (tokens adapt across light/dark and all configured modes)
        ✅ OK        7/7  (adapts across modes, and matches Figma per mode where value-checked)
 
-✅  [6] Exception lists are valid  (no stale or overly broad entries)
+⏭   [6] Exception lists are valid  (no stale or overly broad entries)
        ⏭  no design-system-engine-map.mjs - no exception list to check.
 
 ✅  [7] No invented CSS variables  (every CSS variable traces back to a Figma token)
        ✅ TRACEABLE    10  (maps back to a Figma token or SYSTEM_VARS)
 
-✅  [8] Docs tell the truth  (a style guide / DS doc references only tokens & vars that exist)
+⏭   [8] Docs tell the truth  (a style guide / DS doc references only tokens & vars that exist)
        ⏭ no documentation surfaces configured — skipped
 
 ✅  [9] No invented text casing  (no text-transform the DS/Figma does not define)
@@ -70,15 +70,15 @@
 ⏭   [16] Sub-components match Figma  (the sub-components Figma nests are the ones the code uses)
        ⏭ SKIPPED - snapshot not captured (opt-in). Run the Plugin API capture and commit it to enable.
 
-✅  [17] Templates compose the right components  (each template/page uses the components Figma composes)
+⏭   [17] Templates compose the right components  (each template/page uses the components Figma composes)
        ⏭ no templates[] configured — skipped
 
-✅  [18] Markup  (ids · component classes · icon references · every DS screen control is built)
+⏭   [18] Markup  (ids · component classes · icon references · every DS screen control is built)
        ℹ️  htmlStructureClasses not set in ds-config.json - DS component classes are not part of the fingerprint (ids and icon references still are).
-       ✅ No snapshot found - baseline written (0 plugin(s))
+       ⏭  no product page to read (paths.pluginCSS names none): the markup is not checked
        ⏭  screen elements: no figma-screens.snapshot.json - skipped (capture it to enable)
 
-✅  [19] Required pieces are in place  (icon slots · component slots · form controls)
+⏭   [19] Required pieces are in place  (icon slots · component slots · form controls)
        ⏭  no ICON_USAGES in structure-contract.mjs - icon slots not checked (skipped)
        ⏭  no COMPONENT_USAGES in structure-contract.mjs - component slots not checked (skipped)
        ⏭  no paths.pluginCSS configured - skipping form-control check
@@ -89,16 +89,16 @@
        ⏭  skipped - FIGMA_TOKEN not set (add to .env to enable icon freshness checks)
        ⏭  icon inventory: no figma-icons.snapshot.json - skipped (capture it to enable)
 
-✅  [21] Transitions  (duration · easing · property per DS selector)
+⏭   [21] Transitions  (duration · easing · property per DS selector)
        ⏭  TRANSITION_CONTRACT empty - skipped
 
-✅  [22] Motion  (easing & duration variables → CSS)
+⏭   [22] Motion  (easing & duration variables → CSS)
        ⏭  Motion parity - not configured (no figma.motion in ds-config.json). Skipped.
 
-✅  [23] Shadows  (Figma effect styles → CSS box-shadow)
+⏭   [23] Shadows  (Figma effect styles → CSS box-shadow)
        ⏭  Effect parity - not configured (no snapshot.effects or figma.effects). Skipped.
 
-✅  [24] Renders correctly in a browser  (real computed styles vs the DS spec)
+⏭   [24] Renders correctly in a browser  (real computed styles vs the DS spec)
        ⏭  rendered parity skipped - RENDERED_ASSERTIONS empty (set ds-config.json → rendered.auto to generate height checks automatically)
 
 ✅  [25] What this audit actually checked  (which DS components & states are covered)
@@ -132,13 +132,17 @@
   GATE SUMMARY
 ────────────────────────────────────────────────────────────
   ✅  [1]   Data is up to date                                  Pass
-  ✅  [2]   Figma frame unchanged                               Pass
+  ⏭  [2]   Figma frame unchanged                               Not run
+         Not verified: No frames configured in ds-config.json - visual regression skipped
   ❌  [3]   Token values match Figma                            Fail
-  ✅  [4]   Tokens used in screens exist in CSS                 Pass
+  ⏭  [4]   Tokens used in screens exist in CSS                 Not run
+         Not verified: no frames[] configured in ds-config.json.
   ✅  [5]   Every mode is covered                               Pass
-  ✅  [6]   Exception lists are valid                           Pass
+  ⏭  [6]   Exception lists are valid                           Not run
+         Not verified: no design-system-engine-map.mjs - no exception list to check.
   ✅  [7]   No invented CSS variables                           Pass
-  ✅  [8]   Docs tell the truth                                 Pass
+  ⏭  [8]   Docs tell the truth                                 Not run
+         Not verified: no documentation surfaces configured
   ✅  [9]   No invented text casing                             Pass
   ⏭  [10]  No hand-built DS components                         Not run
          Not verified: [reimplementation] no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
@@ -149,14 +153,21 @@
   ❌  [15]  Component props match Figma                         Fail
   ⏭  [16]  Sub-components match Figma                          Skipped
          snapshot not captured (opt-in). Run the Plugin API capture and commit it to enable.
-  ✅  [17]  Templates compose the right components              Pass
-  ✅  [18]  Markup matches                                      Pass
-  ✅  [19]  Required pieces are in place                        Pass
+  ⏭  [17]  Templates compose the right components              Not run
+         Not verified: no templates[] configured
+  ⏭  [18]  Markup matches                                      Not run
+         Not verified: no product page to read (paths.pluginCSS names none): the markup is not checked
+  ⏭  [19]  Required pieces are in place                        Not run
+         Not verified: no ICON_USAGES in structure-contract.mjs - icon slots not checked (skipped)
   ✅  [20]  Icons match Figma                                   Pass
-  ✅  [21]  Transitions match                                   Pass
-  ✅  [22]  Motion matches (when defined)                       Pass
-  ✅  [23]  Shadows match (when defined)                        Pass
-  ✅  [24]  Renders correctly in a browser                      Pass
+  ⏭  [21]  Transitions match                                   Not run
+         Not verified: TRANSITION_CONTRACT empty
+  ⏭  [22]  Motion matches (when defined)                       Not run
+         Not verified: Motion parity - not configured (no figma.motion in ds-config.json). Skipped.
+  ⏭  [23]  Shadows match (when defined)                        Not run
+         Not verified: Effect parity - not configured (no snapshot.effects or figma.effects). Skipped.
+  ⏭  [24]  Renders correctly in a browser                      Not run
+         Not verified: rendered parity skipped - RENDERED_ASSERTIONS empty (set ds-config.json → rendered.auto to generate height checks automatically)
   ✅  [25]  What this audit actually checked                    Pass
 
   [verified] the 25 gates above are mechanically checked against Figma; checked 0 of 3 DS components (see gate 25).
@@ -194,7 +205,7 @@
      src/pages/Settings.tsx:8  bg-[#1f7a3a]/10  the theme has this value: write bg-status-success/10
 
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
-  ● Gate health      21/25 gates pass
+  ● Gate health      10/25 gates pass
   ● Coverage         0/3 components modelled (0%)  ·  exemption debt 0
   ● Documentation    3/3 contracts have a description (100%)
   ● AI guidance      0/3 carry whenNotToUse/useInstead (0%)
@@ -225,14 +236,14 @@
 - **Component props match Figma** fails:
   - badge/Tone: the code names it "tone" (letter case T → t)  (src/components/Badge.tsx)
 
-**Not checked in this run**: 20
+**Not checked in this run**: 21
 - Data is up to date: No plugins configured in ds-config.json
 - Figma frame unchanged: No frames configured in ds-config.json - visual regression skipped
 - Tokens used in screens exist in CSS: no frames[] configured in ds-config.json
 - Exception lists are valid: no design-system-engine-map.mjs - no exception list to check
 - Docs tell the truth: no documentation surfaces configured
 - No hand-built DS components: no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
-- and 14 more
+- and 15 more
 
 Burndown, open findings per component: badge 4 · 5 not tied to a component
 Fix first: badge. Run with --component badge, fix, run again.

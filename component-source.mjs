@@ -293,7 +293,9 @@ export function usedComponents(text, universe) {
   const used = new Set();
   for (const u of universe) {
     if (u.selNorm.length >= 4 && tn.includes(u.selNorm)) { used.add(u.name); continue; }
-    if (new RegExp(`<${esc(u.name)}\\b|\\b${esc(u.name)}\\b\\s*(?:from|,|})`).test(text)) used.add(u.name);   // JSX tag / import
+    // Its name as a JSX tag or an import, as Figma writes it or capitalised as a component is (button → <Button>).
+    const names = [...new Set([u.name, u.name.charAt(0).toUpperCase() + u.name.slice(1)])];
+    if (names.some((n) => new RegExp(`<${esc(n)}\\b|\\b${esc(n)}\\b\\s*(?:from|,|})`).test(text))) used.add(u.name);   // JSX tag / import
   }
   return used;
 }

@@ -14,6 +14,7 @@ export const PROJECT = {
   history:     { now: 'design-system-engine-history.json' },
   checkResult: { now: 'design-system-engine-check-result.json' },
   checked:     { now: 'design-system-engine-checked.json' },
+  census:      { now: 'design-system-engine-census.json' },
 };
 
 // The engine's output folder, and where the code capture goes in it by default.
