@@ -1063,19 +1063,8 @@ a.pg-usage-name { color: var(--sg-text); }
       d.appendChild(card);
     });
   }
-  var KNOWN = COMPONENTS.filter(function (c) { return !c.codeOnly; });
-  if (KNOWN.length) {
-    hr(); navLink('documentation', 'documentation');
-    var kv = section('documentation', 'Documentation', 'What the team has written', 'Each component\'s Documentation, all in one place, the thinnest first. ' + WRITE_HINT);
-    var rowsK = KNOWN.map(function (c) { var cells = KNOW.map(function (k) { return k[1](c); }); return { c: c, cells: cells, have: cells.filter(Boolean).length }; })
-      .sort(function (a, b) { return a.have - b.have || a.c.name.localeCompare(b.c.name); });
-    var whole = rowsK.filter(function (r) { return r.have === KNOW.length; }).length;
-    var kbox = document.createElement('div'); kbox.className = 'pg-footer sg-doc-all'; kv.appendChild(kbox);
-    // The same table each component's Documentation area shows, its name as the card's title, linked to its page.
-    kbox.innerHTML = '<p class="pg-par-sum">' + esc(whole + ' of ' + KNOWN.length + ' components have every kind written. ' + KNOW.map(function (k, i) { return k[0] + ' ' + rowsK.filter(function (r) { return r.cells[i]; }).length; }).join(', ') + '.') + '</p>' +
-      rowsK.map(function (r) { return knowledgeHTML(r.c, '<a class="sg-uses-link" href="#' + esc(cid(r.c.name)) + '">' + esc(r.c.name) + '</a>').replace('class="pg-doc pg-knowledge"', 'class="pg-doc pg-knowledge" data-have="' + r.have + '"'); }).join('');
-    labelCells(kbox);
-  }
+  // What the team has written for every component is on the To do page (#todo/documentation), each component's
+  // Documentation table with a kind not written yet: no page of its own (an old #documentation or #coverage link opens it).
   if ((DATA.screens || []).length) {
     hr(); navLink('in-use', 'in use');
     var iu = section('in-use', 'In use', 'The system in use', 'Screens built with the system.');
@@ -2018,7 +2007,9 @@ a.pg-usage-name { color: var(--sg-text); }
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
     var id = j < 0 ? path : path.slice(0, j);
-    return { id: id === 'whats-new' ? 'changelog' : id === 'coverage' ? 'documentation' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // a link from when it was What's new
+    // A link from when there was a What's new page, or a Documentation (once Coverage) page: where it lives now.
+    if (id === 'documentation' || id === 'coverage') return { id: 'todo', area: null, slug: 'documentation', q: null };
+    return { id: id === 'whats-new' ? 'changelog' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
   }
   function copyText(text, btn, said) {
     var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
@@ -3730,6 +3721,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // With ?all every view shows, one after another, as before.
   var links = document.querySelectorAll('.sg-nav a');
   function route() {
+    if (/^#(documentation|coverage)$/.test(location.hash)) history.replaceState(null, '', '#todo/documentation');   // the address says where it lives now
     var at = hashParts(), id = at.id || 'overview', built = !!document.getElementById(id);
     if (!built && BUILDERS[id]) BUILDERS[id]();
     if (built && document.getElementById(id)._link) document.getElementById(id)._link(at.q);

@@ -459,14 +459,14 @@ test('in the browser: no script error, a control changes the real component, the
     }
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
-    // Its Documentation is a table holding exactly what the Documentation page shows for it, under the same names, in
-    // the same order, each with where it was written; a missing one said. Where it is used is its own area, never a kind
-    // of documentation.
+    // Its Documentation is a table holding exactly what the To do page's Documentation shows for it, under the same
+    // names, in the same order, each with where it was written; a missing one said. Where it is used is its own area,
+    // never a kind of documentation.
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Kind|What is written|From');
     const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:first-child')].map((d) => d.textContent).join('|')`);
     assert.equal(kinds, 'What it is|When to use|When not to use|Common mistakes|Limitations|Do and don\'t|Role');
     assert.equal(await run(`document.querySelector('#c-chip .pg-knowledge .pg-inspect-head').textContent`), 'Documentation');
-    const pageCard = `[...document.querySelectorAll('#documentation .pg-knowledge')].find((k) => k.querySelector('.pg-inspect-head a').textContent === 'chip')`;
+    const pageCard = `[...document.querySelectorAll('#todo .sg-todo-kind[data-area="Documentation"] .pg-knowledge')].find((k) => k.querySelector('.pg-inspect-head a').textContent === 'chip')`;
     assert.equal(await run(`${pageCard}.querySelector('table').outerHTML`), await run(`document.querySelector('#c-chip .pg-knowledge table').outerHTML`));
     assert.match(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet/);
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
@@ -558,16 +558,14 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await rowOf('1.3.3'), /^done\|.*Checked by Ana on \d{4}-\d\d-\d\d: No instruction relies only on shape/s);
     assert.match(await rowOf('3.3.7'), /^check\|.*Checked by Ana on 2026-09-01, before chip changed\..*Checked it\? Tell Claude chip 3\.3\.7 is checked\./s);
     assert.match(await rowOf('1.4.5'), /^check\|.*Checked it\? Tell Claude chip 1\.4\.5 is checked\./s);
-    // The Documentation page: every component's card, its name on the head as on the To do page, the thinnest first;
-    // an old link to the Coverage page opens it.
-    const docs = JSON.parse(await run(`JSON.stringify((() => { const cards = [...document.querySelectorAll('#documentation .pg-knowledge')]; return { rows: cards.map((k) => ({ name: k.querySelector('.pg-inspect-head a').textContent, have: +k.dataset.have, kinds: [...k.querySelectorAll('tbody td:first-child')].map((d) => d.textContent) })), sum: document.querySelector('#documentation .pg-par-sum').textContent, nav: [...document.querySelectorAll('#sg-sidebar a')].map((a) => a.textContent.trim()).filter((t) => /documentation|coverage/.test(t)) }; })())`));
-    assert.deepEqual(docs.rows[0].kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role']);
-    assert.ok(docs.rows.some((r) => r.name === 'chip'));
-    assert.deepEqual(docs.rows.map((r) => r.have), docs.rows.map((r) => r.have).slice().sort((a, b) => a - b), 'the thinnest first');
-    assert.match(docs.sum, new RegExp(`of ${docs.rows.length} components have every kind written\\. What it is \\d+, When to use \\d+.*Role \\d+\\.$`));
-    assert.deepEqual(docs.nav, ['documentation']);
-    await run(`location.hash = '#coverage'`); await new Promise((r) => setTimeout(r, 200));
-    assert.equal(await run(`getComputedStyle(document.getElementById('documentation')).display !== 'none'`), true, 'an old link to Coverage opens Documentation');
+    // No Documentation page of its own: what is written lives on the To do page (#todo/documentation), and an old link
+    // to Documentation or Coverage opens it there, the address saying so.
+    assert.equal(await run(`!!document.getElementById('documentation') || !!document.querySelector('nav a[href="#documentation"]')`), false);
+    for (const old of ['#documentation', '#coverage']) {
+      await run(`location.hash = '${old}'`); await new Promise((r) => setTimeout(r, 200));
+      assert.equal(await run(`location.hash`), '#todo/documentation', `an old ${old} link`);
+      assert.deepEqual(await run(`[...document.querySelectorAll('#todo .sg-todo-kind')].filter((k) => k.getClientRects().length).map((k) => k.dataset.area)`), ['Documentation']);
+    }
     assert.deepEqual(errors, []);
     close();
   } finally { c.kill(); }
