@@ -798,6 +798,22 @@ if (process.argv.includes('--publish-styleguide')) {
   process.exit(r.file || r.wrote ? 0 : 1);
 }
 
+// ── --census: every value written by hand in the project's styles, with the token to use (M1) ──
+// Lists each file's literal colours, sizes, durations, layers and shadows, the files that guess most first; keeps the
+// count in design-system-engine-census.json so it only falls (the first run writes it, a run with fewer lowers it, a
+// file with more than it fails the run).
+if (process.argv.includes('--census')) {
+  let ccfg = {};
+  try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const rc = await import('./raw-census.mjs');
+  const census = rc.censusOf(ROOT, ccfg), against = rc.censusAgainst(census, rc.readCensusBaseline(ROOT));
+  const all = process.argv.includes('--all');
+  for (const l of rc.censusLines(census, against, all ? { top: Infinity, each: Infinity } : {})) console.log(l);
+  if (against.first || against.fell) rc.writeCensusBaseline(ROOT, census);
+  if (!all && census.files.some((f) => f.findings.length > 8)) console.log('   (--census --all lists every line)');
+  process.exit(against.grew.length ? 1 : 0);
+}
+
 // ── --figma-edits: the Figma side of the hand-back, written by the engine, applied only when a person says yes ──
 if (process.argv.includes('--figma-edits')) {
   let feConfig = {};
@@ -3338,6 +3354,12 @@ function reportFull(label, items, shown) {
   function addGate(label, result) {
     const r = scopeFilter(result);
     if (Array.isArray(r.lines)) r.lines = r.lines.map(legacyFree).filter((l) => !zeroCount(l));
+    // A check whose every part was skipped read nothing: it is not run, never a pass (H5). Its first skip says why.
+    const said = (r.lines ?? []).map((l) => String(l).replace(/\x1b\[[0-9;]*m/g, '').trim()).filter(Boolean);
+    if (r.pass && !r.planLimited && !r.notRun && said.some((l) => /^⏭/.test(l)) && !said.some((l) => /^(✅|❌|⚠️|📸)/.test(l) || /[✓✗]/.test(l))) {
+      r.planLimited = true; r.readNothing = true;
+      r.notRun = said.find((l) => /^⏭/.test(l)).replace(/^⏭\s*(SKIPPED\s*-\s*)?/i, '').replace(/\s*[-—]\s*skipped\.?$/i, '').trim();
+    }
     // planLimited gates are neutral - they don't block the audit
     if (!r.pass && !r.planLimited) anyFail = true;
     gates.push({ n: gates.length + 1, label, ...r });
@@ -3872,6 +3894,20 @@ function reportFull(label, items, shown) {
         : '   Run with --exemption-debt to list them (with status / owner / review).');
     }
   }
+
+  // ── Values written by hand (M1, advisory here): the census of the project's styles in totals ──
+  // --census lists each line with the token to use and keeps the baseline; here, only how many and where most.
+  _section('advice');
+  if (cfg.census !== false && !_scopeNames.length) try {
+    const rc = await import('./raw-census.mjs');
+    const census = rc.censusOf(ROOT, cfg), against = rc.censusAgainst(census, rc.readCensusBaseline(ROOT));
+    if (census.files.length) {
+      const top = census.files[0], kinds = Object.entries(census.byKind).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ');
+      console.log(C.yellow(`\n🧮 Values written by hand in the styles: ${census.errors} error${census.errors === 1 ? '' : 's'}, ${census.warnings} warning${census.warnings === 1 ? '' : 's'} in ${census.files.length} file${census.files.length === 1 ? '' : 's'} (${kinds}); the most in ${top.file} (${top.errors} error${top.errors === 1 ? '' : 's'}, ${top.warnings} warning${top.warnings === 1 ? '' : 's'}).`));
+      if (against.grew.length) console.log(C.yellow(`   More than the baseline (${rc.CENSUS_FILE}) in ${against.grew.map((g) => `${g.file} (${g.was} → ${g.now})`).join(', ')}.`));
+      console.log(C.yellow(`   rms-design-system-engine --census lists each one with the token to use${against.first ? ', and keeps the count so it only falls' : ''}.`));
+    }
+  } catch { /* the census reads the project's styles; nothing to read */ }
 
   // ── Code → design drift (I24, advisory, never a gate) ───────────────────────
   _section('advice');
