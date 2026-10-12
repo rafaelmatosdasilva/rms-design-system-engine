@@ -95,6 +95,8 @@ rms-design-system-engine --figma-effects                 # write the read-only s
 rms-design-system-engine --figma-effects <answer.json>   # keep its answer as the effects snapshot (paths.snapshotEffects) and say each one the code draws otherwise (effects-parity.mjs)
 rms-design-system-engine --figma-screens                 # write the read-only script that reads the screens ds-config.json names (frames and screens), to run with use_figma
 rms-design-system-engine --figma-screens <answer.json>   # keep its answer as the screen layout snapshot (paths.screenLayout) and compare each product's page with its screens
+rms-design-system-engine --figma-a11y                    # write the read-only script that reads the same screens for accessibility: each text and lone icon with what is drawn behind it, inside instances, and each control under 24 by 24, to run with use_figma
+rms-design-system-engine --figma-a11y <answer.json>      # keep its answer as the screen accessibility snapshot (paths.screenA11y) and say what the screens owe (screen-a11y.mjs); every audit with accessibility says it again
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
 rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
 rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
