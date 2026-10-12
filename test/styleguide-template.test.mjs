@@ -1273,10 +1273,20 @@ test('a page title: the system\'s own heading when it has a large one, else its 
   assert.match(tpl, /\.sg-section > h2, \.pg-head > h2 \{ font-size: var\(--sg-title\);/);
 });
 
-test('Health: each area\'s share done, weighted into one number once accessibility is tried; AI readiness; the five components with the most left; each component weakest first', { timeout: 300000 }, async (t) => {
+test('Health: each area counted by component, weighted into one number once accessibility is tried; AI readiness; the five components with the most left; each component weakest first', { timeout: 300000 }, async (t) => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
-  // A row done counts whole, one to check half, one to fix nothing; the weights are the team's when it gives them.
+  // An item done counts whole, one to check half, one to fix nothing; the weights are the team's when it gives them.
   assert.match(tpl, /var HEALTH_PART = \{ done: 1, check: 0\.5, todo: 0 \};/);
+  // Parity and accessibility count the component, so the many values that match never hide the one that does not:
+  // whole with nothing left, half with only checks left, nothing while one thing is to fix.
+  assert.match(tpl, /var HEALTH_WHOLE = \{ Parity: true, Accessibility: true \};/);
+  const standing = new Function(`var HEALTH_PART = { done: 1, check: 0.5, todo: 0 }, HEALTH_WHOLE = { Parity: true, Accessibility: true }; ${tpl.match(/function healthStanding\(rows, area\) \{[\s\S]*?\n  \}/)[0]}; return healthStanding;`)();
+  const rows = (done, check, todo) => [...Array(done).fill({ st: 'done' }), ...Array(check).fill({ st: 'check' }), ...Array(todo).fill({ st: 'todo' })];
+  assert.equal(standing(rows(300, 0, 1), 'Parity'), 0, 'one value to fix among 300 that match');
+  assert.equal(standing(rows(30, 4, 0), 'Accessibility'), 0.5, 'only checks left');
+  assert.equal(standing(rows(30, 0, 0), 'Parity'), 1);
+  assert.equal(standing(rows(2, 0, 5), 'Documentation'), 2 / 7, 'documentation counts each item');
+  assert.equal(standing([], 'Motion'), null, 'nothing to measure');
   assert.match(tpl, /var w = DATA\.healthWeights && DATA\.healthWeights\[a\[0\]\]; return \[a\[0\], typeof w === 'number' && w >= 0 \? w : a\[1\]\];/);
   assert.match(readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8'), /view\.healthWeights = cfg\.styleguide\.health\.weights;/);
   const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
@@ -1303,7 +1313,8 @@ test('Health: each area\'s share done, weighted into one number once accessibili
     assert.deepEqual(tiles.map((x) => x[0]), ['Health', 'Parity', 'Accessibility', 'Documentation', 'Motion', 'AI readiness'], errors.join('\n'));
     for (const [label, num] of [...tiles.slice(0, 4), tiles[5]]) assert.match(num, /^\d{1,3}$/, `${label} has a number`);
     assert.match(tiles[0][2], /^Weighted as Parity 35, Accessibility 30, Documentation 20, Motion 0$/, 'the team\'s weight replaces the page\'s');
-    assert.match(tiles[1][2], /^\d+ of \d+ done$/);
+    assert.match(tiles[1][2], /^\d+ of 2 components done(, \d+ to check)?$/, 'parity counts components');
+    assert.match(tiles[3][2], /^\d+ of \d+ done$/, 'documentation counts items');
     assert.match(tiles[5][2], /^\d of 2 components ready$/);
     // One card: the five components with the most left, at most.
     assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left']);
@@ -1312,6 +1323,8 @@ test('Health: each area\'s share done, weighted into one number once accessibili
     const comps = await run(`[...document.querySelectorAll('#health .sg-health-comps tbody tr')].map((tr) => [tr.querySelector('a').getAttribute('href'), parseInt(tr.children[1].textContent, 10)])`);
     assert.deepEqual(comps.map((x) => x[0]).sort(), ['#c-button', '#c-chip']);
     assert.ok(comps[0][1] <= comps[1][1], 'the weakest first');
+    const parityCells = await run(`[...document.querySelectorAll('#health .sg-health-comps tbody tr')].map((tr) => tr.querySelector('td[data-label="Parity"]').textContent)`);
+    for (const v of parityCells) assert.match(v, /^(0|50|100)%$|^–$/, 'a component\'s parity is whole, half or nothing');
     assert.equal(await run(`document.querySelectorAll('#health .sg-todo-no').length`), 0);
     assert.deepEqual(errors, []);
     close();
