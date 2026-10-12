@@ -559,7 +559,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var COMP_DATA = {};
   COMPONENTS.forEach(function (c) {
     var a = {}; Object.keys(c.a11y || {}).forEach(function (k) { if (!/^(checked|audited|static|sources)$/.test(k)) a[k] = c.a11y[k]; });
-    COMP_DATA[c.name] = JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a]);
+    COMP_DATA[c.name] = JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a].concat(c.renders ? [c.renders] : []));
   });
   // The page's own styles and scripts, read before anything adds to them.
   var PAGE_SIG = sigOf(Array.prototype.map.call(document.querySelectorAll('style, script:not([type="application/json"])'), function (s) { return s.textContent; }).join('\u0000'));
@@ -1311,9 +1311,21 @@ a.pg-usage-name { color: var(--sg-text); }
       ID_REFS.forEach(function (a) { var v = el.getAttribute(a); if (v) el.setAttribute(a, v.split(/\s+/).map(function (x) { return map[x] || x; }).join(' ')); });
     });
   }
-  function baseElement(c) {
-    if (c.markup) {
-      var t = document.createElement('template'); t.innerHTML = c.markup.trim(); var first = t.content.firstElementChild;
+  // A component its own build rendered in each variant (a Vue component): the rendering made with the props set now,
+  // else the one nearest them (the default first); what it was not rendered with is set on it as on any other.
+  function renderFor(c, state) {
+    if (!c.renders || !state) return null;
+    var best = null, most = -1;
+    c.renders.forEach(function (r) {
+      var n = (c.controls || []).filter(function (k) { return k.label in r.props && String(r.props[k.label]) === String(state[k.label]); }).length;
+      if (n > most) { most = n; best = r; }
+    });
+    return best && best.markup;
+  }
+  function baseElement(c, markup) {
+    markup = markup || c.markup;
+    if (markup) {
+      var t = document.createElement('template'); t.innerHTML = markup.trim(); var first = t.content.firstElementChild;
       // The instance as the component is at rest: a state, a hidden flag or a layout the product gave this one copy is
       // dropped, so the props decide (a Disabled option puts disabled back).
       if (first) { ['disabled', 'aria-disabled', 'hidden', 'style'].forEach(function (a) { first.removeAttribute(a); }); uniqueIds(first); return first; }
@@ -3079,7 +3091,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var leaves = {};   // the part each text prop wrote into, as last drawn
     function refresh() {
       preview.innerHTML = '';
-      var e = baseElement(c);
+      var e = baseElement(c, renderFor(c, state));
       preview.appendChild(e);
       // A component that takes its width from where it is placed (a divider line) draws nothing in a centred stage:
       // it gets the stage's width, as it would in a product's row.

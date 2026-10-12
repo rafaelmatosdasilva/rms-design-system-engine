@@ -263,11 +263,15 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   and room below it, changes only the samples and their values, never the page around them); icons from the icon sheet. The
   colours sit six a row, each as wide as the room, so its Figma name and variable read whole (three on a phone).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
-  own pages, else what its source renders: a React component's return, a Vue component as the project's own Vite
-  renders it once its packages are installed (its bound classes, and the CSS its `<style>` blocks compile to, SCSS and
-  scoped ones included; `vue-harness.mjs`), else its template read with its props' default words, else the element its
-  Figma role asks for) with its own CSS. The summary says how many Vue components were drawn as Vite renders them, and
-  why not when none was (no packages installed, no Vite). The components the code has that Figma
+  own pages, else what its source renders: a React component's return, a Vue component as the project's own build
+  (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its
+  `<style>` blocks compile to, SCSS and scoped ones included; `vue-harness.mjs`), else its template read with its props'
+  default words, else the element its Figma role asks for) with its own CSS. A Vue component is rendered in each of its
+  variants, and the Playground draws the one its props pick as it renders, so an option that adds or removes an
+  element (an icon only Large has) shows it, not only its class; a combination never rendered starts from the nearest
+  one. A page for one component (`--component X --styleguide`) renders only it and what it nests. The summary says how
+  many Vue components were drawn as their build renders them, naming it, and why not when none was (no packages
+  installed, no build tool). The components the code has that Figma
   does not list (each file whose first element carries a class of its own, in its `components` folder when it has
   one) are shown too, with their file and the props their code declares, marked **Only in the code** and compared with
   nothing in Figma; each is a To do for Figma while Figma has components of its own. Before Figma's data is captured,
@@ -1107,14 +1111,18 @@ whatever surface the project serves, in this order:
    gives a field or a spinbutton a name, and tells a controlled toggle its new state when it reports a click. So
    names, roles, parts and behaviours are tried on what ships, with no dev server. One it cannot load is listed as
    not rendered, never clean. `a11y.harness: false` turns it off.
-   **A Vue system's components, rendered with the project's own Vite** (`vue-harness.mjs`), once its packages are
+   **A Vue system's components, rendered with the project's own build** (`vue-harness.mjs`), once its packages are
    installed: every `.vue` component (Figma's, and the ones only the code has) in each of its variants on one page,
-   checked beside the other targets on every run, so a variant no page shows is still tried. Vite runs with the
-   project's own config (its plugins, aliases and the SCSS its components share), or with `@vitejs/plugin-vue` when it
-   has none; the page loads the token CSS and the stylesheets the project's `src/main` imports. Each variant is given
+   checked beside the other targets on every run, so a variant no page shows is still tried. The build is the one the
+   project uses, read from its files: Nuxt (`nuxt.config`: its whole app in its dev server, client-side, its modules,
+   auto-imports and auto-registered components, the CSS its config names, the page every route shows replaced by the
+   components', its build files in the engine's output folder), Vite (`vite.config`: its plugins, aliases and the SCSS
+   its components share; with `@vitejs/plugin-vue` when it has no config), Vue CLI (`vue.config.js` or
+   `@vue/cli-service`: the webpack config Vue CLI resolves) or webpack (`webpack.config` with `vue-loader`); the page
+   loads the token CSS and the stylesheets the project's `src/main` imports. Each variant is given
    back what it reports, as the page using it would: an `update:<prop>` event sets that prop, a toggle's click flips
    the state it was told; Figma's values are written as the code's own options write them. A project whose packages
-   are not installed is told so, never rendered with tools of the engine's.
+   are not installed, or that has none of these builds, is told so, never rendered with tools of the engine's.
    **Every variant, every run.** The components rendered from their code are tried in Figma's variants when Figma has
    the component (the default, each other value of each variant prop, each on/off prop flipped), else in the code's
    own props' (each value of each option, booleans on and off, each text emptied or set, each icon emptied), up to
