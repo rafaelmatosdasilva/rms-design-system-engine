@@ -89,6 +89,50 @@ test('page: target size, a positive tabindex, Escape, reduced motion, forced col
   assert.deepEqual(d.issues.filter((i) => i.issue === 'semantics').map((i) => [i.rendered, i.contract]), [['generic', 'button']], out);
 });
 
+test('page: target size on a 320px screen too (A6): a control that shrinks on a phone is measured there', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>
+    body { font: 14px sans-serif; margin: 0; }
+    .shrink { width: 40px; height: 40px; padding: 0; margin: 0; border: 0; }
+    @media (max-width: 400px) { .shrink { width: 16px; height: 16px; } }
+    .tiny { width: 16px; height: 16px; padding: 0; margin: 0 0 0 40px; border: 0; }
+  </style></head><body><main>
+    <button class="shrink" aria-label="first">1</button><button class="shrink" aria-label="second">2</button>
+    <p><button class="tiny" aria-label="x">x</button><button class="tiny" aria-label="y">y</button></p>
+  </main></body></html>`;
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const targets = d.issues.filter((i) => i.issue === 'target');
+  const narrow = targets.filter((i) => (i.modes ?? []).includes('320px wide'));
+  assert.equal(narrow.length, 2, out);                                         // the two that shrink on a phone, side by side
+  assert.ok(narrow.every((i) => /shrink/.test(i.selector) && i.size === '16×16'), out);
+  assert.ok(targets.filter((i) => /tiny/.test(i.selector)).every((i) => !i.modes), out);   // small at any width: said once, at the page's own width
+});
+
+test('page: contrast against what is painted behind the text, a sibling laid under it or a covering ::before included (A8)', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
+  const page = `<!doctype html><html lang="en"><head><style>
+    body { font: 16px sans-serif; margin: 0; background: #fff; }
+    .hero, .banner, .pale-hero { position: relative; width: 320px; padding: 12px; }
+    .hero { background: #fff; } .shade { position: absolute; inset: 0; background: #111; } .on-shade { position: relative; color: #fff; margin: 0; }
+    .banner { background: #fff; } .banner::before { content: ''; position: absolute; inset: 0; background: #123456; } .on-before { position: relative; color: #fff; }
+    .pale-hero { background: #000; } .pale { position: absolute; inset: 0; background: #eee; } .faint { position: relative; color: #999; margin: 0; }
+  </style></head><body><main><h1>Backdrops</h1>
+    <div class="hero"><div class="shade"></div><p class="on-shade">White on the shade beside it</p></div>
+    <div class="banner"><span class="on-before">White over the banner's ::before</span></div>
+    <div class="pale-hero"><div class="pale"></div><p class="faint">Grey on a pale sibling</p></div>
+  </main></body></html>`;
+  const dir = makeFixture({ 'page.html': page });
+  let out = '';
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  catch (e) { out = e.stdout ?? ''; }
+  const d = pageResult(out);
+  const low = d.issues.filter((i) => i.issue === 'contrast').map((i) => i.selector);
+  assert.ok(!low.some((s) => /on-shade|on-before/.test(s)), out);           // white over the dark layer under it, never white on the white ancestor
+  assert.ok(low.some((s) => /faint/.test(s)), out);                         // grey on the pale layer under it, never on the black ancestor
+});
+
 test('page: Escape closes what a trigger opened and gives the focus back to it (I78); an app page has one main heading (I79)', { skip: HAS_CHROME ? false : 'no Chrome available' }, () => {
   const page = `<!doctype html><html lang="en"><head><style>[hidden] { display: none; } body { font: 14px sans-serif; }</style></head><body><main>
     <button id="good" aria-haspopup="dialog" aria-controls="dlg-good">Details</button>

@@ -119,8 +119,8 @@ export function figmaEasing(e) {
 
 // The state a trigger leaves a component in, as CSS reads it: hover, active (pressed); a click or a key changes a
 // variant the code sets itself (a class, an attribute), so its transition is the component's own.
-const STATE = { ON_HOVER: 'hover', WHILE_HOVERING: 'hover', MOUSE_ENTER: 'hover', ON_PRESS: 'active', WHILE_PRESSING: 'active', MOUSE_DOWN: 'active' };
-const TRIGGER_WORD = { ON_HOVER: 'hover', WHILE_HOVERING: 'hover', MOUSE_ENTER: 'hover', ON_PRESS: 'press', WHILE_PRESSING: 'press', MOUSE_DOWN: 'press', ON_CLICK: 'click', ON_KEY_DOWN: 'key', AFTER_TIMEOUT: 'delay', MOUSE_LEAVE: 'leave', MOUSE_UP: 'release', ON_DRAG: 'drag' };
+export const STATE = { ON_HOVER: 'hover', WHILE_HOVERING: 'hover', MOUSE_ENTER: 'hover', ON_PRESS: 'active', WHILE_PRESSING: 'active', MOUSE_DOWN: 'active' };
+export const TRIGGER_WORD = { ON_HOVER: 'hover', WHILE_HOVERING: 'hover', MOUSE_ENTER: 'hover', ON_PRESS: 'press', WHILE_PRESSING: 'press', MOUSE_DOWN: 'press', ON_CLICK: 'click', ON_KEY_DOWN: 'key', AFTER_TIMEOUT: 'delay', MOUSE_LEAVE: 'leave', MOUSE_UP: 'release', ON_DRAG: 'drag' };
 
 // A transition declaration's parts: [{ prop, ms, easing, delay }], from the shorthand or the longhands.
 const splitTop = (s) => { const out = []; let d = 0, cur = ''; for (const ch of String(s ?? '')) { if (ch === '(') d++; if (ch === ')') d--; if (ch === ',' && !d) { out.push(cur.trim()); cur = ''; } else cur += ch; } if (cur.trim()) out.push(cur.trim()); return out; };

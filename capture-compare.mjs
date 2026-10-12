@@ -20,6 +20,7 @@ import { resolveNamingSpec, tokenToVar, withTextScaleKeys } from './naming-conve
 import { sameValue } from './component-capture.mjs';
 import { parseColor, colorHex } from './css-values.mjs';
 import { projectPath } from './names.mjs';
+import { breakpointModes } from './mode-resolver.mjs';
 
 export async function loadParityMaps(ROOT, cfg) {
   const p = resolve(ROOT, cfg.paths?.parityMap ?? projectPath(ROOT, 'map'));
@@ -65,14 +66,27 @@ export function compareTokens(code, vars, cfg, maps) {
     }
   }
   const firstMode = Object.keys(code.tokens ? Object.values(code.tokens)[0]?.modes ?? {} : {})[0] ?? 'light';
+  // A sizing or type token a multi-mode collection sets (a Sizing collection with Desktop and Phone): checked in every
+  // one of its modes the code was read in (A10), against that mode's value; else in the first mode, as one value.
+  const perMode = new Map();
+  for (const section of Object.values(vars.modeVariants ?? {})) {
+    if (!(section?.modes?.length > 1)) continue;
+    for (const [t, d] of Object.entries(section.vars ?? {})) if (d?.values) perMode.set(t, d.values);
+  }
+  const everyMode = (token, cssVar, value) => {
+    const values = perMode.get(token), read = code.tokens?.[cssVar]?.modes ?? {};
+    const modes = values ? Object.keys(values).filter((mk) => read[mk] && values[mk] != null) : [];
+    if (!modes.length) { check(token, cssVar, firstMode, value); return; }
+    for (const mk of modes) check(token, cssVar, mk, values[mk]);
+  };
   for (const [token, value] of Object.entries(vars.sizing ?? {})) {
     if (maps.SIZING_SKIP.has(token) || value == null) { out.skipped++; continue; }
-    check(token, maps.EXPLICIT_SIZING[token] ?? tokenToVar(token, spec, { raw: true }), firstMode, value);
+    everyMode(token, maps.EXPLICIT_SIZING[token] ?? tokenToVar(token, spec, { raw: true }), value);
   }
   for (const [cssVar, [scale, prop]] of Object.entries(maps.TYPO)) {
     const value = vars.typography?.[scale]?.[prop];
     if (value == null) { out.skipped++; continue; }
-    check(`typography/${scale}/${prop}`, cssVar, firstMode, value);
+    everyMode(`typography/${scale}/${prop}`, cssVar, value);
   }
   return out;
 }
@@ -531,7 +545,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
     const firstMode = Object.keys(c.colors ?? {})[0];
     const textInherits = !c.parts?.text?.props?.color || c.parts.text.props.color.value === c.colors?.[firstMode]?.color;
     const partColors = c.parts?.text?.colors ?? (c.parts?.text ? null : c.parts?.font?.colors);
-    const colourChecks = (label, paints, perMode, suffix = '', changed = {}) => {
+    const colourChecks = (label, paints, perMode, suffix = '', changed = {}, byMode = {}) => {
       const slots = [
         ['fill', 'background', (col) => (c.fill === 'before' ? col.beforeBackground : col.backgroundColor), c.props?.backgroundColor],
         // A text part with its own colour rule is read on the part in every mode (its colours per mode, from the capture).
@@ -551,7 +565,9 @@ export function compareComponents(code, structure, vars, cfg, maps) {
           if (!want && got && paint.token) { out.notComparable.push({ component: name, field: `${field}${suffix} [${mode}]`, figma: paint.token, code: got, why: 'Figma has no value for this mode' }); continue; }
           if (!want || !got) continue;
           const expectedVar = paint.token && !suffix ? colorVarOf(paint.token, spec, maps) : undefined;
-          const src = changed[{ fill: 'backgroundColor', text: 'color', stroke: strokeKey }[slot]] ?? fact;
+          // In a state, the rule that wins in this mode when it is a rule of its own (a dark-mode hover), else the first mode's.
+          const key = { fill: 'backgroundColor', text: 'color', stroke: strokeKey }[slot];
+          const src = byMode[mode]?.[key] ?? changed[key] ?? fact;
           push(name, `${field}${suffix} [${mode}]`, paint.token ?? paint.hex, { ...(src ?? {}), value: got, confidence: src?.confidence ?? 'single-source' }, { expectedVar, figmaValue: want });
         }
       }
@@ -607,7 +623,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
         if (typeof v.h === 'number' && !same(v.h, def.h) && (setsHeight || st.changed?.height?.rule || st.changed?.minHeight?.rule) && st.size?.height != null)
           num(v.h, { ...(st.changed?.height ?? st.changed?.minHeight ?? c.props?.height ?? {}), value: `${st.size.height}px` }, 'height');
         const changedPaints = Object.fromEntries(['fill', 'text', 'stroke'].filter((k) => v.colors?.[k] && !same(v.colors[k], def.colors?.[k])).map((k) => [k, v.colors[k]]));
-        if (Object.keys(changedPaints).length && st.colors) colourChecks('', changedPaints, st.colors, ` (${label})`, st.changed ?? {});
+        if (Object.keys(changedPaints).length && st.colors) colourChecks('', changedPaints, st.colors, ` (${label})`, st.changed ?? {}, st.byMode ?? {});
         if (!same(v.layers, def.layers)) layerCheck(label, v.layers, st.layers, knownLayers);
       };
       for (const [label, st] of Object.entries(c.states ?? {})) compareVariant(label, st, vfor(label));
@@ -641,7 +657,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
 export function compareBreakpoints(code, structure, vars) {
   const out = { match: 0, differ: [] };
   const settle = makeSettle(out);
-  const bp = vars.breakpoints ?? {};
+  const bp = breakpointModes(vars);
   if (!Object.keys(bp).length) return out;
   for (const [name, f] of Object.entries(structure ?? {})) {
     const c = code.components?.[name];
@@ -661,6 +677,12 @@ export function compareBreakpoints(code, structure, vars) {
         if (!token || tokens[token] == null || at[prop] == null) continue;   // not a responsive token
         const same = valueMatch(tokens[token], at[prop]);
         if (same !== null) settle(same === true, { component: name, field: `${field} @ ${mode} (${at.width}px)`, figma: token, figmaValue: tokens[token], code: at[prop], rule: c.props?.[prop]?.rule, at: c.props?.[prop]?.at });
+        // Every other mode where the code draws it otherwise at this width (A10): against the same Figma value.
+        for (const [other, diff] of Object.entries(at.byMode ?? {})) {
+          if (diff[prop] == null) continue;
+          const again = valueMatch(tokens[token], diff[prop]);
+          if (again !== null) settle(again === true, { component: name, field: `${field} @ ${mode} (${at.width}px) [${other}]`, figma: token, figmaValue: tokens[token], code: diff[prop], rule: c.props?.[prop]?.rule, at: c.props?.[prop]?.at });
+        }
       }
     }
   }

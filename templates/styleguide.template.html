@@ -363,7 +363,6 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-todo { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-text-2); }
 .sg-todo { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one card table per component */
 .sg-todo-kind { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one kind at a time, its cards spaced as the list's */
-.sg-todo-kind.pg-footer { margin-top: 0; }   /* Documentation's cards start where every other kind's do */
 .sg-todo-kind[hidden] { display: none; }
 /* One table for every issue, on the Tasks page and in a component's Parity and Accessibility areas: the same columns at
    the same widths everywhere, so they line up down the page and read the same in each place. */
@@ -371,6 +370,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Each kind's own columns: six for Parity and Accessibility, four for the rest. */
 .sg-issues th:nth-child(1) { width: 7%; }
 .sg-cols-6 th:nth-child(2) { width: 13%; } .sg-cols-6 th:nth-child(3) { width: 14%; } .sg-cols-6 th:nth-child(4) { width: 21%; } .sg-cols-6 th:nth-child(5) { width: 28%; } .sg-cols-6 th:nth-child(6) { width: 17%; }
+.sg-cols-5 th:nth-child(2) { width: 13%; } .sg-cols-5 th:nth-child(3) { width: 35%; } .sg-cols-5 th:nth-child(4) { width: 28%; } .sg-cols-5 th:nth-child(5) { width: 17%; }
 .sg-cols-4 th:nth-child(2) { width: 26%; } .sg-cols-4 th:nth-child(3) { width: 50%; } .sg-cols-4 th:nth-child(4) { width: 17%; }
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
@@ -503,14 +503,9 @@ a.pg-usage-name { color: var(--sg-text); }
    the table's own head row under it (--pg-card-head-h). Its card clips, never hides, its overflow, so it can stick. */
 .pg-inspect-head { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 6; }
 .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--pg-card-head-h, 0px)); }
-/* Documentation as a table: the kind, what was written, where; its paragraphs as tight as a cell's one line. */
-.pg-know-table td > p { margin: 0; }
-.pg-know-table td > p + p { margin-top: var(--sg-space-xs); }
-@media (min-width: 721px) {
-  .pg-know-table td:first-child { width: 24%; color: var(--sg-muted); }
-  .pg-know-table td:last-child { width: 22%; color: var(--sg-text-2); }
-}
-.pg-knowledge > .pg-from { margin: var(--sg-space-s) 0 0; }
+/* What the team wrote, in the Documentation table: its paragraphs as tight as a cell's one line. */
+.pg-written > p { margin: 0; }
+.pg-written > p + p { margin-top: var(--sg-space-xs); }
 .pg-cards { display: flex; flex-direction: column; gap: var(--sg-space-m); }
 .pg-cards .pg-inspect td:last-child { word-break: normal; overflow-wrap: anywhere; }   /* a commit's words wrap between words */
 .pg-doc-card > .pg-updated { gap: 0; margin: 0; font-size: var(--sg-m); color: var(--sg-text); }
@@ -887,6 +882,13 @@ a.pg-usage-name { color: var(--sg-text); }
     (c.differences || []).forEach(function (x) { TODO.push({ kind: 'parity', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.a11yFindings || []).forEach(function (x) { TODO.push({ kind: 'a11y', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.unbuilt || []).forEach(function (u) { TODO.push({ kind: 'parity', who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell Claude to do it.' }); });
+    // What it draws past its colours (A9): a shadow, a blur, a gradient or image fill, clipping, blending, opacity. One
+    // Figma has is the code's to follow; one only the code has, or Figma's clipping, is a decision.
+    (c.effectDiffs || []).forEach(function (e) {
+      var fig = '<span class="pg-par-val">' + esc(capital(e.figma)) + '</span>', code = '<span class="pg-par-val">' + esc(capital(e.code)) + '</span><span class="pg-par-val">' + esc(e.at) + '</span>';
+      var todo = e.side === 'code' ? 'Draw it as Figma does. Tell Claude to do it.' : 'Decide which one is right: add it to Figma, or change the code.';
+      out.push({ key: c.name + '\u0000effect:' + (e.part || '') + ':' + e.what, area: 'Parity', kind: 'Effect', type: 'Other', figma: fig, code: code, todo: esc(capital((e.part ? e.part + ' ' : '') + e.what) + '. ' + todo), who: e.side === 'code' ? WHO.code : WHO.both, st: e.side === 'code' ? 'todo' : 'check', rel: PAR_REL.differs, at: at0 });
+    });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
     if (c.codeOnly && c.codeOnly.figma) TODO.push({ kind: 'parity', who: 'figma', comp: c.name, say: 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it.', todo: 'Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.' });
   });
@@ -1060,16 +1062,28 @@ a.pg-usage-name { color: var(--sg-text); }
     ['Role', function (c) { var a = c.a11y || {}; return a.role ? roleFrom(a) : ''; },
       function (c) { return paras([c.a11y.role]); }, function (c) { return c.a11y.roleFrom === 'figma' ? 'Figma, its annotation' : roleFrom(c.a11y); }, 'Not written yet.']
   ];
-  // Its Documentation, a table of every kind: what was written and where, or that it is missing. head: the card's title
-  // (the component's own area says Documentation; the Documentation page names the component, linked to it).
-  var WRITE_HINT = 'Write a missing one in Figma, as a line of the component\'s description that starts with its name (When to use: …), or in contract.authored.json under guidance.';
-  function knowledgeHTML(c, head) {
-    var missing = KNOW.filter(function (k) { return !k[1](c); });
-    return '<div class="pg-doc pg-knowledge"><div class="pg-par-card"><div class="pg-inspect-head"><h3>' + (head || 'Documentation') + '</h3></div><div class="pg-par-scroll"><table class="pg-par-table pg-know-table">' +
-      '<thead><tr><th>Kind</th><th>What is written</th><th>From</th></tr></thead><tbody>' + KNOW.map(function (k) {
-        var has = !!k[1](c);
-        return '<tr data-have="' + (has ? 1 : 0) + '"><td>' + esc(k[0]) + '</td><td>' + (has ? k[2](c) : '<p class="pg-missing">' + esc(k[4]) + '</p>') + '</td><td>' + (has ? esc(k[3](c)) : '') + '</td></tr>';
-      }).join('') + '</tbody></table></div></div>' + (!head && missing.some(function (k) { return /^(What it is|When|Common|Limitations)/.test(k[0]); }) ? '<p class="pg-from">' + esc(WRITE_HINT) + '</p>' : '') + '</div>';
+  // Its Documentation, one row for each kind in the table every task shares: what was written (or that it is missing),
+  // what to do and who writes it, and its status with where it was written. A component's own Documentation area lists
+  // every kind, written or not; the Tasks page only the ones still to write, under the same numbers.
+  var GUIDE_HINT = 'Write it in Figma, as a line of the component\'s description that starts with its name (When to use: …), or in contract.authored.json under guidance.';
+  var WRITE_HOW = {
+    'What it is': 'Write it in Figma, as the component\'s description, or as its note in the code.',
+    'Do and don\'t': 'Add pictures of the right and the wrong use, in the references folder (do and dont) or as Figma frames named under examples in contract.authored.json.',
+    Role: 'Write it in Figma, as an annotation on the component (Role: button), or in contract.authored.json under semantics.'
+  };
+  function docIssueRows(c) {
+    if (c.codeOnly) return [];
+    return KNOW.map(function (k) {
+      var has = !!k[1](c);
+      return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? k[2](c) : '<p class="pg-missing">' + esc(k[4]) + '</p>',
+        todo: has ? '' : esc(WRITE_HOW[k[0]] || GUIDE_HINT), who: has ? '' : WHO.figma, st: has ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: has ? [k[3](c)] : [] };
+    });
+  }
+  function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
+  function knowledgeHTML(c) {
+    var rows = byStatus(docIssueRows(c));
+    if (!rows.length) return '';
+    return '<div class="pg-doc pg-par pg-knowledge"><div class="pg-par-sum">' + statusSum(rows) + '</div>' + issueTableHTML(rows, '', '', 'Documentation') + '</div>';
   }
   // Documentation, Accessibility and the rest in the Playground's tables: a section of rows (Usage, Documentation,
   // Accessibility, Anatomy) becomes a card whose head is its title, each row a name and its text. The same on a
@@ -1203,8 +1217,34 @@ a.pg-usage-name { color: var(--sg-text); }
   // Each duration moves a dot across its track at a steady pace, each easing over the system's own longest duration, its
   // curve drawn beside it. Nothing moves until Play is pressed, and for a person who asks for less motion the dots go
   // straight to their end, as the system's own rule has it.
+  var motionTiming = function (m) { return m.ms + 'ms, ' + m.easing; };
+  function motionCard(head, cols, rows, cls) {
+    return '<div class="pg-par-card sg-motion-proto' + (cls ? ' ' + cls : '') + '"><div class="pg-inspect-head">' + head + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr>' + cols.map(function (x) { return '<th>' + esc(x) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div></div>';
+  }
+  // Everything that moves, one row each, the same on the motion page and in each component's Motion area: when it plays
+  // and what moves; the part; the code's timing, the variables it is written with and the rule it is in; Figma's timing
+  // and where in Figma it comes from; whether it stops for a person who asks for less motion; and how the two compare.
+  // Each status with the sign and the colour the other tables give it (the motion page is drawn before them).
+  var MOTION_STATUS = { same: ['✓', 'Same as Figma', 'match'], differs: ['✕', 'Differs from Figma', 'differs'], 'figma-none': ['!', 'None in Figma', 'figma'], 'code-none': ['✕', 'Not in the code', 'differs'], 'code-only': ['–', 'Only in the code', 'none'], unread: ['–', 'Figma not read yet', 'none'] };
+  var MOTION_COLS = ['What happens', 'Part', 'Code', 'Figma', 'Less motion', 'Status'];
+  function motionRowHTML(r, first) {
+    var st = MOTION_STATUS[r.status] || MOTION_STATUS.unread;
+    var timing = function (m) { return motionTiming(m) + (m.delay ? ', after ' + m.delay + 'ms' : ''); };
+    var val = function (t) { return t ? '<span class="pg-par-val">' + esc(t) + '</span>' : ''; };
+    return '<tr data-status="' + esc(r.status) + '">' + (first || '') + '<td>' + esc(r.when) + val(r.what) + '</td><td>' + (r.part ? '<code>' + esc(r.part) + '</code>' : esc('The whole component')) + '</td>' +
+      '<td>' + (r.code ? '<code>' + esc(timing(r.code)) + '</code>' + val(r.code.vars.join(', ')) + val(r.code.at) : esc('None')) + '</td>' +
+      '<td>' + (r.figma ? '<code>' + esc(motionTiming(r.figma)) + '</code>' + val(capital(r.figma.from)) : esc(r.status === 'unread' ? 'Not read yet' : 'None')) + '</td>' +
+      '<td>' + esc(!r.code ? '' : r.code.calm ? 'Stops' : 'Keeps moving') + '</td>' +
+      '<td><span class="pg-par-status pg-par--' + st[2] + '"><span class="pg-par-sign" aria-hidden="true">' + st[0] + '</span>' + esc(st[1]) + '</span></td></tr>';
+  }
+  // Its Motion area: everything that moves in it, in that one table; what does not move said so.
+  function motionHTML(c) {
+    var rows = c.moves || [];
+    if (!rows.length) return '<div class="pg-doc"><p class="pg-parity-sum">It does not move: no transition or animation in its code, and none in Figma.</p></div>';
+    return '<div class="pg-doc pg-motion">' + motionCard('Everything that moves', MOTION_COLS, rows.map(function (r) { return motionRowHTML(r); }), 'sg-motion-all') + '</div>';
+  }
   var MOTION = DATA.motion || null;
-  if (MOTION && ((MOTION.durations || []).length || (MOTION.easings || []).length || (MOTION.transitions || []).length || (MOTION.components || []).length)) {
+  if (MOTION && ((MOTION.durations || []).length || (MOTION.easings || []).length || (MOTION.moves || []).length)) {
     hr(); foundationLink('motion', 'motion');
     var less = MOTION.reduced
       ? 'When a person asks for less motion, the system ends every ' + MOTION.reduced.ends.join(' and ') + ' at once (' + MOTION.reduced.at + ').'
@@ -1231,29 +1271,14 @@ a.pg-usage-name { color: var(--sg-text); }
         });
       });
     }
-    // How Figma's prototype moves each component, and what the code does for it.
-    if ((MOTION.transitions || []).length) {
-      var tc = document.createElement('div'); tc.className = 'pg-par-card sg-motion-proto';
-      tc.innerHTML = '<div class="pg-inspect-head">In Figma\'s prototype</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>Change</th><th>Trigger</th><th>Figma</th><th>Code</th></tr></thead><tbody>' +
-        MOTION.transitions.map(function (r) { return '<tr><td>' + esc(r.component) + '</td><td>' + esc(r.change) + '</td><td>' + esc(r.trigger) + '</td><td>' + esc(r.ms + 'ms, ' + r.easing) + '</td><td>' + esc(r.code ? 'Differs: ' + r.code : 'Same') + '</td></tr>'; }).join('') + '</tbody></table></div>';
-      mo.appendChild(tc); labelCells(tc);
-    }
-    // How each component moves on its own (C7): what repeats while it shows (a spinner turning), how it opens and how it
-    // closes, the code's beside Figma's (its Motion keyframes, the overlay its prototype opens).
-    if ((MOTION.components || []).length) {
-      var KIND = { loop: 'Repeats', open: 'Opens', close: 'Closes' };
-      var FIG = { same: 'Same', 'figma-none': 'None in Figma', unread: 'Not read yet' };
-      var timing = function (m) { return m.ms + 'ms, ' + m.easing; };
+    // Every component's motion in the one table each component's Motion area shows, a column for the component first.
+    if ((MOTION.moves || []).length) {
       var known = function (n) { return COMPONENTS.some(function (c) { return c.name === n; }); };
-      var cm = document.createElement('div'); cm.className = 'pg-par-card sg-motion-proto sg-motion-own';
-      cm.innerHTML = '<div class="pg-inspect-head">How each component moves</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>Motion</th><th>Code</th><th>Figma</th></tr></thead><tbody>' +
-        MOTION.components.map(function (r) {
-          var comp = known(r.component) ? '<a class="sg-uses-link" href="#' + esc(cid(r.component)) + '">' + esc(r.component) + '</a>' : esc(r.component);
-          var code = r.code ? '<code>' + esc(timing(r.code)) + '</code><span class="pg-par-val">' + esc(r.code.selector) + '</span>' : esc('None in the code');
-          var fig = r.figma ? '<code>' + esc(timing(r.figma)) + '</code><span class="pg-par-val">' + esc((r.status === 'same' ? 'Same, ' : r.status === 'differs' ? 'Differs, ' : '') + r.figma.what) + '</span>' : esc(FIG[r.status] || 'None in Figma');
-          return '<tr data-motion="' + esc(r.motion) + '" data-status="' + esc(r.status) + '"><td>' + comp + '</td><td>' + esc(KIND[r.motion] + ': ' + r.what) + '</td><td>' + code + '</td><td>' + fig + '</td></tr>';
-        }).join('') + '</tbody></table></div>';
-      mo.appendChild(cm); labelCells(cm);
+      var cm = document.createElement('div');
+      cm.innerHTML = motionCard('Every component\'s motion', ['Component'].concat(MOTION_COLS), MOTION.moves.map(function (r) {
+        return motionRowHTML(r, '<td>' + (known(r.component) ? '<a class="sg-uses-link" href="#' + esc(cid(r.component)) + '">' + esc(r.component) + '</a>' : esc(r.component)) + '</td>');
+      }), 'sg-motion-all');
+      cm = cm.firstChild; mo.appendChild(cm); labelCells(cm);
     }
   }
 
@@ -1848,24 +1873,26 @@ a.pg-usage-name { color: var(--sg-text); }
   function isOpen(r) { return r.st === 'todo' || r.st === 'check'; }
   function statusHTML(st, sub) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
   // Each kind of issue in a table of its own shape: Parity compares Figma with the code, Accessibility a criterion with
-  // what Figma states and what was found, and the rest where it is and what to do (Documentation is the Documentation
-  // table itself). A component's own Parity and Accessibility areas show the same tables as the Tasks page.
+  // what Figma states and what was found, Documentation a kind with what is written, and the rest where it is and what
+  // to do. A component's own Parity, Accessibility and Documentation areas show the same tables as the Tasks page.
   var ISSUE_CELL = {
     no: function (r) { var n = isOpen(r) ? TODO_NO[r.key] : null; return '<td class="pg-par-type sg-todo-no" data-todo-key="' + esc(encodeURIComponent(r.key)) + '">' + (n || '') + '</td>'; },
     kind: function (r) { return '<td class="sg-todo-area">' + (r.kindHTML || esc(r.kind || '')) + '</td>'; },
     figma: function (r) { return '<td>' + (r.figma || '') + '</td>'; },
+    written: function (r) { return '<td class="pg-written">' + (r.written || '') + '</td>'; },
     code: function (r) { return '<td>' + (r.code || '') + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
     todo: function (r) { return '<td>' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (r.todo || '') + '</td>'; },
     status: function (r) { return '<td>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel) + (r.fresh && isOpen(r) ? '<span class="pg-par-val">New in the last audit</span>' : '') + (r.at ? '<span class="pg-at-date">Updated ' + esc(when(r.at)) + '</span>' : '') + (r.src || []).filter(Boolean).map(function (x) { return '<span class="pg-a11y-from">' + esc(x) + '</span>'; }).join('') + '</td>'; }
   };
   var ISSUE_COLS = {
-    Parity: [['Issue nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status']],
-    Accessibility: [['Issue nr', 'no'], ['WCAG criterion', 'kind'], ['Figma states', 'figma'], ['Found', 'code'], ['What to do', 'todo'], ['Status', 'status']],
-    Migration: [['Issue nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
-    Products: [['Issue nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
-    System: [['Issue nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status']],
-    Page: [['Issue nr', 'no'], ['Kind', 'kind'], ['What to do', 'todo'], ['Status', 'status']]
+    Parity: [['Task nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status']],
+    Accessibility: [['Task nr', 'no'], ['WCAG criterion', 'kind'], ['Figma states', 'figma'], ['Found', 'code'], ['What to do', 'todo'], ['Status', 'status']],
+    Documentation: [['Task nr', 'no'], ['Kind', 'kind'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status']],
+    Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
+    Products: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status']],
+    System: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status']],
+    Page: [['Task nr', 'no'], ['Kind', 'kind'], ['What to do', 'todo'], ['Status', 'status']]
   };
   var colsOf = function (area) { return ISSUE_COLS[area] || ISSUE_COLS.System; };
   function issueRowHTML(r, area) {
@@ -1943,6 +1970,13 @@ a.pg-usage-name { color: var(--sg-text); }
         : m.kind === 'none' ? 'Give it ' + anim + ' of ' + m.figma.ms + 'ms, ' + m.figma.easing + ', as Figma has it' + (m.motion ? ' (' + m.figma.what + ')' : '') + '. Tell Claude to do it.'
         : m.kind === 'duration' ? 'Make ' + (m.motion ? 'its animation' : 'the transition') + ' ' + m.figma.ms + 'ms, as Figma has it. Tell Claude to do it.' : 'Ease it ' + m.figma.easing + ', as Figma does. Tell Claude to do it.';
       out.push({ key: c.name + '\u0000motion:' + m.kind + ':' + m.trigger + ':' + m.change, area: 'Parity', kind: 'Motion', type: 'Other', figma: fig, code: code, todo: esc(capital(m.change) + '. ' + todo), who: m.kind === 'figma-none' ? WHO.figma : WHO.code, st: 'todo', rel: m.kind === 'figma-none' ? PAR_REL.code : PAR_REL.differs, at: at0 });
+    });
+    // What it draws past its colours (A9): a shadow, a blur, a gradient or image fill, clipping, blending, opacity. One
+    // Figma has is the code's to follow; one only the code has, or Figma's clipping, is a decision.
+    (c.effectDiffs || []).forEach(function (e) {
+      var fig = '<span class="pg-par-val">' + esc(capital(e.figma)) + '</span>', code = '<span class="pg-par-val">' + esc(capital(e.code)) + '</span><span class="pg-par-val">' + esc(e.at) + '</span>';
+      var todo = e.side === 'code' ? 'Draw it as Figma does. Tell Claude to do it.' : 'Decide which one is right: add it to Figma, or change the code.';
+      out.push({ key: c.name + '\u0000effect:' + (e.part || '') + ':' + e.what, area: 'Parity', kind: 'Effect', type: 'Other', figma: fig, code: code, todo: esc(capital((e.part ? e.part + ' ' : '') + e.what) + '. ' + todo), who: e.side === 'code' ? WHO.code : WHO.both, st: e.side === 'code' ? 'todo' : 'check', rel: PAR_REL.differs, at: at0 });
     });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
     if (c.codeOnly && c.codeOnly.figma) out.push({ key: c.name + '\u0000codeOnly', area: 'Parity', kind: 'Component', type: 'Other', figma: side(null), code: side({ name: c.name, value: c.codeOnly.file }), todo: esc('Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.'), who: WHO.figma, st: 'todo', rel: PAR_REL.code, at: at0 });
@@ -2045,7 +2079,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // A text copied, the button says so for a moment and a screen reader hears it.
   // The address of a view, the area of a component after a / (#c-chip/accessibility), and after a ? the props of the
   // variant it shows (#c-chip?Size=L&Label=Save): each area has its own link to send someone to.
-  var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', a11y: 'accessibility', parity: 'parity', built: 'built-with', used: 'used-in', log: 'changelog' };
+  var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', used: 'used-in', log: 'changelog' };
   function hashParts() {
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
@@ -2072,7 +2106,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // width, where the system's own media queries apply. The one chosen stays for the next component.
   // The widths Figma sets for each breakpoint mode (a viewport width variable), else the common phone, tablet and desktop.
   var WIDTHS = [['fit', 'Fit']].concat((DATA.widths || []).length ? DATA.widths.map(function (w) { return [w.value, w.label, w.px]; }) : [['phone', 'Phone', 375], ['tablet', 'Tablet', 768], ['desktop', 'Desktop', 1280]]), WIDTH = 'fit';
-  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['docs', 'Documentation'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['built', 'Built with'], ['used', 'Used in'], ['log', 'Changelog']], AREA = 'play';
+  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['docs', 'Documentation'], ['motion', 'Motion'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['built', 'Built with'], ['used', 'Used in'], ['log', 'Changelog']], AREA = 'play';
   // The props whose options are its variants (two or more built), in Figma's order.
   function variantProps(c) { return (c.controls || []).filter(function (p) { return p.type === 'VARIANT' && (p.options || []).filter(function (o) { return !o.unbuilt; }).length > 1; }); }
   // What the Variants area shows: each variant prop's options, and each on/off prop the code builds as off and on.
@@ -2218,12 +2252,8 @@ a.pg-usage-name { color: var(--sg-text); }
         who: m.toName ? WHO.code : WHO.both, st: m.toName ? 'todo' : 'check', rel: '', at: DATA.builtAt || null };
     });
   }
-  // Documentation not written yet: each kind its Documentation area says is missing (shown on the Tasks page in that
-  // same table).
-  function docRows(c) {
-    if (c.codeOnly) return [];
-    return KNOW.filter(function (k) { return !k[1](c); }).map(function (k) { return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], st: 'todo' }; });
-  }
+  // Documentation not written yet: the open rows of its Documentation area, in that same table.
+  function docRows(c) { return docIssueRows(c).filter(isOpen); }
   // A class a product styles almost as this component (I83): a decision, one row each, to use the component or to add
   // the new one to the system on purpose.
   function copyRows(c) {
@@ -2273,7 +2303,7 @@ a.pg-usage-name { color: var(--sg-text); }
     });
     var no = 0;
     Object.keys(TODO_NO).forEach(function (k) { delete TODO_NO[k]; });
-    byKind.forEach(function (k) { if (k.area !== 'Documentation') k.groups.forEach(function (g) { g.rows.forEach(function (r) { r.no = ++no; TODO_NO[r.key] = r.no; }); }); });
+    byKind.forEach(function (k) { k.groups.forEach(function (g) { g.rows.forEach(function (r) { r.no = ++no; TODO_NO[r.key] = r.no; }); }); });
     var all = byKind.reduce(function (n, k) { return n + k.groups.reduce(function (m, g) { return m + g.rows.length; }, 0); }, 0);
     Array.prototype.forEach.call(document.querySelectorAll('.sg-todo-no[data-todo-key]'), function (el) {
       var tr = el.closest('tr'), n = TODO_NO[decodeURIComponent(el.dataset.todoKey)];
@@ -2304,12 +2334,6 @@ a.pg-usage-name { color: var(--sg-text); }
     var filter = '<div class="pg-par-filter sg-todo-filter">' + segHTML(byKind.map(function (k) { return { label: k.area + ' (' + count(k) + ')', v: k.area }; }), 'Show') + '</div>';
     box.innerHTML = '<div class="sg-todo-head">' + filter + '<p class="pg-par-sum sg-todo-sum"></p></div>' + byKind.map(function (k) {
       var link = function (g) { return g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system'; };
-      // Documentation in the table each component's Documentation area and the Documentation page show: every kind,
-      // what is written and where it comes from, a kind not written yet saying so.
-      if (k.area === 'Documentation') return '<div class="sg-todo-kind pg-footer" data-area="Documentation"><p class="pg-from">' + esc(WRITE_HINT) + '</p>' + k.groups.map(function (g) {
-        var c = COMPONENTS.filter(function (x) { return x.name === g.name; })[0];
-        return c ? knowledgeHTML(c, link(g)) : '';
-      }).join('') + '</div>';
       return '<div class="sg-todo-kind" data-area="' + esc(k.area) + '">' + (k.area === 'Accessibility' ? note : '') + k.groups.map(function (g) {
         return issueTableHTML(g.rows, '', link(g), k.area);
       }).join('') + '</div>';
@@ -2338,8 +2362,8 @@ a.pg-usage-name { color: var(--sg-text); }
     if (seg) segItems(seg).forEach(function (b) { segSelect(b, b.dataset.v === todoArea); });
     var shown = null;
     Array.prototype.forEach.call(box.querySelectorAll('.sg-todo-kind'), function (k) { k.hidden = k.dataset.area !== todoArea; if (!k.hidden) shown = k; });
-    var rows = shown ? shown.querySelectorAll(todoArea === 'Documentation' ? 'tbody tr[data-have="0"]' : 'tbody tr') : [];
-    var fix = Array.prototype.filter.call(rows, function (tr) { return tr.dataset.status === 'todo' || tr.dataset.have === '0'; }).length;
+    var rows = shown ? shown.querySelectorAll('tbody tr') : [];
+    var fix = Array.prototype.filter.call(rows, function (tr) { return tr.dataset.status === 'todo'; }).length;
     var sign = function (st, text) { var x = STATUS[st]; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(text) + '</span>'; };
     var sum = box.querySelector('.sg-todo-sum');
     if (sum) sum.innerHTML = [fix ? sign('todo', fix + ' to fix') : '', rows.length - fix ? sign('check', (rows.length - fix) + ' to check or decide') : ''].filter(Boolean).join(' ');
@@ -2630,9 +2654,10 @@ a.pg-usage-name { color: var(--sg-text); }
       '</div>' +
       // What is left to do is marked on its area, the system's alert icon before the label and what it is said to a
       // screen reader: Parity while something differs from Figma or is not built, Accessibility while a problem stands
-      // (the last browser check's and the audit's), the same counts as its overview card.
+      // (the last browser check's and the audit's), the same counts as its overview card, and Documentation while a kind
+      // is not written yet.
       '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)); }).map(function (a) {
-        var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? a11yOpen(c) : null, warn = !!(f && f.todo);
+        var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? a11yOpen(c) : a[0] === 'docs' ? docOpen(c) : null, warn = !!(f && f.todo);
         return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
       })) + '</div></div>' +
       // Playground: the component drawn, its controls, the tokens behind what is drawn and its code.
@@ -2654,6 +2679,8 @@ a.pg-usage-name { color: var(--sg-text); }
         knowledgeHTML(c) + apiHTML(c) +
         (docRows ? '<div class="pg-doc"><h3>Details</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
         '</div></div>' +
+      // Motion: how it moves, as a spec, the code's beside Figma's.
+      '<div class="pg-area" data-area="motion"><div class="pg-footer">' + motionHTML(c) + '</div></div>' +
       '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + a11yHTML(c) + '</div></div>' +
       '<div class="pg-area" data-area="parity"><div class="pg-footer">' + parityHTML(c) + '</div></div>' +
       ((c.uses || []).length ? '<div class="pg-area" data-area="built"><div class="pg-footer"><div class="pg-doc">' + builtWithHTML(c) + '</div></div></div>' : '') +

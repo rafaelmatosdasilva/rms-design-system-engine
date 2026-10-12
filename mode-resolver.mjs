@@ -200,3 +200,16 @@ export function modeSwitchFor(mode) {
   }
   return { unsupported: `unknown mode switch ${sel}` };
 }
+
+// The breakpoints Figma sets: its breakpoint collection (vars.breakpoints, { mode: { token: value } }), else a multi-mode
+// collection whose modes each give the viewport a width (a Sizing collection with Desktop and Phone, read into
+// modeVariants), as the same shape. Empty when the file sets no breakpoint.
+export function breakpointModes(vars = {}) {
+  if (Object.keys(vars.breakpoints ?? {}).length) return vars.breakpoints;
+  for (const section of Object.values(vars.modeVariants ?? {})) {
+    const v = section?.vars ?? {};
+    if (!(section?.modes?.length > 1) || !(v['viewport/min-width'] || v['viewport/width'])) continue;
+    return Object.fromEntries(section.modes.map((m) => [m.snapshotKey, Object.fromEntries(Object.entries(v).map(([t, d]) => [t, d?.values?.[m.snapshotKey]]).filter(([, x]) => x != null))]));
+  }
+  return {};
+}

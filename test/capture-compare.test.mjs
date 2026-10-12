@@ -219,6 +219,36 @@ test('breakpoints: a responsive token against the value measured at that breakpo
   assert.equal(r.match, 1);                                  // gap/m is not responsive: not compared here
 });
 
+test('every mode (A10): sizing and type tokens in each mode the code was read in, breakpoints from a sizing collection and in every colour mode', async () => {
+  const { compareBreakpoints } = await import('../capture-compare.mjs');
+  // A token a Sizing collection sets per mode: checked in each mode the code has a reading for, against that mode's value.
+  const two = (a, b) => ({ modes: { light: { value: a, confidence: 'verified' }, desktop: { value: a, confidence: 'verified' }, phone: { value: b, confidence: 'verified' } } });
+  const code = { tokens: { '--padding-m': two('12px', '12px'), '--gap-s': { modes: { light: { value: '8px', confidence: 'verified' } } } } };
+  const vars = { sizing: { 'padding/m': '12px', 'gap/s': '8px' }, modeVariants: { Sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { kind: 'scalar', values: { desktop: '12px', phone: '14px' } }, 'gap/s': { kind: 'scalar', values: { desktop: '8px', phone: '10px' } } } } } };
+  const r = compareTokens(code, vars, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => `${d.token} [${d.mode}]: ${d.figma} vs ${d.code}`), ['padding/m [phone]: 14px vs 12px']);
+  assert.equal(r.match, 2, 'padding/m on a desktop, and gap/s in the first mode, as the code was read in no sizing mode for it');
+  // Breakpoints from that collection (no breakpoint collection of its own), and a colour mode that pads otherwise.
+  const card = { props: { paddingLeft: { rule: '.card', at: 'a.css:3' } }, breakpoints: { phone: { width: 350, paddingLeft: '14px', byMode: { dark: { paddingLeft: '16px' } } }, desktop: { width: 1680, paddingLeft: '12px' } } };
+  const b = compareBreakpoints({ components: { card } }, { card: { paddingVar: { lr: 'padding/m' } } }, { modeVariants: { Sizing: { modes: vars.modeVariants.Sizing.modes, vars: { 'viewport/min-width': { values: { desktop: '1680px', phone: '350px' } }, 'padding/m': vars.modeVariants.Sizing.vars['padding/m'] } } } });
+  assert.deepEqual(b.differ.map((d) => `${d.field}: ${d.figmaValue} vs ${d.code}`), ['padding (left) @ phone (350px) [dark]: 14px vs 16px']);
+  assert.equal(b.match, 2);
+});
+
+test('a state in a mode with a rule of its own (A10): its difference points at that mode\'s rule', () => {
+  const fact = (value, rule = '.chip') => ({ value, rule, at: 'a.css:1', confidence: 'verified' });
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, fill: 'direct', props: { backgroundColor: fact('#ffffff') },
+    colors: { light: { backgroundColor: '#ffffff', color: '#000000' }, dark: { backgroundColor: '#000000', color: '#ffffff' } },
+    states: { 'State=Hover': { produced: 'forced :hover', changed: { backgroundColor: { value: '#eeeeee', rule: '.chip:hover', at: 'a.css:5' } }, byMode: { dark: { backgroundColor: { value: '#333333', rule: '[data-theme=dark] .chip:hover', at: 'a.css:9' } } },
+      colors: { light: { backgroundColor: '#eeeeee', color: '#000000' }, dark: { backgroundColor: '#333333', color: '#ffffff' } } } } } } };
+  const structure = { chip: { fillStructure: 'direct', colors: { fill: { token: 'chip/bg' } }, variants: { 'State=Hover': { colors: { fill: { token: 'chip/bg/hover' } } } }, defaultVariant: 'State=Default' } };
+  const vars = { color: { light: { 'chip/bg': '#ffffff', 'chip/bg/hover': '#eeeeee' }, dark: { 'chip/bg': '#000000', 'chip/bg/hover': '#222222' } } };
+  const r = compareComponents(code, structure, vars, cfg, maps());
+  const dark = r.differ.find((d) => /\[dark\]/.test(d.field) && /Hover/.test(d.field));
+  assert.ok(dark, JSON.stringify(r.differ));
+  assert.equal(dark.at, 'a.css:9', 'the dark hover rule, not the light one');
+});
+
 test('variant combinations: built from propertyMap selectors; compared with height and visible layers', async () => {
   const { variantCombos } = await import('../code-capture.mjs');
   const states = [{ label: 'Size=L', selector: '.chip.chip--l' }, { label: 'Icon=True', selector: '.chip.has-icon' }, { label: 'State=Hover', selector: '.chip:hover' }];
