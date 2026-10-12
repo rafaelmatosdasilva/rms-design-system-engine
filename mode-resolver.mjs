@@ -172,3 +172,31 @@ export function detectModes(cssText, modeKeys = ['light', 'dark']) {
   });
   return { modes, found, unsure };
 }
+
+// How a browser puts a mode on: the media features to emulate, and a script that sets (and one that takes off) the class
+// or data attribute the mode's cssSelector names. { unsupported: why } for a switch no browser can be told to make.
+export function modeSwitchFor(mode) {
+  const sel = mode.cssSelector ?? 'root';
+  const base = [{ name: 'prefers-color-scheme', value: 'light' }, { name: 'prefers-contrast', value: 'no-preference' }];
+  if (sel === 'root') return { media: base };
+  if (sel === 'dark-media') return { media: [{ name: 'prefers-color-scheme', value: 'dark' }, base[1]] };
+  if (sel === 'high-contrast-media') return { media: [base[0], { name: 'prefers-contrast', value: 'more' }] };
+  if (sel.startsWith('class:')) {
+    const c = JSON.stringify(sel.slice(6));
+    return { media: base, apply: `document.documentElement.classList.add(${c})`, undo: `document.documentElement.classList.remove(${c})` };
+  }
+  if (sel.startsWith('data:')) {
+    const [attr, val = ''] = sel.slice(5).split('=');
+    const a = JSON.stringify(attr.startsWith('data-') ? attr : `data-${attr}`);
+    return { media: base, apply: `document.documentElement.setAttribute(${a}, ${JSON.stringify(val)})`, undo: `document.documentElement.removeAttribute(${a})` };
+  }
+  if (sel.startsWith('media:')) {
+    const cond = sel.slice(6);
+    const feats = [...cond.matchAll(/\(\s*(prefers-color-scheme|prefers-contrast|prefers-reduced-motion|forced-colors)\s*:\s*([\w-]+)\s*\)/g)].map((m) => ({ name: m[1], value: m[2] }));
+    const width = cond.match(/\(\s*min-width\s*:\s*(\d+)px\s*\)/)?.[1] ?? cond.match(/\(\s*max-width\s*:\s*(\d+)px\s*\)/)?.[1];
+    const rest = cond.replace(/\(\s*(prefers-color-scheme|prefers-contrast|prefers-reduced-motion|forced-colors|min-width|max-width)\s*:[^)]*\)/g, '').replace(/\band\b|\s/g, '');
+    if (rest) return { unsupported: `cannot emulate media condition ${cond}` };
+    return { media: feats.length ? feats : base, viewport: width ? +width : null };
+  }
+  return { unsupported: `unknown mode switch ${sel}` };
+}
