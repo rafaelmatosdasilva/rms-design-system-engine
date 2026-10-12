@@ -134,6 +134,27 @@ export function motionFindings(snapshot, sources, classFor = () => null) {
   return out;
 }
 
+// Each transition Figma's prototype animates, one row per component, change and trigger, with what the code does for
+// it (findings: motionFindings' list): the style guide's motion page lists them. → [{ component, change, trigger, ms,
+// easing, code }], code null when the code agrees.
+export function prototypeTransitions(snapshot, findings = []) {
+  const out = [], seen = new Set();
+  for (const [component, list] of Object.entries(snapshot?.components ?? {})) {
+    for (const m of list ?? []) {
+      if (!m || m.type === 'INSTANT' || !(m.duration > 0)) continue;
+      const change = what(m.from, m.to), trigger = TRIGGER_WORD[m.trigger] ?? String(m.trigger ?? '').toLowerCase();
+      const key = `${component}|${change}|${trigger}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const fe = figmaEasing(m.easing);
+      const off = findings.filter((f) => f.component === component && f.change === change && f.trigger === trigger);
+      const code = off.length ? off.map((f) => (f.kind === 'none' ? 'changes at once' : f.kind === 'duration' ? `${f.code?.ms}ms` : `eases ${f.code?.easing}`)).join(', ') : null;
+      out.push({ component, change, trigger, ms: Math.round(m.duration * 1000), easing: fe.css ?? fe.spring, code });
+    }
+  }
+  return out;
+}
+
 // The whole check for a project: the snapshot, the theme and the system's sheets, each component's class.
 // → { findings, compared } | null without a capture
 export async function projectMotion(ROOT, cfg = {}) {

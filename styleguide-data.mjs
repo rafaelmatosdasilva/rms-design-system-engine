@@ -1604,3 +1604,51 @@ export function scopeView(components = [], asked = [], nestsOf = () => []) {
   const kept = components.filter((c) => keep.has(c.name));
   return { components: kept, codeOnly: kept.filter((c) => c.codeOnly).length, scope: { asked: [...new Set(found)], nested: kept.map((c) => c.name).filter((n) => !found.includes(n)), missing } };
 }
+
+// ── Motion (C6): the system's durations and easings, what it does for less motion, and how Figma's prototype moves ──
+// cssText: the system's CSS. figmaVars: the vars snapshot (its motion or animation variables, { name: value }), named
+// to a CSS variable by ds-config.json figma.motion.explicit, else the raw naming convention. files: [{ file, text }],
+// to say where the system answers a request for less motion. transitions: [{ component, change, trigger, ms, easing,
+// code }], Figma's prototype read for each component (motion-parity.mjs).
+// → { durations: [{ figma, var, value, ms }], easings: [{ figma, var, value, bezier }], reduced, transitions } | null
+const EASE_RE = /^(cubic-bezier\([^)]*\)|steps\([^)]*\)|linear\([^)]*\)|linear|ease|ease-in|ease-out|ease-in-out|step-start|step-end)$/i;
+export async function motionTokens(cssText = '', { figmaVars = {}, cfg = {}, files = [], transitions = [] } = {}) {
+  const { timeMs, bezierOf, sameValue, sameEasing } = await import('./css-values.mjs');
+  const { resolveNamingSpec, tokenToVar } = await import('./naming-convention.mjs');
+  const text = String(cssText).replace(/\/\*[\s\S]*?\*\//g, '');
+  // Each custom property once, the first time it is declared (the base mode), an alias followed to its value.
+  const decl = new Map();
+  for (const m of text.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+?)\s*(?:!important\s*)?(?=;|})/g)) if (!decl.has(m[1])) decl.set(m[1], m[2].trim());
+  const resolve = (v, n = 0) => { const a = /^var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)$/.exec(v); return a && n < 5 && decl.has(a[1]) ? resolve(decl.get(a[1]), n + 1) : v; };
+  // Figma's motion variables, each with the CSS variable it is written as.
+  const figma = figmaVars.motion && Object.keys(figmaVars.motion).length ? figmaVars.motion : figmaVars.animation ?? {};
+  const spec = resolveNamingSpec(cfg), explicit = cfg.figma?.motion?.explicit ?? {};
+  const figmaOf = new Map();
+  for (const [name, value] of Object.entries(figma)) {
+    if (name.startsWith('_') || value == null) continue;
+    const cssVar = explicit[name] ?? tokenToVar(name, spec, { raw: true });
+    if (cssVar) figmaOf.set(cssVar, { name, value: String(value) });
+  }
+  const durations = [], easings = [];
+  for (const [cssVar, raw] of decl) {
+    const value = resolve(raw);
+    const f = figmaOf.get(cssVar);
+    // Named as Figma when its variable has the same value; a value Figma gives otherwise is the token check's to say.
+    const same = (kind) => f && (kind === 'time' ? sameValue(f.value, value, 'time') : sameEasing(f.value, value) ?? f.value.replace(/\s+/g, '') === value.replace(/\s+/g, ''));
+    const ms = timeMs(value);
+    if (ms != null) durations.push({ figma: same('time') ? f.name : null, var: cssVar, value, ms });
+    else if (EASE_RE.test(value)) easings.push({ figma: same('ease') ? f.name : null, var: cssVar, value, bezier: bezierOf(value) });
+  }
+  durations.sort((a, b) => a.ms - b.ms || !!b.figma - !!a.figma || a.var.localeCompare(b.var));
+  // Where the system ends its motion for a person who asks for less (prefers-reduced-motion), and what it ends.
+  let reduced = null;
+  for (const { file, text: t } of files) {
+    const at = String(t ?? '').search(/@media[^{]*prefers-reduced-motion\s*:\s*reduce/);
+    if (at < 0) continue;
+    const block = String(t).slice(at, at + 600);
+    reduced = { at: `${file}:${String(t).slice(0, at).split('\n').length}`, ends: ['animation', 'transition'].filter((k) => new RegExp(`${k}(-duration)?\\s*:`).test(block)) };
+    break;
+  }
+  if (!durations.length && !easings.length && !transitions.length) return null;
+  return { durations, easings, reduced, transitions };
+}
