@@ -93,3 +93,36 @@ test('the style guide draws a Vue component as the project\'s own Vite renders i
   const b = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: bare, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.match(b.stdout, /Vue components drawn from their templates: the project has no vue package installed\./);
 });
+
+test('the style guide draws each Vue variant as it renders; a page for one component renders only it and what it nests', { skip: READY, timeout: 300000 }, async () => {
+  const dir = harbor('vue-sg-variants-');
+  // Large adds an element, not only a class; the button nests the badge (its tag, as its file names it).
+  writeFileSync(join(dir, 'components', 'HbButton.vue'), `<script setup lang="ts">
+import HbBadge from './HbBadge.vue';
+withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | 'Large'; label?: string }>(), { variant: 'Primary', size: 'Small', label: 'Continue' });
+</script>
+<template><button :class="['hb-button', { 'hb-button--secondary': variant === 'Secondary' }]" type="button"><span v-if="size === 'Large'" class="hb-button-icon" aria-hidden="true">→</span>{{ label }}<HbBadge /></button></template>
+`);
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  // The button and the badge it nests: the icon button and the chip are not rendered for this page.
+  assert.match(r.stdout, /2 of 2 Vue components drawn as the project's own Vite renders them\./, r.stdout);
+  const file = join(dir, '.design-system-engine-out', 'styleguide', 'button.html');
+  const data = JSON.parse(readFileSync(file, 'utf8').match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
+  const button = data.components.find((c) => c.name === 'button');
+  assert.ok(button.renders?.some((x) => x.props.size === 'Large' && /hb-button-icon/.test(x.markup)), JSON.stringify(button.renders));
+  const { launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const c = await launchChrome(CHROME);
+  try {
+    const { send, close } = await connectCDP(c.wsUrl);
+    const { sessionId } = await openPage(send, `file://${file}#c-button?size=Large`);
+    await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
+    const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
+    const drawn = async () => { let h = ''; for (let n = 0; n < 100 && !h; n++) { if (n) await new Promise((res) => setTimeout(res, 100)); h = await run(`(document.querySelector('#c-button .pg-preview') || {}).innerHTML || ''`); } return h; };
+    // Large, as the button renders it: with its icon. The default has none.
+    assert.match(await drawn(), /class="hb-button-icon"/);
+    await run(`location.hash = '#c-button?size=Small'`); await new Promise((res) => setTimeout(res, 400));
+    assert.doesNotMatch(await drawn(), /hb-button-icon/);
+    close();
+  } finally { c.kill(); }
+});

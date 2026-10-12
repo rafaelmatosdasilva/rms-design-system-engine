@@ -2,7 +2,8 @@
 // Run from project root: node scripts/audit.mjs [--trend]
 //
 // --trend: print the last 20 audit runs and exit (no new run)
-// --init:  run first-time setup (scaffold config files) and exit without auditing
+// --init:  run first-time setup (scaffold config files) and exit without auditing; a project already set up keeps its
+//          ds-config.json unless --reconfigure is added
 //
 // First run: if ds-config.json is missing, asks a few questions (Figma URL, token CSS
 // path, and whether it is a consumer file) then auto-detects collection structure via the
@@ -647,7 +648,7 @@ if (process.argv.includes('--styleguide')) {
       if (r.notAgreed) console.log(`   ${r.notAgreed}`);
     }
     // Its Vue components: drawn from what the project's own Vite renders, or from their templates, and why (E28).
-    if (r.vue) console.log(r.vue.rendered ? `   ${r.vue.rendered} of ${r.vue.of} Vue component${r.vue.of === 1 ? '' : 's'} drawn as the project's own Vite renders ${r.vue.of === 1 ? 'it' : 'them'}${r.vue.rendered < r.vue.of ? `; the rest from their templates${r.vue.failed?.length ? ` (${r.vue.failed.map((f) => `${f.name}: ${f.why}`).join('; ')})` : ''}` : ''}.` : `   Vue components drawn from their templates: ${r.vue.why ?? 'none rendered'}.`);
+    if (r.vue) console.log(r.vue.rendered ? `   ${r.vue.rendered} of ${r.vue.of} Vue component${r.vue.of === 1 ? '' : 's'} drawn as the project's own ${r.vue.build ?? 'build'} renders ${r.vue.of === 1 ? 'it' : 'them'}${r.vue.rendered < r.vue.of ? `; the rest from their templates${r.vue.failed?.length ? ` (${r.vue.failed.map((f) => `${f.name}: ${f.why}`).join('; ')})` : ''}` : ''}.` : `   Vue components drawn from their templates: ${r.vue.why ?? 'none rendered'}.`);
     for (const name of r.scope?.asked ?? SCOPE_COMPONENTS) console.log(`   ${name}: ${relative(ROOT, r.out)}#c-${name}  (its Accessibility and Parity areas)`);
     // Accessibility tried now in a browser, every variant of every component, and kept in the page: whoever opens it reads
     // the final results at once, nothing running while they read (styleguide-bake.mjs). --no-a11y-bake builds the page
@@ -1713,6 +1714,12 @@ async function bootstrapConfig() {
 
   let cfg = {};
   if (INIT_ONLY) {
+    // A project already set up keeps its config: setup again replaces it only when asked to (--reconfigure).
+    if (existsSync(join(ROOT, 'ds-config.json')) && !process.argv.includes('--reconfigure')) {
+      console.log('This project is already set up (ds-config.json); nothing was written.');
+      console.log('NEXT: run the audit (rms-design-system-engine), or answer a question with rms-design-system-engine --query <name>. To set it up again from scratch, replacing ds-config.json, add --reconfigure.');
+      process.exit(0);
+    }
     await bootstrapConfig();
     process.exit(0);
   }

@@ -89,5 +89,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `rename-migrations-copies` | The 21 guide tasks on Haiku (engine f8675f6) | "A rename sweep, steps off what the system retired, and a near copy as a decision" |
 | `motion-screens-modes` | The 21 guide tasks on Haiku (engine c739389) | "Motion and screens against Figma, every combination of modes, and the products' own pages checked" |
 | `documentation-page` | The 21 guide tasks on Haiku (engine 53b5844) | "Coverage becomes Documentation, the same cards as each component's" |
+| `vue-builds` | The 21 guide tasks on Haiku (engine e27cbc3) | "Vue components rendered with whatever builds them" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
