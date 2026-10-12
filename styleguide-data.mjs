@@ -1165,6 +1165,25 @@ export function iconButtonUi(components = [], systemCss = '') {
   return null;
 }
 
+// The system's own tip trigger, for what the page explains on demand (how each Health number is counted): a component
+// whose root carries data-tip, so the system's own script shows the tip on hover and focus, with a class the system's
+// CSS styles; one named for a tip, info or help first. Its markup is kept, with the tip's words ({tip}) and the trigger's
+// name ({name}) left to fill and only the classes the system defines. → { from, markup } | null
+export function tipUi(components = [], systemCss = '') {
+  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
+  const found = [];
+  for (const c of components) {
+    const m = /^\s*<([a-z][\w-]*)\b([^>]*)>([\s\S]*)<\/\1>\s*$/i.exec(c.markup ?? '');
+    if (!m || !/\sdata-tip\s*=/i.test(m[2])) continue;
+    const cls = (/\bclass\s*=\s*["']([^"']*)["']/i.exec(m[2])?.[1] ?? '').split(/\s+/).filter((k) => k && defined(k));
+    if (!cls.length) continue;
+    const rest = m[2].replace(/\s(class|data-tip|aria-label|aria-labelledby|aria-describedby|id|title)\s*=\s*("[^"]*"|'[^']*')/gi, '').trim();
+    found.push({ score: /tip|info|help/i.test(c.name) ? 0 : 1, from: c.name, markup: `<${m[1]} class="${cls.join(' ')}"${rest ? ' ' + rest : ''} data-tip="{tip}" aria-label="{name}">${m[3]}</${m[1]}>` });
+  }
+  const best = found.sort((a, b) => a.score - b.score)[0];
+  return best ? { from: best.from, markup: best.markup } : null;
+}
+
 export function cardUi(components = [], systemCss = '') {
   const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
   for (const c of components) {

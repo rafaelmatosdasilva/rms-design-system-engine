@@ -109,7 +109,10 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* ── Health: the dashboard ───────────────────────────────────────────────── */
 /* Tiles for each area's number, then cards for where what is left gathers. Every box is the system's card (its line,
    corners and shadow), every bar a track and a fill in the system's own colours. */
-:where(.sg-health-tile, .sg-health-card, .sg-health-list > li, .sg-health) > :where(p, h3, ol) { margin: 0; }
+:where(.sg-health-tile, .sg-health-top, .sg-health-card, .sg-health-list > li, .sg-health) > :where(p, h3, ol) { margin: 0; }
+/* Each card's label, and at its top right the system's own tip trigger saying how its number is counted. */
+.sg-health-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sg-space-s); }
+.sg-health-how { font-size: var(--sg-s); color: var(--sg-text-2); }
 .sg-health-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sg-space-l); margin-bottom: var(--sg-space-l); }
 @media (max-width: 640px) { .sg-health-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .sg-health-tile, .sg-health-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); padding: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-s); min-width: 0; }
@@ -2460,17 +2463,34 @@ a.pg-usage-name { color: var(--sg-text); }
       readyGot += got; readyAll += READY_KINDS.length + 1; if (got === READY_KINDS.length + 1) readyN++;
     });
     var bar = function (x) { return '<span class="sg-health-bar" aria-hidden="true"><span style="width:' + Math.max(0, Math.min(100, x)) + '%"></span></span>'; };
-    var tile = function (label, num, of, sub) {
-      return '<div class="sg-health-tile"><p class="sg-health-label">' + esc(label) + '</p><p class="sg-health-num">' + (num == null ? '–' : num) + '<small>' + esc(of) + '</small></p>' + bar(num || 0) + '<p class="sg-health-sub">' + esc(sub) + '</p></div>';
+    // How the card's number is counted, in the system's own tip at its top right; a system with no tip trigger shows
+    // the words on the card.
+    var TIP = DATA.ui && DATA.ui.tip;
+    var tile = function (label, num, of, sub, how) {
+      var tip = TIP && how ? TIP.markup.replace('{tip}', function () { return esc(how); }).replace('{name}', function () { return esc('How ' + label + ' is counted'); }) : '';
+      return '<div class="sg-health-tile"><div class="sg-health-top"><p class="sg-health-label">' + esc(label) + '</p>' + tip + '</div><p class="sg-health-num">' + (num == null ? '–' : num) + '<small>' + esc(of) + '</small></p>' + bar(num || 0) + '<p class="sg-health-sub">' + esc(sub) + '</p>' +
+        (how && !TIP ? '<p class="sg-health-how">' + esc(how) + '</p>' : '') + '</div>';
     };
+    var kindsOf = function (area) { var k = []; per.forEach(function (p) { p.rows.forEach(function (r) { if (r.area === area && k.indexOf(r.kind) < 0) k.push(r.kind); }); }); return k; };
+    var lower = function (xs) { return xs.map(function (x) { return x.charAt(0).toLowerCase() + x.slice(1); }); };
+    var listed = function (xs) { return xs.length > 1 ? xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1] : xs.join(''); };
+    var areaOf = function (n) { return areas.filter(function (a) { return a.name === n; })[0] || { comps: 0 }; };
     var weights = areas.map(function (a) { return a.name + ' ' + a.weight; }).join(', ');
-    var tiles = tile('Health', overall, 'of 100', overall == null ? 'Once every component is tried for accessibility' : 'Weighted as ' + weights) +
+    var HOW = {
+      Health: 'The four areas below, each counted by its weight (' + weights + '), added and divided by the weights that count. An area with nothing to measure yet is left out, and the others share its weight. AI readiness is shown apart and not counted here.',
+      Parity: 'Each component counts the same. One counts 100 when every prop, variable and value it has matches Figma, 50 when only rows to check are left, and 0 while one difference is still to fix, however many others match. The number is the average over the ' + areaOf('Parity').comps + ' components compared.',
+      Accessibility: 'Each component counts the same. One counts 100 when every WCAG 2.2 A and AA criterion it is tried on passes, 50 when only criteria a person has to check are left, and 0 while one criterion fails. The number is the average over the ' + areaOf('Accessibility').comps + ' components tried in the browser.',
+      Documentation: 'Each component counts the same, by the share of its documentation written (' + listed(lower(kindsOf('Documentation'))) + '). An item written counts whole, one to check half, one missing nothing. The number is the average over the ' + areaOf('Documentation').comps + ' components.',
+      Motion: 'Each component that moves counts the same, by the share of its motions that move as Figma has them (the same duration and easing, in both). One to check counts half, one that differs or is only on one side nothing. The number is the average over the ' + areaOf('Motion').comps + ' components that move; one that does not move is left out.',
+      'AI readiness': 'What an agent needs to pick a component right, ' + (READY_KINDS.length + 1) + ' items each (' + listed(lower(READY_KINDS)) + ' written, and nothing open with Figma). The number is the share of those items present over the ' + built.length + ' components; a component is ready when it has them all.'
+    };
+    var tiles = tile('Health', overall, 'of 100', overall == null ? 'Once every component is tried for accessibility' : 'Weighted as ' + weights, HOW.Health) +
       areas.map(function (a) {
-        if (a.wait) return tile(a.name, null, '%', 'Trying the components in this browser, ' + tried.length + ' of ' + COMPONENTS.length);
-        if (!a.comps) return tile(a.name, null, '%', 'Nothing to measure yet');
-        return tile(a.name, a.score, '%', a.whole ? a.clean + ' of ' + a.comps + (a.comps === 1 ? ' component' : ' components') + ' done' + (a.checking ? ', ' + a.checking + ' to check' : '') : a.done + ' of ' + a.n + ' done');
+        if (a.wait) return tile(a.name, null, '%', 'Trying the components in this browser, ' + tried.length + ' of ' + COMPONENTS.length, HOW[a.name]);
+        if (!a.comps) return tile(a.name, null, '%', 'Nothing to measure yet', HOW[a.name]);
+        return tile(a.name, a.score, '%', a.whole ? a.clean + ' of ' + a.comps + (a.comps === 1 ? ' component' : ' components') + ' done' + (a.checking ? ', ' + a.checking + ' to check' : '') : a.done + ' of ' + a.n + ' done', HOW[a.name]);
       }).join('') +
-      tile('AI readiness', readyAll ? pct(readyGot / readyAll) : null, '%', built.length ? readyN + ' of ' + built.length + (built.length === 1 ? ' component ready' : ' components ready') : 'Nothing to measure yet');
+      tile('AI readiness', readyAll ? pct(readyGot / readyAll) : null, '%', built.length ? readyN + ' of ' + built.length + (built.length === 1 ? ' component ready' : ' components ready') : 'Nothing to measure yet', HOW['AI readiness']);
     // The components with the most left, weighed as the system's number weighs it: a row to fix in an area counts that
     // area's weight, one to check half of it.
     var weightOf = {}; HEALTH_AREAS.forEach(function (a) { weightOf[a[0]] = a[1]; });

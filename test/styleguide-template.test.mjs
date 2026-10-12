@@ -1315,6 +1315,11 @@ test('Health: each area counted by component, weighted into one number once acce
     assert.match(tiles[0][2], /^Weighted as Parity 35, Accessibility 30, Documentation 20, Motion 0$/, 'the team\'s weight replaces the page\'s');
     assert.match(tiles[1][2], /^\d+ of 2 components done(, \d+ to check)?$/, 'parity counts components');
     assert.match(tiles[3][2], /^\d+ of \d+ done$/, 'documentation counts items');
+    // How each card's number is counted: the system's tip at its top right, or with none (this fixture) its words on the card.
+    const how = await run(`[...document.querySelectorAll('#health .sg-health-tile')].map((t) => [!!t.querySelector('[data-tip]'), (t.querySelector('.sg-health-how') || {}).textContent || ''])`);
+    for (const [hasTip, words] of how) { assert.equal(hasTip, false); assert.match(words, /counts|counted|share/); }
+    assert.match(how[1][1], /^Each component counts the same\. One counts 100 when every prop, variable and value it has matches Figma, 50 when only rows to check are left, and 0 while one difference is still to fix, however many others match\. The number is the average over the 2 components compared\.$/);
+    assert.match(how[0][1], /\(Parity 35, Accessibility 30, Documentation 20, Motion 0\)/);
     assert.match(tiles[5][2], /^\d of 2 components ready$/);
     // One card: the five components with the most left, at most.
     assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left']);
