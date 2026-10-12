@@ -388,6 +388,51 @@ if (process.argv.includes('--figma-screens')) {
   process.exit(0);
 }
 
+// ── --figma-a11y: the designed screens themselves checked for accessibility (W1) ──
+// Without a file: writes the read-only capture script for the frames and screens ds-config.json names (every text and
+// lone icon with what is drawn behind it, inside every instance; each control under 24 by 24). With the file its
+// answer was saved to: keeps it as the screen accessibility snapshot and says what each screen owes.
+if (process.argv.includes('--figma-a11y')) {
+  let scfg = {};
+  try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const at = process.argv.indexOf('--figma-a11y'), file = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  const ids = [...new Set([...(scfg.frames ?? []), ...(scfg.screens ?? [])].map((f) => f.nodeId).filter(Boolean))];
+  const sa = await import('./screen-a11y.mjs');
+  const script = (list) => { mkdirSync(capDir, { recursive: true }); writeFileSync(join(capDir, 'screen-a11y-capture.js'), sa.screenA11yCaptureScript(list).trim() + '\n'); };
+  const saved = relative(ROOT, join(capDir, 'screen-a11y.json'));
+  if (!file) {
+    if (!ids.length) { console.log('ℹ️  ds-config.json names no frames or screens: add each product\'s screen ({ name, nodeId, plugin }) to frames, then run this again.'); process.exit(0); }
+    script(ids);
+    console.log(`Screen accessibility capture script for ${ids.length} screen${ids.length === 1 ? '' : 's'} → ${relative(ROOT, join(capDir, 'screen-a11y-capture.js'))} (read-only: it changes nothing in Figma).`);
+    console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${saved}, then run rms-design-system-engine --figma-a11y ${saved}`);
+    process.exit(0);
+  }
+  let snap;
+  try { snap = sa.screenA11ySnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  const target = scfg.paths?.screenA11y ?? join(dirname(scfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-a11y.snapshot.json');
+  let prev = null;
+  try { prev = JSON.parse(readFileSync(join(ROOT, target), 'utf8')); } catch { /* the first answer */ }
+  const { left = [], ...kept } = snap;
+  const merged = { ...kept, screens: sa.mergeA11yScreens(prev?.screens ?? [], snap.screens, ids) };
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(merged, null, 1) + '\n');
+  console.log(`✓ ${snap.screens.length} screen${snap.screens.length === 1 ? '' : 's'} read for accessibility → ${target}${left.length ? ` (${merged.screens.length} of ${ids.length} so far)` : ''}`);
+  const cut = snap.screens.filter((x) => x.cut).map((x) => `"${x.name}"`);
+  if (cut.length) console.log(`ℹ️  Too much on one screen for one answer, its rarest colours left out: ${cut.join(', ')}.`);
+  if (left.length) {
+    script(left);
+    console.log(`NEXT: ${left.length} screen${left.length === 1 ? '' : 's'} did not fit in that answer. Run ${relative(ROOT, join(capDir, 'screen-a11y-capture.js'))} the same way (unchanged, with use_figma), save what it returns as ${saved}, then run rms-design-system-engine --figma-a11y ${saved} again.`);
+    process.exit(0);
+  }
+  const { annotatedRole } = await import('./design-a11y.mjs');
+  let props = {};
+  try { props = JSON.parse(readFileSync(join(ROOT, scfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8')); } catch { /* roles from names */ }
+  const roles = Object.fromEntries(Object.entries(props).filter(([k, v]) => !k.startsWith('_') && v && typeof v === 'object').map(([k, v]) => [k, annotatedRole(v)]).filter(([, r]) => r));
+  for (const l of sa.screenA11yLines(sa.screenA11yFindings(merged, { roles }), { screens: merged.screens.length })) console.log(l);
+  process.exit(0);
+}
+
 // ── --rename-sweep: a token renamed in Figma, renamed everywhere in one change (L11) ──
 // Pairs the tokens gone and new between the vars snapshot as last committed (or as of --since <git ref>) and as now, by
 // their values in every mode, and writes one patch per root (the system's, then each product's) that renames the CSS
@@ -4737,7 +4782,9 @@ function reportFull(label, items, shown) {
 
   // ── Accessibility the design owes (design-a11y.mjs, advisory) ─────────────────
   // An interactive component with no focus state, an error state with no message, a control under 24px: read from
-  // the props and structure snapshots, for whoever keeps the Figma file. Off with "designA11y": false.
+  // the props and structure snapshots, for whoever keeps the Figma file. Off with "designA11y": false. Part of
+  // accessibility, so --only accessibility shows it.
+  _section('a11y');
   if (cfg.designA11y !== false && (!ONLY || ONLY.a11y)) {
     try {
       const { designA11yFindings, designA11yBlock } = await import('./design-a11y.mjs');
@@ -4747,6 +4794,18 @@ function reportFull(label, items, shown) {
       const lines = designA11yBlock(designA11yFindings(props, struct, { only: _scopeNames.length ? _scopeNames : null }));
       if (lines.length) { console.log(C.yellow(`\n${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(l)); }
     } catch { /* no props snapshot: nothing to read */ }
+    // The designed screens themselves, once read (--figma-a11y): each text and lone icon against what is behind it, a
+    // control under 24 by 24. A run scoped to some components leaves the screens to the full one.
+    if (!_scopeNames.length) try {
+      const sa = await import('./screen-a11y.mjs');
+      const snap = JSON.parse(readFileSync(join(ROOT, cfg.paths?.screenA11y ?? join(dirname(cfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-a11y.snapshot.json')), 'utf8'));
+      const { annotatedRole } = await import('./design-a11y.mjs');
+      let props = {};
+      try { props = JSON.parse(readFileSync(join(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8')); } catch { /* roles from names */ }
+      const roles = Object.fromEntries(Object.entries(props).filter(([k, v]) => !k.startsWith('_') && v && typeof v === 'object').map(([k, v]) => [k, annotatedRole(v)]).filter(([, r]) => r));
+      const lines = sa.screenA11yLines(sa.screenA11yFindings(snap, { roles }), { screens: (snap.screens ?? []).length });
+      if (lines.length) { console.log(C.yellow(`\n${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(l)); }
+    } catch { /* the screens not read for accessibility yet (--figma-a11y) */ }
   }
 
   // ── A workaround built around a component is a missing API (I59, advisory) ────
