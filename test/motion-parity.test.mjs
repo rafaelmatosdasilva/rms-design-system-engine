@@ -111,32 +111,34 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
     const c = await launchChrome(chromePath);
     try {
       const { send, close } = await connectCDP(c.wsUrl);
-      const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}#c-button/parity`);
+      const { sessionId } = await openPage(send, `file://${join(dir, '.design-system-engine-out/styleguide/index.html')}#c-button/motion`);
       await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
       const run2 = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
-      let row = '';
-      for (let n = 0; n < 100 && !row; n++) { if (n) await new Promise((r) => setTimeout(r, 100)); row = await run2(`([...document.querySelectorAll('#c-button tr[data-area="Parity"]')].find((tr) => /Motion/.test(tr.textContent)) || {}).textContent || ''`); }
-      assert.match(row, /Motion.*250ms.*ease-out, on hover.*State Default to Hover\. (Give it a transition of 250ms, ease-out|Make the transition 250ms), as Figma has it\. Tell Claude to do it\./);
-      // Its own opening, which Figma does not animate: for whoever keeps Figma.
-      const own = await run2(`([...document.querySelectorAll('#c-button tr[data-area="Parity"]')].find((tr) => /Opens\./.test(tr.textContent)) || {}).textContent || ''`);
-      assert.match(own, /Motion.*Not there.*200ms.*ease-out, fades in.*You in Figma.*Opens\. Animate it in Figma as the code does \(fades in, 200ms, ease-out\), on its Motion timeline or in its prototype/);
-      // Its Motion area: everything that moves in it in one table, when it plays and what moves, the part, the code's
-      // timing and rule, Figma's and where in Figma, less motion and how the two compare.
-      await run2(`location.hash = '#c-button/motion'`); await new Promise((r) => setTimeout(r, 300));
-      const mine = await run2(`[...document.querySelectorAll('#c-button .pg-area[data-area="motion"] .sg-motion-all tbody tr')].map((tr) => tr.textContent)`);
-      assert.equal(await run2(`[...document.querySelectorAll('#c-button .pg-area[data-area="motion"] thead th')].map((th) => th.textContent).join('|')`), 'What happens|Part|Code|Figma|Less motion|Status');
-      assert.ok(mine.some((r) => /^Opensfades in\.button200ms, ease-out.*src\/components\/button\.css:\d+NoneKeeps moving!None in Figma$/.test(r)), JSON.stringify(mine));
-      assert.ok(mine.some((r) => /^On hover.*250ms, ease-outIts prototype, State Default to Hover.*(Differs from Figma|Not in the code)$/.test(r)), JSON.stringify(mine));
-      // The foundations' motion page: the system's duration and easing, played on demand, and every component's motion in
-      // the same table, a column for the component first.
+      // Its Motion area: everything that moves in it, in the table every task shares: what happens (when, what, the part),
+      // the code's timing and rule and less motion, Figma's and where in Figma, what to do and who does it, its status.
+      let mine = [];
+      for (let n = 0; n < 100 && !mine.length; n++) { if (n) await new Promise((r) => setTimeout(r, 100)); mine = await run2(`[...document.querySelectorAll('#c-button .pg-area[data-area="motion"] tbody tr')].map((tr) => tr.textContent)`); }
+      assert.equal(await run2(`[...document.querySelectorAll('#c-button .pg-area[data-area="motion"] thead th')].map((th) => th.textContent).join('|')`), 'Task nr|What happens|Code|Figma|What to do|Status');
+      assert.ok(mine.some((r) => /On hover.*250ms, ease-outIts prototype, State Default to Hover.*Claude in the code(Make it|Give it a transition of) 250ms, ease-out, as Figma has it \(its prototype, State Default to Hover\)\. Tell Claude to do it\./.test(r)), JSON.stringify(mine));
+      assert.ok(mine.some((r) => /Opensfades in\.button200ms, ease-out.*src\/components\/button\.css:\d+Keeps moving for less motionNoneYou in FigmaAnimate it in Figma as the code does \(fades in, 200ms, ease-out\), on its Motion timeline or in its prototype/.test(r)), JSON.stringify(mine));
+      assert.match(await run2(`document.querySelector('#c-button .pg-areas [data-v="motion"]').textContent`), /^Motion, \d+ to fix$/, 'its tab says what is to do');
+      assert.equal(await run2(`[...document.querySelectorAll('#c-button tr[data-area="Parity"]')].filter((tr) => /Motion/.test(tr.cells[1] && tr.cells[1].textContent)).length`), 0, 'motion is its own kind, not Parity');
+      // On the Tasks page, a kind of its own with the same rows, only what is to do.
+      await run2(`location.hash = '#tasks/motion'`); await new Promise((r) => setTimeout(r, 300));
+      const tasks = await run2(`[...document.querySelectorAll('#tasks .sg-todo-kind[data-area="Motion"] tbody tr')].map((tr) => tr.textContent)`);
+      assert.deepEqual(tasks, mine.filter((r) => /You in Figma|Claude in the code/.test(r)), 'the same rows, only what is to do');
+      // The foundations' motion page: the system's timings in one table, from the fastest, each with its variables, what
+      // it is for, who moves so, Figma and what the system could do; the variables no component uses are rows too.
       await run2(`location.hash = '#motion'`); await new Promise((r) => setTimeout(r, 300));
-      const page = JSON.parse(await run2(`JSON.stringify({ vars: [...document.querySelectorAll('#motion .sg-token-card td:nth-child(3)')].map((td) => td.textContent), all: [...document.querySelectorAll('#motion .sg-motion-all tbody tr')].map((tr) => tr.textContent), lead: document.querySelector('#motion > p').textContent, card: !!document.querySelector('#overview a[href="#motion"]') })`));
-      assert.deepEqual(page.vars, ['--motion-quick', '--motion-ease']);
-      assert.deepEqual(page.all, mine.map((r) => 'button' + r), 'the same rows as its own Motion area');
+      const page = JSON.parse(await run2(`JSON.stringify({ heads: [...document.querySelectorAll('#motion thead th')].map((th) => th.textContent).join('|'), rows: [...document.querySelectorAll('#motion tbody tr')].map((tr) => tr.textContent), tables: document.querySelectorAll('#motion table').length, lead: document.querySelector('#motion > p').textContent, card: !!document.querySelector('#overview a[href="#motion"]') })`));
+      assert.equal(page.heads, 'Timing|Variables|For|Used by|Figma|For the system');
+      assert.equal(page.tables, 1, 'one table');
+      assert.ok(page.rows.some((r) => /^200ms, ease-outWritten as valuesOpensbuttonOpens, fades in, \.buttonNone in Figma.*Written as values: make it a variable\.$/.test(r)), JSON.stringify(page.rows));
+      assert.ok(page.rows.some((r) => /--motion-quick.*Nothing yetNothing.*No component uses it/.test(r)), JSON.stringify(page.rows));
       assert.match(page.lead, /does not stop its motion yet when a person asks for less/);
       assert.ok(page.card, 'a card on the overview');
       const at = `[...document.querySelectorAll('#motion .sg-motion-dot')].map((d) => Math.round(d.getBoundingClientRect().left - d.parentNode.getBoundingClientRect().left))`;
-      assert.deepEqual(await run2(at), [0, 0], 'nothing moves until Play');
+      assert.ok((await run2(at)).every((x) => x === 0), 'nothing moves until Play');
       await run2(`document.querySelector('#motion [data-motion-play]').click()`);
       // Measured once each dot's animation has finished (a busy machine draws its frames late), never after a fixed wait.
       await send('Runtime.evaluate', { expression: `Promise.race([Promise.all(document.getAnimations().map((a) => a.finished)), new Promise((r) => setTimeout(r, 10000))]).then(() => true)`, awaitPromise: true, returnByValue: true }, sessionId);
