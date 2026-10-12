@@ -438,9 +438,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
   `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`),
-  `contract.authored.json` → `components.<name>.links`, as buttons at the top right of its header. The overview adds Send
-  feedback (`styleguide.feedback`, else `styleguide.issues`, the tracker's new-issue address with `{name}` and `{title}`,
-  else the repository's own on GitHub or GitLab, with a Style guide title, `issueLink`).
+  `contract.authored.json` → `components.<name>.links`, as buttons at the top right of its header.
 - **At a glance** (`factsOf`), under its name, on one line: its class (`.modal-card`), Version (the release its last
   change shipped in), Last changed, its date and time, and how to import it. How it stands with Figma and with accessibility is on those areas (their alert icons) and on its
   overview card, in one line, a fact that needs work marked with ! and in bold, never by colour alone.
