@@ -20,7 +20,7 @@
 //              gates (freshness, CSS hygiene) are computed on the main thread.
 
 import './stdio-sync.mjs';   // first: a report read through a pipe is never cut off at exit
-import { hasCode, PROJECT_GIVEN, PROJECT_FROM }                 from './project-dir.mjs';  // second: moves to the project (--project, or the one remembered) before anything reads the folder
+import { hasCode, PROJECT_GIVEN, PROJECT_FROM, GITLAB_SOURCE }  from './project-dir.mjs';  // second: moves to the project (--project, or the one remembered) before anything reads the folder
 import readline                                                  from 'readline';
 import { spawn, spawnSync }                                      from 'child_process';
 import { existsSync, readdirSync, readFileSync, statSync,
@@ -5166,7 +5166,9 @@ function reportFull(label, items, shown) {
     // The accessibility verdict and its problems, kind by kind, so the chat carries the result and not only a count.
     let a11yBlock = '';
     try { const { a11ySummaryLines } = await import('./a11y-check.mjs'); const l = a11ySummaryLines(JSON.parse(readFileSync(A11Y_JSON, 'utf8'))); if (l.length) a11yBlock = `\n${l.join('\n')}\n`; } catch { /* no browser this run */ }
-    summary = summary.replace(/\n(NEXT:)/, `${a11yBlock}${diffLine}\n$1`);
+    // Which code was checked, when it was read from GitLab: the commit, so the result is never taken for another one.
+    const codeLine = GITLAB_SOURCE ? `\nCode checked: GitLab ${GITLAB_SOURCE.path} @ ${GITLAB_SOURCE.ref} ${GITLAB_SOURCE.sha.slice(0, 8)}${GITLAB_SOURCE.committedAt ? ` (${GITLAB_SOURCE.committedAt.slice(0, 10)})` : ''}${GITLAB_SOURCE.stale ? ' - GitLab was not reached, so this is the copy of that commit' : ''}\n` : '';
+    summary = summary.replace(/\n(NEXT:)/, `${codeLine}${a11yBlock}${diffLine}\n$1`);
     writeFileSync(join(ROOT, OUT_DIR, 'summary.md'), summary);
     console.log(`\n${C.bold(`─── SUMMARY (relay this in the chat as is; also in ${OUT_DIR}/summary.md) ───`)}\n\n${summary}`);
   } catch { /* the full report above still stands */ }
