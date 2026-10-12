@@ -205,6 +205,31 @@ test('[bugfix structure] a component with no selector entry of its own is checke
   assert.match(out, /panel: "\.panel\.panel--right" has `border-left/);
 });
 
+test('[E36 structure] a product rule that paints a background on a component Figma draws with no fill is flagged', () => {
+  // A band of colour behind an empty state came from a product rule giving the system's empty state a fill.
+  const fx = structFixture({ themeCSS: 'theme.css', snapComp: { strokeOnAnyState: false },
+    extra: { 'theme.css': `:root {}\n.widget { color: red; }\n.results .emptyState { background: var(--panel-background-secondary); }` } });
+  fx['snap.json'].components.emptyState = { fillStructure: 'none', strokeOnAnyState: false };
+  const { code, out } = runGate(STRUCT_GATE, fx);
+  assert.equal(code, 1, out);
+  assert.match(out, /CSS paints a background but Figma has no fill/);
+  assert.match(out, /emptyState: "\.results \.emptyState" has `background: var\(--panel-background-secondary\)`/);
+});
+
+test('[E36 structure] a part the component nests, a part inside it, and a component Figma fills are not flagged', () => {
+  const fx = structFixture({ themeCSS: 'theme.css', snapComp: { strokeOnAnyState: false, fills: ['widget/background/color'], fillStructure: 'direct' },
+    extra: { 'theme.css': [':root {}',
+      '.widget { background: var(--widget-background); }',                                   // Figma fills it
+      '.statusBar::after { content: ""; height: 1px; background: var(--dividerLine-border); }', // its nested dividerLine, drawn by CSS
+      '.emptyState .emptyState-icon { background: red; }',                                   // a part inside it, not its surface
+      '.emptyState:hover { background: transparent; }'].join('\n') } });
+  fx['snap.json'].components.statusBar = { fillStructure: 'none', strokeOnAnyState: false, toggles: { 'Show Divider Line Bottom': ['dividerLine'] } };
+  fx['snap.json'].components.emptyState = { fillStructure: 'none', strokeOnAnyState: false };
+  const { out } = runGate(STRUCT_GATE, fx);   // fails elsewhere: the two components are in no contract
+  assert.match(out, /PASS {2}2 component\(s\) - no fill Figma does not have/);
+  assert.match(out, /FAIL {2}0 phantom fill\(s\)/);
+});
+
 test('[bugfix structure] array themeCSS resolves without crashing; a strokeful component keeps its border', () => {
   const { code, out } = runGate(STRUCT_GATE, structFixture({
     themeCSS: ['theme.css', 'extra.css'],           // array form - used to crash
