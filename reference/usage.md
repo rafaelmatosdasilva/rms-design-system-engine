@@ -322,9 +322,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   each kind in a table of its own shape, one card per component, one kind shown at a time with a filter (Parity,
   Accessibility, Documentation, Migration, Products, System and the page's own items, each when it has any; no All):
   Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Issue nr, WCAG criterion, Figma
-  states, Found, What to do, Status), Documentation's Issue nr, Kind, What is written, What to do and Status (`docRows`,
-  each kind its Documentation area says is missing, for You in Figma), and the rest Issue nr, Where or Type, What to do
-  and Status. The count at the top is the shown kind's. Under The system, what the tokens owe (`tokenTodos`, area System): the
+  states, Found, What to do, Status), Documentation's the Documentation table itself (Kind, What is written, From, the
+  card each component's Documentation area and the Documentation page show), one card for each component with a kind
+  not written yet (`docRows`), where to write it above them, and the rest Issue nr, Where or Type, What to do and
+  Status. The count at the top is the shown kind's; Documentation's kinds are counted, not numbered. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
   (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
   hand in two tokens and the tokens one component uses, read from the contracts the last audit wrote (You decide), each

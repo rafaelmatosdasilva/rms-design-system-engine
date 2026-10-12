@@ -492,7 +492,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await until(`(document.querySelector('#todo .sg-todo-note') || {}).textContent || ''`, (v) => v.length > 0), /Every variant of every component was tried in a browser when this page was built, on \d{4}-\d\d-\d\d.*nothing runs while you read them/);
     assert.equal(await run(`!!document.getElementById('sg-a11y-baked') && document.querySelectorAll('.pg-offstage').length`), 0, 'nothing tried here');
     // One kind at a time, each in its own table, chosen with the filter; no list of every kind at once.
-    const shownKind = () => run(`[...document.querySelectorAll('#todo .sg-todo-kind')].filter((k) => !k.hidden).map((k) => k.dataset.area)`);
+    const shownKind = () => run(`[...document.querySelectorAll('#todo .sg-todo-kind')].filter((k) => k.getClientRects().length).map((k) => k.dataset.area)`);
     const shownHead = () => run(`document.querySelector('#todo .sg-todo-kind:not([hidden]) thead').textContent`);
     assert.match((await run(`[...document.querySelectorAll('#todo .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^Parity \(\d+\)\|Accessibility \(\d+\)\|Documentation \(\d+\)/);
     assert.equal(await run(`[...document.querySelectorAll('#todo .sg-todo-filter [data-v]')].some((b) => b.dataset.v === 'all')`), false, 'no All');
@@ -502,11 +502,18 @@ test('in the browser: no script error, a control changes the real component, the
     assert.deepEqual(await shownKind(), ['Accessibility']);
     assert.match(await shownHead(), /^Issue nr\s*WCAG criterion\s*Figma states\s*Found\s*What to do\s*Status$/);
     assert.deepEqual(await run(`[...new Set([...document.querySelectorAll('#todo .sg-todo-kind:not([hidden]) tbody tr')].map((tr) => tr.dataset.area))]`), ['Accessibility']);
-    // Documentation is on the To do page too: each kind not written yet, what to write and where.
+    // Documentation is on the To do page too, in the Documentation table itself (Kind, What is written, From), one card
+    // for each component with a kind not written yet, and where to write it above them.
     await run(`document.querySelector('#todo .sg-todo-filter [data-v="Documentation"]').click()`);
-    assert.match(await shownHead(), /^Issue nr\s*Kind\s*What is written\s*What to do\s*Status$/);
-    assert.match(await run(`document.querySelector('#todo .sg-todo-kind:not([hidden]) tbody tr').textContent`), /^\d+(What it is|When to use|When not to use|Common mistakes|Limitations|Do and don't|Role)(Not written yet\.|No pictures yet\.)You in Figma.*To fix/);
-    assert.match(await run(`document.querySelector('#todo .sg-todo-sum').textContent`), /^✕\d+ to fix$/, 'the count is the kind\'s own');
+    assert.match(await shownHead(), /^Kind\s*What is written\s*From$/);
+    assert.match(await run(`document.querySelector('#todo .sg-todo-kind:not([hidden]) tbody tr[data-have="0"]').textContent`), /^(What it is|When to use|When not to use|Common mistakes|Limitations|Do and don't|Role)(Not written yet\.|No pictures yet\.)$/);
+    assert.match(await run(`document.querySelector('#todo .sg-todo-kind:not([hidden]) > .pg-from').textContent`), /^Write a missing one in Figma/);
+    const missing = await run(`document.querySelectorAll('#todo .sg-todo-kind:not([hidden]) tr[data-have="0"]').length`);
+    assert.equal(await run(`document.querySelector('#todo .sg-todo-sum').textContent`), `✕${missing} to fix`, 'the count is the kind\'s own');
+    assert.match(await run(`document.querySelector('#todo .sg-todo-filter [data-v="Documentation"]').textContent`), new RegExp(`^Documentation \\(${missing}\\)$`));
+    assert.deepEqual(await shownKind(), ['Documentation'], 'only the kind chosen is drawn');
+    await run(`document.querySelector('#todo .sg-todo-filter [data-v="Parity"]').click()`);
+    assert.deepEqual(await shownKind(), ['Parity'], 'Documentation\'s cards go when another kind is chosen');
     // What the tokens owe is a row of The system: the descriptions to write, for whoever keeps Figma.
     assert.match(await run(`[...document.querySelectorAll('#todo tr[data-area="System"]')].map((tr) => tr.textContent).join('|')`), /Tokens, description.*You in Figma.*semantic tokens have no description in Figma.*Write what each one is for/);
     // A retired component still in use: a row for each place it is used, under its name, with what replaces it.
@@ -514,7 +521,7 @@ test('in the browser: no script error, a control changes the real component, the
     const nums = await run(`[...document.querySelectorAll('#todo .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`);
     assert.ok(nums.length > 0 && nums.every(([, n], i) => +n === i + 1), 'numbered 1, 2, 3 down the page');
     const byNo = (a) => a.slice().sort((p, q) => p[1] - q[1]);
-    assert.deepEqual(byNo(await run(`[...document.querySelectorAll('#c-chip .sg-todo-no')].filter((td) => td.textContent).map((td) => [td.dataset.todoKey, td.textContent])`)), nums.filter(([k]) => decodeURIComponent(k).startsWith('chip\u0000') && !decodeURIComponent(k).includes('\u0000doc:')), 'the chip\'s Parity and Accessibility areas show the To do page\'s numbers');
+    assert.deepEqual(byNo(await run(`[...document.querySelectorAll('#c-chip .sg-todo-no')].filter((td) => td.textContent).map((td) => [td.dataset.todoKey, td.textContent])`)), nums.filter(([k]) => decodeURIComponent(k).startsWith('chip\u0000')), 'the chip\'s areas show the To do page\'s numbers');
     await send('Page.reload', {}, sessionId);
     await new Promise((r) => setTimeout(r, 300));
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { tolerateErrors: true });
