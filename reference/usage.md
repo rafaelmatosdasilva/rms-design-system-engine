@@ -312,15 +312,19 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   problem stands (the last browser check's or the audit's), what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Documentation and Details in Documentation, Accessibility) is one of the
   Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
-  table as the Accessibility area's and the To do page's (`issueTableHTML`): Issue nr (the To do page's number, open rows
-  only), Area (Parity, with the type under it), Figma (its name and value), Code (its name and value, and where in the
+  table as the To do page's Parity (`issueTableHTML`, `ISSUE_COLS`): Issue nr (the To do page's number, open rows
+  only), Type, Figma (its name and value), Code (its name and value, and where in the
   code a difference is), What to do (who acts above it) and Status (a sign and the system's colour, To fix, To check,
   Done or Not compared, with what it is under any but Done, differs from Figma, only in Figma, only in code, both not
   compared, New in the last audit when the last audit found it first, and when it last held). Each difference the audit found is merged into
   the row it is about (`parityIssueRows`); what it found beyond those rows, a prop Figma has that the code does not build
-  and a component only the code has are rows of their own. The To do page holds the open rows of every component in
-  that table, one card per component, with a filter by area (Parity, Accessibility, System and the page's own items when
-  it has any) that hides the cards left empty. Under The system, what the tokens owe (`tokenTodos`, area System): the
+  and a component only the code has are rows of their own. The To do page holds the open rows of every component,
+  each kind in a table of its own shape, one card per component, one kind shown at a time with a filter (Parity,
+  Accessibility, Documentation, Migration, Products, System and the page's own items, each when it has any; no All):
+  Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Issue nr, WCAG criterion, Figma
+  states, Found, What to do, Status), Documentation's Issue nr, Kind, What is written, What to do and Status (`docRows`,
+  each kind its Documentation area says is missing, for You in Figma), and the rest Issue nr, Where or Type, What to do
+  and Status. The count at the top is the shown kind's. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
   (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
   hand in two tokens and the tokens one component uses, read from the contracts the last audit wrote (You decide), each
@@ -449,7 +453,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
   its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
   elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
-- **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as Parity's and the To do page's, in
+- **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as the To do page's Accessibility, in
   the same card as the Playground's tables: Issue nr (open rows only), Area (Accessibility, with the criterion and its
   level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
   panel's own pop-up, Escape closing it), Figma (what Figma's annotations state for it), Code (what was found, each
