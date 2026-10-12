@@ -60,6 +60,13 @@ for (let i = 0; i < plugins.length; i++) {
   current[plugin] = fingerprint(html);
 }
 
+// No product page could be read (paths.pluginCSS names none that exists): nothing is fingerprinted, so nothing is
+// checked; said so, never a baseline written or a pass (H5).
+if (!Object.keys(current).length) {
+  console.log(`⏭  [15] no product page to read (paths.pluginCSS names ${pluginCSS.length ? 'none that exists' : 'none'}): the markup is not checked`);
+  process.exit(0);
+}
+
 // ── Accept mode: overwrite snapshot ──────────────────────────────────────────
 if (ACCEPT) {
   const snap = { _updated: new Date().toISOString().slice(0, 10), ...current };
@@ -74,7 +81,7 @@ if (!existsSync(absSnap) || !Object.keys(stored).length) {
   const snap = { _updated: new Date().toISOString().slice(0, 10), ...current };
   mkdirSync(dirname(absSnap), { recursive: true });   // the theme's folder may not exist yet (a project that starts from Figma)
   writeFileSync(absSnap, JSON.stringify(snap, null, 2) + '\n');
-  console.log(`✅ [15] No snapshot found - baseline written (${plugins.length} plugin(s))`);
+  console.log(`✅ [15] No snapshot found - baseline written (${Object.keys(current).length} plugin(s))`);
   process.exit(0);
 }
 

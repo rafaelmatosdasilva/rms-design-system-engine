@@ -324,3 +324,29 @@ test('a Missing box carries what the guidelines say the system lacks, so the rep
   const named = { component: 'Page', children: [{ component: 'Missing', props: { need: 'a link for Cancel', closest: 'button' } }] };
   assert.equal(checkPrototype(named, { catalog, view, scales, name: 'confirm', context }).gaps[0].note, undefined);
 });
+
+// X1: each component is sized in a prototype as the products' screens size it, over its Figma master's own sizing.
+test('the products\' screens decide how a component fills its place in a prototype', async () => {
+  const { screenSizing, screenFills } = await import('../screen-layout.mjs');
+  const { prototypePage } = await import('../prototype.mjs');
+  const bar = (fillW) => ({ kind: 'instance', component: 'Status Bar', fillW, fillH: false });
+  const screens = [
+    { tree: { kind: 'frame', children: [bar(true), { kind: 'instance', component: 'chip', fillW: false }, { kind: 'instance', component: 'chip', fillW: false }] } },
+    { tree: { kind: 'frame', children: [{ kind: 'frame', children: [bar(true)] }, { kind: 'instance', component: 'panel', fillH: true }, { kind: 'instance', component: 'chip', fillW: true, absolute: true }] } },
+    { tree: { kind: 'instance', component: 'statusBar', fillW: false } },   // the screen itself is not a placement
+  ];
+  const catalog = { components: { statusBar: {}, chip: {}, panel: {} } };
+  const s = screenSizing(screens, catalog);
+  assert.deepEqual(s, { statusBar: { n: 2, fillW: 2, fillH: 0 }, chip: { n: 2, fillW: 0, fillH: 0 }, panel: { n: 1, fillW: 0, fillH: 1 } });
+  assert.equal(screenFills(s.statusBar, 'fillW'), true);
+  assert.equal(screenFills(s.chip, 'fillW'), false);
+  assert.equal(screenFills(undefined, 'fillW'), null, 'no screen shows it: the master decides');
+  const html = prototypePage({ name: 'x', tree: { component: 'Page', props: {}, children: [] }, scales: { spacing: [], text: [] }, gaps: [],
+    parts: { themeCSS: '', componentCSS: '.statusBar{} .chip{} .panel{} .tag{}', view: { components: ['statusBar', 'chip', 'panel', 'tag'].map((name) => ({ name, cls: name })) },
+      sizing: { statusBar: { h: 'FIXED' }, chip: { h: 'FILL' }, tag: { h: 'FILL' } }, screenSizing: s } });
+  const comps = JSON.parse(/"components":(\{.*?\}\}),"scales"/.exec(html)[1]);
+  assert.equal(comps.statusBar.fills, true, 'fixed in its master, filling the window on the screens');
+  assert.equal(comps.chip.fills, undefined, 'filling in its master, fixed on every screen');
+  assert.equal(comps.panel.grows, true);
+  assert.equal(comps.tag.fills, true, 'on no screen: its master decides');
+});

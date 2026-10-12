@@ -2631,10 +2631,14 @@ async function main() {
           const before2 = new Set(((await evalv(tapProbeExpression(roots, 'pops'))) ?? []).map((p) => p.id));
           await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 }, sessionId);
           try {
+            // A phone's tap puts the pointer where it lands. Chrome keeps the mouse where the hover above left it, and
+            // right after the tap moves the hover back there: a mouse-out no phone sends, closing what the tap opened.
+            await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at[0], y: at[1] }, sessionId);
             await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: at[0], y: at[1] }] }, sessionId);
             await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }, sessionId);
             const tap = await waitFor(before2, 1800);
             if (!tap) findings.push({ kind: 'tapcontent', plugin: label, desc: `${t.desc}: what it shows on hover (${hover.desc}${hover.tip ? ` "${hover.tip}"` : ''}) never shows on a tap` });
+            await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 }, sessionId);
             await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 2, y: 2 }] }, sessionId);
             await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }, sessionId);
           } finally { await send('Emulation.setTouchEmulationEnabled', { enabled: false }, sessionId).catch(() => {}); }

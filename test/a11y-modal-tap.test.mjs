@@ -27,9 +27,9 @@ const tips = (tapWorks) => `
     el.addEventListener('mouseout', hide);
     document.addEventListener('mousedown', (e) => { if (!tip.contains(e.target)) hide(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
-    ${tapWorks ? `let touched = 0; document.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') touched = Date.now(); }, true);
-    el.addEventListener('click', () => { if (Date.now() - touched < 800) { clearTimeout(timer); show(); } });
-    document.addEventListener('mousedown', (e) => { if (Date.now() - touched < 800) e.stopImmediatePropagation(); }, true);` : ''}
+    ${tapWorks ? `let touched = false; document.addEventListener('pointerdown', (e) => { touched = e.pointerType !== 'mouse'; }, true);
+    el.addEventListener('click', () => { if (touched) { clearTimeout(timer); show(); } });
+    document.addEventListener('mousedown', (e) => { if (touched) e.stopImmediatePropagation(); }, true);` : ''}
   </script>`;
 const modal = (keeps) => `
   <button id="behind">Behind the modal</button>

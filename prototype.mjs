@@ -23,6 +23,7 @@ import { splitStates, applyState, statesOwed, stateFindings, normaliseValues } f
 import { linksOf, flowGraph, teamFlows, flowFindings } from './prototype-flows.mjs';
 import { screenFor, renderPrototype, compareWithScreen, screenLines, owedFromScreen, interactionLines, screenWidths, fitLines } from './prototype-render.mjs';
 import { visualLines } from './prototype-visual.mjs';
+import { screenSizing, screenFills } from './screen-layout.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 export const PROTOTYPE_TEMPLATE = join(ENGINE, 'templates', 'prototype.template.html');
@@ -122,7 +123,7 @@ export function prototypePage({ name, tree, states = [], parts, scales, gaps, no
   // The variables each of those classes' rules use (.badge.high { color: var(--semantic-negative) }): an option whose
   // value names none of the classes can still name the colour one of them uses.
   const modVarsOf = (cls, mods) => Object.fromEntries(mods.map((k) => { const vars = new Set(); const sel = new RegExp(`\\.${cls.replace(/[^\w-]/g, '')}\\.${k.replace(/[^\w-]/g, '')}(?![\\w-])`); for (const r of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) if (sel.test(r[1])) for (const v of r[2].matchAll(/var\(\s*(--[\w-]+)/g)) vars.add(v[1]); return [k, [...vars]]; }).filter(([, v]) => v.length));
-  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => { const mods = modsOf(c.cls); return [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, markups: c.markups, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean'), enumProps: opts(c.name, 'enum'), slotProps: opts(c.name, 'slot'), mods, modVars: modVarsOf(c.cls ?? '', mods), ...(c.only ? { only: c.only } : {}), ...(fillsWidth(css, c.cls) || parts.sizing?.[c.name]?.h === 'FILL' ? { fills: true } : {}), ...(parts.sizing?.[c.name]?.v === 'FILL' ? { grows: true } : {}), ...(c.slots?.length ? { slots: c.slots.map((x) => x.name) } : {}), ...(Object.keys(opts(c.name, 'children')).length ? { slotWords: Object.keys(opts(c.name, 'children')) } : {}), ...(c.motion ? { motion: c.motion } : {}) }]; }));
+  const drawable = Object.fromEntries((parts.view.components ?? []).map((c) => { const mods = modsOf(c.cls); return [c.name, { name: c.name, cls: c.cls, role: c.role, markup: c.markup, markups: c.markups, controls: c.controls, textProps: opts(c.name, 'text'), boolProps: opts(c.name, 'boolean'), enumProps: opts(c.name, 'enum'), slotProps: opts(c.name, 'slot'), mods, modVars: modVarsOf(c.cls ?? '', mods), ...(c.only ? { only: c.only } : {}), ...(fillsWidth(css, c.cls) || (screenFills(parts.screenSizing?.[c.name], 'fillW') ?? parts.sizing?.[c.name]?.h === 'FILL') ? { fills: true } : {}), ...(screenFills(parts.screenSizing?.[c.name], 'fillH') ?? parts.sizing?.[c.name]?.v === 'FILL' ? { grows: true } : {}), ...(c.slots?.length ? { slots: c.slots.map((x) => x.name) } : {}), ...(Object.keys(opts(c.name, 'children')).length ? { slotWords: Object.keys(opts(c.name, 'children')) } : {}), ...(c.motion ? { motion: c.motion } : {}) }]; }));
   // The classes the system's own CSS styles: a copy taken from a product's page keeps only these, so the product's own
   // layout (its panel's width, its rows' spacing) stays in the product.
   const sysClasses = parts.systemCSS ? [...new Set([...String(parts.systemCSS).replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1]))] : null;
@@ -187,6 +188,8 @@ async function systemFor(ROOT, cfg) {
   }
   // What the team wrote about each component and its product (descriptions, annotations, notes, guidelines, layers).
   const context = await loadContext(ROOT, cfg, catalog, { fetchLinks: envVar(process.env, 'NO_FETCH') !== '1' });
+  // How the products' screens size each component (X1): what they show wins over the master's own sizing.
+  parts.screenSizing = screenSizing(context.screens, catalog);
   const actionNames = Object.entries(context.components).filter(([, k]) => /^button$/i.test(k.role ?? '') || /\b(main )?action\b/i.test(k.purpose ?? '')).map(([n]) => n);
   // The screens designers made, read as compositions (a screen already in prototypes/ is read from there instead).
   let designed = [];
