@@ -503,7 +503,7 @@ test('in the browser: no script error, a control changes the real component, the
     // One kind at a time, each in its own table, chosen with the filter; no list of every kind at once.
     const shownKind = () => run(`[...document.querySelectorAll('#tasks .sg-todo-kind')].filter((k) => k.getClientRects().length).map((k) => k.dataset.area)`);
     const shownHead = () => run(`document.querySelector('#tasks .sg-todo-kind:not([hidden]) thead').textContent`);
-    assert.match((await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^Parity \(\d+\)\|Accessibility \(\d+\)\|Documentation \(\d+\)/);
+    assert.match((await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^Parity \(\d+\)\|(Motion \(\d+\)\|)?Documentation \(\d+\)\|.*Accessibility \(\d+\)$/, 'Accessibility last, the kind that waits');
     assert.equal(await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].some((b) => b.dataset.v === 'all')`), false, 'no All');
     assert.deepEqual(await shownKind(), ['Parity']);
     assert.equal(await run(`(() => { const h = document.querySelector('#tasks .sg-todo-head'); return [...h.children].map((e) => e.classList.contains('sg-todo-filter') ? 'filter' : e.classList.contains('sg-todo-sum') ? 'counts' : '?').join(','); })()`), 'filter,counts', 'the counts under the filter, since they are the chosen kind\'s');
@@ -559,11 +559,19 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await note(), /when this page was built/, 'a refresh shows the results the page was built with');
     assert.deepEqual(await run(`[...document.querySelectorAll('#tasks .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`), nums, 'the same list at once');
     // Try again in this browser: every component tried afresh here, then kept in this browser, so a refresh tries nothing.
-    // While it runs, no list and no count that would change in front of the reader: how far it has got, then the list.
+    // While it runs, only Accessibility waits (how far it has got under it, no count in its filter, none in the menu);
+    // every other kind is there at once, with the numbers it had.
     await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Accessibility"]').click()`);
+    const others = `[...document.querySelectorAll('#tasks .sg-todo-kind:not([data-area="Accessibility"]) .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`;
+    const othersBefore = await run(others);
     await run(`document.querySelector('#tasks [data-a11y-again]').click()`);
-    assert.match(await run(`document.querySelector('#tasks .sg-todo-wait').textContent`), /^Trying the components for accessibility in this browser, \d+ of \d+\. The tasks show once every one is tried/);
-    assert.deepEqual(await run(`[document.querySelectorAll('#tasks .sg-todo-kind, #tasks .sg-todo-filter').length, document.querySelector('nav a[href="#tasks"]').textContent.trim()]`), [0, 'tasks']);
+    assert.match(await run(`document.querySelector('#tasks .sg-todo-kind[data-area="Accessibility"]:not([hidden]) .sg-todo-wait').textContent`), /^Trying the components for accessibility in this browser, \d+ of \d+\. Its tasks show once every one is tried/);
+    assert.deepEqual(await run(`[document.querySelector('#tasks .sg-todo-filter [data-v="Accessibility"]').textContent, document.querySelector('nav a[href="#tasks"]').textContent.trim(), document.querySelectorAll('#tasks .sg-todo-kind[data-area="Accessibility"] table').length]`), ['Accessibility', 'tasks', 0]);
+    assert.ok(othersBefore.length > 0);
+    assert.deepEqual(await run(others), othersBefore, 'every other kind at once, its numbers as they were');
+    await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Parity"]').click()`);
+    assert.deepEqual(await run(`[!!document.querySelector('#tasks .sg-todo-kind[data-area="Parity"]:not([hidden]) table'), [...document.querySelectorAll('#tasks .sg-todo-wait')].filter((p) => p.getClientRects().length).length]`), [true, 0], 'the try is said under Accessibility only');
+    await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Accessibility"]').click()`);
     let again = ''; for (let n = 0; n < 480 && !/Every component was tried in this browser/.test(again); n++) { if (n) await new Promise((r) => setTimeout(r, 250)); again = await note(); }
     assert.match(again, /Every component was tried in this browser/);
     await send('Page.reload', {}, sessionId);
