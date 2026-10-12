@@ -882,13 +882,6 @@ a.pg-usage-name { color: var(--sg-text); }
     (c.differences || []).forEach(function (x) { TODO.push({ kind: 'parity', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.a11yFindings || []).forEach(function (x) { TODO.push({ kind: 'a11y', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.unbuilt || []).forEach(function (u) { TODO.push({ kind: 'parity', who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell Claude to do it.' }); });
-    // What it draws past its colours (A9): a shadow, a blur, a gradient or image fill, clipping, blending, opacity. One
-    // Figma has is the code's to follow; one only the code has, or Figma's clipping, is a decision.
-    (c.effectDiffs || []).forEach(function (e) {
-      var fig = '<span class="pg-par-val">' + esc(capital(e.figma)) + '</span>', code = '<span class="pg-par-val">' + esc(capital(e.code)) + '</span><span class="pg-par-val">' + esc(e.at) + '</span>';
-      var todo = e.side === 'code' ? 'Draw it as Figma does. Tell Claude to do it.' : 'Decide which one is right: add it to Figma, or change the code.';
-      out.push({ key: c.name + '\u0000effect:' + (e.part || '') + ':' + e.what, area: 'Parity', kind: 'Effect', type: 'Other', figma: fig, code: code, todo: esc(capital((e.part ? e.part + ' ' : '') + e.what) + '. ' + todo), who: e.side === 'code' ? WHO.code : WHO.both, st: e.side === 'code' ? 'todo' : 'check', rel: PAR_REL.differs, at: at0 });
-    });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
     if (c.codeOnly && c.codeOnly.figma) TODO.push({ kind: 'parity', who: 'figma', comp: c.name, say: 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it.', todo: 'Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.' });
   });

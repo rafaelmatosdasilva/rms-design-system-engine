@@ -194,7 +194,12 @@ test('in the browser: no script error, a control changes the real component, the
   writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify({ components: { button: { status: 'deprecated', supersededBy: 'chip', since: '2.0' } } }));
   mkdirSync(join(dir, 'src', 'pages'), { recursive: true });
   writeFileSync(join(dir, 'src', 'pages', 'Home.jsx'), "import { Button } from '../components/Button';\nexport const Home = () => <Button Label=\"Save\" />;\n");
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
+  // What the last audit found the chip drawing otherwise than Figma (A9): an Effect row of its Parity. The page runs with
+  // it as with any other row (a row built in the wrong place once stopped the page's script, and its build with it).
+  mkdirSync(join(dir, '.design-system-engine-out'), { recursive: true });
+  writeFileSync(join(dir, '.design-system-engine-out', 'effects.json'), JSON.stringify({ findings: [{ component: 'chip', part: null, what: 'shadow offset', figma: 'draws a shadow 0 4', code: 'draws a shadow 0 2', at: 'src/components/chip.css:1', side: 'code', message: 'chip shadow offset' }] }));
+  const built = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
+  assert.doesNotMatch(built.stdout + built.stderr, /script stopped|The page threw/, 'the page runs with an Effect row');
   const c = await launchChrome(chromePath);
   try {
     const { send, on, close } = await connectCDP(c.wsUrl);
