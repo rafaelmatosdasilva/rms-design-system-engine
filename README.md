@@ -8,7 +8,7 @@ It works inside Claude Code. It keeps your code matching your Figma design, and 
 
 - **High quality.** Every colour, size, font, state and animation in your code is checked against Figma, in every combination of modes (Dark on a phone, say), with the fix in plain words. Each product's page is laid out as its Figma screen, a product that builds a component by hand where its Figma screen uses the real one is found, a near copy of a component comes back to you as a decision, and anything the check could not look at is said, never shown as passed.
 - **Change without breaking products.** A token renamed in Figma is renamed everywhere in one change, and what the system retires comes with every place still using it and what to write instead.
-- **A living style guide** ([see one it built](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)). One page with every token and component, built from your system, never written by hand, its durations and easings played as they move. Try each component, see its specs and every variant and how it stands with Figma and accessibility, read one To do list of everything still open, by component, and see where what the team has written about each component is thin. Every component's accessibility is tried in a browser while the page is built, so it opens with the final results.
+- **A living style guide** ([see one it built](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)). One page with every token and component, built from your system, never written by hand, its durations and easings played as they move. Try each component, see its specs and every variant and how it stands with Figma and accessibility, read one list of tasks, everything still open, by component, and see where what the team has written about each component is thin. Every component's accessibility is tried in a browser while the page is built, so it opens with the final results.
 - **Prototypes from your real system.** Describe a screen in your own words and get it made only of your components, following your guidelines and Do and Don't, with every state and screen size checked, pages you can click through, a design review before you see it, and working as your product does. What your system lacks is marked on the page and listed for your design team.
 - **Accessibility tested.** Each component is tried in a real browser against WCAG 2.2 at level A and AA, with axe-core's rules in the same run, in every state and colour mode, and so is each of your products' own pages, the Tab key followed through the whole page. Every problem comes with its fix. Nothing else to run.
 - **Build from Figma.** Only have the design? Claude builds it in code, piece by piece, each piece checked.
@@ -37,7 +37,7 @@ Measured with Claude Opus. The [case study](CASE-STUDY.md) has every model and t
 
 1. **It reads your Figma file**, its tokens, components, props and notes.
 2. **It compares your code with it**, value by value and in a real browser, with the fix for each difference.
-3. **It shares one truth with everyone**, the style guide, one To do list, prototypes made of your components, and the facts your AI tools read.
+3. **It shares one truth with everyone**, the style guide, one list of tasks, prototypes made of your components, and the facts your AI tools read.
 
 The whole flow, step by step, is on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1).
 

@@ -19,7 +19,7 @@ test('every page of the style guide fits 320px: grids, tab bars and long titles 
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const file = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
   const data = JSON.parse(readFileSync(file, 'utf8').match(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/)[1]);
-  const pages = ['', ...data.components.map((c) => `#c-${c.name}`), '#colors', '#spacing', '#todo'];
+  const pages = ['', ...data.components.map((c) => `#c-${c.name}`), '#colors', '#spacing', '#tasks'];
   const browser = await launchChrome(CHROME, { tmpPrefix: 'sg-reflow-' });
   const { send, close } = await connectCDP(browser.wsUrl);
   try {

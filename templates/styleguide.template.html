@@ -271,11 +271,12 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-sticky-edge { box-shadow: 0 1px 0 0 var(--sg-border); }
 /* A foundation's title stays at the top as its page scrolls. */
 .sg-section:not(.pg-card-section) > h2 { position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); margin: calc(-1 * var(--sg-space-s)) 0 0; padding: var(--sg-space-s) 0; }
-/* On the To do page its counts and filter stay at the top instead, so the long list keeps the room the title would take
+/* On the Tasks page its counts and filter stay at the top instead, so the long list keeps the room the title would take
    and the filter is always at hand; each card's head row stays under them. */
-#todo > h2 { position: static; }
+#tasks > h2 { position: static; }
 .sg-todo-head { top: var(--sg-sticky-top, 0px); margin-bottom: var(--sg-space-m); }
 .sg-todo-head .pg-par-filter { margin-bottom: 0; }   /* its words 8px under the tag, as on every page; the bar's own padding above it */
+.sg-todo-head .sg-todo-sum { margin-top: var(--sg-space-m); }   /* the chosen kind's own counts, under the filter that chooses it */
 .pg-import { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin: var(--sg-space-xs) 0; font-size: var(--sg-s); color: var(--sg-text-2); }
 .pg-import code { font-family: inherit; color: var(--sg-text); }
 .pg-parity-sum { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-m); }
@@ -364,7 +365,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-todo-kind { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one kind at a time, its cards spaced as the list's */
 .sg-todo-kind.pg-footer { margin-top: 0; }   /* Documentation's cards start where every other kind's do */
 .sg-todo-kind[hidden] { display: none; }
-/* One table for every issue, on the To do page and in a component's Parity and Accessibility areas: the same columns at
+/* One table for every issue, on the Tasks page and in a component's Parity and Accessibility areas: the same columns at
    the same widths everywhere, so they line up down the page and read the same in each place. */
 .sg-issues { table-layout: fixed; }
 /* Each kind's own columns: six for Parity and Accessibility, four for the rest. */
@@ -378,7 +379,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-issues td { overflow-wrap: break-word; }
 .sg-issues .sg-todo-area { white-space: normal; }
 .sg-issues .pg-at-date { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-text-2); font-size: var(--sg-s); }   /* when it was last updated, under its status */
-.sg-todo-head > :last-child { margin-bottom: 0; }   /* the counts and the filter spaced as on a component's Parity area */
+.sg-todo-head > :last-child { margin-bottom: 0; }   /* the filter, then the counts under it */
 .sg-todo-note { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s) var(--sg-space-m); }
 .pg-diff { border-color: color-mix(in srgb, var(--sg-warning) 40%, transparent); }
 .pg-note:last-child { margin-bottom: var(--sg-space-m); }
@@ -488,7 +489,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: var(--sg-space-m); align-items: start; }
 .pg-inspect-grid.pg-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* Parity: two columns */
 .sg-seg-icon { width: var(--sg-icon); height: var(--sg-icon); flex: none; color: var(--sg-warning); vertical-align: middle; margin-right: var(--sg-space-xxs); }
-.pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; box-shadow: var(--sg-shadow); }
+.pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: clip; box-shadow: var(--sg-shadow); }
 .pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-inspect table { width: 100%; border-collapse: collapse; }
 .pg-inspect td { font-size: var(--sg-m); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); }
@@ -497,6 +498,11 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect tr:last-child td { border-bottom: none; }
 /* A section of the documentation as one of these tables: its title the head, each row a name and its text. */
 .pg-inspect-head > h3 { font: inherit; color: inherit; margin: 0; }
+/* Every table's head stays in view as its rows scroll by, under whatever sticks at the top of its page (the page's
+   title and size switch, a component's areas, the Tasks page's filter and counts: --pg-areas-h): the card's head first,
+   the table's own head row under it (--pg-card-head-h). Its card clips, never hides, its overflow, so it can stick. */
+.pg-inspect-head { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 6; }
+.pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--pg-card-head-h, 0px)); }
 /* Documentation as a table: the kind, what was written, where; its paragraphs as tight as a cell's one line. */
 .pg-know-table td > p { margin: 0; }
 .pg-know-table td > p + p { margin-top: var(--sg-space-xs); }
@@ -610,6 +616,21 @@ a.pg-usage-name { color: var(--sg-text); }
     main.appendChild(s); return s;
   }
   function hr() { var h = document.createElement('hr'); h.className = 'sg-hr'; main.appendChild(h); }
+  // How far down what sticks at the top of a page reaches (its title and size switch, a component's areas, the Tasks
+  // page's filter and counts), for every table's head to stick under it (--pg-areas-h); and how tall a card's head is,
+  // for the table's own head row to stick under that (--pg-card-head-h).
+  var STICK_BARS = '.pg-areas, .sg-section > h2, .sg-size-switch, .sg-todo-head';
+  function stickHeight(sec) {
+    if (!sec) return;
+    var top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sg-sticky-top')) || 0, low = top;
+    Array.prototype.forEach.call(sec.querySelectorAll(STICK_BARS), function (el) {
+      if (!el.offsetParent || getComputedStyle(el).position !== 'sticky') return;
+      low = Math.max(low, (parseFloat(getComputedStyle(el).top) || 0) + el.offsetHeight);
+    });
+    sec.style.setProperty('--pg-areas-h', (low - top) + 'px');
+    var head = Array.prototype.filter.call(sec.querySelectorAll('.pg-inspect-head'), function (h) { return h.offsetParent; })[0];
+    if (head) sec.style.setProperty('--pg-card-head-h', head.offsetHeight + 'px');
+  }
   // A token's name, wherever the page shows it, opens a panel in place: its Figma name, its value in each mode, the
   // components that use it (each linked to its page) and a button to copy it. Nothing moves; Escape or a click outside
   // closes it, the focus going back to the name.
@@ -723,7 +744,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var AXES = DATA.modes || [];
   /* ── Every switch on the page is the system's own segmented control (DATA.ui.segmented, read from its markup). With
      none, its stand-in (tabs, a radio group, its buttons side by side), else a plain row of buttons the browser draws;
-     DATA.ui.gaps says which, on the overview and in the To do list. ─────────────────────────────────────────────── */
+     DATA.ui.gaps says which, on the overview and in the Tasks page. ─────────────────────────────────────────────── */
   var SEG = DATA.ui && DATA.ui.segmented, RADIO = SEG && SEG.item.radio, RADIO_NO = 0;
   // The system's own icon for a warning (its name says so), else none: the count is still said.
   var ALERT_ICON = (DATA.icons || []).find(function (i) { return /warn|alert|caution|attention|exclam/i.test(i); }) || (DATA.icons || []).find(function (i) { return /error|danger/i.test(i); }) || null;
@@ -876,7 +897,7 @@ a.pg-usage-name { color: var(--sg-text); }
   ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. Tell Claude to do it.' }); });
   var ORDER = ['figma', 'code', 'both'];
   TODO.sort(function (a, b) { return ORDER.indexOf(a.who) - ORDER.indexOf(b.who); });
-  TODO.forEach(function (t, i) { t.no = i + 1; });   // numbered again in the order the To do page shows (fillTodo)
+  TODO.forEach(function (t, i) { t.no = i + 1; });   // numbered again in the order the Tasks page shows (fillTodo)
 
   /* ── Overview ─────────────────────────────────────────────────────────────────────────────────────────────── */
   // The menu's first group under its own label, as Foundations and Components are under theirs.
@@ -985,9 +1006,9 @@ a.pg-usage-name { color: var(--sg-text); }
     var tx = (a.left + a.right) / 2 - cx - f * ((L + R) / 2 - cx), ty = (a.top + a.bottom) / 2 - cy - f * ((T + B) / 2 - cy);
     if (f < 1 || Math.abs(tx) > 0.5 || Math.abs(ty) > 0.5) k.style.transform = 'translate(' + tx.toFixed(1) + 'px, ' + ty.toFixed(1) + 'px) scale(' + f.toFixed(3) + ')';
   }
-  // The To do page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
-  hr(); navLink('todo', 'to do');
-  var td = section('todo', 'To do', 'What to do', 'List all open parity, accessibility and documentation issues, one kind at a time, by component, showing who handles each one (you in Figma, Claude in code, or manual check). Then tell Claude which ones to do, for example, do 3 and 7.');
+  // The Tasks page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
+  hr(); navLink('tasks', 'tasks');
+  var td = section('tasks', 'Tasks', 'What to do', 'List all open parity, accessibility and documentation issues, one kind at a time, by component, showing who handles each one (you in Figma, Claude in code, or manual check). Then tell Claude which ones to do, for example, do 3 and 7.');
   // Changelog: every component's changes gathered by the release they shipped in, newest first, each a table of
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
@@ -1063,7 +1084,7 @@ a.pg-usage-name { color: var(--sg-text); }
       d.appendChild(card);
     });
   }
-  // What the team has written for every component is on the To do page (#todo/documentation), each component's
+  // What the team has written for every component is on the Tasks page (#tasks/documentation), each component's
   // Documentation table with a kind not written yet: no page of its own (an old #documentation or #coverage link opens it).
   if ((DATA.screens || []).length) {
     hr(); navLink('in-use', 'in use');
@@ -1800,10 +1821,10 @@ a.pg-usage-name { color: var(--sg-text); }
     return out.join('');
   }
 
-  /* ── One table for every issue: the To do page, and each component's Parity and Accessibility areas ─────────────
-     The same columns everywhere: its issue number (the To do page's), its area (Parity or Accessibility, with the type or the WCAG criterion
+  /* ── One table for every issue: the Tasks page, and each component's Parity and Accessibility areas ─────────────
+     The same columns everywhere: its issue number (the Tasks page's), its area (Parity or Accessibility, with the type or the WCAG criterion
      under it), what Figma has and what the code has, what to do with who acts above it, and the status with when it was
-     last updated and where it was read under it. The To do page lists the open rows of every component; a component's area lists all of its own,
+     last updated and where it was read under it. The Tasks page lists the open rows of every component; a component's area lists all of its own,
      the open ones under the same numbers. A row: { key, area, kind, kindHTML, type, figma, code, todo (html), who, st,
      rel, at, src, extra }. */
   var STATUS = { todo: ['✕', 'To fix', 'differs'], check: ['!', 'To check', 'figma'], done: ['✓', 'Done', 'match'], none: ['–', 'Not needed', 'none'], skip: ['–', 'Not compared', 'none'] };
@@ -1811,7 +1832,7 @@ a.pg-usage-name { color: var(--sg-text); }
   function statusHTML(st, sub) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
   // Each kind of issue in a table of its own shape: Parity compares Figma with the code, Accessibility a criterion with
   // what Figma states and what was found, and the rest where it is and what to do (Documentation is the Documentation
-  // table itself). A component's own Parity and Accessibility areas show the same tables as the To do page.
+  // table itself). A component's own Parity and Accessibility areas show the same tables as the Tasks page.
   var ISSUE_CELL = {
     no: function (r) { var n = isOpen(r) ? TODO_NO[r.key] : null; return '<td class="pg-par-type sg-todo-no" data-todo-key="' + esc(encodeURIComponent(r.key)) + '">' + (n || '') + '</td>'; },
     kind: function (r) { return '<td class="sg-todo-area">' + (r.kindHTML || esc(r.kind || '')) + '</td>'; },
@@ -1838,7 +1859,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var cols = colsOf(area || ((rows || [])[0] || {}).area);
     return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + '"><thead><tr>' + cols.map(function (col) { return '<th>' + esc(col[0]) + '</th>'; }).join('') + '</tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
   }
-  // A count of each status above a table, as the To do page counts them.
+  // A count of each status above a table, as the Tasks page counts them.
   function statusSum(rows) {
     var n = {}; rows.forEach(function (r) { if (!r.extra) n[r.st] = (n[r.st] || 0) + 1; });
     return [['todo', 'to fix'], ['check', 'to check'], ['done', 'done'], ['skip', 'not compared']].filter(function (x) { return n[x[0]]; })
@@ -2008,7 +2029,8 @@ a.pg-usage-name { color: var(--sg-text); }
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
     var id = j < 0 ? path : path.slice(0, j);
     // A link from when there was a What's new page, or a Documentation (once Coverage) page: where it lives now.
-    if (id === 'documentation' || id === 'coverage') return { id: 'todo', area: null, slug: 'documentation', q: null };
+    if (id === 'documentation' || id === 'coverage') return { id: 'tasks', area: null, slug: 'documentation', q: null };
+    if (id === 'todo') return { id: 'tasks', area: null, slug: slug, q: null };   // the page was once To do
     return { id: id === 'whats-new' ? 'changelog' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
   }
   function copyText(text, btn, said) {
@@ -2048,7 +2070,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // where the component is marked, so a screen reader hears each once (alt="", never the name twice).
       var shot = p ? '<div class="pg-shot"><img src="' + p.shot + '" alt="">' +
         (p.w ? boxes.map(function (b) { return '<span class="pg-mark" style="left:' + pct(b[0], p.w) + ';top:' + pct(b[1], p.h) + ';width:' + pct(b[2], p.w) + ';height:' + pct(b[3], p.h) + '"></span>'; }).join('') : '') + '</div>' : '';
-      var where = k.ownInstead ? 'Draws its own instead (' + k.ownInstead + '); the To do list says to use this one.' : k.figmaOnly ? 'Its screens use it in Figma; its code builds it by hand.' : k.places ? (k.places === 1 ? 'Once in its code.' : k.places + ' times in its code.') : '';
+      var where = k.ownInstead ? 'Draws its own instead (' + k.ownInstead + '); its Tasks say to use this one.' : k.figmaOnly ? 'Its screens use it in Figma; its code builds it by hand.' : k.places ? (k.places === 1 ? 'Once in its code.' : k.places + ' times in its code.') : '';
       var note = [where, !p || p.from === 'image' ? '' : boxes.length ? (boxes.length === 1 ? 'Marked where it shows when the product opens.' : 'Marked in the ' + boxes.length + ' places it shows when the product opens.') : 'Not on the screen it opens with.'].filter(Boolean).join(' ');
       var tag = k.href ? 'a' : 'div', cls = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : '');
       return '<' + tag + ' class="' + cls + '"' + (k.href ? ' href="' + esc(k.href) + '" target="_blank" rel="noopener"' : '') + '>' + shot + '<h3>' + esc(k.name) + '</h3>' + (note ? '<p class="pg-selector">' + esc(note) + '</p>' : '') + '</' + tag + '>';
@@ -2088,7 +2110,7 @@ a.pg-usage-name { color: var(--sg-text); }
       '<td class="pg-par-at">' + esc(wcag || '') + '</td>' + (from === undefined ? '' : '<td class="pg-a11y-from">' + esc(from) + '</td>') + '</tr>';
   }
   var FROM_PAGE = 'The style guide, in the browser', FROM_AUDIT = 'The last audit, in a browser';
-  // One Accessibility table, by WCAG criterion, the same table as Parity's and the To do page's: only the criteria that
+  // One Accessibility table, by WCAG criterion, the same table as Parity's and the Tasks page's: only the criteria that
   // apply to the component (a page's own, video and sound it does not play, what it has nothing for, are left out), to
   // fix first, then to check, then done; each with what Figma states, what was found, what to do, who acts, its status
   // and when and where it was read. What a criterion means opens from its name. Above it a count of each, and when the
@@ -2174,7 +2196,7 @@ a.pg-usage-name { color: var(--sg-text); }
         who: m.toName ? WHO.code : WHO.both, st: m.toName ? 'todo' : 'check', rel: '', at: DATA.builtAt || null };
     });
   }
-  // Documentation not written yet: each kind its Documentation area says is missing (shown on the To do page in that
+  // Documentation not written yet: each kind its Documentation area says is missing (shown on the Tasks page in that
   // same table).
   function docRows(c) {
     if (c.codeOnly) return [];
@@ -2235,25 +2257,30 @@ a.pg-usage-name { color: var(--sg-text); }
       var tr = el.closest('tr'), n = TODO_NO[decodeURIComponent(el.dataset.todoKey)];
       el.textContent = n && tr && (tr.dataset.status === 'todo' || tr.dataset.status === 'check') ? n : '';
     });
-    var link = nav.querySelector('a[href="#todo"]');
+    var link = nav.querySelector('a[href="#tasks"]');
     var box = td.querySelector('.sg-todo') || td.appendChild(document.createElement('div')); box.className = 'sg-todo';
     var tried = COMPONENTS.filter(function (c) { return c.__a11y; }), last = tried.reduce(function (m, c) { var at = c.__a11y.live && c.__a11y.live.at; return at && (!m || at > m) ? at : m; }, null);
     var wait = !ALL && tried.length < COMPONENTS.length, baked = !wait && tried.length && tried.every(function (c) { return c.__a11y.baked || !c.__a11y.live; }) && BAKED;
-    // When what the list shows was tried: while the page was built (the final results, nothing runs here), else in this
-    // browser, kept so a refresh lists it at once; while a component the build did not try is still being tried here,
-    // how far it has got. A button tries every component again in this browser.
-    var note = ALL ? '' : '<div class="sg-todo-note"><p class="pg-wcag-note" role="status">' + (wait
-      ? 'Trying in this browser the components not tried when the page was built: ' + tried.length + ' of ' + COMPONENTS.length + ' so far. The list grows as each one is tried, and what is tried is kept for the next visit.'
-      : baked ? 'Every variant of every component was tried in a browser when this page was built, on ' + when(BAKED.at) + '. These are its results; nothing runs while you read them.'
+    // When what the Accessibility list shows was tried: while the page was built (the final results, nothing runs here),
+    // else in this browser, kept so a refresh lists it at once. Said under the filter of Accessibility alone, the kind it
+    // is about, with a button to try every component again in this browser.
+    var note = ALL ? '' : '<div class="sg-todo-note"><p class="pg-wcag-note">' + (baked
+      ? 'Every variant of every component was tried in a browser when this page was built, on ' + when(BAKED.at) + '. These are its results; nothing runs while you read them.'
       : 'Every component was tried in this browser' + (last ? ', the last on ' + when(last) : '') + '. A refresh lists what was found without trying again, and a component that changes is tried again on its own.') + '</p>' +
-      (wait ? '' : sysButton('button', 'Try again in this browser', ' data-a11y-again')) + '</div>';
-    if (link) link.lastChild.textContent = wait ? 'to do' : 'to do (' + all + ')';   // its count once every component is tried
+      sysButton('button', 'Try again in this browser', ' data-a11y-again') + '</div>';
+    // Until every component is tried, no list and no count anywhere: each would change in front of the reader as one more
+    // is tried. Only how far the try has got, then the list once, with its final numbers.
+    if (link) link.lastChild.textContent = wait ? 'tasks' : 'tasks (' + all + ')';
+    if (wait) {
+      box.innerHTML = '<p class="pg-wcag-note sg-todo-wait" role="status">Trying the components for accessibility in this browser, ' + tried.length + ' of ' + COMPONENTS.length + '. The tasks show once every one is tried, and what is tried is kept for the next visit.</p>';
+      return;
+    }
     if (!all) { box.innerHTML = note + '<p class="pg-par-sum">Nothing open: Figma and the code agree, and nothing fails for accessibility.</p>'; return; }
     // One kind shown at a time, chosen with the filter (no list of every kind at once); kept as the list is drawn again.
     var count = function (k) { return k.groups.reduce(function (n, g) { return n + g.rows.length; }, 0); };
     if (!byKind.some(function (k) { return k.area === todoArea; })) todoArea = byKind[0].area;
     var filter = '<div class="pg-par-filter sg-todo-filter">' + segHTML(byKind.map(function (k) { return { label: k.area + ' (' + count(k) + ')', v: k.area }; }), 'Show') + '</div>';
-    box.innerHTML = note + '<div class="sg-todo-head"><p class="pg-par-sum sg-todo-sum"></p>' + filter + '</div>' + byKind.map(function (k) {
+    box.innerHTML = '<div class="sg-todo-head">' + filter + '<p class="pg-par-sum sg-todo-sum"></p></div>' + byKind.map(function (k) {
       var link = function (g) { return g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system'; };
       // Documentation in the table each component's Documentation area and the Documentation page show: every kind,
       // what is written and where it comes from, a kind not written yet saying so.
@@ -2261,7 +2288,7 @@ a.pg-usage-name { color: var(--sg-text); }
         var c = COMPONENTS.filter(function (x) { return x.name === g.name; })[0];
         return c ? knowledgeHTML(c, link(g)) : '';
       }).join('') + '</div>';
-      return '<div class="sg-todo-kind" data-area="' + esc(k.area) + '">' + k.groups.map(function (g) {
+      return '<div class="sg-todo-kind" data-area="' + esc(k.area) + '">' + (k.area === 'Accessibility' ? note : '') + k.groups.map(function (g) {
         return issueTableHTML(g.rows, '', link(g), k.area);
       }).join('') + '</div>';
     }).join('');
@@ -2271,14 +2298,13 @@ a.pg-usage-name { color: var(--sg-text); }
     labelCells(td);
     todoHeadHeight();
   }
-  // Each card's head row sticks under the counts and the filter, whatever their height at this width.
-  function todoHeadHeight() { var h = document.querySelector('#todo .sg-todo-head'); if (h) document.getElementById('todo').style.setProperty('--pg-areas-h', h.offsetHeight + 'px'); }
-  window.addEventListener('resize', todoHeadHeight);
+  // Each card's head row sticks under the filter and the counts, whatever their height at this width.
+  function todoHeadHeight() { stickHeight(document.getElementById('tasks')); }
   // Only the kind chosen, its own tables, and its own count of what is to fix and to check; the numbers stay as they are.
   var TODO_KINDS = ['Parity', 'Accessibility', 'Documentation', 'Migration', 'Products', 'System', 'Page'];
   var todoArea = 'Parity';
-  // Each kind has its own address to send someone to (#todo/accessibility): choosing one writes it, opening it opens it.
-  function todoLink() { if (ALL || hashParts().id !== 'todo') return; var h = '#todo/' + todoArea.toLowerCase(); if (h !== location.hash) history.replaceState(null, '', h); }
+  // Each kind has its own address to send someone to (#tasks/accessibility): choosing one writes it, opening it opens it.
+  function todoLink() { if (ALL || hashParts().id !== 'tasks') return; var h = '#tasks/' + todoArea.toLowerCase(); if (h !== location.hash) history.replaceState(null, '', h); }
   function openTodoKind(slug) {
     var k = TODO_KINDS.filter(function (a) { return a.toLowerCase() === String(slug || '').toLowerCase(); })[0], box = td.querySelector('.sg-todo');
     if (!k || k === todoArea) return;
@@ -2298,13 +2324,13 @@ a.pg-usage-name { color: var(--sg-text); }
     todoHeadHeight();
   }
   // What the browser found on each component. Tried once while the page was built (--styleguide opens it in a browser
-  // and keeps the results in it, sg-a11y-baked): the To do page and every Accessibility area show those results at
+  // and keeps the results in it, sg-a11y-baked): the Tasks page and every Accessibility area show those results at
   // once, the final ones, with nothing running in the viewer's browser. A component the build could not try is tried in
   // the viewer's browser and kept there, so it is never tried again until it changes. Each component's own signature
   // (what is drawn and what its accessibility check reads) and the page's (its styles and scripts) say whether what was
   // kept still holds; what the data says (the audit, the code) is read again on every visit.
   function sigOf(text) { var h = 5381; for (var i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
-  // The build's own run: the page opened by --styleguide to try a share of the components (#todo?bake=1/4).
+  // The build's own run: the page opened by --styleguide to try a share of the components (#tasks?bake=1/4).
   var BAKING = !ALL && /(^|[?&])bake=\d+\/\d+/.test(location.hash);
   var BAKED = null;
   try { BAKED = JSON.parse((document.getElementById('sg-a11y-baked') || {}).textContent || 'null'); } catch (e) { BAKED = null; }
@@ -2331,7 +2357,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // What this page tried, for the build to keep in the page: { name: { sig, live, items } }.
   window.__sgA11yResults = function () { var o = {}; COMPONENTS.forEach(function (c) { if (c.__a11y) o[c.name] = { sig: compSig(c), live: c.__a11y.live || null, items: c.__a11y.liveItems || [], parts: c.__textParts || [] }; }); return o; };
   fillTodo();
-  // Every component not tried yet in this browser, one after another, while the To do page is open: each built out of
+  // Every component not tried yet in this browser, one after another, while the Tasks page is open: each built out of
   // sight, its Accessibility check run as its own area runs it, kept, then the list drawn again with what it found.
   var sweepAt = 0, sweeping = false;
   function a11ySweep() {
@@ -2341,7 +2367,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (BAKING && share) list = list.filter(function (c, i) { return i % +share[2] === +share[1]; });
     sweeping = true;
     (function next() {
-      if (sweepAt >= list.length || hashParts().id !== 'todo') { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
+      if (sweepAt >= list.length || hashParts().id !== 'tasks') { sweeping = false; if (sweepAt >= list.length) { sweepAt = 0; window.__sgSweepDone = true; } keepA11y(); fillTodo(); return; }
       var c = list[sweepAt++], id = cid(c.name);
       if (c.__a11y && (c.__a11y.live || c.__a11y.baked)) return setTimeout(next, 0);
       var sec = null; try { sec = document.getElementById(id) || (BUILDERS[id] && BUILDERS[id]()); } catch (e) { setTimeout(next, 0); throw e; }
@@ -2367,7 +2393,7 @@ a.pg-usage-name { color: var(--sg-text); }
   });
   // The criteria with their status for the component, from its items and how each criterion is known. live: what this
   // page's run tried ({ ran: { check: 1 }, tried, usedN }), or null before it ran (and on the page of every component).
-  // Each criterion with its status for the component (the rows its Accessibility area shows, and what the To do page
+  // Each criterion with its status for the component (the rows its Accessibility area shows, and what the Tasks page
   // gathers): [{ k, st, its, note, how, fig }].
   function a11yStatus(c, items, live) {
     var a = c.a11y || {}, ch = a.checked, audited = a.audited;
@@ -2449,7 +2475,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // what passed and where); what to do (each finding's fix, else what a person checks or what still has to run, else
   // what the criterion asks); who acts; its status; when and where it was read. To fix first, then to check, then done;
   // what goes beyond WCAG 2.2 A and AA last, apart. Each row keeps its criterion, items and note (k, its, note) for the
-  // To do page.
+  // Tasks page.
   function a11yIssueRows(c, items, live) {
     var rows = a11yStatus(c, items, live), ch = c.a11y && c.a11y.checked;
     var order = { todo: 0, check: 1, done: 2 }, num = function (sc) { return sc.split('.').map(function (x) { return ('000' + x).slice(-3); }).join('.'); };
@@ -2575,8 +2601,8 @@ a.pg-usage-name { color: var(--sg-text); }
         // A component only the code has: said at its top, so nothing on its page reads as agreed with Figma.
         (c.codeOnly ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">Only in the code</span><span>' + (c.codeOnly.figma ? 'Figma has no component for it: compared with nothing in Figma.' : 'No Figma data yet: compared with nothing in Figma.') + '</span></p>' : '') +
         (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
-        // Retired and still in use: what replaces it and how much still moves, each place a row of the To do page.
-        (c.migration ? '<p class="pg-status pg-migration">' + (c.status ? '' : statusPill({ kind: 'deprecated', status: 'Deprecated' })) + '<span>' + esc((c.migration.toName ? 'Use ' + c.migration.toName + ' instead. ' : 'Nothing replaces it yet. ') + 'Still used in ' + c.migration.count + (c.migration.count === 1 ? ' place' : ' places') + ' (' + c.migration.products.map(function (p) { return p.name + ' ' + p.count; }).join(', ') + '), each on the ') + '<a href="#todo">To do</a> page.</span></p>' : '') +
+        // Retired and still in use: what replaces it and how much still moves, each place a row of the Tasks page.
+        (c.migration ? '<p class="pg-status pg-migration">' + (c.status ? '' : statusPill({ kind: 'deprecated', status: 'Deprecated' })) + '<span>' + esc((c.migration.toName ? 'Use ' + c.migration.toName + ' instead. ' : 'Nothing replaces it yet. ') + 'Still used in ' + c.migration.count + (c.migration.count === 1 ? ' place' : ' places') + ' (' + c.migration.products.map(function (p) { return p.name + ' ' + p.count; }).join(', ') + '), each on the ') + '<a href="#tasks">Tasks</a> page.</span></p>' : '') +
         // Its version, when it last changed and how to import it: one line, wrapping only when the room runs out.
         '<div class="pg-meta">' + (ALL ? '' : factsHTML(c)) + importHTML(c) + '</div>' +
       '</div>' +
@@ -2699,8 +2725,8 @@ a.pg-usage-name { color: var(--sg-text); }
     // One area at a time (every one at once on the measuring page, ?all); the one chosen stays chosen on the next
     // component. A link to the parity area from the line that says what differs.
     var areaBar = sec.querySelector('.pg-areas');
-    // What sticks under the areas (Parity's table head) knows how tall they are.
-    var areasHeight = function () { sec.style.setProperty('--pg-areas-h', areaBar.offsetHeight + 'px'); };
+    // What sticks under the areas (every table's head) knows how tall they are.
+    var areasHeight = function () { stickHeight(sec); };
     if (window.ResizeObserver) new ResizeObserver(areasHeight).observe(areaBar); else areasHeight();
     var nameEl = sec.querySelector('.pg-head > h2');
     if (!ALL && window.IntersectionObserver && nameEl) new IntersectionObserver(function (es) { areaBar.classList.toggle('is-stuck', !es[0].isIntersecting && es[0].boundingClientRect.top < 0); }).observe(nameEl);
@@ -2720,6 +2746,7 @@ a.pg-usage-name { color: var(--sg-text); }
       if (v === 'a11y') checkLive();
       if (v === 'built') requestAnimationFrame(function () { builtThumbs(sec); });
       if (!kept) writeLink();   // the address names the area, to send someone straight to it
+      stickHeight(sec);   // its cards' heads, now in view, measured for the table heads under them
     }
     segItems(areaBar).forEach(function (b) { b.addEventListener('click', function () { showArea(b.dataset.v); }); });
     Array.prototype.forEach.call(sec.querySelectorAll('[data-area-go]'), function (b) { b.addEventListener('click', function () { showArea(b.getAttribute('data-area-go')); }); });
@@ -2984,7 +3011,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // The Accessibility table, drawn from the items the data gives and those this page's run finds, with a count of each
     // status above it and when the last audit ran.
     var a11yEl = sec.querySelector('.pg-a11y-rows'), a11ySumEl = sec.querySelector('.pg-a11y-sum'), a11yNote = sec.querySelector('.pg-a11y-note');
-    // What this browser tried before (kept on the To do page) shows at once, until this page tries it again.
+    // What this browser tried before (kept on the Tasks page) shows at once, until this page tries it again.
     var staticItems = c.a11y ? a11yStaticItems(c) : [], liveItems = (c.__a11y && c.__a11y.liveItems) || [], liveNow = (c.__a11y && c.__a11y.live) || null;
     // The parts of what is drawn that hold words (its label, its description), by their own class, for the rows a person
     // checks on its words.
@@ -3005,7 +3032,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var tp = textParts(); if (tp.length || !c.__textParts) c.__textParts = tp;   // before it is drawn: the parts kept with its results
       if (liveNow && !liveNow.at) liveNow.at = new Date().toISOString();
       a11yEl.innerHTML = a11yIssueRows(c, staticItems.concat(liveItems), liveNow).concat(unreadRows(c)).map(function (r) { return issueRowHTML(r, 'Accessibility'); }).join('');
-      if (liveNow) { c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice(), baked: !!(c.__a11y && c.__a11y.baked && c.__a11y.live === liveNow) }; fillTodo(); if (!checking) keepA11y(); }   // the To do page lists what it shows
+      if (liveNow) { c.__a11y = { items: staticItems.concat(liveItems), live: liveNow, liveItems: liveItems.slice(), baked: !!(c.__a11y && c.__a11y.baked && c.__a11y.live === liveNow) }; fillTodo(); if (!checking) keepA11y(); }   // the Tasks page lists what it shows
       // Its switch carries the alert icon while anything on it is to fix or to check, as the area counts it.
       var open = a11yOpen(c, staticItems.concat(liveItems), liveNow);
       areaMark(sec.querySelector('.pg-areas [data-v="a11y"]'), open.todo, open.say);
@@ -3040,7 +3067,7 @@ a.pg-usage-name { color: var(--sg-text); }
       else { combos.push({ set: {}, name: 'its defaults' }); axes.forEach(function (a) { a.opts.forEach(function (o) { var one = {}; one[a.label] = o.val; combos.push({ set: one, name: a.label + '=' + o.label }); }); }); }
       return { combos: combos, every: total <= 32 };
     }
-    // The To do page has every component tried in the background, as its Accessibility area does; cb when it is done.
+    // The Tasks page has every component tried in the background, as its Accessibility area does; cb when it is done.
     var bgRun = null;
     sec._a11yRun = function (cb) {
       if (ALL || !a11yEl || !cur || checking) { cb(); return; }
@@ -3636,7 +3663,7 @@ a.pg-usage-name { color: var(--sg-text); }
       (TOKENS.iconStrokes || []).forEach(function (t) { add('Icon stroke', t.figma, '#icons', t.figma, [t.var, t.value]); });
       var FIGI = DATA.iconFigma || {};
       (DATA.icons || []).forEach(function (id) { var n = (FIGI[id] && FIGI[id].name) || id, px = FIGI[id] && FIGI[id].size; add('Icon' + (px ? ' ' + px + 'px' : ''), n, '#icons', n, [id]); });
-      TODO.forEach(function (t) { add('To do' + (t.comp ? ' in ' + t.comp : ''), t.say, '#todo', null, [t.todo, t.comp]); });   // no number: it follows the list as it grows
+      TODO.forEach(function (t) { add('Tasks' + (t.comp ? ' in ' + t.comp : ''), t.say, '#tasks', null, [t.todo, t.comp]); });   // no number: it follows the list as it grows
       return INDEX;
     };
     var pending = null;
@@ -3721,7 +3748,8 @@ a.pg-usage-name { color: var(--sg-text); }
   // With ?all every view shows, one after another, as before.
   var links = document.querySelectorAll('.sg-nav a');
   function route() {
-    if (/^#(documentation|coverage)$/.test(location.hash)) history.replaceState(null, '', '#todo/documentation');   // the address says where it lives now
+    if (/^#(documentation|coverage)$/.test(location.hash)) history.replaceState(null, '', '#tasks/documentation');   // the address says where it lives now
+    else if (/^#todo(\/|$)/.test(location.hash)) history.replaceState(null, '', '#tasks' + location.hash.slice(5));   // the page was once To do
     var at = hashParts(), id = at.id || 'overview', built = !!document.getElementById(id);
     if (!built && BUILDERS[id]) BUILDERS[id]();
     if (built && document.getElementById(id)._link) document.getElementById(id)._link(at.q);
@@ -3737,10 +3765,11 @@ a.pg-usage-name { color: var(--sg-text); }
     var tLink = nav.querySelector('a[href="#' + target.id + '"]'), tGroup = tLink && tLink.previousElementSibling;
     while (tGroup && !tGroup.classList.contains('sg-nav-label')) tGroup = tGroup.previousElementSibling;
     var tTag = target.querySelector('.sg-section-badge'); if (tTag && tGroup) tTag.textContent = tGroup.textContent;
-    if (target.id === 'todo') { openTodoKind(at.slug); setTimeout(a11ySweep, 300); }
+    if (target.id === 'tasks') { openTodoKind(at.slug); setTimeout(a11ySweep, 300); }
     // A foundation's size switch stays in view under its title as the page scrolls.
     var tTitle = target.querySelector(':scope > h2'), tSwitch = target.querySelector('.sg-size-switch');
     if (tTitle && tSwitch) tSwitch.style.top = 'calc(var(--sg-sticky-top, 0px) + ' + tTitle.offsetHeight + 'px)';
+    stickHeight(target);
     if (!ALL) {
       window.scrollTo(0, 0); requestAnimationFrame(function () { window.scrollTo(0, 0); });   // every page opens at its top, the browser's own jump to the address's section undone
       var h = target.querySelector('h1, h2'); document.title = (h && target.id !== 'overview' ? h.textContent + ' · ' : '') + (DATA.title || 'Design system') + ' · Living style guide';
@@ -3748,7 +3777,7 @@ a.pg-usage-name { color: var(--sg-text); }
     }
     route.ran = true; nudge();
   }
-  // Every page's title is its name in the menu, in the menu's own case (overview, to do, colors): one name for one place.
+  // Every page's title is its name in the menu, in the menu's own case (overview, tasks, colors): one name for one place.
   Array.prototype.forEach.call(nav.querySelectorAll('a[href^="#"]'), function (a) {
     var sec = document.getElementById(a.getAttribute('href').slice(1)); if (!sec || sec.classList.contains('pg-card-section')) return;
     var h = sec.querySelector('h1, h2'), name = a.textContent.replace(/\s*\(\d+\)$/, '').trim();
@@ -3768,6 +3797,7 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   window.addEventListener('scroll', function () { if (!stickQueued) { stickQueued = true; requestAnimationFrame(markStuck); } }, { passive: true });
   window.addEventListener('hashchange', route);
+  window.addEventListener('resize', function () { stickHeight(document.getElementById(hashParts().id || 'overview')); });
   route();
 })();
 </script>
