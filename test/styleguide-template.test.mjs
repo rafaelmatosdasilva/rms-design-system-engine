@@ -1122,10 +1122,14 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /@container \(max-width: 560px\) \{\s*\.pg-inspect\.sg-token-card table \{ table-layout: auto; \}/);
   // On a phone a card's line under its name starts where the name does.
   assert.match(phone, /\.sg-card-grid \.sg-card > h3 \{[^}]*padding: var\(--sg-space-s\) var\(--sg-space-m\); \}\s*\.sg-card-grid \.sg-card > h3 \+ p \{ padding: 0 var\(--sg-space-m\)/);
-  // The To do page keeps its counts and filter at the top as it scrolls, in the title's place; the head rows under them.
+  // The Tasks page keeps its filter and counts at the top as it scrolls, in the title's place; the head rows under them.
   assert.match(tpl, /#tasks > h2 \{ position: static; \}/);
   assert.match(tpl, /\.pg-areas, \.sg-section:not\(\.pg-card-section\) > h2, \.sg-size-switch, \.sg-todo-head \{ position: sticky;/);
-  assert.match(tpl, /function todoHeadHeight\(\) \{[^}]*setProperty\('--pg-areas-h'/);
+  assert.match(tpl, /function todoHeadHeight\(\) \{ stickHeight\(document\.getElementById\('tasks'\)\); \}/);
+  // Every table's head sticks under what sticks at the top of its page, a card's head first: one measure for every page.
+  assert.match(tpl, /function stickHeight\(sec\) \{[\s\S]*?setProperty\('--pg-areas-h'[\s\S]*?setProperty\('--pg-card-head-h'/);
+  assert.match(tpl, /\.pg-inspect \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); overflow: clip;/, 'a card clips, so its head can stick');
+  assert.match(tpl, /\.pg-inspect-head \{ position: sticky; top: calc\(var\(--sg-sticky-top, 0px\) \+ var\(--pg-areas-h, 0px\)\);/);
   // Spacing is its names and values, no bar per space; radii keep their samples.
   assert.match(tpl, /sizeList\('spacing', 'Spacing', TOKENS\.spacing, null\);/);
   assert.match(tpl, /sizeList\('radii', 'Radii', TOKENS\.radii, function \(t\) \{ return '<span class="sg-token-radius"/);
