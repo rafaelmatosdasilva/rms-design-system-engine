@@ -262,6 +262,13 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   changes with a mode shows the value of the mode its section's size switch picks (the switch, with no visible label
   and room below it, changes only the samples and their values, never the page around them); icons from the icon sheet. The
   colours sit six a row, each as wide as the room, so its Figma name and variable read whole (three on a phone).
+  Motion (`motionTokens`, `styleguide-data.mjs`): every custom property whose value is a duration or an easing
+  curve, named as Figma's motion variable of the same value (`figma.motion.explicit`, else the naming convention),
+  each with a dot that crosses its track on Play (a duration at a steady pace, an easing over the longest duration,
+  its curve drawn beside it; at once for a person who asks for less motion); where the system answers
+  `prefers-reduced-motion` and what it ends, or that it does not yet; and each transition Figma's prototype animates
+  (`figma-motion.snapshot.json`) with what the code does for it (`prototypeTransitions`, from the last audit's
+  `motion.json`).
 - **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
   own pages, else what its source renders: a React component's return, a Vue component as the project's own build
   (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its
@@ -727,7 +734,14 @@ dropped, then `design-system-engine-map` `EXPLICIT` / `EXPLICIT_SIZING`, then th
 `height` rule compared as the drawn box, a `min-height` by its value), padding, gap and radius by token or
 value, font against the first text element, background as "paints or not" (Figma often paints on a child
 layer, code on the element). On a project whose parity is green this is a calibration: every difference is
-either a capture bug to fix or a real fact about the code that no gate looks at yet.
+either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)
+runs the same token, icon and nesting comparison on every audit, after the components. `MEASURED TOKENS` lists a
+Figma token the page resolves to another value only where the browser alone read it (a script, or a stylesheet
+the page loads that Gate 3 does not read), with what sets it to look for. Everything else is already listed by its
+own gate (tokens by Gate 3, icons by the icon check, nesting by the sub-component check), so one line counts it
+(`📋 measured too: tokens 346 match · icons 40 match`, with how many differ and which check lists
+them) and nothing is listed twice. Advisory like the rest of `MEASURED`; `renderedParityStrict` (and build mode)
+makes a listed token fail the gate.
 
 #### The component catalog and `--check-ui` (for UI generators)
 

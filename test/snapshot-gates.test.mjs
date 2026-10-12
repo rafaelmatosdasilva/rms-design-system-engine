@@ -113,6 +113,36 @@ test('structure gate: renderedParityStrict makes a measured difference fail the 
   assert.equal(r.code, 1);
 });
 
+test('structure gate: tokens, icons and nesting as the capture read them, against Figma (A11)', async () => {
+  const files = {
+    'ds-config.json': JSON.stringify({ paths: { themeCSS: 'theme.css', snapshotStructure: 'figma-structure.snapshot.json', snapshotVars: 'figma-vars.snapshot.json', snapshotIcons: 'figma-icons.snapshot.json' } }),
+    'theme.css': ':root { --brand: #ff0000; --ink: #111111; --accent: #00ff00; }\n.chip { height: 32px; }',
+    'figma-structure.snapshot.json': JSON.stringify({ components: { chip: { h: 32 } } }),
+    'figma-vars.snapshot.json': JSON.stringify({ color: { light: { brand: '#0000ff', ink: '#111111', accent: '#00ff00' } } }),
+    'figma-icons.snapshot.json': JSON.stringify({ _updated: 'x', star: { viewBox: '0 0 24 24', paths: ['M1 1'] }, bell: { viewBox: '0 0 24 24', paths: ['M2 2'] } }),
+    'component-composition.snapshot.json': JSON.stringify({ Card: ['Badge', 'Button'] }),
+    'structure-contract.mjs': "export const CONTRACT = { chip: { h: 32 } }; export const COMPONENT_CSS_SELECTORS = { chip: { main: '.chip' } };",
+  };
+  // The accent the stylesheet declares as Figma's, the page sets otherwise at run time: only the browser reads it.
+  const { dir } = await withSnapshot(files, (s) => {
+    s.tokens['--accent'].modes.light = { value: '#ff00ff', confidence: 'single-source', readBy: 'browser' };
+    s.icons = { star: { viewBox: '0 0 16 16', pathHash: 'x', paths: 1, definedAt: ['icons.svg:3'] } };
+    s.nesting = { Card: { instancesSeen: 2, contains: { Badge: { instances: 2 } } } };
+  });
+  const r = run(dir, 'structure-check.mjs');
+  assert.match(r.out, /⚠️  MEASURED TOKENS 1 .*read only in the browser - advisory/, r.out);
+  assert.match(r.out, /accent \[light\] → --accent: Figma #00ff00, rendered #ff00ff/);
+  assert.doesNotMatch(r.out, /brand \[light\] → --brand/, 'the token check lists what the stylesheet says, not again here');
+  assert.match(r.out, /📋 measured too: tokens 1 match, 1 differ \(listed by the token check\) · icons 0 match, 2 differ \(listed by the icon check\) · nesting 1 match, 1 differ \(listed by the sub-component check\)/);
+  assert.equal(r.code, 0, 'advisory only');
+  // ds-config.json → renderedParityStrict: true makes a listed difference fail the gate.
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, renderedParityStrict: true }));
+  const strict = run(dir, 'structure-check.mjs');
+  assert.match(strict.out, /❌ MEASURED TOKENS 1/, strict.out);
+  assert.equal(strict.code, 1);
+});
+
 test('docs truth: a documentation surface that is not there is not a pass, and a moved style guide is named', () => {
   const cfg = { paths: { themeCSS: 'theme.css' }, docs: { surfaces: ['apps/styleguide/index.html'] }, styleguide: { out: 'apps/style-guide/index.html' } };
   const r = runGate('docs-truth-check.mjs', { 'ds-config.json': cfg, 'theme.css': ':root { --a: 1px; }', 'apps/style-guide/index.html': '<p>doc</p>' });

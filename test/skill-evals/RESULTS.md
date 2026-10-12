@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The structure gate measures tokens, icons and nesting, and a motion page in the foundations (continuous evaluation)
+
+What changed since the entry below (engine e27cbc3): Gate 13 compares tokens, icons and nesting on every audit and lists only what the browser alone reads; the style guide gets a motion page with durations, easings, a Play button and Figma's prototype transitions. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `d54af1919190` · Project measured: `13d811a9d668`
+
+| Haiku, engine 856fd1a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.059 |
+| Input a run | 98k | 110k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 110k a run against 98k. Records: `records/gate-measures-motion-page`.
+
 ## 2026-10: Vue components rendered with whatever builds them (continuous evaluation)
 
 What changed since the entry below (engine 53b5844): E34 and E35: the Vue harness renders with Nuxt, Vue CLI or webpack as well as Vite; the style guide draws each Vue variant as it renders and scopes a one-component page; each component's Documentation is a table; setup keeps an existing ds-config.json unless --reconfigure. The guide changed in `reference/config.md`, `reference/usage.md`.

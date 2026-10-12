@@ -218,6 +218,24 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-token-swatch { width: var(--sg-space-xxl); height: var(--sg-space-xxl); border: var(--sg-line); border-radius: var(--sg-radius-s); }
 .sg-token-sample > .spacing-bar { height: var(--sg-space-xxl); border-radius: 0; }   /* every sample as tall as the others, so a space reads as its width */
 .sg-token-radius { width: var(--sg-space-xxl); height: var(--sg-space-xxl); background: var(--sg-bg-2); border: var(--sg-line); }
+/* Motion: a track a dot crosses when played, an easing's curve drawn before it in the text colour. */
+.sg-motion-bar { display: flex; margin: 0 0 var(--sg-space-m); }
+.pg-inspect.sg-token-card td.sg-token-sample:has(.sg-motion-sample) { width: 30%; }
+.pg-inspect.sg-token-card tr:has(.sg-motion-sample) td:nth-child(2), .pg-inspect.sg-token-card tr:has(.sg-motion-sample) td:nth-child(3) { width: 25%; }
+.sg-token-sample > .sg-motion-sample { display: flex; align-items: center; gap: var(--sg-space-s); }
+.sg-motion-sample > .sg-motion-track { display: flex; align-items: center; flex: 1; min-width: 96px; height: var(--sg-space-xxl); background: var(--sg-bg-2); border-radius: var(--sg-radius-s); }
+.sg-motion-track > .sg-motion-dot { display: block; flex: none; width: var(--sg-space-m); height: var(--sg-space-m); border-radius: 50%; background: var(--sg-accent); }
+.sg-motion-curve { flex: none; width: var(--sg-space-xxl); height: var(--sg-space-xxl); fill: none; stroke: var(--sg-text); stroke-width: 2; }
+.sg-motion-curve .sg-motion-axis { stroke: var(--sg-muted); stroke-width: 1; }
+.sg-thumb .sg-motion-curve { width: 36px; height: 36px; }
+.sg-motion-proto { margin-top: var(--sg-space-m); }
+/* Narrow cards (a phone, a tablet beside the menu): a shorter track under its curve, the names given the room. */
+@container (max-width: 560px) {
+  .pg-inspect.sg-token-card td.sg-token-sample:has(.sg-motion-sample) { width: calc(var(--sg-space-xxl) * 2); }
+  .sg-token-sample > .sg-motion-sample { flex-direction: column; align-items: stretch; }   /* the curve above its track */
+  .sg-motion-sample > .sg-motion-track { flex: none; min-width: 48px; }
+  .pg-inspect.sg-token-card tr:has(.sg-motion-sample) td:nth-child(2), .pg-inspect.sg-token-card tr:has(.sg-motion-sample) td:nth-child(3) { width: auto; }
+}
 .icon-chip { display: flex; flex-direction: column; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-l) var(--sg-space-m); min-width: 0; text-align: center; }
 .sg-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--sg-space-xxl) * 6), 1fr)); }   /* equal cells: every icon lines up across and down */
 .sg-icon-strokes { margin-bottom: var(--sg-space-m); }
@@ -912,6 +930,14 @@ a.pg-usage-name { color: var(--sg-text); }
   if ((TOKENS.typography || []).length) card(fGrid, 'typography', 'Foundations', 'typography', TOKENS.typography.length + ' text styles.', TOKENS.typography.map(function (t) { return '<span style="' + (t.size ? 'font-size:var(' + esc(t.size.var) + ');' : '') + (t.weight ? 'font-weight:var(' + esc(t.weight.var) + ')' : '') + '">Aa</span>'; }).join(''));
   if ((TOKENS.spacing || []).length) card(fGrid, 'spacing', 'Foundations', 'spacing', TOKENS.spacing.length + ' gap and padding tokens.', '<div class="sg-thumb-col">' + TOKENS.spacing.slice().sort(function (a, b) { return parseFloat(a.value) - parseFloat(b.value); }).filter(function (t, i, all) { return i % Math.max(1, Math.floor(all.length / 4)) === 0; }).slice(0, 4).map(function (t) { return '<span class="sg-thumb-bar" style="width:calc(var(' + esc(t.var) + ') * 4)"></span>'; }).join('') + '</div>');
   if ((TOKENS.radii || []).length) card(fGrid, 'radii', 'Foundations', 'radii', TOKENS.radii.length + ' radius tokens.', TOKENS.radii.slice(0, 4).map(function (t) { return '<span class="sg-thumb-box" style="border-radius:var(' + esc(t.var) + ')"></span>'; }).join(''));
+  // An easing's curve, time across and progress up, drawn in the text colour: on the motion page and its card.
+  function motionCurve(b) {
+    if (!b) return '';
+    var x = function (v) { return (2 + v * 36).toFixed(1); }, y = function (v) { return (38 - v * 36).toFixed(1); };
+    return '<svg class="sg-motion-curve" viewBox="0 0 40 40" aria-hidden="true"><path class="sg-motion-axis" d="M2 2V38H38"/><path d="M' + x(0) + ' ' + y(0) + 'C' + x(b[0]) + ' ' + y(b[1]) + ' ' + x(b[2]) + ' ' + y(b[3]) + ' ' + x(1) + ' ' + y(1) + '"/></svg>';
+  }
+  var MOT = DATA.motion || null, motN = MOT ? (MOT.durations || []).length + (MOT.easings || []).length : 0;
+  if (MOT && (motN || (MOT.transitions || []).length)) card(fGrid, 'motion', 'Foundations', 'motion', motN ? motN + ' duration and easing tokens.' : (MOT.transitions || []).length + ' transitions in Figma\'s prototype.', (MOT.easings || []).slice(0, 3).map(function (t) { return motionCurve(t.bezier); }).join(''));
   if ((DATA.icons || []).length) card(fGrid, 'icons', 'Foundations', 'icons', DATA.icons.length + ' icons from the system\'s sheet.', DATA.icons.slice(0, 5).map(function (id) { return '<svg width="24" height="24" aria-hidden="true"><use href="#' + esc(id) + '"/></svg>'; }).join(''));
   var cGrid = COMPONENTS.length ? group('Components', GROUPS.components || 'Each one drawn from the code itself, with what Figma and the code agree on. Open one to try it, read how to use it and see where it is used.') : null;
   // Its Figma description, else its note, else the props it offers.
@@ -1157,6 +1183,47 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   sizeList('spacing', 'Spacing', TOKENS.spacing, null);   // names and values only: a bar per space read as a chart
   sizeList('radii', 'Radii', TOKENS.radii, function (t) { return '<span class="sg-token-radius" style="border-radius:var(' + esc(t.var) + ')"></span>'; });
+
+  /* ── Motion: the system's durations and easings, each played on demand; less motion; Figma's prototype ───────── */
+  // Each duration moves a dot across its track at a steady pace, each easing over the system's own longest duration, its
+  // curve drawn beside it. Nothing moves until Play is pressed, and for a person who asks for less motion the dots go
+  // straight to their end, as the system's own rule has it.
+  var MOTION = DATA.motion || null;
+  if (MOTION && ((MOTION.durations || []).length || (MOTION.easings || []).length || (MOTION.transitions || []).length)) {
+    hr(); foundationLink('motion', 'motion');
+    var less = MOTION.reduced
+      ? 'When a person asks for less motion, the system ends every ' + MOTION.reduced.ends.join(' and ') + ' at once (' + MOTION.reduced.at + ').'
+      : 'The system does not stop its motion yet when a person asks for less (prefers-reduced-motion); the accessibility check lists where it moves.';
+    var mo = section('motion', 'Foundations', 'Motion', less);
+    var longest = (MOTION.durations || []).slice(-1)[0], baseMs = longest ? Math.max(longest.ms, 200) : 300;
+    var track = function (attrs, before) { return '<span class="sg-motion-sample">' + (before || '') + '<span class="sg-motion-track"><span class="sg-motion-dot"' + attrs + '></span></span></span>'; };
+    var name = function (t) { return { figma: t.figma || 'not in Figma', var: t.var }; };
+    var mc = document.createElement('div'); mc.className = 'sg-token-cards';
+    mc.innerHTML = ((MOTION.durations || []).length ? tokenCard('durations', MOTION.durations.map(function (t) { return { sample: track(' data-ms="' + t.ms + '" data-ease="linear"'), t: name(t), value: t.value }; })) : '') +
+      ((MOTION.easings || []).length ? tokenCard('easings', MOTION.easings.map(function (t) { return { sample: track(' data-ms="' + baseMs + '" data-ease="' + esc(t.value) + '"', motionCurve(t.bezier)), t: name(t), value: t.value }; })) : '');
+    if (mc.innerHTML) {
+      var bar = document.createElement('div'); bar.className = 'sg-motion-bar';
+      bar.innerHTML = sysButton('button', 'Play', ' data-motion-play');
+      mo.appendChild(bar); mo.appendChild(mc);
+      bar.querySelector('[data-motion-play]').addEventListener('click', function () {
+        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        Array.prototype.forEach.call(mc.querySelectorAll('.sg-motion-dot'), function (d) {
+          var end = d.parentNode.clientWidth - d.offsetWidth, frames = [{ transform: 'translateX(0)' }, { transform: 'translateX(' + end + 'px)' }];
+          if (d._run) d._run.cancel();
+          if (calm || !d.animate) { d.style.transform = 'translateX(' + end + 'px)'; return; }
+          d.style.transform = '';
+          d._run = d.animate(frames, { duration: Number(d.getAttribute('data-ms')) || 300, easing: d.getAttribute('data-ease') || 'linear', fill: 'forwards' });
+        });
+      });
+    }
+    // How Figma's prototype moves each component, and what the code does for it.
+    if ((MOTION.transitions || []).length) {
+      var tc = document.createElement('div'); tc.className = 'pg-par-card sg-motion-proto';
+      tc.innerHTML = '<div class="pg-inspect-head">In Figma\'s prototype</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>Change</th><th>Trigger</th><th>Figma</th><th>Code</th></tr></thead><tbody>' +
+        MOTION.transitions.map(function (r) { return '<tr><td>' + esc(r.component) + '</td><td>' + esc(r.change) + '</td><td>' + esc(r.trigger) + '</td><td>' + esc(r.ms + 'ms, ' + r.easing) + '</td><td>' + esc(r.code ? 'Differs: ' + r.code : 'Same') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+      mo.appendChild(tc); labelCells(tc);
+    }
+  }
 
   /* ── Icons: every icon is a real one from the system's symbol sheet, referenced by id ───────────────────────── */
   if ((DATA.icons || []).length) {
@@ -3515,6 +3582,7 @@ a.pg-usage-name { color: var(--sg-text); }
       });
       FLAT.forEach(function (t) { add('Colour', t.figma, '#colors', t.figma, [t.var]); });
       [['spacing', 'Spacing'], ['radii', 'Radius']].forEach(function (k) { (TOKENS[k[0]] || []).forEach(function (t) { add(k[1], t.figma, '#' + k[0], t.figma, [t.var, t.value]); }); });
+      [['durations', 'Duration'], ['easings', 'Easing']].forEach(function (k) { ((DATA.motion || {})[k[0]] || []).forEach(function (t) { add(k[1], t.figma || t.var, '#motion', t.figma, [t.var, t.value]); }); });
       (TOKENS.typography || []).forEach(function (t) { add('Type style', t.scale, '#typography', null, ['size', 'weight', 'lh', 'family'].map(function (k) { return t[k] ? [t[k].figma, t[k].var, t[k].value].join(' ') : ''; })); });
       (TOKENS.iconStrokes || []).forEach(function (t) { add('Icon stroke', t.figma, '#icons', t.figma, [t.var, t.value]); });
       var FIGI = DATA.iconFigma || {};
