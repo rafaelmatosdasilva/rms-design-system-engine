@@ -147,6 +147,29 @@ test('GITLAB_TOKEN and GITLAB_HOST are read from a .env beside the mirror or whe
   assert.ok(gl.calls.every((c) => c.token === 'glpat-env'));
 });
 
+test('a run inside the mirror reads GITLAB_TOKEN and GITLAB_HOST from the .env of the folder that holds it', async () => {
+  const from = mkdtempSync(join(tmpdir(), 'gl-from-'));
+  writeFileSync(join(from, '.env'), 'GITLAB_TOKEN=glpat-parent\nGITLAB_HOST=code.acme.example\n');
+  const p = parseGitlabProject('https://code.acme.example/web/ui-kit', { GITLAB_HOST: 'code.acme.example' });
+  const A = 'a'.repeat(40), B = 'b'.repeat(40);
+  const gl = fakeGitlab({ commits: { main: { id: A } }, archives: { [A]: tarOf([['package.json', '{}']]), [B]: tarOf([['package.json', '{"v":2}']]) } });
+  const first = await syncGitlab(p, { from, env: {}, fetchImpl: gl.fetchImpl });
+  assert.equal(first.sha, A);
+  // The next run starts in the mirror itself (cwd = the mirror): its state file names the project, its parent the .env.
+  const inside = first.dir;
+  const gl2 = fakeGitlab({ commits: { main: { id: B } }, archives: { [B]: tarOf([['package.json', '{"v":2}']]) }, status: {} });
+  const guard = async (url, init = {}) => (init.headers?.['PRIVATE-TOKEN'] ? gl2.fetchImpl(url, init) : { ok: false, status: 404 });
+  const r = await syncGitlab(projectFromState(inside), { from: inside, dir: inside, env: {}, fetchImpl: guard });
+  assert.equal(r.stale, undefined, `no fallback to the old copy: ${r.warning ?? ''}`);
+  assert.equal(r.sha, B);
+  assert.ok(gl2.calls.length && gl2.calls.every((c) => c.token === 'glpat-parent'), 'the token of the folder that holds the mirror, sent to its host');
+  // A folder that is not a mirror is never read beyond itself.
+  const lone = mkdtempSync(join(from, 'lone-'));
+  const gl3 = fakeGitlab({ commits: { main: { id: A } }, archives: { [A]: tarOf([['package.json', '{}']]) } });
+  await syncGitlab(p, { from: lone, dir: join(lone, 'ui-kit'), env: {}, fetchImpl: gl3.fetchImpl });
+  assert.ok(gl3.calls.every((c) => c.token === null), 'no state file: the parent\'s .env is not read');
+});
+
 test('GitLab out of reach: the mirror already there is checked, and the run says which commit it is', async () => {
   const from = mkdtempSync(join(tmpdir(), 'gl-from-'));
   const p = parseGitlabProject('https://gitlab.com/acme/ui-kit', {});
