@@ -8,7 +8,7 @@
 //
 // Pure: agreedView takes what the generator read and returns { components, notAgreed, modes }.
 import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
-import { textStyle, textStyleKey } from './text-styles.mjs';
+import { textStyle, textStyleKey, styleFields } from './text-styles.mjs';
 import { sameValue } from './css-values.mjs';
 import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs';
 import { requirementEntry } from './annotation-categories.mjs';
@@ -552,15 +552,38 @@ export function agreedTokens(check = {}, figmaVars = {}) {
   };
   const sizes = pass.filter((x) => x.dimension === 'sizing').map((p) => ({ figma: p.token, var: p.cssVar, value: p.value, ...(byMode(p.token) ? { modes: byMode(p.token) } : {}), ...describe(p.token) }));
   const isRadius = (t) => /radi(i|us)|corner/i.test(t.figma), isSpace = (t) => /\b(gap|padding|margin|space|spacing|inset)\b/i.test(t.figma.replace(/\//g, ' '));
+  // Text styles. A style is shown only when every field Figma gives it was compared and agrees, in every mode when a
+  // field changes with a mode: a field the check did not compare, or one that differs, keeps the whole style off the
+  // page (never a value drawn from the browser's default). Its family is one token of its own (typeFamily), so a family
+  // that differs does not keep every style off. A check without the snapshot's styles groups what it compared.
+  const typo = figmaVars.typography ?? {};
+  const fieldOf = (token) => { const cut = String(token ?? '').lastIndexOf('/'); return cut < 1 ? null : [token.slice(0, cut), token.slice(cut + 1)]; };
+  const tPass = pass.filter((x) => x.dimension === 'typography' && !x.family), tFail = (check.fail ?? []).filter((x) => x.dimension === 'typography' && !x.family);
+  const failed = new Set(tFail.map((f) => f.token));
   const scales = new Map();
-  // A token is the style's key and the field ("s/regular/size"): a style named in full keeps its slashes, so the field
-  // is after the last one.
-  for (const p of pass.filter((x) => x.dimension === 'typography')) {
-    const cut = p.token.lastIndexOf('/');
-    if (cut < 1) continue;
-    const scale = p.token.slice(0, cut), prop = p.token.slice(cut + 1);
+  for (const p of tPass) {
+    const sf = fieldOf(p.token);
+    if (!sf || failed.has(p.token)) continue;
+    const [scale, prop] = sf;
     if (!scales.has(scale)) scales.set(scale, { scale });
-    scales.get(scale)[prop] = { var: p.cssVar, value: p.value };
+    const t = scales.get(scale);
+    // The base value first (the root mode is the first a mode-bound field is compared in), each mode's after it.
+    if (!t[prop]) t[prop] = { var: p.cssVar, value: p.value, ...(p.variable ? { figma: p.variable } : {}) };
+    if (p.mode && p.mode !== '-') (t[prop].modes ??= {})[p.mode] = p.value;
+  }
+  // A style the snapshot has with a field not agreed: off the page, with why.
+  const typeLeftOff = [];
+  for (const [scale, t] of [...scales]) {
+    const entry = textStyle(typo, scale);
+    if (!entry) continue;
+    const missing = styleFields(entry).filter((f) => !t[f]);
+    if (missing.length) { scales.delete(scale); typeLeftOff.push({ style: scale, fields: missing, differs: missing.filter((f) => failed.has(`${scale}/${f}`)) }); }
+  }
+  // The snapshot's other styles, when the check compared text styles at all (with nothing compared, as before: no list).
+  const compared = tPass.length || tFail.length || (check.skip ?? []).some((sk) => sk.dimension === 'typography' && /^not compared/.test(sk.reason ?? ''));
+  if (compared) for (const k of Object.keys(typo)) if (!scales.has(k) && !typeLeftOff.some((x) => x.style === k)) {
+    const fields = styleFields(typo[k]);
+    if (fields.length) typeLeftOff.push({ style: k, fields, differs: fields.filter((f) => failed.has(`${k}/${f}`)) });
   }
   // Each value by the name of the Figma variable its text style binds (typography/m/font-size, font-family), and the
   // styles in Figma's own order.
@@ -568,7 +591,7 @@ export function agreedTokens(check = {}, figmaVars = {}) {
   const sized = new Set(Object.keys(figmaVars.sizing ?? {}));
   for (const t of scales.values()) {
     for (const [prop, v] of Object.entries(t)) {
-      if (prop === 'scale' || !v) continue;
+      if (prop === 'scale' || !v || v.figma) continue;
       const name = `typography/${t.scale}/${FIG_PROP[prop] ?? prop}`;
       // A style named in full (s/regular) binds its scale's variable (typography/s/font-size): named by it when the
       // values agree.
@@ -584,6 +607,10 @@ export function agreedTokens(check = {}, figmaVars = {}) {
   }
   const typeOrder = Object.keys(figmaVars.typography ?? {});
   const typeAt = (t) => { const i = typeOrder.indexOf(textStyleKey(figmaVars.typography, t.scale)); return i < 0 ? typeOrder.length : i; };
+  // The family, once: agreed (the variable the styles bind, or the code's page font) or differing (on the Tasks page).
+  const famPass = pass.find((x) => x.dimension === 'typography' && x.family), famFail = (check.fail ?? []).find((x) => x.dimension === 'typography' && x.family);
+  const typeFamily = famFail ? { differs: true, figma: famFail.figma ?? famFail.value ?? null, code: famFail.css ?? null, var: famFail.cssVar ?? null, variable: famFail.variable ?? null, styles: famFail.styles ?? [] }
+    : famPass ? { figma: famPass.variable ?? 'text styles', var: /^--/.test(famPass.cssVar ?? '') ? famPass.cssVar : null, value: famPass.value, styles: famPass.styles ?? [] } : null;
   const differences = (check.fail ?? []).length + (check.aliasFail ?? []).length;
   return {
     colors: [...groups].map(([group, items]) => ({ group, items })),
@@ -591,8 +618,61 @@ export function agreedTokens(check = {}, figmaVars = {}) {
     radii: sizes.filter(isRadius),
     sizing: sizes.filter((t) => !isSpace(t) && !isRadius(t)),
     typography: [...scales.values()].sort((a, b) => typeAt(a) - typeAt(b)),
+    ...(typeFamily ? { typeFamily } : {}),
+    ...(typeLeftOff.length ? { typeLeftOff: typeLeftOff.sort((a, b) => typeOrder.indexOf(a.style) - typeOrder.indexOf(b.style)) } : {}),
     differences,
   };
+}
+
+// ── The text styles on the Tasks page ───────────────────────────────────────────────────────────────────────────────
+// What the token check found in the text styles (parity-check.mjs, its typography): each style with a field that
+// differs from the code, one task a style with every field and mode that differs; the family when it differs, one task
+// for every style that uses it; and the styles not compared in full (a field with no variable in Figma and no TYPO
+// entry), one task for them all. → system tasks ({ who, area, type, kind, say, todo }), in Figma's order.
+const FIELD_WORD = { size: 'font size', weight: 'font weight', lh: 'line height', ls: 'letter spacing', ps: 'paragraph spacing', textTransform: 'case' };
+export function typographyTodos(check = {}, figmaVars = {}) {
+  const out = [];
+  const typo = figmaVars.typography ?? {};
+  const order = Object.keys(typo);
+  const fails = (check.fail ?? []).filter((f) => f.dimension === 'typography' && !f.family);
+  const byStyle = new Map();
+  for (const f of fails) {
+    const cut = String(f.token ?? '').lastIndexOf('/');
+    if (cut < 1) continue;
+    const style = f.token.slice(0, cut), field = f.token.slice(cut + 1);
+    (byStyle.get(style) ?? byStyle.set(style, []).get(style)).push({ ...f, field });
+  }
+  const at = (k) => { const i = order.indexOf(k); return i < 0 ? order.length : i; };
+  for (const [style, list] of [...byStyle].sort((a, b) => at(a[0]) - at(b[0]))) {
+    const parts = list.map((f) => {
+      const where = f.mode && f.mode !== '-' ? ` in ${f.mode}` : '';
+      return f.issue ? `${FIELD_WORD[f.field] ?? f.field}${where}: the code has no ${f.cssVar} (Figma ${f.value ?? '?'})` : `${FIELD_WORD[f.field] ?? f.field}${where}: Figma ${f.figma}, the code ${f.css} (${f.cssVar})`;
+    });
+    out.push({ who: 'both', area: 'System', type: 'Tokens, text styles', kind: 'Text style', say: `Text style ${style} differs from the code: ${parts.join('; ')}. The Typography page leaves it off until both agree.`,
+      todo: 'Decide which side is right: change the text style (or the variable it binds) in Figma, or the code\'s variable. Ask Claude to change the code.' });
+  }
+  const fam = (check.fail ?? []).find((f) => f.dimension === 'typography' && f.family);
+  if (fam) {
+    const n = (fam.styles ?? []).length;
+    const said = fam.issue ? `the code does not declare ${fam.cssVar}` : `the code's ${fam.cssVar} is ${fam.css}`;
+    out.push({ who: 'both', area: 'System', type: 'Tokens, text styles', kind: 'Font family', say: `The text styles' family differs: Figma ${fam.figma ?? fam.value}${fam.variable ? ` (${fam.variable})` : ''}, ${n} style${n === 1 ? '' : 's'}; ${said}. The Typography page draws the styles in the code's family meanwhile.`,
+      todo: 'Decide which family is right, then change it in Figma or ask Claude to change the code.' });
+  }
+  const skipped = new Map();
+  for (const sk of check.skip ?? []) {
+    if (sk.dimension !== 'typography' || sk.family || !/^not compared/.test(sk.reason ?? '')) continue;
+    const cut = String(sk.token ?? '').lastIndexOf('/');
+    if (cut < 1) continue;
+    const style = sk.token.slice(0, cut);
+    (skipped.get(style) ?? skipped.set(style, []).get(style)).push(FIELD_WORD[sk.token.slice(cut + 1)] ?? sk.token.slice(cut + 1));
+  }
+  if (skipped.size) {
+    const list = [...skipped].sort((a, b) => at(a[0]) - at(b[0]));
+    const shown = list.slice(0, 6).map(([s, f]) => `${s} (${f.join(', ')})`).join(', ') + (list.length > 6 ? `, and ${list.length - 6} more` : '');
+    out.push({ who: 'both', area: 'System', type: 'Tokens, text styles', kind: 'Not compared', say: `${list.length} text style${list.length === 1 ? ' is' : 's are'} not compared in full, so the Typography page leaves ${list.length === 1 ? 'it' : 'them'} off: ${shown}. Neither a variable bound in Figma nor a TYPO entry names the code's variable for ${list.length === 1 ? 'that field' : 'those fields'}.`,
+      todo: 'Bind each field of the text style to its variable in Figma (the engine then pairs it with the code\'s variable of the same name), or name the code\'s variable in TYPO in design-system-engine-map.mjs (a style, or a scale such as \'s\' for all its styles). Ask Claude for the map entries.' });
+  }
+  return out;
 }
 
 // An instance copied from a page, without its handlers and its ids (a script's hooks, unique to that page), except an id

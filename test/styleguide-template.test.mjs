@@ -706,11 +706,12 @@ test('a text goes to the part whose own words they are; a shape part stays empty
   assert.match(tpl, /\.pg-updated \{ display: grid; gap: var\(--sg-space-l\);/);
 });
 
-test('a title in the style guide has no line under it; each type style lists its family, size, weight, line height and letter spacing', () => {
+test('a title in the style guide has no line under it; each type style lists its size, weight, line height, letter spacing and case, the family once', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   const h3 = /\.sg-subsection > h3 \{[^}]*\}/.exec(tpl)[0];
   assert.doesNotMatch(h3, /border-bottom/);
-  for (const k of ['family', 'size', 'weight', 'line height', 'letter spacing']) assert.match(tpl, new RegExp("\\['" + k + "', val\\("));
+  for (const [k, word] of [['size', 'size'], ['weight', 'weight'], ['lh', 'line height'], ['ls', 'letter spacing'], ['textTransform', 'case']]) assert.ok(tpl.includes(`['${k}', `) && tpl.includes(`'${word}']`), k);
+  assert.match(tpl, /tokenCard\('family'/, 'the family once, as its own token');
   assert.match(tpl, /row\.querySelector\('table'\)\.innerHTML = rowsHTML\(lines\);/);   // a token table, as a component has
 });
 

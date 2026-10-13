@@ -721,6 +721,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const pr = (await context()).locator.pairing?.();
       if (pr) for (const t of pairingTasks(pr, { ROOT, skip: new Set(await inProgressNames(ROOT, cfg)) })) (view.systemTodo ??= []).push({ who: 'both', area: 'Parity', type: 'Component pairing', kind: 'Pairing', pairing: t.name, say: t.say, todo: t.todo });
     } catch { /* advice: the page builds without it */ }
+    // The text styles the token check found differing from the code, the family when it does, and the styles it could not
+    // compare in full: a decision each on the Tasks page (the Typography page leaves those styles off).
+    if (!opts.only?.length) try {
+      const { typographyTodos } = await import('./styleguide-data.mjs');
+      const tt = typographyTodos(check ?? {}, readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {});
+      if (tt.length) view.systemTodo = [...(view.systemTodo ?? []), ...tt];
+    } catch { /* the page builds without it */ }
     // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
     // product brings it in (its import line and its file) and the system's components it is built with.
