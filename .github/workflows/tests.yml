@@ -20,7 +20,7 @@ jobs:
       # test/vue-builds.test.mjs).
       - name: Install the Vue build tools the Vue tests use
         run: |
-          npm install --prefix test/.vue-tools --no-audit --no-fund vite@6 @vitejs/plugin-vue@5 vue@3 sass@1
+          npm install --prefix test/.vue-tools --no-audit --no-fund vite@6 @vitejs/plugin-vue@5 vue@3 sass@1 pinia@3 vue-router@4
           npm install --prefix test/.vue-cli-tools --no-audit --no-fund @vue/cli-service@5 vue@3 sass@1 sass-loader@16
           npm install --prefix test/.nuxt-tools --no-audit --no-fund nuxt@4 vue@3
       # The browser tests use the runner's Chrome (found on PATH); one that skips without it fails the run.

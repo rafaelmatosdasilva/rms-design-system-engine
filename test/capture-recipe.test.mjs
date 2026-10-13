@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { textStyle, textStyleKey, shortStyleNames, styleNames, namesStyle } from '../text-styles.mjs';
+import { textStyle, textStyleKey, shortStyleNames, styleNames, namesStyle, scaleStyles, componentStyleKey } from '../text-styles.mjs';
 import { compareTokens } from '../capture-compare.mjs';
 import { systemScales } from '../prototype-pieces.mjs';
 import { buildSheetLines } from '../build-list.mjs';
@@ -216,4 +216,18 @@ test('E42: the readers read a full-name snapshot as they read an old one (token 
     const lines = buildSheetLines('chip', d, { typography });
     assert.ok(lines.some((l) => l.includes('font-size 11px, font-weight 700')), lines.join('\n'));
   }
+});
+
+test('a scale key (s, from a size bound to typography/s/font-size) names its scale\'s styles: the one the weight names, else the regular one', () => {
+  const T = { 's/strong': { size: '12px', weight: '700', lh: '16px' }, 's/regular': { size: '12px', weight: '400', lh: '16px' }, 'm/regular': { size: '14px', weight: '400', lh: '20px' } };
+  assert.deepEqual(scaleStyles(T, 's'), ['s/strong', 's/regular']);
+  assert.equal(componentStyleKey(T, 's'), 's/regular', 'no weight: the regular one');
+  assert.equal(componentStyleKey(T, 's', 'strong'), 's/strong', 'by the style\'s last segment');
+  assert.equal(componentStyleKey(T, 's', '700'), 's/strong', 'by the weight\'s value');
+  assert.equal(componentStyleKey(T, 's', 's'), 's/regular', 'a weight bound to the same scale');
+  assert.equal(componentStyleKey(T, 'm/regular', 'strong'), 'm/regular', 'a key that names a style is that style');
+  assert.equal(componentStyleKey({ 's/strong': T['s/strong'] }, 's'), 's/strong', 'a scale of one style');
+  assert.equal(componentStyleKey(T, 'xl'), null);
+  const d = { COMPONENT_CSS_SELECTORS: { tag: { main: '.tag' } }, CONTRACT: { tag: { fontSizeVar: 's', fontWeightVar: 'strong' } }, FIGMA_LAYOUT_TO_CSS: {}, CSS_BASE_RULE_VARS: [] };
+  assert.ok(buildSheetLines('tag', d, { typography: T }).some((l) => l.includes('text: the "s/strong" text style (font-size 12px, font-weight 700, line-height 16px)')));
 });
