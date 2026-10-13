@@ -105,5 +105,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `a11y-checks-and-figma-review` | The 21 guide tasks on Haiku (engine d5be7e8) | "Accessibility checks V1 to V6, findings and specs handed to Figma" |
 | `census-planted-faults-health` | The 21 guide tasks on Haiku (engine 2b17d2c) | "Raw value census, prototypes sized as screens, planted-fault tests, Health by criterion" |
 | `setup-from-capture` | The 21 guide tasks on Haiku (engine 438d3a4) | "Setup fills from the first capture what it cannot read" |
+| `gitlab-agents-gaps` | The 21 guide tasks on Haiku (engine c2ee891) | "A project read from GitLab, agents without the hooks, and gaps that say what was tried" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
