@@ -352,3 +352,18 @@ test('a text style keeps a token when Figma also has variables under its name (t
   assert.equal(JSON.parse(readFileSync(join(r.outDir, 'label.contract.json'), 'utf8')).anatomy.root.typographyToken, '{textStyle.m}');
   assert.equal(JSON.parse(readFileSync(join(r.outDir, 'tag.contract.json'), 'utf8')).anatomy.root.typographyToken, '{typography.s}');
 });
+
+test('a size bound to a scale\'s variable (s) points at that scale\'s style: the one its weight names, else the regular one', async () => {
+  const dir = makeFixture({
+    'theme.css': ':root{}\n',
+    'vars.json': { color: { light: {}, dark: {} }, sizing: { 'typography/s/font-size': '12px' }, typography: { 's/regular': { size: '12px', weight: '400', lh: '16px' }, 's/strong': { size: '12px', weight: '700', lh: '16px' }, 'm/regular': { size: '14px', weight: '400', lh: '20px' } } },
+    'struct.json': { components: { tag: { nodeId: '1:3', h: 16, fontSizeVar: 's' }, label: { nodeId: '1:4', h: 16, fontSizeVar: 's', fontWeightVar: 'strong' } } },
+    'props.json': { tag: { nodeId: '1:3', properties: {}, annotations: [] }, label: { nodeId: '1:4', properties: {}, annotations: [] } },
+    'structure-contract.mjs': "export const CONTRACT = { tag: { h: 16, fontSizeVar: 's' }, label: { h: 16, fontSizeVar: 's', fontWeightVar: 'strong' } };\n",
+  });
+  const r = await generateContracts(dir, { paths: cfg.paths, figma: cfg.figma }, {});
+  assert.deepEqual(r.undefinedRefs, [], 'never {typography.s}');
+  const token = (n) => JSON.parse(readFileSync(join(r.outDir, `${n}.contract.json`), 'utf8')).anatomy.root.typographyToken;
+  assert.equal(token('tag'), '{typography.s/regular}', 'no weight named: the regular one');
+  assert.equal(token('label'), '{typography.strong}', 'the weight it recorded (its style\'s short name)');
+});

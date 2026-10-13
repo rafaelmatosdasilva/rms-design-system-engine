@@ -9,6 +9,7 @@
 // Pure: agreedView takes what the generator read and returns { components, notAgreed, modes }.
 import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
 import { textStyle, textStyleKey } from './text-styles.mjs';
+import { sameValue } from './css-values.mjs';
 import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs';
 import { requirementEntry } from './annotation-categories.mjs';
 import { WCAG22, WCAG21_KIND } from './wcag21.mjs';
@@ -552,8 +553,12 @@ export function agreedTokens(check = {}, figmaVars = {}) {
   const sizes = pass.filter((x) => x.dimension === 'sizing').map((p) => ({ figma: p.token, var: p.cssVar, value: p.value, ...(byMode(p.token) ? { modes: byMode(p.token) } : {}), ...describe(p.token) }));
   const isRadius = (t) => /radi(i|us)|corner/i.test(t.figma), isSpace = (t) => /\b(gap|padding|margin|space|spacing|inset)\b/i.test(t.figma.replace(/\//g, ' '));
   const scales = new Map();
+  // A token is the style's key and the field ("s/regular/size"): a style named in full keeps its slashes, so the field
+  // is after the last one.
   for (const p of pass.filter((x) => x.dimension === 'typography')) {
-    const [scale, prop] = p.token.split('/');
+    const cut = p.token.lastIndexOf('/');
+    if (cut < 1) continue;
+    const scale = p.token.slice(0, cut), prop = p.token.slice(cut + 1);
     if (!scales.has(scale)) scales.set(scale, { scale });
     scales.get(scale)[prop] = { var: p.cssVar, value: p.value };
   }
@@ -565,8 +570,13 @@ export function agreedTokens(check = {}, figmaVars = {}) {
     for (const [prop, v] of Object.entries(t)) {
       if (prop === 'scale' || !v) continue;
       const name = `typography/${t.scale}/${FIG_PROP[prop] ?? prop}`;
+      // A style named in full (s/regular) binds its scale's variable (typography/s/font-size): named by it when the
+      // values agree.
+      const cut = t.scale.lastIndexOf('/');
+      const ofScale = cut > 0 ? `typography/${t.scale.slice(0, cut)}/${FIG_PROP[prop] ?? prop}` : null;
       // A value Figma keeps in the text style itself, with no variable of its own (a weight): named by that style.
       if (sized.has(name)) v.figma = name;
+      else if (ofScale && sized.has(ofScale) && sameValue(figmaVars.sizing[ofScale], v.value, 'any')) v.figma = ofScale;
       else if (textStyle(figmaVars.typography, t.scale)) v.figma = `text style ${t.scale}`;
     }
     const fam = Object.keys(figmaVars.strings ?? {}).find((k) => /(^|\/)font-?family$/i.test(k));
@@ -897,12 +907,15 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
       .sort((a, b) => rank(a) - rank(b) || a.figma.localeCompare(b.figma))[0];
     if (pick) { roles[role] = `var(${pick.var})`; from[role] = pick.figma; if (!['positive', 'negative', 'warning'].includes(role)) used.add(pick.var); }
   }
-  if (!roles.bg && roles.surface) { roles.bg = roles.surface; from.bg = from.surface; }
-  if (!roles['bg-2'] && roles.bg) { roles['bg-2'] = roles.bg; from['bg-2'] = from.bg; }
-  if (!roles['text-2'] && roles.text) { roles['text-2'] = roles.text; from['text-2'] = from.text; }
-  if (!roles.muted && roles['text-2']) { roles.muted = roles['text-2']; from.muted = from['text-2']; }
-  if (!roles.accent && roles.text) { roles.accent = roles.text; from.accent = from.text; }
-  if (roles.bg) { roles.stage = roles.bg; from.stage = from.bg; }
+  // A role with no token of its own takes the one it follows (the page's background its surface, the second text the
+  // first), and the preview stage is the page's background. Worked out again once styleguide.chrome is applied, so a
+  // role named by hand carries to every role that follows it, unless that one is named by hand too.
+  const FOLLOWS = [['bg', 'surface'], ['bg-2', 'bg'], ['text-2', 'text'], ['muted', 'text-2'], ['accent', 'text'], ['stage', 'bg']];
+  const followed = new Set();
+  const follow = (named = new Set()) => {
+    for (const [role, of] of FOLLOWS) if (!named.has(role) && (!roles[role] || followed.has(role)) && roles[of]) { roles[role] = roles[of]; from[role] = from[of]; followed.add(role); }
+  };
+  follow();
   if (roles.warning) from.warning = from.warning ?? '';
   // Type: the system's text styles, smallest to largest; headings take the largest.
   const type = (tokens?.typography ?? []).filter((t) => t.size?.var).sort((a, b) => parseFloat(a.size.value) - parseFloat(b.size.value));
@@ -944,7 +957,9 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
     if (look.radius) { roles.radius = look.radius; roles['radius-l'] = look.radius; from.radius = from['radius-l'] = at; }
     roles.shadow = look.shadow ?? 'none'; from.shadow = at;
   }
-  for (const [role, v] of Object.entries(override ?? {})) if (typeof v === 'string' && v) { roles[role] = /^--/.test(v) ? `var(${v})` : v; from[role] = 'styleguide.chrome'; }
+  const named = new Set();
+  for (const [role, v] of Object.entries(override ?? {})) if (typeof v === 'string' && v) { roles[role] = /^--/.test(v) ? `var(${v})` : v; from[role] = 'styleguide.chrome'; named.add(role); }
+  follow(named);
   const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
   const missing = NEEDED.filter((r) => !roles[r]);
   // Declared again on every element that carries its own mode, so a preview in Light on a Dark page resolves the

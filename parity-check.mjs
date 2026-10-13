@@ -25,7 +25,7 @@ import { join } from 'path';
 import { loadTokensDict, tokenSource } from './fix-hint.mjs';
 import { loadCssSources, rootTokens, blankComments, neverAppliedRootSelectors } from './css-source.mjs';
 import { readFreshSnapshot } from './code-capture.mjs';
-import { colorHex, sameColor, sameValue } from './css-values.mjs';   // #fff = #ffffff, rgb()/hsl()/oklch() = hex, 0.5rem = 8px   // the cascade-aware theme reader (shared with the code capture)
+import { colorHex, sameColor, sameValue, sameHex } from './css-values.mjs';   // #fff = #ffffff, rgb()/hsl()/oklch() = hex, 0.5rem = 8px   // the cascade-aware theme reader (shared with the code capture)
 import { resolveNamingSpec, tokenToVar as toVar } from './naming-convention.mjs';   // shared Figma↔code naming convention
 import { isBuildMode, writeTokensToBuild } from './build-list.mjs';   // build mode: tokens still to build
 
@@ -290,7 +290,7 @@ function aliasHopToVar(hop) {
 function hexToNeutralVar(hex, modeIdx) {
   const nmap = neutralMaps[modeIdx] ?? {};
   for (const [key, h] of Object.entries(nmap)) {
-    if (h && h.toLowerCase() === hex.toLowerCase()) return `var(--neutral-${key})`;
+    if (h && (sameHex(h, hex) ?? h.toLowerCase() === hex.toLowerCase())) return `var(--neutral-${key})`;
   }
   return null;
 }
@@ -433,8 +433,8 @@ for (let modeIdx = 0; modeIdx < MODES.length; modeIdx++) {
       NEW_SKIP.push({ dimension: 'color', token, cssVar: actualVar, mode: modeMeta.name, reason: 'CSS value is not a colour this gate can read (a gradient, a display-p3 colour, a keyword) - add to SKIP_TOKENS in design-system-engine-map.mjs if intentional' });
       continue;
     }
-    const sameHex = sameColor(figmaHex, cssHex) ?? (figmaHex.toLowerCase() === cssHex.toLowerCase());
-    if (!sameHex) {
+    const agrees = sameColor(figmaHex, cssHex) ?? (figmaHex.toLowerCase() === cssHex.toLowerCase());
+    if (!agrees) {
       // Cross-check against DS source: if source matches CSS, consumer just has a pending
       // library update - this is not a code bug. Route to PENDING_FIGMA_SYNC instead of FAIL.
       const sourceHex = sourceSnap?.[modeMeta.snapshotKey]?.[tokenKey]
@@ -532,7 +532,7 @@ for (const [token, figmaVal] of Object.entries(snap.sizing ?? {})) {
     NEW_SKIP.push({ dimension: 'sizing', token, cssVar: actualVar, mode: '-', reason: 'CSS var did not resolve to a literal' });
     continue;
   }
-  if (!(sameValue(figmaVal, cssVal, 'length') ?? String(figmaVal).trim() === cssVal.trim())) {
+  if (!(sameHex(figmaVal, cssVal) ?? sameValue(figmaVal, cssVal, 'length') ?? String(figmaVal).trim() === cssVal.trim())) {
     const fixHint = sizingFixHint(actualVar, figmaVal);
     FAIL.push({ dimension: 'sizing', token, cssVar: actualVar, mode: '-', figma: figmaVal, css: cssVal, hint: `CSS resolves ${actualVar} → ${cssVal} but Figma says ${figmaVal}`, fixHint });
     if (FIX_MODE) {
@@ -644,7 +644,7 @@ for (const [tokenName, expected] of Object.entries(strSnap)) {
   const actualVar = loc.name;
   const raw = modeVars[0][actualVar];
   const norm = s => String(s).replace(/^["']|["']$/g, '').trim().toLowerCase();
-  if (norm(raw) !== norm(expected)) {
+  if (!(sameHex(raw, expected) ?? norm(raw) === norm(expected))) {
     FAIL.push({ dimension: 'strings', token: tokenName, cssVar: actualVar, mode: '-', figma: expected, css: raw, hint: `CSS has ${actualVar}: ${raw} but Figma says "${expected}"`, fixHint: `${THEME_PATH} - change ${actualVar}: ${raw} → ${expected}` });
   } else {
     PASS.push(`strings ${tokenName}`);
@@ -690,12 +690,12 @@ if (bpModeNames.length > 0) {
       const actual = cssBlock?.[cssVar];
       if (!actual) {
         const rootVal = cssBlocks.root[cssVar];
-        if (rootVal === expected) { PASS.push(`breakpoints ${tokenName}@${modeName}`); continue; }
+        if (rootVal === expected || sameHex(rootVal, expected)) { PASS.push(`breakpoints ${tokenName}@${modeName}`); continue; }
         const fix = modeIdx === 0
           ? `Add ${cssVar}: ${expected} to :root in ${THEME_PATH}`
           : `Add ${cssVar}: ${expected} inside @media (min-width: ${width}px) in ${THEME_PATH}`;
         FAIL.push({ dimension: 'breakpoints', token: tokenName, cssVar, mode: modeName, issue: modeIdx === 0 ? 'CSS var not declared in :root' : `missing in @media (min-width: ${width}px)`, fixHint: fix, value: expected, ...(modeIdx === 0 ? {} : { media: `(min-width: ${width}px)` }) });
-      } else if (actual !== expected) {
+      } else if (actual !== expected && !sameHex(actual, expected)) {
         FAIL.push({ dimension: 'breakpoints', token: tokenName, cssVar, mode: modeName, figma: expected, css: actual, hint: `@media ${width}px: CSS has ${actual} but Figma says ${expected}` });
       } else {
         PASS.push(`breakpoints ${tokenName}@${modeName}`);

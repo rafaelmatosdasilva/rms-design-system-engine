@@ -2,7 +2,7 @@
 // reporting spelling differences as design differences.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { colorHex, sameColor, lengthPx, timeMs, sameValue, sameEasing } from '../css-values.mjs';
+import { colorHex, sameColor, sameHex, lengthPx, timeMs, sameValue, sameEasing } from '../css-values.mjs';
 import { runGate, EMPTY_ENGINE_MAP } from './helpers.mjs';
 
 test('colours: every CSS spelling reads as the same hex', () => {
@@ -17,6 +17,16 @@ test('colours: every CSS spelling reads as the same hex', () => {
   assert.equal(sameColor('#0055ff', 'rgb(0, 85, 255)'), true);
   assert.equal(sameColor('#0055ff', '#0055fe'), true);          // within rounding
   assert.equal(sameColor('#0055ff', '#0055f0'), false);
+});
+
+test('two hex colours written alike: case and an opaque alpha byte aside; anything else is not theirs to say', () => {
+  assert.equal(sameHex('#0037fa', '#0037FA'), true);
+  assert.equal(sameHex('#0037fa', '#0037faff'), true);
+  assert.equal(sameHex('#fff', '#FFFFFFFF'), true);
+  assert.equal(sameHex('#0037fa', '#0037fa80'), false, 'a see-through one is another colour');
+  assert.equal(sameHex('#0037fa', '#0037fb'), false);
+  assert.equal(sameHex('#0037fa', 'rgb(0, 55, 250)'), null);
+  assert.equal(sameHex('8px', '8px'), null);
 });
 
 test('lengths and times: rem, calc(), pt, unitless Figma floats; ms and s', () => {
