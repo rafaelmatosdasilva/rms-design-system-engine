@@ -5,7 +5,8 @@
 // Installed per project by `rms-design-system-engine --install-hooks` (and by --init), in
 // .claude/settings.local.json. It reads the tool call Claude Code is about to make (JSON on stdin) and:
 //   • denies editing a Figma snapshot by hand: they come from the capture, never from a hand edit;
-//   • asks the person before editing ds-config.json, committing, pushing, or applying the hand-back patch;
+//   • asks the person before editing ds-config.json, committing, pushing, applying the hand-back patch, or writing the
+//     engine's rules into an agent's instruction file;
 //   • keeps the records of the system's decisions for the person (I73): what was accepted as debt, the exception
 //     lists and the approved reference pictures (replaced or deleted; a new one is not yet approved) change only
 //     when the person's latest message asks for it, and the record of what both sides last agreed on is the
@@ -256,6 +257,8 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
       const v = decisionVerdict(kind, f, userText);
       if (v) return v;
     }
+    // The engine's rules go into an agent's instruction file only once the person said yes (M2).
+    if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--agent-rules\b[^|;&\n]*\s--write\b/.test(cmd) && !(userText !== null && (APPROVES.test(userText) || asksForChange(userText)))) return { decision: 'ask', reason: 'The engine\'s rules go into an instruction file only when the person says yes. Show them the section (rms-design-system-engine --agent-rules) and ask.' };
     if (/\bgit\b[^|;&\n]*\spush\b/.test(cmd)) return { decision: 'ask', reason: 'Pushing sends the work to the remote. Confirm the person asked for a push.' };
     if (/\bgit\b[^|;&\n]*\scommit\b/.test(cmd)) return { decision: 'ask', reason: 'Committing records the change. Confirm the person asked for a commit.' };
     if (/\bgit\b[^|;&\n]*\sapply\b/.test(cmd) && /handback|code-changes\.diff/.test(cmd) && !(userText !== null && asksForChange(userText))) return { decision: 'ask', reason: 'The hand-back patch is only applied when the person asks. Confirm they did.' };
