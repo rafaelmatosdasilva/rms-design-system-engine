@@ -73,6 +73,7 @@ The easy way is to ask in plain language.
 - *check the whole design system against Figma* checks everything.
 - *check input* checks the `input` component and its parts, and reports only that.
 - *which props does the badge take?* answers from the design system, with names written exactly.
+- *check the accessibility of the primary button* finds buttonPrimary, whatever the spaces, capitals, dashes and word order. *the buttons* checks every component with that word. *the button*, when several components have it, is asked about first, and nothing runs until you answer.
 
 ### From the terminal
 

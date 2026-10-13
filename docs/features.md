@@ -32,6 +32,7 @@ You can combine options. `rms-design-system-engine --component button --only acc
 
 - **One component, its own findings.** When you check one component, accessibility findings are listed only when they are about that component, in its own file or on an element that carries its class. A page that only uses it keeps its findings to itself.
 - **The browser part needs your packages.** When the project's packages are not installed, the run tells you. Install them and run again.
+- **Name the component the way your system does.** Spaces, capitals, dashes and word order do not matter, so *button primary*, *Button Primary* and *primary button* all check buttonPrimary alone. A word only one component has checks that one, and a plural (*the buttons*) checks every component with that word. A word several components share (*the button*, in a system with buttonPrimary and iconButton) makes Claude ask which one first, so a request about one component never checks the whole library.
 
 ### Every difference in one list
 
