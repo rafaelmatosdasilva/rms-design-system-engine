@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Components read in checked chunks (continuous evaluation)
+
+What changed since the entry below (engine c071b6d): The refresh recipe now reads the components in checked chunks too (--capture-script components sums, then each chunk --capture-import names). Each chunk script runs the recipe's own Step 1c functions in Figma (componentFacts and propsFacts, added to the recipe, with the resting variant and child frames as functions); --capture-import merges the chunks into the structure and props snapshots, keeps the keys the capture does not read and takes out components no longer in Figma. figma-cli reads the components the same way. Setup no longer reads a crowded folder above the project for products. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/gates.md`, `reference/usage.md`.
+
+Guide set measured: `62f3f31a7791` · Project measured: `13d811a9d668`
+
+| Haiku, engine 99f052c | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.059 |
+| Input a run | 93k | 111k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 111k a run against 93k. Records: `records/p6-components`.
+
 ## 2026-10: Figma read in checked chunks by both readers, outputs stamped with what they were built from, parity by type, Mac-like runs (continuous evaluation)
 
 What changed since the entry below (engine 78d3116): The refresh recipe reads Figma's variables, text styles and effect styles in checked chunks (--capture-script vars N, then --capture-import, which builds the vars snapshot with the recipe's own scripts; on a refresh only the checksums and the chunks that changed), and figma-cli runs the same scripts, so both readers give the same snapshot; the usage reference lists both commands. The engine also stamps every snapshot, the contracts and the style guide with the code commit, the Figma version and the engine, and keeps an output built from newer inputs; quotes its own path in routed commands; hides Chrome on request wherever it is installed; and the Health page lists the parity differences by type. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
