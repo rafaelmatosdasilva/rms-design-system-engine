@@ -141,7 +141,7 @@ try {
   const st = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {};
   FIGMA_NODE_IDS = Object.fromEntries(Object.entries(st).filter(([, v]) => v?.nodeId).map(([k, v]) => [k, v.nodeId]));
 } catch { /* optional: joins Code Connect files by node id */ }
-const API = createApiReader(ROOT, cfg, { classFor: LOCATOR.classFor, nodeIds: FIGMA_NODE_IDS });
+const API = createApiReader(ROOT, cfg, { classFor: LOCATOR.classFor, nodeIds: FIGMA_NODE_IDS, pairing: LOCATOR.pairing() });
 const resolveFile = (figmaName) => API.fileFor(figmaName);
 
 // ── Compare Figma properties to code props, per component ─────────────────────
