@@ -9,7 +9,7 @@
 // model, in English and Portuguese. route() is pure: projectState() reads the project for it.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
-import { codeComponents } from './component-source.mjs';
+import { createPairing } from './component-pairing.mjs';
 import { join, relative, basename } from 'node:path';
 
 // What the router needs from the project: is there a config, which components, when the snapshots were
@@ -35,7 +35,7 @@ export function projectState(ROOT, { engineDir, env = process.env } = {}) {
     build: conf.build === true,
     pages: uiFiles(ROOT),
     rawColours: rawColoursOf(structure?.components ?? {}),
-    components: withCodeNames(Object.keys(structure?.components ?? {}), () => codeComponents(ROOT, conf)),
+    components: withCodeNames(Object.keys(structure?.components ?? {}), () => createPairing({ ROOT, cfg: conf }).codeOnly()),
     snapshotDate: oldest ? oldest.toISOString().slice(0, 10) : null,
     cmd: onPath || !engineDir ? 'rms-design-system-engine' : `node ${shellPath(join(engineDir, 'audit.mjs'))}`,
   };
@@ -46,8 +46,9 @@ export function projectState(ROOT, { engineDir, env = process.env } = {}) {
 export const shellPath = (p) => (/^[\w@%+=:,./\\-]+$/.test(p) ? p : `"${String(p).replace(/(["$`])/g, '\\$1')}"`);   // in double quotes, as the hooks' own command is
 
 // Figma's components and the ones only the code has (HbChip.vue, a file whose root carries a class of its own), so a
-// request that names a component the snapshot lacks is still scoped to it (E24). One the snapshot has under its own
-// name (HbBadge.vue for Figma's badge, Button.jsx for button) is not named twice.
+// request that names a component the snapshot lacks is still scoped to it (E24). The code's list comes from the shared
+// pairing (component-pairing.mjs), so a file paired with a Figma component, or proposed for one, is not in it; one the
+// snapshot has under its own name (HbBadge.vue for Figma's badge, Button.jsx for button) is not named twice either.
 export function withCodeNames(figmaNames, code) {
   const sq = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
   let found = [];
