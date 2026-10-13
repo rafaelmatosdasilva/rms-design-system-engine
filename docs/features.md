@@ -43,6 +43,23 @@ Each full check writes `.design-system-engine-out/differences.md`, every differe
 
 It is written whether or not you have a style guide, and the summary of every check says where it is.
 
+### Differences you keep on purpose
+
+Some differences are decisions, not mistakes. When your team decides to keep one, say so and give the reason.
+
+| You say | Or run |
+|---|---|
+| `/rms-design-system-engine keep the chip's height, it is on purpose because the product needs a larger tap target` | `rms-design-system-engine --keep --component chip --match height --reason "the product needs a larger tap target"` |
+
+- It is recorded in `design-system-engine-kept.json` with the reason, who decided and when. Commit it.
+- Add `--truth figma` or `--truth code` to say which side is right, and `--review 90d` (or a date) to look at it again later.
+- A kept difference never fails a check. It is listed under Kept on purpose, in the differences list and on the component's Parity area, with its reason.
+- It is that exact difference that is kept. If Figma or the code changes its value, the difference is open again.
+- Only you keep a difference. The AI asks you first, and it never writes a reason for you.
+- `--keep` alone lists what is kept. `--unkeep --match <words>` takes one back.
+
+This is not debt. Debt (`--baseline`) is a difference you will fix later. A kept difference is one you decided to keep.
+
 ## Check your code against Figma
 
 The engine reads what your design system defines in Figma, its tokens and each component's parts, states and options. Then it checks your code against it, value by value and in a real browser. It is not a screenshot comparison.

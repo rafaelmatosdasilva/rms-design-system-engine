@@ -89,6 +89,9 @@ rms-design-system-engine --docs                          # ALSO build the styleg
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
+rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
+rms-design-system-engine --keep                          # list the kept differences
+rms-design-system-engine --unkeep --match <words> [--component <name>]   # take kept differences back: open again on the next audit
 rms-design-system-engine --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
 rms-design-system-engine --no-baseline                   # ignore any design-system-engine-baseline.json this run (enforce every gate)
 rms-design-system-engine --checked badge 1.3.3 --by "Ana"  # the person checked a criterion only a person can judge: Done in the style guide, by them and when, until the component changes (commit design-system-engine-checked.json)
@@ -1128,6 +1131,22 @@ to drop with the next `--baseline --findings`. A failing gate with no `❌` line
 line, and adds them to the file (nothing accepted before is dropped): `--component chip --baseline --findings
 --match radi` accepts the chip's radius and keeps its prop names failing. The router adds it when the person
 names the kind of difference (radius, height, width, padding, gap, colour, props).
+
+#### Kept on purpose (`--keep`)
+
+A difference the team decided to keep is not debt: debt is what will be fixed. `--keep --match <words>` (with
+`--component <name>` when the person names one) records the open differences of the last full audit that match, in a
+committed `design-system-engine-kept.json`: the difference as the audit said it, `--reason` in the person's own words
+(required, never written for them), who decided (`--by`, else the git user) and when, `--truth figma|code` when one side
+is right, and `--review` (a date, or `90d`, `6m`, `1y`) when to look at it again. On every run a kept difference never
+fails its gate (a gate whose failing lines are all kept passes), its line is shown as `✋ kept on purpose` with the
+reason, and it leaves the open differences: `differences.md` lists it under Kept on purpose, and the style guide's
+Parity area shows it with the status Kept on purpose. What is kept is that difference with those values, matched by its
+check and its words (a file's line number and the severity icon aside): when a value changes on either side, it is open
+again and the decision is listed as no longer found, to drop with `--unkeep --match <words>` or to keep again. A kept
+difference whose review date has come is To check in the style guide. `--keep` alone lists the decisions. Only the
+person keeps a difference: the project's hooks ask before `--keep` or an edit of the file unless their latest message
+says to keep it.
 
 #### Values written by hand (M1, `--census`)
 

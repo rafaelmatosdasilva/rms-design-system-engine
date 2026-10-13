@@ -127,7 +127,7 @@ own preference above a documented standard. The project's `llms.txt` names its o
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
 `--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
 refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.json` edit, a commit, a push,
-applying the hand-back, accepting a difference (`--baseline` or the baseline file), marking a check made by hand (`--checked`, only when the person says they checked it), an exception, a code name
+applying the hand-back, accepting a difference (`--baseline` or the baseline file), keeping one on purpose (`--keep` or `design-system-engine-kept.json`), marking a check made by hand (`--checked`, only when the person says they checked it), an exception, a code name
 recorded for a Figma name (`contract.authored.json`), replacing an approved reference picture, or a code edit, unless the person's latest message asked for that change. After a UI
 edit they hand back what it added that the design system does not have (a colour or size written by hand, a
 variable declared nowhere, a prop value a component does not take), an accessibility problem it added, and any

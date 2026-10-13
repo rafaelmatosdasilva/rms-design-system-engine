@@ -1921,7 +1921,7 @@ a.pg-usage-name { color: var(--sg-text); }
      last updated and where it was read under it. The Tasks page lists the open rows of every component; a component's area lists all of its own,
      the open ones under the same numbers. A row: { key, area, kind, kindHTML, type, figma, code, todo (html), who, st,
      rel, at, src, extra }. */
-  var STATUS = { todo: ['✕', 'To fix', 'differs'], check: ['!', 'To check', 'figma'], done: ['✓', 'Done', 'match'], none: ['–', 'Not needed', 'none'], skip: ['–', 'Not compared', 'none'] };
+  var STATUS = { todo: ['✕', 'To fix', 'differs'], check: ['!', 'To check', 'figma'], done: ['✓', 'Done', 'match'], kept: ['≠', 'Kept on purpose', 'none'], none: ['–', 'Not needed', 'none'], skip: ['–', 'Not compared', 'none'] };
   function isOpen(r) { return r.st === 'todo' || r.st === 'check'; }
   function statusHTML(st, sub) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(x[1]) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
   // Each kind of issue in a table of its own shape: Parity compares Figma with the code, Accessibility a criterion with
@@ -1959,10 +1959,10 @@ a.pg-usage-name { color: var(--sg-text); }
   // A count of each status above a table, as the Tasks page counts them.
   function statusSum(rows) {
     var n = {}; rows.forEach(function (r) { if (!r.extra) n[r.st] = (n[r.st] || 0) + 1; });
-    return [['todo', 'to fix'], ['check', 'to check'], ['done', 'done'], ['skip', 'not compared']].filter(function (x) { return n[x[0]]; })
+    return [['todo', 'to fix'], ['check', 'to check'], ['done', 'done'], ['kept', 'kept on purpose'], ['skip', 'not compared']].filter(function (x) { return n[x[0]]; })
       .map(function (x) { return '<span class="pg-par-status pg-par--' + STATUS[x[0]][2] + '"><span class="pg-par-sign" aria-hidden="true">' + STATUS[x[0]][0] + '</span>' + n[x[0]] + ' ' + x[1] + '</span>'; }).join('');
   }
-  var ST_ORDER = { todo: 0, check: 1, done: 2, skip: 3, none: 4 };
+  var ST_ORDER = { todo: 0, check: 1, done: 2, kept: 3, skip: 4, none: 5 };
   function byStatus(rows) { return rows.map(function (r, i) { return [r, i]; }).sort(function (p, q) { return (!!p[0].extra - !!q[0].extra) || ST_ORDER[p[0].st] - ST_ORDER[q[0].st] || p[1] - q[1]; }).map(function (x) { return x[0]; }); }
   function capital(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
 
@@ -1978,6 +1978,14 @@ a.pg-usage-name { color: var(--sg-text); }
     // Where in the code a difference is (its selector and file line), as the audit wrote it.
     var whereOf = function (x) { var m = /\(([^()]*:\d+[^()]*)\)/.exec(String(x.what || '')); return m ? m[1] : ''; };
     var diffRow = function (x) { return { st: x.who === 'both' ? 'check' : 'todo', who: WHO[x.who] || WHO.both, todo: esc(doWhat(x.todo)), fresh: !!x.new }; };
+    // A difference the team decided to keep: its reason, who decided and when; once its review date has come it is to check.
+    var kept = c.kept || [], keptUsed = {};
+    var keptRow = function (k) {
+      var side = k.truth === 'figma' ? ' Figma is right.' : k.truth === 'code' ? ' The code is right.' : '';
+      var todo = esc(capital(k.reason) + (/[.!?]$/.test(k.reason) ? '' : '.') + side) + (k.due ? ' ' + esc('Look at it again: keep it with a new review date, or fix it.') : k.review ? ' ' + esc('Look again on ' + k.review + '.') : '');
+      return { st: k.due ? 'check' : 'kept', who: k.by ? 'Kept by ' + k.by : 'Kept', todo: todo, rel: k.due ? 'Kept on purpose' : '', at: k.at || null };
+    };
+    var names = function (x, r) { var w = String(x.what || '').toLowerCase(); return (r.figma && w.indexOf(lname + ' ' + String(r.figma.name).toLowerCase() + ':') === 0) || (r.type === 'Variable' && r.code && w.indexOf(String(r.code.name).toLowerCase()) >= 0); };
     ((c.parity && c.parity.rows) || []).forEach(function (r, i) {
       var name = (r.figma && r.figma.name) || (r.code && r.code.name) || '';
       // The difference the audit found on this row: one that names it (badge padding left: Figma 0, ...), or its variable.
@@ -1987,9 +1995,12 @@ a.pg-usage-name { color: var(--sg-text); }
         return (r.figma && w.indexOf(lname + ' ' + String(r.figma.name).toLowerCase() + ':') === 0) || (r.type === 'Variable' && r.code && w.indexOf(String(r.code.name).toLowerCase()) >= 0);
       });
       var x = di >= 0 ? diffs[di] : null; if (x) used[di] = 1;
+      var ki = r.status !== 'differs' || x ? -1 : kept.findIndex(function (k, j) { return !keptUsed[j] && names(k, r); });
+      var kx = ki >= 0 ? kept[ki] : null; if (kx) keptUsed[ki] = 1;
       var row = { key: c.name + '\u0000' + (x ? x.what : 'p:' + r.type + ':' + name + ':' + i), area: 'Parity', kind: r.type, type: r.type, figma: side(r.figma), code: side(r.code, x ? whereOf(x) : ''), rel: PAR_REL[r.status] || r.status, at: r.at || (r.status !== 'match' ? at0 : null) };
       var nb = r.status === 'figma' && r.type === 'Prop' && notBuilt[String(name).toLowerCase()];
       if (x) { var d = diffRow(x); row.st = d.st; row.who = d.who; row.todo = d.todo; row.fresh = d.fresh; }
+      else if (kx) { var kr = keptRow(kx); row.st = kr.st; row.who = kr.who; row.todo = kr.todo; row.rel = kr.rel; row.at = kr.at || row.at; }
       else if (r.status === 'match') row.st = 'done';
       else if (r.status === 'paired') { row.st = 'skip'; row.todo = r.why ? esc(capital(r.why) + '.') : ''; }
       else if (nb) { row.st = 'todo'; row.who = WHO.code; row.todo = esc('Build the ' + nb + ' property of ' + c.name + ' in the code. Tell Claude to do it.'); }
@@ -2004,6 +2015,12 @@ a.pg-usage-name { color: var(--sg-text); }
       if (used[j]) return;
       var d = diffRow(x);
       out.push({ key: c.name + '\u0000' + x.what, area: 'Parity', kind: x.check || 'Difference', type: 'Other', figma: '', code: onWhat(c, x.plain || x.what), todo: d.todo, who: d.who, st: d.st, rel: PAR_REL.differs, fresh: d.fresh, at: at0 });
+    });
+    // A kept difference that is not one of the rows above: a row of its own, under the check that found it.
+    kept.forEach(function (k, j) {
+      if (keptUsed[j]) return;
+      var kr = keptRow(k);
+      out.push({ key: c.name + '\u0000kept:' + k.what, area: 'Parity', kind: k.check || 'Difference', type: 'Other', figma: '', code: onWhat(c, k.plain || k.what), todo: kr.todo, who: kr.who, st: kr.st, rel: kr.rel, at: kr.at || at0 });
     });
     // A prop Figma has that the code does not build, when the table above has no row for it.
     (c.unbuilt || []).forEach(function (u) {
@@ -2419,7 +2436,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var HEALTH_AREAS = [['Parity', 35], ['Accessibility', 30], ['Documentation', 20], ['Motion', 15]].map(function (a) {
     var w = DATA.healthWeights && DATA.healthWeights[a[0]]; return [a[0], typeof w === 'number' && w >= 0 ? w : a[1]];
   });
-  var HEALTH_PART = { done: 1, check: 0.5, todo: 0 };
+  var HEALTH_PART = { done: 1, kept: 1, check: 0.5, todo: 0 };
   // Parity and accessibility count the component: whole when nothing in it is left, half when only checks are left
   // (nothing is known to be wrong, someone has to look), nothing while one thing is to fix. Counted by row, the hundreds
   // of values that match and criteria that pass would hide the few that do not. Documentation and motion count each

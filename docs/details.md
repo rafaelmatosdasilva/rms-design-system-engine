@@ -82,6 +82,7 @@ rms-design-system-engine --component input     # one component (or a few: input,
 rms-design-system-engine --check-ui ui.json     # check a UI an AI tool generated against your components
 rms-design-system-engine --query badge          # one component or token, names written exactly; a token says what it is for (its Figma description), a text colour also lists the surfaces it can be read on
 rms-design-system-engine --component chip --baseline --findings --match radi   # accept one known difference (the chip's radius) as debt; everything else keeps failing
+rms-design-system-engine --keep --component chip --match height --reason "the product needs a larger tap target"   # keep a difference on purpose, with its reason
 rms-design-system-engine --only accessibility   # only the accessibility check
 rms-design-system-engine --only parity          # every check against Figma, without accessibility
 rms-design-system-engine --only 3               # one gate by number, or by name: --only "token values", --only states,props
@@ -328,7 +329,7 @@ The engine makes the decisions, not the AI model, so it behaves the same on a sm
 - A Figma snapshot is never edited by hand.
 - The AI asks you before a commit, a push, a `ds-config.json` edit, or a code change you did not ask for.
 - When a request needs a sentence said as it is (the Figma data was not refreshed) and the AI's reply leaves it out, the hook sends it back once to add it.
-- **The AI cannot make a check pass on its own.** Accepting a difference as debt (`--baseline`, or editing `design-system-engine-baseline.json`), adding an exception to `design-system-engine-map.mjs`, or replacing an approved picture in `.design-system-engine-refs/` waits for you, unless your latest message asked for it. `design-system-engine-agreed.json` is written by the audit alone.
+- **The AI cannot make a check pass on its own.** Accepting a difference as debt (`--baseline`, or editing `design-system-engine-baseline.json`), keeping one on purpose (`--keep`, or editing `design-system-engine-kept.json`), adding an exception to `design-system-engine-map.mjs`, or replacing an approved picture in `.design-system-engine-refs/` waits for you, unless your latest message asked for it. `design-system-engine-agreed.json` is written by the audit alone.
 
 ### Every UI edit is checked as it is made
 

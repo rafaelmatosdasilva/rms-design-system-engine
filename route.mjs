@@ -147,6 +147,11 @@ export const FIGMA_EDITS = /\b(update|align|sync|bring|make|annotat\w*|atualiz\w
 // the input", "verifiquei o 1.4.5 do badge".
 const CHECKED_SAYS = /\b(is|are|was|were)\s+checked\b|\b(i|we)\s+(have\s+|'ve\s+)?(checked|verified|confirmed|reviewed)\b|\bmark\w*\b[\s\S]{0,60}\b(checked|done)\b|\b(verifiquei|conferi|chequei|est[áa] verificad)/i;
 const SC = /\b[1-4]\.\d{1,2}\.\d{1,2}\b/;
+// The team decided to keep a difference ("keep the chip's 28px height, it is on purpose", "mantém o raio, é
+// intencional"): recorded with --keep and the person's reason, never as debt.
+export const KEEP_SAYS = /\b(keep|kept|keeping)\b[^.\n]{0,60}\b(differences?|on purpose|intentional\w*|deliberate\w*|as (it|they) (is|are))\b|\b(on purpose|intentional(ly)?|deliberately|by design)\b|\b(mant[eé]m|manter|mantemos|mantenha|de prop[oó]sito|intencional\w*)\b/i;
+// The reason the person gives, in their words: what follows "because", "since", "porque".
+const KEEP_WHY = /\b(because|since|porque|pois|j[aá] que)\b\s+([^.!?\n]{4,200})/i;
 const RULES = [
   ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
   ['guidelines-links', (t) => LINK.test(t)],
@@ -163,6 +168,7 @@ const RULES = [
   ['refresh-figma', (t) => /maxSnapshotAgeDays|go(es)? green|fica(r)? verde|raise the (age|limit)/i.test(t), 'forbidden-green'],
   // Before accept-debt: "que valores aceita o size" asks what a prop accepts, it accepts no debt.
   ['ask-the-system', (t) => QUESTION.test(t) && /\b(props?|propriedades?|values?|valores?|tokens?|variables?|vari[aá]ve(l|is)|names?|nomes?)\b/i.test(t) && !/debt|d[ií]vida|baseline/i.test(t)],
+  ['accept-debt', (t) => KEEP_SAYS.test(t) && !/debt|d[ií]vida|baseline/i.test(t), 'keep'],
   ['accept-debt', (t) => /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit/i.test(t)],
   ['fix-a-difference', (t) => /\b(fix|correct|repair|corrig|conserta|repara|resolve)\w*/i.test(t) && !QUESTION.test(t)],
   // New UI to build ("add a Saved confirmation next to the Save button"): the names come from the system, never from
@@ -304,6 +310,14 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
       notes.push(`Only ${part === 'accessibility' ? 'the accessibility check' : part === 'parity' ? 'the checks against Figma' : 'the gates asked for'} runs: report that part, and say the rest was not checked in this run.`);
       return { recipe: named.length ? 'audit-component' : 'full-audit', question: false, run: [`${scoped} --only ${/\s/.test(part) ? `'${part}'` : part}`], notes };
     }
+    if (kind === 'keep') {
+      // A difference the team keeps on purpose: recorded with the person's own reason, never failing again while its
+      // values stay as they are. Never as debt (debt is what will be fixed).
+      const match = debtWords(t), why = KEEP_WHY.exec(t)?.[2]?.trim().replace(/"/g, "'");
+      notes.push('The team decided to keep this difference: record it with --keep and the person\'s own reason, never one you write. While its values stay as they are it never fails a run, and the differences list and the style guide show it as kept with the reason; when a value changes it is open again. Never --baseline for it: debt is what will be fixed.');
+      const run = `${scoped} --keep${match.length ? ` --match ${match.join(',')}` : ''} --reason ${why ? JSON.stringify(why) : '"<their reason>"'}`;
+      return { recipe, question: false, run: [run], notes, kind, ...(why ? {} : { ask: 'why the team keeps this difference, in their own words (it is recorded with it)', askHow: 'their reason in --reason' }) };
+    }
     if (recipe === 'accept-debt') {
       // The difference the person named (the radius, not the rest): only the findings that name it are accepted.
       const match = debtWords(t);
@@ -431,7 +445,7 @@ export function routeText(r, recipeText, cmd = 'rms-design-system-engine', { max
   for (const s of r.say ?? []) lines.push(`SAY${r.sayIf ? ` (${r.sayIf})` : ''}: ${s}`);
   const say = r.say?.length ? ` Put the SAY line${r.say.length > 1 ? 's' : ''} in your final reply, word for word${r.sayIf ? `, ${r.sayIf}` : ''}.` : '';
   lines.push(r.ask
-    ? `NEXT: before running anything, ask the person, in one message: ${r.ask}. Then run the command above with their answers (--project=. when it is this folder; --figma-url left out when there is no Figma file) and follow its NEXT line.${say}`
+    ? `NEXT: before running anything, ask the person, in one message: ${r.ask}. Then run the command above with their answers (${r.askHow ?? '--project=. when it is this folder; --figma-url left out when there is no Figma file'}) and follow its NEXT line.${say}`
     : r.run.length
     ? r.recipe === 'ask-the-system'
       ? `NEXT: run the command above and answer from what it prints, with the names exactly as written there.${say}`

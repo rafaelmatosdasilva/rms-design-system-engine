@@ -32,7 +32,7 @@ export function collectFindings(lines) {
         const g = line.match(GATE);
         if (g) { section = g[3].trim(); sectionBad = g[1] === '❌'; if (sectionBad) out.add(`${section} :: gate fails`); continue; }
         if (!section || ZERO_FAIL.test(t) || /^─/.test(t)) continue;   // a divider inside a gate's output is no finding
-        if (/^(❌|⚠️|✗)/.test(t) || (sectionBad && !/✓|^(✅|ℹ️|➡️)/.test(t))) out.add(`${section} :: ${t}`);
+        if (/^(❌|⚠️|✗)/.test(t) || (sectionBad && !/✓|^(✅|ℹ️|➡️|✋)/.test(t))) out.add(`${section} :: ${t}`);
       } else if (phase === 'advisory') {
         if (/^─/.test(t)) { section = t.includes('Accessibility') ? 'Accessibility' : section; continue; }
         const h = !/^\s/.test(line) && line.match(HEADING);
@@ -203,7 +203,7 @@ export function livesLine(u) {
 // a difference in a component five products use reads as the larger change it is.
 export function differencesMarkdown(d, { at = '', handback = {}, livesIn = {} } = {}) {
   const out = ['# Differences between Figma and the code', '',
-    `${d.total} open${d.fresh ? `, ${d.fresh} new since the last run` : ''}${at ? ` · ${at}` : ''}. Written by rms-design-system-engine on every full audit: the one list to work from. Each line says what differs and where; fix the side that is wrong, or accept a difference on purpose (\`--baseline --findings\`), and the next run takes it off.`];
+    `${d.total} open${d.fresh ? `, ${d.fresh} new since the last run` : ''}${at ? ` · ${at}` : ''}. Written by rms-design-system-engine on every full audit: the one list to work from. Each line says what differs and where; fix the side that is wrong, keep a difference the team decided on (\`--keep\`, with its reason), or accept it as debt to fix later (\`--baseline --findings\`), and the next run takes it off.`];
   if (d.notChecked?.length) out.push('', `Not checked this run, so a difference there would not show: ${d.notChecked.map((n) => `${n.check} (${n.why})`).join('; ')}.`);
   if (handback.code || handback.figma) out.push('', `How each side would change: ${[handback.code && `the code, \`${handback.code}\` (apply only when you ask)`, handback.figma && `Figma, \`${handback.figma}\``].filter(Boolean).join('; ')}.`);
   for (const g of d.groups) {
@@ -211,6 +211,17 @@ export function differencesMarkdown(d, { at = '', handback = {}, livesIn = {} } 
     const lives = g.component ? livesLine(livesIn[g.component]) : null;
     if (lives) out.push(lives, '');
     for (const it of g.items) out.push(`- ${it.new ? '**new** ' : ''}${it.check ? `${it.check}: ` : ''}${it.what}${it.side === 'figma' ? ' _(in Figma)_' : ''}`);
+  }
+  // The differences the team decided to keep, apart from the open ones, each with why, who and when (without the fix
+  // the audit proposes for an open one).
+  const say = (w) => String(w ?? '').replace(/\s{2,}→\s+.*$/, '').replace(/\s+\[[^\]]*\]$/, '').trim();
+  if (d.kept?.length) {
+    out.push('', `## Kept on purpose (${d.kept.length})`, '', 'The team decided to keep these. They never fail a run while their values stay as they are.', '');
+    for (const k of d.kept) out.push(`- ${k.component ? `**${k.component}** ` : ''}${k.check}: ${say(k.what)}. _${[k.reason, k.by && `kept by ${k.by}`, k.at && `on ${String(k.at).slice(0, 10)}`, k.truth === 'figma' ? 'Figma is right' : k.truth === 'code' ? 'the code is right' : null, k.review && (k.due ? `to look at again since ${k.review}` : `look again on ${k.review}`)].filter(Boolean).join('; ')}._`);
+  }
+  if (d.keptGone?.length) {
+    out.push('', `## Kept on purpose, no longer found (${d.keptGone.length})`, '', 'A value changed, or the difference is gone. A changed one is open again above until the team decides on it; drop the rest with `--unkeep --match <words>`.', '');
+    for (const k of d.keptGone) out.push(`- ${k.component ? `**${k.component}** ` : ''}${k.check}: ${say(k.what)} _(${k.reason})_`);
   }
   return out.join('\n') + '\n';
 }
