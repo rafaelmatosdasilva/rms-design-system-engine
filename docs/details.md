@@ -420,11 +420,13 @@ The capture keeps Figma's values as Figma resolves them.
 Nobody copies a value by hand. The engine writes a read-only script for one chunk at a time, small enough for the Figma tool's answer.
 
 - `--capture-script vars 0` reads the variables, text styles and effect styles.
-- `--capture-script components sums` reads the components. Each chunk is a group of components, put together in Figma with the capture recipe's own functions: sizes, padding, gaps, colours, every variant, and the props.
-- Each answer carries a checksum Figma computed over what it holds.
-- `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the snapshots.
+- `--capture-script components sums` reads the components. Each chunk is a group of components, put together in Figma with the recipes' own functions: sizes, padding, gaps, colours, every variant, the props, every raw value and the variables each state is bound to.
+- Each answer carries a checksum Figma computed over what it holds. The components' checksums are one per component, so one added while the capture runs moves no other.
+- A large file's checksums come in several pages, each short enough for the Figma tool, and a component too large for one answer comes in several.
+- `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the snapshots: the structure, the props, the raw values, and the state tokens and bindings.
 - A component's facts the capture does not read are kept. A component no longer in Figma is taken out, and the import names it.
-- On a refresh only the checksums are asked, and only the chunks that changed are read again.
+- On a refresh only the checksums are asked, and only the components that changed are read again.
+- No script switches Figma's page: switching it is saved with the file, so a capture that only reads would still change it.
 - With figma-cli connected, the engine runs the same scripts through it, so both ways of reading Figma give the same snapshots.
 
 ### Every output says what it was built from

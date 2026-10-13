@@ -1,76 +1,114 @@
-// P6: the components read in chunks the engine checks, each put together in Figma with the capture recipe's own Step 1c
-// functions, and merged into the structure and props snapshots. A stand-in Figma file large enough to need several
-// chunks, and Tidepool's answers as the Figma tool returned them.
+// P6: the components read in chunks the engine checks, each put together in Figma with the recipes' own functions
+// (Step 1c of the refresh recipe, the state walk and the raw-value sweep of the full audit recipe), and merged into the
+// five files the gates read about them. A stand-in Figma file large enough to need several chunks, that throws where
+// the Figma tool throws (a property a layer type does not have, a page switch), and Tidepool's answers as the Figma
+// tool returned them in the format before.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, cpSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, cpSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { componentsScript, captureScript, readCapture, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions, COMPONENT_FUNCTIONS, STRUCTURE_KEYS } from '../figma-capture.mjs';
+import { componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
+  COMPONENT_FUNCTIONS, AUDIT_FUNCTIONS, STRUCTURE_KEYS, SCRIPT_MAX, varsScript, partsBack } from '../figma-capture.mjs';
+import { effectsCaptureScript } from '../effects-parity.mjs';
+import { motionCaptureScript } from '../motion-parity.mjs';
+import { screenCaptureScript } from '../screen-layout.mjs';
+import { screenA11yCaptureScript } from '../screen-a11y.mjs';
+import { captureScript as annotationScript } from '../annotation-categories.mjs';
+import { hygieneOf } from '../figma-hygiene.mjs';
 
 const ENGINE = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+const MIXED = Symbol('mixed');
 const rgb = (r, g, b) => ({ r, g, b });
 const solid = (color, varId, more = {}) => ({ type: 'SOLID', visible: true, opacity: 1, color, ...(varId ? { boundVariables: { color: { type: 'VARIABLE_ALIAS', id: varId } } } : {}), ...more });
 const bound = (id) => ({ type: 'VARIABLE_ALIAS', id });
 
-// A node with what the recipe's functions read, its children's parent set and their place on the canvas.
+// The Figma tool throws on reading a property a layer type does not have ("no such property 'fills' on GROUP node").
+const STRICT = new Set(['fills', 'strokes', 'strokeWeight', 'cornerRadius', 'topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius', 'rectangleCornerRadii',
+  'layoutMode', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'itemSpacing', 'styles', 'style', 'componentId', 'detachedInfo', 'isMask', 'layoutPositioning',
+  'fillStyleId', 'strokeStyleId', 'fontSize']);
+// A layer with what the recipes' functions read, its children's parent set and their place on the canvas. A group has
+// no fills or strokes; a text no layout.
 function node(props, children = []) {
-  const n = { visible: true, opacity: 1, fills: [], strokes: [], boundVariables: {}, x: 0, y: 0, width: 80, height: 32, ...props, children };
+  const shape = props.type === 'GROUP' || props.type === 'TEXT' ? {} : { fills: [], strokes: [] };
+  const raw = { visible: true, opacity: 1, ...shape, boundVariables: {}, x: 0, y: 0, width: 80, height: 32, componentPropertyReferences: null, ...props, children };
+  const n = new Proxy(raw, { get(t, k) { if (typeof k === 'string' && STRICT.has(k) && !(k in t)) throw new Error(`no such property '${k}' on ${t.type} node`); return t[k]; } });
   for (const c of children) c.parent = n;
-  Object.defineProperty(n, 'absoluteBoundingBox', { get() { const p = n.parent?.absoluteBoundingBox ?? { x: 0, y: 0 }; return { x: p.x + n.x, y: p.y + n.y, width: n.width, height: n.height }; } });
-  n.findAll = (pred) => { const out = []; const walk = (x) => { for (const c of x.children ?? []) { if (!pred || pred(c)) out.push(c); walk(c); } }; walk(n); return out; };
-  n.findOne = (pred) => n.findAll(pred)[0] ?? null;
-  n.findAllWithCriteria = ({ types }) => n.findAll((c) => types.includes(c.type));
+  Object.defineProperty(raw, 'absoluteBoundingBox', { get() { const p = raw.parent?.absoluteBoundingBox ?? { x: 0, y: 0 }; return { x: p.x + raw.x, y: p.y + raw.y, width: raw.width, height: raw.height }; } });
+  raw.findAll = (pred) => { const out = []; const walk = (x) => { for (const c of x.children ?? []) { if (!pred || pred(c)) out.push(c); walk(c); } }; walk(n); return out; };
+  raw.findOne = (pred) => raw.findAll(pred)[0] ?? null;
+  raw.findAllWithCriteria = ({ types }) => raw.findAll((c) => types.includes(c.type));
   return n;
 }
 const frame = (props, children) => node({ type: 'FRAME', layoutMode: 'HORIZONTAL', paddingTop: 4, paddingRight: 12, paddingBottom: 4, paddingLeft: 12, itemSpacing: 4,
-  topLeftRadius: 8, topRightRadius: 8, bottomRightRadius: 8, bottomLeftRadius: 8, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'FIXED', minHeight: null, minWidth: null, maxWidth: null,
-  primaryAxisAlignItems: 'CENTER', counterAxisAlignItems: 'CENTER', layoutWrap: 'NO_WRAP', strokeWeight: 1, strokeAlign: 'INSIDE', dashPattern: [], ...props }, children);
+  cornerRadius: 8, topLeftRadius: 8, topRightRadius: 8, bottomRightRadius: 8, bottomLeftRadius: 8, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'FIXED', minHeight: null, minWidth: null, maxWidth: null,
+  primaryAxisAlignItems: 'CENTER', counterAxisAlignItems: 'CENTER', layoutWrap: 'NO_WRAP', strokeWeight: 1, strokeAlign: 'INSIDE', dashPattern: [], fillStyleId: '', strokeStyleId: '', detachedInfo: null, ...props }, children);
 const label = (props = {}) => node({ type: 'TEXT', name: 'Label', width: 40, height: 20, x: 12, y: 6, fontSize: 14, fontName: { family: 'Inter', style: 'Medium' }, lineHeight: { unit: 'PIXELS', value: 20 },
-  letterSpacing: { unit: 'PERCENT', value: 0 }, textCase: 'ORIGINAL', textDecoration: 'NONE', textAlignHorizontal: 'LEFT', textStyleId: 'S:m', fills: [solid(rgb(1, 1, 1), 'v-text')], ...props });
+  letterSpacing: { unit: 'PERCENT', value: 0 }, textCase: 'ORIGINAL', textDecoration: 'NONE', textAlignHorizontal: 'LEFT', textStyleId: 'S:m', fills: [solid(rgb(1, 1, 1), 'v-text')], boundVariables: { fills: [bound('v-text')] }, ...props });
 const icon = (props = {}) => node({ type: 'INSTANCE', name: 'Icon', width: 16, height: 16, x: 4, y: 8, ...props }, [node({ type: 'VECTOR', name: 'Vector', width: 16, height: 16, fills: [solid(rgb(1, 1, 1), 'v-text')] })]);
 
-// One component set: Size and State axes, the disabled one drawn at half opacity, a Background layer, a boolean that
-// shows its icon, and a props definition. extra: the number of layers, so some components are large.
+// One component set: a State axis, the disabled one drawn at half opacity, a Background layer, a boolean that shows its
+// icon, and a props definition. extra: the number of layers, so some components are large.
 function buttonSet(i, extra = 3) {
   const variant = (name, props = {}) => frame({ type: 'COMPONENT', name, boundVariables: { paddingTop: bound('v-pad-s'), paddingLeft: bound('v-pad-m'), itemSpacing: bound('v-gap'), topLeftRadius: bound('v-radius') }, ...props }, [
-    node({ type: 'RECTANGLE', name: 'Background', width: 80, height: 32, layoutPositioning: 'ABSOLUTE', fills: [solid(rgb(0.1, 0.3, 0.8), 'v-bg', { opacity: 0.08 })] }),
+    node({ type: 'RECTANGLE', name: 'Background', width: 80, height: 32, layoutPositioning: 'ABSOLUTE', fills: [solid(rgb(0.1, 0.3, 0.8), 'v-bg', { opacity: 0.08 })], boundVariables: { fills: [bound('v-bg')] } }),
     icon({ componentPropertyReferences: { visible: `Show Icon#${i}:1` } }),
     label(),
-    ...Array.from({ length: extra }, (_, k) => node({ type: 'FRAME', name: `Part ${k} of a long component name`, width: 8, height: 8, layoutMode: 'NONE' })),
+    ...Array.from({ length: extra }, (_, k) => frame({ name: `Part ${k} of a long component name`, width: 8, height: 8, layoutMode: 'NONE', cornerRadius: 0, topLeftRadius: 0, topRightRadius: 0, bottomRightRadius: 0, bottomLeftRadius: 0 }, [])),
   ]);
-  const set = node({ type: 'COMPONENT_SET', id: `${i}:0`, name: `button${i}`, description: `Button number ${i}.`, annotations: [{ label: 'Role: button' }],
+  return node({ type: 'COMPONENT_SET', id: `${i}:0`, name: `button${i}`, description: `Button number ${i}.`, annotations: [{ label: 'Role: button' }],
     componentPropertyDefinitions: { State: { type: 'VARIANT', defaultValue: 'Default', variantOptions: ['Default', 'Hover', 'Disabled'] }, [`Show Icon#${i}:1`]: { type: 'BOOLEAN', defaultValue: true } } }, [
     variant('State=Default', { id: `${i}:1` }),
     variant('State=Hover', { id: `${i}:2`, height: 32 }),
     variant('State=Disabled', { id: `${i}:3`, opacity: 0.5 }),
   ]);
-  return set;
+}
+// A set whose state is drawn by a nested instance (a state layer, bound two layers down), with a hidden badge a
+// visibility variable can show; listed with its hover variant first and a Type axis named Default, so a test of the
+// name for "default" would pick the hover.
+function stateLayerSet() {
+  const variant = (state, id, overlay, opacity) => frame({ type: 'COMPONENT', id, name: `Type=Default, State=${state}` }, [
+    node({ type: 'INSTANCE', name: 'State layer', width: 80, height: 32, layoutPositioning: 'ABSOLUTE' }, [
+      node({ type: 'RECTANGLE', name: 'Overlay', width: 80, height: 32, fills: [solid(rgb(0, 0, 0), overlay, { opacity })], boundVariables: { fills: [bound(overlay)] } }),
+    ]),
+    node({ type: 'RECTANGLE', name: 'Background', width: 80, height: 32, fills: [solid(rgb(1, 1, 1), 'v-surface', { opacity })] }),
+    node({ type: 'ELLIPSE', name: 'Badge', visible: false, width: 6, height: 6, fills: [solid(rgb(1, 0, 0), 'v-badge')], boundVariables: { visible: bound('v-flag'), fills: [bound('v-badge')] } }),
+    label({ annotations: state === 'Default' ? [{ label: 'The label says what the tab opens.' }] : [] }),
+  ]);
+  return node({ type: 'COMPONENT_SET', id: '800:0', name: 'tab', description: 'A tab.',
+    componentPropertyDefinitions: { Type: { type: 'VARIANT', defaultValue: 'Default', variantOptions: ['Default'] }, State: { type: 'VARIANT', defaultValue: 'Default', variantOptions: ['Default', 'Hover'] } } }, [
+    variant('Hover', '800:2', 'v-hover', 0.5),
+    variant('Default', '800:1', 'v-rest', 0.08),
+  ]);
 }
 function makeFile(count = 30) {
   const sets = Array.from({ length: count }, (_, i) => buttonSet(i + 1, i % 5 === 0 ? 30 : 3));
-  // A component outside any set with a slot and an inner frame that binds its own gap; a private one; a variant-less icon.
-  const card = frame({ type: 'COMPONENT', id: '900:1', name: 'card', layoutMode: 'VERTICAL', layoutSizingVertical: 'HUG', height: 120, width: 240, fills: [solid(rgb(1, 1, 1), 'v-surface')], strokes: [solid(rgb(0.5, 0.5, 0.5), 'v-border')], description: 'A card.' }, [
-    frame({ name: 'Head', boundVariables: { itemSpacing: bound('v-gap'), paddingTop: bound('v-pad-s') }, height: 32 }, [label({ name: 'Title' }), label({ name: 'Meta' })]),
+  // A component outside any set with a slot, a group with no fills, a shape whose corners differ and a frame whose
+  // strokes differ (figma.mixed, which is no number); a private one.
+  const card = frame({ type: 'COMPONENT', id: '900:1', name: 'card', layoutMode: 'VERTICAL', layoutSizingVertical: 'HUG', height: 120, width: 240, fills: [solid(rgb(1, 1, 1), 'v-surface')], strokes: [solid(rgb(0.5, 0.5, 0.5), 'v-border')],
+    strokeWeight: MIXED, strokeTopWeight: 1, strokeRightWeight: 0, strokeBottomWeight: 2, strokeLeftWeight: 0, description: 'A card.' }, [
+    frame({ name: 'Head', boundVariables: { itemSpacing: bound('v-gap'), paddingTop: bound('v-pad-s') }, height: 32 }, [label({ name: 'Title' }), label({ name: 'Meta', fontSize: MIXED })]),
     node({ type: 'SLOT', name: 'Content', width: 240, height: 80, layoutMode: 'VERTICAL', itemSpacing: 8 }, [node({ type: 'FRAME', name: 'a' }), node({ type: 'FRAME', name: 'b' })]),
+    node({ type: 'GROUP', name: 'Decor', width: 24, height: 24 }, [node({ type: 'RECTANGLE', name: 'Corner', width: 24, height: 24, cornerRadius: MIXED, topLeftRadius: 6, topRightRadius: 0, bottomRightRadius: 6, bottomLeftRadius: 0, fills: [solid(rgb(0.2, 0.2, 0.2))] })]),
   ]);
   const hidden = frame({ type: 'COMPONENT', id: '901:1', name: '_private', description: 'Not part of the system.' }, []);
-  const page = node({ type: 'PAGE', id: '0:1', name: 'Components' }, [...sets, card, hidden]);
-  const vars = Object.fromEntries([['v-pad-s', 'padding/s'], ['v-pad-m', 'padding/m'], ['v-gap', 'gap/s'], ['v-radius', 'radii/button'], ['v-bg', 'button/background/color'], ['v-text', 'button/text/color'], ['v-surface', 'surface/color'], ['v-border', 'border/color']]
-    .map(([id, name]) => [id, { id, name }]));
-  return { page, vars, sets, card };
+  const loaded = [];
+  const page = node({ type: 'PAGE', id: '0:1', name: 'Components', loadAsync: async () => { loaded.push('0:1'); } }, [...sets, stateLayerSet(), card, hidden]);
+  const vars = Object.fromEntries([['v-pad-s', 'padding/s'], ['v-pad-m', 'padding/m'], ['v-gap', 'gap/s'], ['v-radius', 'radii/button'], ['v-bg', 'button/background/color'], ['v-text', 'button/text/color'],
+    ['v-surface', 'surface/color'], ['v-border', 'border/color'], ['v-hover', 'state/hover/color'], ['v-rest', 'state/rest/color'], ['v-badge', 'badge/color'], ['v-flag', 'show/badge']].map(([id, name]) => [id, { id, name }]));
+  return { page, vars, sets, card, loaded };
 }
 const asFigma = (f) => {
-  const all = [f.page, ...f.page.findAll()];
+  const all = () => [f.page, ...f.page.findAll()];
   return {
-    mixed: Symbol('mixed'),
+    mixed: MIXED,
     root: { children: [f.page], findAllWithCriteria: (c) => f.page.findAllWithCriteria(c) },
     currentPage: f.page,
-    setCurrentPageAsync: async () => {},
-    getNodeByIdAsync: async (id) => all.find((x) => x.id === id) ?? null,
+    setCurrentPageAsync: async () => { throw new Error('the capture switched the page: that changes the file'); },
+    getNodeByIdAsync: async (id) => all().find((x) => x.id === id) ?? null,
     getStyleByIdAsync: async (id) => (id === 'S:m' ? { id, name: 'Body/M' } : null),
     variables: { getLocalVariablesAsync: async () => Object.values(f.vars), getVariableByIdAsync: async (id) => f.vars[id] ?? null },
   };
@@ -78,64 +116,118 @@ const asFigma = (f) => {
 const runIn = (f) => async (code) => new AsyncFunction('figma', code)(asFigma(f));
 const cfg = { paths: { snapshotStructure: 'src/figma-structure.snapshot.json', compPropsSnapshot: 'src/figma-component-props.snapshot.json' } };
 const project = () => { const d = mkdtempSync(join(tmpdir(), 'capture-components-')); writeFileSync(join(d, 'ds-config.json'), JSON.stringify(cfg)); mkdirSync(join(d, 'cap'), { recursive: true }); return d; };
-const save = (dir, kind, n, a) => writeFileSync(join(dir, `${kind}-${n}.json`), JSON.stringify(a));
+const save = (dir, file, a) => writeFileSync(join(dir, file), JSON.stringify(a));
+const json = (root, p) => JSON.parse(readFileSync(join(root, p), 'utf8'));
+// The checksums, page by page, then every chunk the import names, each saved as the engine says. → the answers' sizes.
+async function captureAll(f, dir, { time, fresh = true } = {}) {
+  const run = runIn(f), sizes = [];
+  for (let first = fresh; ; first = false) {
+    const call = componentsCall(dir, 'sums', { cfg, fresh: first, ...(time != null ? { time } : {}) });
+    const a = await run(call.script);
+    sizes.push(Buffer.byteLength(JSON.stringify(a)));
+    save(dir, call.save, a);
+    if (a.after == null) break;
+  }
+  for (const n of readComponents(dir).missing) { const call = componentsCall(dir, n, { cfg }); const a = await run(call.script); sizes.push(Buffer.byteLength(JSON.stringify(a))); save(dir, call.save, a); }
+  return sizes;
+}
 
-test('P6 components: the chunk script carries the recipe\'s own Step 1c functions, and every key they write is known', async () => {
+test('P6 components: the chunk script carries the recipes\' own functions, fits the Figma tool, and every key they write is known', async () => {
   const fns = recipeFunctions();
-  assert.equal(fns.length, COMPONENT_FUNCTIONS.length);
-  for (const [i, src] of fns.entries()) assert.match(src, new RegExp(`^(async )?function ${COMPONENT_FUNCTIONS[i]}\\(`));
-  const md = readFileSync(join(ENGINE, 'cookbook', 'refresh-figma.md'), 'utf8');
-  for (const src of fns) assert.ok(md.includes(src), 'taken from the recipe unchanged');
-  const f = makeFile(3), a = await runIn(f)(componentsScript(0));
-  const keys = new Set(a.items.filter((x) => x.k === 'component').flatMap((x) => Object.keys(x.v)));
+  assert.equal(fns.length, COMPONENT_FUNCTIONS.length + AUDIT_FUNCTIONS.length);
+  const names = [...COMPONENT_FUNCTIONS, ...AUDIT_FUNCTIONS];
+  for (const [i, src] of fns.entries()) assert.match(src, new RegExp(`^(async )?function ${names[i]}\\(`));
+  const md = ['refresh-figma.md', 'full-audit.md'].map((f) => readFileSync(join(ENGINE, 'cookbook', f), 'utf8')).join('\n');
+  for (const src of fns) assert.ok(md.includes(src), 'taken from the recipes unchanged');
+  assert.equal(fns[names.indexOf('hygieneOf')], hygieneOf.toString(), 'the engine\'s own hygiene record');
+  for (const s of [componentsScript('sums'), componentsScript('read', { ids: ['1:0'] })]) assert.ok(s.length < SCRIPT_MAX, `${s.length} characters, within what the Figma tool takes`);
+  const f = makeFile(3), dir = join(project(), 'cap');
+  await captureAll(f, dir);
+  const items = partsBack([...readComponents(dir).have.values()].flat());
+  const keys = new Set(items.filter((x) => x.k === 'component').flatMap((x) => Object.keys(x.v)));
   keys.delete('name');
   for (const k of keys) assert.ok(STRUCTURE_KEYS.includes(k), `${k} is a key the import replaces`);
 });
 
-test('P6 components: each answer fits the Figma tool and is checked; a chunk read through its plan gives the checksum listed', async () => {
-  const f = makeFile(), run = runIn(f);
-  const sums = await run(componentsScript('sums'));
-  assert.ok(sums.of >= 3, `several chunks (${sums.of})`);
-  assert.equal(sums.plan.length, sums.of);
-  for (let n = 0; n < sums.of; n++) {
-    const all = await run(componentsScript(n));
-    assert.ok(Buffer.byteLength(JSON.stringify(all)) < 20480, `chunk ${n} fits in one answer`);
-    assert.deepEqual(all.sums, sums.sums);
-    assert.equal(cyrb53(JSON.stringify(all.items)), all.sum, 'the checksum Figma computed is the one the engine computes');
-    const planned = await run(componentsScript(n, { plan: { ...sums.plan[n], of: sums.of } }));
-    assert.equal(planned.sum, sums.sums[n], `chunk ${n} read alone`);
-    assert.equal(planned.sums, undefined, 'a planned chunk reads only its own components');
-  }
-  // A component set is never split unless the budget forces it, and a private component is left out.
-  const items = (await Promise.all(sums.plan.map((p, n) => run(componentsScript(n, { plan: { ...p, of: sums.of } }))))).flatMap((a) => a.items);
-  assert.ok(!items.some((x) => x.v.name === '_private'));
-  assert.equal(items.filter((x) => x.k === 'component').length, 31);
+test('P6 components: no capture script the engine writes switches Figma\'s page; each loads the pages it reads where they are', async () => {
+  const scripts = {
+    'vars sums': varsScript('sums'), 'vars 0': varsScript(0),
+    'components sums': componentsScript('sums'), 'components sums, continued': componentsScript('sums', { pass: 'p', after: 'k' }), 'components read': componentsScript('read', { ids: ['1:0'] }), 'components slice': componentsScript('read', { ids: ['1:0'], slice: 1 }),
+    '--figma-effects': effectsCaptureScript(), '--figma-motion': motionCaptureScript(), '--figma-screens': screenCaptureScript(['1:2']), '--figma-a11y': screenA11yCaptureScript(['1:2']), '--annotation-categories': annotationScript(),
+  };
+  for (const [name, s] of Object.entries(scripts)) assert.doesNotMatch(s, /setCurrentPage/, `${name} never switches the page`);
+  for (const name of ['components sums', 'components read', '--figma-effects', '--figma-motion', '--annotation-categories']) assert.match(scripts[name], /\.loadAsync\(\)/, `${name} loads each page where it is`);
+  // Run in a file that throws on a page switch: nothing is switched, every page read is loaded.
+  const f = makeFile(2), run = runIn(f);
+  const a = await run(componentsScript('sums'));
+  assert.equal(a.sums.length, 4);
+  assert.deepEqual(f.loaded, ['0:1']);
 });
 
-test('P6 components: the import writes the structure and props snapshots, keeps what the capture does not read, and takes out what Figma no longer has', async () => {
-  const f = makeFile(), run = runIn(f), root = project(), dir = join(root, 'cap');
+test('P6 components: every answer fits the Figma tool, each component is checked against its own checksum, and a large one travels in slices and parts', async () => {
+  const f = makeFile();
+  // A chart of 1,500 bars of different widths: its raw values alone are larger than one answer.
+  f.page.children.push(node({ type: 'COMPONENT_SET', id: '700:0', name: 'chart', parent: f.page }, [frame({ type: 'COMPONENT', id: '700:1', name: 'State=Default' },
+    Array.from({ length: 1500 }, (_, k) => node({ type: 'RECTANGLE', name: `Bar ${k}`, width: 10 + k * 0.37, height: 4, fills: [solid(rgb(k / 1500, 0.5, 0.5))] })))]));
+  f.page.children.at(-1).parent = f.page;
+  const root = project(), dir = join(root, 'cap');
+  const sizes = await captureAll(f, dir);
+  for (const s of sizes) assert.ok(s < 20480, `${s} bytes fit one answer`);
+  const c = readComponents(dir);
+  assert.equal(c.complete, true);
+  assert.equal(c.entries.length, 33, 'the sets and the card; the private one left out');
+  assert.deepEqual(c.missing, []);
+  const chart = c.entries.find((e) => e.id === '700:0');
+  assert.ok(chart.slices > 1, `the chart is read in ${chart.slices} slices`);
+  assert.ok(c.chunks.filter((k) => k.slice != null).length === chart.slices);
+  const items = c.have.get('700:0');
+  assert.ok(items.some((x) => x.k === 'part'), 'its raw values travel in parts');
+  assert.equal(cyrb53(JSON.stringify(items)), chart.sum, 'the checksum Figma computed is the one the engine computes');
+  const r = await importComponents(root, cfg, { dir });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const values = json(root, 'component-values.snapshot.json');
+  assert.ok(values.chart.nums.length > 1800, 'the parts put back together');
+  // An answer changed by hand is refused, and its chunk asked again.
+  const one = readdirSync(dir).find((x) => /^components-\w+-\d+\.json$/.test(x) && !x.startsWith('components-sums'));
+  const a = json(dir, one); a.items[0].v.h = 999; save(dir, one, a);
+  const again = readComponents(dir);
+  assert.match(again.bad[0], new RegExp(`^${one.replace('.', '\\.')}: its checksum does not match`));
+  assert.ok(again.missing.length >= 1);
+});
+
+test('P6 components: the import writes the five files, keeps what the capture does not read, and takes out what Figma no longer has', async () => {
+  const f = makeFile(), root = project(), dir = join(root, 'cap');
+  // One set the Figma tool cannot walk: its structure is kept from before, its other parts are read.
+  const broken = f.sets[2];
+  broken.children[0].findOne = () => { throw new Error('the layer tree could not be read'); };
   mkdirSync(join(root, 'src'), { recursive: true });
   writeFileSync(join(root, 'src/figma-structure.snapshot.json'), JSON.stringify({ _note: 'kept', components: {
-    button1: { h: 99, strokeSides: 'all', childFrameGaps: [{ name: 'Old', gapVar: 'gap/xl' }] },
-    removedOne: { h: 10 },
-  } }));
+    button1: { h: 99, strokeSides: 'all', childFrameGaps: [{ name: 'Old', gapVar: 'gap/xl' }] }, button3: { h: 77 }, removedOne: { h: 10 } } }));
   writeFileSync(join(root, 'src/figma-component-props.snapshot.json'), JSON.stringify({ _note: 'props', button1: { properties: {}, figmaDocs: 'kept' }, removedOne: { properties: {} } }));
-  const sums = await run(componentsScript('sums'));
-  save(dir, 'components', 'sums', sums);
+  writeFileSync(join(root, 'component-values.snapshot.json'), JSON.stringify({ _note: 'values', button1: { nums: [1], colors: [] }, removedOne: { nums: [2], colors: [] } }));
+  writeFileSync(join(root, 'component-state-bindings.json'), JSON.stringify({ removedOne: { 'State=Default': { props: {}, bindings: [] } } }));
+  const sums = componentsCall(join(root, 'cap'), 'sums', { cfg });
+  save(dir, sums.save, await runIn(f)(sums.script));
   let r = await importComponents(root, cfg, { dir });
   assert.equal(r.ok, false);
-  assert.deepEqual(r.missing, [...Array(sums.of).keys()]);
-  for (let n = 0; n < sums.of; n++) save(dir, 'components', n, await run(captureScript('components', n, { dir })));
+  assert.ok(r.missing.length >= 3, `several chunks (${r.missing.length})`);
+  assert.match(importLines(r, 'cap').join('\n'), /^\d+ of \d+ component chunks still to read: 0, 1, 2/);
+  for (const n of r.missing) { const call = componentsCall(dir, n, { cfg }); save(dir, call.save, await runIn(f)(call.script)); }
   r = await importComponents(root, cfg, { dir });
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.deepEqual(r.removed, ['removedOne']);
-  assert.match(importLines(r, 'cap').join('\n'), /^✓ Figma's components read in \d+ checked chunks: 31 components with 90 variants, the props of 31 → src\/figma-structure\.snapshot\.json, src\/figma-component-props\.snapshot\.json\nTaken out, no longer in Figma: removedOne\.$/);
-  const s = JSON.parse(readFileSync(join(root, 'src/figma-structure.snapshot.json'), 'utf8'));
+  const files = ['src/figma-structure.snapshot.json', 'src/figma-component-props.snapshot.json', 'component-values.snapshot.json', 'component-state-tokens.json', 'component-state-bindings.json'];
+  assert.deepEqual(r.written, files);
+  const said = importLines(r, 'cap').join('\n');
+  assert.match(said, /^✓ Figma's components read in \d+ checked chunks: 32 components with 89 variants, the props of 32, the raw values of 32 and the states of 32 → src\/figma-structure\.snapshot\.json, src\/figma-component-props\.snapshot\.json, component-values\.snapshot\.json, component-state-tokens\.json, component-state-bindings\.json\nTaken out, no longer in Figma: removedOne\.\n⚠️ {2}Not read in Figma, kept as it was: button3 \(structure: the layer tree could not be read\)\.$/);
+  for (const p of files) { const s = json(root, p); assert.ok(s._built?.at && s._updated, `${p} stamped`); }
+  const s = json(root, 'src/figma-structure.snapshot.json');
   const b = s.components.button1;
   assert.equal(s._note, 'kept');
   assert.equal(b.h, 32, 'read from Figma');
   assert.equal(b.strokeSides, 'all', 'a key the capture does not read is kept');
   assert.equal(b.childFrameGaps, undefined, 'a key the capture reads and Figma no longer has is gone');
+  assert.deepEqual(s.components.button3, { h: 77 }, 'a component the Figma tool could not read is kept as it was');
   assert.deepEqual(b.paddingVar, { tb: 'padding/s', lr: 'padding/m' });
   assert.equal(b.gapVar, 'gap/s');
   assert.equal(b.innerRadiusVar, 'radii/button');
@@ -146,6 +238,7 @@ test('P6 components: the import writes the structure and props snapshots, keeps 
   assert.equal(b.iconSize, 16);
   assert.deepEqual(b.toggles, { 'Show Icon': ['Icon'] });
   assert.equal(b.defaultVariant, 'State=Default');
+  assert.equal(b.restingState, 'default');
   assert.deepEqual(Object.keys(b.variants), ['State=Default', 'State=Hover', 'State=Disabled']);
   assert.deepEqual(b.drawnOn, [{ fg: 'button/text/color', on: 'button/background/color', icon: true }], 'the icon and the label, one pair');
   assert.equal(b.nodeId, '1:0');
@@ -153,10 +246,10 @@ test('P6 components: the import writes the structure and props snapshots, keeps 
   assert.equal(card.slot, true);
   assert.equal(card.sizingV, 'HUG');
   assert.equal(card.strokeOnDefault, true);
+  assert.deepEqual(card.stroke.weights, [1, 0, 2, 0], 'strokes that differ by side, read side by side');
   assert.deepEqual(card.childFrameGaps, [{ name: 'Head', gapVar: 'gap/s', gapPx: 4 }, { name: 'Content', gapVar: null, gapPx: 8 }]);
   assert.deepEqual(card.childFramePadding, [{ name: 'Head', paddingVar: { tb: 'padding/s', lr: null } }]);
-  assert.ok(s._built?.at, 'stamped');
-  const p = JSON.parse(readFileSync(join(root, 'src/figma-component-props.snapshot.json'), 'utf8'));
+  const p = json(root, 'src/figma-component-props.snapshot.json');
   assert.equal(p._note, 'props');
   assert.equal(p.button1.figmaDocs, 'kept');
   assert.equal(p.button1.description, 'Button number 1.');
@@ -164,67 +257,152 @@ test('P6 components: the import writes the structure and props snapshots, keeps 
   assert.deepEqual(Object.keys(p.button1.properties), ['State', 'Show Icon#1:1']);
   assert.equal(p.removedOne, undefined);
   assert.equal(p.card.description, 'A card.');
+  // The raw values: every number and colour of every layer, a group with no fills and corners that differ included.
+  const v = json(root, 'component-values.snapshot.json');
+  assert.equal(v._note, 'values');
+  assert.equal(v.removedOne, undefined);
+  assert.ok(v.card.nums.includes(6) && v.card.nums.includes(24), 'the corner radii read one by one');
+  assert.ok(v.card.colors.includes('333333'), 'the shape inside the group');
+  assert.ok(!v.card.nums.some((x) => typeof x !== 'number'));
+  assert.deepEqual(v.card.hygiene.raw.find((x) => x.at === 'card/Decor/Corner' && x.field === 'radius'), { at: 'card/Decor/Corner', field: 'radius', value: 6 });
+  assert.equal(v.card.hygiene.binds['v-surface'].FRAME_FILL, 'card', 'the variable each property is bound to');
+  assert.deepEqual(v.button1.colors, ['1a4dcc', 'ffffff']);
+  // The state tokens: summed over the components, the badge bound only on a hidden layer a variable can show.
+  const t = json(root, 'component-state-tokens.json');
+  assert.equal(t['state/hover/color'], 1, 'bound inside the nested state layer');
+  assert.ok(t._hiddenOnly.includes('badge/color') && t._hiddenToggleable.includes('badge/color'));
+  assert.ok(!t._hiddenOnly.includes('button/text/color'));
+  assert.deepEqual(t._components.tab.toggleable, ['badge/color', 'show/badge']);
+  // The state bindings: the state drawn two layers down, inside an instance, is bound.
+  const bi = json(root, 'component-state-bindings.json');
+  assert.equal(bi.removedOne, undefined);
+  assert.deepEqual(bi.tab['Type=Default, State=Hover'].props, { type: 'default', state: 'hover' });
+  assert.deepEqual(bi.tab['Type=Default, State=Hover'].bindings.find((x) => x.token === 'state/hover/color'), { token: 'state/hover/color', bindingField: 'fills', isText: false, depth: 2 });
+  assert.equal(bi.card, undefined, 'a component outside a set has no variants to bind');
+  assert.ok(bi.button1['State=Default'].bindings.some((x) => x.isText && x.depth === 1));
 });
 
-test('P6 components: on a refresh only the chunk that changed is read again; a change after the checksums is said', async () => {
+test('P6 components: the full audit recipe\'s whole-file captures, for a small file in one run, give what the import writes', async () => {
+  const f = makeFile(2), root = project(), dir = join(root, 'cap');
+  await captureAll(f, dir);
+  assert.equal((await importComponents(root, cfg, { dir })).ok, true);
+  const md = readFileSync(join(ENGINE, 'cookbook', 'full-audit.md'), 'utf8');
+  const block = (fn) => { const at = md.indexOf(`function ${fn}(`); return md.slice(md.lastIndexOf('```js\n', at) + 6, md.indexOf('```', at)); };
+  const tokens = await runIn(f)(block('stateTokensOf'));
+  const { _updated, ...counts } = tokens;
+  const t = json(root, 'component-state-tokens.json');
+  assert.deepEqual(counts, Object.fromEntries(Object.entries(t).filter(([k]) => !k.startsWith('_') || k === '_hiddenOnly' || k === '_hiddenToggleable')));
+  const bindings = JSON.parse(await runIn(f)(block('stateBindingsOf')));
+  const b = json(root, 'component-state-bindings.json');
+  assert.deepEqual(bindings, Object.fromEntries(Object.entries(b).filter(([k]) => !k.startsWith('_'))));
+});
+
+test('P6 components: one resting variant everywhere, matched by its axes, never by "default" anywhere in the name', async () => {
+  const f = makeFile(1), root = project(), dir = join(root, 'cap');
+  await captureAll(f, dir);
+  const r = await importComponents(root, cfg, { dir });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const tab = json(root, 'src/figma-structure.snapshot.json').components.tab;
+  assert.equal(tab.defaultVariant, 'Type=Default, State=Default', 'the State axis\'s first value, not the first variant whose name says default');
+  assert.equal(tab.fillOpacity, 0.08, 'the paint facts read the same variant');
+  assert.equal(tab.restingState, 'default');
+  assert.deepEqual(json(root, 'src/figma-component-props.snapshot.json').tab.layerAnnotations.map((x) => x.layer), ['Label'], 'the notes on the resting variant\'s layers');
+});
+
+test('P6 components: kept by component id, so a component added mid-capture shifts no other; a refresh reads only what changed', async () => {
   const f = makeFile(), root = project(), dir = join(root, 'cap');
-  const first = await captureWithFigmaCli(root, cfg, { run: async (code) => JSON.stringify(await runIn(f)(code)), dir, kind: 'components' });
-  assert.equal(first.ok, true, JSON.stringify(first));
-  // A designer makes one button taller; a refresh asks for the checksums and that one chunk (a component in one chunk).
-  const plan = readCapture(dir, 'components').plan;
-  const i = f.sets.findIndex((x) => plan.filter((p) => p.roots.includes(x.id)).length === 1 && plan.find((p) => p.roots.includes(x.id)).roots.length > 1);
-  for (const v of f.sets[i].children) v.height = 40;
+  // The checksums in pages of one component each (as when Figma is slow): every page continues where the last stopped.
+  await captureAll(f, dir, { time: 0 });
+  const c = readComponents(dir);
+  assert.equal(c.pages, 32);
+  assert.equal(c.entries.length, 32);
+  // A designer adds a component after the checksums: every chunk still reads as planned, and the import says so.
+  const before = readComponents(dir).chunks.map((k) => k.ids.join());
+  f.page.children.push(buttonSet(99)); f.page.children.at(-1).parent = f.page;
+  assert.deepEqual(readComponents(dir).chunks.map((k) => k.ids.join()), before);
+  let r = await importComponents(root, cfg, { dir });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  // (every chunk was read before the addition here; read one again after it, as a capture under way would)
+  const again = componentsCall(dir, 0, { cfg });
+  save(dir, again.save, await runIn(f)(again.script));
+  r = await importComponents(root, cfg, { dir });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.added, 1);
+  assert.match(importLines(r, 'cap').join('\n'), /ℹ️ {2}Figma has 1 more component than when the checksums were read: rms-design-system-engine --capture-script components sums new reads it next time\./);
+  // The next capture: new checksums, and only the new component and the one a designer made taller are read.
+  for (const v of f.sets[6].children) v.height = 40;
   const asked = [];
-  const r = await captureWithFigmaCli(root, cfg, { run: async (code) => { asked.push(/CHUNK=('sums'|\d+)/.exec(code)[1]); return JSON.stringify(await runIn(f)(code)); }, dir, kind: 'components' });
-  assert.equal(r.ok, true);
-  assert.equal(asked[0], "'sums'");
-  assert.equal(asked.length, 2, `the checksums and one chunk (${asked.join(', ')})`);
-  assert.equal(JSON.parse(readFileSync(join(root, 'src/figma-structure.snapshot.json'), 'utf8')).components[f.sets[i].name].h, 40);
-  // The checksums are read, then Figma changes before the chunk is: the import says so and asks for the checksums again.
-  save(dir, 'components', 'sums', await runIn(f)(componentsScript('sums')));
-  const n = readCapture(dir, 'components').plan.findIndex((p) => p.roots.includes('5:0'));
-  f.sets[4].children[0].height = 48;
-  save(dir, 'components', n, await runIn(f)(captureScript('components', n, { dir })));
+  r = await captureWithFigmaCli(root, cfg, { run: async (code) => { asked.push(/^const CALL="(\w+)"/m.exec(code)[1]); return JSON.stringify(await runIn(f)(code)); }, dir, kind: 'components' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(asked, ['sums', 'read'], 'the checksums, then one chunk holding the two');
+  assert.equal(json(root, 'src/figma-structure.snapshot.json').components.button7.h, 40);
+  assert.ok(json(root, 'src/figma-structure.snapshot.json').components.button99);
+  assert.ok(!readdirSync(dir).some((x) => /^components-sums-\d+\.json$/.test(x)), 'the pages of the pass before are cleared');
+  // The checksums are read, then Figma changes before a chunk is: the import says so and asks for the checksums again.
+  for (const v of f.sets[1].children) v.height = 44;
+  const sums = componentsCall(dir, 'sums', { cfg, fresh: true });
+  save(dir, sums.save, await runIn(f)(sums.script));
+  for (const v of f.sets[1].children) v.height = 48;
   const late = await importComponents(root, cfg, { dir });
-  assert.equal(late.ok, false);
-  assert.deepEqual(late.changed, [n]);
-  assert.match(importLines(late, 'cap').join('\n'), new RegExp(`^Figma changed after the checksums were read \\(chunk ${n}\\)\\.\\n1 of \\d+ component chunks still to read: ${n}\\.\\nNEXT: run rms-design-system-engine --capture-script components sums`));
+  assert.deepEqual(late.missing, [0]);
+  const call = componentsCall(dir, 0, { cfg });
+  save(dir, call.save, await runIn(f)(call.script));
+  const changed = await importComponents(root, cfg, { dir });
+  assert.equal(changed.ok, false);
+  assert.deepEqual(changed.changed, [0]);
+  assert.match(importLines(changed, 'cap').join('\n'), /^Figma changed after the checksums were read \(chunk 0\)\.\nNEXT: run rms-design-system-engine --capture-script components sums new/);
 });
 
-test('P6 components: the commands write the script and import the answers saved', async () => {
+test('P6 components: the commands write each script and import the answers saved', async () => {
   const root = project();
   const cli = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
-  let r = cli('--capture-script', 'components', 'sums');
+  let r = cli('--capture-script', 'components', '0');
+  assert.equal(r.status, 2);
+  assert.match(r.stdout, /❌ the checksums are not all read yet/);
+  r = cli('--capture-script', 'components', 'sums', 'new');   // a new pass (here the first)
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const out = join(root, '.design-system-engine-out/figma-capture');
   assert.match(r.stdout, /NEXT: run it unchanged with the Figma tool \(use_figma\) on the design system's file, save its answer as it came to \.design-system-engine-out\/figma-capture\/components-sums\.json, then run rms-design-system-engine --capture-import: it names each chunk to read\.$/m);
   const f = makeFile(4), run = runIn(f);
-  save(out, 'components', 'sums', await run(readFileSync(join(out, 'components-sums.js'), 'utf8')));
+  save(out, 'components-sums.json', await run(readFileSync(join(out, 'components-sums.js'), 'utf8')));
   r = cli('--capture-import');
   assert.equal(r.status, 1);
   assert.match(r.stdout, /component chunks? still to read: 0/);
+  const pass = readComponents(out).pass;
+  assert.match(r.stdout, new RegExp(`save its answer as it came to \\.design-system-engine-out/figma-capture/components-${pass}-<chunk>\\.json`));
   r = cli('--capture-script', 'components', '0');
-  assert.match(readFileSync(join(out, 'components-0.js'), 'utf8'), /PLAN=\{"roots":/, 'the chunk script reads only its own components');
-  save(out, 'components', 0, await run(readFileSync(join(out, 'components-0.js'), 'utf8')));
-  for (let n = 1; n < readCapture(out, 'components').of; n++) save(out, 'components', n, await run(captureScript('components', n, { dir: out })));
+  assert.match(r.stdout, new RegExp(`save its answer as it came to \\.design-system-engine-out/figma-capture/components-${pass}-0\\.json, then run rms-design-system-engine --capture-import\\.`));
+  assert.match(readFileSync(join(out, `components-${pass}-0.js`), 'utf8'), /IDS=\["/, 'the chunk script reads its components by id');
+  save(out, `components-${pass}-0.json`, await run(readFileSync(join(out, `components-${pass}-0.js`), 'utf8')));
+  for (const n of readComponents(out).missing) save(out, `components-${pass}-${n}.json`, await run(captureScript('components', n, { dir: out })));
   r = cli('--capture-import', 'components');
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /✓ Figma's components read in \d+ checked chunks?: 5 components with 12 variants/);
-  assert.ok(existsSync(join(root, 'src/figma-component-props.snapshot.json')));
+  assert.match(r.stdout, /✓ Figma's components read in \d+ checked chunks?: 6 components with 14 variants/);
+  for (const p of ['src/figma-component-props.snapshot.json', 'component-values.snapshot.json', 'component-state-tokens.json', 'component-state-bindings.json']) assert.ok(existsSync(join(root, p)), p);
 });
 
-// On a real file: Tidepool's answers, saved as the Figma tool returned them (test/fixtures/tidepool-figma/figma-capture).
-test('P6 components on a real file: Figma\'s checksums hold, and the import gives what the recipe captured by hand', async () => {
+// On a real file: Tidepool's answers, saved as the Figma tool returned them before the capture read the raw values
+// and the states (test/fixtures/tidepool-figma/figma-capture).
+test('P6 components on a real file: Figma\'s checksums hold, the import gives what the recipe captured by hand, and keeps the files those answers did not read', async () => {
   const TP = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
   const root = mkdtempSync(join(tmpdir(), 'capture-tidepool-'));
   cpSync(join(TP, 'ds-config.json'), join(root, 'ds-config.json'));
   const tpCfg = JSON.parse(readFileSync(join(root, 'ds-config.json'), 'utf8'));
-  const c = readCapture(join(TP, 'figma-capture'), 'components');
+  const dir = mkdtempSync(join(tmpdir(), 'capture-tidepool-answers-'));
+  for (const f of readdirSync(join(TP, 'figma-capture')).filter((x) => x.startsWith('components-'))) cpSync(join(TP, 'figma-capture', f), join(dir, f));
+  const c = readComponents(dir);
+  assert.equal(c.v, 1);
   assert.deepEqual(c.bad, []);
   assert.deepEqual(c.missing, [], 'the checksums Figma computed are the engine\'s');
-  const r = await importComponents(root, tpCfg, { dir: join(TP, 'figma-capture') });
+  // The raw values captured before: these answers did not read them, so they stay as they were.
+  const values = JSON.stringify({ _updated: '2026-01-01T00:00:00.000Z', button: { nums: [4, 32], colors: ['ffffff'] }, gone: { nums: [1], colors: [] } });
+  writeFileSync(join(root, 'component-values.snapshot.json'), values);
+  const r = await importComponents(root, tpCfg, { dir });
   assert.equal(r.ok, true, JSON.stringify(r));
-  const got = JSON.parse(readFileSync(join(root, tpCfg.paths.snapshotStructure), 'utf8')).components;
+  assert.deepEqual(r.written, [tpCfg.paths.snapshotStructure, tpCfg.paths.compPropsSnapshot]);
+  assert.equal(readFileSync(join(root, 'component-values.snapshot.json'), 'utf8'), values);
+  assert.ok(!existsSync(join(root, 'component-state-tokens.json')));
+  const got = json(root, tpCfg.paths.snapshotStructure).components;
   const hand = JSON.parse(readFileSync(join(TP, tpCfg.paths.snapshotStructure), 'utf8')).components;
   assert.deepEqual(Object.keys(got), Object.keys(hand));
   for (const [name, h] of Object.entries(hand)) {
@@ -236,7 +414,7 @@ test('P6 components on a real file: Figma\'s checksums hold, and the import give
       for (const [v, hv] of Object.entries(h.variants ?? {})) assert.equal(got[name].variants[v].h, hv.h, `${name} ${v} height`);
     }
   }
-  const props = JSON.parse(readFileSync(join(root, tpCfg.paths.compPropsSnapshot), 'utf8'));
+  const props = json(root, tpCfg.paths.compPropsSnapshot);
   const handProps = JSON.parse(readFileSync(join(TP, tpCfg.paths.compPropsSnapshot), 'utf8'));
   for (const [name, h] of Object.entries(handProps)) {
     if (name.startsWith('_')) continue;

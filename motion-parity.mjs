@@ -60,7 +60,7 @@ const motionOf = (root, variant) => {
   return list;
 };
 for (const page of pages) {
-  await figma.setCurrentPageAsync(page);
+  await page.loadAsync();   // loaded where it is: switching the page would change the file
   const sets = page.findAllWithCriteria({ types: ['COMPONENT_SET'] });
   for (const set of sets) {
     const list = [];
