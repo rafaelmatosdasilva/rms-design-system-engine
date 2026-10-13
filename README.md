@@ -2,32 +2,29 @@
 
 **The maintenance engine for AI-ready design systems.**
 
-It connects design intent, implementation and automated verification, giving teams a dependable way to maintain their design system as both people and AI agents build products.
+It connects design intent, implementation and automated verification, helping teams keep their design systems reliable as products evolve and AI agents generate more code.
 
-## Understand the system
+### Understand the system
 
-Generate contracts, documentation, style guides and structured design intent from real sources.
+Turn real design and code sources into contracts, documentation, style guides and structured design intent that both people and AI agents can use.
 
-## Verify the system
+### Verify the system
 
-Check parity, component usage, accessibility and implementation changes against explicit rules.
+Check design-code parity, component usage, accessibility and implementation against explicit rules, with actionable findings instead of relying on AI judgement alone.
 
-## Maintain the system
+### Maintain the system
 
-Keep products aligned as tokens, components, requirements and implementations evolve.
+Track inconsistencies and regressions as tokens, components, requirements and implementations change, helping products stay aligned over time.
 
-## Explore
+## Why it matters
 
-- [Features and capabilities](docs/features.md)
-- [Technical documentation](docs/details.md)
-- [Case study](CASE-STUDY.md) and [evaluation results](test/skill-evals/RESULTS.md)
-- [Live style guide](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)
+AI can generate interfaces quickly, but speed alone doesn't guarantee consistency with your design system. RMS Design System Engine makes design-system requirements explicit and verifiable, combining structured design intent with deterministic checks to help teams catch issues that AI-generated code can introduce.
 
 ## Get started
 
 **Requirements:** [Claude Code](https://claude.com/claude-code), [Node.js](https://nodejs.org) 22+ and [Git](https://git-scm.com).
 
-Install the engine:
+Ask Claude Code to run this command to install the engine:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.sh | bash
@@ -41,8 +38,22 @@ Restart Claude Code and run:
 
 Once configured, ask Claude Code to check parity, audit accessibility, generate a style guide, build prototypes or investigate component usage.
 
-See the [technical documentation](docs/details.md#run-it) for setup details and the [features guide](docs/features.md) for available capabilities.
+- `/rms-design-system-engine check everything`
+- `/rms-design-system-engine check the button`
+- `/rms-design-system-engine check the accessibility of the button`
+- `/rms-design-system-engine build the style guide`
+- `/rms-design-system-engine prototype a settings page with our components`
+
+## Explore
+
+- Features and capabilities
+- Technical documentation
+- Case study
+- Evaluation results
+- [Live style guide](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)
 
 ## Open source
 
-Built by [Rafael Matos da Silva](https://rafaelmatosdasilva.com). Released under the [MIT License](LICENSE).
+Built by [Rafael Matos da Silva](https://rafaelmatosdasilva.com). Released under the MIT License.
+
+Add a clear project value propositionMake the installation flow more reassuring
