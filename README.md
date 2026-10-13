@@ -46,10 +46,10 @@ Once configured, ask Claude Code to check parity, audit accessibility, generate 
 
 ## Explore
 
-- Features and capabilities
-- Technical documentation
-- Case study
-- Evaluation results
+- [Features and capabilities](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md)
+- [Technical documentation](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md)
+- [Case study](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/CASE-STUDY.md)
+- [Evaluation results](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/test/skill-evals/RESULTS.md)
 - [Live style guide](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)
 
 ## Open source
