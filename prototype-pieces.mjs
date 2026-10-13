@@ -72,7 +72,7 @@ export function pieceCatalog(scales, systemNames = []) {
     Row: { description: 'The engine\'s horizontal arrangement; grow takes the room its parent leaves; surface is a colour token\'s Figma name for its background.', props: { gap: spacing, padding: spacing, align: { type: 'enum', values: ['start', 'center', 'end', 'stretch', 'baseline'] }, justify: { type: 'enum', values: ['start', 'center', 'end', 'between'] }, wrap: { type: 'boolean' }, grow: { type: 'boolean' }, stretch: { type: 'boolean' }, clip: { type: 'boolean' }, ...sides, surface: { type: 'text' } } },
     Columns: { description: 'The engine\'s equal columns; minWidth is the narrowest a column may be, in px: on a narrower screen the columns wrap, fewer to a row.', props: { count: { type: 'enum', values: ['2', '3', '4'] }, minWidth: { type: 'text' }, gap: spacing, grow: { type: 'boolean' }, stretch: { type: 'boolean' } } },
     Text: { description: 'Copy in one of the system\'s text styles; color is a colour token\'s Figma name.', props: { text: { type: 'text' }, style: { type: 'enum', values: scales.text.map((t) => t.name) }, as: { type: 'enum', values: ['h1', 'h2', 'h3', 'p', 'span'] }, color: { type: 'text' } } },
-    Missing: { description: 'A need the system has nothing for: a labelled empty box, and a line on the gaps list.', props: { need: { type: 'text' }, kind: { type: 'enum', values: GAP_KINDS }, closest: { type: 'text' } } },
+    Missing: { description: 'A need the system has nothing for: a labelled empty box, and a line on the gaps list; searched and why say what was looked for and why nothing fit.', props: { need: { type: 'text' }, kind: { type: 'enum', values: GAP_KINDS }, closest: { type: 'text' }, searched: { type: 'text' }, why: { type: 'text' } } },
   };
   if (!scales.text.length) delete defs.Text.props.style;
   return Object.fromEntries(Object.entries(defs).filter(([n]) => !taken.has(n.toLowerCase())).map(([n, d]) => [n, { ...d, engine: true }]));
@@ -105,10 +105,10 @@ function withoutNotes(ui) {
     // instance shows), box (its size on the screen) and, on a component the code has not built, the surface the screen
     // gives it, figmaState (the state a designed screen shows it in), opens (the id of the part a click opens), name
     // (what a screen reader says for it), inSlot (which of its parent's slots it goes in) and, on a system component,
-    // grow and stretch (Figma's fill container, which is the instance's).
-    const { standInFor, purpose, content, box, textless, figmaState, opens, goesTo, name: nm, inSlot, tip, ...rest } = o;
+    // grow and stretch (Figma's fill container, which is the instance's); why and searched, the gap record's evidence.
+    const { standInFor, purpose, content, box, textless, figmaState, opens, goesTo, name: nm, inSlot, tip, why, searched, ...rest } = o;
     for (const k of ['width', 'height']) if (typeof rest[k] === 'number') rest[k] = String(rest[k]);
-    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, goesTo: g2, name: n2, inSlot: i2, tip: t3, ...p } = rest.props; if (!PIECES.includes(rest.component)) { delete p.surface; delete p.grow; delete p.stretch; } rest.props = p; for (const k of ['width', 'height', 'count', 'minWidth']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
+    if (rest.props && typeof rest.props === 'object') { const { standInFor: s2, purpose: p2, content: c2, box: b2, textless: t2, figmaState: f2, opens: o2, goesTo: g2, name: n2, inSlot: i2, tip: t3, why: w2, searched: q2, ...p } = rest.props; if (!PIECES.includes(rest.component)) { delete p.surface; delete p.grow; delete p.stretch; } rest.props = p; for (const k of ['width', 'height', 'count', 'minWidth']) if (typeof p[k] === 'number') p[k] = String(p[k]); }
     if (typeof rest.count === 'number') rest.count = String(rest.count);
     return rest;
   };
@@ -153,7 +153,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const p = node.props ?? {};
     if (node.component === 'Missing' && pieces.Missing) {
       const said = lackSaid(context, String(p.need ?? ''), p.closest);
-      gaps.push({ need: String(p.need ?? 'unnamed need'), kind: p.kind ?? 'component', closest: p.closest ?? null, used: null, prototype: name, node: node.id, ...(said ? { note: `the guidelines: "${said}"` } : {}) });
+      gaps.push({ need: String(p.need ?? 'unnamed need'), kind: p.kind ?? 'component', closest: p.closest ?? null, used: null, prototype: name, node: node.id, ...(said ? { note: `the guidelines: "${said}"` } : {}), ...said2(p) });
       if (!p.need) findings.push({ rule: 2, level: 'error', id: node.id, message: 'a Missing box must say the need it stands for (need)' });
       continue;
     }
@@ -163,9 +163,9 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const own = p.standInFor ? systemHas(String(p.standInFor), node.component) : null;
     if (own) findings.push({ rule: null, level: 'warning', id: node.id, message: `${node.component} stands in for "${p.standInFor}", and the system has ${own}: use ${own} itself, without "standInFor"` });
     // A stand-in is a gap whatever stands in, the engine's own Text included.
-    if (pieces[node.component] && p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: null, used: `the engine's ${node.component}`, prototype: name, node: node.id });
+    if (pieces[node.component] && p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: null, used: `the engine's ${node.component}`, prototype: name, node: node.id, ...said2(p) });
     if (pieces[node.component]) { if (node.component !== 'Text') (used[node.component] ??= []).push(node.id); continue; }
-    if (p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: node.component, used: node.component, prototype: name, node: node.id });
+    if (p.standInFor) gaps.push({ need: String(p.standInFor), kind: 'component', closest: node.component, used: node.component, prototype: name, node: node.id, ...said2(p) });
     // A use the component's documentation rules out: never as a stand-in; as a label, worth a look.
     if (context?.components?.[node.component]) {
       for (const r of ruledOut(context.components[node.component], p.standInFor ?? '', node.component)) findings.push({ rule: null, source: 'the team\'s documentation', level: 'error', id: node.id, message: `${node.component} is not for "${p.standInFor}": "${r.sentence}". Show "${p.standInFor}" as a Missing box instead` });
@@ -194,7 +194,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const agreed = new Set((v.controls ?? []).flatMap((c) => [c.label, c.prop]));
     const optDefs = catalog.components[node.component]?.props ?? {};
     for (const k of Object.keys(p)) {
-      if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState', 'opens', 'goesTo', 'name', 'inSlot', 'tip', 'grow', 'stretch'].includes(k) || agreed.has(k)) continue;
+      if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState', 'opens', 'goesTo', 'name', 'inSlot', 'tip', 'grow', 'stretch', 'why', 'searched'].includes(k) || agreed.has(k)) continue;
       // A value of a choice turns on the class the system's CSS adds for it (.node.node-selected); a default value
       // needs none. One the CSS has no class for is drawn without it, and said.
       if (optDefs[k]?.type === 'enum') {
@@ -234,9 +234,11 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     if (!tokenNames.has(String(v))) findings.push({ rule: 2, level: 'error', id: n.id, message: `${n.component}.${k} "${v}" is not one of the system's colour tokens: name one of them by its Figma name, or leave it out` });
   }
   // Gaps written beside the composition (a screen's starting point carries what its screen used that the system lacks).
-  for (const g of declared) if (g?.need) gaps.push({ need: String(g.need), kind: GAP_KINDS.includes(g.kind) ? g.kind : 'component', closest: g.closest ?? null, used: g.used ?? null, prototype: name, node: null, ...(g.note ? { note: g.note } : {}) });
+  for (const g of declared) if (g?.need) gaps.push({ need: String(g.need), kind: GAP_KINDS.includes(g.kind) ? g.kind : 'component', closest: g.closest ?? null, used: g.used ?? null, prototype: name, node: null, ...(g.note ? { note: g.note } : {}), ...said2(g) });
   // The engine's layout pieces stand in for layout components the system does not have.
   for (const [piece, ids] of Object.entries(used)) gaps.push({ need: `a ${piece} layout component`, kind: 'layout', closest: null, used: `the engine's ${piece}`, prototype: name, node: ids.join(', '), count: ids.length });
+  // Each gap says what was tried (H2): what was searched, what stands in meanwhile, and why nothing fit.
+  for (const g of gaps) g.tried = triedFor(g, catalog);
   const errors = findings.filter((f) => f.level === 'error').length;
   return { ok: errors === 0, findings, counts: { components: r.counts.components, errors, warnings: findings.length - errors }, gaps, drawable, pieces: Object.keys(pieces) };
 }
@@ -288,15 +290,41 @@ export function drawnByName(prop, def = {}, markup = '') {
 }
 
 // The gaps of every prototype so far, merged by need: what the design team sees, the most needed first.
+// What the agent said it searched and why nothing fit, on a Missing box, a stand-in or a gap written beside the
+// composition (searched, why): kept on the gap.
+const said2 = (p = {}) => ({ ...(typeof p.searched === 'string' && p.searched.trim() ? { searched: p.searched.trim() } : {}), ...(typeof p.why === 'string' && p.why.trim() ? { why: p.why.trim() } : {}) });
+const STOP_WORDS = new Set(['the', 'and', 'for', 'with', 'what', 'that', 'this', 'from', 'into', 'its', 'one', 'opens', 'built', 'code', 'component', 'components', 'layout', 'dialog', 'menu']);
+const gapWords = (t) => (String(t ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().match(/[a-z][a-z0-9]{2,}/g) ?? []).map((w) => w.replace(/(ies)$/, 'y').replace(/([^s])s$/, '$1')).filter((w) => !STOP_WORDS.has(w));
+// A gap's record of what was tried, so whoever decides works from the evidence (K6): what was searched (the agent's
+// words, and the system's own components by name and description), the system's components nearest to the need,
+// what stands in for it meanwhile, and why nothing fit (the agent's reason, the guidelines, the note).
+export function triedFor(g, catalog = { components: {} }) {
+  const need = gapWords(g.need);
+  const own = Object.entries(catalog?.components ?? {}).filter(([n]) => !PIECES.includes(n));
+  const nearest = need.length ? own.map(([n, c]) => { const hay = new Set(gapWords(`${n} ${c?.description ?? ''}`)); return [n, need.filter((w) => hay.has(w)).length]; })
+    .filter(([n, k]) => k > 0 && n !== g.closest).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 3).map(([n]) => n) : [];
+  return {
+    searched: [...(g.searched ? [g.searched] : []), `the system's ${own.length} component${own.length === 1 ? '' : 's'}, by name and description`],
+    nearest,
+    reused: g.used ?? null,
+    why: [...new Set([g.why, g.note].filter(Boolean))],
+  };
+}
+
 export function mergeGaps(byPrototype = {}) {
   const merged = new Map();
   for (const [proto, list] of Object.entries(byPrototype)) {
     for (const g of list ?? []) {
       const key = `${g.kind}|${String(g.need).toLowerCase()}`;
-      if (!merged.has(key)) merged.set(key, { need: g.need, kind: g.kind, closest: g.closest ?? null, used: g.used ?? null, note: g.note ?? null, prototypes: [] });
+      if (!merged.has(key)) merged.set(key, { need: g.need, kind: g.kind, closest: g.closest ?? null, used: g.used ?? null, note: g.note ?? null, prototypes: [], ...(g.tried ? { tried: { searched: [], nearest: [], reused: null, why: [] } } : {}) });
       const m = merged.get(key);
       if (!m.prototypes.includes(proto)) m.prototypes.push(proto);
       if (!m.closest && g.closest) m.closest = g.closest;
+      if (g.tried) {
+        m.tried ??= { searched: [], nearest: [], reused: null, why: [] };
+        for (const k of ['searched', 'nearest', 'why']) for (const x of g.tried[k] ?? []) if (!m.tried[k].includes(x)) m.tried[k].push(x);
+        m.tried.reused ??= g.tried.reused ?? null;
+      }
     }
   }
   return [...merged.values()].sort((a, b) => b.prototypes.length - a.prototypes.length || (a.kind === 'layout') - (b.kind === 'layout'));
@@ -319,13 +347,17 @@ export function groupLayout(gaps = []) {
 export function pageGaps(gaps = []) {
   return groupLayout(mergeGaps({ page: gaps })).map(({ prototypes, ...g }) => {
     const same = g.kind === 'layout' ? [] : gaps.filter((x) => x.kind === g.kind && String(x.need).toLowerCase() === String(g.need).toLowerCase());
-    return { line: gapLine(g), kind: g.kind, need: g.need, nodes: [...new Set(same.flatMap((x) => String(x.node ?? '').split(', ').filter(Boolean)))] };
+    return { line: gapLine(g, { short: true }), kind: g.kind, need: g.need, nodes: [...new Set(same.flatMap((x) => String(x.node ?? '').split(', ').filter(Boolean)))] };
   });
 }
 
 // One line per gap, for the summary and the reply.
-export function gapLine(g) {
+// short: the prototype page's own list, without what was tried (the gaps list and the summary carry it).
+export function gapLine(g, { short = false } = {}) {
   const where = g.prototypes ? ` (needed in ${g.prototypes.length} prototype${g.prototypes.length === 1 ? '' : 's'}: ${g.prototypes.join(', ')})` : '';
   const instead = g.used ? `; the prototype uses ${g.used} meanwhile` : g.closest ? `; closest in the system: ${g.closest}` : '';
-  return `${g.kind}: ${g.need}${instead}${g.note ? ` (${g.note})` : ''}${where}`;
+  // What was tried (H2): the system's components nearest to the need, and why none fit when it was said.
+  const t = g.tried, why = (t?.why ?? []).filter((w) => w !== g.note);
+  const tried = short || !t || g.kind === 'layout' ? '' : `; searched ${t.searched.join(', and ')}: ${t.nearest.length ? `nearest ${t.nearest.join(', ')}` : 'none near it'}${why.length ? `; why none fits: ${why.join('; ')}` : ''}`;
+  return `${g.kind}: ${g.need}${instead}${g.note ? ` (${g.note})` : ''}${tried}${where}`;
 }

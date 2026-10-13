@@ -14,7 +14,7 @@ interview** - you do not conduct it or write `ds-config.json` by hand. A project
 has one keeps it: `--init` there writes nothing and says so, and only `--init --reconfigure`
 sets it up again from scratch, replacing it. It needs these inputs (auto-detecting what it can):
 
-1. **Where the code is** *(required)* - this folder (`--project=.`), another folder or a git link (`--project=<it>`), or the token file here (`--theme-css`). Never guessed: without it setup writes nothing and its NEXT line asks the person.
+1. **Where the code is** *(required)* - this folder (`--project=.`), another folder, or a link to its repository on GitHub or GitLab (`--project=<it>`), or the token file here (`--theme-css`). Never guessed: without it setup writes nothing and its NEXT line asks the person.
 2. **Main Design System Figma file** *(optional)* - the full browser URL of the DS file. The engine extracts the file key (path segment after `/design/` or `/file/`). Pass the URL, never a raw key. Without it `figmaFileKey` is empty, each run checks the code alone (the accessibility check) and says nothing was compared with Figma; add the key to compare. A project that already has Figma snapshots committed is still compared with them, as they are: nothing can refresh them without the link, so their age is said (Gate [1]) and never a failure, and the summary says the link is what refreshes them.
 3. **Theme CSS path** - relative path to the token CSS file(s). Auto-scanned; a single detected file becomes the default.
 4. **Figma personal access token** *(optional)* - needed for collection auto-detection and Gates [2], [20] (visual regression + icon freshness). Read from `.env` if present. Never stored in `ds-config.json`.
@@ -48,12 +48,23 @@ them afresh. A `FIGMA_TOKEN` in the environment is picked up
 silently; it is never prompted for and never required.
 
 **Where the project is.** The engine works on the folder it runs in. `--project=<folder>` or
-`--project=<git link>` (cloned beside that folder once; `owner/repo` means GitHub) points it at
-another, on any command, and is remembered in the folder it ran from (`.design-system-engine-project`),
+`--project=<link>` points it at another, on any command, and is remembered in the folder it ran from (`.design-system-engine-project`),
 so later runs there need no flag (it says `📁 Project: <folder>` on stderr). Setup never takes the
 folder it runs in for the code by a guess: told nothing, it says what the folder holds and exits
 with a NEXT line asking where the code is. Told the code is in a folder with none (no manifest,
 stylesheet, page or script), it asks whether the code is elsewhere or starts there (`--build`).
+
+A GitHub link (`owner/repo` means GitHub) is cloned beside that folder once. A GitLab link (gitlab.com, a host named
+`gitlab.<domain>`, a host in `GITLAB_HOST`, or any link with GitLab's `/-/`; `/-/tree/<branch>` for another branch than
+the default) is never cloned and needs no git: the engine keeps a mirror of the branch's latest commit beside that
+folder through GitLab's API, asks GitLab for the latest commit on every run and downloads it again only when the branch
+moved, and says which commit it checked (`🦊 GitLab: <project> @ <branch> <commit>`). Offline, it checks the mirror it
+has and says from which commit. The history the engine shows (each component's changelog with its release and merge
+request, the reason a line changed, the commit an agreement records) comes through the same API, kept per commit in
+the mirror (`.gitlab-history.json`), so only what moved is asked again. A private project needs a token the person
+sets, never one asked for in the chat: `GITLAB_TOKEN` (a personal or project token with the `read_api` scope) in the
+`.env` of the folder the engine runs in, and for a company's own GitLab `GITLAB_HOST=<its host>`, the only host the
+token is ever sent to besides gitlab.com. A public project needs neither.
 
 **Do not ask for frame node IDs, collection names, or primitive prefixes** - these are either auto-detected or added later.
 

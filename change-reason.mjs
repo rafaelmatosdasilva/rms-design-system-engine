@@ -5,9 +5,11 @@
 //   • Figma side: the file's latest named version (REST /files/:key/versions): label, description,
 //     author and date. Figma keeps versions per file, not per node, so this is one line per run.
 //
-// Never fails the caller: outside a git repository, or without a token, it returns null.
+// Never fails the caller: outside a git repository, or without a token, it returns null. A project read from GitLab
+// (a mirror, no .git) is blamed through the GitLab API instead (gitlab-history.mjs).
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { blameOf, ensureHistory, mirrorState } from './gitlab-history.mjs';
 
 const BLAME = new Map();   // file → Map(line → reason), one blame per file per process
 
@@ -16,6 +18,10 @@ export function codeReason(root, at) {
   if (!m) return null;
   const [, file, line] = m;
   const abs = resolve(root, file);
+  if (!BLAME.has(abs) && mirrorState(root)) {
+    const b = blameOf(root, file);
+    BLAME.set(abs, b?.uncommitted ? { get: () => ({ uncommitted: true }) } : b ?? null);
+  }
   if (!BLAME.has(abs)) {
     let lines = null;
     try {
@@ -25,6 +31,13 @@ export function codeReason(root, at) {
     BLAME.set(abs, lines);
   }
   return BLAME.get(abs)?.get(Number(line)) ?? null;
+}
+
+// The reasons for many `file:line` at once: a project read from GitLab asks for every file in one go, not one by one.
+export function prefetchReasons(root, ats = []) {
+  if (!mirrorState(root)) return;
+  const files = [...new Set(ats.map((a) => String(a ?? '').match(/^(.+):(\d+)$/)?.[1]).filter(Boolean))];
+  if (files.length) ensureHistory(root, { blame: files });
 }
 
 // git blame --line-porcelain: a header per line ("<hash> <orig> <final> [<count>]"), then key/value

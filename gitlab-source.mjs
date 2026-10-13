@@ -184,9 +184,9 @@ export async function syncGitlab(p, opts = {}) {
     if (state?.sha === sha && existsSync(dir)) return { ...info, changed: false };
     const a = await get(`${base}/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}`);
     if (!a.ok) return cached(a.status ? why(a.status, p.host) + notSent : `could not reach ${p.host}`);
-    // The project cannot write the mirror's own record (a .gitlab-source.json committed upstream would otherwise say
-    // which host the next run talks to).
-    const files = untar(gunzipSync(Buffer.from(await a.arrayBuffer()))).filter((f) => f.path !== STATE_FILE);
+    // The project cannot write the mirror's own records (a .gitlab-source.json committed upstream would otherwise say
+    // which host the next run talks to; a .gitlab-history.json, whose history it shows).
+    const files = untar(gunzipSync(Buffer.from(await a.arrayBuffer()))).filter((f) => f.path !== STATE_FILE && f.path !== '.gitlab-history.json');
     if (!files.length) return cached('the archive GitLab sent holds no files');
     const root = resolve(dir) + sep;
     mkdirSync(dir, { recursive: true });

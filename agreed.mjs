@@ -18,6 +18,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { newPath, projectPath } from './names.mjs';
+import { mirrorHead } from './gitlab-history.mjs';
 
 export const AGREED_FILE = newPath('agreed');
 
@@ -112,6 +113,8 @@ export function leadersLine(by) {
 }
 
 function headCommit(root) {
+  const mirrored = mirrorHead(root);
+  if (mirrored) return mirrored.slice(0, 7);
   try { return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
   catch { return null; }
 }
