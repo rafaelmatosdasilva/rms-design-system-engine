@@ -79,7 +79,8 @@ rms-design-system-engine --no-docs                       # skip the design-inten
 rms-design-system-engine --refresh-figma                 # read Figma the best way there is: design.json, figma-cli, else says how
 rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --capture-script vars <n|sums>  # write the read-only script for chunk n of Figma's variables, text styles and effect styles (sums: the checksums alone), to run unchanged with use_figma; save its answer as it came
-rms-design-system-engine --capture-import                # check every saved answer against the checksum Figma computed, name the chunks to read again, and once all are there write the vars snapshot with the capture recipe's own scripts
+rms-design-system-engine --capture-script components <n|sums>  # the same for the components: each chunk runs the capture recipe's Step 1c functions in Figma (sums: the checksums and each chunk's plan)
+rms-design-system-engine --capture-import [vars|components]  # check every saved answer against the checksum Figma computed, name the chunks to read again, and once all are there write the vars snapshot, or the structure and props snapshots, with the capture recipe's own scripts
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then a page of it and the components it nests (styleguide/modal.html), its address printed
 rms-design-system-engine --styleguide --no-a11y-bake     # the page without its accessibility tried while it is built (a page only measured, as a CI's first build is)

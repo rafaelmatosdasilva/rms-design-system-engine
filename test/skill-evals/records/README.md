@@ -108,5 +108,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `gitlab-agents-gaps` | The 21 guide tasks on Haiku (engine c2ee891) | "A project read from GitLab, agents without the hooks, and gaps that say what was tried" |
 | `capture-recipe-fixes` | The 21 guide tasks on Haiku (engine 78d3116) | "The Figma capture reads library aliases, colours with opacity among the sizes, durations in their unit, every text style by its full name, and shared sizing modes" |
 | `chunked-capture-stamps` | The 21 guide tasks on Haiku (engine c071b6d) | "Figma read in checked chunks by both readers, outputs stamped with what they were built from, parity by type, Mac-like runs" |
+| `p6-components` | The 21 guide tasks on Haiku (engine 99f052c) | "Components read in checked chunks" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
