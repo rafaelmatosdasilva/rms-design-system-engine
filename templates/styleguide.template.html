@@ -125,6 +125,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-health-bar { display: flex; height: calc(var(--sg-space-xs) * 2); border-radius: var(--sg-radius-pill); background: color-mix(in srgb, var(--sg-border) 30%, transparent); overflow: hidden; }
 .sg-health-bar > span { display: block; height: 100%; background: var(--sg-text); }
 .sg-health-bar > span + span { background: color-mix(in srgb, var(--sg-text) 35%, transparent); }
+.sg-health-bar > span + span + span { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--sg-text) 35%, transparent) 0 2px, transparent 2px 4px); }
 .sg-health-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); }
 .sg-health-list > li { display: flex; flex-direction: column; gap: var(--sg-space-xs); }
 .sg-health-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sg-space-s); font-size: var(--sg-m); color: var(--sg-text); }
@@ -2545,6 +2546,21 @@ a.pg-usage-name { color: var(--sg-text); }
       var say = [x.fail ? x.fail + ' fail' : '', x.check ? x.check + ' to check' : ''].filter(Boolean).join(', ');
       return '<li><div class="sg-health-row"><span>' + esc(x.sc + ' ' + x.name + (x.level ? ' (' + x.level + ')' : '')) + '</span><span>' + esc(say) + '</span></div>' + bar2(pct(x.fail / critOf), pct(x.check / critOf)) + '</li>';
     }).join('') + '</ol><p class="sg-health-sub">Of ' + critOf + (critOf === 1 ? ' component' : ' components') + ' tried. The dark part fails, the light part waits on a person\'s check.</p>' : '<p class="sg-health-sub">No component fails a criterion, and none waits on a person\'s check.</p>';
+    // Parity by type (G11): every open difference by what it is about and where it comes from (Figma and the code
+    // differ, only Figma has it, only the code has it), so it shows where the drift comes from. The longest type is the
+    // full bar.
+    var parType = function (r) { return r.type === 'Prop' ? 'Props' : r.type === 'Variable' ? 'Variables' : r.type === 'Value' ? 'Values' : r.kind === 'Effect' ? 'Effects' : /\bmodes?\b/i.test(r.kind || '') ? 'Modes' : 'Other'; };
+    var parSide = function (r) { return r.rel === PAR_REL.figma ? 'figma' : r.rel === PAR_REL.code ? 'code' : 'differs'; };
+    var byType = {};
+    per.forEach(function (p) { p.rows.forEach(function (r) { if (r.area !== 'Parity' || !isOpen(r)) return; var e = byType[parType(r)] = byType[parType(r)] || { differs: 0, figma: 0, code: 0 }; e[parSide(r)]++; }); });
+    var parTypes = ['Props', 'Variables', 'Values', 'Effects', 'Modes', 'Other'].filter(function (k) { return byType[k]; }).map(function (k) { var e = byType[k]; return { name: k, differs: e.differs, figma: e.figma, code: e.code, n: e.differs + e.figma + e.code }; });
+    var parTop = Math.max.apply(null, [1].concat(parTypes.map(function (x) { return x.n; })));
+    var parOpen = parTypes.reduce(function (s, x) { return s + x.n; }, 0);
+    var bar3 = function (a, b, c) { return '<span class="sg-health-bar" aria-hidden="true"><span style="width:' + a + '%"></span><span style="width:' + b + '%"></span><span style="width:' + c + '%"></span></span>'; };
+    var typeHTML = parTypes.length ? '<ol class="sg-health-list">' + parTypes.map(function (x) {
+      var say = [x.differs ? x.differs + (x.differs === 1 ? ' differs' : ' differ') : '', x.figma ? x.figma + ' only in Figma' : '', x.code ? x.code + ' only in the code' : ''].filter(Boolean).join(', ');
+      return '<li><div class="sg-health-row"><span>' + esc(x.name) + '</span><span>' + esc(say) + '</span></div>' + bar3(pct(x.differs / parTop), pct(x.figma / parTop), pct(x.code / parTop)) + '</li>';
+    }).join('') + '</ol><p class="sg-health-sub">' + parOpen + (parOpen === 1 ? ' difference' : ' differences') + ' open. The dark part differs, the light part is only in Figma, the striped part only in the code.</p>' : '<p class="sg-health-sub">Nothing differs from Figma.</p>';
     var cell = function (v, label) { return '<td data-label="' + esc(label) + '">' + (v == null ? '<span class="pg-par-none">–</span>' : v + '%') + '</td>'; };
     var compHTML = compScores.length ? '<div class="pg-par-card sg-health-comps"><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>Health</th>' +
       HEALTH_AREAS.map(function (a) { return '<th>' + esc(a[0]) + '</th>'; }).join('') + '<th>AI readiness</th><th>Checked</th></tr></thead><tbody>' +
@@ -2557,6 +2573,7 @@ a.pg-usage-name { color: var(--sg-text); }
       }).join('') + '</tbody></table></div></div>' : '';
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div>' +
       '<div class="sg-health-card"><h3>Components with the most left</h3>' + painHTML + '</div>' +
+      '<div class="sg-health-card sg-health-types"><h3>Parity by type</h3>' + typeHTML + '</div>' +
       (critHTML ? '<div class="sg-health-card sg-health-crit"><h3>Accessibility by WCAG criterion</h3>' + critHTML + '</div>' : '') +
       (compHTML ? '<h3 class="sg-health-head">Each component</h3>' + compHTML : '') + '<p class="pg-wcag-note sg-health-note">Parity and accessibility count each component, whole when nothing in it is left, half when only checks are left, nothing while something is to fix. Documentation and motion count each item, done whole, to check half, to fix nothing. Every component counts the same; what is left is weighed by its area. ' +
       'AI readiness counts what it is, when to use it and when not, its role and agreeing with Figma, and is not in the weighted number. ' +

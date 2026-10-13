@@ -73,9 +73,10 @@ export function fixtureProject(fixture, prefix = 'ds-', { overlay = null } = {})
   return dir;
 }
 
-// A PATH with only git and which, so a run meant to be without Chrome cannot find one; and no TypeScript but the
-// project's own (no NODE_PATH, DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project), so a machine that has one installed for every
-// project runs the same as one that has none.
+// A PATH with only git and which, and DESIGN_SYSTEM_ENGINE_CHROME=none, so a run meant to be without Chrome cannot find
+// one (a Mac's Chrome in /Applications included); and no TypeScript but the project's own (no NODE_PATH,
+// DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project), so a machine that has one installed for every project runs the same as one
+// that has none.
 export function bareEnv() {
   const bin = mkdtempSync(join(tmpdir(), 'demo-bin-'));
   for (const name of ['git', 'which']) {
@@ -83,7 +84,7 @@ export function bareEnv() {
     if (p) symlinkSync(p, join(bin, name));
   }
   const { CHROME_PATH, NODE_PATH, ...rest } = process.env;
-  return { ...rest, PATH: bin, PLAYWRIGHT_BROWSERS_PATH: join(bin, 'none'), DESIGN_SYSTEM_ENGINE_TYPESCRIPT: 'project' };
+  return { ...rest, PATH: bin, PLAYWRIGHT_BROWSERS_PATH: join(bin, 'none'), DESIGN_SYSTEM_ENGINE_TYPESCRIPT: 'project', DESIGN_SYSTEM_ENGINE_CHROME: 'none' };
 }
 
 // Dates, durations, ages, commit hashes and the temporary directory change from run to run; so does the share of a

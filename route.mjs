@@ -37,9 +37,13 @@ export function projectState(ROOT, { engineDir, env = process.env } = {}) {
     rawColours: rawColoursOf(structure?.components ?? {}),
     components: withCodeNames(Object.keys(structure?.components ?? {}), () => codeComponents(ROOT, conf)),
     snapshotDate: oldest ? oldest.toISOString().slice(0, 10) : null,
-    cmd: onPath || !engineDir ? 'rms-design-system-engine' : `node ${join(engineDir, 'audit.mjs')}`,
+    cmd: onPath || !engineDir ? 'rms-design-system-engine' : `node ${shellPath(join(engineDir, 'audit.mjs'))}`,
   };
 }
+
+// A path as a shell reads it: quoted when it holds a space or a character the shell would act on (an engine kept in
+// "My Drive/tools"), as it is, so the command reads as before, when it holds none.
+export const shellPath = (p) => (/^[\w@%+=:,./\\-]+$/.test(p) ? p : `"${String(p).replace(/(["$`])/g, '\\$1')}"`);   // in double quotes, as the hooks' own command is
 
 // Figma's components and the ones only the code has (HbChip.vue, a file whose root carries a class of its own), so a
 // request that names a component the snapshot lacks is still scoped to it (E24). One the snapshot has under its own

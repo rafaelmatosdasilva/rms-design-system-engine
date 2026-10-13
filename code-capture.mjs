@@ -22,6 +22,7 @@
 // Config (all optional): ds-config.json → codeReading: { browser: "auto" | "off", pages: [paths or URLs],
 //                                                       out: ".design-system-engine-out/code.snapshot.json" }
 
+import { buildStamp, mayWrite } from './stamp.mjs';
 import { appDir } from './code-roots.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve, dirname, relative } from 'node:path';
@@ -95,10 +96,12 @@ function hashInputs(ROOT, cfg, files, pages, opts) {
   const h = createHash('sha256');
   h.update(`v${CAPTURE_VERSION}|${JSON.stringify(cfg.figma?.modes ?? null)}|${JSON.stringify(cfg.figma?.collections ?? null)}|${JSON.stringify(cfg.codeReading ?? null)}`);
   for (const f of ['code-capture.mjs', 'css-source.mjs', 'component-capture.mjs', 'component-locator.mjs', 'structure-capture.mjs', 'component-api.mjs', 'component-source.mjs', 'icon-source.mjs', 'markup-source.mjs', 'codeconnect-check.mjs', 'state-concepts.mjs', 'css-values.mjs']) { try { h.update(readFileSync(join(ENGINE_DIR, f))); } catch { /* engine file */ } }
-  for (const extra of opts.extraFiles ?? []) { try { h.update(extra); h.update(readFileSync(extra)); } catch { /* optional */ } }
+  // Paths relative to the project: the same project read under another name (a Mac's /var and /private/var, a
+  // symlinked folder, a moved checkout) has the same inputs.
+  for (const extra of opts.extraFiles ?? []) { try { h.update(relative(ROOT, extra)); h.update(readFileSync(extra)); } catch { /* optional */ } }
   for (const key of opts.extraKeys ?? []) h.update(`|${key}`);
   for (const abs of [...files.map((f) => f.abs), ...pages.filter((p) => !/^https?:/.test(p.path) && !p.generated).map((p) => resolve(ROOT, p.path))].sort()) {
-    try { h.update(abs); h.update(readFileSync(abs)); } catch { /* vanished */ }
+    try { h.update(relative(ROOT, abs)); h.update(readFileSync(abs)); } catch { /* vanished */ }
   }
   return h.digest('hex').slice(0, 16);
 }
@@ -613,6 +616,10 @@ export async function captureCode(ROOT, cfg, { force = false, browser: wantBrows
     markup,
     nesting,
   };
+  // What it was read from (P4). A snapshot of newer code on disk stays: this run uses its own reading, unsaved.
+  snapshot._built = buildStamp(ROOT);
+  const may = mayWrite(outPath, snapshot._built, { ROOT, label: relative(ROOT, outPath) });
+  if (!may.ok) { log(may.line); return { snapshot, outPath, cached: false, kept: may.line }; }
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(snapshot, null, 2) + '\n');
   return { snapshot, outPath, cached: false };
