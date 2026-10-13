@@ -54,7 +54,7 @@ const walk = async (n, depth) => {
   return rec;
 };
 for (const page of pages) {
-  await figma.setCurrentPageAsync(page);
+  await page.loadAsync();   // loaded where it is: switching the page would change the file
   for (const set of page.findAllWithCriteria({ types: ['COMPONENT_SET'] })) if (set.children[0]) { const r = await walk(set.children[0], 0); out[set.name] = kept(r) ? r : {}; }
   for (const c of page.findAllWithCriteria({ types: ['COMPONENT'] })) if (!c.parent || c.parent.type !== 'COMPONENT_SET') { const r = await walk(c, 0); if (kept(r)) out[c.name] = r; }
 }

@@ -90,7 +90,7 @@ test('findings, the block and the score; a scoped run keeps to its components', 
   assert.equal(hygieneBlock(many, { all: true }).at(-1), '     chip: and 18 more values with no variable or style');
 });
 
-test('the Plugin API capture in the cookbook carries the engine function, and runs', () => {
+test('the Plugin API capture in the cookbook carries the engine function, and runs', async () => {
   const md = readFileSync(join(ENGINE, 'cookbook', 'full-audit.md'), 'utf8');
   const start = md.indexOf('function hygieneOf(');
   const end = md.indexOf('\n}\n', start) + 2;
@@ -104,8 +104,13 @@ test('the Plugin API capture in the cookbook carries the engine function, and ru
   const all = [];
   const link = (n, parent) => { n.parent = parent; all.push(n); for (const c of n.children ?? []) link(c, n); };
   link(tree, null);
-  const figma = { root: { findAll: (pred) => all.filter(pred) } };
-  const out = JSON.parse(new Function('figma', snippet)(figma));
+  // Each page loaded where it is, never switched to.
+  let loaded = 0;
+  Object.assign(tree, { loadAsync: async () => { loaded++; }, findAllWithCriteria: ({ types }) => all.filter((n) => n !== tree && types.includes(n.type)) });
+  const figma = { root: { children: [tree] }, setCurrentPageAsync: async () => { throw new Error('a capture never switches the page'); } };
+  const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+  const out = JSON.parse(await new AsyncFunction('figma', snippet)(figma));
+  assert.equal(loaded, 1);
   assert.deepEqual(Object.keys(out).filter((k) => k !== '_updated'), ['Chip', 'Divider']);   // a variant is part of its set
   assert.deepEqual(out.Chip.nums, [16, 32, 40]);
   assert.deepEqual(out.Chip.hygiene.raw, [{ at: 'Size=M', field: 'fill', value: '#ffffff' }, { at: 'Size=M', field: 'radius', value: 16 }]);

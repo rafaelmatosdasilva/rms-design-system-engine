@@ -22,23 +22,28 @@
 // One component's record. Plain JavaScript with no imports, so the Plugin API capture in the cookbook carries
 // this same function (a test checks the two are identical). Works on a Plugin API node and on a REST /nodes
 // document: styles are `node.styles.fill` in REST and `node.fillStyleId` in the plugin, bound variables are
-// `boundVariables` in both. `budget` ({ n }) bounds a REST walk. `names` maps a REST instance's componentId to its
+// `boundVariables` in both. Every property is read through `get`: the Figma tool throws on reading one a layer type
+// does not have (fills on a group, rectangleCornerRadii, which only REST has), and a mixed value (figma.mixed) is
+// never a number. `budget` ({ n }) bounds a REST walk. `names` maps a REST instance's componentId to its
 // component's name (the set's, for a variant); the plugin reads mainComponent.
 export function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
   // values: how many values were read (raw or bound), variants: how many variants hold two or more layers; with rawCount
   // and noAutoLayout they say how far the file can be trusted for a comparison (R1).
   const out = { raw: [], rawCount: 0, values: 0, noAutoLayout: [], variants: 0, description: !!String(description ?? '').trim() };
+  const get = (n, k) => { try { return n != null && typeof n === 'object' && k in n ? n[k] : undefined; } catch (e) { return undefined; } };
   const key = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const mainName = (n) => {
-    if (names[n.componentId]) return names[n.componentId];
+    const id = get(n, 'componentId');
+    if (id != null && names[id]) return names[id];
     try { const m = n.mainComponent; return m ? (m.parent && m.parent.type === 'COMPONENT_SET' ? m.parent.name : m.name) : null; } catch (e) { return null; }
   };
   const has = (o, k) => { const v = o ? o[k] : null; return Array.isArray(v) ? v.some(Boolean) : !!v; };
-  const bound = (n, k) => has(n.boundVariables, k);
-  const styled = (n, kind) => has(n.styles, kind) || (typeof n[kind + 'StyleId'] === 'string' && n[kind + 'StyleId'] !== '');
+  const bound = (n, k) => has(get(n, 'boundVariables'), k);
+  const styled = (n, kind) => { const id = get(n, kind + 'StyleId'); return has(get(n, 'styles'), kind) || (typeof id === 'string' && id !== ''); };
   const hex = (c) => '#' + [c.r, c.g, c.b].map((x) => Math.round((x || 0) * 255).toString(16).padStart(2, '0')).join('');
   const num = (v) => typeof v === 'number' && isFinite(v) && v > 0;
-  const kids = (n) => (Array.isArray(n.children) ? n.children : []);
+  const kids = (n) => { const c = get(n, 'children'); return Array.isArray(c) ? c : []; };
+  const paintsOf = (n, list) => { const p = get(n, list); return Array.isArray(p) ? p : []; };
   const artwork = /^(VECTOR|BOOLEAN_OPERATION|STAR|LINE|POLYGON|REGULAR_POLYGON)$/;
   const raw = (at, field, value) => { out.rawCount++; if (out.raw.length < 12) out.raw.push({ at, field, value }); };
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomRightRadius', 'bottomLeftRadius'];
@@ -66,40 +71,44 @@ export function hygieneOf(root, description, budget = { n: Infinity }, names = {
       if (main && n.name !== main && key(n.name) === key(main)) { out.renamed = out.renamed || []; out.renamed.push({ at, layer: n.name, component: main }); }
       return;
     }
-    if (n.detachedInfo !== undefined) { detached = detached || []; if (n.detachedInfo) detached.push(at); }
+    const detachedInfo = get(n, 'detachedInfo');
+    if (detachedInfo !== undefined) { detached = detached || []; if (detachedInfo) detached.push(at); }
     const fillScope = n.type === 'TEXT' ? 'TEXT_FILL' : /^(FRAME|COMPONENT|SECTION)$/.test(n.type) ? 'FRAME_FILL' : 'SHAPE_FILL';
-    for (const [k, v] of Object.entries(n.boundVariables || {})) {
+    const bvs = get(n, 'boundVariables') || {};
+    for (const [k, v] of Object.entries(bvs)) {
       const scope = k === 'fills' ? fillScope : SCOPE[k];
       if (scope) for (const a of [].concat(v)) bind(a, scope, at);
     }
     for (const [list, scope] of [['fills', fillScope], ['strokes', 'STROKE_COLOR']]) {
-      for (const p of Array.isArray(n[list]) ? n[list] : []) if (p && p.boundVariables) bind(p.boundVariables.color, scope, at);
+      for (const p of paintsOf(n, list)) if (p && p.boundVariables) bind(p.boundVariables.color, scope, at);
     }
     if (!artwork.test(n.type)) {
       for (const [list, kind] of [['fills', 'fill'], ['strokes', 'stroke']]) {
-        const paints = Array.isArray(n[list]) ? n[list] : [];
-        paints.forEach((p, i) => {
+        paintsOf(n, list).forEach((p, i) => {
           if (!p || p.type !== 'SOLID' || p.visible === false || !p.color) return;
           out.values++;
-          const viaNode = n.boundVariables && Array.isArray(n.boundVariables[list]) && n.boundVariables[list][i];
+          const viaNode = Array.isArray(bvs[list]) && bvs[list][i];
           if (has(p.boundVariables, 'color') || viaNode || styled(n, kind)) return;
           raw(at, kind, hex(p.color));
         });
       }
     }
-    const radii = Array.isArray(n.rectangleCornerRadii) ? n.rectangleCornerRadii : corners.map((k) => n[k]);
-    const radius = num(n.cornerRadius) ? n.cornerRadius : Math.max(0, ...radii.filter(num));
+    const rectRadii = get(n, 'rectangleCornerRadii'), cornerRadius = get(n, 'cornerRadius');
+    const radii = Array.isArray(rectRadii) ? rectRadii : corners.map((k) => get(n, k));
+    const radius = num(cornerRadius) ? cornerRadius : Math.max(0, ...radii.filter(num));
     if (radius > 0) out.values++;
     if (radius > 0 && !bound(n, 'cornerRadius') && !corners.some((k) => bound(n, k))) raw(at, 'radius', radius);
-    if (sides.some(([k]) => num(n[k]))) out.values++;
-    const loose = sides.filter(([k]) => num(n[k]) && !bound(n, k)).map(([k, w]) => `${w} ${n[k]}`);
+    if (sides.some(([k]) => num(get(n, k)))) out.values++;
+    const loose = sides.filter(([k]) => num(get(n, k)) && !bound(n, k)).map(([k, w]) => `${w} ${get(n, k)}`);
     if (loose.length) raw(at, 'padding', loose.join(', '));
-    const auto = n.layoutMode && n.layoutMode !== 'NONE';
-    if (auto && num(n.itemSpacing) && kids(n).length > 1) out.values++;
-    if (auto && num(n.itemSpacing) && kids(n).length > 1 && !bound(n, 'itemSpacing')) raw(at, 'gap', n.itemSpacing);
+    const layoutMode = get(n, 'layoutMode'), gap = get(n, 'itemSpacing');
+    const auto = layoutMode && layoutMode !== 'NONE';
+    if (auto && num(gap) && kids(n).length > 1) out.values++;
+    if (auto && num(gap) && kids(n).length > 1 && !bound(n, 'itemSpacing')) raw(at, 'gap', gap);
     if (n.type === 'TEXT') out.values++;
     if (n.type === 'TEXT' && !styled(n, 'text') && !bound(n, 'fontSize')) {
-      const size = typeof n.fontSize === 'number' ? n.fontSize : n.style && n.style.fontSize;
+      const fontSize = get(n, 'fontSize'), style = get(n, 'style');
+      const size = typeof fontSize === 'number' ? fontSize : style && style.fontSize;
       raw(at, 'text style', size ? `${size}px` : 'mixed');
     }
     for (const c of kids(n)) walk(c, `${at}/${c.name}`);
@@ -107,8 +116,9 @@ export function hygieneOf(root, description, budget = { n: Infinity }, names = {
   const variants = root && root.type === 'COMPONENT_SET' ? kids(root) : [root];
   for (const v of variants) {
     if (!v) continue;
+    const mode = get(v, 'layoutMode');
     if (kids(v).length > 1) out.variants++;
-    if (kids(v).length > 1 && (!v.layoutMode || v.layoutMode === 'NONE')) out.noAutoLayout.push(v.name);
+    if (kids(v).length > 1 && (!mode || mode === 'NONE')) out.noAutoLayout.push(v.name);
     walk(v, v.name);
   }
   if (detached) out.detached = detached;

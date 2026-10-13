@@ -24,9 +24,12 @@ single-component check clean instead of drowning in the rest of the DS. Because 
 **contains** others (a button may hold an icon, a card a badge), the scope **auto-expands**
 to the nested components used inside the chosen ones (found via their source files, so the
 parent is never passed while a child it depends on is broken); the banner lists what was
-pulled in. Only a component's own source counts: the file `componentFiles` names for it, or a
-file whose name ends with its name (`HbIconButton.vue` is iconButton's, `Chip/index.tsx` is
-chip's). A page that shows several components, the theme CSS, a native element (`<button>`,
+pulled in. Only a component's own source counts: the file the shared pairing gives it
+(`component-pairing.mjs`: `componentFiles` always wins; a strong sign such as the file's name,
+the component it declares, its first class or its folder pairs alone, as `HbIconButton.vue` is
+iconButton's and `Chip/index.tsx` chip's; weak signs such as a generic file name, the library's
+prefix, the tokens the file uses or a state-word sibling pair only when two agree, and one alone
+is only a proposal to confirm or pin). A page that shows several components, the theme CSS, a native element (`<button>`,
 `type="button"`) and a name inside a longer one (button inside iconButton) pull in nothing. A
 finding that names a component belongs to that component; one that names none (a token, a
 shared rule) belongs to the scope when its file mentions a component in scope. The burndown
@@ -79,8 +82,8 @@ rms-design-system-engine --no-docs                       # skip the design-inten
 rms-design-system-engine --refresh-figma                 # read Figma the best way there is: design.json, figma-cli, else says how
 rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
 rms-design-system-engine --capture-script vars <n|sums>  # write the read-only script for chunk n of Figma's variables, text styles and effect styles (sums: the checksums alone), to run unchanged with use_figma; save its answer as it came
-rms-design-system-engine --capture-script components <n|sums>  # the same for the components: each chunk runs the capture recipe's Step 1c functions in Figma (sums: the checksums and each chunk's plan)
-rms-design-system-engine --capture-import [vars|components]  # check every saved answer against the checksum Figma computed, name the chunks to read again, and once all are there write the vars snapshot, or the structure and props snapshots, with the capture recipe's own scripts
+rms-design-system-engine --capture-script components <n|sums|sums new>  # the same for the components, kept by component id: sums gives each component's checksum, a page at a time (the next page when one is left, 'sums new' starts over), n reads chunk n of the plan --capture-import names; each runs the recipes' Step 1c functions, state walk and raw-value sweep in Figma, and none switches Figma's page
+rms-design-system-engine --capture-import [vars|components]  # check every saved answer against the checksum Figma computed, name the chunks to read again, and once all are there write the vars snapshot, or the structure and props snapshots with component-values.snapshot.json, component-state-tokens.json and component-state-bindings.json (keeping what a chunk did not read, naming the components no longer in Figma)
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then a page of it and the components it nests (styleguide/modal.html), its address printed
 rms-design-system-engine --styleguide --no-a11y-bake     # the page without its accessibility tried while it is built (a page only measured, as a CI's first build is)
