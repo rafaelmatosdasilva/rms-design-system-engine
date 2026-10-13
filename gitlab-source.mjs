@@ -8,7 +8,7 @@
 // is removed from the mirror.
 //
 // Token: GITLAB_TOKEN (read_api is enough), from the environment or a .env where the engine runs (else in the
-// mirror), never logged. It is only ever sent to gitlab.com or a host named in GITLAB_HOST (gitlab-fetch.mjs's rule),
+// mirror, else, for a run inside the mirror, in the folder that holds it), never logged. It is only ever sent to gitlab.com or a host named in GITLAB_HOST (gitlab-fetch.mjs's rule),
 // so a mistyped or hostile link cannot receive it. A public project needs no token.
 //
 // GitLab cannot be reached (offline, VPN down): the mirror already there is used, and the run says from which
@@ -153,8 +153,11 @@ export async function syncGitlab(p, opts = {}) {
   const statePath = join(dir, STATE_FILE);
   let state = null; try { state = JSON.parse(readFileSync(statePath, 'utf8')); } catch { /* first run */ }
   const env = { ...(opts.env ?? process.env) };
-  env.GITLAB_HOST = hostEnvFrom(env, [from, dir]);
-  const token = tokenFrom(env, [from, dir]);
+  // A .env where the engine runs, in the mirror, and, for a run inside a mirror (its state file says so), in the folder
+  // that holds it: where the project was first named with --project=, and where its .env is.
+  const folders = [...new Set([from, dir, ...(state ? [dirname(resolve(dir))] : [])].map((d) => resolve(d)))];
+  env.GITLAB_HOST = hostEnvFrom(env, folders);
+  const token = tokenFrom(env, folders);
   const send = token && tokenAllowedFor(p.host, env);
   const headers = send ? { 'PRIVATE-TOKEN': token } : {};
   const fetchImpl = opts.fetchImpl ?? plainGet;
