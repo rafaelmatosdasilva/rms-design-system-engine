@@ -1,6 +1,6 @@
 # Features and capabilities
 
-Everything the engine does, in plain words. Start with how you use it, then jump to the part you need. For the options behind each feature and how each check works, see the [technical documentation](details.md).
+Everything the engine does, in plain words. What to ask in Claude Code is on the [Commands](commands.md) page. For how each check works, see the [technical documentation](details.md).
 
 **On this page**
 
@@ -17,21 +17,11 @@ Everything the engine does, in plain words. Start with how you use it, then jump
 
 ## How you use it
 
-Ask in Claude Code, in your own words, after `/rms-design-system-engine`. Every request also has a terminal command that does the same.
-
-| You want to | Type in Claude Code | Or in the terminal |
-|---|---|---|
-| Check the whole design system | `/rms-design-system-engine check everything` | `rms-design-system-engine` |
-| Check one component | `/rms-design-system-engine check the button` | `rms-design-system-engine --component button` |
-| Check against Figma only, without accessibility | `/rms-design-system-engine check the button against Figma, without accessibility` | `rms-design-system-engine --only parity` |
-| Check accessibility only | `/rms-design-system-engine check the accessibility of the button` | `rms-design-system-engine --only accessibility` |
-| Run one check (a gate) | `/rms-design-system-engine run only the token values check` | `rms-design-system-engine --only 3` |
-| Ask what the design system has | `/rms-design-system-engine which props does the badge take?` | `rms-design-system-engine --query badge` |
-
-You can combine options. `rms-design-system-engine --component button --only accessibility` checks only the button's accessibility.
+Ask in Claude Code, in your own words, after `/rms-design-system-engine`. **[Every request](commands.md)** is on the Commands page, grouped by type, with what you get.
 
 - **One component, its own findings.** When you check one component, accessibility findings are listed only when they are about that component, in its own file or on an element that carries its class. A page that only uses it keeps its findings to itself.
 - **The browser part needs your packages.** When the project's packages are not installed, the run tells you. Install them and run again.
+- **Name the component the way your system does.** Spaces, capitals, dashes and word order do not matter, so *button primary*, *Button Primary* and *primary button* all check buttonPrimary alone. A word only one component has checks that one, and a plural (*the buttons*) checks every component with that word. A word several components share (*the button*, in a system with buttonPrimary and iconButton) makes Claude ask which one first, so a request about one component never checks the whole library.
 
 ### Every difference in one list
 
@@ -45,11 +35,7 @@ It is written whether or not you have a style guide, and the summary of every ch
 
 ### Differences you keep on purpose
 
-Some differences are decisions, not mistakes. When your team decides to keep one, say so and give the reason.
-
-| You say | Or run |
-|---|---|
-| `/rms-design-system-engine keep the chip's height, it is on purpose because the product needs a larger tap target` | `rms-design-system-engine --keep --component chip --match height --reason "the product needs a larger tap target"` |
+Some differences are decisions, not mistakes. When your team decides to keep one, [tell Claude](commands.md#tokens-and-changes) and give the reason.
 
 - It is recorded in `design-system-engine-kept.json` with the reason, who decided and when. Commit it.
 - Add `--truth figma` or `--truth code` to say which side is right, and `--review 90d` (or a date) to look at it again later.
@@ -91,7 +77,7 @@ Figma says how things move in three places, and the engine reads all of them.
 - **On their own.** A spinner turning, a panel, modal or toast opening and closing. Figma says it on its Motion timeline, in the overlays its prototype opens and in variants that lead to each other after a delay.
 - **In the code.** `@keyframes` animations, and the transitions a state plays when it opens or closes (a drawer's `.is-open`).
 
-`rms-design-system-engine --figma-motion` writes a read-only script that reads Figma's side, on every page, without changing anything. Once its answer is saved, each movement is compared.
+When Claude [refreshes the Figma data](commands.md#set-up) with the Figma tool of your session, it also reads Figma's side, on every page, without changing anything. Each movement is then compared.
 
 - One Figma animates and the code does not, or with another duration or curve, is Claude's to fix in the code.
 - One only the code animates is yours to add in Figma, or to ask the code team to stop.
@@ -102,7 +88,7 @@ Each one is a row in the component's Motion tab and on the Tasks page, under Mot
 
 A card's shadow, a scrim's blur, a banner's gradient, a frame that clips what overflows it, a layer that blends or is see-through.
 
-`rms-design-system-engine --figma-effects` writes a read-only script that reads these for each component and its layers, two levels deep. Once its answer is saved, each is compared with the component's own rule in the code (`box-shadow`, `filter`, `backdrop-filter`, `overflow`, `mix-blend-mode` and `opacity`).
+When Claude [refreshes the Figma data](commands.md#set-up) with the Figma tool of your session, it also reads these for each component and its layers, two levels deep, without changing anything. Then each is compared with the component's own rule in the code (`box-shadow`, `filter`, `backdrop-filter`, `overflow`, `mix-blend-mode` and `opacity`).
 
 - One Figma draws and the code does not, or draws differently, is Claude's.
 - One only the code draws, or a clip Figma sets that the code leaves open, is a decision for both.
@@ -111,7 +97,7 @@ Each is an Effect row in the component's Parity area and on the Tasks page.
 
 ### Each product's screen, as designed
 
-A component can match Figma on its own while a product puts it in the wrong place. `rms-design-system-engine --figma-screens` reads the screens `ds-config.json` names for each product, read only. Each product's built page is then opened at the width, height and colour mode of its screen, and compared.
+A component can match Figma on its own while a product puts it in the wrong place. When Claude [refreshes the Figma data](commands.md#set-up), it also reads the screens `ds-config.json` names for each product, without changing Figma. Each product's built page is then opened at the width, height and colour mode of its screen, and compared.
 
 - Which components, and how many.
 - Their order.
@@ -128,7 +114,7 @@ A list (three or more of one component) is compared by whether it is there and w
 
 ## The checks
 
-Each check is called a gate. To run just one, use its number or its name, for example `--only 3` or `--only "token values"`. How each one works is in the [technical documentation](details.md#what-it-checks).
+Each check is called a gate. To run just one, see [Parity](commands.md#parity) on the Commands page. How each one works is in the [technical documentation](details.md#what-it-checks).
 
 | # | Gate | What it looks at |
 |---|---|---|
@@ -166,7 +152,7 @@ Each component is tried in a real browser against WCAG 2.2 at level A and AA. ax
 
 - **Your components.** On a page you name, your style guide or your built pages. React and Vue components with no page to open are rendered straight from their own code, in each Figma variant, with no dev server.
 - **Your products' pages.** When the check runs on the style guide, each product's built page is opened whole, and every rule runs on it. Findings are named after the product and listed on the Tasks page under Products. `a11y.products: false` leaves them out.
-- **Your designed screens in Figma.** `rms-design-system-engine --figma-a11y` reads the screens `ds-config.json` names, read only, for text and icon contrast and target size. With `--figma-edits`, each problem is pinned on its layer in Figma once you say yes.
+- **Your designed screens in Figma.** When Claude [refreshes the Figma data](commands.md#set-up), it also reads the screens `ds-config.json` names for text and icon contrast and target size, without changing Figma. [Updating Figma](commands.md#update-figma) pins each problem on its layer once you say yes.
 
 ### What it tries
 
@@ -208,12 +194,12 @@ Every rule the check applies is in the [technical documentation](details.md#acce
 
 ## The living style guide
 
-`rms-design-system-engine --styleguide` builds one page with every token and component, from what Figma and the code agree on. It goes to `.design-system-engine-out/styleguide/index.html`.
+[The style guide](commands.md#style-guide) is one page with every token and component, from what Figma and the code agree on, in `.design-system-engine-out/styleguide/index.html`.
 
 **[See an example](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)**, the RMS Design System's style guide, built by this engine and published by that design system, so it shows what the engine makes today.
 
-- **One component at a time.** Add `--component modal` and it checks that component first, against Figma and for accessibility, then builds a page of that component and the ones it nests, `styleguide/modal.html`.
-- **One link for the team.** `rms-design-system-engine --publish-styleguide` writes the CI job that publishes it on every push, to GitHub Pages or GitLab Pages, so everyone opens the same page built from what is merged. A local run stays a preview.
+- **One component at a time.** A page for one component checks it first, against Figma and for accessibility, then shows it and the components it nests, `styleguide/modal.html`.
+- **One link for the team.** Publishing writes the CI job that publishes it on every push, to GitHub Pages or GitLab Pages, so everyone opens the same page built from what is merged. A local run stays a preview.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
 
 ### What's in it
@@ -246,7 +232,7 @@ Every row says what to do and who acts.
 - **You in Figma.** A change you make in the Figma file, a colour that fails contrast included.
 - **Claude in the code.** Tell Claude the task number, for example do 3 and 7.
 - **You decide.** Figma and the code each have a case.
-- **You check by hand.** What only a person can judge. Once you have, tell Claude (badge 1.3.3 is checked) and the row is Done, with your name and the date, until the component changes.
+- **You check by hand.** What only a person can judge. Once you have, [tell Claude](commands.md#accessibility) and the row is Done, with your name and the date, until the component changes.
 
 Each row also shows its status (To fix, To check, New in the last audit), when it was last updated and where it was read. The system's own items come first. Under The system you find what the tokens owe, such as descriptions to write in Figma, a token named after a product, an alias that points nowhere, and a retired token still in use.
 
@@ -319,12 +305,7 @@ Describe a screen in your own words and get it made only of your design system's
 
 Measured on twelve prototype requests, Claude alone made 17 of 36 right with Opus and 3 of 36 with Haiku. With the engine, 36 of 36 and 35 of 36 ([case study](../CASE-STUDY.md)).
 
-| You want to | Type in Claude Code | Or in the terminal |
-|---|---|---|
-| Make a prototype | `/rms-design-system-engine prototype a notification settings page with our components` | `rms-design-system-engine --prototype prototypes/settings.json` |
-| See what a prototype may use | `/rms-design-system-engine what can a prototype use?` | `rms-design-system-engine --prototype --catalog` |
-| Start from the screens you designed in Figma | `/rms-design-system-engine make prototypes from our Figma screens` | `rms-design-system-engine --prototype --from-screens <screen capture>` |
-| Check that the product's pages match | `/rms-design-system-engine are our prototype pages consistent?` | `rms-design-system-engine --prototype --consistency` |
+What to ask is in [Prototypes and building](commands.md#prototypes-and-building) on the Commands page.
 
 ### What you get
 
@@ -359,12 +340,7 @@ Every prototype's gaps are kept in `.design-system-engine-out/prototypes/gaps.js
 
 Open an empty project, set it up with your Figma link and ask for what to build. With no code yet, the engine starts in build mode. What Figma has and the code does not is listed as to build, in order, never as a failure.
 
-| You want to | Type in Claude Code |
-|---|---|
-| Build the tokens | `/rms-design-system-engine build the tokens from Figma` |
-| Build a component | `/rms-design-system-engine build the button from Figma` |
-| Build a screen from the components | `/rms-design-system-engine build the settings screen from Figma with our components` |
-| See what is left to build | `/rms-design-system-engine what is left to build?` |
+What to ask is in [Prototypes and building](commands.md#prototypes-and-building) on the Commands page.
 
 Claude writes the code. The engine gives it Figma's exact names and values first, and checks every piece after.
 
@@ -372,10 +348,10 @@ Measured on a small design system in Figma (tokens, four components and a screen
 
 ## Keep products aligned
 
-- **Rename a token everywhere.** A token renamed in Figma is renamed in one change. `rms-design-system-engine --rename-sweep` pairs each old name with its new one by value in every mode, and writes one patch for the system and one for each product. The old name stays in the theme, pointing at the new one, until every product has moved.
+- **Rename a token everywhere.** A token renamed in Figma is renamed in one change ([Tokens and changes](commands.md#tokens-and-changes)). The engine pairs each old name with its new one by value in every mode, and writes one patch for the system and one for each product. The old name stays in the theme, pointing at the new one, until every product has moved.
 - **Retire a component or a token.** Mark it deprecated in Figma or in the code, and the engine lists every place still using it with what to write instead (`handback/migrations.md`), plus a patch for each token swap. The style guide shows it on the old component's page (Use chip instead, still used in 12 places).
 - **Catch near copies.** A product that builds a component by hand, or styles a class almost like one of yours, comes back to you as a decision. Use the component, with a new option if it needs one, or add the new one to the system on purpose.
-- **Count values written by hand.** Every colour, size, radius or duration a token should carry, with the token to use. `rms-design-system-engine --census` keeps the count, so it only falls.
+- **Count values written by hand.** Every colour, size, radius or duration a token should carry, with the token to use. Every check counts them, and the count only falls.
 - **Products in their own repositories.** Name them in `ds-config.json` (`pluginDirs`, or `codeRoots` for any folder) and every scan reads their code as the project's own.
 
 Nothing is applied until you ask.
@@ -389,13 +365,7 @@ When the code already states something Figma does not, the engine can write it i
 
 Both are replaced on each run, so what is fixed clears.
 
-| You want to | Type in Claude Code | Or in the terminal |
-|---|---|---|
-| Update Figma to match the code | `/rms-design-system-engine update Figma to match the code` | `rms-design-system-engine --figma-edits` |
-| Send the prototypes' gaps to Figma as a to do list | `/rms-design-system-engine send the gaps to Figma` | `rms-design-system-engine --figma-edits` |
-| Pin the designed screens' accessibility problems in Figma, and each component's accessibility spec | `/rms-design-system-engine update Figma to match the code` | `rms-design-system-engine --figma-edits` |
-| List in Figma the accessibility annotations no check reads, with the wording one reads | `/rms-design-system-engine update Figma to match the code` | `rms-design-system-engine --figma-edits` |
-| Read the category of each Figma annotation (Accessibility is a requirement; Intent, Implementation, Content and Authoring are design intent, never a task) | `/rms-design-system-engine refresh the Figma data` | `rms-design-system-engine --annotation-categories` |
+What to ask is in [Update Figma](commands.md#update-figma) on the Commands page.
 
 - **You see the list first.** Each change names the component, what it adds and why. Nothing changes until you say yes.
 - **The engine writes the change, not the AI.** It writes the script, Claude runs it through the Figma MCP, and the project hooks refuse any other write to Figma.
@@ -405,7 +375,7 @@ Both are replaced on each run, so what is fixed clears.
 
 - **Share the results with your team.** Commit the files it creates in your project, so everyone, and your automated builds, check against the same design.
 - **Figma stays as it is.** It only reads Figma. It tells you what to change there, and a person makes that change.
-- **Reading Figma, the best way available.** `rms-design-system-engine --refresh-figma` picks it for you. A `design.json` newer than the saved data first, then [figma-cli](https://github.com/silships/figma-cli) when Figma Desktop is connected to it (no API key, no rate limit, every mode), then the Figma tool of your Claude session, then the Figma API with a token. After you run `figma-cli snapshot`, the next check reads its `design.json` on its own, and `--from-figma-cli` reads one directly.
+- **Reading Figma, the best way available.** [Refreshing the Figma data](commands.md#set-up) picks it for you. A `design.json` newer than the saved data first, then [figma-cli](https://github.com/silships/figma-cli) when Figma Desktop is connected to it (no API key, no rate limit, every mode), then the Figma tool of your Claude session, then the Figma API with a token. After you run `figma-cli snapshot`, the next check reads its `design.json` on its own.
 - **Large Figma files, read in checked pieces.** Through the Figma tool of your Claude session, the variables and the components are read a few at a time, each piece checked against a checksum Figma computes. Nothing is copied by hand, and a later refresh reads only the pieces that changed. See [Large Figma files](details.md#large-figma-files).
 - **Which TypeScript reads your components.** Your project's own, else one installed for the whole machine (a global npm folder, `NODE_PATH`, `tsc` on the PATH). Set `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` to use only the project's own. `DESIGN_SYSTEM_ENGINE_CHROME=none` reads the code with no browser, even where Chrome is installed.
 - **More detail.** Every option and how each check works are in the [technical documentation](details.md).

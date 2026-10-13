@@ -1,6 +1,6 @@
 # Technical documentation
 
-This page is for developers. It explains how the engine works, how to run it, and what each check does. For everyday use in plain words, start with [Features and capabilities](features.md).
+This page is for developers. It explains how the engine works, how to run it, and what each check does. For everyday use in plain words, start with [Features and capabilities](features.md). What to ask in Claude Code is on the [Commands](commands.md) page.
 
 The complete lists live in the guide Claude reads. Every option is in `reference/usage.md`, every setting in `reference/config.md` and every gate in `reference/gates.md`, with the recipes in `cookbook/` and the short guide in `rms-design-system-engine.md`.
 
@@ -68,13 +68,18 @@ Files the engine writes in the mirror (`ds-config.json`, snapshots, its output) 
 
 ### Ask in Claude Code
 
-The easy way is to ask in plain language.
+The easy way is to ask in plain language. Every request is on the [Commands](commands.md) page.
 
-- *check the whole design system against Figma* checks everything.
-- *check input* checks the `input` component and its parts, and reports only that.
-- *which props does the badge take?* answers from the design system, with names written exactly.
+How a component's name is read.
+
+- Spaces, capitals, dashes and word order do not matter, so *primary button* finds buttonPrimary.
+- A word only one component has scopes the run to that one.
+- A plural (*the buttons*) scopes it to every component with that word.
+- A word several components share (*the button*, with buttonPrimary and iconButton) is asked about first, and nothing runs until you answer. Words for an aspect of the check (text, icon, state) never name a component.
 
 ### From the terminal
+
+The same requests as terminal commands, for scripts and CI.
 
 ```bash
 rms-design-system-engine                       # the whole design system
