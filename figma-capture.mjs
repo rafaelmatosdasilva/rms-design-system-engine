@@ -44,12 +44,16 @@ const bytes=(s)=>{let n=0;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);n+
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={},order=[];
 for(const c of collections)for(const id of c.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v&&!idToVar[id]){idToVar[id]=v;order.push(id);}}
+// Every variable a text style binds that the file does not hold (a library's), so a bound value resolves.
+const textStyles=await figma.getLocalTextStylesAsync();
+for(const st of textStyles)for(const a of Object.values(st.boundVariables||{}))for(const x of [].concat(a)){if(!x||!x.id||idToVar[x.id])continue;const t=await figma.variables.getVariableByIdAsync(x.id);if(t){idToVar[x.id]=t;order.push(x.id);}}
 // Every alias target the file does not hold (a library's variable), so a token that points at one resolves.
 const tried={};for(let added=1;added;){added=0;for(const id of [...order]){for(const val of Object.values(idToVar[id].valuesByMode)){const a=val&&val.type==='VARIABLE_ALIAS'?val:val&&val.color&&val.color.type==='VARIABLE_ALIAS'?val.color:null;if(!a||idToVar[a.id]||tried[a.id])continue;tried[a.id]=1;const t=await figma.variables.getVariableByIdAsync(a.id);if(t){idToVar[a.id]=t;order.push(a.id);added++;}}}}
 const items=[];
 for(const c of collections)items.push({k:'collection',id:c.id,v:{id:c.id,name:c.name,modes:c.modes.map(m=>({modeId:m.modeId,name:m.name}))}});
 for(const id of order){const v=idToVar[id];items.push({k:'var',id,v:{id:v.id,name:v.name,resolvedType:v.resolvedType,variableCollectionId:v.variableCollectionId,valuesByMode:v.valuesByMode,scopes:[...(v.scopes||[])],description:v.description||'',remote:!!v.remote}});}
-for(const st of await figma.getLocalTextStylesAsync())items.push({k:'text',id:st.id,v:{id:st.id,name:st.name,fontSize:st.fontSize,fontName:st.fontName,lineHeight:st.lineHeight,letterSpacing:st.letterSpacing,textCase:st.textCase,description:st.description||''}});
+// A text style with the variables it binds (boundVariables: the field and the variable's id), its family in fontName.
+for(const st of textStyles)items.push({k:'text',id:st.id,v:{id:st.id,name:st.name,fontSize:st.fontSize,fontName:st.fontName,lineHeight:st.lineHeight,letterSpacing:st.letterSpacing,paragraphSpacing:st.paragraphSpacing,textCase:st.textCase,boundVariables:st.boundVariables||{},description:st.description||''}});
 for(const st of await figma.getLocalEffectStylesAsync())items.push({k:'effect',id:st.id,v:{id:st.id,name:st.name,effects:st.effects}});
 // Chunks: a boundary after an item whose id hashes to it, or before an item that would pass the budget.
 const chunks=[];let cur=[],size=0;

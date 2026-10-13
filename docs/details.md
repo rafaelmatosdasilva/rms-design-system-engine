@@ -131,6 +131,12 @@ Every run compares your code with Figma and reports in plain words. The 25 gates
 - **Data is up to date.** You are checking against today's Figma, not an old copy.
 - **Figma frame unchanged.** The design still looks like the version you approved.
 - **Token values match.** Colours, sizes and fonts, in every mode. A colour in a collection that also holds sizes is compared as a colour, so `#0037fa`, `#0037FA` and `#0037faff` are the same.
+- **Text styles match.** Every field of every text style is compared with the code: size, weight, line height, letter spacing and case.
+  - A field bound to a variable in Figma is paired with the code's variable of the same name, by the naming convention. Every style that binds it is compared, with no map entry.
+  - A `TYPO` entry in `design-system-engine-map.mjs` still wins. It may name one style (`'s/regular'`), a scale whose every style it feeds (`'s'`), or a list.
+  - A field whose variable changes with a breakpoint is compared in every breakpoint, against the CSS each one resolves to.
+  - The family is compared once for all the styles that use it: with the variable they bind, else with the font your page text uses. A difference is one finding.
+  - A field nothing names is listed as not compared, never passed.
 - **Tokens used in screens exist.** Nothing a screen uses is missing from the code.
 - **Every mode is covered.** Things that should change between modes really do. Gate [5] (Every mode is covered) finds where the theme sets each mode, in an `@media`, a `[data-…]` or a class block. A mode the code never implements fails with every value it owes.
 - **Exception lists are valid.** Your "ignore this" notes still point at real things.
@@ -411,7 +417,10 @@ The capture keeps Figma's values as Figma resolves them.
 - A token that points at a library's variable is followed into the library. One whose target was deleted is reported as a broken alias.
 - A colour with its own opacity keeps its alpha wherever it sits.
 - A duration is kept in ms. A number variable is read as seconds below 10 (0.3 is 300ms) and as ms from 10 up. A number that is not a duration (a scale, a spring's stiffness) stays a number.
-- Each text style is kept under its full name, so `xl/regular` and `m/regular` stay two styles.
+- Each text style is kept under its full name, so `xl/regular` and `m/regular` stay two styles, in Figma's order, with its family.
+- A text style field bound to a variable takes the variable's value in the mode your code's root shows (the mode `ds-config.json` sets on `root`). The value Figma keeps on the style is only the mode it last drew. The style records which variable each field binds (`vars`).
+- A weight or an opacity is a plain number, never `500px`: its scopes say so, or a text style binds it as its weight.
+- A collection `ds-config.json` names in `figma.collections` keeps its numbers and strings in `sizing` too, each in its root mode, so a value that is the same at every breakpoint is not lost.
 - A component whose size is bound to a scale's variable (`typography/s/font-size`) records the scale. Its contract uses that scale's style its weight names, else the regular one (`s/regular`).
 - A collection that holds both colours and sizes keeps its colour modes' names for its sizes.
 
