@@ -202,7 +202,7 @@ extraction with `figma.primitiveKeyRe` in `ds-config.json`.
 
 ## Phase 2 - State walk (auto, enables Gates [13] + [14])
 
-**No manual step needed.** `audit.mjs` auto-generates two files by walking every COMPONENT_SET:
+**No manual step needed.** The components capture writes two files from the same checked chunks as the structure and props snapshots (`rms-design-system-engine --capture-script components sums`, then each chunk `--capture-import` names; the refresh recipe's Steps, item 2): each chunk script runs the functions below in Figma for each component, and `--capture-import` merges them, keeps what a chunk did not read and takes out the components no longer in Figma. Every function walks every variant and every layer, hidden ones and the insides of nested instances included, and reads a property through a guard, since the Figma tool throws on one a layer type does not have.
 
 ### `component-state-tokens.json` - flat count map (Gate [14] (All states are built))
 
@@ -210,41 +210,54 @@ extraction with `figma.primitiveKeyRe` in `ds-config.json`.
 
 **Hard Rule 7 - visibility gating (three states).** Visible token → hard requirement (`❌ UNCOVERED` fails when the CSS var is missing). Hidden + visibility boolean → can be toggled on later, so the code must permit it: missing var ⇒ `⚠️ UNCOVERED-TOGGLEABLE`, an advisory that is surfaced but does **not** fail the gate. Hidden with no boolean → `⏭ HIDDEN-STATIC`, ignored. The refresh records `_hiddenOnly` (all hidden-only tokens) and `_hiddenToggleable` (the subset gated by a `boundVariables.visible` boolean) so `state-check.mjs` can separate the advisory case from the ignored one.
 
-**If the auto-refresh fails** (no `FIGMA_TOKEN` or the fetch fails): Gate [14] (All states are built) uses whatever exists. If missing, Gate [14] (All states are built) hard-fails (exit 2).
+**If the file is missing:** Gate [14] (All states are built) hard-fails (exit 2): read the components (above).
 
-> `_`-prefixed keys are metadata and ignored by every consumer - the refresh writes an `_updated` stamp so Gate [1] (Data is up to date) can track the file's freshness, plus `_hiddenOnly`/`_hiddenToggleable` for Hard Rule 7.
+> `_`-prefixed keys are metadata and ignored by every consumer - the capture writes an `_updated` stamp so Gate [1] (Data is up to date) can track the file's freshness, `_hiddenOnly`/`_hiddenToggleable` for Hard Rule 7, and `_components`, each component's own tokens (`stateTokensOf` below), so a refresh that reads some components again recounts the file without the others.
 
-**Plugin API capture (any plan, no token)** - run this in Figma (via `use_figma` or Plugin console), save the output as `component-state-tokens.json` at project root, and commit it:
+`stateTokensOf` reads one component; the counts, `_hiddenOnly` and `_hiddenToggleable` are summed over the components (a token is hidden-only when no component binds it on a visible layer). **Plugin API capture (any plan, no token)**, for a small file in one run: run this in Figma (via `use_figma` or Plugin console), save the output as `component-state-tokens.json` at project root, and commit it. A large file is read by the components capture instead: one answer of the Figma tool holds at most 20,480 bytes.
 
 ```js
+// stateTokensOf(root, idToName): the variables one component's layers are bound to, for component-state-tokens.json:
+// { tokens: { <name>: count }, hidden: [names bound only on hidden layers], toggleable: [the hidden ones a visibility
+// variable can show] }. idToName: { variableId: name } of the file's own variables.
+function stateTokensOf(root, idToName) {
+  const get = (n, k) => { try { return n != null && typeof n === 'object' && k in n ? n[k] : undefined; } catch (e) { return undefined; } };
+  const tokens = {}, visible = new Set(), toggle = new Set();
+  const walk = (n, hidden, gated) => {
+    const bv = get(n, 'boundVariables') || {};
+    const isHidden = hidden || get(n, 'visible') === false;
+    const isGated = gated || bv.visible != null;
+    for (const val of Object.values(bv)) {
+      for (const r of [].concat(val)) {
+        const name = r && idToName[r.id];
+        if (!name) continue;
+        tokens[name] = (tokens[name] || 0) + 1;
+        if (!isHidden) visible.add(name); else if (isGated) toggle.add(name);
+      }
+    }
+    for (const c of get(n, 'children') || []) walk(c, isHidden, isGated);
+  };
+  walk(root, false, false);
+  const hidden = Object.keys(tokens).filter((t) => !visible.has(t)).sort();
+  return { tokens, hidden, toggleable: hidden.filter((t) => toggle.has(t)) };
+}
 const idToName = {};
 for (const v of await figma.variables.getLocalVariablesAsync()) idToName[v.id] = v.name;
-const counts = {};
-const all = new Set(), visible = new Set(), toggle = new Set();
-function collect(node, hidden, gated) {
-  const bv = node.boundVariables;
-  if (bv) for (const val of Object.values(bv)) {
-    const refs = Array.isArray(val) ? val : [val];
-    for (const r of refs) {
-      const n = idToName[r?.id]; if (!n) continue;
-      counts[n] = (counts[n] ?? 0) + 1; all.add(n);
-      if (!hidden) visible.add(n); else if (gated) toggle.add(n);
-    }
+const counts = {}, shown = new Set(), toggle = new Set();
+for (const page of figma.root.children) {
+  await page.loadAsync();   // loaded where it is: never figma.setCurrentPageAsync, which changes the file
+  for (const node of page.findAllWithCriteria({ types: ['COMPONENT_SET', 'COMPONENT'] })) {
+    if (node.type === 'COMPONENT' && node.parent?.type === 'COMPONENT_SET') continue;   // a variant is read with its set
+    const s = stateTokensOf(node, idToName);
+    for (const [t, n] of Object.entries(s.tokens)) { counts[t] = (counts[t] ?? 0) + n; if (!s.hidden.includes(t)) shown.add(t); }
+    for (const t of s.toggleable) toggle.add(t);
   }
 }
-function walk(n, hidden = false, gated = false) {
-  const isHidden = hidden || n.visible === false;
-  const isGated  = gated  || n.boundVariables?.visible != null;
-  collect(n, isHidden, isGated);
-  if ('children' in n) for (const c of n.children) walk(c, isHidden, isGated);
-}
-const page = figma.root.children.find(p => p.name.toLowerCase().includes('component')) ?? figma.currentPage;
-for (const node of page.children) if (node.type === 'COMPONENT_SET' || node.type === 'COMPONENT') walk(node);
-const hiddenOnly = [...all].filter(t => !visible.has(t));
+const hiddenOnly = Object.keys(counts).filter((t) => !shown.has(t)).sort();
 return {
   _updated: new Date().toISOString(),
-  _hiddenOnly: hiddenOnly.sort(),
-  _hiddenToggleable: hiddenOnly.filter(t => toggle.has(t)).sort(),
+  _hiddenOnly: hiddenOnly,
+  _hiddenToggleable: hiddenOnly.filter((t) => toggle.has(t)),
   ...counts,
 };
 ```
@@ -257,6 +270,8 @@ return {
   { "token": "buttonPrimary/text/color",       "bindingField": "fills", "isText": true,  "depth": 1 }
 ] } } }
 ```
+
+The walk goes into nested instances as deep as the state-tokens walk does: a component whose state is drawn by an instance inside it (a button's state layer) is bound there, two or more layers down, and a walk that stops one layer down records no binding for it. Each binding is listed once per variant.
 
 Gate [13] (Structure) auto-derives CSS var assertions using **naming convention** - no `CONTRACT.propertyMap` dependency:
 
@@ -275,37 +290,30 @@ Coverage:
 
 Manual `CSS_BASE_RULE_VARS` entries always override auto-derived for the same `selector+prop`. Use them for edge cases: shorthand combiners, deeply-nested selectors, or explicit exception overrides.
 
-**If the auto-refresh fails** (no `FIGMA_TOKEN` or the fetch fails): Gate [13] (Structure) falls back to manual `CSS_BASE_RULE_VARS` only. No gate noise - the count just shows `(N manual)` instead of `(N auto-derived · M manual)`.
+**If the file is missing:** Gate [13] (Structure) falls back to manual `CSS_BASE_RULE_VARS` only. No gate noise - the count just shows `(N manual)` instead of `(N auto-derived · M manual)`.
 
-**Plugin API capture (any plan, no token)** - run this in Figma (via `use_figma` or Plugin console), save the output as `component-state-bindings.json` at project root (gitignored):
+**Plugin API capture (any plan, no token)**, for a small file in one run - run this in Figma (via `use_figma` or Plugin console), save the output as `component-state-bindings.json` at project root (gitignored):
 
 ```js
-const idToVar = {};
-const allVars = await figma.variables.getLocalVariablesAsync();
-for (const v of allVars) idToVar[v.id] = v;
-
-function getBindings(node, maxDepth = 1, depth = 0) {
+// getBindings(node, idToVar): the colour variables a layer and every layer inside it are bound to, with their depth.
+function getBindings(node, idToVar, maxDepth = Infinity, depth = 0) {
+  const get = (n, k) => { try { return n != null && typeof n === 'object' && k in n ? n[k] : undefined; } catch (e) { return undefined; } };
   if (depth > maxDepth) return [];
-  const isText = node.type === 'TEXT';
+  const isText = get(node, 'type') === 'TEXT';
+  const bv = get(node, 'boundVariables') || {};
   const result = [];
   for (const field of ['fills', 'strokes']) {
-    const refs = Array.isArray(node.boundVariables?.[field])
-      ? node.boundVariables[field]
-      : node.boundVariables?.[field] ? [node.boundVariables[field]] : [];
-    for (const r of refs) {
-      const v = idToVar[r?.id];
+    for (const r of [].concat(bv[field] || [])) {
+      const v = r && idToVar[r.id];
       if (v) result.push({ token: v.name, bindingField: field, isText, depth });
     }
   }
-  if ('children' in node) {
-    for (const child of node.children) result.push(...getBindings(child, maxDepth, depth + 1));
-  }
+  for (const child of get(node, 'children') || []) result.push(...getBindings(child, idToVar, maxDepth, depth + 1));
   return result;
 }
-
-const result = {};
-const sets = figma.root.findAll(n => n.type === 'COMPONENT_SET');
-for (const set of sets) {
+// stateBindingsOf(set, idToVar): one component set's entry, { <variant>: { props, bindings } }, for the variants
+// with a binding. idToVar: { variableId: variable } of the file's own variables.
+function stateBindingsOf(set, idToVar) {
   const variants = {};
   for (const variant of set.children) {
     if (variant.type !== 'COMPONENT') continue;
@@ -314,10 +322,22 @@ for (const set of sets) {
       const eq = part.indexOf('=');
       if (eq !== -1) props[part.slice(0, eq).trim().toLowerCase()] = part.slice(eq + 1).trim().toLowerCase();
     }
-    const bindings = getBindings(variant, 1, 0);
+    // Each binding once: the same token on the same field at the same depth says nothing more.
+    const seen = new Set(), bindings = [];
+    for (const b of getBindings(variant, idToVar)) { const k = JSON.stringify(b); if (!seen.has(k)) { seen.add(k); bindings.push(b); } }
     if (bindings.length) variants[variant.name] = { props, bindings };
   }
-  if (Object.keys(variants).length) result[set.name] = variants;
+  return variants;
+}
+const idToVar = {};
+for (const v of await figma.variables.getLocalVariablesAsync()) idToVar[v.id] = v;
+const result = {};
+for (const page of figma.root.children) {
+  await page.loadAsync();   // loaded where it is: never figma.setCurrentPageAsync, which changes the file
+  for (const set of page.findAllWithCriteria({ types: ['COMPONENT_SET'] })) {
+    const variants = stateBindingsOf(set, idToVar);
+    if (Object.keys(variants).length) result[set.name] = variants;
+  }
 }
 return JSON.stringify(result, null, 2);
 ```
@@ -330,42 +350,43 @@ Powers the **per-component** parity scoping of the hardcoded-value gate (Hard Ru
 
 The same sweep records each component's **Figma file hygiene** in `hygiene`: values with no variable and no style (a solid fill or stroke colour, a corner radius, a padding, a gap in an auto layout, a text layer with no text style), frames detached from an instance (the Plugin API capture only; REST has no such flag), variants with two or more layers and no auto layout, whether the component has a description, how many values it read (`values`) and how many variants hold two or more layers (`variants`), which say how reliable the file is to compare, and in `binds` the variable each property is bound to, by the scope Figma gives that property (compared with `variableScopes` in the vars snapshot, refresh Step 1f). The audit lists them in a `🎨 Figma file hygiene` block, for whoever keeps the Figma file: code can only match what Figma states. Vector artwork and instances are left out (an instance holds its own component's values). Advisory, never a gate; `"figmaHygiene": false` turns it off and `--hygiene` lists every finding. The parity never changes a value in Figma.
 
-**Optional convenience - auto-refresh (REST):** `audit.mjs` regenerates it on every run when `FIGMA_TOKEN` is set. Not required; the plugin capture below is the universal, any-plan, no-token path.
+The components capture writes it (above), with `collectRaw` and `hygieneOf` below run per component in Figma. **Optional convenience - auto-refresh (REST):** `audit.mjs` regenerates it on every run when `FIGMA_TOKEN` is set. Not required.
 
-**Plugin API capture (any plan, no token)** - run this in Figma (via `use_figma` or the Plugin console), save as `component-values.snapshot.json` at project root, and commit it:
+**Plugin API capture (any plan, no token)**, for a small file in one run - run this in Figma (via `use_figma` or the Plugin console), save as `component-values.snapshot.json` at project root, and commit it. Both functions read every property through a guard (the Figma tool throws on reading one a layer type does not have, such as `fills` on a group or `rectangleCornerRadii`, which only REST has), and a mixed value (`figma.mixed`, corners or strokes that differ) is not a number: its parts are read on their own.
 
 ```js
-const round = (n) => Math.round(n * 100) / 100;
+// collectRaw(node, nums, colors): every raw number and colour of a layer and the layers inside it.
 function collectRaw(node, nums, colors) {
-  if (!node) return;
-  const pushN = (v) => { const n = Number(v); if (Number.isFinite(n) && n !== 0) { nums.add(round(n)); nums.add(Math.round(n)); } };
-  pushN(node.width); pushN(node.height);
-  pushN(node.cornerRadius);
-  for (const k of ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius']) pushN(node[k]);
-  pushN(node.strokeWeight); pushN(node.itemSpacing);
-  pushN(node.paddingLeft); pushN(node.paddingRight); pushN(node.paddingTop); pushN(node.paddingBottom);
-  if (node.fontSize && typeof node.fontSize === 'number') pushN(node.fontSize);
+  const get = (k) => { try { return node != null && typeof node === 'object' && k in node ? node[k] : undefined; } catch (e) { return undefined; } };
+  const round = (n) => Math.round(n * 100) / 100;
+  const pushN = (v) => { if (typeof v === 'number' && Number.isFinite(v) && v !== 0) { nums.add(round(v)); nums.add(Math.round(v)); } };
+  for (const k of ['width', 'height', 'cornerRadius', 'topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius', 'strokeWeight', 'itemSpacing', 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom', 'fontSize']) pushN(get(k));
   const hex = (c) => { const to = (x) => Math.round((x ?? 0) * 255).toString(16).padStart(2, '0'); return (to(c.r) + to(c.g) + to(c.b)).toLowerCase(); };
-  for (const p of ['fills', 'strokes']) for (const paint of (Array.isArray(node[p]) ? node[p] : [])) if (paint?.type === 'SOLID' && paint.color) colors.add(hex(paint.color));
-  for (const e of (Array.isArray(node.effects) ? node.effects : [])) if (e?.color) colors.add(hex(e.color));
-  for (const child of node.children ?? []) collectRaw(child, nums, colors);
+  for (const p of ['fills', 'strokes']) { const paints = get(p); for (const paint of Array.isArray(paints) ? paints : []) if (paint?.type === 'SOLID' && paint.color) colors.add(hex(paint.color)); }
+  const effects = get('effects');
+  for (const e of Array.isArray(effects) ? effects : []) if (e?.color) colors.add(hex(e.color));
+  const children = get('children');
+  for (const child of Array.isArray(children) ? children : []) collectRaw(child, nums, colors);
 }
 // The Figma file hygiene record (the same function as the engine's figma-hygiene.mjs).
 function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
   // values: how many values were read (raw or bound), variants: how many variants hold two or more layers; with rawCount
   // and noAutoLayout they say how far the file can be trusted for a comparison (R1).
   const out = { raw: [], rawCount: 0, values: 0, noAutoLayout: [], variants: 0, description: !!String(description ?? '').trim() };
+  const get = (n, k) => { try { return n != null && typeof n === 'object' && k in n ? n[k] : undefined; } catch (e) { return undefined; } };
   const key = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const mainName = (n) => {
-    if (names[n.componentId]) return names[n.componentId];
+    const id = get(n, 'componentId');
+    if (id != null && names[id]) return names[id];
     try { const m = n.mainComponent; return m ? (m.parent && m.parent.type === 'COMPONENT_SET' ? m.parent.name : m.name) : null; } catch (e) { return null; }
   };
   const has = (o, k) => { const v = o ? o[k] : null; return Array.isArray(v) ? v.some(Boolean) : !!v; };
-  const bound = (n, k) => has(n.boundVariables, k);
-  const styled = (n, kind) => has(n.styles, kind) || (typeof n[kind + 'StyleId'] === 'string' && n[kind + 'StyleId'] !== '');
+  const bound = (n, k) => has(get(n, 'boundVariables'), k);
+  const styled = (n, kind) => { const id = get(n, kind + 'StyleId'); return has(get(n, 'styles'), kind) || (typeof id === 'string' && id !== ''); };
   const hex = (c) => '#' + [c.r, c.g, c.b].map((x) => Math.round((x || 0) * 255).toString(16).padStart(2, '0')).join('');
   const num = (v) => typeof v === 'number' && isFinite(v) && v > 0;
-  const kids = (n) => (Array.isArray(n.children) ? n.children : []);
+  const kids = (n) => { const c = get(n, 'children'); return Array.isArray(c) ? c : []; };
+  const paintsOf = (n, list) => { const p = get(n, list); return Array.isArray(p) ? p : []; };
   const artwork = /^(VECTOR|BOOLEAN_OPERATION|STAR|LINE|POLYGON|REGULAR_POLYGON)$/;
   const raw = (at, field, value) => { out.rawCount++; if (out.raw.length < 12) out.raw.push({ at, field, value }); };
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomRightRadius', 'bottomLeftRadius'];
@@ -393,40 +414,44 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
       if (main && n.name !== main && key(n.name) === key(main)) { out.renamed = out.renamed || []; out.renamed.push({ at, layer: n.name, component: main }); }
       return;
     }
-    if (n.detachedInfo !== undefined) { detached = detached || []; if (n.detachedInfo) detached.push(at); }
+    const detachedInfo = get(n, 'detachedInfo');
+    if (detachedInfo !== undefined) { detached = detached || []; if (detachedInfo) detached.push(at); }
     const fillScope = n.type === 'TEXT' ? 'TEXT_FILL' : /^(FRAME|COMPONENT|SECTION)$/.test(n.type) ? 'FRAME_FILL' : 'SHAPE_FILL';
-    for (const [k, v] of Object.entries(n.boundVariables || {})) {
+    const bvs = get(n, 'boundVariables') || {};
+    for (const [k, v] of Object.entries(bvs)) {
       const scope = k === 'fills' ? fillScope : SCOPE[k];
       if (scope) for (const a of [].concat(v)) bind(a, scope, at);
     }
     for (const [list, scope] of [['fills', fillScope], ['strokes', 'STROKE_COLOR']]) {
-      for (const p of Array.isArray(n[list]) ? n[list] : []) if (p && p.boundVariables) bind(p.boundVariables.color, scope, at);
+      for (const p of paintsOf(n, list)) if (p && p.boundVariables) bind(p.boundVariables.color, scope, at);
     }
     if (!artwork.test(n.type)) {
       for (const [list, kind] of [['fills', 'fill'], ['strokes', 'stroke']]) {
-        const paints = Array.isArray(n[list]) ? n[list] : [];
-        paints.forEach((p, i) => {
+        paintsOf(n, list).forEach((p, i) => {
           if (!p || p.type !== 'SOLID' || p.visible === false || !p.color) return;
           out.values++;
-          const viaNode = n.boundVariables && Array.isArray(n.boundVariables[list]) && n.boundVariables[list][i];
+          const viaNode = Array.isArray(bvs[list]) && bvs[list][i];
           if (has(p.boundVariables, 'color') || viaNode || styled(n, kind)) return;
           raw(at, kind, hex(p.color));
         });
       }
     }
-    const radii = Array.isArray(n.rectangleCornerRadii) ? n.rectangleCornerRadii : corners.map((k) => n[k]);
-    const radius = num(n.cornerRadius) ? n.cornerRadius : Math.max(0, ...radii.filter(num));
+    const rectRadii = get(n, 'rectangleCornerRadii'), cornerRadius = get(n, 'cornerRadius');
+    const radii = Array.isArray(rectRadii) ? rectRadii : corners.map((k) => get(n, k));
+    const radius = num(cornerRadius) ? cornerRadius : Math.max(0, ...radii.filter(num));
     if (radius > 0) out.values++;
     if (radius > 0 && !bound(n, 'cornerRadius') && !corners.some((k) => bound(n, k))) raw(at, 'radius', radius);
-    if (sides.some(([k]) => num(n[k]))) out.values++;
-    const loose = sides.filter(([k]) => num(n[k]) && !bound(n, k)).map(([k, w]) => `${w} ${n[k]}`);
+    if (sides.some(([k]) => num(get(n, k)))) out.values++;
+    const loose = sides.filter(([k]) => num(get(n, k)) && !bound(n, k)).map(([k, w]) => `${w} ${get(n, k)}`);
     if (loose.length) raw(at, 'padding', loose.join(', '));
-    const auto = n.layoutMode && n.layoutMode !== 'NONE';
-    if (auto && num(n.itemSpacing) && kids(n).length > 1) out.values++;
-    if (auto && num(n.itemSpacing) && kids(n).length > 1 && !bound(n, 'itemSpacing')) raw(at, 'gap', n.itemSpacing);
+    const layoutMode = get(n, 'layoutMode'), gap = get(n, 'itemSpacing');
+    const auto = layoutMode && layoutMode !== 'NONE';
+    if (auto && num(gap) && kids(n).length > 1) out.values++;
+    if (auto && num(gap) && kids(n).length > 1 && !bound(n, 'itemSpacing')) raw(at, 'gap', gap);
     if (n.type === 'TEXT') out.values++;
     if (n.type === 'TEXT' && !styled(n, 'text') && !bound(n, 'fontSize')) {
-      const size = typeof n.fontSize === 'number' ? n.fontSize : n.style && n.style.fontSize;
+      const fontSize = get(n, 'fontSize'), style = get(n, 'style');
+      const size = typeof fontSize === 'number' ? fontSize : style && style.fontSize;
       raw(at, 'text style', size ? `${size}px` : 'mixed');
     }
     for (const c of kids(n)) walk(c, `${at}/${c.name}`);
@@ -434,8 +459,9 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
   const variants = root && root.type === 'COMPONENT_SET' ? kids(root) : [root];
   for (const v of variants) {
     if (!v) continue;
+    const mode = get(v, 'layoutMode');
     if (kids(v).length > 1) out.variants++;
-    if (kids(v).length > 1 && (!v.layoutMode || v.layoutMode === 'NONE')) out.noAutoLayout.push(v.name);
+    if (kids(v).length > 1 && (!mode || mode === 'NONE')) out.noAutoLayout.push(v.name);
     walk(v, v.name);
   }
   if (detached) out.detached = detached;
@@ -443,10 +469,14 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
 }
 const result = {};
 // Components, and component sets as one entry (a variant is part of its set, not a component of its own).
-for (const set of figma.root.findAll(n => n.type === 'COMPONENT_SET' || (n.type === 'COMPONENT' && n.parent?.type !== 'COMPONENT_SET'))) {
-  const nums = new Set(), colors = new Set();
-  collectRaw(set, nums, colors);
-  result[set.name] = { nums: [...nums].sort((a, b) => a - b), colors: [...colors].sort(), hygiene: hygieneOf(set, set.description) };
+for (const page of figma.root.children) {
+  await page.loadAsync();   // loaded where it is: never figma.setCurrentPageAsync, which changes the file
+  for (const set of page.findAllWithCriteria({ types: ['COMPONENT_SET', 'COMPONENT'] })) {
+    if (set.type === 'COMPONENT' && set.parent?.type === 'COMPONENT_SET') continue;
+    const nums = new Set(), colors = new Set();
+    collectRaw(set, nums, colors);
+    result[set.name] = { nums: [...nums].sort((a, b) => a - b), colors: [...colors].sort(), hygiene: hygieneOf(set, set.description) };
+  }
 }
 return JSON.stringify({ _updated: new Date().toISOString(), ...result }, null, 2);
 ```
