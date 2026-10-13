@@ -67,6 +67,8 @@ rms-design-system-engine --trend                         # show last 20 audit ru
 rms-design-system-engine --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
 rms-design-system-engine --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
 rms-design-system-engine --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
+rms-design-system-engine --agent-rules [--write[=<file>]]  # the engine's rules for an agent with no hooks (Cursor, Copilot): shown, and asked about; --write puts them in AGENTS.md, CLAUDE.md, .cursorrules, .github/copilot-instructions.md or .cursor/rules (those the project has, else AGENTS.md), between markers, once the person says yes (the hook holds it until then)
+rms-design-system-engine --edit-check [file …]           # the check the hook makes on each UI edit, on demand: the files named, else every UI file changed since the last commit; exits 1 when something the system does not have was added
 rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
 rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line
@@ -920,7 +922,11 @@ The rules are `--check-ui`'s, plus:
   composition does not choose, is a ⚠️ line.
 - **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
   `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
-  needed first. The Stop hook holds the reply to the gaps of the prototype just drawn. The page lists its own gaps
+  needed first. Each gap records what was tried (`tried`), so whoever decides works from the evidence: what was
+  searched (the agent's `searched` on the Missing box or stand-in, and the system's own components by name and
+  description), the components nearest to the need, what stands in for it meanwhile, and why none fit (the agent's
+  `why`, the guidelines). The gaps list and the summary say it on each line; the prototype's own page keeps the short
+  line. The Stop hook holds the reply to the gaps of the prototype just drawn. The page lists its own gaps
   (Gaps on its bar), each marked stand-in, missing or by its kind, with "Show on the page": it scrolls to the parts the
   gap comes from and flashes them (the layout gap turns on the engine's outline); a part that is not drawn now (in
   another state, or inside what a click opens) is said so.

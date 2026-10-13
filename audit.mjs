@@ -934,6 +934,53 @@ if (process.argv.includes('--check-ui')) {
   process.exit(r.status ?? 1);
 }
 
+// ── --agent-rules [--write[=<file>]]: the engine's rules for agents without its hooks (agent-rules.mjs, M2) ──
+// Cursor, Copilot and other agents read only their own instruction file. Without --write the section is shown and the
+// person is asked; --write puts it in the project's instruction files (or the one named), once they said yes.
+if (process.argv.includes('--agent-rules')) {
+  const { rulesSection, ruleTargets, writeRules } = await import('./agent-rules.mjs');
+  const w = process.argv.find((a) => a === '--write' || a.startsWith('--write='));
+  const targets = w?.includes('=') ? [w.slice('--write='.length)] : ruleTargets(ROOT);
+  if (!w) {
+    console.log(rulesSection());
+    console.log(`\nThese are the engine's rules for an agent that has no hooks (Cursor, Copilot and others read only their own instruction file). Nothing was written.`);
+    console.log(`NEXT: ask the person whether to add them to ${targets.join(' and ')}; once they say yes, run rms-design-system-engine --agent-rules --write${targets.length === 1 && targets[0] !== 'AGENTS.md' ? `=${targets[0]}` : ''}.`);
+    process.exit(0);
+  }
+  for (const f of targets) {
+    const r = writeRules(ROOT, f);
+    console.log(r.done === 'unchanged' ? `✓ ${f} already has the engine's rules.` : `✅ The engine's rules ${r.done === 'added' ? 'added to' : 'updated in'} ${f} (between the rms-design-system-engine markers; run again to update them).`);
+  }
+  process.exit(0);
+}
+
+// ── --edit-check [file …]: the check the hook makes on each UI edit, on demand (M2) ──
+// For an agent with no hooks, before committing: each file named, else every UI file changed since the last commit,
+// against what it held then. Exit 1 when something the design system does not have was added.
+if (process.argv.includes('--edit-check')) {
+  let ecfg = {};
+  try { ecfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  if (ecfg.editCheck === false) { console.log('The edit check is off in this project ("editCheck": false in ds-config.json).'); process.exit(0); }
+  const { sessionLeftovers, editCheck } = await import('./edit-check.mjs');
+  const cfgOn = { ...ecfg, hooks: true };
+  const files = process.argv.slice(process.argv.indexOf('--edit-check') + 1).filter((a) => !a.startsWith('--'));
+  const lines = [];
+  if (files.length) {
+    for (const f of files) {
+      let now = ''; try { now = readFileSync(resolve(ROOT, f), 'utf8'); } catch { console.log(`⚠️  ${f}: not found`); continue; }
+      const rel = relative(ROOT, resolve(ROOT, f));
+      const head = (() => { const r = spawnSync('git', ['show', `HEAD:${rel}`], { cwd: ROOT, encoding: 'utf8' }); return r.status === 0 ? r.stdout : null; })();
+      const reason = editCheck({ tool_name: 'Write', tool_input: { file_path: resolve(ROOT, f), content: now } }, { root: ROOT, cfg: cfgOn, headOf: () => head });
+      if (reason) lines.push(...reason.split('\n').filter((l) => /^ {2}\S/.test(l)).map((l) => `  ${rel}${l.trim().replace(/^[^\s:]+/, '')}`));
+    }
+  } else lines.push(...sessionLeftovers(ROOT, cfgOn));
+  if (!lines.length) { console.log(`✅ Edit check: nothing the design system does not have was added${files.length ? ` in ${files.join(', ')}` : ' since the last commit'}.`); process.exit(0); }
+  console.log(`❌ Edit check: ${lines.length} thing${lines.length === 1 ? '' : 's'} the design system does not have:`);
+  for (const l of lines) console.log(l);
+  console.log('NEXT: fix each one with the system\'s token or component (rms-design-system-engine --query <name> when unsure of a name), then run the edit check again; ask the person when nothing in the system fits.');
+  process.exit(1);
+}
+
 // ── --trend: no config needed - just show history and exit ────────────────────
 if (SHOW_TREND) {
   const histPath = join(ROOT, projectPath(ROOT, 'history'));
@@ -1842,6 +1889,12 @@ async function bootstrapConfig() {
       console.log(C.green(`✅ Hooks installed in ${relative(ROOT, r.file)}`) + C.dim(' (never edit a Figma snapshot by hand; ask before commit, push, applying the hand-back or editing ds-config.json; route each /rms-design-system-engine request). Off: --remove-hooks.'));
     } catch (e) { console.log(C.yellow(`⚠️  Hooks not installed: ${e.message}`)); }
   }
+  // Other agents set up here (Cursor, Copilot) have no hooks: their instruction file can carry the engine's rules (M2).
+  try {
+    const { otherAgents } = await import('./agent-rules.mjs');
+    const others = otherAgents(ROOT);
+    if (others.length) console.log(C.dim(`  Agents with no hooks read their own instruction file (${others.join(', ')} here): rms-design-system-engine --agent-rules shows the engine's rules for it, written there once you say yes.`));
+  } catch { /* an offer, never a step */ }
   // The request setup was reached from comes back first: routed now, as the person asked it.
   if (INIT_THEN) console.log(`NEXT: the person asked: "${INIT_THEN}". Setup is done; route that request now: rms-design-system-engine --route '${INIT_THEN.replace(/'/g, `'\\''`)}', and follow what it prints.\n`);
   else console.log(buildMode
