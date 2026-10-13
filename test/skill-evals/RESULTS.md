@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: A project read from GitLab, agents without the hooks, and gaps that say what was tried (continuous evaluation)
+
+What changed since the entry below (engine 438d3a4): Setup's recipe, the main guide and the config reference say what a GitLab link does (read through the API, never cloned, GITLAB_TOKEN and GITLAB_HOST in .env set by the person) and how its history is read; the usage reference documents --agent-rules and --edit-check; the prototype recipe asks for searched and why on a Missing box or a stand-in. The guide changed in `cookbook/first-setup.md`, `cookbook/prototype.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `ee76069011b4` · Project measured: `13d811a9d668`
+
+| Haiku, engine c2ee891 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.058 |
+| Input a run | 102k | 104k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 104k a run against 102k. Records: `records/gitlab-agents-gaps`.
+
 ## 2026-10: Setup fills from the first capture what it cannot read (continuous evaluation)
 
 What changed since the entry below (engine 2b17d2c): The capture recipe finds the colour collection, its modes and the sizes itself when the configured ones are not in the file, and keeps their names in _collections; the config reference documents figma.fromCapture and the naming ways that keep /color and /default. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`.
