@@ -5,7 +5,7 @@
 ## Steps
 
 1. Run `rms-design-system-engine --refresh-figma` first. It picks the best way to read Figma: a `design.json` newer than the snapshots, else figma-cli when Figma Desktop is connected to it (it runs `figma-cli snapshot`, reads the result, then reads the variables, text styles and effect styles with the scripts below through figma-cli), else it says the Figma tool of this session reads it (the steps below), or the API with FIGMA_TOKEN. A design.json read this way keeps what it does not hold (text styles, scopes, descriptions, other variants, annotations) from the snapshots already there.
-2. With the Figma tool of this session, read the variables, text styles and effect styles in checked chunks, never by copying values: run `rms-design-system-engine --capture-script vars 0`, run the script it writes unchanged with `use_figma`, save its answer as it came to the file its `NEXT:` line names, do the same for each chunk up to the `of` the answer gives, then run `rms-design-system-engine --capture-import`. It checks each answer against the checksum Figma computed, names any chunk to read again, and writes the vars snapshot with the scripts of Step 1 below. On a refresh, start with `--capture-script vars sums` and read only the chunks `--capture-import` names. Components still follow Step 1c.
+2. With the Figma tool of this session, read the variables, text styles and effect styles in checked chunks, never by copying values: run `rms-design-system-engine --capture-script vars 0`, run the script it writes unchanged with `use_figma`, save its answer as it came to the file its `NEXT:` line names, do the same for each chunk up to the `of` the answer gives, then run `rms-design-system-engine --capture-import`. It checks each answer against the checksum Figma computed, names any chunk to read again, and writes the vars snapshot with the scripts of Step 1 below. On a refresh, start with `--capture-script vars sums` and read only the chunks `--capture-import` names. Read the components the same way in the same run: `rms-design-system-engine --capture-script components sums`, then each chunk `--capture-import` names (`--capture-script components <chunk>`). Each script runs the functions of Step 1c in Figma, and the import writes the structure and props snapshots.
 3. Otherwise refresh only with a capture faithful to the steps below (the Plugin API capture works on any plan). Never hand-edit a snapshot: the project's hooks refuse it. Every value in a refreshed snapshot is one read from Figma in this capture: a value the capture cannot read is never kept from the old snapshot, it is told to the person (which variable, in which mode, and what Figma holds there) so they can fix the file or report the capture.
 4. When no refresh path is available (no figma-cli, no token, no Figma MCP, no Plugin API), say so once, in the route's SAY sentence, and audit the committed snapshots. Add no way of your own to refresh: a token is only ever `FIGMA_TOKEN` in the project's `.env`, set by the person, so never ask them for one or to provide one, not even in a closing line.
 5. When the Figma tool of this session can read the file, also refresh the annotation categories, which no other path returns: run `rms-design-system-engine --annotation-categories`, run the script it writes with that tool (once per page on a large file), save each result unchanged under `.design-system-engine-out/figma-capture/`, then run `rms-design-system-engine --annotation-categories <each file>`.
@@ -599,11 +599,12 @@ async function deepFacts(node, set) {
     out.defaultVariant = node.name;
     out.variants = {};
     for (const v of set.children.filter((c) => c.type === 'COMPONENT')) out.variants[v.name] = await geometry(v);
-    // Each slot's and instance swap's preferred components, by name (the definitions only carry keys).
-    const byKey = new Map(figma.root.findAll((x) => (x.type === 'COMPONENT' || x.type === 'COMPONENT_SET') && x.key).map((x) => [x.key, x.name]));
+    // Each slot's and instance swap's preferred components, by name (the definitions only carry keys). The file is
+    // walked once, the first time a slot names any.
     const slots = {};
     for (const [k, d] of Object.entries(set.componentPropertyDefinitions ?? {})) {
       if ((d.type !== 'INSTANCE_SWAP' && d.type !== 'SLOT') || !d.preferredValues?.length) continue;
+      const byKey = deepFacts.byKey ??= new Map(figma.root.findAllWithCriteria({ types: ['COMPONENT', 'COMPONENT_SET'] }).filter((x) => x.key).map((x) => [x.key, x.name]));
       slots[k.replace(/#.*$/, '')] = d.preferredValues.map((p) => byKey.get(p.key)).filter(Boolean);
     }
     if (Object.keys(slots).length) out.slots = slots;
@@ -722,19 +723,22 @@ first `State=` value, with `Disabled=False` and `Selected=False` where those axe
 
 ```js
 function parseAxes(name){const o={};for(const p of name.split(',')){const i=p.indexOf('=');if(i>=0)o[p.slice(0,i).trim().toLowerCase()]=p.slice(i+1).trim().toLowerCase();}return o;}
-const variants = set.children.filter(c => c.type === 'COMPONENT');
-const firstAxes = parseAxes(variants[0].name);
-const stateKey  = 'state' in firstAxes ? 'state' : Object.keys(firstAxes)[0];
-const firstState = firstAxes[stateKey];
-const resting = variants.find(v => {
-  const a = parseAxes(v.name);
-  if (a[stateKey] !== firstState) return false;
-  if ('disabled' in a && a.disabled !== 'false') return false;
-  if ('selected' in a && a.selected !== 'false') return false;
-  return true;
-}) ?? variants[0];
-const restingState  = firstState;
-const restingStroke = (resting.strokes ?? []).filter(s => s.visible !== false).length > 0;
+function restingOf(set) {
+  const variants = set.children.filter(c => c.type === 'COMPONENT');
+  const firstAxes = parseAxes(variants[0].name);
+  const stateKey  = 'state' in firstAxes ? 'state' : Object.keys(firstAxes)[0];
+  const firstState = firstAxes[stateKey];
+  const resting = variants.find(v => {
+    const a = parseAxes(v.name);
+    if (a[stateKey] !== firstState) return false;
+    if ('disabled' in a && a.disabled !== 'false') return false;
+    if ('selected' in a && a.selected !== 'false') return false;
+    return true;
+  }) ?? variants[0];
+  const restingState  = firstState ?? null;
+  const restingStroke = (resting.strokes ?? []).filter(s => s.visible !== false).length > 0;
+  return { restingState, restingStroke };
+}
 ```
 
 `restingStroke` records the resting variant's **root** stroke, so a Phase-1 diff surfaces
@@ -872,6 +876,7 @@ function getBoundPaddingVar(node, idToVar) {
   const tb = res(bv.paddingTop?.id ?? bv.paddingBottom?.id);
   return (lr || tb) ? { tb: tb ?? null, lr: lr ?? null } : null;
 }
+function childFrames(defaultVariant, idToVar) {
 const childFramePadding = [], childFrameGaps = [];
 for (const child of defaultVariant.children ?? []) {
   // FRAME **and SLOT**: a slotted component (panel, toolbar, moreMenu, modal, …) keeps its
@@ -895,6 +900,100 @@ for (const child of defaultVariant.children ?? []) {
     childFrameGaps.push({ name: child.name, gapVar: null, gapPx });
 }
 // Include childFramePadding / childFrameGaps in snapshot only when non-empty
+return { ...(childFramePadding.length ? { childFramePadding } : {}), ...(childFrameGaps.length ? { childFrameGaps } : {}) };
+}
+```
+
+**One component's entry, and its props.** `componentFacts` puts the facts above together for one component (a
+`COMPONENT_SET`, or a `COMPONENT` outside any set), from the State=Default variant at rest, and `propsFacts` reads what
+the component-props snapshot holds. `rms-design-system-engine --capture-script components` runs these functions
+unchanged in Figma, so write no other version of them.
+
+```js
+// componentFacts(root, idToVar): one component's entry in figma-structure.snapshot.json. idToVar: { variableId: variable },
+// filled here with any variable a layer binds that it does not hold yet (a library's).
+async function componentFacts(root, idToVar) {
+  const n = (v) => (typeof v === 'number' ? Math.round(v * 100) / 100 : null);
+  const set = root.type === 'COMPONENT_SET' ? root : null;
+  const variants = set ? set.children.filter((c) => c.type === 'COMPONENT') : [root];
+  // The State=Default variant at rest (Disabled=False and Selected=False where those axes exist), else Figma's default.
+  const atRest = (a) => (!('disabled' in a) || a.disabled === 'false') && (!('selected' in a) || a.selected === 'false');
+  const isDefault = (v) => parseAxes(v.name).state === 'default';
+  const node = variants.find((v) => isDefault(v) && atRest(parseAxes(v.name))) ?? variants.find(isDefault) ?? set?.defaultVariant ?? variants[0];
+  const varName = async (id) => {
+    if (!id) return null;
+    if (!(id in idToVar)) idToVar[id] = await figma.variables.getVariableByIdAsync(id);
+    return idToVar[id]?.name ?? null;
+  };
+  for (const c of node.children ?? []) for (const b of Object.values(c.boundVariables ?? {})) for (const a of [b].flat()) if (a?.id) await varName(a.id);
+  for (const b of Object.values(node.boundVariables ?? {})) for (const a of [b].flat()) if (a?.id) await varName(a.id);
+  const drawn = (paints) => Array.isArray(paints) && paints.some((p) => p.visible !== false);
+  const shown = (x) => { for (let p = x; p && p !== node; p = p.parent) if (p.visible === false) return false; return true; };
+  // fillStructure: on the frame itself, on a child under the content (named Background, or covering the whole frame), or none.
+  const covers = (c) => Math.abs(c.x) < 0.5 && Math.abs(c.y) < 0.5 && c.width >= node.width - 0.5 && c.height >= node.height - 0.5;
+  const under = (node.children ?? []).find((c) => c.visible !== false && drawn(c.fills) && (/background/i.test(c.name) || covers(c)));
+  // The text scale key: the bound variable's (typography/m/font-size → m), else the text style's last segment.
+  const text = node.findOne?.((t) => t.type === 'TEXT' && shown(t)) ?? null;
+  const scaleKey = (name) => { const parts = String(name).split('/').filter((x) => !/^(font[-_ ]?)?(size|weight|family)$/i.test(x.trim())); return parts.length ? parts[parts.length - 1].trim().toLowerCase() : null; };
+  const firstId = (b) => [b].flat().find((a) => a?.id)?.id ?? null;
+  const style = text && typeof text.textStyleId === 'string' && text.textStyleId ? await figma.getStyleByIdAsync(text.textStyleId) : null;
+  const styleKey = style ? style.name.split('/').pop().trim().toLowerCase() : null;
+  const scaleOf = async (field) => { const id = firstId(text?.boundVariables?.[field]); return id ? scaleKey(await varName(id)) : styleKey; };
+  // The first bound radius: on the frame, then on its Background child.
+  const radiusOf = async (x) => { for (const k of ['topLeftRadius', 'cornerRadius', 'topRightRadius', 'bottomRightRadius', 'bottomLeftRadius']) { const id = x?.boundVariables?.[k]?.id; if (id) return varName(id); } return null; };
+  const icon = node.findOne?.((x) => x.type === 'INSTANCE' && /icon/i.test(x.name) && shown(x)) ?? null;
+  const notes = [...(root.annotations ?? []), ...(node.annotations ?? [])].map((a) => a.label ?? a.labelMarkdown ?? '');
+  const out = {
+    nodeId: root.id,
+    h: n(node.height),
+    paddingVar: getBoundPaddingVar(node, idToVar),
+    gapVar: await varName(node.boundVariables?.itemSpacing?.id),
+    fontSizeVar: text ? await scaleOf('fontSize') : null,
+    fontWeightVar: text ? await scaleOf('fontWeight') : null,
+    fillStructure: drawn(node.fills) ? 'direct' : under ? 'before' : 'none',
+    innerRadiusVar: (await radiusOf(node)) ?? (await radiusOf((node.children ?? []).find((c) => /background/i.test(c.name)))),
+    strokeOnDefault: drawn(node.strokes),
+    strokeOnAnyState: variants.some((v) => deepHasStroke(v)),
+    sizingV: notes.some((t) => /sizing:\s*fill/i.test(t)) ? 'FILL' : node.layoutSizingVertical ?? null,
+    layout: node.layoutMode ?? 'NONE',
+    slot: !!node.findOne?.((x) => x.type === 'SLOT'),
+    minH: n(node.minHeight),
+    ...(icon ? { iconSize: n(icon.width) } : {}),
+    ...childFrames(node, idToVar),
+  };
+  if (set) {
+    out.variantStroke = Object.fromEntries(variants.map((v) => [v.name, drawn(v.strokes)]));
+    out.variantHeight = Object.fromEntries(variants.map((v) => [v.name, n(v.height)]));
+    Object.assign(out, restingOf(set));
+    // Each variant drawn at a lower opacity, by the state it differs in: Disabled=True → disabled, State=Pressed →
+    // pressed, else Axis=Value, or the variant's whole name when it differs in more than one axis.
+    const axes = (name) => Object.fromEntries(name.split(',').map((x) => x.split('=').map((y) => y.trim())).filter((x) => x.length === 2));
+    const base = axes(node.name), opacity = {};
+    for (const v of variants) {
+      if (typeof v.opacity !== 'number' || v.opacity >= 1) continue;
+      const diff = Object.entries(axes(v.name)).filter(([k, val]) => base[k] !== val);
+      const [k, val] = diff[0] ?? [];
+      const key = diff.length !== 1 ? v.name : /^true$/i.test(val) ? k.toLowerCase() : /^state$/i.test(k) ? val.toLowerCase() : `${k}=${val}`;
+      opacity[key] = n(v.opacity);
+    }
+    if (Object.keys(opacity).length) out.variantOpacity = opacity;
+  }
+  return { ...out, ...(await deepFacts(node, set)), ...(await paintFacts(root)) };
+}
+
+// propsFacts(root): the component's entry in figma-component-props.snapshot.json, or null when it has nothing to record.
+function propsFacts(root) {
+  let properties = {};
+  try { properties = root.componentPropertyDefinitions ?? {}; } catch { /* a variant: its set holds them */ }
+  const annotations = root.annotations ?? [];
+  // Notes on inner layers of the default variant (the first one; a component outside a set is its own).
+  const base = root.type === 'COMPONENT_SET' ? root.children[0] : root;
+  const layerAnnotations = (base.findAll?.((x) => (x.annotations ?? []).length > 0) ?? []).slice(0, 50)
+    .map((x) => ({ layer: x.name, nodeId: x.id, annotations: x.annotations }));
+  const description = String(root.description ?? '').trim();
+  if (!Object.keys(properties).length && !annotations.length && !layerAnnotations.length && !description) return null;
+  return { nodeId: root.id, properties, annotations, ...(layerAnnotations.length ? { layerAnnotations } : {}), ...(description ? { description } : {}) };
+}
 ```
 
 Write the result in this shape:

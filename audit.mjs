@@ -339,37 +339,51 @@ if (process.argv.includes('--figma-motion')) {
   process.exit(0);
 }
 
-// ── --capture-script / --capture-import: Figma's variables, text styles and effect styles in checked chunks (P6) ──
-// --capture-script vars N writes the read-only script for chunk N ('sums' for the checksums alone) to run with the
-// Figma tool; the agent saves each answer as it came. --capture-import checks every saved answer against the checksum
-// Figma computed, says which chunks are missing or changed, and once all are there writes the vars snapshot with the
-// capture recipe's own scripts. No value is copied by hand.
+// ── --capture-script / --capture-import: Figma read in checked chunks (P6) ──
+// --capture-script vars N writes the read-only script for chunk N of the variables, text styles and effect styles
+// ('sums' for the checksums alone); --capture-script components N the same for the components (structure and props),
+// run in Figma with the capture recipe's Step 1c functions. The agent runs each with the Figma tool and saves its
+// answer as it came. --capture-import checks every saved answer against the checksum Figma computed, says which chunks
+// are missing or changed, and once all are there writes the snapshots. No value is copied by hand.
 if (process.argv.includes('--capture-script') || process.argv.includes('--capture-import')) {
   let ccfg = {};
   try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   const fc = await import('./figma-capture.mjs');
   const dir = fc.captureDir(ROOT), rel = relative(ROOT, dir);
   mkdirSync(dir, { recursive: true });
+  const KINDS = ['vars', 'components'];
   if (process.argv.includes('--capture-script')) {
     const at = process.argv.indexOf('--capture-script');
-    const kind = process.argv[at + 1], which = process.argv[at + 2] ?? '0';
-    if (kind !== 'vars') { console.log('rms-design-system-engine --capture-script vars <chunk|sums>: the variables, text styles and effect styles. Components are read with the recipe\'s Step 1c walk.'); process.exit(2); }
+    const kind = process.argv[at + 1], which = process.argv[at + 2] ?? (kind === 'components' ? 'sums' : '0');
+    if (!KINDS.includes(kind)) { console.log('rms-design-system-engine --capture-script vars <chunk|sums>: the variables, text styles and effect styles. rms-design-system-engine --capture-script components <chunk|sums>: the components, their structure and props.'); process.exit(2); }
     const chunk = which === 'sums' ? 'sums' : Number.parseInt(which, 10);
     if (chunk !== 'sums' && !(chunk >= 0)) { console.log(`❌ ${which}: a chunk number (0, 1, ...) or sums`); process.exit(2); }
-    const file = join(dir, `vars-${chunk}.js`);
-    writeFileSync(file, fc.varsScript(chunk));
-    console.log(`Capture script for ${chunk === 'sums' ? 'the checksums' : `chunk ${chunk}`} → ${relative(ROOT, file)} (read only: it changes nothing in Figma).`);
-    console.log(`NEXT: run it unchanged with the Figma tool (use_figma) on the design system's file, save its answer as it came to ${rel}/vars-${chunk}.json, ${chunk === 0 ? 'then do the same for each chunk up to the "of" it gives, ' : ''}then run rms-design-system-engine --capture-import.`);
+    const file = join(dir, `${kind}-${chunk}.js`);
+    writeFileSync(file, fc.captureScript(kind, chunk, { dir, cfg: ccfg }));
+    console.log(`Capture script for ${chunk === 'sums' ? 'the checksums' : `chunk ${chunk}`} of the ${kind === 'vars' ? 'variables' : 'components'} → ${relative(ROOT, file)} (read only: it changes nothing in Figma).`);
+    const then = kind === 'vars' && chunk === 0 ? 'then do the same for each chunk up to the "of" it gives, ' : chunk === 'sums' ? 'then run rms-design-system-engine --capture-import: it names each chunk to read. ' : '';
+    console.log(`NEXT: run it unchanged with the Figma tool (use_figma) on the design system's file, save its answer as it came to ${rel}/${kind}-${chunk}.json, ${then}${chunk === 'sums' ? '' : 'then run rms-design-system-engine --capture-import.'}`.trim());
     process.exit(0);
   }
+  const asked = process.argv[process.argv.indexOf('--capture-import') + 1];
+  const kinds = KINDS.includes(asked) ? [asked] : KINDS;
+  const saved = (k) => { try { return readdirSync(dir).some((f) => f.startsWith(`${k}-`) && f.endsWith('.json')); } catch { return false; } };
   let figmaVersion = null;
   // The file's version, read after the capture as Step 5 says, when the API can give it (FIGMA_TOKEN in .env).
   if (process.env.FIGMA_TOKEN && ccfg.figmaFileKey) {
     try { const res = await fetch(`https://api.figma.com/v1/files/${ccfg.figmaFileKey}?depth=1`, { headers: { 'X-Figma-Token': process.env.FIGMA_TOKEN }, signal: AbortSignal.timeout(15000) }); if (res.ok) figmaVersion = (await res.json()).version ?? null; } catch { /* offline: no version stamped */ }
   }
-  const r = await fc.importCapture(ROOT, ccfg, { dir, figmaVersion });
-  for (const line of fc.importLines(r, rel)) console.log(line);
-  process.exit(r.ok ? 0 : 1);
+  const tried = kinds.length === 1 ? kinds : kinds.filter(saved);
+  if (!tried.length) tried.push('vars');
+  let ok = true;
+  for (const k of tried) {
+    const r = k === 'vars' ? await fc.importCapture(ROOT, ccfg, { dir, figmaVersion }) : await fc.importComponents(ROOT, ccfg, { dir, figmaVersion });
+    for (const line of fc.importLines(r, rel)) console.log(line);
+    ok = ok && r.ok;
+  }
+  // The structure is read in the same run as the variables (Step 1c): say so when only one was read.
+  for (const k of kinds.filter((x) => !tried.includes(x))) console.log(`${k === 'components' ? 'Components' : 'Variables'}: none read in checked chunks yet. Read them in the same run: rms-design-system-engine --capture-script ${k} sums.`);
+  process.exit(ok ? 0 : 1);
 }
 
 // ── --figma-screens: the screens designed for each product, for the screen check (I96) ──
@@ -1839,6 +1853,7 @@ async function bootstrapConfig() {
     if (!plugins.includes(p.key)) plugins.push(p.key);
   }
   if (facts.products.length) console.log(C.green(`  ✅ Products beside it that use the system: ${facts.products.map((p) => `${p.key} (${p.dir})`).join(', ')}: their code is read with the system's`));
+  if (facts.crowded) console.log(C.dim(`  Products beside it were not looked for: the folder above this one holds ${facts.crowded} entries, not a folder of projects. Name any in ds-config.json → pluginDirs.`));
   if (facts.missing.length) console.log(C.yellow(`  ⚠️  products.json lists ${facts.missing.join(', ')}, not checked out beside this folder: clone ${facts.missing.length === 1 ? 'it' : 'them'} next to it and run setup again, so their code is checked too`));
   if (facts.scripts.length) console.log(C.green(`  ✅ The system's own script${facts.scripts.length === 1 ? '' : 's'}: ${facts.scripts.join(', ')}${facts.iconSources.length ? ` (its icons are defined in ${facts.iconSources.join(', ')})` : ''}`));
   if (facts.frames.length || facts.screens.length) console.log(C.green(`  ✅ From the screens already captured: ${facts.frames.length} frame${facts.frames.length === 1 ? '' : 's'} and ${facts.screens.length} screen${facts.screens.length === 1 ? '' : 's'} (${facts.snapshots.snapshotScreenComponents})`));

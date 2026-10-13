@@ -18,7 +18,7 @@ Every Figma annotation attached to a component node is a design specification. T
 
 ### Plugin API capture (no token, any plan)
 
-No token? Generate the same file inside Figma via `use_figma` / the plugin console, then save it as `figma-component-props.snapshot.json` at project root and commit it. `componentPropertyDefinitions` is readable on a COMPONENT_SET (or a standalone COMPONENT), so this needs no token or special plan access - it feeds Gate [15] (component prop parity) and Gate [13] (Structure) at full strength:
+No token? `rms-design-system-engine --capture-script components sums` reads it in checked chunks with the Figma tool (`propsFacts` in the refresh recipe's Step 1c), together with the structure snapshot. Or generate the same file inside Figma via `use_figma` / the plugin console, then save it as `figma-component-props.snapshot.json` at project root and commit it. `componentPropertyDefinitions` is readable on a COMPONENT_SET (or a standalone COMPONENT), so this needs no token or special plan access - it feeds Gate [15] (component prop parity) and Gate [13] (Structure) at full strength:
 
 ```js
 const result = {};
