@@ -28,7 +28,7 @@ test('the route, in order: a newer design.json, figma-cli connected, the API wit
 test('figma-cli is run to write design.json, then it is read; a failed snapshot says why', async () => {
   const dir = fixtureProject(TP, 'fc-run-');
   const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
-  const r = await refreshFromFigmaCli(dir, cfg, { run: () => { writeFileSync(join(dir, 'design.json'), JSON.stringify(tidepoolDesign())); return { status: 0 }; } });
+  const r = await refreshFromFigmaCli(dir, cfg, { run: () => { writeFileSync(join(dir, 'design.json'), JSON.stringify(tidepoolDesign())); return { status: 0 }; }, capture: async () => null });
   assert.equal(r.source, 'Tidepool');
   assert.equal(r.counts.components, 6);
   await assert.rejects(refreshFromFigmaCli(dir, cfg, { run: () => ({ status: 1, stderr: 'not connected to Figma\n' }) }), /figma-cli snapshot did not finish: not connected to Figma/);

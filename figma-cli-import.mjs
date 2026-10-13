@@ -7,13 +7,16 @@
 //   • figma-component-props.snapshot.json  each component set's variant props, their options and default
 //   • figma-structure.snapshot.json        each component's default variant: height, padding, gap, radius, the
 //                                          variables bound to them, and its fill, text and stroke colours
-// What design.json does not hold is kept from the snapshots already there, never erased: text styles, the other
-// variants of a component, text and boolean props, descriptions and annotations. Those still come from a capture
-// through the Figma MCP.
+// What design.json does not hold is kept from the snapshots already there, never erased: text styles, the variables'
+// scopes and descriptions, Figma's own order of the modes (design.json sorts them by name), the other variants of a
+// component, text and boolean props, descriptions and annotations. With figma-cli connected, --refresh-figma reads the
+// variables, text styles and effect styles through the capture recipe's own scripts (figma-capture.mjs), so they are
+// the snapshot a capture through the Figma tool gives (P7).
 //
 // Pure except importFigmaCli (reads and writes files).
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { buildStamp, mayWrite } from './stamp.mjs';
 
 export const FIGMA_CLI_FORMAT = 2;   // design.json `version` this reader knows
 
@@ -90,7 +93,30 @@ export function varsFromDesign(design, cfg = {}) {
   }
   // The collections read, by name: what setup could not know before the first capture (E38).
   const collections = { color: colourCol?.name ?? null, colorModes: colourCol?.modes ?? [], sizing: [...sizedBy] };
-  return { color, aliases, sizing, strings, booleans, modeOrder, brokenAliases, collections };
+  // Every collection with two or more modes, as the capture recipe keeps it (modeVariants, P7): each variable whose
+  // value changes with the mode, in each mode, its kind from its type. The colour collection's colours are in color.
+  // The colour modes keep their snapshot keys, any other mode its name.
+  const KIND = { COLOR: 'color', FLOAT: 'scalar', STRING: 'string', BOOLEAN: 'boolean' };
+  const slug = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const scalar = (v) => (typeof v === 'number' ? px(v) : typeof v === 'boolean' ? String(v) : typeof v === 'string' && /^#[0-9a-f]{6,8}$/i.test(v) ? v.toLowerCase() : v == null ? null : String(v));
+  const configured = new Map((cfg.figma?.collections ?? []).map((c) => [c.name, c]));
+  const modeVariants = {};
+  for (const c of cols) {
+    if ((c.modes ?? []).length < 2) continue;
+    const own = configured.get(c.name);
+    const keyed = c.modes.map((name) => ({ name, snapshotKey: own?.modes?.find((m) => m.name === name)?.snapshotKey ?? (c === colourCol ? keyOf(name) : slug(name)) }));
+    const vars = {};
+    for (const v of c.variables ?? []) {
+      if (v.name.startsWith(prefix)) continue;
+      const kind = KIND[v.type] ?? 'scalar';
+      if (kind === 'color' && c === colourCol) continue;
+      const values = {};
+      for (const m of keyed) { const { value } = resolveVar(byKey, c.name, v.name, m.name); values[m.snapshotKey] = kind === 'color' ? (typeof value === 'string' ? value.toLowerCase() : null) : scalar(value); }
+      if (new Set(Object.values(values).map(String)).size > 1) vars[v.name] = { kind, values };
+    }
+    if (Object.keys(vars).length) modeVariants[c.name] = { modes: keyed, vars };
+  }
+  return { color, aliases, sizing, strings, booleans, modeOrder, brokenAliases, collections, modeVariants };
 }
 
 // Every component set (and lone component) in design.json's page trees.
@@ -159,7 +185,7 @@ export function snapshotsFromDesign(design, cfg = {}, existing = {}, now = new D
   const source = `figma-cli design.json${design.meta?.file ? ` (${design.meta.file})` : ''}`;
   const t = varsFromDesign(design, cfg);
   const prevVars = existing.vars ?? {};
-  const vars = { ...prevVars, _updated: now, _source: source, _modeOrder: t.modeOrder, _collections: t.collections, color: t.color, aliases: t.aliases, brokenAliases: t.brokenAliases, sizing: t.sizing,
+  const vars = { ...prevVars, _updated: now, _source: source, _modeOrder: t.modeOrder, _collections: t.collections, color: t.color, aliases: t.aliases, brokenAliases: t.brokenAliases, sizing: t.sizing, modeVariants: t.modeVariants,
     strings: { ...(prevVars.strings ?? {}), ...t.strings }, booleans: { ...(prevVars.booleans ?? {}), ...t.booleans } };
   for (const k of ['typography', 'breakpoints', 'animation', 'primitives']) vars[k] = prevVars[k] ?? {};
   const props = { ...(existing.props ?? {}), _updated: now, _source: source };
@@ -194,9 +220,14 @@ export function importFigmaCli(ROOT, cfg = {}, file = 'design.json') {
   };
   const read = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return undefined; } };
   const out = snapshotsFromDesign(design, cfg, { vars: read(paths.vars), props: read(paths.props), structure: read(paths.structure) });
+  // What they were read from (P4): when Figma was read; a snapshot read later than this design.json stays.
+  const stamp = buildStamp(ROOT, { figma: null, figmaRead: design.meta?.extractedAt ? new Date(design.meta.extractedAt).toISOString() : out.vars._updated });
+  const kept = [];
   for (const k of ['vars', 'props', 'structure']) {
+    const may = mayWrite(join(ROOT, paths[k]), stamp, { ROOT, label: paths[k] });
+    if (!may.ok) { kept.push(may.line); continue; }
     mkdirSync(dirname(join(ROOT, paths[k])), { recursive: true });
-    writeFileSync(join(ROOT, paths[k]), JSON.stringify(out[k], null, 2) + '\n');
+    writeFileSync(join(ROOT, paths[k]), JSON.stringify({ ...out[k], _built: stamp }, null, 2) + '\n');
   }
-  return { counts: out.counts, paths };
+  return { counts: out.counts, paths, ...(kept.length ? { kept } : {}) };
 }

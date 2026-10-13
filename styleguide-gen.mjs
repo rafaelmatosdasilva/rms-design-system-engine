@@ -21,6 +21,7 @@
 //
 // Exit 0 on success. Never throws into the audit — callers wrap it.
 
+import { buildStamp, mayWrite, stampMeta } from './stamp.mjs';
 import { usedClasses } from './class-use.mjs';
 import { appDir } from './code-roots.mjs';
 import { codeSizeCSS, modeRootCSS, scopeView } from './styleguide-data.mjs';
@@ -637,6 +638,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // What uses each token, for the page's "What uses it" view.
     // When the page was built: a row read then (its code, the team's notes, a stand-in) says so in its Updated column.
     view.builtAt = new Date().toISOString();
+    // What it was built from (P4): the code commit, the Figma version and the engine, also in the page's <head>.
+    view.built = buildStamp(ROOT, { vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), at: view.builtAt });
     try { const { tokenUses } = await import('./styleguide-data.mjs'); view.tokenUses = tokenUses(allCss, view.components); } catch { /* none listed */ }
     // Every token each component is drawn with (its parts and states too, seen in this variant or not), by Figma's name.
     try {
@@ -1007,6 +1010,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   }
 
   html = html.split(VUE_CSS_MARK).join(vueCss);
+  // An older run never replaces a page built from newer inputs (P4). The code capture's own copy (opts.out) is always
+  // the code as it is now.
+  const built = buildStamp(ROOT, { vars: (() => { try { return JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { return null; } })() });
+  const may = opts.out ? { ok: true } : mayWrite(outPath, built, { ROOT, label: relative(ROOT, outPath) });
+  if (!may.ok) return { out: outPath, kept: may.line, filled, bytes: 0, components: 0 };
+  html = html.replace(/<head>/i, (m) => `${m}\n${stampMeta(built)}`);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html);
   return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };

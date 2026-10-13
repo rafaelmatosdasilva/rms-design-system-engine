@@ -25,6 +25,7 @@ import { dirname, resolve, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { pruneCandidates } from './prune-check.mjs';
 import { withTextScaleKeys } from './naming-convention.mjs';
+import { buildStamp, mayWrite } from './stamp.mjs';
 import { shortStyleNames, textStyleKey } from './text-styles.mjs';
 import { resolveStatus, parseStatusTags, lintStatusFields, statusFindings, statusLine } from './decision-status.mjs';
 import { buildCatalog, catalogTable } from './ui-catalog.mjs';
@@ -667,6 +668,12 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   if (typeof targets === 'string') targets = [targets];
   targets = targets.filter((n) => structure[n] || CONTRACT[n] || props[n]);
 
+  // What this run is built from (P4): an older run never replaces contracts built from newer inputs.
+  const builtFile = join(outDir, 'built.json');
+  const stamp = buildStamp(ROOT, { vars });
+  const may = mayWrite(builtFile, stamp, { ROOT, force: opts.force ?? process.argv.includes('--force'), label: relative(ROOT, outDir) || outDir });
+  if (!may.ok) return { kept: may.line, outDir, tokensOut, schemaOut, authoredPath, components: [], invalid: [], tokenCount: 0, authoredIssues: [], droppedTokens: [], breaking: [], undefinedRefs: [], typeMismatches: [], prune: null, statusIssues: [], statusCounts: {} };
+
   // Load the committed AUTHORED layer. Scaffold it once if missing (empty bindings per component);
   // never rewrite it afterwards, so it stays user-owned with clean git diffs.
   let authoredDoc = readJSON(authoredPath);
@@ -790,5 +797,6 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   const statusIssues = statusFindings(built);
   const statusCounts = built.reduce((acc, b) => { const st = b.contract.status?.state; if (st) acc[st] = (acc[st] || 0) + 1; return acc; }, {});
 
-  return { tokensOut, schemaOut, outDir, authoredPath, llmsOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
+  try { ensureDir(outDir); writeFileSync(builtFile, JSON.stringify({ _built: stamp }, null, 2) + '\n'); } catch { /* best-effort */ }
+  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
 }

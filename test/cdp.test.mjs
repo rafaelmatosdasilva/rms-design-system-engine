@@ -20,6 +20,12 @@ test('findChrome: CHROME_PATH wins, then PATH binaries; Playwright only when opt
   assert.equal(findChrome({ env, exists, which: none }), null);
 });
 
+test('findChrome: DESIGN_SYSTEM_ENGINE_CHROME=none finds none, even a Mac\'s Chrome in /Applications (E44)', () => {
+  const mac = (p) => p === '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  assert.equal(findChrome({ env: {}, exists: mac, which: none }), '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', 'found without the PATH');
+  assert.equal(findChrome({ env: { DESIGN_SYSTEM_ENGINE_CHROME: 'none' }, exists: mac, which: () => '/usr/bin/chromium', playwright: true }), null);
+});
+
 test('playwrightChromium: picks the newest chromium-N build that has a binary', () => {
   const list = () => ['chromium-1100', 'chromium_headless_shell-1200', 'chromium-1200', 'ffmpeg-1'];
   const exists = (p) => p.endsWith('chrome-linux/chrome');
