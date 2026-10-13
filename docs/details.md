@@ -10,6 +10,8 @@ It reads your code the same careful way it reads Figma. Once per run it opens yo
 
 It also gives AI tools that generate interfaces a catalog of your real components (their options, and which components go inside which), and `--check-ui` checks what they generate against it, every time, without changing it.
 
+The whole flow, step by step, is on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1).
+
 ## Updates
 
 ```bash
