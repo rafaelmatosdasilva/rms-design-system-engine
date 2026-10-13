@@ -82,13 +82,25 @@ export function globalStyles(ROOT, cfg = {}) {
   return [...out];
 }
 
+// What the project's app gives its components that a component may need to render at all: a Pinia store and a router,
+// each when the project's package.json lists it and it is installed (its own copy, never the engine's).
+// → { pinia, router } (booleans).
+export function appPlugins(ROOT) {
+  let deps = {};
+  try { const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')); deps = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.peerDependencies }; } catch { /* no package.json */ }
+  const has = (name) => Boolean(deps[name]) && Boolean(projectModule(ROOT, name));
+  return { pinia: has('pinia'), router: has('vue-router') };
+}
+
 // The page's module: each component imported by its own path, mounted once per variant in a box that names it
 // (data-dse-component, data-dse-case), and given back what it reports, as the page that uses it would: an
-// update:<prop> event sets that prop, a toggle's click flips the state it was told.
-export function harnessModule(groups, styles = []) {
+// update:<prop> event sets that prop, a toggle's click flips the state it was told. plugins (appPlugins): each instance
+// gets a Pinia of its own and a router on a page of its own, from the project's packages, unless the project's app
+// (Nuxt's) already gives them.
+export function harnessModule(groups, styles = [], plugins = {}) {
   return `${styles.map((s) => `import ${JSON.stringify(s)};`).join('\n')}
 import { createApp, h, reactive } from 'vue';
-const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options }) => ({ name, role, cases, options: options ?? {} }))).replace(/</g, '\\u003c')};
+${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options }) => ({ name, role, cases, options: options ?? {} }))).replace(/</g, '\\u003c')};
 const LOAD = {
 ${groups.map((g) => `  ${JSON.stringify(g.name)}: () => import(${JSON.stringify(g.file)}),`).join('\n')}
 };
@@ -158,7 +170,7 @@ for (const g of GROUPS) {
     app.config.errorHandler = (e) => failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] });
     app.config.warnHandler = () => {};
     inherit(app);
-    try { app.mount(box); } catch (e) { failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] }); }
+${plugins.pinia ? "    if (!app.config.globalProperties.$pinia) app.use(createPinia());\n" : ''}${plugins.router ? "    if (!app.config.globalProperties.$router) app.use(createRouter({ history: createMemoryHistory(), routes: [{ path: '/:any(.*)*', component: { render: () => null } }] }));\n" : ''}    try { app.mount(box); } catch (e) { failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] }); }
   }
 }
 window.__dseHarnessFailed = failed;
@@ -208,24 +220,26 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
   const themes = [cfg.paths?.themeCSS].flat().filter((f) => f && !/^https?:/.test(f));
   const css = themes.map((f) => { try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; } }).join('\n');
   const colours = pageColours(css);
-  const started = pb.kind === 'nuxt' ? await startNuxt(ROOT, pb, dir, groups, cfg, colours)
-    : pb.kind === 'webpack' ? await startWebpack(ROOT, pb, dir, groups, cfg, colours, themes)
-      : await startVite(ROOT, pb, dir, groups, cfg, colours);
+  const plugins = appPlugins(ROOT);
+  const started = pb.kind === 'nuxt' ? await startNuxt(ROOT, pb, dir, groups, cfg, colours, plugins)
+    : pb.kind === 'webpack' ? await startWebpack(ROOT, pb, dir, groups, cfg, colours, themes, plugins)
+      : await startVite(ROOT, pb, dir, groups, cfg, colours, plugins);
   return started.url ? { ...started, groups, missing, build: pb.label } : { url: null, why: started.why };
 }
 
 // Vite: its dev server in middleware mode, the page's module imported by its path from the project's root.
-async function startVite(ROOT, pv, dir, groups, cfg, { surface, ink }) {
+async function startVite(ROOT, pv, dir, groups, cfg, { surface, ink }, plugins = {}) {
   const fromRoot = (f) => '/' + relative(ROOT, f).split(sep).join('/');
-  writeFileSync(join(dir, 'entry.js'), harnessModule(groups.map((g) => ({ ...g, file: fromRoot(g.file) })), globalStyles(ROOT, cfg)));
+  writeFileSync(join(dir, 'entry.js'), harnessModule(groups.map((g) => ({ ...g, file: fromRoot(g.file) })), globalStyles(ROOT, cfg), plugins));
   let vite;
   try {
     vite = await pv.vite.createServer({
       root: ROOT, configFile: pv.config ? join(ROOT, pv.config) : false, plugins: pv.plugins, logLevel: 'silent', clearScreen: false, appType: 'custom',
       cacheDir: join(ROOT, OUT_DIR, 'vite-cache'),
       server: { middlewareMode: true, hmr: false, watch: null, fs: { strict: false } },
-      // Only Vue itself is bundled ahead, so the page never reloads halfway for a dependency found late.
-      optimizeDeps: { noDiscovery: true, include: ['vue'] },
+      // Only Vue itself (and the Pinia and router the page gives each instance) is bundled ahead, so the page never
+      // reloads halfway for a dependency found late, and they share the one Vue.
+      optimizeDeps: { noDiscovery: true, include: ['vue', ...(plugins.pinia ? ['pinia'] : []), ...(plugins.router ? ['vue-router'] : [])] },
     });
   } catch (e) { return { why: `the project's Vite did not start (${why1(e)})` }; }
   const page = PAGE(surface, ink);
@@ -244,9 +258,9 @@ async function startVite(ROOT, pv, dir, groups, cfg, { surface, ink }) {
 // Nuxt: the project's whole app in its dev server (its modules, plugins, auto-imports and components, the CSS its
 // config names), with the page every route shows replaced by the components' own; client-side only, its build files
 // beside the engine's other output.
-async function startNuxt(ROOT, pb, dir, groups, cfg, { surface, ink }) {
+async function startNuxt(ROOT, pb, dir, groups, cfg, { surface, ink }, plugins = {}) {
   const abs = (s) => (s.startsWith('/') ? join(ROOT, s) : s);
-  writeFileSync(join(dir, 'entry.js'), harnessModule(groups, globalStyles(ROOT, cfg).map(abs)));
+  writeFileSync(join(dir, 'entry.js'), harnessModule(groups, globalStyles(ROOT, cfg).map(abs), plugins));
   const main = join(dir, 'Harness.vue');
   writeFileSync(main, `<script setup>
 import { onMounted, getCurrentInstance } from 'vue';
@@ -299,10 +313,10 @@ function fetchHandler(fetch) {
 // with the page. The token CSS is the page's own stylesheet, so what the build adds can be told from it.
 const NOT_FOR_A_PAGE = /^(HtmlWebpackPlugin|HtmlPlugin|CopyPlugin|CopyWebpackPlugin|FriendlyErrorsWebpackPlugin|ESLintWebpackPlugin|ESLintPlugin|ForkTsCheckerWebpackPlugin|ProgressPlugin|PreloadPlugin|PreloadWebpackPlugin|BundleAnalyzerPlugin|HotModuleReplacementPlugin|WorkboxPlugin|GenerateSW|InjectManifest)$/;
 const usesVueLoader = (config) => JSON.stringify(config?.module?.rules ?? [], (k, v) => (v instanceof RegExp ? String(v) : typeof v === 'function' ? undefined : v)).includes('vue-loader');
-async function startWebpack(ROOT, pb, dir, groups, cfg, { surface, ink }, themes) {
+async function startWebpack(ROOT, pb, dir, groups, cfg, { surface, ink }, themes, plugins = {}) {
   const plainTheme = new Set(themes.filter((f) => /\.css$/i.test(f)).map((f) => '/' + String(f).replace(/^\.?\//, '')));
   const styles = globalStyles(ROOT, cfg).filter((s) => !plainTheme.has(s)).map((s) => (s.startsWith('/') ? join(ROOT, s) : s));
-  writeFileSync(join(dir, 'entry.js'), harnessModule(groups, styles));
+  writeFileSync(join(dir, 'entry.js'), harnessModule(groups, styles, plugins));
   const env = { ...process.env };
   const restore = () => { for (const k of Object.keys(process.env)) if (!(k in env)) delete process.env[k]; Object.assign(process.env, env); delete process.VUE_CLI_SERVICE; };
   let config, webpack;

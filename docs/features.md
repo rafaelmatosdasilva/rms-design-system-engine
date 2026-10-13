@@ -163,6 +163,7 @@ Each component is tried in a real browser against WCAG 2.2 at level A and AA. ax
 ### Where it runs
 
 - **Your components.** On a page you name, your style guide or your built pages. React and Vue components with no page to open are rendered straight from their own code, in each Figma variant, with no dev server.
+- **What your app gives them.** A Vue component that reads a Pinia store or links with Vue Router gets your project's own, when your `package.json` lists it and it is installed.
 - **Your products' pages.** When the check runs on the style guide, each product's built page is opened whole, and every rule runs on it. Findings are named after the product and listed on the Tasks page under Products. `a11y.products: false` leaves them out.
 - **Your designed screens in Figma.** When Claude [refreshes the Figma data](commands.md#set-up), it also reads the screens `ds-config.json` names for text and icon contrast and target size, without changing Figma. [Updating Figma](commands.md#update-figma) pins each problem on its layer once you say yes.
 
@@ -288,7 +289,7 @@ Also on each component.
 ### Foundations
 
 - **Colours.** The primitive ramp first, then the semantic roles, each with its sample, Figma name, variable and value, and a Light and Dark switch.
-- **Typography.** Figma's text styles in Figma's order, each with family, size, weight, line height, letter spacing and case.
+- **Typography.** Figma's text styles in Figma's order, each under its full name (`s/regular`), with family, size, weight, line height, letter spacing and case.
 - **Spacing and radii.** One card per family, smallest first.
 - **Motion.** The durations and easings, each played when you press Play, each easing's curve drawn, and what the system does for someone who asks for less motion.
 - **Icons.** Grouped by size, shown at the size Figma gives them, with their stroke widths.
@@ -302,6 +303,7 @@ The template is only the layout. Every colour, text style, radius and space on t
 - When your system lacks a control, the page uses its nearest stand-in from your system (no segmented control, so your tabs) and says so on the Tasks page, for your team to decide whether the system needs one.
 - The engine fails the page when anything on it is not from your system, or when its own text falls below 4.5:1 in any colour mode.
 - Page titles use your own heading style. `"title-scale"` in `styleguide.chrome` changes their size.
+- A colour you set in `styleguide.chrome` carries to the ones that follow it. A new `bg` is also the stage behind each component, unless you set `stage` too.
 
 ### Modes
 

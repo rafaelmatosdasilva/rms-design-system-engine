@@ -7,7 +7,7 @@
 //   • then the components, each after the ones it nests (a button before the card that holds it).
 // A component or token still to build is never a failure; once it is built it is compared as usual.
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
-import { textStyle } from './text-styles.mjs';
+import { textStyle, componentStyleKey } from './text-styles.mjs';
 import { join, dirname, relative } from 'node:path';
 import { inProgressList } from './in-progress.mjs';
 import { OUT_DIR } from './names.mjs';
@@ -292,9 +292,12 @@ export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}
   if (c.strokeOnDefault && !base.some((b) => b.startsWith('border-color'))) base.push('a border on every side');
   lines.push(`    ${sel} { ${base.join('; ')} }`);
   if (c.fontSizeVar || c.fontWeightVar) {
-    const t = textStyle(typography, c.fontSizeVar) ?? {}, w = textStyle(typography, c.fontWeightVar) ?? {};
+    // A size bound to a scale's variable records the scale ('s'): its style is the one the weight names, else its regular.
+    const key = c.fontSizeVar ? componentStyleKey(typography, c.fontSizeVar, c.fontWeightVar) : null;
+    const t = (key ? typography[key] : null) ?? {}, w = textStyle(typography, c.fontWeightVar) ?? {};
     const vals = [t.size && `font-size ${t.size}`, (w.weight ?? t.weight) && `font-weight ${w.weight ?? t.weight}`, t.lh && `line-height ${t.lh}`].filter(Boolean);
-    lines.push(`    text: the "${c.fontSizeVar ?? c.fontWeightVar}" text style${vals.length ? ` (${vals.join(', ')})` : ''}`);
+    const named = key && !textStyle(typography, c.fontSizeVar) ? key : c.fontSizeVar ?? c.fontWeightVar;
+    lines.push(`    text: the "${named}" text style${vals.length ? ` (${vals.join(', ')})` : ''}`);
   }
   for (const [prop, map] of Object.entries(c.propertyMap ?? {})) {
     for (const [value, selector] of Object.entries(map)) {
