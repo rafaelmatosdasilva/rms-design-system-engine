@@ -152,8 +152,10 @@ export function systemScripts(root, cssDir) {
 // package (by its name, or by its repository). Each is keyed by its folder's name without the prefix every product
 // folder shares, or by the product a captured screen names when the folder's name ends with it, and its UI source
 // (ui.src.html) is read as product code. A product the system lists (products.json) that is not checked out beside it
-// is said, so the person can clone it.
-export function productsBeside(root, { screenKeys = [] } = {}) {
+// is said, so the person can clone it. A parent folder holding more than maxSiblings entries is not a folder of projects
+// (a temporary or home folder): it is not read, which would take minutes, and the count is returned as crowded.
+export const MAX_SIBLINGS = 2000;
+export function productsBeside(root, { screenKeys = [], maxSiblings = MAX_SIBLINGS } = {}) {
   const pkg = readJson(join(root, 'package.json')) ?? {};
   const name = pkg.name ?? null;
   const repoUrl = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url ?? '';
@@ -165,6 +167,7 @@ export function productsBeside(root, { screenKeys = [] } = {}) {
   const found = [];
   let entries = [];
   try { entries = readdirSync(parent); } catch { /* no parent to read */ }
+  if (entries.length > maxSiblings) return { products: [], missing: [], crowded: entries.length };
   for (const d of entries.sort()) {
     const dir = join(parent, d);
     if (dir === here) continue;

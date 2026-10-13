@@ -1853,6 +1853,7 @@ async function bootstrapConfig() {
     if (!plugins.includes(p.key)) plugins.push(p.key);
   }
   if (facts.products.length) console.log(C.green(`  ✅ Products beside it that use the system: ${facts.products.map((p) => `${p.key} (${p.dir})`).join(', ')}: their code is read with the system's`));
+  if (facts.crowded) console.log(C.dim(`  Products beside it were not looked for: the folder above this one holds ${facts.crowded} entries, not a folder of projects. Name any in ds-config.json → pluginDirs.`));
   if (facts.missing.length) console.log(C.yellow(`  ⚠️  products.json lists ${facts.missing.join(', ')}, not checked out beside this folder: clone ${facts.missing.length === 1 ? 'it' : 'them'} next to it and run setup again, so their code is checked too`));
   if (facts.scripts.length) console.log(C.green(`  ✅ The system's own script${facts.scripts.length === 1 ? '' : 's'}: ${facts.scripts.join(', ')}${facts.iconSources.length ? ` (its icons are defined in ${facts.iconSources.join(', ')})` : ''}`));
   if (facts.frames.length || facts.screens.length) console.log(C.green(`  ✅ From the screens already captured: ${facts.frames.length} frame${facts.frames.length === 1 ? '' : 's'} and ${facts.screens.length} screen${facts.screens.length === 1 ? '' : 's'} (${facts.snapshots.snapshotScreenComponents})`));

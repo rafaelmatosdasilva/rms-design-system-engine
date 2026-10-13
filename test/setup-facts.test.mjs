@@ -57,6 +57,8 @@ test('the products checked out beside the system are the folders whose package d
   assert.deepEqual(products, [{ key: 'harbor', dir: '../tidal-app-harbor', ui: '../tidal-app-harbor/ui.src.html' }, { key: 'kelp', dir: '../tidal-app-kelp', ui: '../tidal-app-kelp/src/ui.src.html' }], 'by the package\'s name, or by the repository');
   assert.deepEqual(missing, ['tidal-co/tidal-app-reef']);
   assert.deepEqual(productsBeside(ds, { screenKeys: ['app-harbor'] }).products.map((p) => p.key), ['app-harbor', 'kelp'], 'the key a captured screen names wins');
+  // A crowded parent (a temporary or home folder) is not read: reading every folder in it takes minutes.
+  assert.deepEqual(productsBeside(ds, { maxSiblings: 3 }), { products: [], missing: [], crowded: 4 });
 });
 
 test('the frames and screens a captured screen snapshot names: each product\'s whole screen a frame, its finer views screens', () => {

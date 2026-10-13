@@ -369,6 +369,8 @@ Commit the files it creates, so your whole team and CI check against the same de
 
 Setup writes only what it can read. Before Figma is captured it cannot know which collection holds your colours or your sizes, your colour modes, or how your CSS names Figma's tokens. It lists them in `ds-config.json` (`figma.fromCapture`), and the first capture fills each one and says what it set.
 
+It also looks beside the project for products that use the system. When the folder above holds more than 2,000 entries (a temporary or home folder), it skips that look and says so, and you name any products in `ds-config.json` → `pluginDirs`.
+
 The CSS naming is found by trying each way on your tokens, Figma's `iconText` kept or not, camelCase split or not, and `/color` or `/default` kept (`--button-background-default-color`) or dropped.
 
 ### How Figma's values are kept
