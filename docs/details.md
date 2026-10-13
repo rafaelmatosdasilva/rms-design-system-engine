@@ -383,12 +383,15 @@ The capture keeps Figma's values as Figma resolves them.
 
 ### Large Figma files
 
-Nobody copies a value by hand. The engine writes a read-only script for one chunk of the variables, text styles and effect styles at a time (`--capture-script vars 0`), small enough for the Figma tool's answer.
+Nobody copies a value by hand. The engine writes a read-only script for one chunk at a time, small enough for the Figma tool's answer.
 
+- `--capture-script vars 0` reads the variables, text styles and effect styles.
+- `--capture-script components sums` reads the components. Each chunk is a group of components, put together in Figma with the capture recipe's own functions: sizes, padding, gaps, colours, every variant, and the props.
 - Each answer carries a checksum Figma computed over what it holds.
-- `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the snapshot with the variables' scopes and descriptions.
+- `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the snapshots.
+- A component's facts the capture does not read are kept. A component no longer in Figma is taken out, and the import names it.
 - On a refresh only the checksums are asked, and only the chunks that changed are read again.
-- With figma-cli connected, the engine runs the same scripts through it, so both ways of reading Figma give the same snapshot.
+- With figma-cli connected, the engine runs the same scripts through it, so both ways of reading Figma give the same snapshots.
 
 ### Every output says what it was built from
 
