@@ -59,7 +59,7 @@ accessibility" or "only the token values gate" into the right `--only`.
 **Utility flags (no full audit - run the terminal command directly):**
 ```bash
 rms-design-system-engine --init                          # first-time setup only: asks where the code is and for the Figma link (optional), scaffolds config files, then exits; a project already set up keeps its ds-config.json (--reconfigure replaces it)
-rms-design-system-engine --init --project=<. | folder | git link> --figma-url=<url>   # non-interactive setup (for agents/CI): --project required (or --theme-css=<path>), --figma-url and --figma-source-url=<url> optional; --then='<request>' routes the request that led to setup once it is done
+rms-design-system-engine --init --project=<. | folder | GitHub or GitLab link> --figma-url=<url>   # non-interactive setup (for agents/CI): --project required (or --theme-css=<path>), --figma-url and --figma-source-url=<url> optional; --then='<request>' routes the request that led to setup once it is done
 rms-design-system-engine --version                       # am I on the latest? compares local vs remote (a normal run also nudges once/day)
 rms-design-system-engine --update                        # update to the latest - no re-download
 rms-design-system-engine --link-command                  # (re)point the /rms-design-system-engine command at the install via symlink
