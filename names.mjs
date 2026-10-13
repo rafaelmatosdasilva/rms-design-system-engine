@@ -11,6 +11,7 @@ export const PROJECT = {
   map:         { now: 'design-system-engine-map.mjs' },
   baseline:    { now: 'design-system-engine-baseline.json' },
   agreed:      { now: 'design-system-engine-agreed.json' },
+  kept:        { now: 'design-system-engine-kept.json' },
   history:     { now: 'design-system-engine-history.json' },
   checkResult: { now: 'design-system-engine-check-result.json' },
   checked:     { now: 'design-system-engine-checked.json' },

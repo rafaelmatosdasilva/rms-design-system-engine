@@ -1276,7 +1276,7 @@ test('a page title: the system\'s own heading when it has a large one, else its 
 test('Health: each area counted by component, weighted into one number once accessibility is tried; AI readiness; the five components with the most left; each component weakest first', { timeout: 300000 }, async (t) => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   // An item done counts whole, one to check half, one to fix nothing; the weights are the team's when it gives them.
-  assert.match(tpl, /var HEALTH_PART = \{ done: 1, check: 0\.5, todo: 0 \};/);
+  assert.match(tpl, /var HEALTH_PART = \{ done: 1, kept: 1, check: 0\.5, todo: 0 \};/);
   // Parity and accessibility count the component, so the many values that match never hide the one that does not:
   // whole with nothing left, half with only checks left, nothing while one thing is to fix.
   assert.match(tpl, /var HEALTH_WHOLE = \{ Parity: true, Accessibility: true \};/);
