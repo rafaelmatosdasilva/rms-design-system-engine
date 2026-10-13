@@ -47,7 +47,8 @@ export function varsFromDesign(design, cfg = {}) {
   const colourCol = cols.find((c) => c.name === (cfg.figma?.colorCollection ?? 'Color'))
     ?? cols.find((c) => (c.variables ?? []).some((v) => v.type === 'COLOR') && (c.modes ?? []).length > 1)
     ?? cols.find((c) => (c.variables ?? []).some((v) => v.type === 'COLOR'));
-  const modes = cfg.figma?.modes?.length ? cfg.figma.modes
+  // The configured colour modes, else (none of them in the file: setup's guess before a first capture) the file's own.
+  const modes = cfg.figma?.modes?.some((m) => (colourCol?.modes ?? []).includes(m.name)) ? cfg.figma.modes
     : (colourCol?.modes ?? []).map((name) => ({ name, snapshotKey: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') }));
   const color = {}, aliases = {}, sizing = {}, strings = {}, booleans = {};
   if (colourCol) {
@@ -63,12 +64,13 @@ export function varsFromDesign(design, cfg = {}) {
     }
   }
   const sizingCol = cfg.figma?.sizingCollection ? cols.find((c) => c.name === cfg.figma.sizingCollection) : null;
+  const sizedBy = new Set();
   for (const c of sizingCol ? [sizingCol] : cols.filter((x) => x !== colourCol)) {
     const base = (c.modes ?? [])[0];
     for (const v of c.variables ?? []) {
       if (v.name.startsWith(prefix)) continue;
       const { value } = resolveVar(byKey, c.name, v.name, base);
-      if (v.type === 'FLOAT' && typeof value === 'number') sizing[v.name] = px(value);
+      if (v.type === 'FLOAT' && typeof value === 'number') { sizing[v.name] = px(value); sizedBy.add(c.name); }
       else if (v.type === 'STRING' && value != null) strings[v.name] = String(value);
       else if (v.type === 'BOOLEAN' && value != null) booleans[v.name] = String(value);
     }
@@ -86,7 +88,9 @@ export function varsFromDesign(design, cfg = {}) {
     const targetCol = own.collection ?? c.name;
     if (colNames.has(targetCol) && !byKey.has(`${targetCol}\u0000${own.alias}`)) brokenAliases.push({ name: v.name, mode, target: own.alias });
   }
-  return { color, aliases, sizing, strings, booleans, modeOrder, brokenAliases };
+  // The collections read, by name: what setup could not know before the first capture (E38).
+  const collections = { color: colourCol?.name ?? null, colorModes: colourCol?.modes ?? [], sizing: [...sizedBy] };
+  return { color, aliases, sizing, strings, booleans, modeOrder, brokenAliases, collections };
 }
 
 // Every component set (and lone component) in design.json's page trees.
@@ -155,7 +159,7 @@ export function snapshotsFromDesign(design, cfg = {}, existing = {}, now = new D
   const source = `figma-cli design.json${design.meta?.file ? ` (${design.meta.file})` : ''}`;
   const t = varsFromDesign(design, cfg);
   const prevVars = existing.vars ?? {};
-  const vars = { ...prevVars, _updated: now, _source: source, _modeOrder: t.modeOrder, color: t.color, aliases: t.aliases, brokenAliases: t.brokenAliases, sizing: t.sizing,
+  const vars = { ...prevVars, _updated: now, _source: source, _modeOrder: t.modeOrder, _collections: t.collections, color: t.color, aliases: t.aliases, brokenAliases: t.brokenAliases, sizing: t.sizing,
     strings: { ...(prevVars.strings ?? {}), ...t.strings }, booleans: { ...(prevVars.booleans ?? {}), ...t.booleans } };
   for (const k of ['typography', 'breakpoints', 'animation', 'primitives']) vars[k] = prevVars[k] ?? {};
   const props = { ...(existing.props ?? {}), _updated: now, _source: source };
