@@ -113,6 +113,35 @@ export function namedComponents(text, components = []) {
   return found;
 }
 
+// A component the request names loosely, when no name matched as written: its words in another order ("the primary
+// button" is buttonPrimary), or one word that is part of the names ("the button" in a system of buttonPrimary,
+// buttonSecondary and iconButton). One component is taken. When the word fits several, a plural takes them all
+// ("the buttons") and a singular one is asked about (`ask: true`), so a request about one component never checks the
+// whole library in its place. Words that name an aspect of the check rather than a thing (text, icon, state) never do.
+const nameWords = (name) => name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').toLowerCase().trim().split(/\s+/).filter(Boolean);
+const orders = (w) => w.length < 2 ? [w] : w.flatMap((x, i) => orders([...w.slice(0, i), ...w.slice(i + 1)]).map((rest) => [x, ...rest]));
+const LOOSE_STOP = new Set(['text', 'texts', 'icon', 'icons', 'state', 'states', 'prop', 'props', 'token', 'tokens', 'mode', 'modes', 'colour', 'colours', 'color', 'colors', 'size', 'sizes', 'page', 'pages', 'screen', 'screens', 'system', 'library', 'design', 'style', 'guide', 'code', 'figma', 'component', 'components', 'file', 'files', 'value', 'values', 'variable', 'variables', 'contrast', 'spacing', 'radius', 'motion', 'shadow', 'shadows', 'border', 'borders', 'whole', 'entire', 'same', 'other', 'first', 'last', 'new', 'default', 'base', 'main']);
+const LOOSE_SPOT = /(?:^|[^a-z0-9])(?:the|a|an|our|this|that|my|each|every|all(?: the)?|of|on|for|in)\s+([a-z][a-z0-9]{2,})(?=['’]s?\b|\s*(?:[.,;:!?)]|$|\s(?:component|components|and|in|on|for|against|with|to|from|please|now|only|again|too|padding|paddings|radius|height|width|size|sizes|colou?rs?|borders?|labels?|states?|hover|focus|contrast|spacing|gaps?|accessibility|props?|tokens?|variants?|markup|structure)\b))/g;
+export function looseComponents(text, components = [], { anywhere = false } = {}) {
+  const t = ` ${String(text ?? '').toLowerCase()} `;
+  const reordered = components.filter((name) => {
+    const w = nameWords(name);
+    return w.length > 1 && w.length < 4 && orders(w).some((o) => new RegExp(`[^a-z0-9]${o.join('[\\s-]+')}s?[^a-z0-9]`).test(t));
+  });
+  if (reordered.length) return { names: reordered, ask: false };
+  for (const m of anywhere ? t.matchAll(/(?<![a-z0-9])([a-z][a-z0-9]{2,})(?![a-z0-9])/g) : t.matchAll(LOOSE_SPOT)) {
+    const said = m[1];
+    for (const w of [said, ...(said.endsWith('s') ? [said.slice(0, -1)] : [])]) {
+      if (LOOSE_STOP.has(w) || LOOSE_STOP.has(said)) continue;
+      const fits = components.filter((name) => nameWords(name).includes(w));
+      if (!fits.length) continue;
+      return { names: fits, ask: fits.length > 1 && w === said };
+    }
+  }
+  return { names: [], ask: false };
+}
+const orList = (names) => names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names[0];
+
 const NOT_COMPONENT = /^(GitHub|GitLab|JavaScript|TypeScript|FigJam|YouTube|LinkedIn|iPhone|iPad|macOS|iOS|DevTools|PostCSS|ESLint|NodeJS|VSCode|WordPress|PowerPoint|OpenAI|PayPal|WhatsApp|McDonald)$/i;
 export function guessedComponents(text) {
   const t = String(text ?? '');
@@ -234,13 +263,30 @@ export function route(text, { hasConfig = true, components = [], cmd = 'rms-desi
   return { ...r, say, sayIf };
 }
 
-function routeOnly(text, { hasConfig, components, cmd, build = false, pages = [], cloud = false }) {
+// A check that would run on the whole library while the request named a word several components share ("check the
+// accessibility of the button"): the person is asked which one first, and the command waits for the answer.
+const WHOLE_LIBRARY_CHECK = new Set(['full-audit', 'audit-component', 'fix-a-difference', 'states-and-variants', 'a11y-notes', 'visual-diff', 'accept-debt']);
+function routeOnly(text, opts) {
+  const r = routeRequest(text, opts);
+  const { cmd, components = [] } = opts;
+  if (!opts.hasConfig || !components.length || namedComponents(text, components).length) return r;
+  const loose = looseComponents(text, components);
+  if (!loose.ask || !WHOLE_LIBRARY_CHECK.has(r.recipe) || r.run.length !== 1) return r;
+  const rest = r.run[0] === cmd ? '' : r.run[0].startsWith(`${cmd} --`) && !r.run[0].includes(' --component ') ? r.run[0].slice(cmd.length) : null;
+  if (rest == null) return r;
+  return { ...r, recipe: r.recipe === 'full-audit' ? 'audit-component' : r.recipe, question: false, run: [`${cmd} --component '<${orList(loose.names)}>'${rest}`], which: `which component they mean: ${orList(loose.names)}, or all of them`,
+    notes: [`The request names a word several components share (${loose.names.join(', ')}): ask which one before running anything, never check the whole library in its place.`, ...r.notes] };
+}
+
+function routeRequest(text, { hasConfig, components, cmd, build = false, pages = [], cloud = false }) {
   const t = String(text ?? '');
   const question = QUESTION.test(t);
   const named = namedComponents(t, components);
   // Before any component is known (no snapshot, no component file), a name written as one (buttonPrimary, the card
   // component) is still taken: the scoped run then says whether it was found, never an unscoped run instead (E24).
   if (!named.length && !components.length) named.push(...guessedComponents(t));
+  // A name written loosely (the primary button, the buttons, the button when only one component has the word).
+  if (!named.length && components.length) { const loose = looseComponents(t, components); if (!loose.ask) named.push(...loose.names); }
   const scoped = named.length ? `${cmd} --component ${named.join(',')}` : cmd;
   const notes = [];
 
@@ -316,6 +362,8 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
     if (recipe === 'burndown') return { recipe, question, run: [cmd], notes };
     if (recipe === 'ask-the-system') {
       const terms = [...named, ...(t.match(/(?:--[a-z][\w-]*|\b[a-z][\w-]*(?:\/[\w-]+)+)/gi) ?? [])];
+      // A word several components share ("which props does the button take?"): the query prints each of them.
+      if (!terms.length && components.length) terms.push(...looseComponents(t, components, { anywhere: true }).names);
       if (kind === 'build-ui') {
         notes.push('The person asks for new UI: build it, in the file they name, with the design system\'s own components, classes and CSS variables, their names exactly as the query prints them. Write no colour, size or variable the system does not have: the edit check hands back anything that is not the system\'s. When the system has no value for what is asked (a green where it has none), use the closest one it has and say so, or ask; never invent one.');
         const where = pagesNamed(t, pages, components);
@@ -432,6 +480,8 @@ export function routeText(r, recipeText, cmd = 'rms-design-system-engine', { max
   const say = r.say?.length ? ` Put the SAY line${r.say.length > 1 ? 's' : ''} in your final reply, word for word${r.sayIf ? `, ${r.sayIf}` : ''}.` : '';
   lines.push(r.ask
     ? `NEXT: before running anything, ask the person, in one message: ${r.ask}. Then run the command above with their answers (--project=. when it is this folder; --figma-url left out when there is no Figma file) and follow its NEXT line.${say}`
+    : r.which
+    ? `NEXT: before running anything, ask the person ${r.which}. Then run the command above with their answer in --component (comma separated when they say all of them), relay its SUMMARY as it is, and follow its NEXT line.${say}`
     : r.run.length
     ? r.recipe === 'ask-the-system'
       ? `NEXT: run the command above and answer from what it prints, with the names exactly as written there.${say}`
