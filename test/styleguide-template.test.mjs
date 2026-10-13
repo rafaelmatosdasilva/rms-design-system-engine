@@ -730,6 +730,17 @@ test('typography follows Figma: its text styles in Figma\'s order, each value na
   assert.deepEqual(t[0].family, { figma: 'font-family', value: 'inter' });
 });
 
+test('a text style named in full (s/regular) keeps its name: each value is after the last slash, named by the scale\'s variable it binds', () => {
+  const pass = (style, prop, cssVar, value) => ({ dimension: 'typography', token: `${style}/${prop}`, cssVar, value });
+  const check = { passVars: [pass('s/regular', 'size', '--s-size', '12px'), pass('s/regular', 'weight', '--s-weight', '400'), pass('s/strong', 'size', '--s-size', '12px'), pass('s/strong', 'weight', '--s-strong-weight', '700')] };
+  const vars = { typography: { 's/regular': { size: '12px', weight: '400' }, 's/strong': { size: '12px', weight: '700' } }, sizing: { 'typography/s/font-size': '12px', 'typography/s/font-weight': '400' } };
+  const t = agreedTokens(check, vars).typography;
+  assert.deepEqual(t.map((x) => x.scale), ['s/regular', 's/strong'], 'two styles, not one "s" with a "regular" field');
+  assert.deepEqual(t[0].size, { var: '--s-size', value: '12px', figma: 'typography/s/font-size' });
+  assert.equal(t[0].weight.figma, 'typography/s/font-weight');
+  assert.equal(t[1].weight.figma, 'text style s/strong', 'a value the scale\'s variable does not hold is named by its style');
+});
+
 test('the search covers every part of the page and, while it has words, only its results show below the field', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   for (const kind of ['Component', 'Colour', 'Type style', 'Icon', 'Section']) assert.match(tpl, new RegExp("add\\('" + kind));

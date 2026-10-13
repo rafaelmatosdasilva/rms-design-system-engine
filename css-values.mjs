@@ -115,6 +115,14 @@ export function colorHex(input) {
   return '#' + h(c[0]) + h(c[1]) + h(c[2]) + (c[3] < 1 ? h(c[3] * 255) : '');
 }
 
+// Two hex colours written alike? Case aside and the alpha byte of an opaque one aside (#0037fa = #0037FA = #0037faff).
+// null when either is not a hex colour, so a caller falls back to its own comparison.
+export function sameHex(a, b) {
+  const hex = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+  const x = String(a ?? '').trim(), y = String(b ?? '').trim();
+  return hex.test(x) && hex.test(y) ? colorHex(x) === colorHex(y) : null;
+}
+
 // Same colour? Channels within 1/255 (rounding across colour spaces), alpha within 0.01.
 export function sameColor(a, b) {
   const x = parseColor(a), y = parseColor(b);
