@@ -7,6 +7,7 @@
 //   • then the components, each after the ones it nests (a button before the card that holds it).
 // A component or token still to build is never a failure; once it is built it is compared as usual.
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { textStyle } from './text-styles.mjs';
 import { join, dirname, relative } from 'node:path';
 import { inProgressList } from './in-progress.mjs';
 import { OUT_DIR } from './names.mjs';
@@ -291,7 +292,7 @@ export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}
   if (c.strokeOnDefault && !base.some((b) => b.startsWith('border-color'))) base.push('a border on every side');
   lines.push(`    ${sel} { ${base.join('; ')} }`);
   if (c.fontSizeVar || c.fontWeightVar) {
-    const t = typography[c.fontSizeVar] ?? {}, w = typography[c.fontWeightVar] ?? {};
+    const t = textStyle(typography, c.fontSizeVar) ?? {}, w = textStyle(typography, c.fontWeightVar) ?? {};
     const vals = [t.size && `font-size ${t.size}`, (w.weight ?? t.weight) && `font-weight ${w.weight ?? t.weight}`, t.lh && `line-height ${t.lh}`].filter(Boolean);
     lines.push(`    text: the "${c.fontSizeVar ?? c.fontWeightVar}" text style${vals.length ? ` (${vals.join(', ')})` : ''}`);
   }

@@ -25,6 +25,7 @@ import { dirname, resolve, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { pruneCandidates } from './prune-check.mjs';
 import { withTextScaleKeys } from './naming-convention.mjs';
+import { shortStyleNames, textStyleKey } from './text-styles.mjs';
 import { resolveStatus, parseStatusTags, lintStatusFields, statusFindings, statusLine } from './decision-status.mjs';
 import { buildCatalog, catalogTable } from './ui-catalog.mjs';
 import { loadLocator } from './component-locator.mjs';
@@ -125,7 +126,9 @@ function buildTokens(vars, modes) {
     place(name, tokenPath(name), applyMeta({ $type: 'dimension', $value: String(val), $deprecated: false }, name));
   }
   // typography — DTCG composite type.
-  for (const [name, val] of Object.entries(vars.typography || {})) {
+  // Each style under its short name (its last segment when no other style shares it), as components refer to it.
+  for (const [key, name] of shortStyleNames(vars.typography || {})) {
+    const val = vars.typography[key];
     if (val && typeof val === 'object') {
       place(name, textStylePath(name, vars), applyMeta({
         $type: 'typography',
@@ -200,7 +203,8 @@ function buildAnatomy(contract, structure, vars = {}) {
   if (h != null) root.height = h;
 
   const fontSize = c.fontSizeVar || s.fontSizeVar;
-  if (fontSize) root.typographyToken = '{' + textStylePath(fontSize, vars).join('.') + '}';
+  const styleShort = new Map(shortStyleNames(vars.typography || {}));
+  if (fontSize) root.typographyToken = '{' + textStylePath(styleShort.get(textStyleKey(vars.typography, fontSize)) ?? fontSize, vars).join('.') + '}';
 
   const anatomy = { root };
 

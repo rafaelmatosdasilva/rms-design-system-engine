@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The Figma capture reads library aliases, colours with opacity among the sizes, durations in their unit, every text style by its full name, and shared sizing modes (continuous evaluation)
+
+What changed since the entry below (engine c2ee891): The capture recipe (refresh-figma.md, Steps 1a, 1b-single, 1b-batched and 1b-motion-effects) reads every alias target the file does not hold before resolving, so a token that aliases a library resolves; resolves a colour with its own opacity among the sizes as a hex with its alpha; keeps durations in ms (a TIMING variable in seconds, a FLOAT in seconds below 10 and ms from 10 up, a FLOAT named as no duration kept a number); keys each text style by its full name, every reader of the typography snapshot reading old and new keys alike; and keeps the colour modes' keys for a sizing collection that is also the colour collection. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `f0821abf8acc` · Project measured: `13d811a9d668`
+
+| Haiku, engine 78d3116 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.059 |
+| Input a run | 104k | 108k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 104k. Records: `records/capture-recipe-fixes`.
+
 ## 2026-10: A project read from GitLab, agents without the hooks, and gaps that say what was tried (continuous evaluation)
 
 What changed since the entry below (engine 438d3a4): Setup's recipe, the main guide and the config reference say what a GitLab link does (read through the API, never cloned, GITLAB_TOKEN and GITLAB_HOST in .env set by the person) and how its history is read; the usage reference documents --agent-rules and --edit-check; the prototype recipe asks for searched and why on a Missing box or a stand-in. The guide changed in `cookbook/first-setup.md`, `cookbook/prototype.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.

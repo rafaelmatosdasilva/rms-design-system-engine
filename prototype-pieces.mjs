@@ -10,6 +10,7 @@
 //
 // Pure: no I/O. prototype.mjs is the command.
 import { checkUi } from './ui-catalog.mjs';
+import { shortStyleNames } from './text-styles.mjs';
 import { ruledOut, requestFindings, wordsOf } from './prototype-context.mjs';
 
 export const PIECES = ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'];
@@ -46,7 +47,7 @@ export function fontStack(family, cssStack = null) {
 export function systemScales(view = {}, figmaVars = {}, cssText = '') {
   const spacing = (view.tokens?.spacing ?? []).map((t) => ({ name: t.figma, var: t.var, value: t.value }));
   const cssStack = systemFamily(cssText);
-  const text = Object.entries(figmaVars.typography ?? {}).map(([name, t]) => ({ name, size: t.size, weight: t.weight, lh: t.lh, family: t.family ? fontStack(t.family, cssStack) : t.family }));
+  const text = shortStyleNames(figmaVars.typography ?? {}).map(([key, name]) => [name, figmaVars.typography[key]]).map(([name, t]) => ({ name, size: t.size, weight: t.weight, lh: t.lh, family: t.family ? fontStack(t.family, cssStack) : t.family }));
   // The page's own colours, when the system names them: its page surface and its primary text.
   // A component's own colour (buttonSecondary/background) is never the page's: only system-wide names count.
   const own = new Set((view.components ?? []).map((c) => String(c.name).toLowerCase().replace(/^[._]+/, '')));

@@ -33,6 +33,7 @@
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
+import { styleNames } from './text-styles.mjs';
 import { TOKENS_TO_BUILD } from './build-list.mjs';   // build mode: the tokens still to build
 import { readFileSync, existsSync } from 'node:fs';
 import { join, relative, resolve, basename } from 'node:path';
@@ -284,7 +285,8 @@ export function editTruth(ROOT, cfg = {}) {
     for (const opts of [{}, { raw: true }]) { try { const v = tokenToVar(n, spec, opts); if (v) figmaVars.add(v); } catch { /* a name the convention cannot map */ } }
   };
   for (const mode of Object.values(vars.color ?? {})) Object.keys(mode ?? {}).forEach(addName);
-  for (const k of ['sizing', 'strings', 'booleans', 'primitives', 'typography', 'breakpoints']) Object.keys(vars[k] ?? {}).forEach(addName);
+  for (const k of ['sizing', 'strings', 'booleans', 'primitives', 'breakpoints']) Object.keys(vars[k] ?? {}).forEach(addName);
+  styleNames(vars.typography ?? {}).forEach(addName);   // a text style by its full name and its short one
   for (const c of Object.values(vars.modeVariants ?? {})) Object.keys(c?.vars ?? {}).forEach(addName);
   // Build mode: every token the engine wrote out to build is Figma's, whatever the project's own mapping does.
   if (cfg.build === true) for (const m of read(TOKENS_TO_BUILD).matchAll(/(--[\w-]+)\s*:/g)) figmaVars.add(m[1]);
