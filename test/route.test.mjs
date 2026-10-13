@@ -203,3 +203,24 @@ test('a person who says they checked a criterion has it recorded as theirs (G5)'
   assert.deepEqual(r('1.3.3 is checked').run, []);                 // no component named: ask which
   assert.ok(!r('check the accessibility of the chip').run.some((c) => /--checked/.test(c)));
 });
+
+test('a component named loosely is found, and a word several components share is asked about, never the whole library', () => {
+  const L = { hasConfig: true, components: ['buttonPrimary', 'buttonSecondary', 'iconButton', 'chip', 'textField'] };
+  const q = (text) => route(text, L);
+  // The words of its name in another order, or a word only one component has.
+  assert.deepEqual(q('check the accessibility of the primary button').run, ['rms-design-system-engine --component buttonPrimary --only accessibility']);
+  assert.deepEqual(q('check the field').run, ['rms-design-system-engine --component textField']);
+  // A plural takes every component with the word.
+  assert.deepEqual(q('check the buttons').run, ['rms-design-system-engine --component buttonPrimary,buttonSecondary,iconButton']);
+  // A singular word several share: asked about first, the command waiting for the answer.
+  const a = q('check the accessibility of the button');
+  assert.deepEqual([a.recipe, a.run], ['audit-component', ["rms-design-system-engine --component '<buttonPrimary, buttonSecondary or iconButton>' --only accessibility"]]);
+  assert.match(routeText(a, ''), /NEXT: before running anything, ask the person which component they mean: buttonPrimary, buttonSecondary or iconButton, or all of them/);
+  assert.ok(q("check the button's padding").which && q('accept the button radius as known debt').which);
+  // A question about props names each of them; a prototype, a word for an aspect of the check and the whole system are left alone.
+  assert.deepEqual(q('which props does the button take?').run, ['rms-design-system-engine --query buttonPrimary buttonSecondary iconButton']);
+  assert.deepEqual(q('prototype a page with a button').run, ['rms-design-system-engine --prototype --catalog']);
+  for (const text of ['check the text contrast', 'check the icons', 'check everything']) assert.deepEqual([q(text).run, q(text).which], [['rms-design-system-engine'], undefined], text);
+  // A name written as the system writes it is unchanged.
+  assert.deepEqual(q('run the accessibility on button primary').run, ['rms-design-system-engine --component buttonPrimary --only accessibility']);
+});
