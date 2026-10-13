@@ -10,18 +10,21 @@
 //   2. structure-contract.mjs → COMPONENT_CSS_SELECTORS[name].main (the contract's selector map)
 //   3. a name that already is a selector (".x", "#x", "[x]")      (used as-is)
 //   4. the class the code's own component file gives its first element: one that is the name in another spelling
-//      (ButtonPrimary → .button-primary), else the first class of the file its folder and name spell
-//      (buttonSecondary → buttons/Secondary.vue → .button-secondary-container). With no Figma data and no contract,
-//      the convention guessed .buttonPrimary
+//      (ButtonPrimary → .button-primary), else the class of the file the shared pairing gives the component
+//      (component-pairing.mjs: its folder and name, buttonSecondary → buttons/Secondary.vue →
+//      .button-secondary-container; a generic file name, switches/General.vue for switch; componentFiles…). With no
+//      Figma data and no contract, the convention guessed .buttonPrimary
 //   5. the naming convention: ComponentName → .componentName
 //
 // Pure: no I/O unless you call loadLocator(), which imports structure-contract.mjs once and reads the component files
-// (once, only when a name reaches step 4).
+// (once, only when a name reaches step 4). locator.pairing() is the pairing it reads, for a caller that needs the
+// component's file too.
 
 import { existsSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { componentSourceFiles, textReader } from './component-source.mjs';
+import { createPairing, folderForms } from './component-pairing.mjs';
 
 export const lcFirst = (name) => String(name).charAt(0).toLowerCase() + String(name).slice(1);
 
@@ -55,27 +58,33 @@ export function codeRootClasses(files = [], read = textReader()) {
     for (const c of list) add(byName, squash(c), c);
     const parts = f.replace(/\\/g, '/').split('/');
     const folder = squash(parts.at(-2) ?? ''), base = squash(parts.at(-1).replace(/\.[^.]+$/, ''));
-    // The folder as it is and without its plural s (tabs/Primary.vue is tabsPrimary or tabPrimary); index is the folder.
-    if (list[0] && folder) for (const fo of new Set([folder, folder.replace(/(?<=...)s$/, '')])) add(byFile, base === 'index' ? fo : fo + base, list[0]);
+    // The folder as it is and as one of its components (tabs/Primary.vue is tabsPrimary or tabPrimary, switches/On.vue
+    // switchOn); index is the folder.
+    if (list[0] && folder) for (const fo of folderForms(folder)) add(byFile, base === 'index' ? fo : fo + base, list[0]);
   }
   return { byName, byFile };
 }
 
-// createLocator(cfg, { contractSelectors, codeClasses }) → { selectorFor, classFor, sourceOf, names }
+// createLocator(cfg, { contractSelectors, codeClasses, pairing }) → { selectorFor, classFor, sourceOf, names, pairing }
 // codeClasses: () → codeRootClasses(...) (read once, when first needed).
-export function createLocator(cfg = {}, { contractSelectors = {}, codeClasses = null } = {}) {
+// pairing: () → the shared pairing (component-pairing.mjs), read once when first needed; without one, the file its
+// folder and name spell (codeRootClasses' byFile) gives the class.
+export function createLocator(cfg = {}, { contractSelectors = {}, codeClasses = null, pairing = null } = {}) {
   const configured = cfg?.componentSelectors ?? {};
   const has = (o, k) => o && Object.prototype.hasOwnProperty.call(o, k);
-  let code = null;
+  let code = null, paired;
+  const pairingOf = () => (paired === undefined ? (paired = (typeof pairing === 'function' ? pairing() : pairing) ?? null) : paired);
   const most = (m) => (m?.size ? [...m].sort((a, b) => b[1] - a[1])[0][0] : null);
-  // The code's own class for a name, first by spelling, then by its file; null when the code has none, or when the
-  // convention's own class is among the ones spelled that way (it is right already).
+  // The code's own class for a name, first by spelling, then by the file paired with it; null when the code has none,
+  // or when the convention's own class is among the ones spelled that way (it is right already).
   const fromCode = (name, convention) => {
-    if (!codeClasses) return null;
-    code ??= codeClasses() ?? { byName: new Map(), byFile: new Map() };
+    if (!codeClasses && !pairing) return null;
+    code ??= codeClasses?.() ?? { byName: new Map(), byFile: new Map() };
     const spelled = code.byName.get(squash(name));
     if (spelled?.has(convention)) return null;
-    return most(spelled) ?? most(code.byFile.get(squash(name)));
+    if (spelled?.size) return most(spelled);
+    const pr = pairingOf();
+    return pr ? pr.classOf(name) : most(code.byFile.get(squash(name)));
   };
 
   function resolveOne(name) {
@@ -98,6 +107,8 @@ export function createLocator(cfg = {}, { contractSelectors = {}, codeClasses = 
     sourceOf: (name) => resolveOne(name).source,
     // Every component this locator was told about explicitly.
     names: () => [...new Set([...Object.keys(configured), ...Object.keys(contractSelectors)])],
+    // The shared pairing it reads (null when it was given none): which file is each component.
+    pairing: () => pairingOf(),
   };
 }
 
@@ -109,7 +120,10 @@ export async function loadLocator(ROOT, cfg = {}) {
   if (existsSync(p)) {
     try { contractSelectors = (await import(pathToFileURL(p).href)).COMPONENT_CSS_SELECTORS ?? {}; } catch { /* optional */ }
   }
-  return createLocator(cfg, { contractSelectors, codeClasses: codeClassesIn(ROOT, cfg) });
+  // The pairing's selector signs look for what the config and the contract say, else the convention (never the code's
+  // own class, which the pairing itself gives).
+  const explicit = (n) => leadingToken(cfg?.componentSelectors?.[n]) ?? leadingToken(contractSelectors?.[n]?.main) ?? null;
+  return createLocator(cfg, { contractSelectors, codeClasses: codeClassesIn(ROOT, cfg), pairing: () => createPairing({ ROOT, cfg, selectorFor: explicit }) });
 }
 
 // The project's component files read for step 4, for a gate that builds its own locator.

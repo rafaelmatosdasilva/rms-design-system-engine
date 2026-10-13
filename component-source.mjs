@@ -15,8 +15,9 @@
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
-import { join, extname, basename } from 'node:path';
+import { join, extname, basename, resolve, relative } from 'node:path';
 import { ENGINE_DIRS } from './names.mjs';
+import { createPairing } from './component-pairing.mjs';
 
 export const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -104,36 +105,32 @@ export function declaredNames(text) {
   return out;
 }
 
-// 1) explicit componentFiles map  2) declared by a standard file (Storybook, docgen, Custom Elements
-// Manifest, Code Connect - `declared`)  3) base selector present  4) a declared component name
-// matches  5) the file basename matches. Returns { file, how } (file null when not found or ambiguous).
-export function resolveComponentFile(name, { ROOT, cfg = {}, files, read, classFor, declared = {} }) {
+// 1) explicit componentFiles map  2) declared by a standard file (Storybook, docgen, Custom Elements Manifest, Code
+// Connect - `declared`)  3) the shared pairing (component-pairing.mjs: the file's name, the name it declares, its root
+// class, its folder and file, the only file with its selector, or two weaker signs that agree). Returns { file, how }:
+// file null when nothing pairs, or only a proposal does (how says which file, to confirm or pin), or it is ambiguous.
+// `pairing` is the caller's pairing; without one, one is read for the caller's file list, once.
+const PAIRINGS = new WeakMap();   // the caller's file list → { pairing, inFiles }
+export function resolveComponentFile(name, { ROOT, cfg = {}, files, read, classFor, declared = {}, pairing = null }) {
   const map = cfg.componentFiles ?? {};
-  if (map[name]) {
-    const p = join(ROOT, map[name]);
+  const pinned = [map[name] ?? []].flat().find((p) => typeof p === 'string' && p);
+  if (pinned) {
+    const p = join(ROOT, pinned);
     return existsSync(p) ? { file: p, how: 'componentFiles' } : { file: null, how: 'componentFiles(missing)' };
   }
   const d = declared[name];
   if (d?.file && existsSync(d.file)) return { file: d.file, how: d.how };
-  const fig = norm(name);
-  const sel = norm(classFor ? classFor(name) : name);
-  const bySelector = [], byName = [], byBasename = [];
-  for (const f of files) {
-    const t = read(f);
-    if (sel.length >= 4 && norm(t).includes(sel)) bySelector.push(f);
-    if (declaredNames(t).some((n) => norm(n) === fig)) byName.push(f);
-    if (norm(basename(f, extname(f))) === fig) byBasename.push(f);
+  let entry = files ? PAIRINGS.get(files) : null;
+  if (!entry || (pairing && entry.pairing !== pairing)) {
+    const pr = pairing ?? createPairing({ ROOT, cfg, files: [...componentSourceFiles(ROOT, cfg), ...(files ?? [])], read: read ?? textReader() });
+    entry = { pairing: pr, inFiles: files ? new Set(files.map((f) => resolve(f))) : null };
+    if (files) PAIRINGS.set(files, entry);
   }
-  // Several files mention the selector (a parent that uses the component does too): the one that
-  // also declares the component, or is named after it, is the component.
-  if (bySelector.length > 1) {
-    const own = bySelector.filter((f) => byName.includes(f) || byBasename.includes(f));
-    if (own.length === 1) return { file: own[0], how: 'selector' };
-  }
-  const pick = bySelector.length ? bySelector : byName.length ? byName : byBasename;
-  if (pick.length === 1) return { file: pick[0], how: bySelector.length ? 'selector' : byName.length ? 'name' : 'basename' };
-  if (pick.length > 1) return { file: null, how: `ambiguous (${pick.length} files)` };
-  return { file: null, how: 'not found' };
+  const p = entry.pairing.pairOf(name, classFor ? classFor(name) : undefined);
+  if (!p.file) return { file: null, how: p.how };
+  // A caller that reads only some of the files (the Vue ones) gets the pair only when it is one of them.
+  if (entry.inFiles && !entry.inFiles.has(resolve(p.file))) return { file: null, how: `paired with ${relative(ROOT, p.file).replace(/\\/g, '/')}, not among the files read here` };
+  return { file: p.file, how: p.how };
 }
 
 // ── Props (text patterns) ─────────────────────────────────────────────────────

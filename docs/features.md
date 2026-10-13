@@ -60,6 +60,18 @@ The engine reads what your design system defines in Figma, its tokens and each c
 
 Every difference comes with its fix in plain words and who acts, you in Figma or Claude in the code.
 
+### Which file is each component
+
+The engine finds the code file of each Figma component on its own, so you write no map.
+
+- **By its name.** The file's name, the name it declares, the class on its first element, or its folder and file name (`buttons/Secondary.vue` is buttonSecondary).
+- **By a generic file name.** `switches/General.vue` is switch, not switchGeneral. So are Default, Base, Main and the only file in a folder, and `cards/Primary.vue` when Figma has no cardPrimary.
+- **By its tokens.** The CSS variables a file writes or uses name the component whose tokens they are, whatever the file is called.
+- **One file, two states.** When Figma has tooltipOpen and tooltipClosed and the code builds both in one file, both are paired with it.
+- **Two signs, or you confirm.** A name pairs on its own. A weaker sign (a generic file name, the tokens, a library prefix, a state word) needs a second one that agrees, such as the tokens or the props. One alone is a proposal: the audit and the style guide's Tasks list it to confirm, or to pin in `componentFiles`. It is never applied on its own.
+- **Only in Figma.** A component with no file is named with the files closest to its name.
+- **Your map wins.** `componentFiles` in `ds-config.json` always decides.
+
 ### Every combination of modes
 
 The gates check each mode on its own. When you have two collections that switch (Light and Dark, Desktop and Phone), every combination is also opened in the browser, such as Dark on a phone or Light on a desktop.
