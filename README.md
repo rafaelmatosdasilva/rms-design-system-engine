@@ -2,23 +2,19 @@
 
 **The maintenance engine for AI-ready design systems.**
 
-It connects design intent, implementation and automated verification, helping teams keep their design systems reliable as products evolve and AI agents generate more code.
+Unlike standalone skills and fragmented workflows, RMS Design System Engine generates and connects design intent, implementation insights, documentation, contracts, verification and prototypes through shared knowledge. Every capability builds on the same context, allowing insights from one task to inform others without duplicating analysis or starting from scratch. This helps teams maintain reliable design systems as products evolve and AI agents build with them.
 
 ### Understand the system
 
-Turn real design and code sources into contracts, documentation, style guides and structured design intent that both people and AI agents can use.
+Turn real design and code sources into structured design intent, component contracts, documentation and style guides that people and AI agents can use.
 
 ### Verify the system
 
-Check design-code parity, component usage, accessibility and implementation against explicit rules, with actionable findings instead of relying on AI judgement alone.
+Run deterministic checks for design-code parity, component usage, accessibility and implementation rules, with actionable findings rather than relying on AI judgement alone.
 
 ### Maintain the system
 
-Track inconsistencies and regressions as tokens, components, requirements and implementations change, helping products stay aligned over time.
-
-## Why it matters
-
-AI can generate interfaces quickly, but speed alone doesn't guarantee consistency with your design system. RMS Design System Engine makes design-system requirements explicit and verifiable, combining structured design intent with deterministic checks to help teams catch issues that AI-generated code can introduce.
+Detect inconsistencies and regressions as tokens, components, requirements and implementations change, keeping products aligned with the design system over time.
 
 ## Get started
 
@@ -55,5 +51,3 @@ Once configured, ask Claude Code to check parity, audit accessibility, generate 
 ## Open source
 
 Built by [Rafael Matos da Silva](https://rafaelmatosdasilva.com). Released under the MIT License.
-
-Add a clear project value propositionMake the installation flow more reassuring
