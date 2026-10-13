@@ -3,7 +3,7 @@
 // the browser accessibility check and for the style guide, its SCSS compiled.
 //
 // The Vue tests use the build tools a Vue project has installed, laid in a gitignored folder as CI does:
-//   npm install --prefix test/.vue-tools vite@6 @vitejs/plugin-vue@5 vue@3 sass@1
+//   npm install --prefix test/.vue-tools vite@6 @vitejs/plugin-vue@5 vue@3 sass@1 pinia@3 vue-router@4
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, writeFileSync, readFileSync, symlinkSync, existsSync, mkdirSync } from 'node:fs';
@@ -12,7 +12,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { variantsFromCode, startHarness, loadTypeScript } from '../component-harness.mjs';
-import { globalStyles } from '../vue-harness.mjs';
+import { globalStyles, renderedVue, appPlugins } from '../vue-harness.mjs';
 import { textComponentApi } from '../component-source.mjs';
 import { findChrome } from '../cdp.mjs';
 
@@ -125,4 +125,37 @@ withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | '
     assert.doesNotMatch(await drawn(), /hb-button-icon/);
     close();
   } finally { c.kill(); }
+});
+
+// A component that reads a store and links to a page, as an app's components do: the project's own Pinia and router.
+const CART = `<script setup>
+import { defineStore } from 'pinia';
+import { RouterLink } from 'vue-router';
+const useCart = defineStore('cart', { state: () => ({ items: 3 }) });
+const cart = useCart();
+</script>
+<template><RouterLink class="hb-cart" to="/cart">{{ cart.items }} items</RouterLink></template>
+`;
+const STORES = existsSync(join(TOOLS, 'pinia')) && existsSync(join(TOOLS, 'vue-router')) ? READY : 'no pinia or vue-router (npm install --prefix test/.vue-tools pinia@3 vue-router@4)';
+
+test('a Vue component that reads a Pinia store and links with the router renders with the project\'s own Pinia and router', { skip: STORES, timeout: 300000 }, async () => {
+  const project = (deps) => {
+    const dir = mkdtempSync(join(tmpdir(), 'vue-store-'));
+    mkdirSync(join(dir, 'components'));
+    writeFileSync(join(dir, 'components', 'HbCart.vue'), CART);
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'store-ds', private: true, dependencies: { vue: '^3.5.0', ...deps } }));
+    symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
+    return dir;
+  };
+  const draw = (dir) => renderedVue(dir, {}, ['cart'], { locate: () => join(dir, 'components', 'HbCart.vue'), chromePath: CHROME });
+  const dir = project({ pinia: '^3.0.0', 'vue-router': '^4.0.0' });
+  assert.deepEqual(appPlugins(dir), { pinia: true, router: true });
+  const r = await draw(dir);
+  assert.deepEqual(r.failed, [], JSON.stringify(r));
+  assert.equal(r.markup.cart, '<a href="/cart" class="hb-cart">3 items</a>', 'the store\'s count, in the router\'s link');
+  // A project that does not list pinia gets none: the component cannot render, and says why.
+  const bare = project({ 'vue-router': '^4.0.0' });
+  assert.deepEqual(appPlugins(bare), { pinia: false, router: true });
+  const b = await draw(bare);
+  assert.match(JSON.stringify(b.failed), /getActivePinia\(\)\\" was called but there was no active Pinia/, JSON.stringify(b));
 });

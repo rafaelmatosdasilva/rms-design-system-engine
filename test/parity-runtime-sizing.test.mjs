@@ -161,3 +161,16 @@ test('[bugfix strings runtime] a string var used in code but absent from static 
   assert.equal(r.fail.length, 0, 'runtime-injected string var must not FAIL: ' + JSON.stringify(r.fail));
   assert.ok(r.skip.some(x => /runtime-injected/i.test(x.reason || '')), JSON.stringify(r.skip));
 });
+
+test('[bugfix colour] a colour in a collection of sizes matches its CSS whatever its case and alpha byte; another colour still fails', () => {
+  const { dir } = runGate('parity-check.mjs', {
+    ...BASE,
+    'theme.css': ':root { --brand-accent: #0037FA; --brand-overlay: #0037fa; --brand-other: #0037fb; --brand-ink: #0037fa; }\n',
+    'snap.json': { sizing: { 'brand/accent': '#0037fa', 'brand/overlay': '#0037FAFF', 'brand/other': '#0037FA' }, strings: { 'brand/ink': '#0037faff' } },
+  }, ['--json']);
+  const r = result(dir);
+  assert.ok(r.passList.includes('sizing brand/accent'), 'case aside: ' + JSON.stringify(r.fail));
+  assert.ok(r.passList.includes('sizing brand/overlay'), 'an opaque alpha byte aside: ' + JSON.stringify(r.fail));
+  assert.ok(r.passList.includes('strings brand/ink'), JSON.stringify(r.fail));
+  assert.deepEqual(r.fail.map((f) => f.token), ['brand/other'], 'a different colour still fails');
+});
