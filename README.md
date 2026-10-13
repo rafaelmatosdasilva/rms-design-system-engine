@@ -1,20 +1,18 @@
-# RMS Design System Engine
-
-**The maintenance engine for AI-ready design systems.**
+# The maintenance engine for AI-ready design systems
 
 Unlike standalone skills and fragmented workflows, RMS Design System Engine generates and connects design intent, implementation insights, documentation, contracts, verification and prototypes through shared knowledge. Every capability builds on the same context, allowing insights from one task to inform others without duplicating analysis or starting from scratch. This helps teams maintain reliable design systems as products evolve and AI agents build with them.
 
-### Understand the system
+## Who it's for
 
-Turn real design and code sources into structured design intent, component contracts, documentation and style guides that people and AI agents can use.
+- **Design-led teams** working in Figma who want to turn their design system into working code, build prototypes with real components and verify accessibility.
+- **Design and engineering teams** who need to maintain parity between Figma and code, verify implementations against design intent and catch inconsistencies as designs and code evolve.
+- **Code-first teams** who want to improve the reliability, accessibility and maintainability of their codebase, document components, track design system health and ensure AI-generated code follows their implementation rules.
 
-### Verify the system
+## What it does
 
-Run deterministic checks for design-code parity, component usage, accessibility and implementation rules, with actionable findings rather than relying on AI judgement alone.
-
-### Maintain the system
-
-Detect inconsistencies and regressions as tokens, components, requirements and implementations change, keeping products aligned with the design system over time.
+- **Understand**: Turn real design and code sources into structured design intent, component contracts, documentation and style guides that people and AI agents can use.
+- **Verify**: Run deterministic checks for design-code parity, component usage, accessibility and implementation rules, with actionable findings rather than relying on AI judgement alone.
+- **Maintain**: Detect inconsistencies and regressions as tokens, components, requirements and implementations change, keeping products aligned with the design system over time.
 
 ## Get started
 
@@ -22,13 +20,13 @@ Detect inconsistencies and regressions as tokens, components, requirements and i
 
 Ask Claude Code to run this command to install the engine:
 
-```
+```bash
 curl -fsSL https://raw.githubusercontent.com/rafaelmatosdasilva/rms-design-system-engine/main/install.sh | bash
 ```
 
 Restart Claude Code and run:
 
-```
+```text
 /rms-design-system-engine set up this project
 ```
 
