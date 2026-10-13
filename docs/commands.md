@@ -62,6 +62,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine rename the tokens renamed in Figma everywhere` | One patch per product for every renamed token |
 | `/rms-design-system-engine accept the chip radius as known debt` | One known difference accepted, the rest still checked |
+| `/rms-design-system-engine keep the chip height on purpose because the product needs a larger tap target` | One difference kept with your reason, never failing a check |
 
 ## Update Figma
 

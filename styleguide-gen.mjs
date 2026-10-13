@@ -417,6 +417,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { OUT_DIR } = await import('./names.mjs');
       const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8'));
       const by = new Map((d.groups ?? []).map((g) => [g.component, g.items ?? []]));
+      // The differences the team decided to keep, with why, who and when: shown on the component as kept, never open.
+      const keptBy = new Map();
+      for (const k of d.kept ?? []) if (k.component) (keptBy.get(k.component) ?? keptBy.set(k.component, []).get(k.component)).push(k);
       const { plainDifference, plainAction } = await import('./run-diff.mjs');
       // Each difference said in plain English, with who acts (Figma or the code) and exactly what to do.
       // A finding about accessibility (a text's contrast) is not a difference from Figma: it goes to the component's
@@ -425,6 +428,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const c of view.components) {
         const { parity, a11y } = splitFindings((by.get(c.name) ?? []).map((x) => ({ check: x.check, what: x.what, plain: plainDifference(x.what), ...plainAction(x.what, c.name), new: !!x.new })));
         if (parity.length) c.differences = parity;
+        const kept = (keptBy.get(c.name) ?? []).map((k) => ({ check: k.check, what: k.what, plain: plainDifference(k.what), reason: k.reason, by: k.by ?? null, at: k.at ?? null, ...(k.truth ? { truth: k.truth } : {}), ...(k.review ? { review: k.review } : {}), ...(k.due ? { due: true } : {}) }));
+        if (kept.length) c.kept = kept;
         if (a11y.length) c.a11yFindings = a11y;
         // A product that draws its own version of it (Gate [10]) is in its Used in too, said so, so a product never
         // reads as not using it when it shows one of its own.
@@ -436,7 +441,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           c.usage = (c.usage ?? []).filter((u) => (u.key ?? u) !== key).concat([{ key, name: g?.name ?? m[1], ...(typeof g?.href === 'string' && /^https?:\/\//.test(g.href) ? { href: g.href } : {}), ownInstead: m[2] }]);
         }
       }
-      view.differences = { total: d.total ?? 0, at: d.at ?? null, file: `${OUT_DIR}/differences.md` };
+      view.differences = { total: d.total ?? 0, kept: (d.kept ?? []).length, at: d.at ?? null, file: `${OUT_DIR}/differences.md` };
     } catch { /* no full audit yet: nothing to list */ }
     // When each component last changed: the latest commit on its own CSS rules and its contract and config entries (git
     // blame on their lines), and the day Figma was last read for it (the props snapshot). A line not committed yet says so.
