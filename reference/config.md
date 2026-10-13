@@ -212,7 +212,7 @@ Use these throughout all Figma queries. Never hardcode collection or mode names.
 
 | File | Contents | Path (from ds-config.json) |
 |---|---|---|
-| `figma-vars.snapshot.json` | color (all modes), sizing, typography, `modeVariants` (per-collection, per-mode non-colour maps), `variableScopes` (each variable's scopes, by id) | `paths.snapshotVars` |
+| `figma-vars.snapshot.json` | color (all modes), sizing, typography (each style's size, weight, `lh`, `ls`, `textTransform`, `family`, and `vars`: the variable each bound field takes its value from), `modeVariants` (per-collection, per-mode non-colour maps), `variableScopes` (each variable's scopes, by id) | `paths.snapshotVars` |
 | `figma-structure.snapshot.json` | per-component structure, read from each component's resting variant, with every variant | `paths.snapshotStructure` |
 | `figma-annotation-categories.snapshot.json` | the category of each Figma note, which the REST API does not return: the file's categories and each categorised note by its node and words, captured with the Plugin API (`--annotation-categories`) | `paths.annotationCategoriesSnapshot`, else beside the component-props snapshot |
 | `component-values.snapshot.json` | per component: every raw number and colour its nodes use (scopes the literal check), and its Figma file hygiene, with the variable each property is bound to; written by the components capture (`--capture-import`) | project root |

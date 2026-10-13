@@ -1201,30 +1201,47 @@ a.pg-usage-name { color: var(--sg-text); }
   }
 
   /* ── Typography ───────────────────────────────────────────────────────────────────────────────────────────── */
-  if ((TOKENS.typography || []).length) {
+  // Only the text styles the token check compared in full and found equal (in every mode, the switch shows each), each
+  // with the fields Figma gives it and nothing else: never a value the browser fills in. The family once, as its own
+  // token; the styles left off, named, with the Tasks page saying why.
+  var TYPE_FAMILY = TOKENS.typeFamily || null, TYPE_OFF = TOKENS.typeLeftOff || [];
+  if ((TOKENS.typography || []).length || TYPE_FAMILY || TYPE_OFF.length) {
     hr(); foundationLink('typography', 'typography');
     var ts = section('typography', 'Foundations', 'Typography', null);
+    if (TYPE_FAMILY && TYPE_FAMILY.differs) {
+      var fd = document.createElement('div'); fd.className = 'sg-pending sg-type-family';
+      fd.innerHTML = '<b>The family differs.</b> Figma\'s text styles use ' + esc(TYPE_FAMILY.figma || '') + (TYPE_FAMILY.variable ? ' (' + esc(TYPE_FAMILY.variable) + ')' : '') + ', the code ' + esc(TYPE_FAMILY.code || 'none') + (TYPE_FAMILY.var && /^--/.test(TYPE_FAMILY.var) ? ' (' + esc(TYPE_FAMILY.var) + ')' : '') + '. It is on the Tasks page; the styles below are drawn in the code\'s family.';
+      ts.appendChild(fd);
+    } else if (TYPE_FAMILY) {
+      var fc = document.createElement('div'); fc.className = 'sg-token-cards sg-type-family';
+      fc.innerHTML = tokenCard('family', [{ sample: '<span style="font-family:inherit">Aa</span>', t: { figma: TYPE_FAMILY.figma, var: TYPE_FAMILY.var || '' }, value: TYPE_FAMILY.value }]);
+      ts.appendChild(fc);
+    }
+    if (TYPE_OFF.length) {
+      var off = document.createElement('div'); off.className = 'sg-pending sg-type-off';
+      off.innerHTML = '<b>Left off until Figma and the code agree:</b> ' + TYPE_OFF.map(function (x) { return esc(x.style) + ' (' + esc(x.differs.length ? 'differs' : 'not compared') + ': ' + esc(x.fields.map(function (f) { return ({ size: 'size', weight: 'weight', lh: 'line height', ls: 'letter spacing', ps: 'paragraph spacing', textTransform: 'case' })[f] || f; }).join(', ')) + ')'; }).join(', ') + '. Each is on the Tasks page.';
+      ts.appendChild(off);
+    }
     var demo = document.createElement('div'); demo.className = 'type-list';   // no frame around the list: each style is its own card
+    var TYPE_PROPS = [['size', 'font-size', 'size'], ['weight', 'font-weight', 'weight'], ['lh', 'line-height', 'line height'], ['ls', 'letter-spacing', 'letter spacing'], ['textTransform', 'text-transform', 'case']];
     var drawType = function (sized) {
       demo.innerHTML = '';
       TOKENS.typography.forEach(function (t) {
         var style = [];
-        // The family is the system's page font, which every text inherits (with its fallbacks): named, never set again here.
-        [['size', 'font-size'], ['weight', 'font-weight'], ['lh', 'line-height']].forEach(function (k) { if (t[k[0]]) style.push(k[1] + ':var(' + t[k[0]].var + ')'); });
+        // The family is the system's page font, which every text inherits (with its fallbacks): shown once above, never set again here.
+        TYPE_PROPS.forEach(function (k) { if (t[k[0]] && t[k[0]].var) style.push(k[1] + ':var(' + t[k[0]].var + ')'); });
         var row = document.createElement('div'); row.className = 'type-specimen pg-inspect';
         row.innerHTML = '<div class="pg-inspect-head"></div><div class="type-specimen-preview" style="' + esc(style.join(';')) + '">The quick brown fox jumps over the lazy dog</div><table></table>';
         demo.appendChild(row);
         sized(row.querySelector('.type-specimen-preview'));
-        // Every property of the style as the browser draws it in this mode, as a component's token table: the property,
-        // then the variable it comes from and its value.
+        // Every field of the style as the browser draws it in this mode, as a component's token table: the field, then the
+        // variable it comes from and its value. Only the fields Figma gives the style: each one was compared.
         var cs = getComputedStyle(row.querySelector('.type-specimen-preview'));
         // Named as in Figma first (the variable the text style binds), then the code's variable, then the value drawn.
         // The code's variable only when its name is not Figma's own (typography/m/font-size is --typography-m-font-size).
         var val = function (k, v) { var x = t[k]; if (!x) return v; var same = x.figma && x.var === '--' + x.figma.replace(/[\/\s]+/g, '-'); return [x.figma, same ? null : x.var, v].filter(Boolean).join(' · '); };
-        var family = cs.fontFamily.split(',')[0].replace(/["']/g, '').trim() || (t.family && t.family.value);
-        var lines = [['family', val('family', family)], ['size', val('size', cs.fontSize)], ['weight', val('weight', cs.fontWeight)], ['line height', val('lh', cs.lineHeight === 'normal' ? 'auto' : cs.lineHeight)],
-          ['letter spacing', val('ls', cs.letterSpacing === 'normal' ? '0' : cs.letterSpacing)]];
-        if (cs.textTransform && cs.textTransform !== 'none') lines.push(['case', cs.textTransform]);
+        var drawn = { size: cs.fontSize, weight: cs.fontWeight, lh: cs.lineHeight === 'normal' ? 'auto' : cs.lineHeight, ls: cs.letterSpacing === 'normal' ? '0' : cs.letterSpacing, textTransform: cs.textTransform };
+        var lines = TYPE_PROPS.filter(function (k) { return t[k[0]]; }).map(function (k) { return [k[2], val(k[0], drawn[k[0]])]; });
         row.querySelector('.pg-inspect-head').textContent = t.scale;
         row.querySelector('table').innerHTML = rowsHTML(lines);
       });

@@ -139,6 +139,9 @@ function toHex(c){const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).pa
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={};
 for(const col of collections){for(const id of col.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v)idToVar[id]=v;}}
+// The text styles, and each variable one binds that the file does not hold (a library's), so a bound value resolves.
+const styles=await figma.getLocalTextStylesAsync();
+for(const st of styles)for(const a of Object.values(st.boundVariables||{}))for(const x of [].concat(a)){if(x?.id&&!idToVar[x.id]){const t=await figma.variables.getVariableByIdAsync(x.id);if(t)idToVar[x.id]=t;}}
 // A token may alias a variable from a library: read each alias target the file does not hold, so it resolves (one that cannot be read stays a broken alias).
 const tried={};for(let added=1;added;){added=0;for(const v of Object.values(idToVar))for(const val of Object.values(v.valuesByMode)){const a=val?.type==='VARIABLE_ALIAS'?val:val?.color?.type==='VARIABLE_ALIAS'?val.color:null;if(!a||idToVar[a.id]||tried[a.id])continue;tried[a.id]=1;const t=await figma.variables.getVariableByIdAsync(a.id);if(t){idToVar[a.id]=t;added++;}}}
 function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);
@@ -160,19 +163,31 @@ for(const m of MODES){
     const chain=aliasChain(id,modeId); if(chain.length>0)aliasesOut[m.snapshotKey][v.name]=chain;
   }
 }
+// A number is a length (px), except a variable for a unitless property: a weight or an opacity (its scopes say so, or a
+// text style binds it as its weight, through any alias).
+const UNITLESS=['FONT_WEIGHT','OPACITY','FONT_VARIATIONS'],weightIds=new Set();
+const markWeight=(id,n=0)=>{const v=idToVar[id];if(!v||weightIds.has(id)||n>10)return;weightIds.add(id);for(const x of Object.values(v.valuesByMode))if(x?.type==='VARIABLE_ALIAS')markWeight(x.id,n+1);};
+for(const st of styles){const a=st.boundVariables?.fontWeight;if(a?.id)markWeight(a.id);}
+const unitless=(id)=>{const v=idToVar[id];return weightIds.has(id)||(v?.scopes?.length>0&&v.scopes.every(s=>UNITLESS.includes(s)));};
 function resolveScalarVal(id,modeId,d=0){let v=idToVar[id];if(!v)return null;if(v.resolvedType==='COLOR')return resolve(id,modeId); // a colour, its own opacity included ({ color, opacity })
-let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+'px';if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);if(typeof val==='object')return null;return String(val);}
+let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+(unitless(id)?'':'px');if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);if(typeof val==='object')return null;return String(val);}
+const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:[{name:'Phone',snapshotKey:'phone'},{name:'Tablet',snapshotKey:'tablet'}]}]
+// The mode one value of a collection is read in: the one ds-config puts on the code's root (cssSelector root), else the
+// first mode it lists, else Figma's first.
+function baseMode(c){const ms=c===col?MODES:(COLLECTIONS.find(x=>x.name===c.name)?.modes??[]);const own=ms.filter(m=>c.modes.some(fm=>fm.name===m.name));const m=own.find(x=>(x.cssSelector??'root')==='root')??own[0];return m?c.modes.find(fm=>fm.name===m.name).modeId:c.modes[0].modeId;}
 const sizingOut={};
 // The configured sizing collection, else the numbers of every collection but the colours' (a first capture).
 const sizingCols=collections.some(c=>c.name===SIZING_COLLECTION)?collections.filter(c=>c.name===SIZING_COLLECTION):collections.filter(c=>c!==col);const sizedBy=new Set();
 for(const sc of sizingCols){const mid=sc.modes[0].modeId;for(const id of sc.variableIds){const v=idToVar[id];if(!v||(sc.name!==SIZING_COLLECTION&&(v.resolvedType!=='FLOAT'||v.name.startsWith(PRIMITIVE_PREFIX))))continue;sizingOut[v.name]=resolveScalarVal(id,mid)??'';if(v.resolvedType==='FLOAT')sizedBy.add(sc.name);}}
+// The collections ds-config names (figma.collections) that the sizing collection is not: their numbers and strings too,
+// each in its base mode, so a value that is the same in every mode is kept (modeVariants keeps only the ones that change).
+for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c||sizingCols.includes(c))continue;const mid=baseMode(c);for(const id of c.variableIds){const v=idToVar[id];if(!v||(v.resolvedType!=='FLOAT'&&v.resolvedType!=='STRING')||v.name.startsWith(PRIMITIVE_PREFIX)||v.name in sizingOut)continue;sizingOut[v.name]=resolveScalarVal(id,mid)??'';}}
 // modeVariants - DS-agnostic: for every collection in ds-config → figma.collections with ≥2 modes,
 // capture the vars that DIFFER across its modes, tagging EACH with its own kind (inferred from
 // resolvedType - a single collection may mix color/scalar/string/boolean). Colours of the colour
 // collection are skipped here (already in snap.color). Lets Gate [5] (Every mode is covered) check non-colour, per-collection
 // mode axes (breakpoint sizing, per-locale strings) AND mixed-type collections (a Theme whose floats
 // and booleans also vary light↔dark).
-const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:[{name:'Phone',snapshotKey:'phone'},{name:'Tablet',snapshotKey:'tablet'}]}]
 // Auto-capture a multi-mode SIZING collection (e.g. Desktop/Phone). The flat `sizing`
 // bucket above keeps only the FIRST mode (base) for the value gate; its OTHER modes
 // would otherwise be lost, so capture them here into modeVariants like any per-mode
@@ -186,8 +201,21 @@ const KIND={COLOR:'color',FLOAT:'scalar',STRING:'string',BOOLEAN:'boolean'};
 const modeVariantsOut={};
 for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c||c.modes.length<2)continue;const vars={};for(const id of c.variableIds){const v=idToVar[id];if(!v||v.name.startsWith(PRIMITIVE_PREFIX))continue;const kind=KIND[v.resolvedType]||'scalar';if(kind==='color'&&cc.name===COLOR_COLLECTION)continue;const values={};for(const m of cc.modes){const mid=c.modes.find(fm=>fm.name===m.name)?.modeId;if(!mid)continue;values[m.snapshotKey]=kind==='color'?resolve(id,mid):resolveScalarVal(id,mid);}if(new Set(Object.values(values).map(String)).size>1)vars[v.name]={kind,values};}if(Object.keys(vars).length)modeVariantsOut[cc.name]={modes:cc.modes,vars};}
 const WEIGHT={'Thin':100,'Extra Light':200,'Light':300,'Regular':400,'Medium':500,'Semi Bold':600,'Bold':700,'Extra Bold':800,'Black':900};
-const styles=await figma.getLocalTextStylesAsync(); const typo={};
-for(const st of styles){const key=st.name.trim().toLowerCase(); /* the full name: xl/regular and m/regular are two styles */const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
+// Each text style under its full name (xl/regular and m/regular are two styles), in Figma's order, with its family. A
+// field bound to a variable takes that variable's value in its collection's base mode (the value Figma keeps on the
+// style is the one of the mode it last drew), and vars names the variable, so the token check pairs the field with
+// the code's variable and, when the variable changes with a mode, compares it in every mode.
+const typo={},colOf={};for(const c of collections)for(const id of c.variableIds)colOf[id]=c;
+function boundValue(id){const v=idToVar[id];if(!v)return null;const mid=colOf[id]?baseMode(colOf[id]):null;let val=(mid&&v.valuesByMode[mid])??Object.values(v.valuesByMode)[0];let n=0;while(val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];if(!a)return null;val=(mid&&a.valuesByMode[mid])??Object.values(a.valuesByMode)[0];}return val==null||typeof val==='object'?null:val;}
+const BOUND={fontSize:'size',lineHeight:'lh',fontWeight:'weight',fontFamily:'family',letterSpacing:'ls',paragraphSpacing:'ps'},r1=(n)=>Math.round(n*10)/10;
+for(const st of styles){const key=st.name.trim().toLowerCase();const b=st.boundVariables||{},vars={},val={};
+  for(const [f,k] of Object.entries(BOUND)){const id=b[f]?.id;if(!id)continue;if(idToVar[id])vars[k]=idToVar[id].name;const x=boundValue(id);if(x!=null)val[k]=x;}
+  const entry={size:r1(Number(val.size??st.fontSize))+'px'};const wn=Number(val.weight);const w=val.weight!=null&&Number.isFinite(wn)?Math.round(wn):WEIGHT[st.fontName.style];if(w)entry.weight=String(w);
+  if(val.lh!=null)entry.lh=r1(Number(val.lh))+'px';else if(st.lineHeight?.unit==='PIXELS')entry.lh=r1(st.lineHeight.value)+'px';
+  const ls=val.ls??st.letterSpacing?.value;if(ls)entry.ls=(st.letterSpacing?.unit==='PERCENT'?Math.round(ls*100)/10000+'em':Math.round(ls*100)/100+'px');
+  if(val.ps)entry.ps=r1(Number(val.ps))+'px';
+  if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());
+  const fam=val.family??st.fontName?.family;if(fam)entry.family=String(fam);if(Object.keys(vars).length)entry.vars=vars;typo[key]=entry;}
 const _modeOrder={};for(const c of collections){if(c.modes.length<2)continue;const key=m=>(c.name===COLOR_COLLECTION?(MODES.find(x=>x.name===m.name)||{}).snapshotKey:null)||m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');_modeOrder[c.name===COLOR_COLLECTION?'color':c.name]=c.modes.map(key);} // Figma's own order of each collection's modes
 const _collections={color:col.name,colorModes:col.modes.map(m=>m.name),sizing:[...sizedBy]}; // the collections read, which the engine writes into ds-config.json
 return {color:colorOut,aliases:aliasesOut,sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder,_collections};
@@ -264,6 +292,9 @@ Then fetch **sizing and typography** in one separate call (these collections are
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={};
 for(const col of collections){for(const id of col.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v)idToVar[id]=v;}}
+// The text styles, and each variable one binds that the file does not hold (a library's), so a bound value resolves.
+const styles=await figma.getLocalTextStylesAsync();
+for(const st of styles)for(const a of Object.values(st.boundVariables||{}))for(const x of [].concat(a)){if(x?.id&&!idToVar[x.id]){const t=await figma.variables.getVariableByIdAsync(x.id);if(t)idToVar[x.id]=t;}}
 // A token may alias a variable from a library: read each alias target the file does not hold, so it resolves (one that cannot be read stays a broken alias).
 const tried={};for(let added=1;added;){added=0;for(const v of Object.values(idToVar))for(const val of Object.values(v.valuesByMode)){const a=val?.type==='VARIABLE_ALIAS'?val:val?.color?.type==='VARIABLE_ALIAS'?val.color:null;if(!a||idToVar[a.id]||tried[a.id])continue;tried[a.id]=1;const t=await figma.variables.getVariableByIdAsync(a.id);if(t){idToVar[a.id]=t;added++;}}}
 const SIZING_COLLECTION='Sizing'; let COLOR_COLLECTION='Theme'; const PRIMITIVE_PREFIX='primitives/'; // fill from ds-config.json
@@ -273,19 +304,31 @@ if(!MODES.some(m=>col.modes.some(fm=>fm.name===m.name)))MODES=col.modes.map(fm=>
 function toHex(c){const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('');const a=c.a===undefined?1:c.a;return '#'+h+(a>=1?'':Math.round(a*255).toString(16).padStart(2,'0'));}
 function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);
 if(val.color){const base=val.color.type==='VARIABLE_ALIAS'?resolve(val.color.id,modeId,d+1):('r'in val.color?toHex(val.color):null);if(!base)return null;const op=(val.opacity??100)/100;const a0=base.length>7?parseInt(base.slice(7,9),16)/255:1;const a=Math.round(a0*op*255);return a>=255?base.slice(0,7):base.slice(0,7)+a.toString(16).padStart(2,'0');}return null;}
+// A number is a length (px), except a variable for a unitless property: a weight or an opacity (its scopes say so, or a
+// text style binds it as its weight, through any alias).
+const UNITLESS=['FONT_WEIGHT','OPACITY','FONT_VARIATIONS'],weightIds=new Set();
+const markWeight=(id,n=0)=>{const v=idToVar[id];if(!v||weightIds.has(id)||n>10)return;weightIds.add(id);for(const x of Object.values(v.valuesByMode))if(x?.type==='VARIABLE_ALIAS')markWeight(x.id,n+1);};
+for(const st of styles){const a=st.boundVariables?.fontWeight;if(a?.id)markWeight(a.id);}
+const unitless=(id)=>{const v=idToVar[id];return weightIds.has(id)||(v?.scopes?.length>0&&v.scopes.every(s=>UNITLESS.includes(s)));};
 function resolveScalarVal(id,modeId,d=0){let v=idToVar[id];if(!v)return null;if(v.resolvedType==='COLOR')return resolve(id,modeId); // a colour, its own opacity included ({ color, opacity })
-let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+'px';if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);if(typeof val==='object')return null;return String(val);}
+let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+(unitless(id)?'':'px');if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);if(typeof val==='object')return null;return String(val);}
+const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:[{name:'Phone',snapshotKey:'phone'},{name:'Tablet',snapshotKey:'tablet'}]}]
+// The mode one value of a collection is read in: the one ds-config puts on the code's root (cssSelector root), else the
+// first mode it lists, else Figma's first.
+function baseMode(c){const ms=c===col?MODES:(COLLECTIONS.find(x=>x.name===c.name)?.modes??[]);const own=ms.filter(m=>c.modes.some(fm=>fm.name===m.name));const m=own.find(x=>(x.cssSelector??'root')==='root')??own[0];return m?c.modes.find(fm=>fm.name===m.name).modeId:c.modes[0].modeId;}
 const sizingOut={};
 // The configured sizing collection, else the numbers of every collection but the colours' (a first capture).
 const sizingCols=collections.some(c=>c.name===SIZING_COLLECTION)?collections.filter(c=>c.name===SIZING_COLLECTION):collections.filter(c=>c!==col);const sizedBy=new Set();
 for(const sc of sizingCols){const mid=sc.modes[0].modeId;for(const id of sc.variableIds){const v=idToVar[id];if(!v||(sc.name!==SIZING_COLLECTION&&(v.resolvedType!=='FLOAT'||v.name.startsWith(PRIMITIVE_PREFIX))))continue;sizingOut[v.name]=resolveScalarVal(id,mid)??'';if(v.resolvedType==='FLOAT')sizedBy.add(sc.name);}}
+// The collections ds-config names (figma.collections) that the sizing collection is not: their numbers and strings too,
+// each in its base mode, so a value that is the same in every mode is kept (modeVariants keeps only the ones that change).
+for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c||sizingCols.includes(c))continue;const mid=baseMode(c);for(const id of c.variableIds){const v=idToVar[id];if(!v||(v.resolvedType!=='FLOAT'&&v.resolvedType!=='STRING')||v.name.startsWith(PRIMITIVE_PREFIX)||v.name in sizingOut)continue;sizingOut[v.name]=resolveScalarVal(id,mid)??'';}}
 // modeVariants - DS-agnostic: for every collection in ds-config → figma.collections with ≥2 modes,
 // capture the vars that DIFFER across its modes, tagging EACH with its own kind (inferred from
 // resolvedType - a single collection may mix color/scalar/string/boolean). Colours of the colour
 // collection are skipped here (already in snap.color). Lets Gate [5] (Every mode is covered) check non-colour, per-collection
 // mode axes (breakpoint sizing, per-locale strings) AND mixed-type collections (a Theme whose floats
 // and booleans also vary light↔dark).
-const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:[{name:'Phone',snapshotKey:'phone'},{name:'Tablet',snapshotKey:'tablet'}]}]
 // Auto-capture a multi-mode SIZING collection (e.g. Desktop/Phone). The flat `sizing`
 // bucket above keeps only the FIRST mode (base) for the value gate; its OTHER modes
 // would otherwise be lost, so capture them here into modeVariants like any per-mode
@@ -299,8 +342,21 @@ const KIND={COLOR:'color',FLOAT:'scalar',STRING:'string',BOOLEAN:'boolean'};
 const modeVariantsOut={};
 for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c||c.modes.length<2)continue;const vars={};for(const id of c.variableIds){const v=idToVar[id];if(!v||v.name.startsWith(PRIMITIVE_PREFIX))continue;const kind=KIND[v.resolvedType]||'scalar';if(kind==='color'&&cc.name===COLOR_COLLECTION)continue;const values={};for(const m of cc.modes){const mid=c.modes.find(fm=>fm.name===m.name)?.modeId;if(!mid)continue;values[m.snapshotKey]=kind==='color'?resolve(id,mid):resolveScalarVal(id,mid);}if(new Set(Object.values(values).map(String)).size>1)vars[v.name]={kind,values};}if(Object.keys(vars).length)modeVariantsOut[cc.name]={modes:cc.modes,vars};}
 const WEIGHT={'Thin':100,'Extra Light':200,'Light':300,'Regular':400,'Medium':500,'Semi Bold':600,'Bold':700,'Extra Bold':800,'Black':900};
-const styles=await figma.getLocalTextStylesAsync(); const typo={};
-for(const st of styles){const key=st.name.trim().toLowerCase(); /* the full name: xl/regular and m/regular are two styles */const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
+// Each text style under its full name (xl/regular and m/regular are two styles), in Figma's order, with its family. A
+// field bound to a variable takes that variable's value in its collection's base mode (the value Figma keeps on the
+// style is the one of the mode it last drew), and vars names the variable, so the token check pairs the field with
+// the code's variable and, when the variable changes with a mode, compares it in every mode.
+const typo={},colOf={};for(const c of collections)for(const id of c.variableIds)colOf[id]=c;
+function boundValue(id){const v=idToVar[id];if(!v)return null;const mid=colOf[id]?baseMode(colOf[id]):null;let val=(mid&&v.valuesByMode[mid])??Object.values(v.valuesByMode)[0];let n=0;while(val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];if(!a)return null;val=(mid&&a.valuesByMode[mid])??Object.values(a.valuesByMode)[0];}return val==null||typeof val==='object'?null:val;}
+const BOUND={fontSize:'size',lineHeight:'lh',fontWeight:'weight',fontFamily:'family',letterSpacing:'ls',paragraphSpacing:'ps'},r1=(n)=>Math.round(n*10)/10;
+for(const st of styles){const key=st.name.trim().toLowerCase();const b=st.boundVariables||{},vars={},val={};
+  for(const [f,k] of Object.entries(BOUND)){const id=b[f]?.id;if(!id)continue;if(idToVar[id])vars[k]=idToVar[id].name;const x=boundValue(id);if(x!=null)val[k]=x;}
+  const entry={size:r1(Number(val.size??st.fontSize))+'px'};const wn=Number(val.weight);const w=val.weight!=null&&Number.isFinite(wn)?Math.round(wn):WEIGHT[st.fontName.style];if(w)entry.weight=String(w);
+  if(val.lh!=null)entry.lh=r1(Number(val.lh))+'px';else if(st.lineHeight?.unit==='PIXELS')entry.lh=r1(st.lineHeight.value)+'px';
+  const ls=val.ls??st.letterSpacing?.value;if(ls)entry.ls=(st.letterSpacing?.unit==='PERCENT'?Math.round(ls*100)/10000+'em':Math.round(ls*100)/100+'px');
+  if(val.ps)entry.ps=r1(Number(val.ps))+'px';
+  if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());
+  const fam=val.family??st.fontName?.family;if(fam)entry.family=String(fam);if(Object.keys(vars).length)entry.vars=vars;typo[key]=entry;}
 const _modeOrder={};for(const c of collections){if(c.modes.length<2)continue;const key=m=>(c.name===COLOR_COLLECTION?(MODES.find(x=>x.name===m.name)||{}).snapshotKey:null)||m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');_modeOrder[c.name===COLOR_COLLECTION?'color':c.name]=c.modes.map(key);} // Figma's own order of each collection's modes
 const _collections={color:col.name,colorModes:col.modes.map(m=>m.name),sizing:[...sizedBy]}; // the collections read, which the engine writes into ds-config.json
 return {sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder,_collections};

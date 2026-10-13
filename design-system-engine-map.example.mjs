@@ -76,8 +76,11 @@ export const SIZING_SKIP = new Map([
   // ['general/window-radii', 'Figma window-chrome - not controlled by HTML/CSS'],
 ]);
 
-// ─── TYPOGRAPHY: CSS var → [scale, prop] snapshot path ────────────────────────
-// Only include vars that have a Figma text-style equivalent.
+// ─── TYPOGRAPHY: CSS var → [style, prop] snapshot path ────────────────────────
+// A text style field bound to a variable in Figma needs no entry: it is paired with the code's variable of the same
+// name by the naming convention. List here only a field Figma keeps on the style itself, or a var named otherwise.
+// An entry wins over the binding. The key is one style ('s/regular'), a scale whose every style it feeds ('s'),
+// a list of styles ([['s/regular', 's/bold'], 'size']), or a list of [style, prop] pairs.
 // Example: '--m-size': ['m', 'size']
 export const TYPO = {
   // '--m-size':   ['m', 'size'],

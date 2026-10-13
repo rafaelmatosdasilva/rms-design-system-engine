@@ -13,7 +13,7 @@
 // A code fact the capture could not read reliably is "not comparable", never a difference.
 
 import { pathHash } from './icon-source.mjs';
-import { textStyle, componentStyle } from './text-styles.mjs';
+import { textStyle, componentStyle, typographyPairs } from './text-styles.mjs';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -84,11 +84,11 @@ export function compareTokens(code, vars, cfg, maps) {
     if (maps.SIZING_SKIP.has(token) || value == null) { out.skipped++; continue; }
     everyMode(token, maps.EXPLICIT_SIZING[token] ?? tokenToVar(token, spec, { raw: true }), value);
   }
-  for (const [cssVar, [scale, prop]] of Object.entries(maps.TYPO)) {
-    const value = textStyle(vars.typography, scale)?.[prop];
-    if (value == null) { out.skipped++; continue; }
-    everyMode(`typography/${scale}/${prop}`, cssVar, value);
-  }
+  // Each text style's fields, paired as the token check pairs them (text-styles.mjs typographyPairs): a TYPO entry, else
+  // the variable the style binds, whose modes then give the value in each mode.
+  const typo = typographyPairs(vars.typography ?? {}, maps.TYPO, (v) => (maps.SIZING_SKIP.has(v) ? null : maps.EXPLICIT_SIZING[v] ?? tokenToVar(v, spec, { raw: true })));
+  out.skipped += typo.unknown.length;
+  for (const p of typo.pairs) everyMode(p.variable ?? `typography/${p.style}/${p.field}`, p.cssVar, vars.typography[p.style][p.field]);
   return out;
 }
 
