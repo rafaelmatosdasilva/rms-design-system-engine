@@ -20,10 +20,11 @@
 // Exit 0 = full parity. Exit 1 = at least one FAIL or NEW SKIP.
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
-import { textStyle, namesStyle } from './text-styles.mjs';
+import { namesStyle, typographyPairs, familyGroups, sameFamily, bodyFontFamily } from './text-styles.mjs';
+import { loadCollections } from './mode-resolver.mjs';
 import { join } from 'path';
 import { loadTokensDict, tokenSource } from './fix-hint.mjs';
-import { loadCssSources, rootTokens, blankComments, neverAppliedRootSelectors } from './css-source.mjs';
+import { loadCssSources, rootTokens, blankComments, neverAppliedRootSelectors, resolveVars } from './css-source.mjs';
 import { readFreshSnapshot } from './code-capture.mjs';
 import { colorHex, sameColor, sameValue, sameHex } from './css-values.mjs';   // #fff = #ffffff, rgb()/hsl()/oklch() = hex, 0.5rem = 8px   // the cascade-aware theme reader (shared with the code capture)
 import { resolveNamingSpec, tokenToVar as toVar } from './naming-convention.mjs';   // shared Figma↔code naming convention
@@ -545,49 +546,121 @@ for (const [token, figmaVal] of Object.entries(snap.sizing ?? {})) {
 }
 
 // ── 3. TYPOGRAPHY ─────────────────────────────────────────────────────────────
-if (snap.typography && Object.keys(TYPO).length) {
-  for (const [cssVar, [scale, prop]] of Object.entries(TYPO)) {
-    const figmaVal = textStyle(snap.typography, scale)?.[prop];
-    if (figmaVal === undefined || figmaVal === null) {
-      SKIP.push({ dimension: 'typography', token: `${scale}/${prop}`, mode: '-', reason: 'no Figma value in snapshot' });
-      continue;
-    }
+// Every field of every text style (size, weight, line height, letter spacing, case), each with the CSS variable it is
+// compared with (text-styles.mjs typographyPairs): a TYPO map entry that names it wins (a style, a scale whose every
+// style it feeds, or a list of them); else the Figma variable the style binds for that field, named by the naming
+// convention as a sizing token is, so every style that binds a variable is compared with no map entry. A field bound to
+// a variable that changes with a mode (modeVariants) is compared in each mode the config gives a selector, against the
+// CSS that mode resolves to. The family is compared once for all the styles that use it (one finding, not one a style).
+const TYPO_PAIRS = snap.typography ? typographyPairs(snap.typography, TYPO, (v) => sizingTokenToVar(v)) : { pairs: [], unpaired: [], unknown: [] };
+// The modes a variable changes with: its modeVariants section, each mode with the selector ds-config gives it (the colour
+// modes for the colour collection, figma.collections for another). A collection ds-config does not describe: null, and
+// the field is compared in the base only.
+const DECLARED_MODES = new Map(loadCollections(cfg).map((c) => [c.name, c.modes]));
+function modesOfVariable(variable) {
+  for (const [name, section] of Object.entries(snap.modeVariants ?? {})) {
+    const d = section?.vars?.[variable];
+    if (!d?.values) continue;
+    const declared = name === cfg.figma?.colorCollection ? MODES : DECLARED_MODES.get(name);
+    if (!declared) return null;
+    const modes = (section.modes ?? []).map((m) => {
+      const c = declared.find((x) => String(x.snapshotKey ?? x.name).toLowerCase() === String(m.snapshotKey).toLowerCase() || x.name === m.name);
+      return c ? { name: m.name ?? c.name, snapshotKey: m.snapshotKey, cssSelector: c.cssSelector ?? 'root' } : null;
+    }).filter((m) => m && d.values[m.snapshotKey] != null);
+    return modes.length ? { collection: name, modes, values: d.values } : null;
+  }
+  return null;
+}
+// A variable's value in one mode, as the cascade gives it (the base where the mode does not set it), var() resolved.
+const modeTables = new Map();
+function cssInMode(cssVar, mode) {
+  if (!modeTables.has(mode.cssSelector)) modeTables.set(mode.cssSelector, rootTokens(TOKEN_SOURCES, mode));
+  const table = modeTables.get(mode.cssSelector);
+  const hit = table.get(cssVar) ?? [...table].find(([k]) => k.toLowerCase() === cssVar.toLowerCase())?.[1];
+  if (!hit) return null;
+  const r = resolveVars(hit.value, table);
+  return r.unresolved.length ? null : String(r.value).trim();
+}
+const sameTypo = (a, b) => sameValue(a, b, 'any') ?? String(a).trim() === String(b).trim();
+if (snap.typography && (TYPO_PAIRS.pairs.length || Object.keys(TYPO).length)) {
+  for (const u of TYPO_PAIRS.unknown) SKIP.push({ dimension: 'typography', token: `${u.key}/${u.field}`, cssVar: u.cssVar, mode: '-', reason: 'no Figma value in snapshot' });
+  for (const { style, field, cssVar, variable } of TYPO_PAIRS.pairs) {
+    const token = `${style}/${field}`;
+    const figmaVal = snap.typography[style][field];
+    const bound = variable ? { variable } : {};
     const loc = locateVar(cssVar);
     if (!loc) {
       if (usedVarsLower.has(cssVar.toLowerCase())) {
-        SKIP.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar, mode: '-', reason: 'runtime-injected - used in code, not in static token CSS (backend stylesheet)' });
+        SKIP.push({ dimension: 'typography', token, cssVar, mode: '-', reason: 'runtime-injected - used in code, not in static token CSS (backend stylesheet)' });
       } else {
-        FAIL.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar, mode: '-', issue: 'CSS var not declared', fixHint: `Add ${cssVar}: ${figmaVal} to ${THEME_PATH}`, value: figmaVal });
+        FAIL.push({ dimension: 'typography', token, cssVar, mode: '-', issue: 'CSS var not declared', fixHint: `Add ${cssVar}: ${figmaVal} to ${THEME_PATH}`, value: figmaVal, ...bound });
       }
       continue;
     }
     if (!loc.root) {
-      SKIP.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar: loc.name, mode: '-', reason: 'declared outside :root (component-scoped) - not compared by this gate' });
+      SKIP.push({ dimension: 'typography', token, cssVar: loc.name, mode: '-', reason: 'declared outside :root (component-scoped) - not compared by this gate' });
       continue;
     }
     const actualVar = loc.name;
-    const cssVal = resolveScalar(actualVar);
-    if (cssVal === null) {
-      NEW_SKIP.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar: actualVar, mode: '-', reason: 'CSS var did not resolve' });
+    const perMode = variable ? modesOfVariable(variable) : null;
+    if (perMode) {
+      for (const m of perMode.modes) {
+        const want = perMode.values[m.snapshotKey], have = cssInMode(actualVar, m);
+        if (have == null) { NEW_SKIP.push({ dimension: 'typography', token, cssVar: actualVar, mode: m.name, reason: 'CSS var did not resolve' }); continue; }
+        if (!sameTypo(want, have)) FAIL.push({ dimension: 'typography', token, cssVar: actualVar, mode: m.name, modeKey: m.snapshotKey, figma: want, css: have, hint: `In ${m.name}, CSS resolves ${actualVar} → ${have} but Figma says ${want}`, ...bound });
+        else { PASS.push(`typography ${token}@${m.snapshotKey}`); PASS_VARS.push({ dimension: 'typography', token, cssVar: actualVar, mode: m.snapshotKey, value: have, ...bound }); }
+      }
       continue;
     }
-    if (!(sameValue(figmaVal, cssVal, 'any') ?? String(figmaVal).trim() === cssVal.trim())) {
+    const cssVal = resolveScalar(actualVar);
+    if (cssVal === null) {
+      NEW_SKIP.push({ dimension: 'typography', token, cssVar: actualVar, mode: '-', reason: 'CSS var did not resolve' });
+      continue;
+    }
+    if (!sameTypo(figmaVal, cssVal)) {
       const fixHint = sizingFixHint(actualVar, figmaVal);
-      FAIL.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar: actualVar, mode: '-', figma: figmaVal, css: cssVal, hint: `CSS resolves ${actualVar} → ${cssVal} but Figma says ${figmaVal}`, fixHint });
+      FAIL.push({ dimension: 'typography', token, cssVar: actualVar, mode: '-', figma: figmaVal, css: cssVal, hint: `CSS resolves ${actualVar} → ${cssVal} but Figma says ${figmaVal}`, fixHint, ...bound });
       if (FIX_MODE) {
         const line = varLineMap[actualVar];
         if (line && varFileMap[actualVar] === THEME_PATH) autoFixes.push({ cssVar: actualVar, newVal: String(figmaVal).trim(), line });
       }
     } else {
-      PASS.push(`typography ${scale}/${prop}`); PASS_VARS.push({ dimension: 'typography', token: `${scale}/${prop}`, cssVar: actualVar, value: cssVal });
+      PASS.push(`typography ${token}`); PASS_VARS.push({ dimension: 'typography', token, cssVar: actualVar, value: cssVal, ...bound });
     }
   }
+  // A field no variable and no map entry names: not compared, said so (the style guide shows only styles compared in full).
+  for (const u of TYPO_PAIRS.unpaired) SKIP.push({ dimension: 'typography', token: `${u.style}/${u.field}`, mode: '-', reason: 'not compared: Figma binds no variable to it and no TYPO entry in design-system-engine-map.mjs names it' });
 } else if (!snap.typography) {
   SKIP.push({ dimension: 'typography', token: 'ALL', mode: '-', reason: 'snapshot has no typography section - run /rms-design-system-engine Phase 1' });
-} else if (!Object.keys(TYPO).length) {
+} else {
   SKIP.push({ dimension: 'typography', token: 'ALL', mode: '-', reason: 'TYPO map empty in design-system-engine-map.mjs - add your type scale vars' });
 }
-// Advisory: snapshot has ls/textTransform fields not yet covered by a TYPO map entry.
+// The family the text styles use, once for every style that uses it: the variable they bind for it (named by the
+// convention), else the font the code's page text uses (font-family on html, body or :root).
+for (const g of snap.typography ? familyGroups(snap.typography) : []) {
+  const base = { dimension: 'typography', family: true, styles: g.styles, mode: '-', ...(g.variable ? { variable: g.variable } : {}) };
+  const token = g.variable ?? 'family';
+  const n = `${g.styles.length} text style${g.styles.length === 1 ? '' : 's'}`;
+  let cssVar = 'font-family (html, body)', cssVal;
+  if (g.variable) {
+    cssVar = sizingTokenToVar(g.variable);
+    const loc = cssVar ? locateVar(cssVar) : null;
+    if (!cssVar || !loc || !loc.root) {
+      if (!cssVar) SKIP.push({ ...base, token, reason: 'no CSS var (SIZING_SKIP)' });
+      else if (loc && !loc.root) SKIP.push({ ...base, token, cssVar: loc.name, reason: 'declared outside :root (component-scoped) - not compared by this gate' });
+      else FAIL.push({ ...base, token, cssVar, issue: `CSS var not declared (the family of ${n})`, fixHint: `Add ${cssVar}: ${g.family} to ${THEME_PATH}`, value: g.family });
+      continue;
+    }
+    cssVar = loc.name; cssVal = resolveScalar(cssVar);
+  } else {
+    cssVal = bodyFontFamily(css, (v) => { const l = locateVar(v); return l?.root ? resolveScalar(l.name) : null; });
+    if (cssVal == null) { SKIP.push({ ...base, token, reason: `the CSS sets no font-family on html, body or :root to compare the family of ${n} with` }); continue; }
+  }
+  if (cssVal == null) { NEW_SKIP.push({ ...base, token, cssVar, reason: 'CSS var did not resolve' }); continue; }
+  if (!sameFamily(g.family, cssVal)) FAIL.push({ ...base, token, cssVar, figma: g.family, css: cssVal, hint: `${n} use ${g.family} in Figma; the code's ${cssVar} is ${cssVal}` });
+  else { PASS.push(`typography family ${token}`); PASS_VARS.push({ ...base, token, cssVar, value: cssVal }); }
+}
+// Advisory: snapshot has ls/textTransform fields no variable and no TYPO map entry covers.
 // Phase 1 captures these when letterSpacing / textCase are present in the Figma text style.
 // To gate-check them: add entries to design-system-engine-map.mjs TYPO, e.g.:
 //   '--m-ls': ['m', 'ls'], '--m-text-transform': ['m', 'textTransform'],
@@ -595,7 +668,7 @@ if (snap.typography) {
   for (const [scale, entry] of Object.entries(snap.typography)) {
     for (const field of ['ls', 'textTransform']) {
       if (entry[field] === undefined) continue;
-      const alreadyCovered = Object.entries(TYPO).some(([, [s, p]]) => p === field && namesStyle(snap.typography, s, scale));
+      const alreadyCovered = TYPO_PAIRS.pairs.some((p) => p.style === scale && p.field === field) || Object.entries(TYPO).some(([, [s, p]]) => p === field && namesStyle(snap.typography, s, scale));
       if (!alreadyCovered) {
         const cssSuffix = field === 'ls' ? 'ls' : 'text-transform';
         TYPO_INFO.push({

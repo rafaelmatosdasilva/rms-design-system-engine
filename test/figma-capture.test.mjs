@@ -172,7 +172,11 @@ test('P6 and P7 on a real file: Figma\'s checksum holds, and the Figma tool, the
   const built = await varsFromItems(answer.items, tpCfg);
   // The same file captured before with the recipe, value by value.
   const recipe = JSON.parse(readFileSync(join(TP, 'src', 'figma', 'figma-vars.snapshot.json'), 'utf8'));
-  for (const k of ['color', 'sizing', 'typography']) assert.deepEqual(built[k], recipe[k], k);
+  for (const k of ['color', 'sizing']) assert.deepEqual(built[k], recipe[k], k);
+  // Each style now records its family too (the snapshot was captured before it did): the rest is the same.
+  const noFamily = Object.fromEntries(Object.entries(built.typography).map(([n, { family, ...rest }]) => [n, rest]));
+  assert.deepEqual(noFamily, recipe.typography, 'typography');
+  assert.ok(Object.values(built.typography).every((t) => t.family === 'Inter'));
   assert.deepEqual(built._collections, { color: 'Theme', colorModes: ['Light', 'Dark'], sizing: ['Sizing'] });
   assert.deepEqual(built.variableScopes['VariableID:1:17'], { name: 'radii/button', scopes: ['CORNER_RADIUS'] });
   // figma-cli's design.json of the same file gives the same colours and sizes.

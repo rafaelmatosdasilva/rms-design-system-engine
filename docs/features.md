@@ -289,7 +289,9 @@ Also on each component.
 ### Foundations
 
 - **Colours.** The primitive ramp first, then the semantic roles, each with its sample, Figma name, variable and value, and a Light and Dark switch.
-- **Typography.** Figma's text styles in Figma's order, each under its full name (`s/regular`), with family, size, weight, line height, letter spacing and case.
+- **Typography.** Figma's text styles in Figma's order, each under its full name (`s/regular`), with the fields Figma gives it: size, weight, line height, letter spacing and case. The size switch shows each breakpoint.
+  - A style shows only when every one of its fields was compared and agrees, in every breakpoint. The others are named at the top and listed on the Tasks page.
+  - The family shows once, as its own token. When it differs, the styles are drawn in the code's family, with a note.
 - **Spacing and radii.** One card per family, smallest first.
 - **Motion.** The durations and easings, each played when you press Play, each easing's curve drawn, and what the system does for someone who asks for less motion.
 - **Icons.** Grouped by size, shown at the size Figma gives them, with their stroke widths.

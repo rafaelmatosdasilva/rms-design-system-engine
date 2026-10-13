@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Text styles complete and accurate (continuous evaluation)
+
+What changed since the entry below (engine 89948cd): Style guide accuracy: full-name text styles, scale keys, chrome overrides, hex in sizes, Pinia; Text styles complete and accurate, from Figma to the style guide; Tests: a type style lists only its own fields, the family once; a capture records each style's family. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`.
+
+Guide set measured: `957137cde0c4` · Project measured: `13d811a9d668`
+
+| Haiku, engine 3f9b610 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.063 |
+| Input a run | 120k | 139k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 139k a run against 120k. Records: `records/2026-10-13-tests-a-type-style-lists`.
+
 ## 2026-10: Read-only complete capture (continuous evaluation)
 
 What changed since the entry below (engine fee165b): Router: a component named loosely is found, and a shared word is asked about; Docs: one Commands page, linked from every other page; One pairing of Figma components with their code files, no map needed; Capture components read-only and complete: raw values and states by component id; Guide: a component's own file comes from the one pairing, every sign named. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
