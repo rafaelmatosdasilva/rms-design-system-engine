@@ -1,10 +1,23 @@
-# Everything it does
+# Features and capabilities
 
-The [README](../README.md) gives the overview. This page shows how to use each part, what the style guide holds, how prototypes and the checks work, in plain words. For developers, every option and how each check works is in [the technical details](details.md).
+Everything the engine does, in plain words. Start with how you use it, then jump to the part you need. For the options behind each feature and how each check works, see the [technical documentation](details.md).
 
-## Use it
+**On this page**
 
-The easiest way is to ask in Claude Code, in your own words, after `/rms-design-system-engine`. The terminal command does the same.
+- [How you use it](#how-you-use-it)
+- [Check your code against Figma](#check-your-code-against-figma)
+- [The checks](#the-checks)
+- [Accessibility](#accessibility)
+- [The living style guide](#the-living-style-guide)
+- [Prototypes](#prototype-with-your-design-system)
+- [Build from Figma](#start-from-figma-only)
+- [Keep products aligned](#keep-products-aligned)
+- [Bring Figma in line with the code](#bring-figma-in-line-with-the-code)
+- [Good to know](#good-to-know)
+
+## How you use it
+
+Ask in Claude Code, in your own words, after `/rms-design-system-engine`. Every request also has a terminal command that does the same.
 
 | You want to | Type in Claude Code | Or in the terminal |
 |---|---|---|
@@ -15,49 +28,349 @@ The easiest way is to ask in Claude Code, in your own words, after `/rms-design-
 | Run one check (a gate) | `/rms-design-system-engine run only the token values check` | `rms-design-system-engine --only 3` |
 | Ask what the design system has | `/rms-design-system-engine which props does the badge take?` | `rms-design-system-engine --query badge` |
 
-You can mix them. `rms-design-system-engine --component button --only accessibility` checks only the accessibility of the button. Scoped to a component, what the code's accessibility finds is listed only when it is about that component: in its own file, or on an element or rule that carries its class. A page that only uses it keeps its findings to itself. The browser part needs the project's packages installed; when they are not, the run says so (install them, then run again).
+You can combine options. `rms-design-system-engine --component button --only accessibility` checks only the button's accessibility.
 
-**Every difference in one list.** Each full check writes `.design-system-engine-out/differences.md`: every difference between Figma and the code, grouped by component, with what is new since the last check, and under each component where it lives (the products that use it and what it sits inside), so you see how far a fix reaches. It is written whether or not you have a style guide, and the summary of every check says where it is. It also names each check that did not run, so a gap is never mistaken for a pass.
+- **One component, its own findings.** When you check one component, accessibility findings are listed only when they are about that component, in its own file or on an element that carries its class. A page that only uses it keeps its findings to itself.
+- **The browser part needs your packages.** When the project's packages are not installed, the run tells you. Install them and run again.
 
-### The style guide
+### Every difference in one list
 
-`rms-design-system-engine --styleguide` builds a living style guide of what Figma and the code agree on, in `.design-system-engine-out/styleguide/index.html`. Add `--component modal` and it audits that component first (every check against Figma and the accessibility check in a browser), then builds a page of that component and the components it nests only, `styleguide/modal.html` beside the whole system's page, and prints its address, so its Accessibility and Parity are as of now. **[See an example](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)**: the RMS Design System's style guide, built by this engine and published by that design system, so it shows what the engine makes today. Every project fills the same template, the one in the engine (`templates/styleguide.template.html`), with its own data, so an improvement made there reaches every design system on its next run.
+Each full check writes `.design-system-engine-out/differences.md`, every difference between Figma and the code in one place.
 
-- **One link for the team.** `rms-design-system-engine --publish-styleguide` writes the CI job that publishes it on every push, on GitHub Pages or GitLab Pages as your repository is hosted, so everyone opens the same page built from what is merged. A local run stays a preview.
-- **It reads on a phone.** Every page fits a 320px screen (WCAG 1.4.10): cards sit two side by side (the overview, the icons, Used in, the pictures in use), each card's picture holds its whole component, scaled down to fit, a token's value is never cut, a long component name breaks, and a component's areas scroll sideways in their own bar.
-- **Its look is your system's.** The template is only the layout: every colour, text style, radius, space and the icon size on the page is one of your tokens, the page's text is your own body rule and inherits your page font with its fallbacks (the names of props, variables and classes too: one font on the page, never the browser's monospace), and every switch, text field, button, link and card on it is your own segmented control, text field, button and card. The page never draws a control of its own. When your system lacks one, the page uses its nearest stand-in from your system (no segmented control: your tabs, then your radio group, then your buttons side by side; no text field: your search field), else a plain control drawn with your tokens, and says so on the overview and on the Tasks page, for your team to decide whether the system needs it. The engine checks the built page and fails it when anything on it is not from your system (a button or link it styles itself, a font of its own), when its own text is below 4.5:1 on its own background in any colour mode, or when it breaks an accessibility rule it checks you by.
-- **Health.** Its own entry in the menu, above Tasks. How far the system has come in each area (parity with Figma, accessibility, documentation and motion), one number for the whole system with the areas weighted (Parity 35, Accessibility 30, Documentation 20 and Motion 15, or your own in `styleguide.health.weights`), and beside them its AI readiness, how much of what an agent needs to pick each component right is there (what it is, when to use it and when not and its role written, and nothing open with Figma), with how many components have all of it. Parity and accessibility count components: one counts whole when nothing in it is left, half when only checks are left and nothing while something is to fix, so the many values that match and criteria that pass never hide the few that do not. Documentation and motion count each item: done whole, to check half, to fix nothing. Every component counts the same. Each card has a tip at its top right that says exactly how its number is counted, with the counts it uses (the system's own tip trigger, a component carrying `data-tip`; with none, the words show on the card). Under the numbers, the five components with the most left; then parity by type, every open difference counted by what it is about (props, variables, values, effects, modes) and split by where it comes from (Figma and the code differ, only Figma has it, only the code has it), so it shows where the drift comes from; then accessibility by WCAG criterion, a bar for each criterion with how many components fail it and how many wait on a person's check, the one failing in most components first, so a fix that clears many at once comes first; then each component's own number, its standing in each area, its AI readiness and how much of it was checked (the share of its checks that ran, with the count: a value not compared, a criterion the last audit did not reach and Figma not read yet did not), the weakest first. A component whose number rests on fewer than half its checks says so under it. No task is listed there; they are on the Tasks page. Accessibility, and the system's number with it, shows once every component is tried in the browser, as on the Tasks page.
-- **Tasks.** Its filter, and under it the chosen kind's own counts, stay at the top as the list scrolls, each card's head row under them. Everything open in the system, by component, and under The system what its tokens owe (the semantic tokens with no description in Figma, for you to write; a token named after a product or a brand, for you to rename in Figma; a Figma variable that points at one no longer in the file, for you to fix in Figma; a token in the code that points at one declared nowhere, for Claude; the same colour written by hand in two tokens rather than pointing at one primitive, and the tokens a single component uses, for you to decide; a retired token still used, for Claude to swap or for you to name what replaces it), and under each component what moves off it when it is retired (one row for each product still using it, with its first places) and each class a product styles almost as it (for you to decide: use the component, with a new option if it needs one, or add the new one to the system on purpose), and the documentation still to write, in the Documentation table itself (kind, what is written, where it comes from), one card for each component with a kind not written yet, and where to write it above them. One kind is shown at a time, chosen with the filter (Parity, Motion, Documentation, Migration, Products, System, Page and Accessibility last; no list of every kind at once), each with its own address to send someone straight to it (`#tasks/parity`, `#tasks/motion`, `#tasks/accessibility`, and so on), each in a table of its own shape: Parity's is the table every component's Parity area shows (its task number, the type, what Figma has and what the code has, the values themselves and where in the code a difference is), Motion's the table every component's Motion tab shows, Accessibility's the table every component's Accessibility area shows (the WCAG criterion, what Figma states, what was found), Documentation's the Documentation table, and the rest where it is and what to do. Each row says what to do with who acts above it (You in Figma, a change you make in the Figma file, a colour that fails contrast included, since Figma's colours are yours; Claude in the code, tell Claude its number, a duty a Figma note asks for that has still to be tried in a browser included; You decide, when Figma and the code each have a case; You check by hand, what only a person can judge: once you have, tell Claude, for example badge 1.3.3 is checked, and the row is Done with your name and the date until the component changes, so a component can reach Meets WCAG 2.2 at level A and AA), and its status (To fix or To check, what it is for Parity, such as Differs from Figma or Only in code, New in the last audit when the last audit found it first, when it was last updated and where it was read). The system's own items come first in each kind and the kind's own count of what is to fix and to check is under the filter, so you can answer with the numbers (do 3 and 7). A control with no name only where an on/off prop hides its words (an icon-only button, a checkbox with no text) stays To fix, with what to do: the product names it where it uses it that way. The numbers run in the order of the kinds and down each one (the system first, then each component by name, in each what is to fix before what is to check), and a component's own Parity and Accessibility areas show the same numbers. Every variant of every component is tried in a browser while the page is built, and what each found is kept in the page, so the Tasks page and every Accessibility area open with the final results, dated, and nothing runs while you read them; that note sits under the Accessibility filter, the kind it is about. A component the build could not try (no Chrome where it was built, or the first copy published while the full build still runs) is tried in your browser instead and kept there, so a refresh never tries it again. A page whose own script stops while it is drawn is never published: the build says so at once and fails, so the last good page stays. Until every one is tried only Accessibility waits, how far the try has got said under its filter alone; every other kind is there at once with its final numbers, and Accessibility's list comes once, final, so no number changes while you read. A button under the Accessibility filter tries every component again in your browser when you ask.
-- **One view at a time.** The overview has a card for each foundation and component, each with a thumbnail (a few of the real tokens, or the component itself drawn small) and its name, two cards side by side and shorter on a phone; opening one shows only that foundation or component, at its own address you can share (`#c-badge`). A search covers everything on the page (components with their descriptions, annotations and props, every token by its Figma name and variable, type styles, icons, to-dos and sections): while you type, only its results show, just below the field, and choosing one opens it and marks it on the page (Enter opens the first, Escape clears), and every button on it says what it does in words, never an icon alone: on a phone, Menu at the top opens the navigation as a panel and Close menu shuts it; on a wide screen the menu is always there. The thumbnails are drawn in the browser from your own code each time the page opens, so they never need regenerating. The engine opens the page with `?all`, which draws every view at once and no thumbnails, for its own checks; it does so with your published page too, so a shrunken thumbnail is never measured as the component.
-- **One name, one look, on every page.** Each page's title is its name in the menu, in the menu's own case (overview, tasks, colors), 8px under its tag and 8px above what follows it on every page (the overview's links too, then its groups as far below as a page's text is from its content), in your system's own heading style when it has one clearly larger than its body text (at least 20px and 1.6 times it), else at 3.125 times its largest text style, so the guide has its own hierarchy whatever sizes the system has (`"title-scale": "2"` in `styleguide.chrome` changes the scale); the overview has no descriptions, only its groups and cards; the menu's groups (System, Foundations, Components) sit 24px apart, its links in your system's l text size, 8px apart, the page shown on your system's page background; each page's tag is the name of the menu group it sits under, so renaming a group renames the tags. Every bar that stays at the top as a page scrolls (a component's areas, a page's title, a foundation's size switch, kept under its title) is drawn alike, with a line under the lowest once it is stuck. Every table's head stays in view too as its rows scroll by, on every page: the card's head right under those bars, and the table's own head row (its column names) under the card's head.
-- **Foundations.** Under their own label in the menu. What the whole system shares: colours (the primitive ramp first, then the semantic roles, each group a list in one card with its name as the card's head, each colour with its sample (every sample on these pages the same height, so a space reads as its width), its Figma name, its variable and the value it is drawn with, and a Light and Dark switch above that changes only the samples and their values), typography (Figma's text styles in Figma's order, each beside a token table, as a component has: its family, size, weight, line height, letter spacing and case, each named by the Figma variable the style binds, then the code's variable and the value), spacing (one card per family, gap or padding, its name as the card's head, smallest first, each space with its names and value), radii (listed the same way), motion (the system's durations and easings, each with a dot that crosses its track when you press Play, at that duration or with that easing, and each easing's curve drawn beside it; nothing moves until you press it, and for a person who asks for less motion the dots go straight to their end; what the system does when a person asks for less motion, and where; and, once Figma's prototype is read, how Figma moves each component and whether the code does the same; when Figma has no motion variables at all, the Tasks page says so, for you to add them in Figma) and icons (grouped by their own size, with their stroke widths). Anything named after a component (its colours, its sizes), or that only a component's tokens point at (window chrome colours an action bar uses), is shown in that component instead; a component Figma has without props (a divider line) has its own view. Each is the CSS variable itself, shown only when the token check finds it equal to Figma in every mode. A size that changes with a mode shows the value of the mode picked on the section's size switch, as a component does, so you see the spaces and text styles change. Icons are shown at the size Figma gives them and under their Figma names, one card per size with the size as its head, on a grid of equal cells so they line up across and down; their stroke widths are listed as the spacing is.
-- **Components.** Each one drawn from your own markup (the contract's probe, an instance in your pages, or what its React or Vue source renders) with your own CSS: the instance that holds every part its props show or hide, so turning an icon or a label on or off shows it or hides it. A part no instance in your products has is drawn from your own CSS for it (an icon from your icon sheet, a text part with its own name, such as Description), and a Figma prop your code does not build yet is listed as such, never drawn with Figma's look. Its controls are the props both sides have, labelled with Figma's names and in the order of Figma's panel (variants first, then the rest as Figma lists them, a prop not built yet in its place, and a text right after the boolean that shows it, Show Text before Text Content); every text prop writes into the part whose own words it is, and a part your CSS draws as a shape (a priority dot) stays empty and comes before the words; an option applies what your contract's propertyMap says it adds. In a plain HTML and CSS system the controls are the Figma props your code realizes (the contract's propertyMap, `htmlRealizations`, a modifier class). Each one is centred in the playground at every width (one wider than it scrolls from its start), and one that lives inside another (one segment of a segmented control) is drawn once, inside its parent. Every state can be chosen, hover, focus and pressed too (the system's own rules for them, applied without a mouse), a state set on a part (a checkbox's input ticked) is set there, and choosing the option already set changes nothing. Using the component in the playground sets its props too: tick a checkbox, pick a radio, flip a switch or type in a field and its controls follow; editing a label changes only its words, so whatever else is set stays. A Figma option your code does not build is offered but marked so, and an option your contract maps to a product's own markup is read from the component's own CSS instead (Selected from its `:checked` rule). A component shown in an overlay opens over the whole window, as in a product. Its documentation at the bottom is Figma's description and annotations, its slots (how Figma lets each be filled: any content or only its preferred components, how many, empty at first), then the code's own note; when Figma was last read for it and every commit that changed its code are in its Changelog; on a phone it reads in one column, each name above its text. What still differs from Figma is marked on its Parity area with your system's alert icon and listed there, in two columns of tables, in plain English, each with who acts (you in Figma, or the code) and exactly what to do. Each one works as in your products: a selection moves when you click it, your system's own scripts run (`systemScripts` in `ds-config.json`), a component shown in an overlay opens in it with its own animation from a button, and an entry or exit animation can be replayed, its button at the bottom left of the playground, on the same bar as the colour mode. Your system's modes are switched inside the playground, named as your Figma collections are (Styling, Sizing): the colour mode at its top left, the other at its bottom right, with no label over them, apart from the component's own props. Below it, the tokens behind what is drawn now (each visible part, read again on every prop change; a text a prop hides takes its text style and colour out with it) with its code on their right, the code as tall as what it holds and scrolling inside only past the tokens' height. Every token the component has is listed in Parity, each variable's name opening its value per mode, what it is for (its Figma description, or that none is written yet) and what else uses it. A component your system defines by an id (a tooltip, `#tt`) is drawn with that id's own rules and shown as it is in use, in place in the playground. Documentation, Accessibility and Changelog are grouped in the same tables, and every box on the page has your card's border, corners and shadow.
-- **What only the code has.** A component your code has and Figma does not is shown too, with its file and its props, marked Only in the code; before your Figma data is captured, the style guide lists every component your code has that way.
-- **A component's page, in areas.** Above them, its name and how a product imports it (`import { Chip } from '@/components/Chip'`, with your button to copy it and one to download its file; in a system of CSS classes, the stylesheet that holds its rule, by the name your package's exports give it, `@import '@acme/ds/theme.css';`, and the functions of your system's own script that build or drive it, `showToast(msg, opts)` from `@acme/ds/ui-shared.js`, or their import when the script is a module, each read from your code for that component). Then one area at a time, switched with your own tabs that stay at the top as the page scrolls (with none in your system, the page's own: the area names in a row, a line under the chosen one and under the whole row, in your colours, text styles and spacing, with no note about it, in your largest text style, the words twice as far from the line as they sit from the top) (on a phone it scrolls sideways in one row, the area you chose brought into view, and the playground keeps room for the component below its mode switches), with the component's name beside it once its heading has scrolled away (a foundation's title stays at the top too), a component always opening on its Playground, each area under its own title with its content 16 pixels below: **Playground** (the component, its controls and Width, the tokens behind what is drawn and its code), **Specs** (its parts, paddings and gaps), **Variants** (every option of each variant prop and both sides of each on/off prop, one per row, in the page's colour mode, with Try it to set it in the Playground; every component with a variant or an on/off prop has it, one with only text, slots or swaps does not), **Documentation** (its usage, its API, Figma's and the code's own words), **Accessibility**, **Parity**, **Built with** (the system's components it is made of, each the overview's card with its own preview, linked to its page), **Used in** (a product that draws its own version instead, found by Gate [10], is there too, said so) and **Changelog** (Figma first: when it was last read, then every read that changed what Figma says of it, with what changed, a property added or renamed, an option, a variable's value in a mode; then every commit that changed its code, followed through its own rules so a change inside a rule counts, by the release it shipped in, each release linked, each commit linked with its pull request and a short note of what it changed in its rules, padding --padding-s → --padding-m). Its version is the release its last change shipped in. The Playground is one card: the stage fills its left side to the edges, the controls are on its right. A table's own head is as tall as the card's head above it. In the Playground, every Figma slot is shown as the area it takes (Inspect on it says only that it is a place for content and the spacing Figma gives it, its padding and gap, checked against the code's like every other part's): dashed, named Slot inside, in place of its placeholder (in the part that holds it, `.modal-slot`, or in place of the content a card or a status bar holds, at least the size a slot needs to be read, so the component grows around it and its other parts still show), while the HTML shown stays your markup; a slot only Figma has is listed in Parity. Then how ready it is (stable, beta or deprecated, only when your team said so: a `Status: beta` line in its Figma description or annotations, `@deprecated` or `@status beta` in its code, or `status` in `contract.authored.json`) and how much of its file your tests cover (from the coverage summary your tests write, `coverage/coverage-summary.json` or `styleguide.coverage`); its status is on its overview card too. Beside it, its version (the release its last change shipped in) and when it last changed, date and time; each overview card is its picture and, below it on your table heads' background, its name (a Used in card adds a line under the name on the same background; the card's corners round the picture's top, its bottom stays square), and the Accessibility and Parity areas carry your alert icon before their label when something needs work (on Accessibility, anything its table has to fix or to check) (on Parity, anything its table marks: a row that differs, one only in Figma or only in code, a prop not built). Parity's table keeps its head in view under the areas as its rows scroll by, and a Figma slot or component swap counts as built when your markup takes content (with code props, a slot is `children`). Each overview group says what it holds (`styleguide.groups` words it your way). Its version, when it last changed and its import share one line, wrapping when the room runs out. At its top right, its links, said as where they take you (See in Figma, See in code) with your system's icon for a link that opens elsewhere: its node in Figma, its code (its own file, or the line of its rule in your stylesheet) and your team's pages (`styleguide.componentDocs: "https://wiki/…/{name}"`, or `links` in `contract.authored.json`). The overview links the Figma file, the repository and `styleguide.links`. The import path is the file's package and path, else `@/` and its path under `src/`; `styleguide.importFrom` (`"~/ui/{path}"`) writes it your way. Each area has its own link to send someone to (`#c-chip/accessibility`, `#c-chip/documentation`), kept in the address as you switch areas.
-- **Documentation, the same on every component.** Each component's Documentation is the table every task shares, as its Parity and Accessibility are: each kind (what it is, when to use and when not, common mistakes, limitations, do and don't pictures and its role) with what is written, what to do and who does it, and its status, To fix or Done with where it was written. The component shows every kind, what is still to write first; the Tasks page shows only what is still to write, under the same task numbers, and the Documentation tab carries the alert icon while anything is missing.
-- **Motion, the same on every component.** Each component has a Motion tab: everything that moves in it in the table every task shares, each row what happens (when it plays, what moves and the part: opens and fades in, `.modal-card`), the code's duration and curve with the variables and the file and line they come from and whether it stops for a person who asks for less motion, Figma's with where in Figma it comes from (its Motion timeline, the overlay its prototype opens, a transition between its variants), what to do and who does it, and its status. A modal's card and its backdrop are each a row. The tab carries the alert icon while something moves otherwise than Figma, and the Tasks page lists those rows under Motion.
-- **Width.** Width shows the component at each width your Figma file gives its breakpoint modes (a viewport width variable, `viewport/min-width`: Phone 350, Desktop 1680), else at 375, 768 and 1280 pixels, without resizing your browser, with your own stylesheets, so your media queries apply, and your scripts run in it, so it works there too; Fit brings back the live preview. The address follows what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant; the other areas' addresses carry only the area. The stage is never narrower than a phone screen and its margins: with less room the controls go below it, and a component wider than the stage scrolls inside it, never over the controls. The component has room above and below it on the stage, whatever it shows (the component, Inspect, a width): 100px on a wide screen, 64px on a tablet or a narrow laptop and 40px on a phone.
-- **Figma beside the code.** In the Playground, the Figma button shows Figma's image of the variant you set beside the component as your code draws it, or over it with a slider that reveals more or less of Figma, a small one drawn larger. The images come from your references folder (`.design-system-engine-refs/components/<name>/Size=L, State=Default.png`, each variant named as Figma names it) or, with `FIGMA_TOKEN` in `.env`, straight from Figma, every variant at once. A variant with no image says so.
-- **Do and Don't.** Pictures of the right and wrong use, each named for what it shows, in your references folder (`.design-system-engine-refs/components/button/do/Labels that say what happens.png`, and `dont/`), or Figma frames your contract names (`examples` in `contract.authored.json`, read with `FIGMA_TOKEN`), shown in pairs under Usage.
-- **Changelog.** Every release and what it changed, one row per change with the components it touched, from your code's history.
-- **One way of writing names.** Every property and option name in your Figma file is read for how it is written (Show Icon, show-icon, showIcon), and the way most of the system writes them wins; each name written otherwise is listed in the audit's list of differences, on its component's Parity and on the Tasks page, with its rename for the Figma file, and a misspelt option (sucess) is named as the word it meant.
-- **A token's panel.** Click any token's name on the page and a panel opens right there: its Figma name, its value in each mode of each collection that changes it (Light and Dark, Desktop and Phone, the one drawn where you clicked marked, else that it is the same in every mode), the components that use it, in their own rules or through another token (`--button-background` naming `--neutral-100`), each linked, and a button to copy it, so you know what a change to it touches without leaving the page. Search finds props too.
-- **Inspect.** In the Playground's top bar: the Width goes back to Fit, so the component sits in the middle of the stage, and the Playground turns into the component's anatomy, as you set it, at the size the Playground draws it (never scaled down; one wider than the stage scrolls) and redrawn with every change, each part, padding and gap outlined (never filled with a colour, so nothing reads as a token's colour). Click one and the bar below says in one line what it is and its value (`chip padding left · --padding-s · 8px`, an icon's size and colour), the rest dimmed around it. Click inside it to reach what is nested there, one level at a time (`Actions › buttonSecondary › text`), and click it again to go back up; click outside the component to let go. Switch Light, Dark, Desktop or Phone while inspecting and the drawing follows; pick a Width and it is drawn at that width instead of the Playground's. Done inspecting brings the live component back and removes the anatomy. The sizing mode sits in the bar above the component and the colour mode in the bar below it, so the stage stays apart from what changes it.
-- **Parity.** One table of everything the component has, whatever the Playground shows: every prop, every variable and every value compared, in the same table as the Tasks page's Parity. Each row has its issue number when it is open, its type, Figma's name and value beside the code's, what to do with who acts, and a status you read at a glance (a sign in the system's colours: Done, To fix, To check or Not compared, with what it is under any but Done, differs from Figma, only in Figma, only in code) with the date and time it last held. A difference the last audit found sits in the row it is about, with where in the code it is, who acts and what to do; what it found beyond those rows has a row of its own. Open rows come first. A count of each status is above it, and you can filter it by props, variables, values or the rest. On a phone every table of several columns reads as a block per row, each value under the name of its column, so nothing is squeezed, cut or drawn over; a filter or a control with many options scrolls sideways, and the page fits 320 pixels.
-- **Used in.** A card for each of your products that uses it, with the product's own picture (`docs/preview.png` or a screenshot in its folder, or `styleguide.plugins[].image`), its name, linked to it, and how many times the component appears in its code. A product with no picture of its own is pictured as its page opens, with each place the component sits on it marked.
-- **Code.** Under each component, the code for exactly what the playground shows, with your button to copy it. In a framework system it is the component as a product writes it (`<Chip size="l" />` in React, Svelte or a custom element, `:on="false"` in Vue), with each value as your code spells it, a default left out, and every prop your code requires written even when the playground does not set it. In an HTML and CSS system it is the HTML drawn, with only the classes your CSS styles.
-- **API.** The props your component's file declares, each one it requires marked with a * (and read as required by a screen reader), with its values and default; the events it sends (Vue's emits, Svelte's dispatch, React's onChange-style callbacks) and its slots, with the file they were read from. Required only ever means what the code says: a prop with a default is not required, and a prop nothing marks is never guessed. An HTML and CSS system has no API to read, so the section is left out.
-- **Accessibility.** One table, by WCAG 2.2 criterion at level A and AA, of only what applies to the component: in the same table as the Tasks page's Accessibility: its issue number when it is open, the criterion, what Figma's annotations state for it, what was found (each finding or duty naming the component, its variant or the part it is about), what to do with who acts, and its status with when and where it was read (a Figma annotation, your contract, your code, the style guide in the browser, the last audit, a person); what a criterion means opens from its name on a click or when the pointer rests on it (To fix, To check, Done) with a count of each above it and when the audit last ran. What belongs to the page that uses the component, video and sound it does not play, and what asks of controls or fields on a component with none, are left out. To fix comes first. Every variant is tried in a browser while the page is built, its results kept in the page (the Tab stops, names, focus, text contrast in every colour mode, images, groups, reading order, control edges, hover and focus content, motion, links, label in name, valid ARIA, status messages, and what it does when used), the audit adds real key presses, zoom, text spacing and a keyboard trap, and your code is read for single-key shortcuts, short timers, gestures and device motion. Colours are read once a mode has settled, never halfway through the component's own transition, in the page and in the audit. A criterion that passes says so and where it was tried (Passes in all 8 variants); one a person still checks says no problem was found there, then what the person looks at. What only a person can judge says what to look at. What no check reads is in the same table, a row each: each Figma annotation on it or its layers that no check reads, with how to write it so one does, and the section of your guidelines from Notion or GitLab named after it (read by the agents).
-- **Modes.** A switch for each of your mode collections on each component (and each foundation section), and the colour mode for the whole page too; a component's own switch is independent of the page's, so a component in Light on a Dark page looks exactly as it does in Light. The modes are listed in Figma's own order. By default the page switch is on Auto, which names the mode it found, and the page and every component use your computer's and browser's own settings (Dark when it is set to dark, Phone sizes in a narrow window) and follow them when they change, until you pick a mode; a change on the page's switch applies to every component. A breakpoint mode your theme draws in a media query (a phone size, say) can be switched on any screen, and the switch lists what the mode changes (padding/xs 4px → 8px). A mode your code has no CSS for yet is shown as such, never drawn with Figma's values.
-- **Last update.** Each component shows when its code last changed (the latest commit on its CSS rules and its contract and config entries, or that a change is not committed yet) and when Figma was last read for it.
-- **In use.** The approved pictures of your Figma frames (the ones the frame check compares against), when there are any.
-- **Not agreed yet.** A prop only one side has, another default, a token that differs or a component not built yet is left out and counted in one line at the top, so you decide each one before it appears.
+- Grouped by component, with what is new since the last check.
+- Under each component, where it lives (the products that use it and what it sits inside), so you see how far a fix reaches.
+- At the top, each check that did not run, so a gap is never mistaken for a pass.
 
-A project can still use a template of its own (`ds-config.json` → `styleguide.template`).
+It is written whether or not you have a style guide, and the summary of every check says where it is.
 
-### Bring Figma in line with the code
+## Check your code against Figma
 
-When the code already states something Figma does not, the engine can write it into Figma for you. Each component gets its accessibility spec as the code gives it, in the Accessibility category: its role (a real `<button>` gets `Role: button`, the note every later check reads), what names it, the states it says, the keys its role owes (Enter and Space press a button, Escape closes a dialog) and what a screen reader says for it, for whoever builds it. And once the designed screens are read for accessibility, each problem found on them is pinned on the layer it is on, with its WCAG number and its fix, and each screen gets a summary, in the category Accessibility Review. Both are replaced on each run, so what is fixed clears.
+The engine reads what your design system defines in Figma, its tokens and each component's parts, states and options. Then it checks your code against it, value by value and in a real browser. It is not a screenshot comparison.
+
+### What it compares
+
+- **Tokens.** Colours, sizes, fonts, shadows and durations, in every mode (Light and Dark, Desktop and Phone).
+- **Components.** Props, defaults and options, every state (hover, focus, pressed, disabled, selected), heights, spacing, corners and markup.
+- **Icons.** From the shared set, drawn the same way as in Figma.
+- **Motion and effects.** How each component moves, and what it draws beyond its colours (both below).
+- **Product screens.** Where each product puts each component (below).
+
+Every difference comes with its fix in plain words and who acts, you in Figma or Claude in the code.
+
+### Every combination of modes
+
+The gates check each mode on its own. When you have two collections that switch (Light and Dark, Desktop and Phone), every combination is also opened in the browser, such as Dark on a phone or Light on a desktop.
+
+- Each token is compared with Figma's value in that combination.
+- Each text and background pair the system uses is measured for contrast.
+
+Only what is wrong together and right in each mode alone is listed, with the combination. A phone rule that sets a colour, so Dark on a phone keeps Light's, is a typical case. These show on the style guide's Tasks page, under The system.
+
+### How components move
+
+Figma says how things move in three places, and the engine reads all of them.
+
+- **Between states.** A variant that leads to another on hover or press, with its duration and curve (Smart animate, 300ms, ease out). Gate 21 also holds the code to the transitions your team wrote down.
+- **On their own.** A spinner turning, a panel, modal or toast opening and closing. Figma says it on its Motion timeline, in the overlays its prototype opens and in variants that lead to each other after a delay.
+- **In the code.** `@keyframes` animations, and the transitions a state plays when it opens or closes (a drawer's `.is-open`).
+
+`rms-design-system-engine --figma-motion` writes a read-only script that reads Figma's side, on every page, without changing anything. Once its answer is saved, each movement is compared.
+
+- One Figma animates and the code does not, or with another duration or curve, is Claude's to fix in the code.
+- One only the code animates is yours to add in Figma, or to ask the code team to stop.
+
+Each one is a row in the component's Motion tab and on the Tasks page, under Motion. The style guide's motion page also puts the system's timings in one table, fastest first, with what each is for, the components that use it and what the system could tidy up.
+
+### What each component draws beyond its colours
+
+A card's shadow, a scrim's blur, a banner's gradient, a frame that clips what overflows it, a layer that blends or is see-through.
+
+`rms-design-system-engine --figma-effects` writes a read-only script that reads these for each component and its layers, two levels deep. Once its answer is saved, each is compared with the component's own rule in the code (`box-shadow`, `filter`, `backdrop-filter`, `overflow`, `mix-blend-mode` and `opacity`).
+
+- One Figma draws and the code does not, or draws differently, is Claude's.
+- One only the code draws, or a clip Figma sets that the code leaves open, is a decision for both.
+
+Each is an Effect row in the component's Parity area and on the Tasks page.
+
+### Each product's screen, as designed
+
+A component can match Figma on its own while a product puts it in the wrong place. `rms-design-system-engine --figma-screens` reads the screens `ds-config.json` names for each product, read only. Each product's built page is then opened at the width, height and colour mode of its screen, and compared.
+
+- Which components, and how many.
+- Their order.
+- The space between neighbours.
+- Whether the ones that line up in Figma line up on the page.
+
+A list (three or more of one component) is compared by whether it is there and where it starts, since how many rows it shows is data. A page that opens in another state than its screen, empty before its data arrives, is said once and not compared until its screen has a `setup`, a script that puts the page in that state. Each product with a difference is a row on the Tasks page, under Products.
+
+### Nothing passes by accident
+
+- A check that had nothing to read shows **Not run** with the reason, never Pass.
+- What a check cannot see is listed as not comparable, with the reason, not as a difference.
+- Every check is tested with a mistake planted on purpose.
+
+## The checks
+
+Each check is called a gate. To run just one, use its number or its name, for example `--only 3` or `--only "token values"`. How each one works is in the [technical documentation](details.md#what-it-checks).
+
+| # | Gate | What it looks at |
+|---|---|---|
+| 1 | Data is up to date | You are comparing with today's Figma, not an old copy |
+| 2 | Figma frame unchanged | The design still looks like the version you approved |
+| 3 | Token values match Figma | Colours, sizes and fonts, in every mode |
+| 4 | Tokens used in screens exist | Nothing a screen uses is missing from the code |
+| 5 | Every mode is covered | Things that should change between modes really do |
+| 6 | Exception lists are valid | Your "ignore this" notes still point at real things |
+| 7 | No invented CSS variables | Every variable in the code comes from a Figma token, under that token's name |
+| 8 | Docs tell the truth | Your docs mention only things that exist |
+| 9 | No invented text casing | No forced UPPERCASE the design did not ask for |
+| 10 | No hand-built DS components | Screens use the real component, and no product draws its own copy of one |
+| 11 | Clean CSS | Nothing unused, nothing that contradicts Figma |
+| 12 | Nested components keep their styles | One component's look does not leak into another |
+| 13 | Structure matches | Heights, spacing, corners, widths and alignment, measured in a browser at each breakpoint and colour mode |
+| 14 | All states are built | Hover, disabled, selected and the rest, in every mode |
+| 15 | Component props match Figma | The same names, defaults and choices, written one way across the system |
+| 16 | Sub-components match Figma | The parts inside a component are the right ones |
+| 17 | Templates compose the right components | Each page is built from what Figma shows |
+| 18 | Markup matches | Classes, icons and every control the design shows |
+| 19 | Required pieces are in place | Icon slots, component slots and form fields |
+| 20 | Icons match Figma | From the shared set, drawn the same way |
+| 21 | Transitions match | Durations and easing |
+| 22 | Motion matches | When your design defines it |
+| 23 | Shadows match | When your design defines them |
+| 24 | Renders correctly in a browser | Checked on the real page, not only in the code, every text style and mode included |
+| 25 | What this audit actually checked | So you can see that nothing slipped through |
+
+## Accessibility
+
+Each component is tried in a real browser against WCAG 2.2 at level A and AA. axe-core, the scanner most accessibility tools are built on, runs on the same page every time. One run is the whole check, so nothing else needs to run beside it.
+
+### Where it runs
+
+- **Your components.** On a page you name, your style guide or your built pages. React and Vue components with no page to open are rendered straight from their own code, in each Figma variant, with no dev server.
+- **Your products' pages.** When the check runs on the style guide, each product's built page is opened whole, and every rule runs on it. Findings are named after the product and listed on the Tasks page under Products. `a11y.products: false` leaves them out.
+- **Your designed screens in Figma.** `rms-design-system-engine --figma-a11y` reads the screens `ds-config.json` names, read only, for text and icon contrast and target size. With `--figma-edits`, each problem is pinned on its layer in Figma once you say yes.
+
+### What it tries
+
+- **Every state and colour mode.** Each control is measured again while hovered, focused and pressed, in every colour mode, its text and its edge.
+- **The keyboard.** The Tab key is followed through the page. It finds an element a mouse can click that Tab never reaches, a keyboard trap, focus that jumps back up the page and focus that lands where no one can see it. A modal dialog must keep the focus inside.
+- **Screen readers.** Each press that shows something is heard as a screen reader hears it, so a toast or an error that appears with nothing said is found. The report prints what a screen reader says for each component (`checkbox, Remember me, not checked`), so you can judge the words without opening VoiceOver or NVDA.
+- **Contrast.** Measured against what is really painted behind the text, see-through text and colours in `oklch()` included. An icon that carries meaning and a control's edge are held to 3:1 in every colour mode.
+- **Touch and small screens.** Target size is measured in every mode, at the page's width and again on a 320 pixel screen. Each tip is tapped with a touch screen emulated. A control under the comfortable 44 pixels gets advice.
+- **Reading needs.** Wider text spacing, zoom, Windows high-contrast mode and colour blindness. Two variants told apart only by red and green are found.
+- **Roles from Figma.** Each component is held to the role in your Figma annotations, what it must expose (a toggle's pressed state, a field's label, a stepper's value) and what a person can do with it (Space flips a toggle, ArrowUp steps a stepper).
+- **Hidden components.** A modal, menu or popover kept behind a button is opened first, never with a button that deletes, sends or submits. One that nothing opens is said not checked, never clean.
+- **Signing in and dragging.** A password field that refuses paste or a password manager is found, and so is something moved only by dragging.
+
+### What you get
+
+- Every problem with its fix in plain words, named after the component it is in.
+- How many texts, icons and controls were measured, and every element with its verdict.
+- One verdict line, such as `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.1 AA`.
+
+How sure each finding is.
+
+- **Blocker.** Measured on the page against WCAG.
+- **Warning.** Read from the code, a contract or a Figma note, and can be wrong.
+- **Advisory.** Beyond AA, or for a person to judge.
+
+`--no-axe` and `--no-states` leave a part out, and then the result says not all of it was checked.
+
+### What the design owes
+
+Some problems belong to the Figma file. They are listed for whoever keeps it.
+
+- An interactive component with no focus state, so the code has to invent the focus ring.
+- An error state with no message, so the error is shown by colour alone.
+- A control under 24 pixels.
+
+Meanwhile Claude writes a visible focus ring and leaves an error message's words to you.
+
+Every rule the check applies is in the [technical documentation](details.md#accessibility).
+
+## The living style guide
+
+`rms-design-system-engine --styleguide` builds one page with every token and component, from what Figma and the code agree on. It goes to `.design-system-engine-out/styleguide/index.html`.
+
+**[See an example](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)**, the RMS Design System's style guide, built by this engine and published by that design system, so it shows what the engine makes today.
+
+- **One component at a time.** Add `--component modal` and it checks that component first, against Figma and for accessibility, then builds a page of that component and the ones it nests, `styleguide/modal.html`.
+- **One link for the team.** `rms-design-system-engine --publish-styleguide` writes the CI job that publishes it on every push, to GitHub Pages or GitLab Pages, so everyone opens the same page built from what is merged. A local run stays a preview.
+- **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
+
+### What's in it
+
+| Page | What you find there |
+|---|---|
+| Overview | A card for each foundation and component, with a thumbnail drawn from your own code, and a search across everything |
+| Health | How far the system has come, in one number and by area |
+| Tasks | Everything still open, with who acts and what to do |
+| Foundations | Colours, typography, spacing, radii, motion and icons |
+| Components | One page for each component, in areas you switch between |
+
+### Health
+
+One number for the whole system, weighted across four areas. Parity counts 35, Accessibility 30, Documentation 20 and Motion 15, or your own weights in `styleguide.health.weights`.
+
+- **AI readiness.** How much of what an agent needs to pick each component right is there, what it is, when to use it and when not, its role, and nothing open with Figma.
+- **How it counts.** Parity and accessibility count components. A component counts whole when nothing is left, half when only checks are left, and nothing while something is to fix, so the many values that match never hide the few that do not. Documentation and motion count each item the same way. Each card has a tip that explains its number.
+- **Where to start.** The five components with the most left. Parity by type, every open difference counted by what it is about (props, variables, values, effects, modes) and where it comes from (Figma and the code differ, only Figma has it, only the code has it). Accessibility by WCAG criterion, the one failing in most components first, so a fix that clears many comes first.
+- **Each component.** Its own number, its standing in each area, its AI readiness and how much of it was really checked, weakest first. A component whose number rests on fewer than half its checks says so.
+
+Accessibility, and the system's number with it, shows once every component has been tried in the browser.
+
+### Tasks
+
+Everything open in the system, one kind at a time. The kinds are Parity, Motion, Documentation, Migration, Products, System, Page and Accessibility, each with its own address to share (`#tasks/parity`, `#tasks/accessibility`).
+
+Every row says what to do and who acts.
+
+- **You in Figma.** A change you make in the Figma file, a colour that fails contrast included.
+- **Claude in the code.** Tell Claude the task number, for example do 3 and 7.
+- **You decide.** Figma and the code each have a case.
+- **You check by hand.** What only a person can judge. Once you have, tell Claude (badge 1.3.3 is checked) and the row is Done, with your name and the date, until the component changes.
+
+Each row also shows its status (To fix, To check, New in the last audit), when it was last updated and where it was read. The system's own items come first. Under The system you find what the tokens owe, such as descriptions to write in Figma, a token named after a product, an alias that points nowhere, and a retired token still in use.
+
+Accessibility is tried while the page is built and kept in it, so the page opens with the final results and nothing runs while you read. A component the build could not try is tried in your browser instead. A page whose own script fails is never published, so the last good page stays.
+
+### Each component's page
+
+At the top, the component's name and how a product imports it, with buttons to copy it or download its file. Beside it, its version, when it last changed, and links to See in Figma, See in code and your team's own pages. Then one area at a time.
+
+| Area | What it shows |
+|---|---|
+| Playground | The component drawn from your own markup and CSS, with Figma's props as controls, every state, your modes and a Width switch. Below it, the tokens behind what is drawn and the code to copy |
+| Specs | Its parts, paddings and gaps |
+| Variants | Every option of each prop, one per row, with Try it to set it in the Playground |
+| Documentation | What it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures and its role, with what is still to write |
+| Accessibility | One table by WCAG 2.2 criterion, with what Figma states, what was found, what to do and who acts |
+| Parity | Every prop, variable and value compared with Figma, each marked Done, To fix, To check or Not compared |
+| Motion | Everything that moves in it, the code's timing beside Figma's |
+| Built with | The system's components it is made of |
+| Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
+| Changelog | Each Figma change and each code commit, by release, with links |
+
+Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.
+
+In the Playground.
+
+- **Inspect.** Outlines each part, padding and gap. Click one to see what it is and its value (`chip padding left · --padding-s · 8px`), and click inside to go one level deeper.
+- **Figma beside the code.** The Figma button shows Figma's image of the variant you set, beside the component or over it with a slider. The images come from `.design-system-engine-refs/` or, with `FIGMA_TOKEN` in `.env`, straight from Figma.
+- **Width.** Shows the component at each breakpoint your Figma file gives (Phone 350, Desktop 1680), else at 375, 768 and 1280 pixels, with your media queries applied.
+- **It works as in your products.** Your system's own scripts run (`systemScripts` in `ds-config.json`), a selection moves when you click it, and an overlay opens with its own animation.
+
+Also on each component.
+
+- **API.** The props, events and slots your code declares, required ones marked. A plain HTML and CSS system has no API to read, so it is left out.
+- **Code.** Exactly what the Playground shows, as a product writes it (`<Chip size="l" />`), or the HTML with only the classes your CSS styles.
+- **A token's panel.** Click any token to see its value in each mode, the components that use it, and a button to copy it.
+- **Not agreed yet.** A prop only one side has, a different default or a token that differs is left out and counted at the top, so you decide each one first.
+- **Only in the code.** A component your code has and Figma does not is shown too, marked as such.
+- **Status and coverage.** Stable, beta or deprecated when your team says so, and how much of its file your tests cover.
+
+### Foundations
+
+- **Colours.** The primitive ramp first, then the semantic roles, each with its sample, Figma name, variable and value, and a Light and Dark switch.
+- **Typography.** Figma's text styles in Figma's order, each with family, size, weight, line height, letter spacing and case.
+- **Spacing and radii.** One card per family, smallest first.
+- **Motion.** The durations and easings, each played when you press Play, each easing's curve drawn, and what the system does for someone who asks for less motion.
+- **Icons.** Grouped by size, shown at the size Figma gives them, with their stroke widths.
+
+A token shows only when the token check finds it equal to Figma in every mode. Anything named after a component, its colours or sizes, is shown in that component instead.
+
+### It looks like your system
+
+The template is only the layout. Every colour, text style, radius and space on the page is one of your tokens, and every button, switch, field and card is your own component.
+
+- When your system lacks a control, the page uses its nearest stand-in from your system (no segmented control, so your tabs) and says so on the Tasks page, for your team to decide whether the system needs one.
+- The engine fails the page when anything on it is not from your system, or when its own text falls below 4.5:1 in any colour mode.
+- Page titles use your own heading style. `"title-scale"` in `styleguide.chrome` changes their size.
+
+### Modes
+
+Each component and foundation has its own switch for each mode collection, and the page has one for colour. By default everything follows your device (Dark when it is set to dark, Phone sizes in a narrow window) until you pick a mode. A mode your code has no CSS for yet is shown as such, never drawn with Figma's values.
+
+### It works on a phone
+
+Every page fits a 320 pixel screen (WCAG 1.4.10). Cards sit two side by side, every table reads as a block per row, and the menu opens from a Menu button.
+
+## Prototype with your design system
+
+Describe a screen in your own words and get it made only of your design system's components, with their own options. Nothing is invented and nothing in the system changes. When a screen needs something the system lacks, the prototype shows a labelled box or marks the component standing in, and the need goes on a list for your design team.
+
+Measured on twelve prototype requests, Claude alone made 17 of 36 right with Opus and 3 of 36 with Haiku. With the engine, 36 of 36 and 35 of 36 ([case study](../CASE-STUDY.md)).
+
+| You want to | Type in Claude Code | Or in the terminal |
+|---|---|---|
+| Make a prototype | `/rms-design-system-engine prototype a notification settings page with our components` | `rms-design-system-engine --prototype prototypes/settings.json` |
+| See what a prototype may use | `/rms-design-system-engine what can a prototype use?` | `rms-design-system-engine --prototype --catalog` |
+| Start from the screens you designed in Figma | `/rms-design-system-engine make prototypes from our Figma screens` | `rms-design-system-engine --prototype --from-screens <screen capture>` |
+| Check that the product's pages match | `/rms-design-system-engine are our prototype pages consistent?` | `rms-design-system-engine --prototype --consistency` |
+
+### What you get
+
+- **A page made of your real system.** Your components and tokens, in light and dark, under `.design-system-engine-out/prototypes/`. It draws at once, even offline.
+- **Every state.** Empty, error, loading and any state your guidelines or your request name, each switchable on the page.
+- **Every screen size.** Each state is tried from phone to desktop, with the words as written and 40% longer, as a translation makes them. Text that spills, a label on two lines and a target too small to tap are listed.
+- **Click-through flows.** Pages link to each other, so you can click through a sign-up or a checkout, checked against the flows your guidelines describe.
+- **It works.** Your system's own scripts run, so a selection moves, a toggle switches, a field takes typing and a dialog opens and closes with Escape.
+- **A design review.** Each page is reviewed in the browser and scored out of 10 for alignment, spacing rhythm, one main action, a heading that leads and lines short enough to read. Claude fixes what scores low.
+- **Checked in the browser.** Measured against the screen your designers made, and run through the accessibility check.
+- **Pages that match.** Page padding, space between sections, text styles, where actions sit and what they are called, never Save on one page and Submit on another.
+
+### It uses what your team knows
+
+Before Claude writes a prototype, it sees what was read (Figma, the code, your recorded decisions, your guidelines from Notion, GitLab or the project) and the guidelines, components and screens that fit your request. Each component comes with what it is for, when to use it and when not, its common mistakes and its Do and Don't.
+
+- A retired component is never used.
+- A rule like one button per screen is checked.
+- A component your documentation rules out for a use is not used for it.
+
+### What a prototype is
+
+A short file listing which components go where, with which options (`prototypes/<name>.json`). The engine checks it first. One that uses a component or an option the system lacks is not drawn, and each line says why.
+
+Where your system has no layout components, the engine lends neutral ones (a page, a stack, a row, columns) that use only your spacing tokens and text styles, and adds layout components to the list.
+
+### The gap list
+
+Every prototype's gaps are kept in `.design-system-engine-out/prototypes/gaps.json`, the most needed first. Each says what was searched, the nearest components, what stands in meanwhile and why none fit, so whoever decides works from the evidence. Ask to send them to Figma and they become your design team's to do list there, one card per need, written only after you say yes.
+
+## Start from Figma only
+
+Open an empty project, set it up with your Figma link and ask for what to build. With no code yet, the engine starts in build mode. What Figma has and the code does not is listed as to build, in order, never as a failure.
+
+| You want to | Type in Claude Code |
+|---|---|
+| Build the tokens | `/rms-design-system-engine build the tokens from Figma` |
+| Build a component | `/rms-design-system-engine build the button from Figma` |
+| Build a screen from the components | `/rms-design-system-engine build the settings screen from Figma with our components` |
+| See what is left to build | `/rms-design-system-engine what is left to build?` |
+
+Claude writes the code. The engine gives it Figma's exact names and values first, and checks every piece after.
+
+Measured on a small design system in Figma (tokens, four components and a screen), Claude with the Figma MCP alone built 8 of 18 pieces right with Opus, 16 of 30 with Sonnet and 4 of 18 with Haiku. With the engine all three built all of them. The [case study](../CASE-STUDY.md) gathers every measurement, and the full log is in [test/skill-evals/RESULTS.md](../test/skill-evals/RESULTS.md).
+
+## Keep products aligned
+
+- **Rename a token everywhere.** A token renamed in Figma is renamed in one change. `rms-design-system-engine --rename-sweep` pairs each old name with its new one by value in every mode, and writes one patch for the system and one for each product. The old name stays in the theme, pointing at the new one, until every product has moved.
+- **Retire a component or a token.** Mark it deprecated in Figma or in the code, and the engine lists every place still using it with what to write instead (`handback/migrations.md`), plus a patch for each token swap. The style guide shows it on the old component's page (Use chip instead, still used in 12 places).
+- **Catch near copies.** A product that builds a component by hand, or styles a class almost like one of yours, comes back to you as a decision. Use the component, with a new option if it needs one, or add the new one to the system on purpose.
+- **Count values written by hand.** Every colour, size, radius or duration a token should carry, with the token to use. `rms-design-system-engine --census` keeps the count, so it only falls.
+- **Products in their own repositories.** Name them in `ds-config.json` (`pluginDirs`, or `codeRoots` for any folder) and every scan reads their code as the project's own.
+
+Nothing is applied until you ask.
+
+## Bring Figma in line with the code
+
+When the code already states something Figma does not, the engine can write it into Figma for you.
+
+- **Each component's accessibility spec,** as the code gives it, in the Accessibility category. Its role (a real `<button>` gets `Role: button`), what names it, its states, the keys its role owes and what a screen reader says.
+- **The designed screens' accessibility problems,** each pinned on its layer with its WCAG number and its fix, and a summary for each screen, in the category Accessibility Review.
+
+Both are replaced on each run, so what is fixed clears.
 
 | You want to | Type in Claude Code | Or in the terminal |
 |---|---|---|
@@ -67,118 +380,14 @@ When the code already states something Figma does not, the engine can write it i
 | List in Figma the accessibility annotations no check reads, with the wording one reads | `/rms-design-system-engine update Figma to match the code` | `rms-design-system-engine --figma-edits` |
 | Read the category of each Figma annotation (Accessibility is a requirement; Intent, Implementation, Content and Authoring are design intent, never a task) | `/rms-design-system-engine refresh the Figma data` | `rms-design-system-engine --annotation-categories` |
 
-- **You see the list first.** Each change names the component, what it adds and why (what the code renders, in how many places). Nothing changes until you say yes.
+- **You see the list first.** Each change names the component, what it adds and why. Nothing changes until you say yes.
 - **The engine writes the change, not the AI.** It writes the script, Claude runs it through the Figma MCP, and the project hooks refuse any other write to Figma.
-- **Only what the code already proves.** A component whose role differs between Figma and code is listed for you to decide. Descriptions, missing components and layouts are never written; they stay on the hand-back list for your design team.
-
-### Start from Figma only
-
-Open an empty project, set it up with your Figma link, and ask for what to build. With no code yet, the engine starts in build mode: what Figma has and the code does not is listed as to build, in order, never as a failure.
-
-| You want to | Type in Claude Code |
-|---|---|
-| Build the tokens | `/rms-design-system-engine build the tokens from Figma` |
-| Build a component | `/rms-design-system-engine build the button from Figma` |
-| Build a screen from the components | `/rms-design-system-engine build the settings screen from Figma with our components` |
-| See what is left to build | `/rms-design-system-engine what is left to build?` |
-
-Claude writes the code; the engine gives it Figma's exact names and values first and checks every piece after.
-
-Measured on a small design system in Figma (tokens, four components and a screen), Claude with the Figma MCP alone built 8 of 18 pieces right with Opus, 16 of 30 with Sonnet and 4 of 18 with Haiku. With the engine all three built all of them. The [case study](../CASE-STUDY.md) gathers every measurement in a few pages; the full log is in [test/skill-evals/RESULTS.md](../test/skill-evals/RESULTS.md).
-
-## Prototype with your design system
-
-A prototype here is made only of your design system's own components, with their own options. Nothing is invented and nothing in the system changes. When a screen needs something the system does not have, the prototype shows a labelled box, or marks the component standing in for it, and you get a list of what the system would need, for your design team to decide; each item on the list shows you its place on the page. The page draws at once even without the internet, in your system's own fonts until the design's font is found. Each component takes its place as your products' screens give it: one that fills the window on every screen (a status bar) fills it in the prototype too, whatever size its Figma component has on its own.
-
-Measured on twelve prototype requests, Claude alone made 17 of 36 right with Opus and 3 of 36 with Haiku; with the skill, 36 of 36 and 35 of 36 ([case study](../CASE-STUDY.md)).
-
-| You want to | Type in Claude Code | Or in the terminal |
-|---|---|---|
-| Make a prototype | `/rms-design-system-engine prototype a notification settings page with our components` | `rms-design-system-engine --prototype prototypes/settings.json` |
-| See what a prototype may use | `/rms-design-system-engine what can a prototype use?` | `rms-design-system-engine --prototype --catalog` |
-| Start from the screens you designed in Figma | `/rms-design-system-engine make prototypes from our Figma screens` | `rms-design-system-engine --prototype --from-screens <screen capture>` |
-| Check that the product's pages match | `/rms-design-system-engine are our prototype pages consistent?` | `rms-design-system-engine --prototype --consistency` |
-
-- **What a prototype is.** A short file listing which components go where, with which options (`prototypes/<name>.json`). The engine checks it first; one that uses a component or an option the system lacks is not drawn, and each line says why.
-- **What you see.** One page with your real components and tokens, in light and dark, under `.design-system-engine-out/prototypes/`.
-- **Drawn as your system draws it, even from your products' pages.** Where your components' markup comes from your products' own pages, a prototype takes only what is the system's: a segment is drawn inside its segmented control, a panel's head and main take what the prototype puts in them and nothing the product had there, a product's own layout (its panel's width) and its words (a control named "Browse") stay in the product, and each option lands on its part (a switch turned off, a field's value, a field disabled for a screen reader too). What your system makes fill its container fills it, as Figma's fill container does, and a prototype can say so of any part.
-- **Everything the engine knows goes into it.** Before Claude writes a prototype it is shown what was read (Figma, the code, your recorded decisions, your guidelines from Notion, GitLab or the project, each with its age) and, for what you asked, the guidelines that apply, the components your words point to and the screen to start from. Each component comes with what it is for: Figma descriptions and annotations, option notes, code notes, when to use it and when not, common mistakes, limitations, its Do and Don't, and what instead, without the notes written for whoever builds it (node ids, CSS). The screens your designers made for each product are listed with the components each one uses, and a request that names a product gets its screen in view. A use your Do and Don't or a common mistake describes is caught like one your guidelines rule out. A retired component is never used, a rule like "one button per screen" in your guidelines is held by the check, a component your documentation says never to use for something is not used for it, and after drawing each component is listed beside what the prototype uses it for, so a use your documentation rules out stands out.
-- **Pages that match.** A new page is compared with the product's other pages: page padding, space between sections, screen width, heading and body text styles, where the actions sit, what each action is called and which component it is (never Save on one page and Submit on another), and the answer given to each need the system lacks. Even with no patterns or templates in your system, the first page made sets the rule for the next, and the pages of a flow are held to each other, with a way back on every page after the first. Each difference is listed with the pages it differs from. A screen your designers made counts on its own; your team can also write its decisions down in `prototypes/conventions.json`.
-- **Seen in the browser.** The drawn page is opened in Chrome and measured against the screen your designers made: the same spacing, each part in its place, each component at its Figma size. A screen read from Figma keeps its colour mode, its window size, its own words and its components' states. A picture of the page is saved for you and for Claude to look at, with the Figma image of the screen you also get how many pixels differ, and the page goes through the accessibility check too.
-- **Every state.** A page comes with its other states, such as empty, error and loading, each switchable on the page. A page with a list must have an empty state, one that takes input an error state, and any state your guidelines or your request name, or Claude has to say why not.
-- **Every screen size, with longer words.** Each state is tried at every screen width, from phone to desktop, and at the page's own width when it has one (a plugin's window), with the words as written and 40% longer, as a translation makes them. What runs off the screen, a cut or spilling text, a button label on two lines and a target too small to tap on a phone are listed, and a picture is saved for each width and each state.
-- **Click-through flows.** Pages link to each other, so you can click through a sign-up or a checkout. The links are checked against the flows your guidelines describe: a step with no page, two steps that do not lead to each other, or a file that is not one page (a draft left behind), is listed.
-- **A design review before you see it.** Each page is reviewed in the browser and scored out of 10: parts that line up, one spacing rhythm, one main action, a heading that leads, lines short enough to read. Claude fixes what scores low, and tells you what it kept.
-- **It works.** The page runs your system's own scripts: a selection moves (and what follows it, like a sliding pill), a toggle turns on and off on its own, a field takes typing, a tooltip shows the words the prototype gives it, and a button can open a dialog or a menu from the prototype, drawn as your system draws it, keeping the focus inside a dialog and closed with Escape. Each one is tried in Chrome, and what does not work is listed. Each control the prototype draws is named for a screen reader; one that is not is listed for Claude to name, apart from what your system's components do themselves, which is the audit's.
-- **Layout.** Where your system has no layout components, the engine lends neutral ones (a page, a stack, a row, columns) that only take your spacing tokens and your text styles, and puts layout components on the list.
-- **Your screens as starting points.** Each screen designed in Figma becomes a prototype with the same arrangement and your components in place. The capture is read from Figma and never changes it. What a screen uses that the system does not own (a local component, a container with its own look, a typed number) goes on the list too.
-- **The list.** Every prototype's gaps are kept in `.design-system-engine-out/prototypes/gaps.json`, the most needed first, each with what was tried: what was searched, the components nearest to it, what stands in meanwhile and why none fit, so whoever decides works from the evidence. Ask to send them to Figma and they become the design team's to do list there, on a page of its own, one card per need, written only after you say yes.
-
-You get a short summary back: what passes, what is different, and how to fix each thing. Nothing is changed until you ask for it.
-
-## The checks
-
-Each check is called a gate. To run just one, use its number or its name, for example `--only 3` or `--only "token values"`.
-
-| # | Gate | What it looks at |
-|---|---|---|
-| 1 | Data is up to date | You are comparing with today's Figma, not an old copy. A build counts as older than its source by when each was committed, so a fresh clone, which writes its files in any order, is never called stale; a file changed since its last commit goes by its date on disk |
-| 2 | Figma frame unchanged | The design still looks like the version you approved |
-| 3 | Token values match Figma | Colours, sizes and fonts, in every mode (light and dark, and a size or font a sizing collection sets on a desktop and on a phone, in each) |
-| 4 | Tokens used in screens exist | Nothing a screen uses is missing from the code |
-| 5 | Every mode is covered | Things that should change between light and dark really do |
-| 6 | Exception lists are valid | Your "ignore this" notes still point at real things |
-| 7 | No invented CSS variables | Every variable in the code comes from a Figma token, and carries that token's Figma name (a variable called by another name is listed; `figmaNames: "strict"` fails it) |
-| 8 | Docs tell the truth | Your docs mention only things that exist |
-| 9 | No invented text casing | No forced UPPERCASE the design did not ask for |
-| 10 | No hand-built DS components | Screens use the real component, not a hand-made copy, and no product draws its own version of something the system has (a loading state and spinner of its own beside the system's loader), found by what it draws (the same looping animation as a component's part) or by its name (a class of its own that starts with a component's name); each is on the Tasks page and in that component's Used in |
-| 11 | Clean CSS | Nothing unused, nothing that contradicts Figma |
-| 12 | Nested components keep their styles | One component's look does not leak into another |
-| 13 | Structure matches | Heights, spacing and corners, each measured in a browser. A height your code leaves to its content is compared by what Figma says: a fixed Figma height against the height drawn, a hugging row by its drawn height too, a hugging stack by how its height is set, and a component Figma sets to fill its container agrees when the code leaves its height to the page. Padding, corners and gaps Figma sets with no variable are compared too, every side and corner at each breakpoint and in each colour mode there (the breakpoints a sizing collection's viewport width gives when there is no breakpoint collection), and a line height or letter spacing Figma gives in % is worked out from Figma's font size, never the code's. A text part with its own colour is compared in every colour mode, and a mode Figma has no value for is said, not skipped. Min and max width, how auto layout lines children up, wrap and a dashed stroke are compared too, and so are the first text's decoration, italic and alignment. The first text is the first one drawn, a label before a text field included, as Figma reads its first text layer. Each variant is measured as the code draws it: an option the bare component draws with the default variant's class taken off, and one the component's own checkbox draws (a switch) with that checkbox ticked or not, its text's own colour read in each. What a check cannot see is listed as not comparable, with the reason, and not as a difference: corners on a root that draws nothing (Figma draws the shape on a layer inside), alignment along a side Figma hugs or inside a slot, spacing the code puts on its root that Figma gives a frame inside it, and a width the page sets on the element. Every audit also compares each Figma token with the value the page resolves it to in each mode, each Figma icon with your sprite's drawing of it, and each component Figma nests with what your code shows inside its parent. A token only the browser reads (set by a script, or by a stylesheet the token check does not read) is listed as advice with what to look for; the rest is counted in one line, since the token, icon and sub-component checks already list it. |
-| 14 | All states are built | Hover, disabled, selected and the rest, in every mode, a difference in one mode pointing at the rule that mode uses |
-| 15 | Component props match Figma | The same names, defaults and choices, and one way of writing names across the system |
-| 16 | Sub-components match Figma | The parts inside a component are the right ones |
-| 17 | Templates compose the right components | Each page is built from what Figma shows |
-| 18 | Markup matches | Classes, icons and every control the design shows |
-| 19 | Required pieces are in place | Icon slots, component slots and form fields |
-| 20 | Icons match Figma | From the shared set, drawn the same way |
-| 21 | Transitions match | Durations and easing |
-| 22 | Motion matches | When your design defines it |
-| 23 | Shadows match | When your design defines them |
-| 24 | Renders correctly in a browser | Checked on the real page, not only the code. Heights made for you (`rendered.auto`) are only the ones Figma fixes, never a component that hugs its content. A text style is checked in full, its size, weight, line height, letter spacing and case, and each mode is put on as your project puts it on (a class, a data attribute or a media query), not only by the colour scheme |
-| 25 | What this audit actually checked | So you can see that nothing slipped through |
-
-**How it moves, as Figma has it.** Gate 21 holds the code to the transitions your team wrote down. Figma's prototype says it too: a variant that leads to another on hover or press, with its duration and curve (Smart animate, 300ms, ease out). `rms-design-system-engine --figma-motion` writes a read-only script that reads those transitions from the file, and once its answer is kept, each is compared with the code's: a change Figma animates and the code makes at once, another duration, another curve. Each is a row of the component's Motion tab and of the Tasks page's Motion.
-
-**How each component moves on its own.** A spinner turns while it shows, a side panel, a modal or a toast opens and closes. The code says it in its `@keyframes` animations (the loader's spinner turning, 800ms, linear, forever; the modal's card fading in and sliding up as it opens) and in the transitions a state that opens or closes it plays (a drawer's `.is-open`, a side panel widening as its script resizes it). Figma says it on its Motion timeline (a Rotation track from 0° to 360°, an animation style such as Fade in or Slide in), in the overlays its prototype opens (Move in, 300ms, Ease out; Figma plays it backwards when the overlay closes) and in variants that lead to each other after a delay and back to the first. The same `--figma-motion` script reads all of it, on every page, without changing anything. Each component's loop, opening and closing are then compared: one Figma animates and the code does not, or another duration or curve, is Claude's in the code; one the code animates and Figma does not is for you to animate in Figma, or to tell the code team to stop. Each is a row of the component's Motion tab and of the Tasks page's Motion, and the motion page puts the system's motion in one table: each timing its components move with, from the fastest, with its variables and their Figma names, what it is for, the components that move so (their names, each linked to its Motion tab), Figma's timing, and what the system could do (a purpose with several timings to choose one of, a timing several components share to keep as one variable, one written as values to make a variable).
-
-**What each component draws past its colours.** A card's shadow, a scrim's blur, a banner's gradient, a frame that clips what overflows it, a layer that blends or is see-through. `rms-design-system-engine --figma-effects` writes a read-only script that reads them for each component and its layers two levels deep (effects with the variable or effect style each uses, gradient and image fills, Clip content, blend mode and opacity), and once its answer is kept, each is compared with the component's own rule in the code, a layer with the code's part of the same name: `box-shadow`, `filter` and `backdrop-filter` blurs (Figma's blur is twice the CSS one), a gradient's colours, `overflow`, `mix-blend-mode` and `opacity`. One Figma draws and the code does not, or draws otherwise, is Claude's in the code; one only the code draws, or a clip Figma sets that the code leaves open, is a decision for both. Each is an Effect row in the component's Parity area and on the Tasks page.
-
-**Each product's screen, as designed.** A component can match Figma on its own while a product puts it in the wrong place. `rms-design-system-engine --figma-screens` reads the screens `ds-config.json` names for each product (read only), and each product's built page is opened at the width, height and colour mode of its screen: its components are compared with the screen's, which ones and how many, their order, the space between neighbours and whether the ones that line up in Figma line up on the page. A list (three or more of one component) is compared by whether it is there and where it starts, since how many rows it shows is data. A page that opens in another state than its screen (empty before its data comes) is said once, not compared, until its screen has a `setup`, a script that puts the page in that state. Each product with a difference is a row on the Tasks page, under Products.
-
-**Every combination of modes.** Each mode is checked on its own by the gates. With two collections that switch (Light and Dark, Desktop and Phone), every combination is also opened in the browser, Dark on a phone, Light on a desktop: each token is compared with Figma's value in that combination, and each text and background pair the system uses with its contrast. Only what is wrong together and right with each mode alone is listed (a phone rule that sets a colour, so Dark on a phone keeps Light's), with the combination, on the Tasks page under The system.
-
-Accessibility is checked beside the gates. Part of it reads the code directly, and part of it tries the components in a real browser: on a page you name, your style guide, or your built pages, and for React components with no page to open (a project building from Figma, say), on the components themselves, rendered from their own code in each Figma variant, no dev server needed. Each component is held to its role from your Figma annotations: what it must expose (a toggle button's pressed state, a field's label, a stepper's value and range), what each part annotated in Figma owes (a label that names its field, an error message linked while it shows, a silent icon, a step button with a name), and what a person can do with it (Space flips a toggle, a click opens a disclosure, ArrowUp steps a stepper). Focus is read the way a keyboard user sees it. While a component is being built, each of these lines is part of building it. An exception is your team's decision, with a link to where it was decided. An icon that carries meaning is held to 3:1 against its background in every colour mode, so one drawn for the light theme is caught when it disappears in the dark one, and a sprite icon painted in a fixed colour of its own is caught in the code. A control said only in a tooltip (an icon whose only name is its title) is reported, since no one on a touch screen or a keyboard sees the tooltip. A state shown only by its look (selected, open, in error) is reported until a screen reader hears it too, in the words that state takes (the step a person is on is `aria-current`, an error on a field `aria-invalid`, an error on a message an announcement such as `role="alert"`), also when the look is drawn on the component and the state belongs on a part (a field disabled inside its wrapper, said in the contract's `heardOn`), and listing your system's own scripts lets the style guide run its components as your product does. Text is measured as it is drawn: see-through text blended over its background, colours written in `oklch()` or `color(srgb …)` (Tailwind v4's default) read rather than skipped (a colour space it cannot read is said, never passed), a placeholder on show measured like any text, and text inside a disabled control left alone, as WCAG allows. A focus ring kept transparent until focus counts as a focus style, a ring drawn on `::before` or `::after` is measured, and a two-tone ring passes when one of its tones stands out. A field named only by its placeholder is reported (the placeholder goes once typing starts), a role written without the state it requires (a `role="slider"` with no `aria-valuenow`, a `role="combobox"` with no `aria-expanded`) or an ARIA value the attribute does not take (`aria-live="loud"`) is reported, publishing and graphics roles (`doc-chapter`, `graphics-symbol`) are valid, and a spinner turning fast inside `role="progressbar"` is not a flash. A control's edge is held to 3:1 in every colour mode, so one that fades only into the dark background is found, with the modes it fades in.
-
-One accessibility run is the whole check, against WCAG 2.2 at level A and AA, so nothing else needs to run beside it. axe-core, the scanner most accessibility tools are built on, runs on the same page every time, and what only it finds is listed with the engine's own findings, each element reported once. Every control is measured again while hovered, focused and pressed, in every colour mode, its text and its edge. An element a script makes clickable that the Tab key never reaches is found from its click handlers (React's and Vue's too, and those Chrome lists), a keyboard trap that goes round a few controls or holds only with Shift+Tab is found, and target size is measured by the WCAG circle in every mode, at the page's own width and again on a 320 pixel screen where a control may shrink, with a control under the comfortable 44 pixels for a finger given as advice. Contrast is measured against what is really painted behind the text, a sibling laid under it or a decoration drawn under it included, not only the boxes it sits in. Each component is tried on a 320 pixel screen, text that spills over its neighbours when a reader widens the spacing is found, a password field that refuses paste or a password manager is found (WCAG 2.2's sign-in criterion), and so is something moved only by dragging. Windows high-contrast mode is tried for icons and text that vanish in it, and for a selected, checked or pressed item that looks like the rest once the mode replaces its colours. Text that passes is read again as colour-blind people see it, and so are a component's variants: two told apart only by a red and a green are found. A modal dialog is walked with Tab, and the focus must stay inside it. Each tip is tapped with a touch screen emulated, the pointer moving where the finger lands as on a phone, so one that shows on hover but never on a tap is found. Each press that shows something is heard as a screen reader hears it, so a toast or an error that appears with nothing said is found, with what the screen reader says printed for each press. The report says how many texts, icons and controls it measured, every element with its verdict, and what a screen reader says for each component (`checkbox, Remember me, not checked`), so a person can judge the words without opening VoiceOver or NVDA. The run's summary in the chat carries the verdict and every kind of problem with the components it is in. `--no-axe` and `--no-states` leave a part out, and then the result says not all of it was checked.
-
-A Vue design system's components are rendered with your project's own build (Vite, Nuxt, Vue CLI or webpack, with its config, plugins and SCSS) once its packages are installed: each one in every variant, Figma's when it has them, else your code's own props (each option, each switch on and off, each text empty and set), so the accessibility check tries a variant no page shows, on every run. The style guide draws them as your build renders them too, with their bound classes and compiled styles, and its Playground draws each variant as it renders, so an option that adds an element (an icon only the large size has) shows it. A page for one component renders only that component and the ones it nests.
-
-A component that shows only after an action (a modal behind its "Show modal" button, a menu or a popover kept hidden until its trigger is pressed) is opened before it is checked: the engine presses the controls that may open it, the ones that name it first, never one that deletes, sends or submits, checks it open, and says what opened it. One that nothing opened is said not checked, never clean.
-
-Each finding names the component it is in, and the style guide shows each component's own findings from the last check. On the style guide a component's role is read where the component is drawn, in its own section, never on the page's own navigation that shares the system's classes, and the checks that press keys, click or type act only on components drawn in a preview, never on the page's own switches built from them (an arrow key there would change the component on show, and the checks after it would judge that one), and a landmark it draws (a panel's aside) is not held to sitting at the top of the page, which the guide's own main region is, and a component the code has no markup for is said not checked rather than read on the stand-in the page draws. An option a group reaches by its arrow keys (a radio group or a tab list with one Tab stop) counts as reachable by keyboard, and a role Figma calls presentation is met by none or by a plain element. A big page (a style guide with every component drawn) is read in parts, and a style guide with more than six components is checked six at a time, the same page drawing only those, so the whole check finishes and what it found reaches the guide, and a component whose selector is not valid CSS is said not checked, never clean, while the rest of the page is still checked. A state drawn with a class is heard the way the element's role says it: a selected radio is `aria-checked`, a selected toggle `aria-pressed`, a selected step `aria-current`, a selected tab `aria-selected`. Content that appears on hover or focus owes a way to close it with Escape only when it covers or replaces something; a row's action button that appears in the room the row makes for it does not. The style guide's own switches (its modes, widths and props) each say what they choose, the way their role does: one your script makes a radio is checked, never pressed. The page holds itself to the same rules it checks: a long component name wraps in its card rather than spill with wider text spacing, a Figma slot's area is never wider than the room it has, so a component still fits a 320 pixel screen, and a Used in picture is not read out, its card's words already say what it shows.
-
-**Your products' own pages too.** When the check runs on the style guide, each product's built page is opened as well, whole: every rule runs on it, axe-core's heading order and landmarks among them, and its findings are named after the product and listed on the Tasks page under Products. On a whole page the Tab key is followed from the top: a stop that sends the focus back up above the one before it, in the same column, is out of the order people read (2.4.3), and a stop the focus lands on that no one can see (moved off the screen, inside a closed panel) is a focus lost (2.4.7). `a11y.products: false` leaves the products out.
-
-What the design itself owes is listed for whoever keeps the Figma file: an interactive component with no focus state (so the code invents the focus ring), an error state with no message (an error shown by colour alone), a control under 24px. Meanwhile Claude writes a visible focus ring and leaves an error message's words to you.
-
-**The designed screens too.** `rms-design-system-engine --figma-a11y` reads the screens `ds-config.json` names (read only) the way a person sees them: every text and icon on its own, inside every instance, against what is really drawn behind it, see-through layers blended and each colour variable resolved as that layer uses it. Text below 4.5:1 (3:1 when large) and an icon below 3:1 are listed, words on a photo or a gradient are listed to check by eye, and a control drawn under 24 by 24 is listed with its sizes, told from an ornament by its role in your Figma annotations or its name. Notes, specs and redlines laid over a screen, what lies outside it and a disabled control (its Disabled variant, or the whole of it faded to half or less) are left out, as WCAG allows. A screen with no fill of its own is said once, since what sits on it cannot be measured. Every audit with accessibility lists them again until the screens are read afresh, and `--figma-edits` pins each one on its layer in Figma, once you say yes.
+- **Only what the code already proves.** A component whose role differs between Figma and the code is listed for you to decide. Descriptions, missing components and layouts are never written. They stay on the hand-back list for your design team.
 
 ## Good to know
 
-- **Which TypeScript reads your components.** Your project's own, else one installed for the whole machine (a global npm folder, `NODE_PATH`, `tsc` on the PATH). Set `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` to use only the project's own, so a run depends on the project alone; the engine's tests do this where they expect none. `DESIGN_SYSTEM_ENGINE_CHROME=none` reads the code with no browser even where Chrome is installed (a Mac's is found in Applications without the PATH).
-
 - **Share the results with your team.** Commit the files it creates in your project, so everyone, and your automated builds, check against the same design.
 - **Figma stays as it is.** It only reads Figma. It tells you what to change there, and a person makes that change.
-- **Reading Figma, the best way available.** `rms-design-system-engine --refresh-figma` picks it for you: a `design.json` newer than the saved data, then [figma-cli](https://github.com/silships/figma-cli) when Figma Desktop is connected to it (no API key, no rate limit, every mode), then the Figma tool of your Claude session, then the Figma API with a token. After you run `figma-cli snapshot`, the next check reads its `design.json` on its own; `--from-figma-cli` reads one directly.
-- **More detail.** Everything for developers, every option and how each check works, is in [docs/details.md](details.md).
+- **Reading Figma, the best way available.** `rms-design-system-engine --refresh-figma` picks it for you. A `design.json` newer than the saved data first, then [figma-cli](https://github.com/silships/figma-cli) when Figma Desktop is connected to it (no API key, no rate limit, every mode), then the Figma tool of your Claude session, then the Figma API with a token. After you run `figma-cli snapshot`, the next check reads its `design.json` on its own, and `--from-figma-cli` reads one directly.
+- **Which TypeScript reads your components.** Your project's own, else one installed for the whole machine (a global npm folder, `NODE_PATH`, `tsc` on the PATH). Set `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` to use only the project's own. `DESIGN_SYSTEM_ENGINE_CHROME=none` reads the code with no browser, even where Chrome is installed.
+- **More detail.** Every option and how each check works are in the [technical documentation](details.md).
