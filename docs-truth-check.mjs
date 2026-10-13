@@ -32,6 +32,7 @@
 // Exit 1 = invented / dangling DS references found.
 
 import { readFileSync, existsSync } from 'fs';
+import { styleNames } from './text-styles.mjs';
 import { join, basename } from 'path';
 
 const ROOT = process.cwd();
@@ -77,7 +78,7 @@ try {
   const snap = JSON.parse(readLocal(SNAP_VARS) || '{}');
   for (const mode of Object.values(snap.color || {})) for (const k of Object.keys(mode)) tokenKeys.add(k);
   for (const k of Object.keys(snap.sizing || {})) tokenKeys.add(k);
-  for (const k of Object.keys(snap.typography || {})) tokenKeys.add('typography/' + k);
+  for (const k of styleNames(snap.typography || {})) tokenKeys.add('typography/' + k);
 } catch {}
 
 // ── Scan each surface ─────────────────────────────────────────────────────────

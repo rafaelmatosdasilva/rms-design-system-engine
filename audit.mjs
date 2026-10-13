@@ -29,6 +29,7 @@ import { existsSync, readdirSync, readFileSync, statSync,
 import { join, dirname, resolve, relative, basename }           from 'path';
 import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
 import { readGateLabels, parseOnly, onlyWords, onlyHelp } from './only.mjs';
+import { styleNames }                                           from './text-styles.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
 import { takeableUrls, fetchHosted, mergeHosted }               from './hosted-tokens.mjs';
 import { fileURLToPath, pathToFileURL }                         from 'url';
@@ -4044,7 +4045,7 @@ function reportFull(label, items, shown) {
         const tk = new Set();
         for (const mode of Object.values(vs.color || {})) for (const k of Object.keys(mode)) tk.add(k);
         for (const k of Object.keys(vs.sizing || {})) tk.add(k);
-        for (const k of Object.keys(vs.typography || {})) tk.add('typography/' + k);
+        for (const k of styleNames(vs.typography || {})) tk.add('typography/' + k);
         tokenNames = [...tk];
       } catch { /* no vars snapshot - tokens skipped */ }
       const surfaces = [];

@@ -13,6 +13,7 @@
 // A code fact the capture could not read reliably is "not comparable", never a difference.
 
 import { pathHash } from './icon-source.mjs';
+import { textStyle } from './text-styles.mjs';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -84,7 +85,7 @@ export function compareTokens(code, vars, cfg, maps) {
     everyMode(token, maps.EXPLICIT_SIZING[token] ?? tokenToVar(token, spec, { raw: true }), value);
   }
   for (const [cssVar, [scale, prop]] of Object.entries(maps.TYPO)) {
-    const value = vars.typography?.[scale]?.[prop];
+    const value = textStyle(vars.typography, scale)?.[prop];
     if (value == null) { out.skipped++; continue; }
     everyMode(`typography/${scale}/${prop}`, cssVar, value);
   }
@@ -335,7 +336,7 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       // A vertical stack's gap is between rows.
       if (!f.gapVar && typeof rawDef.gapPx === 'number') raw(rawDef.gapPx, (c.parts?.gap?.props ?? c.props)?.[(f.layout ?? f.box?.layout) === 'VERTICAL' ? 'rowGap' : 'columnGap'], 'gap');
     }
-    const ty = (k) => vars.typography?.[k] ?? null;
+    const ty = (k) => textStyle(vars.typography, k);
     // Font: Figma's font fields describe the component's first TEXT node, so the code side is the
     // contract's fontSel part, else the first element holding text, else the root.
     const fp = c.parts?.font?.props ?? c.parts?.text?.props ?? c.props;

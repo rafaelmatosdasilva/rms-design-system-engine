@@ -74,6 +74,8 @@ for (const col of collections) {
     const v = await figma.variables.getVariableByIdAsync(id); if (v) idToVar[id] = v;
   }
 }
+// A token may alias a variable from a library: read each alias target the file does not hold, so it resolves (one that cannot be read stays a broken alias).
+const tried={};for(let added=1;added;){added=0;for(const v of Object.values(idToVar))for(const val of Object.values(v.valuesByMode)){const a=val?.type==='VARIABLE_ALIAS'?val:val?.color?.type==='VARIABLE_ALIAS'?val.color:null;if(!a||idToVar[a.id]||tried[a.id])continue;tried[a.id]=1;const t=await figma.variables.getVariableByIdAsync(a.id);if(t){idToVar[a.id]=t;added++;}}}
 const COLOR_COLLECTION  = 'Theme';       // figma.colorCollection from ds-config.json
 const SIZING_COLLECTION = 'Sizing';      // figma.sizingCollection (or null)
 const PRIMITIVE_PREFIX  = 'primitives/'; // figma.primitivePrefix
@@ -134,6 +136,8 @@ function toHex(c){const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).pa
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={};
 for(const col of collections){for(const id of col.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v)idToVar[id]=v;}}
+// A token may alias a variable from a library: read each alias target the file does not hold, so it resolves (one that cannot be read stays a broken alias).
+const tried={};for(let added=1;added;){added=0;for(const v of Object.values(idToVar))for(const val of Object.values(v.valuesByMode)){const a=val?.type==='VARIABLE_ALIAS'?val:val?.color?.type==='VARIABLE_ALIAS'?val.color:null;if(!a||idToVar[a.id]||tried[a.id])continue;tried[a.id]=1;const t=await figma.variables.getVariableByIdAsync(a.id);if(t){idToVar[a.id]=t;added++;}}}
 function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);
 // A colour with its own opacity ({ color: <alias or rgb>, opacity: 88 }): the colour, its alpha times that opacity.
 if(val.color){const base=val.color.type==='VARIABLE_ALIAS'?resolve(val.color.id,modeId,d+1):('r'in val.color?toHex(val.color):null);if(!base)return null;const op=(val.opacity??100)/100;const a0=base.length>7?parseInt(base.slice(7,9),16)/255:1;const a=Math.round(a0*op*255);return a>=255?base.slice(0,7):base.slice(0,7)+a.toString(16).padStart(2,'0');}return null;}
@@ -153,7 +157,8 @@ for(const m of MODES){
     const chain=aliasChain(id,modeId); if(chain.length>0)aliasesOut[m.snapshotKey][v.name]=chain;
   }
 }
-function resolveScalarVal(id,modeId,d=0){let v=idToVar[id];if(!v)return null;let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+'px';if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);return String(val);}
+function resolveScalarVal(id,modeId,d=0){let v=idToVar[id];if(!v)return null;if(v.resolvedType==='COLOR')return resolve(id,modeId); // a colour, its own opacity included ({ color, opacity })
+let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+'px';if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);if(typeof val==='object')return null;return String(val);}
 const sizingOut={};
 // The configured sizing collection, else the numbers of every collection but the colours' (a first capture).
 const sizingCols=collections.some(c=>c.name===SIZING_COLLECTION)?collections.filter(c=>c.name===SIZING_COLLECTION):collections.filter(c=>c!==col);const sizedBy=new Set();
@@ -168,9 +173,9 @@ const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:
 // Auto-capture a multi-mode SIZING collection (e.g. Desktop/Phone). The flat `sizing`
 // bucket above keeps only the FIRST mode (base) for the value gate; its OTHER modes
 // would otherwise be lost, so capture them here into modeVariants like any per-mode
-// axis (base key 'desktop'; other modes slugified, Phone -> 'phone'). Single-mode
+// axis (each mode keyed by its name, Desktop -> 'desktop', Phone -> 'phone'). Single-mode
 // sizing collections are a no-op. The styleguide's [data-size] axis is built from this.
-if(SIZING_COLLECTION){const _s=collections.find(c=>c.name===SIZING_COLLECTION);if(_s&&_s.modes.length>=2&&!COLLECTIONS.some(c=>c.name===SIZING_COLLECTION))COLLECTIONS.push({name:SIZING_COLLECTION,modes:_s.modes.map((m,i)=>({name:m.name,snapshotKey:i===0?'desktop':m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});}
+if(SIZING_COLLECTION){const _s=collections.find(c=>c.name===SIZING_COLLECTION);if(_s&&_s.modes.length>=2&&!COLLECTIONS.some(c=>c.name===SIZING_COLLECTION))COLLECTIONS.push({name:SIZING_COLLECTION,modes:_s.modes.map(m=>({name:m.name,snapshotKey:(_s===col?(MODES.find(x=>x.name===m.name)||{}).snapshotKey:null)||m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});} // the colour modes' keys when it is the colour collection, else each mode's name
 // Every other collection with two or more modes too (breakpoints, density, locale), even when ds-config names none:
 // a value that changes with a mode is never captured as one value.
 for(const _c of collections){if(_c.modes.length>=2&&_c.name!==COLOR_COLLECTION&&!COLLECTIONS.some(c=>c.name===_c.name))COLLECTIONS.push({name:_c.name,modes:_c.modes.map(m=>({name:m.name,snapshotKey:m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});}
@@ -179,7 +184,7 @@ const modeVariantsOut={};
 for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c||c.modes.length<2)continue;const vars={};for(const id of c.variableIds){const v=idToVar[id];if(!v||v.name.startsWith(PRIMITIVE_PREFIX))continue;const kind=KIND[v.resolvedType]||'scalar';if(kind==='color'&&cc.name===COLOR_COLLECTION)continue;const values={};for(const m of cc.modes){const mid=c.modes.find(fm=>fm.name===m.name)?.modeId;if(!mid)continue;values[m.snapshotKey]=kind==='color'?resolve(id,mid):resolveScalarVal(id,mid);}if(new Set(Object.values(values).map(String)).size>1)vars[v.name]={kind,values};}if(Object.keys(vars).length)modeVariantsOut[cc.name]={modes:cc.modes,vars};}
 const WEIGHT={'Thin':100,'Extra Light':200,'Light':300,'Regular':400,'Medium':500,'Semi Bold':600,'Bold':700,'Extra Bold':800,'Black':900};
 const styles=await figma.getLocalTextStylesAsync(); const typo={};
-for(const st of styles){const key=st.name.trim().toLowerCase().split('/').pop();const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
+for(const st of styles){const key=st.name.trim().toLowerCase(); /* the full name: xl/regular and m/regular are two styles */const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
 const _modeOrder={};for(const c of collections){if(c.modes.length<2)continue;const key=m=>(c.name===COLOR_COLLECTION?(MODES.find(x=>x.name===m.name)||{}).snapshotKey:null)||m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');_modeOrder[c.name===COLOR_COLLECTION?'color':c.name]=c.modes.map(key);} // Figma's own order of each collection's modes
 const _collections={color:col.name,colorModes:col.modes.map(m=>m.name),sizing:[...sizedBy]}; // the collections read, which the engine writes into ds-config.json
 return {color:colorOut,aliases:aliasesOut,sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder,_collections};
@@ -200,6 +205,8 @@ function toHex(c){const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).pa
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={};
 for(const col of collections){for(const id of col.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v)idToVar[id]=v;}}
+// A token may alias a variable from a library: read each alias target the file does not hold, so it resolves (one that cannot be read stays a broken alias).
+const tried={};for(let added=1;added;){added=0;for(const v of Object.values(idToVar))for(const val of Object.values(v.valuesByMode)){const a=val?.type==='VARIABLE_ALIAS'?val:val?.color?.type==='VARIABLE_ALIAS'?val.color:null;if(!a||idToVar[a.id]||tried[a.id])continue;tried[a.id]=1;const t=await figma.variables.getVariableByIdAsync(a.id);if(t){idToVar[a.id]=t;added++;}}}
 function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);
 // A colour with its own opacity ({ color: <alias or rgb>, opacity: 88 }): the colour, its alpha times that opacity.
 if(val.color){const base=val.color.type==='VARIABLE_ALIAS'?resolve(val.color.id,modeId,d+1):('r'in val.color?toHex(val.color):null);if(!base)return null;const op=(val.opacity??100)/100;const a0=base.length>7?parseInt(base.slice(7,9),16)/255:1;const a=Math.round(a0*op*255);return a>=255?base.slice(0,7):base.slice(0,7)+a.toString(16).padStart(2,'0');}return null;}
@@ -254,11 +261,17 @@ Then fetch **sizing and typography** in one separate call (these collections are
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={};
 for(const col of collections){for(const id of col.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v)idToVar[id]=v;}}
+// A token may alias a variable from a library: read each alias target the file does not hold, so it resolves (one that cannot be read stays a broken alias).
+const tried={};for(let added=1;added;){added=0;for(const v of Object.values(idToVar))for(const val of Object.values(v.valuesByMode)){const a=val?.type==='VARIABLE_ALIAS'?val:val?.color?.type==='VARIABLE_ALIAS'?val.color:null;if(!a||idToVar[a.id]||tried[a.id])continue;tried[a.id]=1;const t=await figma.variables.getVariableByIdAsync(a.id);if(t){idToVar[a.id]=t;added++;}}}
 const SIZING_COLLECTION='Sizing'; let COLOR_COLLECTION='Theme'; const PRIMITIVE_PREFIX='primitives/'; // fill from ds-config.json
+let MODES=[{name:'Light',snapshotKey:'light'},{name:'Dark',snapshotKey:'dark'}]; // from figma.modes
 const col=collections.find(c=>c.name===COLOR_COLLECTION)??collections.find(c=>c.modes.length>1&&c.variableIds.some(id=>idToVar[id]?.resolvedType==='COLOR'))??collections.find(c=>c.variableIds.some(id=>idToVar[id]?.resolvedType==='COLOR'));COLOR_COLLECTION=col.name; // the configured one, else the one that holds the colours (a first capture)
-function toHex(c){const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('');return '#'+h;}
-function resolve(id,modeId,d=0){if(d>10)return null;const v=idToVar[id];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);return null;}
-function resolveScalarVal(id,modeId,d=0){let v=idToVar[id];if(!v)return null;let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+'px';if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);return String(val);}
+if(!MODES.some(m=>col.modes.some(fm=>fm.name===m.name)))MODES=col.modes.map(fm=>({name:fm.name,snapshotKey:fm.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')})); // none configured is in the file: its own
+function toHex(c){const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('');const a=c.a===undefined?1:c.a;return '#'+h+(a>=1?'':Math.round(a*255).toString(16).padStart(2,'0'));}
+function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);
+if(val.color){const base=val.color.type==='VARIABLE_ALIAS'?resolve(val.color.id,modeId,d+1):('r'in val.color?toHex(val.color):null);if(!base)return null;const op=(val.opacity??100)/100;const a0=base.length>7?parseInt(base.slice(7,9),16)/255:1;const a=Math.round(a0*op*255);return a>=255?base.slice(0,7):base.slice(0,7)+a.toString(16).padStart(2,'0');}return null;}
+function resolveScalarVal(id,modeId,d=0){let v=idToVar[id];if(!v)return null;if(v.resolvedType==='COLOR')return resolve(id,modeId); // a colour, its own opacity included ({ color, opacity })
+let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+'px';if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);if(typeof val==='object')return null;return String(val);}
 const sizingOut={};
 // The configured sizing collection, else the numbers of every collection but the colours' (a first capture).
 const sizingCols=collections.some(c=>c.name===SIZING_COLLECTION)?collections.filter(c=>c.name===SIZING_COLLECTION):collections.filter(c=>c!==col);const sizedBy=new Set();
@@ -273,9 +286,9 @@ const COLLECTIONS=[]; // from figma.collections, e.g. [{name:'Breakpoint',modes:
 // Auto-capture a multi-mode SIZING collection (e.g. Desktop/Phone). The flat `sizing`
 // bucket above keeps only the FIRST mode (base) for the value gate; its OTHER modes
 // would otherwise be lost, so capture them here into modeVariants like any per-mode
-// axis (base key 'desktop'; other modes slugified, Phone -> 'phone'). Single-mode
+// axis (each mode keyed by its name, Desktop -> 'desktop', Phone -> 'phone'). Single-mode
 // sizing collections are a no-op. The styleguide's [data-size] axis is built from this.
-if(SIZING_COLLECTION){const _s=collections.find(c=>c.name===SIZING_COLLECTION);if(_s&&_s.modes.length>=2&&!COLLECTIONS.some(c=>c.name===SIZING_COLLECTION))COLLECTIONS.push({name:SIZING_COLLECTION,modes:_s.modes.map((m,i)=>({name:m.name,snapshotKey:i===0?'desktop':m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});}
+if(SIZING_COLLECTION){const _s=collections.find(c=>c.name===SIZING_COLLECTION);if(_s&&_s.modes.length>=2&&!COLLECTIONS.some(c=>c.name===SIZING_COLLECTION))COLLECTIONS.push({name:SIZING_COLLECTION,modes:_s.modes.map(m=>({name:m.name,snapshotKey:(_s===col?(MODES.find(x=>x.name===m.name)||{}).snapshotKey:null)||m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});} // the colour modes' keys when it is the colour collection, else each mode's name
 // Every other collection with two or more modes too (breakpoints, density, locale), even when ds-config names none:
 // a value that changes with a mode is never captured as one value.
 for(const _c of collections){if(_c.modes.length>=2&&_c.name!==COLOR_COLLECTION&&!COLLECTIONS.some(c=>c.name===_c.name))COLLECTIONS.push({name:_c.name,modes:_c.modes.map(m=>({name:m.name,snapshotKey:m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}))});}
@@ -284,8 +297,8 @@ const modeVariantsOut={};
 for(const cc of COLLECTIONS){const c=collections.find(x=>x.name===cc.name);if(!c||c.modes.length<2)continue;const vars={};for(const id of c.variableIds){const v=idToVar[id];if(!v||v.name.startsWith(PRIMITIVE_PREFIX))continue;const kind=KIND[v.resolvedType]||'scalar';if(kind==='color'&&cc.name===COLOR_COLLECTION)continue;const values={};for(const m of cc.modes){const mid=c.modes.find(fm=>fm.name===m.name)?.modeId;if(!mid)continue;values[m.snapshotKey]=kind==='color'?resolve(id,mid):resolveScalarVal(id,mid);}if(new Set(Object.values(values).map(String)).size>1)vars[v.name]={kind,values};}if(Object.keys(vars).length)modeVariantsOut[cc.name]={modes:cc.modes,vars};}
 const WEIGHT={'Thin':100,'Extra Light':200,'Light':300,'Regular':400,'Medium':500,'Semi Bold':600,'Bold':700,'Extra Bold':800,'Black':900};
 const styles=await figma.getLocalTextStylesAsync(); const typo={};
-for(const st of styles){const key=st.name.trim().toLowerCase().split('/').pop();const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
-const _modeOrder={};for(const c of collections){if(c.modes.length<2)continue;const key=m=>m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');_modeOrder[c.name===COLOR_COLLECTION?'color':c.name]=c.modes.map(key);} // Figma's own order of each collection's modes
+for(const st of styles){const key=st.name.trim().toLowerCase(); /* the full name: xl/regular and m/regular are two styles */const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
+const _modeOrder={};for(const c of collections){if(c.modes.length<2)continue;const key=m=>(c.name===COLOR_COLLECTION?(MODES.find(x=>x.name===m.name)||{}).snapshotKey:null)||m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');_modeOrder[c.name===COLOR_COLLECTION?'color':c.name]=c.modes.map(key);} // Figma's own order of each collection's modes
 const _collections={color:col.name,colorModes:col.modes.map(m=>m.name),sizing:[...sizedBy]}; // the collections read, which the engine writes into ds-config.json
 return {sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder,_collections};
 ```
@@ -335,15 +348,22 @@ parity-checked. Both gates are **no-ops unless captured AND declared** in `ds-co
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={};
 for(const col of collections){for(const id of col.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v)idToVar[id]=v;}}
-// Motion - the Motion collection's variables → CSS-comparable strings. Figma variables are FLOAT
-// (durations, read as ms) or STRING (easing curves such as "cubic-bezier(0.4, 0, 0.2, 1)" or "ease-out");
-// EASING/TIMING are accepted too in case Figma adds dedicated types. The gate compares 200ms = 0.2s and
-// a keyword easing = its curve.
+// A token may alias a variable from a library: read each alias target the file does not hold, so it resolves (one that cannot be read stays a broken alias).
+const tried={};for(let added=1;added;){added=0;for(const v of Object.values(idToVar))for(const val of Object.values(v.valuesByMode)){const a=val?.type==='VARIABLE_ALIAS'?val:val?.color?.type==='VARIABLE_ALIAS'?val.color:null;if(!a||idToVar[a.id]||tried[a.id])continue;tried[a.id]=1;const t=await figma.variables.getVariableByIdAsync(a.id);if(t){idToVar[a.id]=t;added++;}}}
+// Motion - the Motion collection's variables → CSS-comparable strings: TIMING (Figma's duration type, in seconds),
+// FLOAT (a duration without a unit: see ms() below), EASING (a curve) or STRING (an easing such as
+// "cubic-bezier(0.4, 0, 0.2, 1)" or "ease-out"). The gate compares 200ms = 0.2s and a keyword easing = its curve.
 function deref(id,modeId,d=0){let v=idToVar[id];if(!v)return null;let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}return val;}
-function motionStr(val){if(val==null)return null;if(typeof val==='number')return val+'ms';if(typeof val==='string')return val.trim();const b=val.easingFunctionCubicBezier||val.cubicBezier||val.bezier;if(b&&('x1'in b))return `cubic-bezier(${b.x1}, ${b.y1}, ${b.x2}, ${b.y2})`;if('value'in val)return val.value+(val.unit==='MILLISECONDS'||!val.unit?'ms':'');return JSON.stringify(val);}
+// A duration in ms. A TIMING variable holds seconds (0.3 is 300ms). A FLOAT has no unit: below 10 it is read as seconds,
+// as Figma's own durations are (0.3 is 300ms), from 10 up as ms (200 is 200ms). A value that says its unit
+// ({ value, unit: 'SECONDS' | 'MILLISECONDS' }) is read in it. A FLOAT whose name says it is no duration (a scale, a spring) stays a number.
+function ms(n,unit){const u=String(unit||'').toUpperCase();const x=Number(n);return (Math.round((u==='SECONDS'||u==='S'?x*1000:u==='MILLISECONDS'||u==='MS'?x:x<10?x*1000:x)*1000)/1000)+'ms';}
+const NOT_DURATION=/^(scale|spring|stiff(ness)?|damp(ing)?|mass|bounce|bounciness|opacity|distance|offset|ratio)$/; // a whole word of the name (press/scale, springStiffness), so duration/fast stays a duration
+const notDuration=name=>String(name??'').replace(/([a-z])([A-Z])/g,'$1 $2').toLowerCase().split(/[^a-z0-9]+/).some(w=>NOT_DURATION.test(w));
+function motionStr(val,v){if(val==null)return null;if(typeof val==='number')return v?.resolvedType==='TIMING'?ms(val,'SECONDS'):notDuration(v?.name)?String(val):ms(val);if(typeof val==='string')return val.trim();const b=val.easingFunctionCubicBezier||val.cubicBezier||val.bezier;if(b&&('x1'in b))return `cubic-bezier(${b.x1}, ${b.y1}, ${b.x2}, ${b.y2})`;if('value'in val)return ms(val.value,val.unit);return JSON.stringify(val);}
 const MOTION_COLLECTION='Motion'; // fill from figma.motion (or leave and let it match by type)
 const motionOut={};
-for(const c of collections){if(MOTION_COLLECTION&&c.name!==MOTION_COLLECTION)continue;const mid=c.modes[0].modeId;for(const id of c.variableIds){const v=idToVar[id];if(!v||!['FLOAT','STRING','EASING','TIMING'].includes(v.resolvedType))continue;const s=motionStr(deref(id,mid));if(s!=null)motionOut[v.name]=s;}}
+for(const c of collections){if(MOTION_COLLECTION&&c.name!==MOTION_COLLECTION)continue;const mid=c.modes[0].modeId;for(const id of c.variableIds){const v=idToVar[id];if(!v||!['FLOAT','STRING','EASING','TIMING'].includes(v.resolvedType))continue;const s=motionStr(deref(id,mid),v);if(s!=null)motionOut[v.name]=s;}}
 // Effects - local effect styles → canonical box-shadow "x y blur spread color[, …]".
 function rgba(c){return `rgba(${Math.round(c.r*255)}, ${Math.round(c.g*255)}, ${Math.round(c.b*255)}, ${+(c.a??1).toFixed(3)})`;}
 function effShadow(e){const p=[`${e.offset?.x??0}px`,`${e.offset?.y??0}px`,`${e.radius??0}px`];if(e.spread)p.push(`${e.spread}px`);p.push(rgba(e.color||{r:0,g:0,b:0,a:1}));if(e.type==='INNER_SHADOW')p.push('inset');return p.join(' ');}
