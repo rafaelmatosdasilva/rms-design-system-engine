@@ -136,3 +136,5 @@ The engine makes the decisions, not the AI model, so it behaves the same on a sm
 ## The files it creates
 
 Commit the files it creates so your whole team and CI check against the same design. The deeper setup and every option live in the full guide.
+
+Setup writes only what it can read. Before Figma is captured it cannot know the name of the collection that holds your colours, the one that holds your sizes, your colour modes or how your CSS names Figma's tokens, so it lists them in `ds-config.json` (`figma.fromCapture`) and the first capture fills each from what it read, then says what it set. The CSS naming is found by trying each way on your tokens: Figma's `iconText` kept or not, camelCase split or not, and `/color`, `/default` or both kept (`--button-background-default-color`) or dropped.

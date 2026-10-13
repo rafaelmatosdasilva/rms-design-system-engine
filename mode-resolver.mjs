@@ -131,13 +131,8 @@ export function buildResolver(rawCss, MODES, prims = {}) {
   return { resolve, resolveRaw, rootVars, modeBlocks };
 }
 
-// detectModes(cssText, modeKeys) → the colour modes for a new ds-config.json (--init), read from where the
-// theme CSS really puts each mode's overrides, instead of assuming a prefers-color-scheme media query.
-// `modeKeys` are the Figma snapshot's colour modes (["light", "dark"]; the first is the base). Returns
-// { modes: [{ name, snapshotKey, cssSelector }], found: [{ key, selector, how }], unsure: [key] }: a mode
-// with no override block of its own falls back to the old default and is listed in `unsure`, so the setup
-// says which one to check.
-export function detectModes(cssText, modeKeys = ['light', 'dark']) {
+// modeOverrides(cssText) → each block the theme CSS overrides its variables in: [{ selector, words, how }].
+export function modeOverrides(cssText) {
   const css = blankComments(String(cssText ?? ''));
   const overrides = [];   // { selector, words, how }
   const hasVars = (body) => /--[a-zA-Z]/.test(body);
@@ -156,7 +151,26 @@ export function detectModes(cssText, modeKeys = ['light', 'dark']) {
       else if (cls) overrides.push({ selector: `class:${cls[1]}`, words: cls[1].split(/[-_]/).concat(cls[1]), how: `:root.${cls[1]}` });
     }
   }
-  const norm = (s) => String(s).toLowerCase().replace(/[\s_]+/g, '-');
+  return overrides;
+}
+const norm = (s) => String(s).toLowerCase().replace(/[\s_]+/g, '-');
+// The colour mode the theme CSS sets in :root itself: the one key no override block names, when exactly one is
+// (a file whose Figma order puts Dark first still has Light as its CSS base). Else the first key, Figma's own base.
+export function baseModeKey(cssText, modeKeys = []) {
+  const words = modeOverrides(cssText).flatMap((o) => o.words.map(norm));
+  const named = (k) => words.some((w) => w === norm(k) || norm(k).includes(w) || w.includes(norm(k)));
+  const unnamed = modeKeys.filter((k) => !named(k));
+  return unnamed.length === 1 ? unnamed[0] : modeKeys[0];
+}
+
+// detectModes(cssText, modeKeys) → the colour modes for a new ds-config.json (--init), read from where the
+// theme CSS really puts each mode's overrides, instead of assuming a prefers-color-scheme media query.
+// `modeKeys` are the Figma snapshot's colour modes (["light", "dark"]; the first is the base). Returns
+// { modes: [{ name, snapshotKey, cssSelector }], found: [{ key, selector, how }], unsure: [key] }: a mode
+// with no override block of its own falls back to the old default and is listed in `unsure`, so the setup
+// says which one to check.
+export function detectModes(cssText, modeKeys = ['light', 'dark']) {
+  const overrides = modeOverrides(cssText);
   const title = (k) => String(k).replace(/(^|[-_\s])(\w)/g, (_, p, c) => (p ? ' ' : '') + c.toUpperCase());
   const found = [], unsure = [];
   const used = new Set();

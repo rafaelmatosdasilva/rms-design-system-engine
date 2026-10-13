@@ -691,6 +691,25 @@ if (process.argv.includes('--query')) {
   process.exit(r.status ?? 1);
 }
 
+// What setup could not read before Figma was captured (figma.fromCapture), filled from the first capture that read it:
+// the collection names, the colour modes and the token naming (setup-facts.mjs, E37, E38). Said once, then gone.
+async function settleConfig(cfg) {
+  if (!Array.isArray(cfg?.figma?.fromCapture)) return cfg;
+  try {
+    const { settleFromCapture } = await import('./setup-facts.mjs');
+    const vars = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8'));
+    const themeText = [cfg.paths?.themeCSS ?? []].flat().map((f) => { try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; } }).join('\n');
+    const r = settleFromCapture(cfg, vars, themeText);
+    if (!r) return cfg;
+    const next = { ...cfg, figma: r.figma };
+    writeFileSync(join(ROOT, 'ds-config.json'), JSON.stringify(next, null, 2) + '\n');
+    console.log(C.green('✅ From the first Figma capture, ds-config.json now says what setup could not know:'));
+    for (const l of r.lines) console.log(C.green(`   ${l}`));
+    if (r.unsure.length) console.log(C.yellow(`  ⚠️  No block of its own found in the theme CSS for ${r.unsure.join(', ')}: set its cssSelector in ds-config.json → figma.modes.`));
+    return next;
+  } catch { return cfg; }
+}
+
 // ── --from-figma-cli [design.json] · --refresh-figma: read Figma the best way there is (figma-source.mjs) ──
 if (process.argv.includes('--from-figma-cli') || process.argv.includes('--refresh-figma')) {
   let fcConfig = {};
@@ -700,6 +719,7 @@ if (process.argv.includes('--from-figma-cli') || process.argv.includes('--refres
     if (process.argv.includes('--from-figma-cli')) {
       const i = process.argv.indexOf('--from-figma-cli'), file = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : src.designJsonPath(fcConfig);
       console.log(`✅ ${src.importLine(await src.importDesign(ROOT, fcConfig, file))}`);
+      await settleConfig(fcConfig);
       console.log('NEXT: rms-design-system-engine (the audit, on the refreshed snapshots)');
       process.exit(0);
     }
@@ -709,6 +729,7 @@ if (process.argv.includes('--from-figma-cli') || process.argv.includes('--refres
     else if (route.route === 'figma-cli') console.log(`✅ ${src.importLine(await src.refreshFromFigmaCli(ROOT, fcConfig))}`);
     else if (route.route === 'rest') { console.log('NEXT: rms-design-system-engine (it refreshes from the Figma API as it runs)'); process.exit(0); }
     else { console.log('NEXT: rms-design-system-engine --recipe refresh-figma (read the variables and components with the Figma tool of this session)'); process.exit(0); }
+    await settleConfig(fcConfig);
     console.log('NEXT: rms-design-system-engine (the audit, on the refreshed snapshots)');
     process.exit(0);
   } catch (e) { console.error(`❌ Figma not read: ${e.message}`); process.exit(1); }
@@ -1678,14 +1699,14 @@ async function bootstrapConfig() {
   console.log('');
 
   // ── Auto-detect Figma collections ─────────────────────────────────────────────
-  let figmaCfg = { colorCollection: 'Color', sizingCollection: null, breakpointCollection: null, animationCollection: null, excludeCollections: [], primitivePrefix: 'primitives/' };
+  // Only the keys something reads. Before Figma is captured the collection names, the colour modes and the naming are
+  // not known: setup lists them in figma.fromCapture and the first capture fills them from what it read (E38).
+  let figmaCfg = { colorCollection: 'Color', sizingCollection: null, primitivePrefix: 'primitives/' };
   if (figmaFileKey && figmaToken) {
     // Collection auto-detect is disabled (analyseCollections returns null); kept as a forward hook.
     // No log line here: an earlier "Querying Figma…" message claimed work that never happens.
     const detected = await analyseCollections();
     if (detected) figmaCfg = { ...figmaCfg, ...detected };
-  } else if (figmaFileKey && !figmaToken) {
-    console.log(C.yellow('  ⚠️  No FIGMA_TOKEN - collection names defaulted to "Color" / null. Edit ds-config.json if needed.'));
   }
 
   // ── Write config ──────────────────────────────────────────────────────────────
@@ -1696,12 +1717,12 @@ async function bootstrapConfig() {
 
   // Colour modes: the Figma snapshot's modes when there is one, each mapped to where the theme CSS puts its
   // overrides (a data attribute, a class or a media query), never assumed.
-  let modeKeys = ['light', 'dark'];
+  let modeKeys = ['light', 'dark'], captured = false;
   try {
     const color = JSON.parse(readFileSync(join(ROOT, snapshotVars), 'utf8')).color;
     const keys = color && typeof color === 'object' ? Object.keys(color).filter((k) => !k.startsWith('_') && color[k] && typeof color[k] === 'object') : [];
-    if (keys.length) modeKeys = keys;
-  } catch { /* no snapshot yet: light and dark */ }
+    if (keys.length) { modeKeys = keys; captured = true; }
+  } catch { /* no snapshot yet: light and dark, until the first capture says */ }
   const themeText = [themeCSS].flat().map((f) => { try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; } }).join('\n');
   const detected = detectModes(themeText, modeKeys);
   for (const m of detected.modes) {
@@ -1721,12 +1742,15 @@ async function bootstrapConfig() {
   // What the project's own files already say (setup-facts.mjs): the naming its token CSS follows, every Figma snapshot
   // beside it, the system's own scripts, the products checked out beside it, and the frames and screens a captured
   // screen snapshot names. So the first run checks what is there, never setup's guesses.
-  const { repoFacts } = await import('./setup-facts.mjs');
+  const { repoFacts, namingWords, FROM_CAPTURE } = await import('./setup-facts.mjs');
   const facts = repoFacts(ROOT, { themeCSS, naming: figmaCfg.namingConvention ?? {} });
   if (Object.keys(facts.naming.naming).length) {
     figmaCfg.namingConvention = { ...(figmaCfg.namingConvention ?? {}), ...facts.naming.naming };
-    const how = [facts.naming.naming.iconTextAlias === false ? 'keeps Figma\'s iconText' : null, facts.naming.naming.case === 'kebab' ? 'splits camelCase with hyphens' : null].filter(Boolean).join(' and ');
-    console.log(C.green(`  ✅ Token names: the CSS ${how} (${facts.naming.found} of ${facts.naming.of} Figma tokens found that way; figma.namingConvention)`));
+    console.log(C.green(`  ✅ Token names: the CSS ${namingWords(facts.naming.naming)} (${facts.naming.found} of ${facts.naming.of} Figma tokens found that way; figma.namingConvention)`));
+  }
+  if (!captured) {
+    figmaCfg.fromCapture = FROM_CAPTURE;
+    if (figmaFileKey) console.log(C.dim('  The Figma collections, the colour modes and the token naming are filled from the first capture (figma.fromCapture), from what it reads.'));
   }
   for (const p of facts.products) {
     if (p.ui && !pluginCSS.includes(p.ui)) pluginCSS.push(p.ui);
@@ -1853,7 +1877,7 @@ async function bootstrapConfig() {
     process.exit(0);
   }
   try {
-    cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8'));
+    cfg = await settleConfig(JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')));
   } catch {
     if (process.env.CI) {
       console.error('❌ ds-config.json not found. In CI, commit ds-config.json to the repository (it contains no secrets - only paths and the public Figma file key).');
