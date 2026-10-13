@@ -294,9 +294,10 @@ export function callName(name, file, text = '', cem = null, docgen = null) {
 }
 
 // ── The whole reading, for a list of component names ──────────────────────────
-// createApiReader(ROOT, cfg, { classFor, nodeIds }) → { fileFor(name), apiFor(name), sources }
+// createApiReader(ROOT, cfg, { classFor, nodeIds, pairing }) → { fileFor(name), apiFor(name), sources }
 //   nodeIds: { componentName: figmaNodeId } (from the Figma structure snapshot), to join Code Connect.
-export function createApiReader(ROOT, cfg = {}, { classFor, nodeIds = {} } = {}) {
+//   pairing: the shared pairing (component-pairing.mjs; the component finder's, locator.pairing()), else one is read.
+export function createApiReader(ROOT, cfg = {}, { classFor, nodeIds = {}, pairing = null } = {}) {
   const read = textReader();
   const files = componentSourceFiles(ROOT, cfg);
   const cr = cfg.codeReading ?? {};
@@ -335,7 +336,7 @@ export function createApiReader(ROOT, cfg = {}, { classFor, nodeIds = {} } = {})
       else if (e?.file && existsSync(e.file)) declared[name] = { file: e.file, how: cem.includes(e) ? 'custom elements manifest' : 'docgen' };
       else if (sb[name]) declared[name] = { file: sb[name], how: 'storybook' };
     }
-    const r = resolveComponentFile(name, { ROOT, cfg, files, read, classFor, declared });
+    const r = resolveComponentFile(name, { ROOT, cfg, files, read, classFor, declared, pairing });
     fileCache.set(name, r);
     return r;
   }
