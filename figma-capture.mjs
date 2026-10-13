@@ -1,20 +1,21 @@
-// figma-capture.mjs - Figma's variables, text styles and effect styles read in chunks the engine checks (P6), by the
-// Figma tool of the agent's session or by figma-cli (P7), and turned into the vars snapshot here with the capture
-// recipe's own scripts.
+// figma-capture.mjs - Figma read in chunks the engine checks (P6), by the Figma tool of the agent's session or by
+// figma-cli (P7): the variables, text styles and effect styles, turned into the vars snapshot here with the capture
+// recipe's own scripts; and the components, whose structure and props are put together in Figma with the recipe's
+// own Step 1c functions and merged here into the structure and props snapshots.
 //
 // Through the Figma tool every answer is capped (about 20 kB), and copying each value into the snapshot by hand takes
-// hours on a large file. So the engine writes a read-only script for one chunk (--capture-script vars N). Each answer
-// carries a checksum computed in Figma over what it holds and the checksums of every chunk; the agent saves it as it
-// came. --capture-import verifies each saved answer against its checksum, says which chunks are missing or changed,
-// and once all are there builds the snapshot locally: it runs the recipe's own scripts (cookbook/refresh-figma.md,
+// hours on a large file. So the engine writes a read-only script for one chunk (--capture-script vars N, or
+// components N). Each answer carries a checksum computed in Figma over what it holds; the agent saves it as it came.
+// --capture-import verifies each saved answer against its checksum, says which chunks are missing or changed, and
+// once all are there writes the snapshots. For the variables it runs the recipe's own scripts (cookbook/refresh-figma.md,
 // Steps 1a, 1b-single, 1b-motion-effects and 1f) on what Figma returned, so the result is the one a capture through
-// the Figma tool gives. On a refresh only the checksums are asked (--capture-script vars sums) and only the chunks
-// that changed are read again. figma-cli runs the same scripts itself (`figma-cli eval`), so both readers give the
-// same snapshot.
+// the Figma tool gives. On a refresh only the checksums are asked (--capture-script vars sums, components sums) and
+// only the chunks that changed are read again. figma-cli runs the same scripts itself (`figma-cli eval`), so both
+// readers give the same snapshots.
 //
 // A chunk's boundaries follow its items (a boundary after an item whose id hashes to it, or when the next item would
-// pass the budget), so a variable added or changed moves only the chunk it is in. Chunks are matched by checksum, not
-// by number: a chunk saved before under another number is used as it is.
+// pass the budget), so a variable or a component added or changed moves only the chunk it is in. Chunks are matched
+// by checksum, not by number: a chunk saved before under another number is used as it is.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,23 +73,26 @@ export function parseAnswer(text) {
 // The saved answers of a capture in dir. → { sums (the latest list), of, chunks: Map(sum → items), bad: [file: why],
 // missing: [chunk numbers to read again], stale: [files no longer in the list] }
 export function readCapture(dir, kind = 'vars') {
-  const out = { sums: null, of: 0, chunks: new Map(), bad: [], missing: [], stale: [], files: new Map() };
+  const out = { sums: null, of: 0, plan: null, chunks: new Map(), bad: [], missing: [], stale: [], changed: [], files: new Map() };
   if (!existsSync(dir)) return out;
   let latest = -Infinity;
+  const read = new Map();   // sum → { chunk, at }
   for (const f of readdirSync(dir).filter((x) => x.startsWith(`${kind}-`) && x.endsWith('.json'))) {
     const p = join(dir, f), a = parseAnswer(readFileSync(p, 'utf8'));
     if (!a || a.capture !== kind) { out.bad.push(`${f}: not an answer of the ${kind} capture script`); continue; }
     if (a.error) { out.bad.push(`${f}: ${a.error}`); continue; }
     const at = statSync(p).mtimeMs;
-    if (Array.isArray(a.sums) && at > latest) { latest = at; out.sums = a.sums; out.of = a.of; }
+    if (Array.isArray(a.sums) && at > latest) { latest = at; out.sums = a.sums; out.of = a.of; out.plan = a.plan ?? null; }
     if (!Array.isArray(a.items)) continue;
     const sum = cyrb53(JSON.stringify(a.items));
     if (sum !== a.sum) { out.bad.push(`${f}: its checksum does not match what it holds (changed or cut while it was saved)`); continue; }
-    out.chunks.set(sum, a.items); out.files.set(sum, f);
+    out.chunks.set(sum, a.items); out.files.set(sum, f); read.set(sum, { chunk: a.chunk, at });
   }
   if (out.sums) {
     out.missing = out.sums.map((s, i) => (out.chunks.has(s) ? null : i)).filter((i) => i != null);
     out.stale = [...out.files].filter(([s]) => !out.sums.includes(s)).map(([, f]) => f);
+    // A chunk read after the checksums that no longer matches them: Figma changed in between.
+    out.changed = [...read].filter(([s, r]) => !out.sums.includes(s) && r.at >= latest && out.missing.includes(r.chunk)).map(([, r]) => r.chunk);
   }
   return out;
 }
@@ -176,7 +180,7 @@ export async function varsFromItems(items, cfg = {}, { engineDir = ENGINE } = {}
 // figmaVersion: the file's version, when the API gives it (FIGMA_TOKEN), read after the capture as Step 5 says.
 export async function importCapture(ROOT, cfg = {}, { dir = captureDir(ROOT), source = 'the Figma tool', now = new Date().toISOString(), engineDir = ENGINE, figmaVersion = null } = {}) {
   const c = readCapture(dir, 'vars');
-  const base = { missing: c.missing, bad: c.bad, stale: c.stale, of: c.of };
+  const base = { kind: 'vars', missing: c.missing, bad: c.bad, stale: c.stale, changed: c.changed, of: c.of };
   if (!c.sums) return { ok: false, ...base, missing: [0], why: 'no answer saved yet' };
   if (c.missing.length) return { ok: false, ...base };
   const items = c.sums.flatMap((s) => c.chunks.get(s));
@@ -199,20 +203,162 @@ export async function importCapture(ROOT, cfg = {}, { dir = captureDir(ROOT), so
   return { ok: true, ...base, path, counts: { chunks: c.sums.length, colours, modes: Object.keys(snap.color ?? {}).length, sizing: Object.keys(snap.sizing ?? {}).length, textStyles: Object.keys(snap.typography ?? {}).length, scopes: Object.keys(snap.variableScopes ?? {}).length } };
 }
 
-// figma-cli reads the same chunks itself: the checksums first, then each chunk not saved yet (P7).
-// run(code) → the text figma-cli printed (or a promise of it). → importCapture's result.
-export async function captureWithFigmaCli(ROOT, cfg = {}, { run = figmaCliEval(ROOT), dir = captureDir(ROOT), engineDir = ENGINE, figmaVersion = null } = {}) {
-  mkdirSync(dir, { recursive: true });
-  const sums = parseAnswer(await run(varsScript('sums')));
-  if (!sums?.sums) throw new Error('figma-cli did not return the checksums (is Figma Desktop open on the design system\'s file?)');
-  writeFileSync(join(dir, 'vars-sums.json'), JSON.stringify(sums) + '\n');
-  for (const n of readCapture(dir, 'vars').missing) {
-    const text = await run(varsScript(n));
-    const a = parseAnswer(text);
-    if (!a?.items) throw new Error(`figma-cli did not return chunk ${n}: ${String(text).trim().split('\n').slice(-1)[0]}`);
-    writeFileSync(join(dir, `vars-${n}.json`), text.trim() + '\n');
+// ── Components (Step 1c): each component's structure and props, read in Figma with the recipe's own functions ──
+// The facts are put together in Figma (the node trees are far too large to send), so each chunk script carries the
+// recipe's functions unchanged. Items: { k: 'component' | 'variant' | 'props', id, v }, a component's variants and props
+// as items of their own, so a large component set can span two chunks. A chunk boundary falls after a component whose
+// id hashes to it, or before an item that would pass the budget. The checksums' answer also gives each chunk's plan
+// (its components, first and last item), so a chunk script reads only its own components.
+export const COMPONENT_FUNCTIONS = ['parseAxes', 'restingOf', 'deepHasStroke', 'getBoundPaddingVar', 'childFrames', 'deepFacts', 'paintFacts', 'componentFacts', 'propsFacts'];
+// The keys componentFacts writes, and propsFacts: an older snapshot's other keys are kept, these are replaced.
+export const STRUCTURE_KEYS = ['nodeId', 'h', 'paddingVar', 'gapVar', 'fontSizeVar', 'fontWeightVar', 'fillStructure', 'innerRadiusVar', 'strokeOnDefault', 'strokeOnAnyState',
+  'sizingV', 'layout', 'slot', 'minH', 'iconSize', 'childFramePadding', 'childFrameGaps', 'variantStroke', 'variantHeight', 'restingState', 'restingStroke', 'variantOpacity',
+  'box', 'paddingPx', 'radiusPx', 'gapPx', 'colors', 'inFlow', 'stroke', 'opacity', 'text', 'toggles', 'defaultVariant', 'variants', 'slots', 'fillOpacity', 'variantFillOpacity', 'drawnOn', 'fills'];
+export const PROPS_KEYS = ['nodeId', 'properties', 'annotations', 'layerAnnotations', 'description'];
+
+// The source of each named function in the recipe's code blocks (cookbook/refresh-figma.md).
+export function recipeFunctions(engineDir = ENGINE, names = COMPONENT_FUNCTIONS) {
+  const md = readFileSync(join(engineDir, 'cookbook', 'refresh-figma.md'), 'utf8');
+  const code = [...md.matchAll(new RegExp(FENCE + 'js\\n([\\s\\S]*?)' + FENCE, 'g'))].map((m) => m[1]).join('\n');
+  return names.map((name) => {
+    const m = new RegExp(`^(async )?function ${name}\\(`, 'm').exec(code);
+    if (!m) throw new Error(`cookbook/refresh-figma.md has no function ${name}`);
+    let i = code.indexOf('{', code.indexOf(')', m.index)), depth = 0;
+    for (; i < code.length; i++) { if (code[i] === '{') depth++; else if (code[i] === '}' && --depth === 0) break; }
+    return code.slice(m.index, i + 1);
+  });
+}
+
+// The script for chunk N ('sums' for the checksums alone), to run unchanged in Figma. Read only.
+// pages: the pages to read (ds-config.json figma.componentsPage), null for every page. plan: the chunk's plan from
+// the checksums' answer ({ roots, from, to, of }); without one the script reads every component.
+export function componentsScript(chunk = 0, { budget = BUDGET, pages = null, plan = null, engineDir = ENGINE } = {}) {
+  const which = chunk === 'sums' ? "'sums'" : String(Number(chunk) || 0);
+  const ids = pages == null ? null : [pages].flat().filter(Boolean).map((id) => String(id).replace('-', ':'));
+  return `// rms-design-system-engine: Figma's components (structure and props), ${chunk === 'sums' ? 'the checksums' : `chunk ${chunk}`}. Read only: it changes nothing in Figma.
+// Each component is read with the capture recipe's own functions (cookbook/refresh-figma.md, Step 1c).
+const CHUNK=${which}, BUDGET=${budget}, PAGE_IDS=${JSON.stringify(ids && ids.length ? ids : null)}, PLAN=${JSON.stringify(chunk === 'sums' ? null : plan)};
+${HASH_SRC}
+const bytes=(s)=>{let n=0;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);n+=c<0x80?1:c<0x800?2:(c>=0xd800&&c<0xdc00)?(i++,4):3;}return n;};
+${recipeFunctions(engineDir).join('\n')}
+const idToVar={};
+for(const v of await figma.variables.getLocalVariablesAsync())idToVar[v.id]=v;
+// The page each component is on is loaded once (the current page when there is only one).
+const pageOf=(x)=>{while(x&&x.type!=='PAGE')x=x.parent;return x;};
+const load=async(pages)=>{const ps=[...new Set(pages.filter(Boolean))];if(ps.length===1&&ps[0]!==figma.currentPage)await figma.setCurrentPageAsync(ps[0]);else for(const p of ps)if(p!==figma.currentPage&&typeof p.loadAsync==='function')await p.loadAsync();};
+let roots;
+if(PLAN){roots=(await Promise.all(PLAN.roots.map((id)=>figma.getNodeByIdAsync(id)))).filter(Boolean);await load(roots.map(pageOf));}
+else if(PAGE_IDS){const pages=(await Promise.all(PAGE_IDS.map((id)=>figma.getNodeByIdAsync(id)))).filter((p)=>p&&p.type==='PAGE');await load(pages);
+roots=pages.flatMap((p)=>p.findAllWithCriteria({types:['COMPONENT_SET','COMPONENT']}));}
+else roots=figma.root.findAllWithCriteria({types:['COMPONENT_SET','COMPONENT']});
+roots=roots.filter((x)=>x.type==='COMPONENT_SET'||!x.parent||x.parent.type!=='COMPONENT_SET');
+// A name starting with _ or . is private to the file, not part of the system.
+roots=roots.filter((r)=>!/^[_.]/.test(r.name));
+let items=[];
+for(const r of roots){
+  const {variants,...entry}=await componentFacts(r,idToVar);
+  items.push({k:'component',id:r.id,v:{name:r.name,...entry}});
+  for(const [name,g] of Object.entries(variants||{}))items.push({k:'variant',id:r.id+'|'+name,v:{of:r.id,name,...g}});
+  const p=propsFacts(r);
+  if(p)items.push({k:'props',id:r.id+'#props',v:{name:r.name,...p}});
+}
+// What JSON keeps (no symbol, no undefined), so the checksum is over what the answer carries.
+items=JSON.parse(JSON.stringify(items));
+const rootOf=(it)=>it.k==='component'?it.id:it.k==='variant'?it.v.of:it.id.replace(/#props$/,'');
+if(PLAN){const a=items.findIndex((it)=>it.id===PLAN.from),b=items.findIndex((it)=>it.id===PLAN.to);
+if(a<0||b<a)return {capture:'components',chunk:CHUNK,of:PLAN.of,error:'Figma changed after the checksums were read: read them again'};
+const mine=items.slice(a,b+1);return {capture:'components',chunk:CHUNK,of:PLAN.of,sum:cyrb53(JSON.stringify(mine)),items:mine};}
+const chunks=[];let cur=[],size=0;
+for(let i=0;i<items.length;i++){const it=items[i],b=bytes(JSON.stringify(it))+1;if(cur.length&&size+b>BUDGET){chunks.push(cur);cur=[];size=0;}cur.push(it);size+=b;
+const r=rootOf(it),next=items[i+1];if((!next||rootOf(next)!==r)&&parseInt(cyrb53(r).slice(-2),16)%8===0){chunks.push(cur);cur=[];size=0;}}
+if(cur.length)chunks.push(cur);
+const sums=chunks.map((c)=>cyrb53(JSON.stringify(c)));
+const plan=chunks.map((c)=>({roots:[...new Set(c.map(rootOf))],from:c[0].id,to:c[c.length-1].id}));
+if(CHUNK==='sums')return {capture:'components',of:chunks.length,sums,plan};
+if(CHUNK>=chunks.length)return {capture:'components',chunk:CHUNK,of:chunks.length,sums,plan,error:'no such chunk'};
+return {capture:'components',chunk:CHUNK,of:chunks.length,sums,plan,sum:sums[CHUNK],items:chunks[CHUNK]};
+`;
+}
+
+// The script for a chunk with the plan of the checksums saved in dir, when there is one.
+export function captureScript(kind, chunk, { dir, cfg = {}, engineDir = ENGINE } = {}) {
+  if (kind === 'vars') return varsScript(chunk);
+  const c = dir ? readCapture(dir, 'components') : null;
+  const plan = chunk !== 'sums' && c?.plan?.[chunk] ? { ...c.plan[chunk], of: c.of } : null;
+  return componentsScript(chunk, { pages: cfg.figma?.componentsPage ?? cfg.componentsPage ?? null, plan, engineDir });
+}
+
+// The structure and props entries from the chunks' items. → { structure, props, variants, dupes }
+export function componentsFromItems(items) {
+  const byId = new Map(), structure = {}, props = {}, dupes = [];
+  let variants = 0;
+  for (const it of items) {
+    if (it.k !== 'component') continue;
+    const { name, ...entry } = it.v;
+    if (name in structure) { dupes.push(name); continue; }
+    structure[name] = entry; byId.set(it.id, name);
   }
-  return importCapture(ROOT, cfg, { dir, source: 'figma-cli', engineDir, figmaVersion });
+  for (const it of items) {
+    const name = it.k === 'variant' ? byId.get(it.v.of) : it.k === 'props' ? byId.get(it.id.replace(/#props$/, '')) : null;
+    if (!name) continue;
+    if (it.k === 'variant') { const { of, name: vn, ...g } = it.v; (structure[name].variants ??= {})[vn] = g; variants++; }
+    else { const { name: _n, ...p } = it.v; props[name] = p; }
+  }
+  return { structure, props, variants, dupes: [...new Set(dupes)] };
+}
+
+// --capture-import for the components: when every chunk is there, write the structure and props snapshots.
+// Keys the capture does not read (set by other means) are kept; a component no longer in Figma is taken out.
+export async function importComponents(ROOT, cfg = {}, { dir = captureDir(ROOT), source = 'the Figma tool', now = new Date().toISOString(), engineDir = ENGINE, figmaVersion = null } = {}) {
+  const c = readCapture(dir, 'components');
+  const base = { kind: 'components', missing: c.missing, bad: c.bad, stale: c.stale, changed: c.changed, of: c.of };
+  if (!c.sums) return { ok: false, ...base, missing: ['sums'], why: 'no answer saved yet' };
+  if (c.missing.length) return { ok: false, ...base };
+  const items = c.sums.flatMap((s) => c.chunks.get(s));
+  const got = componentsFromItems(items);
+  const paths = { structure: cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json', props: cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json' };
+  const read = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+  const prevS = read(paths.structure), prevP = read(paths.props);
+  const keep = (old, keys) => Object.fromEntries(Object.entries(old ?? {}).filter(([k]) => !keys.includes(k)));
+  const components = {};
+  for (const [name, e] of Object.entries(got.structure)) components[name] = { ...e, ...keep(prevS.components?.[name], STRUCTURE_KEYS) };
+  const removed = Object.keys(prevS.components ?? {}).filter((k) => !(k in components));
+  const how = `${source}, read in ${c.sums.length} checked chunk${c.sums.length === 1 ? '' : 's'} with the capture recipe's Step 1c functions`;
+  const stamp = buildStamp(ROOT, { engineDir, figma: figmaVersion, figmaRead: now });
+  const structure = { ...prevS, _updated: now, _note: prevS._note ?? 'Each component\'s structure as Figma draws it, read with the capture recipe\'s Step 1c functions (cookbook/refresh-figma.md). Do not edit by hand.', _source: how, components, _built: stamp };
+  const props = Object.fromEntries(Object.entries(prevP).filter(([k]) => k.startsWith('_')));
+  for (const [name, p] of Object.entries(got.props)) props[name] = { ...p, ...keep(prevP[name], PROPS_KEYS) };
+  Object.assign(props, { _updated: now, _source: how, _built: stamp });
+  const kept = [], written = [];
+  for (const [k, snap] of [['structure', structure], ['props', props]]) {
+    const may = mayWrite(join(ROOT, paths[k]), stamp, { ROOT, engineDir, label: paths[k] });
+    if (!may.ok) { kept.push(may.line); continue; }
+    mkdirSync(dirname(join(ROOT, paths[k])), { recursive: true });
+    writeFileSync(join(ROOT, paths[k]), JSON.stringify(snap, null, 2) + '\n');
+    written.push(paths[k]);
+  }
+  if (!written.length) return { ok: false, ...base, kept: kept.join('\n') };
+  for (const f of c.stale) { try { unlinkSync(join(dir, f)); } catch { /* left */ } }
+  return { ok: true, ...base, paths, written, removed, dupes: got.dupes, ...(kept.length ? { kept: kept.join('\n') } : {}),
+    counts: { chunks: c.sums.length, components: Object.keys(components).length, variants: got.variants, props: Object.keys(got.props).length } };
+}
+
+// figma-cli reads the same chunks itself: the checksums first, then each chunk not saved yet (P7).
+// run(code) → the text figma-cli printed (or a promise of it). kind: vars or components. → the import's result.
+export async function captureWithFigmaCli(ROOT, cfg = {}, { run = figmaCliEval(ROOT), dir = captureDir(ROOT), engineDir = ENGINE, figmaVersion = null, kind = 'vars' } = {}) {
+  mkdirSync(dir, { recursive: true });
+  const script = (chunk) => captureScript(kind, chunk, { dir, cfg, engineDir });
+  const sums = parseAnswer(await run(script('sums')));
+  if (!sums?.sums) throw new Error('figma-cli did not return the checksums (is Figma Desktop open on the design system\'s file?)');
+  writeFileSync(join(dir, `${kind}-sums.json`), JSON.stringify(sums) + '\n');
+  for (const n of readCapture(dir, kind).missing) {
+    const text = await run(script(n));
+    const a = parseAnswer(text);
+    if (!a?.items) throw new Error(`figma-cli did not return chunk ${n}: ${a?.error ?? String(text).trim().split('\n').slice(-1)[0]}`);
+    writeFileSync(join(dir, `${kind}-${n}.json`), text.trim() + '\n');
+  }
+  const opts = { dir, source: 'figma-cli', engineDir, figmaVersion };
+  return kind === 'vars' ? importCapture(ROOT, cfg, opts) : importComponents(ROOT, cfg, opts);
 }
 export function figmaCliEval(ROOT) {
   return (code) => {
@@ -226,18 +372,28 @@ export function figmaCliEval(ROOT) {
   };
 }
 
-// What --capture-import says. r: importCapture's result; dir relative to the project.
+// What --capture-import says. r: importCapture's or importComponents' result; dir relative to the project.
 export function importLines(r, rel) {
-  const lines = [];
+  const kind = r.kind ?? 'vars', lines = [];
   for (const b of r.bad ?? []) lines.push(`❌ ${b}`);
-  if (r.kept) { lines.push(r.kept); return lines; }
+  if (r.kept && !r.ok) { lines.push(r.kept); return lines; }
   if (!r.ok) {
     const left = r.missing ?? [];
-    lines.push(r.why === 'no answer saved yet' ? `No answer saved in ${rel} yet.` : `${left.length} of ${r.of} chunk${r.of === 1 ? '' : 's'} still to read: ${left.join(', ')}.`);
-    lines.push(`NEXT: for each, run rms-design-system-engine --capture-script vars <chunk>, run the script it writes unchanged with the Figma tool (use_figma), save its answer as it came to ${rel}/vars-<chunk>.json, then run rms-design-system-engine --capture-import again.`);
+    if (r.changed?.length) lines.push(`Figma changed after the checksums were read (chunk ${r.changed.join(', ')}).`);
+    const what = kind === 'components' ? 'component ' : '';
+    lines.push(r.why === 'no answer saved yet' ? `No ${what}answer saved in ${rel} yet.` : `${left.length} of ${r.of} ${what}chunk${r.of === 1 ? '' : 's'} still to read: ${left.join(', ')}.`);
+    if (r.changed?.length) lines.push(`NEXT: run rms-design-system-engine --capture-script ${kind} sums, run the script it writes unchanged with the Figma tool (use_figma), save its answer as it came to ${rel}/${kind}-sums.json, then read each chunk --capture-import names.`);
+    else if (kind === 'components' && r.why === 'no answer saved yet') lines.push(`NEXT: run rms-design-system-engine --capture-script components sums, run the script it writes unchanged with the Figma tool (use_figma), save its answer as it came to ${rel}/components-sums.json, then run rms-design-system-engine --capture-import again.`);
+    else lines.push(`NEXT: for each, run rms-design-system-engine --capture-script ${kind} <chunk>, run the script it writes unchanged with the Figma tool (use_figma), save its answer as it came to ${rel}/${kind}-<chunk>.json, then run rms-design-system-engine --capture-import again.`);
     return lines;
   }
   const n = r.counts;
-  lines.push(`✓ Figma's variables read in ${n.chunks} checked chunk${n.chunks === 1 ? '' : 's'}: ${n.colours} colours in ${n.modes} mode${n.modes === 1 ? '' : 's'}, ${n.sizing} sizes, ${n.textStyles} text styles, the scopes of ${n.scopes} variables → ${r.path}`);
+  if (kind === 'vars') lines.push(`✓ Figma's variables read in ${n.chunks} checked chunk${n.chunks === 1 ? '' : 's'}: ${n.colours} colours in ${n.modes} mode${n.modes === 1 ? '' : 's'}, ${n.sizing} sizes, ${n.textStyles} text styles, the scopes of ${n.scopes} variables → ${r.path}`);
+  else {
+    lines.push(`✓ Figma's components read in ${n.chunks} checked chunk${n.chunks === 1 ? '' : 's'}: ${n.components} component${n.components === 1 ? '' : 's'} with ${n.variants} variants, the props of ${n.props} → ${r.written.join(', ')}`);
+    if (r.removed?.length) lines.push(`Taken out, no longer in Figma: ${r.removed.join(', ')}.`);
+    if (r.dupes?.length) lines.push(`⚠️  Two components share a name, the first one is kept: ${r.dupes.join(', ')}. Rename one in Figma.`);
+    if (r.kept) lines.push(r.kept);
+  }
   return lines;
 }
