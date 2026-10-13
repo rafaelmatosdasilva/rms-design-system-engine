@@ -1976,7 +1976,8 @@ try {
     if (r.differ.length) {
       console.log(`\n${mark} MEASURED ${r.differ.length}  (rendered in the browser, the component differs from Figma${strictMeasured ? '' : ' - advisory'})`);
       // Who last changed the rule's line, and why (git), so the reason travels with the finding.
-      const { codeReason, reasonLine } = await import('./change-reason.mjs');
+      const { codeReason, reasonLine, prefetchReasons } = await import('./change-reason.mjs');
+      prefetchReasons(ROOT, r.differ.map((d) => d.at));
       // Which side moved since they last agreed (design-system-engine-agreed.json), when there is a record.
       const { loadAgreed, classify, MOVED_LABEL } = await import('./agreed.mjs');
       const { factOf } = await import('./capture-compare.mjs');

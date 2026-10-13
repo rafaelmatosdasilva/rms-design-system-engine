@@ -152,17 +152,18 @@ node <install-dir>/audit.mjs --init \
   --project='.' \
   --figma-url='<DS file URL or key>' \
   --theme-css='src/styles/theme.css'        # comma-separate multiple files
-  # --project: where the code is (. for this folder, another folder or a git link), required
+  # --project: where the code is (. for this folder, another folder, or a GitHub or GitLab link), required
   # --figma-url: optional; --figma-source-url='<upstream DS URL>': optional, consumer/branded-fork files
 ```
 
 **Setup asks the person two things before it writes anything: where the code is (this folder,
-another folder or a git link) and the link to the Figma file.** The code is required and never
+another folder, or a link to its repository on GitHub or GitLab) and the link to the Figma file.** The code is required and never
 guessed; the Figma link is optional (without it only the code's own checks run, and nothing is
 compared with Figma). The router asks what the request leaves out, in one message; a setup run
 that does not know where the code is writes nothing, and its NEXT line asks. Pass the answer as
-`--project=<folder or link>` (`.` for this folder; a link is cloned beside the folder, `owner/repo`
-means GitHub), or name the token file with `--theme-css`. A request for something else that sent the
+`--project=<folder or link>` (`.` for this folder; a GitHub link is cloned beside the folder, `owner/repo`
+means GitHub; a GitLab link, gitlab.com or a company's own, is read through GitLab's API, never cloned:
+see Where the project is in `--reference config`), or name the token file with `--theme-css`. A request for something else that sent the
 person to setup is passed along with `--then='<the request>'`; setup's NEXT line routes it again. Every other choice takes the option that
 keeps the most of the system, without asking. `--theme-css` may be omitted when the engine
 auto-detects a single token CSS file. A code folder with no design tokens yet starts in build mode
@@ -222,9 +223,9 @@ Route by intent:
   in the chat (`--only accessibility`) and builds no page.
 - **Another design system than this folder's:** when the request names a system this folder is not
   set up for ("the style guide for Innova DS"), the router asks for that system's code (a folder or
-  a git link) and its Figma link at once, in one message, and the request runs there with
+  a link to its repository) and its Figma link at once, in one message, and the request runs there with
   `--project`. Never run this folder's system in its place. A cloud session cannot read a folder on
-  the person's computer: ask for the git link, and say that to work on a local folder they run
+  the person's computer: ask for the repository link, and say that to work on a local folder they run
   `claude remote-control` in it, or open it in the Claude Desktop app.
 
 **Running the command means running the WHOLE thing - Phase 1 included - whenever Phase 1

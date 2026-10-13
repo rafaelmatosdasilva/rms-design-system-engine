@@ -11,9 +11,11 @@
 //   every commit that recorded a new read of Figma (its snapshots) and changed what Figma says of the component: its
 //   properties and options, and its variables in every mode.
 // commitUrl / prUrl: links in the repository's own host form (GitHub, GitLab).
+// A project read from GitLab (a mirror with no .git) gives the same through the GitLab API (gitlab-history.mjs).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { mirrorState, mirrorRepo, mirrorBranch, commitsOf, ensureHistory } from './gitlab-history.mjs';
 
 const git = (ROOT, args) => { const r = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }); return r.status === 0 ? r.stdout : ''; };
 
@@ -26,6 +28,7 @@ export function normalizeRepo(url) {
 }
 
 export function repoUrl(ROOT) {
+  if (mirrorState(ROOT)) return mirrorRepo(ROOT);
   try {
     const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
     const r = normalizeRepo(typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url);
@@ -39,7 +42,7 @@ export const commitUrl = (repo, sha) => (repo && sha ? `${repo}${gitlab(repo) ? 
 export const prUrl = (repo, n) => (repo && n ? `${repo}${gitlab(repo) ? '/-/merge_requests/' : '/pull/'}${n}` : null);
 export const fileUrl = (repo, branch, file, line) => (repo && file ? `${repo}${gitlab(repo) ? '/-' : ''}/blob/${branch}/${file}${line ? `#L${line}` : ''}` : null);
 // The branch the repository publishes from: the origin's default, else main.
-export const defaultBranch = (ROOT) => git(ROOT, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).trim().replace(/^origin\//, '') || 'main';
+export const defaultBranch = (ROOT) => mirrorBranch(ROOT) ?? (git(ROOT, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).trim().replace(/^origin\//, '') || 'main');
 
 // What a commit's patch of a rule changed, in a few words: each declaration changed (old → new), added or removed.
 export function ruleChanges(patch = [], { most = 4 } = {}) {
@@ -106,6 +109,15 @@ export function figmaChangelogs(ROOT, { props = null, vars = null } = {}, names 
 
 export function changelogs(ROOT, comps = [], { max = 100 } = {}) {
   const out = {};
+  // Read from GitLab: every component's files asked for in one go, then each one's commits from the record.
+  if (mirrorState(ROOT)) {
+    ensureHistory(ROOT, { paths: comps.flatMap((c) => (c.files ?? []).map((path) => ({ path, ...(c.pattern ? { pattern: c.pattern } : {}) }))) });
+    for (const c of comps) {
+      const rows = c.files?.length ? commitsOf(ROOT, c.files, { pattern: c.pattern ?? null, max, ruleChanges }) : null;
+      if (rows?.length) out[c.name] = rows;
+    }
+    return out;
+  }
   for (const c of comps) {
     if (!c.files?.length) continue;
     let rows;

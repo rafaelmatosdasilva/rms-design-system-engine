@@ -440,11 +440,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // When each component last changed: the latest commit on its own CSS rules and its contract and config entries (git
     // blame on their lines), and the day Figma was last read for it (the props snapshot). A line not committed yet says so.
     try {
-      const { codeReason } = await import('./change-reason.mjs');
+      const { codeReason, prefetchReasons } = await import('./change-reason.mjs');
       const { ruleLines, entryLines } = await import('./styleguide-data.mjs');
       const sheets = [...new Set([...themeFiles, ...(ctx?.componentSheets ?? [])])].map((f) => [f, readText(f)]).filter(([, t]) => t);
       // its entries in the contract and config files (structure-contract.mjs, contract.authored.json, ds-config.json)
       const entries = ['structure-contract.mjs', 'contract.authored.json', 'ds-config.json'].map((f) => [f, readText(f)]).filter(([, t]) => t);
+      prefetchReasons(ROOT, [...sheets, ...entries].map(([f]) => `${f}:1`));   // read from GitLab: every file in one go
       const figmaRead = String(ctx?.propsSnap?._updated ?? '') || null;   // the date and time of the read
       for (const c of view.components) {
         let latest = null, uncommitted = false;

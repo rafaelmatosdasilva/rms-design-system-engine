@@ -209,9 +209,9 @@ export function route(text, { hasConfig = true, components = [], cmd = 'rms-desi
   if (other) {
     const inner = routeOnly(text, { hasConfig: true, components: [], cmd, build: false, pages: [], cloud });
     const { figma, project } = codeAndFigma(String(text ?? ''));
-    const at = project ? ` --project='${project}'${figma ? ` --figma-url='${figma}'` : ''}` : ` --project='<${other}'s folder or git link>'`;
+    const at = project ? ` --project='${project}'${figma ? ` --figma-url='${figma}'` : ''}` : ` --project='<${other}'s folder or repository link>'`;
     const ask = [!project && whereCode(`${other}'s`, cloud), !figma && `the link to ${other}'s Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
-    const notes = [`The request names ${other}, and this folder is set up for ${names[0] ?? 'another system'}: never run this folder's system in its place. Its code may be on the person's computer (a folder) or online (a git link); a run there with no setup sets it up first.`, ...inner.notes];
+    const notes = [`The request names ${other}, and this folder is set up for ${names[0] ?? 'another system'}: never run this folder's system in its place. Its code may be on the person's computer (a folder) or online (a link to its repository on GitHub or GitLab); a run there with no setup sets it up first.`, ...inner.notes];
     const run = (inner.run ?? []).map((c) => c.startsWith(cmd) ? cmd + at + c.slice(cmd.length) : c);
     return { recipe: inner.recipe, question: false, run: run.length ? run : [`${cmd}${at}`], ...(ask.length ? { ask: ask.join(', and ') } : {}), notes, say: [], sayIf: null };
   }
@@ -333,7 +333,7 @@ function routeOnly(text, { hasConfig, components, cmd, build = false, pages = []
 }
 
 // Setup needs to know where the code is (never guessed) and asks for the Figma link, which is optional. Both are taken
-// from the request when it gives them: a token stylesheet or a folder or git link for the code, a Figma link. What
+// from the request when it gives them: a token stylesheet or a folder or repository link for the code, a Figma link. What
 // the request leaves out is asked first, in one message.
 const CODE_LINK = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:github|gitlab|bitbucket)(?:\.[\w-]+)+\/[^\s'"]+|git@[^\s'"]+/i;
 const CODE_PATH = /(?:^|[\s'"(])((?:~|\.{1,2})\/[^\s'"(),]*|\/[^\s'"(),/]+\/[^\s'"(),]+)/;   // ~/x, ./x, ../x, or /a/b (one bare /word is a command)
@@ -351,17 +351,17 @@ export function codeAndFigma(t) {
   return { figma, css, project };
 }
 // The question about the code's place. In a cloud session a folder on the person's own computer cannot be read: the
-// git link is asked for, and how to work on a local folder is said (a session on their computer).
+// repository link is asked for, and how to work on a local folder is said (a session on their computer).
 const whereCode = (whose, cloud) => cloud
-  ? `where ${whose} code is: its git link (a private GitHub repository works once it is attached to this session). This session runs in the cloud and cannot read a folder on the person's computer: to work on a local folder, they run \`claude remote-control\` in it on their computer, or open it in the Claude Desktop app, and ask there`
-  : `where ${whose} code is (this folder, another folder on this computer, or a git link)`;
+  ? `where ${whose} code is: the link to its repository (a private GitHub repository works once it is attached to this session, a private GitLab project once GITLAB_TOKEN is set). This session runs in the cloud and cannot read a folder on the person's computer: to work on a local folder, they run \`claude remote-control\` in it on their computer, or open it in the Claude Desktop app, and ask there`
+  : `where ${whose} code is (this folder, another folder on this computer, or a link to its repository on GitHub or GitLab)`;
 // A request for something else than setup ("check buttonPrimary's accessibility" where nothing is set up yet) goes to
 // setup with it (--then), and setup's NEXT line routes it again once the project is set up, so it is never dropped (E21).
 const SETUP_ASKED = /\bset ?up\b|\bsetup\b|configur|install|\binit\b/i;
 const shellQuote = (x) => `'${String(x).replace(/'/g, `'\\''`)}'`;
 function setupRun(t, cmd, { cloud = false, then = true } = {}) {
   const { figma, css, project } = codeAndFigma(t);
-  const code = css ? ` --theme-css='${css}'` : ` --project='${project ?? '<. for this folder, or the folder or git link>'}'`;
+  const code = css ? ` --theme-css='${css}'` : ` --project='${project ?? '<. for this folder, or the folder or repository link>'}'`;
   const ask = [!css && !project && whereCode('the design system\'s', cloud),
     !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
   const request = String(t ?? '').trim().replace(/\s+/g, ' ');
