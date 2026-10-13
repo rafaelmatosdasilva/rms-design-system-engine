@@ -31,6 +31,9 @@ export function playwrightChromium({ env = process.env, exists = existsSync, lis
 // Find a Chrome/Chromium binary. Order: CHROME_PATH, the macOS app bundles, then binaries on
 // PATH, then (opt-in) a Playwright Chromium.
 export function findChrome({ env = process.env, exists = existsSync, which = whichBin, playwright = false } = {}) {
+  // DESIGN_SYSTEM_ENGINE_CHROME=none: no Chrome, wherever one is installed (a Mac's /Applications is found without the
+  // PATH, so hiding it from the PATH is not enough). A run meant to read the code without a browser sets it.
+  if (env.DESIGN_SYSTEM_ENGINE_CHROME === 'none') return null;
   const absolute = [
     env.CHROME_PATH,
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',

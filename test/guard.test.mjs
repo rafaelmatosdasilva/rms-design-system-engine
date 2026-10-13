@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { judge, asksForChange, lastUserText, routePrompt, MAX_RECIPE, stopCheck, rememberSay } from '../guard.mjs';
-import { SAY } from '../route.mjs';
+import { SAY, shellPath } from '../route.mjs';
 import { installHooks, hooksStatus, upgradeHooks } from '../hooks-install.mjs';
 import { makeFixture } from './helpers.mjs';
 import { PROJECT } from '../names.mjs';
@@ -233,12 +233,15 @@ test('the router as a hook: a request made with the command arrives already rout
   const ctx = (prompt, cfg = {}) => routePrompt({ prompt }, { root: dir, engineDir: ENGINE, cfg, env });
   const chip = ctx('/rms-design-system-engine audit the chip');
   assert.match(chip, /^The engine already routed this request/);
-  assert.match(chip, new RegExp(`\\nROUTE: audit-component\\nRUN: node ${join(ENGINE, 'audit.mjs').replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} --component chip\\n`));
+  assert.ok(chip.includes(`\nROUTE: audit-component\nRUN: node ${shellPath(join(ENGINE, 'audit.mjs'))} --component chip\n`), chip);
   const figma = ctx('/rms-design-system-engine change the chip radius in Figma to 12px so it matches the code');
   assert.match(figma, /\nSAY: I can't change this in Figma: the skill writes to Figma only what the code already states/);
   const refresh = ctx('/rms-design-system-engine refresh the Figma snapshots, the design changed yesterday');
   assert.match(refresh, /SAY \(when there is no Figma tool in this session\): I couldn't refresh the Figma snapshots here: .* \(captured 2026-03-02\)/);
-  assert.match(refresh, /--- recipe refresh-figma: read it with node \S+ --recipe refresh-figma before you follow a step it has ---$/);   // too long to inline
+  assert.match(refresh, /--- recipe refresh-figma: read it with node .+ --recipe refresh-figma before you follow a step it has ---$/);   // too long to inline
+  // An engine kept in a folder whose name has a space (E44): its path is quoted, so the command runs as written.
+  const spaced = routePrompt({ prompt: '/rms-design-system-engine audit the chip' }, { root: dir, engineDir: '/Users/a/My Drive/engine', cfg: {}, env });
+  assert.ok(spaced.includes('\nRUN: node "/Users/a/My Drive/engine/audit.mjs" --component chip\n'), spaced);
   assert.ok(refresh.length < MAX_RECIPE);
   assert.equal(ctx('audit the chip'), null);                           // not the command: no opinion
   assert.equal(ctx('/rms-design-system-engine'), null);                   // the command alone: nothing to route

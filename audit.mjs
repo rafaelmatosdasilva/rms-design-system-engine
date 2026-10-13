@@ -339,6 +339,39 @@ if (process.argv.includes('--figma-motion')) {
   process.exit(0);
 }
 
+// ── --capture-script / --capture-import: Figma's variables, text styles and effect styles in checked chunks (P6) ──
+// --capture-script vars N writes the read-only script for chunk N ('sums' for the checksums alone) to run with the
+// Figma tool; the agent saves each answer as it came. --capture-import checks every saved answer against the checksum
+// Figma computed, says which chunks are missing or changed, and once all are there writes the vars snapshot with the
+// capture recipe's own scripts. No value is copied by hand.
+if (process.argv.includes('--capture-script') || process.argv.includes('--capture-import')) {
+  let ccfg = {};
+  try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const fc = await import('./figma-capture.mjs');
+  const dir = fc.captureDir(ROOT), rel = relative(ROOT, dir);
+  mkdirSync(dir, { recursive: true });
+  if (process.argv.includes('--capture-script')) {
+    const at = process.argv.indexOf('--capture-script');
+    const kind = process.argv[at + 1], which = process.argv[at + 2] ?? '0';
+    if (kind !== 'vars') { console.log('rms-design-system-engine --capture-script vars <chunk|sums>: the variables, text styles and effect styles. Components are read with the recipe\'s Step 1c walk.'); process.exit(2); }
+    const chunk = which === 'sums' ? 'sums' : Number.parseInt(which, 10);
+    if (chunk !== 'sums' && !(chunk >= 0)) { console.log(`❌ ${which}: a chunk number (0, 1, ...) or sums`); process.exit(2); }
+    const file = join(dir, `vars-${chunk}.js`);
+    writeFileSync(file, fc.varsScript(chunk));
+    console.log(`Capture script for ${chunk === 'sums' ? 'the checksums' : `chunk ${chunk}`} → ${relative(ROOT, file)} (read only: it changes nothing in Figma).`);
+    console.log(`NEXT: run it unchanged with the Figma tool (use_figma) on the design system's file, save its answer as it came to ${rel}/vars-${chunk}.json, ${chunk === 0 ? 'then do the same for each chunk up to the "of" it gives, ' : ''}then run rms-design-system-engine --capture-import.`);
+    process.exit(0);
+  }
+  let figmaVersion = null;
+  // The file's version, read after the capture as Step 5 says, when the API can give it (FIGMA_TOKEN in .env).
+  if (process.env.FIGMA_TOKEN && ccfg.figmaFileKey) {
+    try { const res = await fetch(`https://api.figma.com/v1/files/${ccfg.figmaFileKey}?depth=1`, { headers: { 'X-Figma-Token': process.env.FIGMA_TOKEN }, signal: AbortSignal.timeout(15000) }); if (res.ok) figmaVersion = (await res.json()).version ?? null; } catch { /* offline: no version stamped */ }
+  }
+  const r = await fc.importCapture(ROOT, ccfg, { dir, figmaVersion });
+  for (const line of fc.importLines(r, rel)) console.log(line);
+  process.exit(r.ok ? 0 : 1);
+}
+
 // ── --figma-screens: the screens designed for each product, for the screen check (I96) ──
 // Without a file: writes the read-only capture script for the frames and screens ds-config.json names. With the file
 // its answer was saved to: keeps it as the screen layout snapshot, then compares each product's page with its screens.
@@ -751,6 +784,7 @@ if (process.argv.includes('--styleguide')) {
   try {
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
     const r = await generateStyleguide(ROOT, sgConfig, SCOPE_COMPONENTS.length ? { only: SCOPE_COMPONENTS } : {});
+    if (r.kept) { console.log(`🖼  ${r.kept}`); process.exit(0); }
     // What agrees with Figma and what only the code has (shown, compared with nothing), never one count called agreed.
     const agreedN = r.components - (r.codeOnly ?? 0);
     const counted = [agreedN || !r.codeOnly ? `${agreedN} component${agreedN === 1 ? '' : 's'} agreed` : null, r.codeOnly ? `${r.codeOnly} only in the code` : null].filter(Boolean).join(', ');
@@ -4611,7 +4645,7 @@ function reportFull(label, items, shown) {
       try {
         const { generateStyleguide } = await import('./styleguide-gen.mjs');
         const r = await generateStyleguide(ROOT, cfg.styleguide || !sgCfg ? cfg : { ...cfg, styleguide: sgCfg }, {});
-        console.log(`🖼  Styleguide → ${r.out.replace(ROOT + '/', '')}  (${r.components} components · filled ${r.filled.join(', ')})`);
+        console.log(r.kept ? `🖼  ${r.kept}` : `🖼  Styleguide → ${r.out.replace(ROOT + '/', '')}  (${r.components} components · filled ${r.filled.join(', ')})`);
       } catch (e) {
         console.log(C.yellow('\n⚠️  styleguide generation failed (never fails the audit): ' + e.message));
       }
@@ -4634,7 +4668,7 @@ function reportFull(label, items, shown) {
       const { generateContracts } = await import('./contract-gen.mjs');
       const r = await generateContracts(ROOT, cfg, {});
       const issues = r.invalid.length ? ` · ⚠️ ${r.invalid.length} schema issue(s)` : '';
-      console.log(`\n📐 Contracts → ${r.outDir.replace(ROOT + '/', '')}  (${r.components.length} component${r.components.length === 1 ? '' : 's'} · ${r.tokenCount} DTCG tokens${issues})`);
+      console.log(r.kept ? `\n📐 ${r.kept}` : `\n📐 Contracts → ${r.outDir.replace(ROOT + '/', '')}  (${r.components.length} component${r.components.length === 1 ? '' : 's'} · ${r.tokenCount} DTCG tokens${issues})`);
       if (r.propTypesOut) console.log(`ℹ️  Figma prop types → ${r.propTypesOut.replace(ROOT + '/', '')}: type a component's props with its <Name>FigmaProps so tsc shows prop drift.`);
       if (r.authoredIssues?.length) {
         console.log(C.yellow(`⚠️  contract.authored.json has ${r.authoredIssues.length} issue(s) — the malformed binding(s) below are ignored until fixed:`));

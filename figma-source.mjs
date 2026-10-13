@@ -41,11 +41,16 @@ export async function chooseFigmaSource(ROOT, cfg = {}, { env = process.env, whi
   return { route: 'mcp', why: 'no figma-cli connection and no design.json: the Figma tool of this session reads it' };
 }
 
-// Runs `figma-cli snapshot` in the project (it writes design.json), then imports it. Returns the import result.
-export async function refreshFromFigmaCli(ROOT, cfg = {}, { run = (cmd, args) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', timeout: 600000 }) } = {}) {
+// Runs `figma-cli snapshot` in the project (it writes design.json) and imports it; then reads the variables, text
+// styles and effect styles through figma-cli with the capture recipe's own scripts, in checked chunks (P7), so the
+// vars snapshot is the one a capture through the Figma tool gives. Returns the import result, with the capture's.
+export async function refreshFromFigmaCli(ROOT, cfg = {}, { run = (cmd, args) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', timeout: 600000 }), capture = async () => (await import('./figma-capture.mjs')).captureWithFigmaCli(ROOT, cfg) } = {}) {
   const r = run('figma-cli', ['snapshot']);
   if (r.error || r.status !== 0) throw new Error(`figma-cli snapshot did not finish: ${(r.error?.message ?? r.stderr ?? '').trim().split('\n').slice(-1)[0] || `exit ${r.status}`}`);
-  return importDesign(ROOT, cfg);
+  const out = await importDesign(ROOT, cfg);
+  let captured = null;
+  try { captured = await capture(); } catch (e) { captured = { ok: false, error: String(e.message).split('\n')[0] }; }
+  return { ...out, captured };
 }
 
 // Imports design.json into the snapshots ds-config names, and says which Figma file it came from.
@@ -57,4 +62,6 @@ export async function importDesign(ROOT, cfg = {}, file = designJsonPath(cfg)) {
   return { ...out, file, source };
 }
 
-export const importLine = (r) => `Figma read from ${r.file}${r.source ? ` (${r.source})` : ''}: ${r.counts.colours} colours in ${r.counts.modes} mode${r.counts.modes === 1 ? '' : 's'}, ${r.counts.sizing} sizes, ${r.counts.components} components → ${Object.values(r.paths).join(', ')}`;
+// The line for the capture figma-cli ran after its snapshot (refreshFromFigmaCli), or null.
+const capturedLine = (c) => (!c ? '' : c.ok ? `\nFigma's variables, text styles and effect styles read through figma-cli in ${c.counts.chunks} checked chunk${c.counts.chunks === 1 ? '' : 's'} → ${c.path}` : c.kept ? `\n${c.kept}` : `\nThe variables' scopes, descriptions and text styles were not read through figma-cli (${c.error ?? 'chunks missing'}); the ones already saved are kept.`);
+export const importLine = (r) => `Figma read from ${r.file}${r.source ? ` (${r.source})` : ''}: ${r.counts.colours} colours in ${r.counts.modes} mode${r.counts.modes === 1 ? '' : 's'}, ${r.counts.sizing} sizes, ${r.counts.components} components → ${Object.values(r.paths).join(', ')}${r.kept?.length ? `\n${r.kept.join('\n')}` : ''}${capturedLine(r.captured)}`;

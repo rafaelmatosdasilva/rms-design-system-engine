@@ -1323,8 +1323,20 @@ test('Health: each area counted by component, weighted into one number once acce
     assert.match(tiles[5][2], /^\d of 2 components ready$/);
     // The five components with the most left, at most; then each WCAG criterion that fails or waits on a person, the
     // one that fails in most components first (G10).
-    assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left', 'Accessibility by WCAG criterion']);
-    assert.ok(await run(`document.querySelectorAll('#health .sg-health-card:not(.sg-health-crit) .sg-health-list > li').length`) <= 5);
+    assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left', 'Parity by type', 'Accessibility by WCAG criterion']);
+    assert.ok(await run(`document.querySelectorAll('#health .sg-health-card:not(.sg-health-crit):not(.sg-health-types) .sg-health-list > li').length`) <= 5);
+    // Parity by type (G11): each open difference by what it is about, split by where it comes from, the longest type a
+    // full bar; the counts add up to the open differences said under it.
+    const types = await run(`[...document.querySelectorAll('#health .sg-health-types .sg-health-list > li')].map((li) => [li.querySelector('.sg-health-row > span').textContent, li.querySelector('.sg-health-row > span:last-child').textContent, li.querySelectorAll('.sg-health-bar > span').length])`);
+    assert.ok(types.length > 0, 'something differs in the fixture');
+    let sum = 0;
+    for (const [name, say, segs] of types) {
+      assert.ok(['Props', 'Variables', 'Values', 'Effects', 'Modes', 'Other'].includes(name), name);
+      assert.match(say, /^(\d+ differs?)?(, )?(\d+ only in Figma)?(, )?(\d+ only in the code)?$/);
+      assert.equal(segs, 3);
+      sum += (say.match(/\d+/g) ?? []).map(Number).reduce((a, b) => a + b, 0);
+    }
+    assert.equal(await run(`document.querySelector('#health .sg-health-types > p.sg-health-sub').textContent`), `${sum} difference${sum === 1 ? '' : 's'} open. The dark part differs, the light part is only in Figma, the striped part only in the code.`);
     const crit = await run(`[...document.querySelectorAll('#health .sg-health-crit .sg-health-list > li')].map((li) => [li.querySelector('.sg-health-row > span').textContent, li.querySelector('.sg-health-row > span:last-child').textContent, li.querySelectorAll('.sg-health-bar > span').length])`);
     assert.ok(crit.length > 0, 'a criterion to fix or to check');
     const fails = crit.map((x) => Number((/(\d+) fail/.exec(x[1]) ?? [0, 0])[1]));
