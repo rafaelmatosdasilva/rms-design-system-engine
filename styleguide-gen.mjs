@@ -1015,7 +1015,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const built = buildStamp(ROOT, { vars: (() => { try { return JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { return null; } })() });
   const may = opts.out ? { ok: true } : mayWrite(outPath, built, { ROOT, label: relative(ROOT, outPath) });
   if (!may.ok) return { out: outPath, kept: may.line, filled, bytes: 0, components: 0 };
-  html = html.replace(/<head>/i, (m) => `${m}\n${stampMeta(built)}`);
+  html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, (m) => `${stampMeta(built)}\n${m}`) : html.replace(/<head>/i, (m) => `${m}\n${stampMeta(built)}`);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html);
   return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };

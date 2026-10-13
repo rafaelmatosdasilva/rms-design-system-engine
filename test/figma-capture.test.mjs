@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { varsScript, readCapture, importCapture, captureWithFigmaCli, parseAnswer, cyrb53, recipeScripts, importLines } from '../figma-capture.mjs';
 import { snapshotsFromDesign } from '../figma-cli-import.mjs';
 
@@ -144,7 +145,7 @@ test('P7: figma-cli and the Figma tool give the same snapshot; the design.json i
 
 test('P6: the commands write the script for a chunk and import what was saved', async () => {
   const { spawnSync } = await import('node:child_process');
-  const { fileURLToPath } = await import('node:url');
+
   const ENGINE = join(fileURLToPath(new URL('.', import.meta.url)), '..');
   const root = project();
   const cli = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
@@ -158,4 +159,24 @@ test('P6: the commands write the script for a chunk and import what was saved', 
   r = cli('--capture-import');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /✓ Figma's variables read in \d+ checked chunks: 484 colours in 2 modes, 2 sizes, 3 text styles, the scopes of 245 variables → src\/figma-vars\.snapshot\.json/);
+});
+
+// On a real file: Tidepool's answer, saved as the Figma tool returned it (test/fixtures/tidepool-figma/figma-capture).
+test('P6 and P7 on a real file: Figma\'s checksum holds, and the Figma tool, the recipe\'s capture and figma-cli agree', async () => {
+  const { varsFromItems } = await import('../figma-capture.mjs');
+  const { tidepoolDesign } = await import('./figma-cli-design.mjs');
+  const TP = join(fileURLToPath(new URL('.', import.meta.url)), 'fixtures', 'tidepool-figma');
+  const answer = JSON.parse(readFileSync(join(TP, 'figma-capture', 'vars-0.json'), 'utf8'));
+  assert.equal(cyrb53(JSON.stringify(answer.items)), answer.sum, 'the checksum computed in Figma is the engine\'s');
+  const tpCfg = JSON.parse(readFileSync(join(TP, 'ds-config.json'), 'utf8'));
+  const built = await varsFromItems(answer.items, tpCfg);
+  // The same file captured before with the recipe, value by value.
+  const recipe = JSON.parse(readFileSync(join(TP, 'src', 'figma', 'figma-vars.snapshot.json'), 'utf8'));
+  for (const k of ['color', 'sizing', 'typography']) assert.deepEqual(built[k], recipe[k], k);
+  assert.deepEqual(built._collections, { color: 'Theme', colorModes: ['Light', 'Dark'], sizing: ['Sizing'] });
+  assert.deepEqual(built.variableScopes['VariableID:1:17'], { name: 'radii/button', scopes: ['CORNER_RADIUS'] });
+  // figma-cli's design.json of the same file gives the same colours and sizes.
+  const fromDesign = snapshotsFromDesign(tidepoolDesign(), tpCfg).vars;
+  assert.deepEqual(fromDesign.color, built.color);
+  assert.deepEqual(fromDesign.sizing, built.sizing);
 });
