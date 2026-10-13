@@ -43,6 +43,7 @@ import { frameworkGateSkipReason }                              from './componen
 import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-parse.mjs';
 import { ZERO_FAIL }                                             from './run-diff.mjs';
 import { loadBaselineLabels, loadBaselineFindings, classifyBaseline, writeBaseline } from './baseline.mjs';
+import { readKept, keepInGates, matchKept, keptState, keptReport } from './kept.mjs';
 import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, newPath, projectPath } from './names.mjs';
 import { buildFreshness, buildRecordPath }                    from './build-freshness.mjs';
 import { codeRoots } from './code-roots.mjs';
@@ -520,6 +521,62 @@ if (process.argv.includes('--rename-sweep')) {
   if (!process.argv.includes('--no-keep-old')) console.log('   The old names stay in the theme, pointing at the new ones, until every product has moved (migrations.md lists where).');
   const sys = written.find((p) => p.root === '.'), others = written.filter((p) => p.root !== '.');
   console.log(`NEXT: show the person the change; when they ask, apply it${sys ? ` with git apply ${sys.file}` : ''}${others.length ? `${sys ? ', and' : ''} in each product's folder with git apply ${others.map((p) => resolve(ROOT, p.file)).join(', ')}` : ''}, then run rms-design-system-engine`);
+  process.exit(0);
+}
+
+// ── --keep / --unkeep: a difference the team decided to keep (kept.mjs) ──
+// --keep --match <words> [--component <name>] --reason "<why>" [--by "<name>"] [--truth figma|code] [--review <date|90d>]
+// keeps the open differences of the last full audit that match, each with why, who and when; they never fail a run
+// again while their values stay as they are. --keep alone lists the decisions. --unkeep --match <words> takes some back.
+// Only the person keeps a difference: the project's hooks ask otherwise.
+if (process.argv.includes('--keep') || process.argv.includes('--unkeep')) {
+  const undo = process.argv.includes('--unkeep');
+  const argOf = (flag) => { const i = process.argv.indexOf(flag); return i > -1 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null; };
+  const mi = process.argv.indexOf('--match');
+  const words = mi > -1 ? process.argv.slice(mi + 1).filter((x, i, all) => !x.startsWith('--') && all.slice(0, i).every((y) => !y.startsWith('--'))).flatMap((x) => x.split(',')).map((x) => x.trim()).filter(Boolean) : [];
+  const components = (argOf('--component') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  const component = components.length ? components : null;
+  const km = await import('./kept.mjs');
+  const file = PROJECT.kept.now;
+  if (undo) {
+    if (!words.length && !component) { console.log('Usage: rms-design-system-engine --unkeep --match <words> [--component <name>]: takes back the kept differences that match.'); process.exit(2); }
+    const gone = km.dropKept(ROOT, (d) => km.pick([d], { component, words }).length > 0);
+    if (!gone.length) { console.log(`No kept difference matches${component ? ` in ${component.join(', ')}` : ''}${words.length ? ` "${words.join(', ')}"` : ''}.`); process.exit(1); }
+    console.log(`✓ ${gone.length} difference${gone.length === 1 ? '' : 's'} no longer kept: the next audit lists ${gone.length === 1 ? 'it' : 'them'} as open again.`);
+    for (const d of gone) console.log(`   • ${km.keptLine(d)}`);
+    console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`);
+    process.exit(0);
+  }
+  const all = km.readKept(ROOT);
+  if (!words.length && !component) {
+    if (!all.length) console.log(`No difference is kept on purpose yet. Keep one: rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>".`);
+    else { console.log(`Kept on purpose (${file}): ${all.length}`); for (const d of all) console.log(`   • ${km.keptLine(d)}`); }
+    process.exit(0);
+  }
+  const reason = argOf('--reason');
+  if (!reason) { console.log('❌ A kept difference needs its reason: add --reason "<why the team keeps it>". Ask the person for it; never write one for them.'); process.exit(2); }
+  const truth = argOf('--truth');
+  if (truth && !['figma', 'code'].includes(truth)) { console.log('❌ --truth is figma or code: the side that is right.'); process.exit(2); }
+  const reviewArg = argOf('--review'), review = reviewArg ? km.reviewDate(reviewArg) : null;
+  if (reviewArg && !review) { console.log(`❌ --review ${reviewArg}: a date (2027-01-31) or a span from today (90d, 6m, 1y).`); process.exit(2); }
+  let records = null;
+  try { records = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'findings.json'), 'utf8')).findings ?? null; } catch { /* no full audit yet */ }
+  if (!records) { console.log('❌ No full audit yet: run rms-design-system-engine first, then keep the differences it lists.'); process.exit(2); }
+  const open = records.filter((r) => r.difference).map((r) => ({ check: r.check, what: r.evidence, component: r.component ?? null }));
+  const chosen = km.pick(open, { component, words });
+  if (!chosen.length) {
+    const near = km.pick(open, { component });
+    console.log(`❌ No open difference${component ? ` in ${component.join(', ')}` : ''} matches${words.length ? ` "${words.join(', ')}"` : ''} in the last full audit.`);
+    for (const x of near.slice(0, 10)) console.log(`   • ${x.check}: ${x.what}`);
+    process.exit(1);
+  }
+  const git = spawnSync('git', ['config', 'user.name'], { cwd: ROOT, encoding: 'utf8' });
+  const by = argOf('--by') || String(git.stdout ?? '').trim() || null;
+  const added = km.recordKept(ROOT, chosen, { reason, by, truth, review });
+  console.log(`✓ Kept on purpose: ${added.length} difference${added.length === 1 ? '' : 's'}, in ${file}.`);
+  for (const d of added) console.log(`   • ${km.keptLine(d)}`);
+  console.log('   While the values stay as they are, they never fail a run and the differences list and the style guide show them as kept, with the reason. When a value changes, the difference is open again.');
+  console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`);
   process.exit(0);
 }
 
@@ -2620,7 +2677,7 @@ function reportFull(label, items, shown) {
     // audit. Narrowing usage to the scan set produces confident false positives; on the
     // project this was built for it wrongly condemned classes used by a style guide.
     const usageOnlyFiles = [];
-    const ENGINE_FILES = new Set(['history', 'checkResult', 'baseline', 'agreed'].map((k) => PROJECT[k].now));
+    const ENGINE_FILES = new Set(['history', 'checkResult', 'baseline', 'agreed', 'kept'].map((k) => PROJECT[k].now));
     (function walkAll(dir) {
       let entries;
       try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
@@ -3681,6 +3738,11 @@ function reportFull(label, items, shown) {
     gates.push(...keep);
     anyFail = keep.some((g) => !g.pass && !g.planLimited) || (ONLY.a11y && cfg.a11yStrict === true && !!rA11y && rA11y.status === 1);
   }
+
+  // ── Kept on purpose (kept.mjs): the differences the team decided to keep never fail the run ──
+  const _keptDecisions = readKept(ROOT);
+  const _keptInGates = keepInGates(gates, _keptDecisions);
+  if (_keptInGates.length) anyFail = gates.some((g) => !g.pass && !g.planLimited) || ((!ONLY || ONLY.a11y) && cfg.a11yStrict === true && !!rA11y && rA11y.status === 1);
 
   // ── Adoption baseline / ratchet (feature #2) ────────────────────────────────────
   // Let a real (imperfect) codebase adopt the audit without either a wall of red or turning gates
@@ -5165,7 +5227,7 @@ function reportFull(label, items, shown) {
   // ── Since the last run ───────────────────────────────────────────────────────
   // The findings this run printed, against the ones the last run with the same scope printed.
   console.log = _log;
-  let _burndownLines = [], _burndownNext = null;
+  let _burndownLines = [], _burndownNext = null, _keptNow = null;
   if (!ONLY) try {
     const { collectFindings, diffFindings, diffReport, burndown, burndownLines, componentOf } = await import('./run-diff.mjs');
     const ledgerPath = join(ROOT, OUT_DIR, 'last-findings.json');
@@ -5178,6 +5240,12 @@ function reportFull(label, items, shown) {
       const a = JSON.parse(readFileSync(A11Y_JSON, 'utf8'));
       for (const i of a.issues ?? []) now.push(`Accessibility :: ${i.issue} ${i.selector ?? ''}${i.theme ? ` (${i.theme})` : ''}${i.contrast != null ? ` ${i.contrast}:1` : ''}`);
     } catch { /* no browser this run: nothing to add */ }
+    // Kept on purpose: a kept difference is neither open nor new; the decisions not found this run are said.
+    const _keptRest = matchKept(_keptDecisions, now);
+    now.length = 0; now.push(..._keptRest.open);
+    _keptNow = keptState(_keptDecisions, [..._keptInGates, ..._keptRest.kept]);
+    const _keptLines = keptReport(_scopeNames.length ? { ..._keptNow, gone: [] } : _keptNow);
+    if (_keptLines.length) { console.log(''); for (const l of _keptLines) console.log(l); }
     const prev = ledger.scopes?.[scopeKey];
     if (!prev) console.log(C.dim(`\nℹ️  Since the last run: this is the first recorded run${_scopeNames.length ? ' for this scope' : ''}; the next one lists what is new, gone or changed.`));
     else {
@@ -5207,6 +5275,12 @@ function reportFull(label, items, shown) {
       const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
       const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_') && n.length > 2);
       const d = differences(now, names, prev?.findings ?? null);
+      // What the team decided to keep, with why, who and when: listed apart, never open.
+      if (_keptNow) {
+        const item = (k) => ({ component: k.component ?? null, check: k.check, what: k.what, reason: k.reason, by: k.by ?? null, at: k.at ?? null, ...(k.truth ? { truth: k.truth } : {}), ...(k.review ? { review: k.review } : {}) });
+        d.kept = _keptNow.kept.map((k) => ({ ...item(k), ...(_keptNow.due.includes(k) ? { due: true } : {}) }));
+        d.keptGone = _keptNow.gone.map(item);
+      }
       // The checks that did not run: a difference there would not show, so the list says so rather than look clean.
       const plain = (l) => String(l ?? '').replace(/\x1b\[[0-9;]*m/g, '').trim();
       d.notChecked = gates.filter((g) => g.notRun || g.planLimited || (g.pass && (g.lines ?? []).map(plain).filter(Boolean).length && (g.lines ?? []).map(plain).filter(Boolean).every((l) => /^⏭/.test(l))))
