@@ -24,9 +24,12 @@ single-component check clean instead of drowning in the rest of the DS. Because 
 **contains** others (a button may hold an icon, a card a badge), the scope **auto-expands**
 to the nested components used inside the chosen ones (found via their source files, so the
 parent is never passed while a child it depends on is broken); the banner lists what was
-pulled in. Only a component's own source counts: the file `componentFiles` names for it, or a
-file whose name ends with its name (`HbIconButton.vue` is iconButton's, `Chip/index.tsx` is
-chip's). A page that shows several components, the theme CSS, a native element (`<button>`,
+pulled in. Only a component's own source counts: the file the shared pairing gives it
+(`component-pairing.mjs`: `componentFiles` always wins; a strong sign such as the file's name,
+the component it declares, its first class or its folder pairs alone, as `HbIconButton.vue` is
+iconButton's and `Chip/index.tsx` chip's; weak signs such as a generic file name, the library's
+prefix, the tokens the file uses or a state-word sibling pair only when two agree, and one alone
+is only a proposal to confirm or pin). A page that shows several components, the theme CSS, a native element (`<button>`,
 `type="button"`) and a name inside a longer one (button inside iconButton) pull in nothing. A
 finding that names a component belongs to that component; one that names none (a token, a
 shared rule) belongs to the scope when its file mentions a component in scope. The burndown
