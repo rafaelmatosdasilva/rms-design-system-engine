@@ -23,8 +23,33 @@ The complete lists live in the guide Claude reads. Every option is in `reference
 - **It reads your code the same way.** Once per run it opens your pages in a browser and records what the code really produces, every token in every mode, each component's sizes, states, props, icons and markup, and which components sit inside which.
 - **Every fact has a source.** Each one says where it came from and how sure the reading is. When something cannot be read reliably, the engine says so instead of blaming the design.
 - **It writes the facts out for AI tools.** A catalog of your real components, their options and which go inside which, so AI tools build with the real system instead of guessing. `--check-ui` checks what they generate against it, every time, without changing it.
+- **It pairs each Figma component with its code file.** One shared pairing (`component-pairing.mjs`) answers for every check, the style guide and the router, so they all agree. Details below.
 
 The whole flow, step by step, is on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1).
+
+### Which code file is each Figma component
+
+Each sign the code gives counts. A strong sign pairs on its own. A weak one needs a second sign that agrees.
+
+| Sign | Strength | Example |
+| --- | --- | --- |
+| File name | Strong | `Button.vue`, `button-primary.tsx` |
+| Name it declares | Strong | `name: 'buttonPrimary'`, `function ButtonPrimary` |
+| Class on its first element | Strong | `.button-primary` |
+| Folder and file name | Strong | `buttons/Secondary.vue` is buttonSecondary, `card-box/index.vue` is cardBox |
+| Only file with its selector | Strong | the one file that holds `.chip` |
+| Generic file name | Weak | `switches/General.vue` is switch (also Default, Base, Main, the only file in a folder, and `cards/Primary.vue` when Figma has no cardPrimary) |
+| Library prefix | Weak | `HbBadge.vue` or `.hb-badge` is badge |
+| Tokens | Weak | a file using `var(--advanced-tooltip-bg)` is tooltip's, read through the variables snapshot and your naming convention |
+| State word | Weak | tooltipOpen and tooltipClosed are both `Tooltip.vue` |
+| Props | Backs another sign | its props hold two thirds of Figma's properties |
+
+- **Paired.** A strong sign, or two that agree.
+- **Proposed.** One weak sign alone. Never applied: the audit prints it (`🔗`), the props and sub-component checks name it in their "no code file" line, and the style guide lists it under Tasks, Parity, to confirm or pin.
+- **Only in Figma.** No sign at all. The files nearest its name are named, among those no other component has.
+- **Never taken twice on a weak sign.** A file a name gives to one component is not offered to another on its tokens alone, unless the two differ only by a state word.
+- **`componentFiles` always wins.** It pins a pair by hand in `ds-config.json`.
+- **Its class.** With no `componentSelectors` or contract selector, a component's class is the one its paired file writes for its name, else the class of that file's first element. A file named after the component keeps the convention's class (`.chip` for `Chip.jsx`).
 
 ## Install and update
 

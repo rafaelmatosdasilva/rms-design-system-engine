@@ -306,8 +306,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const vueRenders = {};   // a Vue component's every variant as its build renders it: [{ props, markup }] (E35)
     const fileOf = {};   // each component's own file, read for the components it nests (a scoped page, E27)
     // The components the code has that Figma does not list (every one, before Figma's data is captured): each with its
-    // file, the props its code declares and the markup its source renders (codeComponents, E26).
+    // file, the props its code declares and the markup its source renders (codeComponents, E26). Which file is which
+    // Figma component is the shared pairing's answer (component-pairing.mjs), so a file paired with one, or proposed for
+    // one, is not listed as the code's alone.
     const codeOnly = [];
+    const pairing = locator.pairing?.() ?? null;
     try {
       const { componentSourceFiles, resolveComponentFile, textReader, codeComponents, textComponentApi } = await import('./component-source.mjs');
       const { jsxMarkup } = await import('./jsx-markup.mjs');
@@ -319,7 +322,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const vueFiles = {};   // a Vue component's file, to draw it from what the project's own build renders (E28)
       for (const name of drawNames) {
         if (name.startsWith('_')) continue;
-        const { file } = resolveComponentFile(name, { ROOT, cfg, files, read, classFor: locator.classFor });
+        const { file } = resolveComponentFile(name, { ROOT, cfg, files, read, classFor: locator.classFor, pairing });
         if (file) { covered.add(resolve(file)); fileOf[name] = file; }
         if (file && /\.vue$/.test(file) && !probes[name]) vueFiles[name] = resolve(ROOT, file);
         if (probes[name] || !file || !/\.(jsx|tsx|js|vue)$/.test(file)) continue;
@@ -331,7 +334,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const figmaNames = new Set(drawNames.map(squash));
       for (const k of codeComponents(ROOT, cfg, read)) {
         const abs = resolve(ROOT, k.file);
-        if (covered.has(abs) || figmaClasses.has(k.cls) || figmaNames.has(squash(k.name))) continue;
+        if (covered.has(abs) || pairing?.claimed(abs) || figmaClasses.has(k.cls) || figmaNames.has(squash(k.name))) continue;
         const api = textComponentApi(abs, read(abs));
         const props = Object.entries(api?.props ?? {}).map(([prop, d]) => ({ name: prop, ...(d.default != null ? { default: String(d.default) } : {}), ...(d.options ? { options: [...d.options] } : {}), ...(d.required ? { required: true } : {}) }));
         codeOnly.push({ ...k, props, markup: sourceMarkup(abs, k.cls), from: /\.vue$/.test(k.file) ? 'vue' : 'jsx' });
@@ -708,6 +711,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // Where a product's page is laid out otherwise than its designed screens (I96).
       const { screenTodos } = await import('./screen-parity.mjs');
       view.systemTodo.push(...screenTodos(readJson(join(OUT_DIR, 'screens.json'))));
+    } catch { /* advice: the page builds without it */ }
+    // Which code file is each Figma component (component-pairing.mjs): a pair on one sign only is a proposal, never
+    // applied, and a component only in Figma with files near its name names them. Each is a decision on the Tasks page:
+    // confirm it, or pin it in ds-config.json → componentFiles.
+    if (!opts.only?.length) try {
+      const { pairingTasks } = await import('./component-pairing.mjs');
+      const { inProgressNames } = await import('./in-progress.mjs');
+      const pr = (await context()).locator.pairing?.();
+      if (pr) for (const t of pairingTasks(pr, { ROOT, skip: new Set(await inProgressNames(ROOT, cfg)) })) (view.systemTodo ??= []).push({ who: 'both', area: 'Parity', type: 'Component pairing', kind: 'Pairing', pairing: t.name, say: t.say, todo: t.todo });
     } catch { /* advice: the page builds without it */ }
     // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
