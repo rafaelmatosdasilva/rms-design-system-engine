@@ -38,10 +38,13 @@ Once configured, ask Claude Code to check parity, audit accessibility, generate 
 - `/rms-design-system-engine build the style guide`
 - `/rms-design-system-engine prototype a settings page with our components`
 
+[See every command](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/commands.md), grouped by type.
+
 ## Explore
 
 - [Features and capabilities](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md)
 - [Technical documentation](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md)
+- [Commands](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/commands.md)
 - [Case study](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/CASE-STUDY.md)
 - [Evaluation results](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/test/skill-evals/RESULTS.md)
 - [Live style guide](https://rafaelmatosdasilva.github.io/rms-ds-figma-plugins/)
