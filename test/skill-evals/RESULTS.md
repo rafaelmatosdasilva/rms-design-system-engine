@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Kept on purpose (continuous evaluation)
+
+What changed since the entry below (engine 99f052c): A difference the team decides to keep is recorded with --keep, with its reason, who and when, and never fails a run; the accept-debt recipe now asks whether to keep or to accept as debt. The guide changed in `cookbook/accept-debt.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `43645a1d1875` · Project measured: `13d811a9d668`
+
+| Haiku, engine fee165b | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.057 |
+| Input a run | 111k | 97k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 111k. Records: `records/kept-on-purpose`.
+
 ## 2026-10: Components read in checked chunks (continuous evaluation)
 
 What changed since the entry below (engine c071b6d): The refresh recipe now reads the components in checked chunks too (--capture-script components sums, then each chunk --capture-import names). Each chunk script runs the recipe's own Step 1c functions in Figma (componentFacts and propsFacts, added to the recipe, with the resting variant and child frames as functions); --capture-import merges the chunks into the structure and props snapshots, keeps the keys the capture does not read and takes out components no longer in Figma. figma-cli reads the components the same way. Setup no longer reads a crowded folder above the project for products. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/gates.md`, `reference/usage.md`.
