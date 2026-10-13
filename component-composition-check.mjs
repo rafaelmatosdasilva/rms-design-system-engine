@@ -58,7 +58,9 @@ const uni = [...universe].map(n => ({ name: n, nameNorm: norm(n), selNorm: selNo
 // ── Read the code (component-source.mjs, shared with the code capture) ────────
 const files = componentSourceFiles(ROOT, cfg);
 const read = textReader();
-const resolveFile = (name) => resolveComponentFile(name, { ROOT, cfg, files, read, classFor: LOCATOR.classFor }).file;
+// Which file is the component: the shared pairing (component-pairing.mjs), as every gate reads it.
+const findFile = (name) => resolveComponentFile(name, { ROOT, cfg, files, read, classFor: LOCATOR.classFor, pairing: LOCATOR.pairing() });
+const resolveFile = (name) => findFile(name).file;
 // Which DS components does a file use? Its base selector, or its name as a JSX tag / import.
 const usedComponents = (file) => usedIn(read(file), uni);
 // Nesting seen in the rendered page (code capture), so markup built by JavaScript counts too.
@@ -113,7 +115,7 @@ for (const [name, list] of Object.entries(SNAP)) {
 
   const file = resolveFile(name);
   const rendered = renderedChildren(name);
-  if (!file && !rendered.size) { NOFILE.push(`${name}: Figma nests [${nested.join(', ')}] but no code component file found - set ds-config.json → componentFiles["${name}"]`); continue; }
+  if (!file && !rendered.size) { NOFILE.push(`${name}: Figma nests [${nested.join(', ')}] but no code component file found (${findFile(name).how}) - set ds-config.json → componentFiles["${name}"]`); continue; }
   const used = file ? usedComponents(file) : new Set();
   for (const r of rendered) used.add(r);
   const rel = file ? relative(ROOT, file) : 'rendered page';

@@ -3398,7 +3398,8 @@ function reportFull(label, items, shown) {
   // and those must be verified too - auditing the parent without its children is a false
   // pass. So expand the chosen set transitively, in one direction: a component in scope pulls
   // in the components ITS OWN source file uses. A file is a component's source when
-  // ds-config.json → componentFiles says so, or when its name ends with the component's name
+  // ds-config.json → componentFiles says so, when the shared pairing pairs it with the component (component-pairing.mjs:
+  // switches/General.vue → switch), or when its name ends with the component's name
   // (HbIconButton.vue → iconButton, the longest name; Chip/index.tsx → chip). A page that shows
   // several components, the central theme CSS, or any file mentioning many components is no
   // component's source, so it never joins them. A name inside a longer one (button inside
@@ -3430,8 +3431,12 @@ function reportFull(label, items, shown) {
     const maxNest  = cfg.scopeMaxNestPerFile ?? 8;
     const declared = new Map();
     for (const [name, p] of Object.entries(cfg.componentFiles ?? {})) for (const f of [p].flat()) declared.set(join(ROOT, f), name);
+    let _pairing = null;
+    try { _pairing = (await (await import('./component-locator.mjs')).loadLocator(ROOT, cfg)).pairing(); } catch { /* the names alone */ }
     const ownerOf = (f) => {
       if (declared.has(f)) return declared.get(f);
+      const paired = _pairing?.ownersOf(f).find((n) => universe.includes(n));
+      if (paired) return paired;
       const parts = relative(ROOT, f).replace(/\\/g, '/').split('/');
       let base = parts.at(-1).replace(/\.[^.]+$/, '');
       if (/^index$/i.test(base) && parts.length > 1) base = parts.at(-2);
@@ -5321,7 +5326,10 @@ function reportFull(label, items, shown) {
         const squash = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
         const known = new Set(figmaNames.map(squash)), classes = new Set(figmaNames.map((n) => String(locator.classFor(n) ?? '').replace(/^\./, '')).filter(Boolean));
         const read = textReader(), css = readThemeCSS() + '\n' + [cfg.paths?.pluginCSS ?? []].flat().map((p) => { try { return readFileSync(join(ROOT, p), 'utf8'); } catch { return ''; } }).join('\n');
-        const only = codeComponents(ROOT, cfg, read).filter((k) => !classes.has(k.cls) && !known.has(squash(k.name))).map((k) => {
+        // Which file is each Figma component: the shared pairing (component-pairing.mjs). A file paired with one, or
+        // proposed for one, is not the code's alone.
+        const pairing = locator.pairing();
+        const only = codeComponents(ROOT, cfg, read).filter((k) => !pairing?.claimed(join(ROOT, k.file)) && !classes.has(k.cls) && !known.has(squash(k.name))).map((k) => {
           const api = textComponentApi(join(ROOT, k.file), read(join(ROOT, k.file)));
           const props = Object.entries(api?.props ?? {}).map(([name, d]) => ({ name, ...(d.options ? { options: [...d.options] } : {}), ...(d.default != null ? { default: String(d.default) } : {}), ...(d.required ? { required: true } : {}) }));
           return { name: k.name, file: k.file, props, tokens: componentTokens(css, k.cls) };
@@ -5332,6 +5340,20 @@ function reportFull(label, items, shown) {
           mkdirSync(join(ROOT, dir), { recursive: true });
           writeFileSync(join(ROOT, dir, 'figma-to-build.md'), md);
           console.log(`\n🧱 ${only.length} component${only.length === 1 ? '' : 's'} only in code: what to build in Figma, with the props and tokens of each → ${join(dir, 'figma-to-build.md')}`);
+        }
+        // A pair on one sign only is a proposal, never applied; a component only in Figma with files near its name names
+        // them. Each is the person's to confirm, or to pin in ds-config.json → componentFiles (the style guide's Tasks too).
+        if (pairing) {
+          const { pairingTasks } = await import('./component-pairing.mjs');
+          const { inProgressNames } = await import('./in-progress.mjs');
+          const tasks = pairingTasks(pairing, { ROOT, skip: new Set(await inProgressNames(ROOT, cfg)) });
+          if (tasks.length) {
+            const n = (k) => tasks.filter((t) => t.kind === k).length;
+            const said = [n('proposed') ? `${n('proposed')} on one sign only` : '', n('ambiguous') ? `${n('ambiguous')} fitting several files` : '', n('none') ? `${n('none')} only in Figma with files near ${n('none') === 1 ? 'its' : 'their'} name` : ''].filter(Boolean).join(', ');
+            console.log(`\n🔗 Which file is each Figma component: ${said}. Not paired until you confirm it, or pin it in ds-config.json → componentFiles.`);
+            for (const t of tasks.slice(0, 12)) console.log(`   · ${t.say}`);
+            if (tasks.length > 12) console.log(`   · and ${tasks.length - 12} more (the style guide's Tasks page lists every one)`);
+          }
         }
       }
     } catch { /* a convenience */ }

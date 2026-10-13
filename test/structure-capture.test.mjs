@@ -17,7 +17,7 @@ const HAS_CHROME = !!findChrome({ playwright: true }) && typeof WebSocket !== 'u
 const TS = loadTypeScript(process.env.TS_FOR_TESTS ?? process.cwd());
 
 // ── Component source ──────────────────────────────────────────────────────────
-test('source: the file finder prefers componentFiles, then a declared file, then selector, name, basename', () => {
+test('source: the file finder prefers componentFiles, then a declared file, then the shared pairing (name, class, selector…)', () => {
   const dir = makeFixture({
     'src/Chip.tsx': 'export function Chip({ label, tone = "neutral" }: ChipProps) { return <span className="chip">{label}</span>; }\n',
     'src/Other.tsx': 'export function Other() { return null; }\n',
@@ -26,7 +26,9 @@ test('source: the file finder prefers componentFiles, then a declared file, then
   const files = componentSourceFiles(dir, {});
   assert.ok(!files.some((f) => f.endsWith('.figma.tsx')), 'Code Connect files are not components');
   const read = textReader();
-  assert.equal(resolveComponentFile('Chip', { ROOT: dir, files, read, classFor: () => '.chip' }).how, 'selector');
+  const found = resolveComponentFile('Chip', { ROOT: dir, files, read, classFor: () => '.chip' });
+  assert.equal(found.file, join(dir, 'src/Chip.tsx'));
+  assert.equal(found.how, 'name + declares + class + selector');   // every sign the pairing read, the only file with its selector among them
   assert.equal(resolveComponentFile('Chip', { ROOT: dir, cfg: { componentFiles: { Chip: 'src/Other.tsx' } }, files, read }).file, join(dir, 'src/Other.tsx'));
   assert.equal(resolveComponentFile('Chip', { ROOT: dir, files, read, declared: { Chip: { file: join(dir, 'src/Other.tsx'), how: 'storybook' } } }).how, 'storybook');
   assert.equal(resolveComponentFile('Nope', { ROOT: dir, files, read }).how, 'not found');
