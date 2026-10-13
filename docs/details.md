@@ -1,43 +1,80 @@
-# Technical details
+# Technical documentation
 
-The [README](../README.md) gives the overview and [Everything it does](features.md) covers everyday use, in plain words. This page is for developers: how the engine works, every check in detail, and the options behind them. The full guide the AI reads is `rms-design-system-engine.md`, with its recipes in `cookbook/` and its reference in `reference/`.
+This page is for developers. It explains how the engine works, how to run it, and what each check does. For everyday use in plain words, start with [Features and capabilities](features.md).
+
+The complete lists live in the guide Claude reads. Every option is in `reference/usage.md`, every setting in `reference/config.md` and every gate in `reference/gates.md`, with the recipes in `cookbook/` and the short guide in `rms-design-system-engine.md`.
+
+**On this page**
+
+- [How it works](#how-it-works)
+- [Install and update](#install-and-update)
+- [Run it](#run-it)
+- [What it checks](#what-it-checks)
+- [More checks beside the gates](#more-checks-beside-the-gates)
+- [Accessibility](#accessibility)
+- [Working with AI tools](#working-with-ai-tools)
+- [Inside Claude Code](#inside-claude-code)
+- [The files it creates](#the-files-it-creates)
+- [Environment variables](#environment-variables)
 
 ## How it works
 
-It is not a "does this look like Figma?" screenshot comparison. It reads what your design system really defines in Figma (the tokens, and each component's parts, states and options) and checks your code against that, precisely. It also writes those facts out in a simple form, so AI tools build with the real design system instead of guessing.
+- **It reads Figma precisely.** What your design system really defines, the tokens and each component's parts, states and options. It is not a "does this look like Figma?" screenshot comparison.
+- **It reads your code the same way.** Once per run it opens your pages in a browser and records what the code really produces, every token in every mode, each component's sizes, states, props, icons and markup, and which components sit inside which.
+- **Every fact has a source.** Each one says where it came from and how sure the reading is. When something cannot be read reliably, the engine says so instead of blaming the design.
+- **It writes the facts out for AI tools.** A catalog of your real components, their options and which go inside which, so AI tools build with the real system instead of guessing. `--check-ui` checks what they generate against it, every time, without changing it.
 
-It reads your code the same careful way it reads Figma. Once per run it opens your pages in a browser and records what the code really produces: every token in every mode, each component's sizes and states, its props, icons, markup and which components sit inside which. Each fact says where it came from and how sure the reading is. When the tool can't read something reliably, it says so instead of blaming the design.
+The whole flow, step by step, is on the [FigJam board](https://www.figma.com/board/W5UEjkrLv5t4fqsGPQWqk8/rms-design-system-engine-flow?node-id=0-1).
 
-It also gives AI tools that generate interfaces a catalog of your real components (their options, and which components go inside which), and `--check-ui` checks what they generate against it, every time, without changing it.
+## Install and update
 
-## Updates
+The skill updates itself. Once a day, before an audit, it pulls the latest version and says so in one line.
 
-```bash
-rms-design-system-engine --update
-```
+- It only does this when the install is on `main` with no local changes, and never on CI.
+- `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` turns it off.
+- `rms-design-system-engine --update` updates it by hand, and `--version` tells you if you are behind.
+- `rms-design-system-engine --doctor` checks the install, axe-core included. The install fetches axe-core, so the first accessibility check needs no network.
 
-The skill updates itself: once a day, before an audit, it pulls the latest version and says so in one line. It only does this when the install is on `main` with no local changes, never on CI, and `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` turns it off. `rms-design-system-engine --update` updates it by hand, and `--version` tells you if you are behind. You never re-download.
-
-Keep a single copy: link anything that needs the skill's files to `~/.claude/skills/rms-design-system-engine`, the folder that updates itself, instead of keeping a clone of your own.
+Keep a single copy. Link anything that needs the skill's files to `~/.claude/skills/rms-design-system-engine`, the folder that updates itself, instead of keeping a clone of your own.
 
 ## Run it
 
-First time in a project, set it up once (it asks a couple of quick questions):
+### Set up a project
+
+The first time in a project, set it up once. It asks a couple of quick questions.
 
 ```bash
 cd my-project
 rms-design-system-engine --init
 ```
 
-**Code on GitLab.** The code can be read straight from GitLab instead of a folder: `--init --project=https://<your GitLab>/<group>/<project>` (add `/-/tree/<branch>` for a branch other than the default one), on gitlab.com or any company-hosted GitLab. It keeps a mirror of the branch's latest commit beside where it runs, through the GitLab API (no git, no clone, no SSH key), and every run asks GitLab for the latest commit first and fetches again only when the branch has moved, so each check is of what is on GitLab now. The SUMMARY names the commit checked (`Code checked: GitLab <project> @ <branch> <commit>`). A private project needs `GITLAB_TOKEN` (a personal access token with the `read_api` scope) in a `.env` in the folder you run it from, and, for a company host, `GITLAB_HOST=<host>` beside it: the token is only ever sent to gitlab.com or the host named there, and never printed. Files the engine writes in the mirror (`ds-config.json`, snapshots, its output) are kept from one refresh to the next. The mirror has no git history, so the history the engine shows comes through the same API, for the files a run needs: each component's changelog in the style guide (with the release it shipped in and its merge request), the reason a line changed on a finding, and the commit an agreement records. It is kept per commit in the mirror (`.gitlab-history.json`), so a later run asks again only for the files that moved. When GitLab cannot be reached, the run checks the mirror already there and says which commit it is. Commands that only print (`--version`, `--route`, `--recipe`) do not call GitLab.
+### Code on GitLab
 
-Then the easy way is to just ask, in plain language, inside Claude Code:
+The code can be read straight from GitLab instead of a folder, on gitlab.com or a company-hosted GitLab.
 
-- *"check the whole design system against Figma"*: checks everything
-- *"check input"*: checks the `input` component (and its parts) and reports only that
-- *"which props does the badge take?"*: answers from the design system, names written exactly
+```bash
+rms-design-system-engine --init --project=https://<your GitLab>/<group>/<project>
+```
 
-Or from the terminal:
+Add `/-/tree/<branch>` for a branch other than the default one.
+
+- **Always the latest commit.** It keeps a mirror of the branch's latest commit beside where it runs, through the GitLab API, with no git, no clone and no SSH key. Every run asks GitLab for the latest commit first and fetches again only when the branch has moved.
+- **You see what was checked.** The summary names the commit, `Code checked: GitLab <project> @ <branch> <commit>`.
+- **Private projects.** Put `GITLAB_TOKEN` (a personal access token with the `read_api` scope) in a `.env` in the folder you run it from. For a company host, add `GITLAB_HOST=<host>` beside it. The token is only sent to gitlab.com or that host, and never printed.
+- **History without git.** The mirror has no git history, so the history the engine shows (each component's changelog, the reason a line changed, the commit an agreement records) comes through the same API. It is kept per commit in `.gitlab-history.json`, so a later run asks only for the files that moved.
+- **When GitLab is down.** The run checks the mirror already there and says which commit it is.
+
+Files the engine writes in the mirror (`ds-config.json`, snapshots, its output) are kept from one refresh to the next. Commands that only print (`--version`, `--route`, `--recipe`) never call GitLab.
+
+### Ask in Claude Code
+
+The easy way is to ask in plain language.
+
+- *check the whole design system against Figma* checks everything.
+- *check input* checks the `input` component and its parts, and reports only that.
+- *which props does the badge take?* answers from the design system, with names written exactly.
+
+### From the terminal
 
 ```bash
 rms-design-system-engine                       # the whole design system
@@ -50,98 +87,326 @@ rms-design-system-engine --only parity          # every check against Figma, wit
 rms-design-system-engine --only 3               # one gate by number, or by name: --only "token values", --only states,props
 ```
 
-`--only` runs that part and nothing else, and the summary says so, so a part never reads as the whole system passing. A word it does not know prints the list of gates. `--baseline` needs the whole run. Every option is in `reference/usage.md` (`rms-design-system-engine --reference usage`).
+- `--only` runs that part and nothing else, and the summary says so, so a part never reads as the whole system passing. A word it does not know prints the list of gates.
+- `--baseline` needs the whole run.
+- Every option is in `reference/usage.md` (`rms-design-system-engine --reference usage`).
 
 ## What it checks
 
-Every run compares your code against Figma and reports it in plain words:
+Every run compares your code with Figma and reports in plain words. The 25 gates are listed in [Features and capabilities](features.md#the-checks). Here is what a developer needs to know about each.
 
-- **Data is up to date:** you are checking against today's Figma, not an old copy.
-- **Figma frame unchanged:** the design still looks like the version you approved.
-- **Token values** match: colours, sizes and fonts, in every mode (light and dark).
-- **Tokens used in** screens exist in the code: nothing a screen uses is missing.
-- **Every mode is** covered: things that should change between light and dark really do.
-- **Exception lists are** valid: your "ignore this" notes still point at real things.
-- **No invented CSS** variables: every variable traces back to a real Figma token.
-- **Docs tell the** truth: they mention only things that actually exist.
-- **No invented text** casing: no forced UPPERCASE the design never asked for.
-- **No hand-built DS** components: a screen uses the real component, not a hand-styled copy. A component a screen draws only as another component's own part (a status bar's divider), as its layout read with `--figma-screens` shows, is that component's, not one the code must use. A product's own version of a system component is listed too (advisory): a class it puts on an element, of its own or one the system's CSS holds that no component owns, that loops the same animation a component's part loops (`.spinner` beside the loader's `.loader-spinner`), or a class with a rule of the product's own whose name starts with a component's name and says nothing more than the whole thing (`loading-state`, not `overlay-label-text`). A class beside a system class on the same element, or in a product that uses that component too, dresses the component and is left alone; `"Product/component"` in `knownReimplementations` keeps one on purpose.
-- **Clean CSS:** nothing unused, nothing that contradicts Figma. A focus ring's outline, which Figma has no value for, is listed apart, not failed.
-- **Nested components keep** their own styles: one component's look does not leak into another.
-- **Structure:** the right height, spacing and corners, from the design. A stroke Figma draws inside the box may be an inset ring in the code (`box-shadow: inset 0 0 0 1.5px …`), which adds no size and counts as that stroke. A border or outline the code draws on a component Figma draws with no stroke in any variant fails (focus rules aside), for every component Figma has: one the contract names no selector for (a panel drawn by its class alone) is found by its class, as every other check finds it. A background a rule paints on a component Figma draws with no fill in any variant fails the same way, the system's rules and a product's alike (a product rule that gives the system's empty state a band of colour): a rule on the component itself, its `::before` or its `::after`. A part inside it is the part's, and a paint made only of the tokens of a component Figma nests in it (a status bar's divider drawn as a `::after` line) is that part; `knownPhantomFillExceptions` names a selector allowed one.
-- **All states are** built: hover, disabled, selected and the rest, each with the right values.
-- **Component props match** Figma: the same names, defaults and choices, spelled exactly the same. `Size` and `size` are two prop names (a slot's name too), and the finding shows the letters that differ (`letter case S → s`). `L` and `large`, or `Large` and `large`, are two values; the finding says which code value it most likely is. The catalog tells AI tools the right name for each wrong one they are likely to guess (`error` → `danger`).
-- **Sub-components match Figma:** the parts Figma nests are the ones the code uses.
-- **Templates compose the** right components: each page uses the components Figma composes.
-- **Markup:** ids, classes and icons match, and every control the design shows is built.
-- **Required pieces are** in place: icon slots, component slots and form controls.
-- **Icons:** from the shared set, drawn the same as Figma.
-- **Transitions:** the durations and easings from the design. Once Figma's prototype is read (`--figma-motion`), each change it animates between a component's variants is compared with the code's transition into that state (`🎞`, advisory): one the code makes at once, another duration (more than 10ms apart) or another curve. A spring has no CSS curve, so only its duration is compared. The same capture reads how each component moves on its own: its Motion keyframes and animation styles, the overlays the prototype opens (played backwards as they close) and variants that lead to each other after a delay. Each component's loop (a spinner turning), opening and closing are compared with the code's `@keyframes` animations and the transitions its open or closed states play: one Figma animates and the code does not, another duration or curve, and one the code animates and Figma does not (for Figma), each said once Figma's Motion has been read.
-- **Motion:** movement values match Figma, when your design defines them.
-- **Shadows and blurs:** match Figma, when your design defines them. Once each component's effects are read (`--figma-effects`), what it draws past its colours is compared with its own rule in the code (`🌫`, advisory): each shadow (offset, blur, spread and colour), a layer or background blur (Figma's radius is twice the CSS `blur()`), a gradient's kind and colours or an image fill, Clip content against `overflow`, a blend mode and opacity, and each of its layers against the code's part of the same name (`.badge-background`). One Figma draws and the code does not, or draws otherwise, is for Claude; one only the code draws, and a clip Figma sets that the code leaves open, are for both to decide.
-- **Renders correctly in** a browser: checked on the real result, not just the code on paper. A component the page holds but does not draw on load (in a closed panel) is measured from its sample markup (the rule's `probe`) instead.
-- **What this audit** covered: so you can see nothing slipped through.
-- **Instructions for AI agents tell the truth:** `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own, and every component, prop value, token and CSS variable they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing. A file that only says what not to use is noted too: saying the design system is installed and its components are the ones to use is what moves agents onto it. Advisory; `"steering": false` in `ds-config.json` turns it off.
+### Data and tokens
 
-**Every difference in one list.** A full audit writes `.design-system-engine-out/differences.md` and `differences.json`: each difference between Figma and the code, grouped by the component it names, marked new when the last run did not have it (one whose line number only moved is not new), next to where the hand-back says how each side would change. Lines that only point at a difference stay in the audit and out of the list: a Figma link, who last changed it, what was skipped or how much was compared. Each check that did not run is named at the top, so a difference it would have found is never mistaken for a pass. The summary points to it after every run; the style guide, when there is one, shows each component's own. Under its verdict, the summary of a full audit counts the components: passing, drifting (an open difference) and not checked (the browser measurement reached none of its values), with the names when there are few. Beside them, `findings.json` holds every finding of every check as one record, with its rule in plain words, its evidence and its verdict, and each check's own verdict.
+- **Data is up to date.** You are checking against today's Figma, not an old copy.
+- **Figma frame unchanged.** The design still looks like the version you approved.
+- **Token values match.** Colours, sizes and fonts, in every mode.
+- **Tokens used in screens exist.** Nothing a screen uses is missing from the code.
+- **Every mode is covered.** Things that should change between modes really do. Gate [5] (Every mode is covered) finds where the theme sets each mode, in an `@media`, a `[data-…]` or a class block. A mode the code never implements fails with every value it owes.
+- **Exception lists are valid.** Your "ignore this" notes still point at real things.
+- **No invented CSS variables.** Every variable traces back to a real Figma token.
+- **Docs tell the truth.** They mention only things that actually exist.
+- **No invented text casing.** No forced UPPERCASE the design never asked for.
 
-**Every mode, every collection.** A collection whose values change with a mode (a sizing collection per breakpoint) is captured in every mode and checked per mode even when `ds-config.json` names no collections. Its sizes and text styles are compared with Figma's value in each of its modes the code was read in, each breakpoint is measured in every colour mode too (from a sizing collection's `viewport/min-width` when there is no breakpoint collection), and each state's rule is traced in every mode, so a dark hover that differs names the dark rule. Gate [5] (Every mode is covered) finds where the theme sets each mode (an `@media`, a `[data-…]` or class block), and a mode the code never implements fails with every value it owes. In the style guide, such a mode is switched with the theme's own values for it (the media query's block, under `[data-size]`), so a phone size can be seen on a desktop and a desktop size on a phone; the page starts in the mode the device gets, and the switch lists what the mode changes. A preview never uses an instance hidden at rest (a hidden class or attribute, an inline `display: none`, or a class whose rule hides it). It uses the instance that holds every part its props show, hide or write (an icon, a label), drawn at rest (a state or layout the product gave that one copy is dropped), and a text prop writes into its own part without wiping the rest or another prop's text. A part no instance holds is drawn from the selector the code styles it with (an icon from the system's sheet at its icon size), a text with nowhere to go is offered but not editable, and a Figma prop the code does not build is listed in the panel as not in the code yet. A component's own colour or size switch is independent of the page's: the page's text styles and roles are declared again on the preview, so they resolve with its own mode. Every switch starts in the mode the device gets, colour included (the theme's `prefers-color-scheme: dark` block), and follows the browser's setting when it changes until a mode is picked by hand (the page's colour switch shows this as Auto and names the mode it found; a size or breakpoint mode is switched on each component and foundation section, not for the page); the modes are listed in Figma's own order (the capture records each collection's order as `_modeOrder` on the vars snapshot), and an axis rests on its root mode when the device's media query does not match; a change on the page's switch drops each component's own choice of that mode, so every component follows. Each component is dated: the latest commit on its own CSS rules and on its entries in `structure-contract.mjs`, `contract.authored.json` and `ds-config.json` (git blame on those lines, or "not committed yet"), and the day Figma was last read for it. The page draws nothing of its own that a person clicks: its buttons and links are the system's quietest text button (`ds-config.json` → `styleguide.ui.button` names another), its overview links the system's card, its switches and fields the system's own, and the check fails a button or link the page styles itself, or a font of its own (its text inherits the system's page font and fallbacks). A component works as in a product: a click moves the selection in a group of items one of which is selected, the system's scripts (`systemScripts`) run, and a component the system defines by id (a tooltip, `#tt`) is one element in the page for them. What the page explains on demand (how each Health number is counted) is the system's own tip trigger, a component whose root carries `data-tip`; with none, the words show on the page. How it moves is read from the system's CSS: an entry animation on its own rule and an exit modifier are replayed from a button, and a component shown in an overlay (a container with an open class, a closing class and layers, as `.modal.is-open`, `.modal.is-closing`, `.modal-overlay`) opens in it from a button, closes on its layer, a button or Escape, and gives focus back. The tokens table lists what is drawn now, each visible part (an icon's size and colour, a text's style and colour) and the opacity. Each foundation section has the same size switch, and icons are shown at their own size (their symbol's viewBox) or at each size the components draw them at. A token named after a component (`badge/…`, or `button/…` for every button) is shown in that component's Parity, its name opening its value in each mode; the foundations keep what the system shares, icon stroke widths go with the icons and the other shared sizes with the spacing. Each difference a component lists is said in plain English (run-diff.mjs `plainDifference`) with who acts and what to do (`plainAction`: Figma when the code changed last, the code when Figma did or nothing says, a decision for a contrast, a border only one side has or an action the products lay over a component), and the Tasks page numbers them all, with the Figma props and components the code does not build yet, the audit's own line kept in the differences file. The colours start with the primitive ramp, shown when the theme declares each primitive (`primitives/Neutral 100` → `--neutral-100`) with Figma's value in every mode, then the semantic roles, then each component's own; spaces are grouped by family and sorted smallest first, icons by their own size. The page shows one view at a time (the overview, a foundation or a component, by the address, `#c-badge`), and a component is drawn the first time its view opens; `?all` draws every view at once, as the code capture and the accessibility check open it. The overview has a card for each foundation and component with a thumbnail (a few of the real tokens, or the component's own preview drawn small and inert), the sidebar a search field (the system's own) that narrows the components, their links and cards, and on a phone the sidebar is a panel opened from a menu button at the top left (the system's icon-only button and overlay), closed by its close button, the overlay, a link or Escape.
+A collection whose values change with a mode (a sizing collection per breakpoint) is captured and checked in every mode, even when `ds-config.json` names no collections. Each breakpoint is measured in every colour mode too, and each state's rule is traced in every mode, so a dark hover that differs names the dark rule.
 
-When the **products live in their own repositories**, checked out beside the design system, `ds-config.json` names them (`pluginDirs`, or `codeRoots` for any other folder) and every scan reads their code as the project's own: a variable or class only a product uses is not unused, and a value a product writes by hand is still found.
+### Components
 
-It also spots a **primitive written by hand**, once the library owner declares which styling means which component (`primitives` in `ds-config.json`): a `<span>` given the body text style and the secondary colour is `<Text size="medium" color="secondary">`, and a flex `<div>` with the system's gap is its `Stack`. No token check sees these, their values are the system's own; the audit lists each, the edit check hands it back when an AI adds one, and `llms.txt` gives generators the table.
+- **No hand-built DS components.** A screen uses the real component, not a hand-styled copy.
+  - A product's own version of a system component is listed too, as advice. It is found by what it draws (a class that loops the same animation as a component's part, `.spinner` beside the loader's `.loader-spinner`) or by its name (a class of its own that starts with a component's name and says nothing more, `loading-state`).
+  - A class beside a system class on the same element dresses the component and is left alone.
+  - A component a screen draws only as another component's part (a status bar's divider) belongs to that component.
+  - `"Product/component"` in `knownReimplementations` keeps one on purpose.
+- **Clean CSS.** Nothing unused, nothing that contradicts Figma. A focus ring's outline, which Figma has no value for, is listed apart, not failed.
+- **Nested components keep their own styles.** One component's look does not leak into another.
+- **Structure.** The right height, spacing and corners, from the design.
+  - A stroke Figma draws inside the box may be an inset ring in the code (`box-shadow: inset 0 0 0 1.5px …`), which adds no size and counts as that stroke.
+  - A border, outline or background the code draws on a component Figma draws with none, in any variant, fails (focus rules aside). This holds for the system's rules and a product's alike, on the component itself, its `::before` or its `::after`.
+  - A paint made only of the tokens of a component Figma nests inside (a divider drawn as a `::after` line) belongs to that part. `knownPhantomFillExceptions` names a selector allowed one.
+- **All states are built.** Hover, disabled, selected and the rest, each with the right values.
+- **Component props match Figma.** The same names, defaults and choices, spelled exactly the same.
+  - `Size` and `size` are two prop names, and the finding shows the letters that differ (`letter case S → s`).
+  - `L` and `large` are two values, and the finding says which code value it most likely is.
+  - The catalog tells AI tools the right name for each wrong one they are likely to guess (`error` → `danger`).
+- **Sub-components match Figma.** The parts Figma nests are the ones the code uses.
+- **Templates compose the right components.** Each page uses the components Figma composes.
+- **Markup.** Ids, classes and icons match, and every control the design shows is built.
+- **Required pieces are in place.** Icon slots, component slots and form controls.
+- **Icons.** From the shared set, drawn the same as Figma.
 
-It also spots **workarounds around a component**: a screen that lays its own control over a component (a clear button over a text field, actions over a list row) is doing what the component cannot, so it is reported to the design system as a missing slot or prop, not as the screen's mistake. `"workarounds": false` in `ds-config.json` turns it off.
+### Motion and effects
 
-In a **Tailwind** project each component's own classes are compared with what Figma states for it (`h-9` against a 36px height, `px-3 py-2` against its padding tokens, `rounded-control`, `bg-action-primary`), and a difference names the class to write. It also reads the classes with a value in brackets (`rounded-[4px]`, `bg-[#b42318]`), which step outside the theme where no CSS rule is written: when your `@theme` has the same value it names the utility to write (`rounded-control`, `bg-status-danger`), otherwise it says the value is not in the design system. `"tailwind": false` in `ds-config.json` turns it off. `--init` sees a Tailwind theme and sets `"namingConvention": { "preset": "tailwind" }` under `figma` in `ds-config.json`; with it, Figma's token names are matched to the theme's own (`surface/base/color` to `--color-surface-base`, `space/2` to `--spacing-2`), and a theme variable used through its utility (`bg-action-primary`) counts as used.
+- **Transitions.** The durations and easings from the design. Once Figma's prototype is read (`--figma-motion`), each change it animates between a component's variants is compared with the code's transition into that state, as advice (`🎞`).
+  - A change the code makes at once, another duration (more than 10ms apart) or another curve is listed.
+  - A spring has no CSS curve, so only its duration is compared.
+  - Each component's own loop, opening and closing are compared with the code's `@keyframes` and the transitions its open and closed states play.
+- **Motion.** Movement values match Figma, when your design defines them.
+- **Shadows and blurs.** They match Figma, when your design defines them. Once each component's effects are read (`--figma-effects`), each is compared with its own rule in the code, as advice (`🌫`).
+  - Each shadow's offset, blur, spread and colour.
+  - A layer or background blur. Figma's radius is twice the CSS `blur()`.
+  - A gradient's kind and colours, an image fill, Clip content against `overflow`, a blend mode and opacity.
+  - Each layer against the code's part of the same name (`.badge-background`).
 
-It also checks the **Figma file itself**, for whoever keeps it: a colour, radius, padding, gap or text with no variable or style, an instance detached from its component, a variant with no auto layout, a component with no description, an instance whose layer spells its component's name another way (`Button Tertiary` for `buttonTertiary`, which an agent reading the file would copy), a property bound to a variable meant for other properties (a spacing variable on a corner radius), and variables left on all scopes, offered for every property. Code can only match what Figma states, so the summary says first when the file is not reliable enough to compare: under 90% of its values bound to a variable or style, or of its variants in auto layout, it is only partly reliable, and under 60% a match or a difference can be chance, with the components least reliable named. Advice only; the parity never changes a value in Figma. `"figmaHygiene": false` in `ds-config.json` turns it off.
+### In the browser
 
-It also counts **every value written by hand** in your styles (`🧮`): each colour, spacing, radius, font size, duration, layer and shadow a token should carry, with the token to use when one has that value, the files that guess most first. `rms-design-system-engine --census` lists each one and keeps the count, so it only falls: a file with more than before fails the run.
+- **Renders correctly in a browser.** Checked on the real result, not just the code on paper. A component the page holds but does not draw on load (in a closed panel) is measured from its sample markup, the rule's `probe`.
+- **What this audit covered.** So you can see nothing slipped through.
 
-Each check says when it had nothing to read: it shows **Not run** with the reason, never Pass. Every one of the checks is tested with a mistake planted on purpose, so one that passes what it never read fails its own test.
+### Every difference in one list
 
-It also gives **advice on keeping the system healthy as it grows** (`🧭 System health`, never a failure): a colour mode set on an element below a product's root (`data-theme` on a section), so part of the page draws in another mode; a product that brings in two of the system's themes, one overriding the other by load order; the semantic tokens with no description in Figma, since what a token is for is what an agent reads to pick it; a Storybook preview stylesheet that styles a component, so the catalogue shows it right while the products draw it as the code does; two components whose own rules are nearly the same; tokens named by look (`blue-500`) rather than role; tokens named after a product or a brand (`harborNotes/accent`), which stop making sense when a second one uses the system; and aliases to a removed token, a Figma variable that points at one no longer in the file and a token in the code that points at one declared nowhere, so only its fallback shows (with the commit that removed it). The prune candidates add the token budget: the same colour written by hand in two tokens instead of pointing at one primitive (tokens that point at the same one share it by design), and tokens only one component uses. The style guide's Tasks page lists the three for the tokens under The system: the descriptions to write in Figma, and the two to decide. A component only the code has is written to `handback/figma-to-build.md` with its props and the tokens its styles use, to build it in Figma. A class a product styles almost as the system styles one of its components is a decision, never a drift: the advice names the file and line and the component it copies, and the style guide's Tasks page puts it under that component for you to decide (use the component, with a new option if it needs one, or add the new one to the system on purpose). `"systemHealth": false` in `ds-config.json` turns the advice off.
+A full audit writes `.design-system-engine-out/differences.md` and `differences.json`.
 
-It also helps **move off what the system retires**. A component whose status is deprecated (`@deprecated` and `@use-instead` in its Figma description, or `contract.authored.json`), a token whose Figma description says `@deprecated`, or an old name a rename kept: the audit lists each in `handback/migrations.md` with what replaces it, when and why, and every file and line that still uses it, the system's own and each product's, docs included, with a patch for each token swap (`migrations.diff`, `migrations-<product>.diff`). The style guide shows it on the old component's page (Use chip instead, still used in 12 places) and in its rows on the Tasks page, one for each product. A token **renamed in Figma** is renamed everywhere in one change: `rms-design-system-engine --rename-sweep` pairs each old name with its new one by value in every mode and writes one patch for the system and one for each product, every rule, script and doc, with the old name kept in the theme pointing at the new one until every product has moved. A full audit says in one line when the code still writes a renamed token by its old name. Nothing is applied until you ask.
+- Each difference between Figma and the code, grouped by the component it names.
+- Marked new when the last run did not have it. One whose line number only moved is not new.
+- Each check that did not run is named at the top, so a difference it would have found is never mistaken for a pass.
+- Lines that only point at a difference (a Figma link, who last changed it, what was skipped) stay in the audit and out of the list.
 
-It also compares **each product's page with the screens designed for it** (`🖼`, advisory). The screen capture (`--figma-screens`, read only) records where each instance sits on the screens `ds-config.json` names (`frames` and `screens`). One answer from Figma holds at most 20 KB, so the capture keeps a list to its first three items (the rest counted), takes as many screens as fit, and names the ones left; each answer saved is added to the screens kept so far, and the engine writes the script for the rest with a NEXT line, until every screen is read (one too large on its own is read without its words, then its deepest layers). Each product's built page (`ui.html` beside its source, else `<product>/ui.html`) is opened at each screen's width, height and colour mode, its components found by their classes, and the two are compared in reading order: which components and how many, their order (the longest run both share; what it leaves out is out of order), the space between neighbours stacked or side by side (more than 2px apart), and whether the ones that line up in Figma line up on the page. The parts of a small component (a button's icon, a segmented control's segments) are its own on both sides; a list (three or more of one component) is compared by whether it is there and where its first item sits. Only components in the same scope are neighbours: those placed in one component's slots (a panel's, an action bar's), or on the screen itself, so a switch in the side panel and a badge in a status bar beside it are never compared. A component inside another and outside its slots is that component's own part (a status bar's divider, an empty state's button), on the screen and on the page alike, and is left to the component's own check. Two of one component are paired by where they sit, once the shift the whole page shares is taken off (a window title bar Figma draws above it), and the space after a list is not compared, since it depends on how many items it shows. A product's own frame drawn as an instance (a window holding the whole screen) is no one's scope: what it holds is the screen's. Where an answer was cut, the screen does not say what is there, and what the page draws in those places is left out. A space between two side by side wider than any gap the screen's layouts use is a row's free space: it takes up whatever the text before it draws wider or narrower in Chrome than in Figma, so it is allowed 2% of what sits before it in its row on top of the 2px; a gap stays exact. A component is out of order only against one it shares a column or a row with. A page that lacks more than a third of a screen's components (at least three) opens in another state than the screen: it is listed as not compared, with the way to give it that state (`setup` on the screen's entry, a script run on the page before it is read, or the path of a script file from the project's root, `screens/results.js`, for a long one). `screenParity: false` turns it off.
+Under its verdict, the summary of a full audit counts the components that pass, drift (an open difference) and were not checked, with the names when there are few. Beside them, `findings.json` holds every finding of every check as one record, with its rule in plain words, its evidence and its verdict.
 
-It also checks **every combination of modes** (`🎛`, advisory). The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations, each set at once on a page holding only the theme (the smallest viewport of the breakpoints in it), and every root variable is read: a token whose value differs from Figma's in that combination, and right with each of its modes alone, is listed with the combination (`Dark with Phone`), as is a text and background pair the system uses that falls below its WCAG ratio only there. They go to the Tasks page under The system. `modeCombinations: false` turns it off.
+## More checks beside the gates
 
-It also does an **accessibility** check, against WCAG 2.2 at level A and AA: it flags anything that would make the design hard to use (text that is hard to read, a button with no label, something you cannot reach with the keyboard) and tells you, in plain words, how to fix it. axe-core's rules run in the same check, and every control is tried hovered, focused and pressed, so it is the whole check in one run. Part of it always runs straight from the code and the CSS, with no browser and no page to open (a button or link with only an icon and no label, an image whose alt is a file name, a removed focus outline, a mouse-only control, a hidden element that still takes focus, a misspelled `aria-*`, a page with no language or no main heading, zoom blocked, animations with no reduced-motion option); when a page can be opened, the browser check goes deeper (among others, a dialog or menu that Escape does not close, or that leaves the focus somewhere other than the control that opened it, a modal dialog that lets Tab leave it, a tip that a tap never shows, a message that appears with nothing said to a screen reader, a state lost in high-contrast mode, and variants told apart only by a colour some people cannot see). The rendered contrast is measured against what is really painted behind each text, the layers at its centre in paint order, so a text laid over a sibling or over a `::before` that covers its box is measured on that, not on the boxes it sits in, and target size is measured at the page's own width and again on a 320 pixel screen, where a control that shrinks is caught (`320px wide`). Each finding says how sure the check is of it: a blocker is measured on the page against WCAG 2.1 A or AA, a warning is read from the code, a contract or a Figma note and can be wrong, an advisory is beyond AA or for a person to judge; the check ends with one line (`Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.1 AA`), and a must-pass check (`"a11yStrict": true`) never stops on an advisory. Run on the style guide, it also opens each product's built page whole, every rule on it (axe-core's heading order and landmarks among them), each finding named after its product and listed on the Tasks page under Products; on a whole page the Tab walk also says when the focus goes back up the page within a column (2.4.3) and when it lands on a control no one can see (2.4.7). `a11y.products: false` leaves the products out. A focus outline taken off a class counts as put back when a more specific rule shows focus on every element the class is put on (`button:focus-visible` for a class used only on buttons). `"a11yStatic": false` in `ds-config.json` turns the code part off. A text colour is checked against its background token by name (`badge/label/warning` on `badge/background/warning`), except where the code paints that background as a tint (a `color-mix` or an opacity, as a badge does): there the solid token is not what the eye sees, so only the rendered contrast, the tint over what is behind it, decides. A tint shows whatever it sits on, so it is measured in every colour mode over each surface the system defines (its Figma colour tokens with `/surface/` in the name, or the ones `a11y.surfaces` in `ds-config.json` lists), and the worst one is reported with the surface it was. The pairs themselves follow what Figma draws: the capture records, for each text and icon colour, the fill of the layer right under it, so a text is paired with the background it sits on, and a pair the token names suggest is left out and listed when Figma paints that background in the same component but never under the text (a checkbox's selected text beside its box). A fill's own opacity in Figma (a tint drawn as an 8% layer) is compared with the alpha the code paints, for the default and each variant, so a tint drawn at 12% in the code is a difference. Every Figma refresh also records each component's deeper facts (its box and sizing, padding, gap, corners, colours, text and the visible layers of every variant), so the measured comparison reaches hundreds of facts rather than a few per component; a fill drawn by a child that covers the whole frame (a Slot) counts as a fill on a child layer, as a Background layer does.
+These run beside the gates. Most give advice and never fail a run, and each can be turned off in `ds-config.json`.
 
-Does your guidance help your AI tools? `node eval-run.mjs --levels bare,steering,parity` runs the same generation tasks three ways: with the prompt alone, with your own instruction files (`AGENTS.md`, `CLAUDE.md`, rules), and with what this skill writes for agents (`contracts/llms.txt`). It scores each by the same checks (design-system tokens and classes, accessibility) and says what each kind of guidance adds or costs against the prompt alone. A case says the component it expects (`"component": "chip"`), and the agent never sees it: the prompt says the intent, and a result that builds its own instead of using the component fails, because a screen built by hand has nothing to get wrong on the other checks and would otherwise look like the best result. A prompt that names a component is flagged before the run, since its score would measure reading the prompt, not finding the component. When the results are `.tsx` or `.jsx` and a TypeScript compiler is at hand, each one is also type-checked against your components' props, written the way your code writes them: `tone="error"` where the badge takes neutral, success or danger is a type error, as it would be in your build (`"evals": { "compile": false }` turns it off). It needs your own generate command in `ds-config.json` (`evals.generate.cmd`), spends your model tokens, and never gates the repo; with `--ci` it fails when a run is worse than the last one (zero-fix down more than 5 points, or more avoidance, type errors or accessibility findings).
+| Check | What it finds | How to turn it off |
+|---|---|---|
+| Instructions for AI agents | Wrong names in `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules | `"steering": false` |
+| Primitives written by hand | A `<span>` styled as your Text component, a flex `<div>` with the system's gap | Runs only when `primitives` is set |
+| Workarounds | A control laid over a component, a sign of a missing slot or prop | `"workarounds": false` |
+| Tailwind | Classes that differ from Figma, and values in brackets outside the theme | `"tailwind": false` |
+| The Figma file itself | Values with no variable, detached instances, missing auto layout or descriptions | `"figmaHygiene": false` |
+| System health | Risks as the system grows, such as tokens named after a product | `"systemHealth": false` |
+| Product screens | Each product's page against the screens designed for it | `screenParity: false` |
+| Mode combinations | What breaks only in a combination of modes, such as Dark on a phone | `modeCombinations: false` |
+| Values written by hand | Every value a token should carry, with the token to use | `"census": false` (a run fails when a file's count grows) |
 
-What it writes for agents says what to use, not only what exists: `contracts/llms.txt` opens by telling an agent that the design system is part of the project, to build nothing by hand that a component covers, and to ask `--query` before guessing a name, then which source decides when two disagree (the goal of the people who use the product, then verified research, then the system's documented standards, then accepted past decisions, then general heuristics, with this system's own source named at each level and WCAG 2.2 AA as the floor). It stays small enough to read whole: for a large system the full catalog table stays in `catalog.json`.
+### Instructions for AI agents
 
-It keeps to your **Figma quota**. A Figma seat has a limited number of API calls a day or a month, so each refresh says how many calls it made, asks each thing once, and is skipped when the Figma file has not changed since the last complete refresh (one call to check; `FIGMA_REFRESH=force` refreshes anyway). When Figma answers with a daily or monthly limit, the refresh stops at once, says how long Figma asks to wait, and keeps the snapshots as they were, instead of spending more calls on retries.
+`AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own. Every component, prop value, token and CSS variable they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing.
 
-Everything is advice with a clear fix. It points at the problem, it does not silently change your code.
+A file that only says what not to use is noted too. Saying that the design system is installed and its components are the ones to use is what moves agents onto it.
+
+### Primitives written by hand
+
+Once the library owner declares which styling means which component (`primitives` in `ds-config.json`), the engine spots it written by hand. A `<span>` given the body text style and the secondary colour is `<Text size="medium" color="secondary">`, and a flex `<div>` with the system's gap is its `Stack`. No token check sees these, since their values are the system's own. The audit lists each one, the edit check hands it back when an AI adds one, and `llms.txt` gives generators the table.
+
+### Workarounds around a component
+
+A screen that lays its own control over a component (a clear button over a text field, actions over a list row) is doing what the component cannot. It is reported to the design system as a missing slot or prop, not as the screen's mistake.
+
+### Tailwind
+
+- Each component's own classes are compared with what Figma states for it (`h-9` against a 36px height, `px-3 py-2` against its padding tokens), and a difference names the class to write.
+- A class with a value in brackets (`rounded-[4px]`, `bg-[#b42318]`) steps outside the theme. When your `@theme` has the same value, it names the utility to write. Otherwise it says the value is not in the design system.
+- `--init` sees a Tailwind theme and sets `"namingConvention": { "preset": "tailwind" }`. Figma's token names are then matched to the theme's own (`surface/base/color` to `--color-surface-base`), and a theme variable used through its utility counts as used.
+
+### The Figma file itself
+
+For whoever keeps the Figma file, it lists a colour, radius, padding, gap or text with no variable or style, an instance detached from its component, a variant with no auto layout, a component with no description, an instance whose layer spells its component's name another way, a property bound to a variable meant for other properties, and variables left on all scopes.
+
+Code can only match what Figma states, so the summary says first when the file is not reliable enough to compare.
+
+- Under 90% of its values bound to a variable or style, or of its variants in auto layout, it is only partly reliable.
+- Under 60%, a match or a difference can be chance, and the least reliable components are named.
+
+### System health
+
+Advice on keeping the system healthy as it grows (`🧭 System health`), never a failure.
+
+- A colour mode set below a product's root, so part of the page draws in another mode.
+- A product that brings in two of the system's themes, one overriding the other by load order.
+- Semantic tokens with no description in Figma. What a token is for is what an agent reads to pick it.
+- A Storybook preview stylesheet that styles a component, so the catalogue shows it right while products draw it as the code does.
+- Two components whose own rules are nearly the same.
+- Tokens named by look (`blue-500`) rather than role, or after a product or brand (`harborNotes/accent`).
+- Aliases to a removed token, with the commit that removed it.
+- The token budget, the same colour written by hand in two tokens instead of one primitive, and tokens only one component uses.
+- A class a product styles almost as one of the system's components, as a decision, never a drift.
+
+A component only the code has is written to `handback/figma-to-build.md` with its props and tokens, to build it in Figma.
+
+### Retiring and renaming
+
+- **Retired components and tokens.** A component marked deprecated (`@deprecated` and `@use-instead` in its Figma description, or `contract.authored.json`), a token whose Figma description says `@deprecated`, or an old name a rename kept. The audit lists each in `handback/migrations.md`, with what replaces it, when and why, and every file and line still using it, docs included. Each token swap gets a patch (`migrations.diff`, `migrations-<product>.diff`).
+- **Renamed tokens.** `rms-design-system-engine --rename-sweep` pairs each old name with its new one by value in every mode, and writes one patch for the system and one for each product, every rule, script and doc. The old name stays in the theme pointing at the new one until every product has moved. A full audit says in one line when the code still writes a renamed token by its old name.
+
+Nothing is applied until you ask.
+
+### Product screens
+
+The screen capture (`--figma-screens`, read only) records where each instance sits on the screens `ds-config.json` names (`frames` and `screens`). Each product's built page (`ui.html` beside its source, else `<product>/ui.html`) is opened at each screen's width, height and colour mode, and compared in reading order.
+
+- **What is compared.** Which components and how many, their order, the space between neighbours (more than 2px apart) and whether the ones that line up in Figma line up on the page.
+- **Who is a neighbour.** Only components in the same scope, placed in one component's slots or on the screen itself. A component inside another and outside its slots is that component's own part, left to its own check.
+- **Lists.** Three or more of one component are compared by whether they are there and where the first item sits. The space after a list is not compared.
+- **Free space in a row.** A gap wider than any the screen's layouts use is allowed 2% of what sits before it, since text draws slightly wider or narrower in Chrome than in Figma.
+- **Another state.** A page that lacks more than a third of a screen's components (at least three) opens in another state. It is listed as not compared, with the way to fix it, a `setup` script on the screen's entry (inline, or a file path such as `screens/results.js`).
+- **Large answers.** One answer from Figma holds at most 20 KB. The capture keeps a list to its first three items, takes as many screens as fit, and writes the script for the rest with a NEXT line until every screen is read.
+
+### Mode combinations
+
+The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations (`🎛`). Each is set at once on a page holding only the theme, and every root variable is read. A token that differs from Figma's value only in that combination is listed with the combination (`Dark with Phone`), and so is a text and background pair that falls below its WCAG ratio only there. They go to the Tasks page under The system.
+
+### Values written by hand
+
+The census (`🧮`) counts each colour, spacing, radius, font size, duration, layer and shadow a token should carry, with the token to use when one has that value, the files that guess most first. `rms-design-system-engine --census` lists each one and keeps the count, so it only falls. A file with more than before fails the run.
+
+## Accessibility
+
+The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the same check, and every control is tried hovered, focused and pressed, so it is the whole check in one run. Every problem comes with its fix in plain words.
+
+### Two parts
+
+- **From the code, always.** No browser and no page needed. It finds a button or link with only an icon and no label, an image whose alt is a file name, a removed focus outline, a mouse-only control, a hidden element that still takes focus, a misspelled `aria-*`, a page with no language or no main heading, zoom blocked and animations with no reduced-motion option. `"a11yStatic": false` turns this part off.
+- **In the browser, when a page can be opened.** It goes deeper. A dialog or menu that Escape does not close, or that leaves focus somewhere other than the control that opened it. A modal dialog that lets Tab leave it. A tip a tap never shows. A message that appears with nothing said to a screen reader. A state lost in high-contrast mode. Variants told apart only by a colour some people cannot see.
+
+### Contrast
+
+- Measured against what is really painted behind each text, the layers at its centre in paint order, so text over a sibling or a `::before` is measured on that.
+- A text colour is checked against its background token by name (`badge/label/warning` on `badge/background/warning`).
+- Where the code paints the background as a tint (a `color-mix` or an opacity), only the rendered contrast decides. A tint is measured in every colour mode over each surface the system defines (Figma colour tokens with `/surface/` in the name, or `a11y.surfaces`), and the worst is reported with its surface.
+- The pairs follow what Figma draws. The capture records, for each text and icon colour, the fill of the layer right under it.
+
+### Target size
+
+Measured by the WCAG circle in every mode, at the page's own width and again on a 320 pixel screen, where a control that shrinks is caught (`320px wide`).
+
+### Focus
+
+A focus outline taken off a class counts as put back when a more specific rule shows focus on every element the class is put on (`button:focus-visible` for a class used only on buttons).
+
+### Products' pages
+
+Run on the style guide, it also opens each product's built page whole, with every rule, axe-core's heading order and landmarks among them. On a whole page the Tab walk also says when the focus goes back up the page within a column (2.4.3) and when it lands on a control no one can see (2.4.7). `a11y.products: false` leaves the products out.
+
+### How sure each finding is
+
+- **Blocker.** Measured on the page against WCAG 2.1 A or AA.
+- **Warning.** Read from the code, a contract or a Figma note, and can be wrong.
+- **Advisory.** Beyond AA, or for a person to judge.
+
+The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.1 AA`. A must-pass check (`"a11yStrict": true`) never stops on an advisory.
+
+## Working with AI tools
+
+### What it writes for agents
+
+`contracts/llms.txt` says what to use, not only what exists. It opens by telling an agent three things.
+
+- The design system is part of the project.
+- Build nothing by hand that a component covers.
+- Ask `--query` before guessing a name.
+
+Then it says which source decides when two disagree. The goal of the people who use the product first, then verified research, then the system's documented standards, then accepted past decisions, then general heuristics, with this system's own source named at each level and WCAG 2.2 AA as the floor. It stays small enough to read whole. For a large system the full catalog stays in `catalog.json`.
+
+### Does your guidance help your AI tools?
+
+`node eval-run.mjs --levels bare,steering,parity` runs the same generation tasks three ways, with the prompt alone, with your own instruction files (`AGENTS.md`, `CLAUDE.md`, rules), and with what this skill writes for agents (`contracts/llms.txt`). Each is scored by the same checks, design-system tokens and classes and accessibility, so you see what each kind of guidance adds or costs.
+
+- **Finding the component is part of the test.** A case names the component it expects (`"component": "chip"`), and the agent never sees it. A result that builds its own instead fails. A prompt that names a component is flagged before the run.
+- **Type checks.** When results are `.tsx` or `.jsx` and a TypeScript compiler is at hand, each one is type-checked against your components' props (`"evals": { "compile": false }` turns it off).
+- **What it needs.** Your own generate command in `ds-config.json` (`evals.generate.cmd`). It spends your model tokens and never gates the repo. With `--ci` it fails when a run is worse than the last one.
+
+### Figma quota
+
+A Figma seat has a limited number of API calls a day or a month.
+
+- Each refresh says how many calls it made, and asks each thing once.
+- It is skipped when the Figma file has not changed since the last complete refresh (one call to check). `FIGMA_REFRESH=force` refreshes anyway.
+- When Figma answers with a limit, the refresh stops at once, says how long to wait, and keeps the snapshots as they were.
+
+Everything is advice with a clear fix. It points at the problem and never silently changes your code.
 
 ## Inside Claude Code
 
-The engine makes the decisions, not the AI model, so it behaves the same on a small model as on a large one:
+The engine makes the decisions, not the AI model, so it behaves the same on a small model as on a large one.
 
-- **Every request is routed by the engine.** `--init` adds project hooks (`.claude/settings.local.json`, never committed). With them, each `/rms-design-system-engine` request arrives already matched to the right recipe and the exact command to run, with the words to use for what the tool cannot do (it never changes a value in Figma, and never fakes a Figma refresh). The one write to Figma is the engine's own `--figma-edits` script (a component's role the code already states), run only after you say yes.
-- **The hooks also keep the rules.** A Figma snapshot is never edited by hand, and the AI asks you before a commit, a push, a `ds-config.json` edit, or a code change you did not ask for.
-- **The answer says what you need to hear.** When a request needs a sentence said as it is (the Figma data was not refreshed, the tool does not change that in Figma) and the AI's last reply leaves it out, the hook sends it back once to add it.
-- **The AI cannot make a check pass on its own.** Accepting a difference as known debt (`--baseline`, or editing `design-system-engine-baseline.json`), adding an exception to `design-system-engine-map.mjs`, or replacing an approved picture in `.design-system-engine-refs/` waits for you, unless your latest message asked for it. `design-system-engine-agreed.json`, the record of what Figma and the code last agreed on, is written by the audit alone.
-- **Every UI edit is checked when it is made.** After the AI edits a style, markup or component file, the hook reads only what that edit added and hands back, with the right name, anything the design system does not have: a colour written by hand, as hex, `rgb()`, `hsl()`, `oklch()` or a name like `green` (and the token that has it), a padding, gap, corner radius or font size written by hand (and the token that has the value, or the nearest ones), a CSS variable declared nowhere, a prop value or prop name a component does not take, in a Tailwind project a class with a value in brackets, an accessibility problem it added (a button with only an icon and no name, an image with no alt, a clickable div, a focus outline removed, a misspelt `aria-*`), each with its fix, a comment that switches a check off (`eslint-disable`, `@ts-ignore` and the like), with the rules it names, an import from the library your system replaced or from inside the system's package past what it exports (`imports` in `ds-config.json`), with the import to write, a component put inside another the way your system never does (a primary button inside a toolbar that holds only icon buttons), with where it goes instead, and a class rule that nearly copies one of your components (a new component is a decision: the AI uses yours, with a new option if it needs one, or asks you whether the new one belongs in the system). The AI fixes it before moving on, whether or not it thought to ask. Silent when the edit is clean; your own components, the browser's own attributes, token definitions, comments and data are never flagged, nor a colour name in a class, in prose or in a component's prop. `"editCheck": false` in `ds-config.json` turns this part off.
-- **Other AI tools, without hooks.** Cursor, Copilot and other agents read only their own instruction file. `rms-design-system-engine --agent-rules` shows a short section for it (ask the engine for a component's contract before UI work, use only the system's tokens and components, run the edit check before committing, and what an agent never does on its own) and, once you say yes, writes it into the files your project has (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.github/copilot-instructions.md`, `.cursor/rules`), between markers so it is updated in place. `rms-design-system-engine --edit-check` runs the same check the hook makes, on every UI file changed since the last commit or the files you name, and fails when something the system does not have was added. Setup mentions it when it finds another agent's file.
-- **Short guide, recipes on demand.** The AI reads a short guide, then only the recipe the task needs (`rms-design-system-engine --recipe` lists them). Measured on 20 real requests: every one done right on both a large and a small model, at about a fifth of the cost of the old one-file guide (results in `test/skill-evals/RESULTS.md`).
-- **Going back is one command.** `rms-design-system-engine --guide classic` switches to the old one-file guide, `--guide current` switches back.
-- `rms-design-system-engine --doctor` checks the install, axe-core included (the install fetches it, so the first accessibility check needs no network). `--remove-hooks` (or `"hooks": false` in `ds-config.json`) turns the hooks off. Projects set up before the router, the edit check or the final check existed get them on their next run.
-- Optional and local only: `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` records which recipes and commands ran in `.design-system-engine-out/skill-usage.json`. Nothing is ever sent anywhere.
+### Every request is routed
+
+`--init` adds project hooks (`.claude/settings.local.json`, never committed). With them, each `/rms-design-system-engine` request arrives already matched to the right recipe and the exact command to run, with the words to use for what the tool cannot do. It never changes a value in Figma and never fakes a Figma refresh. The one write to Figma is the engine's own `--figma-edits` script, run only after you say yes.
+
+### The hooks keep the rules
+
+- A Figma snapshot is never edited by hand.
+- The AI asks you before a commit, a push, a `ds-config.json` edit, or a code change you did not ask for.
+- When a request needs a sentence said as it is (the Figma data was not refreshed) and the AI's reply leaves it out, the hook sends it back once to add it.
+- **The AI cannot make a check pass on its own.** Accepting a difference as debt (`--baseline`, or editing `design-system-engine-baseline.json`), adding an exception to `design-system-engine-map.mjs`, or replacing an approved picture in `.design-system-engine-refs/` waits for you, unless your latest message asked for it. `design-system-engine-agreed.json` is written by the audit alone.
+
+### Every UI edit is checked as it is made
+
+After the AI edits a style, markup or component file, the hook reads only what that edit added and hands back anything the design system does not have, with the right name.
+
+- A colour written by hand (hex, `rgb()`, `hsl()`, `oklch()` or a name like `green`), with the token that has it.
+- A padding, gap, radius or font size written by hand, with the token that has the value or the nearest ones.
+- A CSS variable declared nowhere, and a prop name or value a component does not take.
+- In a Tailwind project, a class with a value in brackets.
+- An accessibility problem it added, such as an icon-only button with no name, an image with no alt, a clickable div or a removed focus outline.
+- A comment that switches a check off (`eslint-disable`, `@ts-ignore`), with the rules it names.
+- An import from the library your system replaced, or from inside the system's package (`imports` in `ds-config.json`), with the import to write.
+- A component put inside another the way your system never does, with where it goes instead.
+- A class rule that nearly copies one of your components.
+
+The AI fixes it before moving on. The check is silent when the edit is clean, and never flags your own components, token definitions, comments or data. `"editCheck": false` turns it off.
+
+### Other AI tools, without hooks
+
+Cursor, Copilot and other agents read only their own instruction file.
+
+- `rms-design-system-engine --agent-rules` shows a short section for it (ask the engine for a component's contract before UI work, use only the system's tokens and components, run the edit check before committing). Once you say yes, it writes it into the files your project has (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.github/copilot-instructions.md`, `.cursor/rules`), between markers so it is updated in place.
+- `rms-design-system-engine --edit-check` runs the same check the hook makes on every UI file changed since the last commit, or the files you name, and fails when something the system does not have was added.
+
+### A short guide, recipes on demand
+
+The AI reads a short guide, then only the recipe the task needs (`rms-design-system-engine --recipe` lists them). Measured on 20 real requests, every one was done right on both a large and a small model, at about a fifth of the cost of the old one-file guide (results in `test/skill-evals/RESULTS.md`).
+
+- `rms-design-system-engine --guide classic` switches to the old one-file guide, and `--guide current` switches back.
+- `--remove-hooks`, or `"hooks": false` in `ds-config.json`, turns the hooks off. Projects set up before a hook existed get it on their next run.
+- `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` records which recipes and commands ran, in `.design-system-engine-out/skill-usage.json`. It is local only, and nothing is ever sent anywhere.
 
 ## The files it creates
 
-Commit the files it creates so your whole team and CI check against the same design. The deeper setup and every option live in the full guide.
+Commit the files it creates, so your whole team and CI check against the same design.
 
-Setup writes only what it can read. Before Figma is captured it cannot know the name of the collection that holds your colours, the one that holds your sizes, your colour modes or how your CSS names Figma's tokens, so it lists them in `ds-config.json` (`figma.fromCapture`) and the first capture fills each from what it read, then says what it set. The CSS naming is found by trying each way on your tokens: Figma's `iconText` kept or not, camelCase split or not, and `/color`, `/default` or both kept (`--button-background-default-color`) or dropped.
+### What setup writes
 
-The capture keeps Figma's values as Figma resolves them. A token that points at a library's variable is followed into the library, and one whose target was deleted is reported as a broken alias. A colour with its own opacity keeps its alpha wherever it sits, among the sizes too. A duration is kept in ms: a timing variable holds seconds, a number variable is read as seconds below 10 (0.3 is 300ms) and as ms from 10 up, and a number named as no duration (a scale, a spring's stiffness) stays a number. Each text style is kept under its full name, so `xl/regular` and `m/regular` stay two styles; a map or a snapshot that names a style by its last segment still finds it when no other style shares it. A collection that holds both the colours and the sizes keeps its colour modes' names for its sizes.
+Setup writes only what it can read. Before Figma is captured it cannot know which collection holds your colours or your sizes, your colour modes, or how your CSS names Figma's tokens. It lists them in `ds-config.json` (`figma.fromCapture`), and the first capture fills each one and says what it set.
 
-On a large file, nobody copies a value by hand. The engine writes a read-only script for one chunk of the variables, text styles and effect styles at a time (`--capture-script vars 0`), small enough for the Figma tool's answer, and each answer carries a checksum Figma computed over what it holds. `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the vars snapshot here with the capture recipe's own scripts, the variables' scopes and descriptions included. On a refresh only the checksums are asked and only the chunks that changed are read again. With figma-cli connected, the engine runs the same scripts through it, so both ways of reading Figma give the same snapshot.
+The CSS naming is found by trying each way on your tokens, Figma's `iconText` kept or not, camelCase split or not, and `/color` or `/default` kept (`--button-background-default-color`) or dropped.
 
-Every snapshot, the contracts and the style guide say what they were built from: the code's commit (and whether it had changes not committed), Figma's file version or when Figma was read, and the engine's commit. A run whose inputs are older than those of the output already there (a commit that one descends from, an earlier Figma version) keeps that output and says so; `--force` replaces it. A run from the same inputs, or from two branches that cannot be ordered, writes as before.
+### How Figma's values are kept
+
+The capture keeps Figma's values as Figma resolves them.
+
+- A token that points at a library's variable is followed into the library. One whose target was deleted is reported as a broken alias.
+- A colour with its own opacity keeps its alpha wherever it sits.
+- A duration is kept in ms. A number variable is read as seconds below 10 (0.3 is 300ms) and as ms from 10 up. A number that is not a duration (a scale, a spring's stiffness) stays a number.
+- Each text style is kept under its full name, so `xl/regular` and `m/regular` stay two styles.
+- A collection that holds both colours and sizes keeps its colour modes' names for its sizes.
+
+### Large Figma files
+
+Nobody copies a value by hand. The engine writes a read-only script for one chunk of the variables, text styles and effect styles at a time (`--capture-script vars 0`), small enough for the Figma tool's answer.
+
+- Each answer carries a checksum Figma computed over what it holds.
+- `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the snapshot with the variables' scopes and descriptions.
+- On a refresh only the checksums are asked, and only the chunks that changed are read again.
+- With figma-cli connected, the engine runs the same scripts through it, so both ways of reading Figma give the same snapshot.
+
+### Every output says what it was built from
+
+Every snapshot, the contracts and the style guide record the code's commit (and whether it had uncommitted changes), Figma's file version or when Figma was read, and the engine's commit.
+
+A run whose inputs are older than those of the output already there keeps that output and says so. `--force` replaces it. A run from the same inputs, or from two branches that cannot be ordered, writes as before.
+
+## Environment variables
+
+| Variable | What it does |
+|---|---|
+| `FIGMA_TOKEN` | Reads Figma through its API, and lets the style guide fetch Figma's images |
+| `FIGMA_REFRESH=force` | Refreshes from Figma even when the file has not changed |
+| `GITLAB_TOKEN` | Reads a private GitLab project (a personal access token with `read_api`) |
+| `GITLAB_HOST` | The host of a company GitLab |
+| `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` | Turns off the daily self-update |
+| `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` | Uses only the project's own TypeScript |
+| `DESIGN_SYSTEM_ENGINE_CHROME=none` | Reads the code with no browser, even where Chrome is installed |
+| `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` | Records which recipes and commands ran, locally |
+
+Put tokens in a `.env` in the folder you run the engine from.
