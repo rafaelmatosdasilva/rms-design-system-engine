@@ -65,6 +65,21 @@ test('the page\'s look is the system\'s: its page colours, a shared token before
   assert.deepEqual(chromeRoles({ tokens, override: { accent: '--brand' } }).roles.accent, 'var(--brand)', 'styleguide.chrome names one by hand');
 });
 
+test('a page colour set by hand (styleguide.chrome) carries to the roles that follow it, unless they are set too', () => {
+  const page = 'body { color: var(--text); background: var(--bg); }';
+  const { roles, from } = chromeRoles({ tokens, themeCss: page, override: { bg: '--surface-high', 'text-2': '--warn' } });
+  assert.equal(roles.bg, 'var(--surface-high)');
+  assert.equal(roles.stage, 'var(--surface-high)', 'the stage behind each component is the new background');
+  assert.equal(from.stage, 'styleguide.chrome');
+  assert.equal(roles['bg-2'], 'var(--bg-low)', 'a role with a token of its own keeps it');
+  assert.equal(roles.muted, 'var(--warn)', 'the muted text follows the second text set by hand');
+  assert.match(chromeRoles({ tokens, themeCss: page, override: { bg: '--surface-high' } }).css, /--sg-stage: var\(--surface-high\);/);
+  const own = chromeRoles({ tokens, themeCss: page, override: { bg: '--surface-high', stage: '--bg-low' } }).roles;
+  assert.equal(own.stage, 'var(--bg-low)', 'a stage set by hand stays');
+  assert.equal(chromeRoles({ tokens, themeCss: page, override: { text: '--text-2' } }).roles.accent, 'var(--text-2)', 'the accent, with no token, follows the text');
+  assert.equal(chromeRoles({ tokens, themeCss: page }).roles.stage, 'var(--bg)', 'with nothing set, the stage is the page\'s own background');
+});
+
 test('the page\'s switches and text fields are the system\'s own components, read from their markup', () => {
   const seg = segmentedUi([{ name: 'card', markup: '<div class="card"><button>A</button></div>' },
     { name: 'segmentedControl', markup: '<div class="segmented-control full-width"><span class="seg-pill"></span><button class="selected"><span class="tab-label">A</span></button><button><span class="tab-label">B</span></button></div>' }]);

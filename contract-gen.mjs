@@ -26,7 +26,7 @@ import { pathToFileURL } from 'node:url';
 import { pruneCandidates } from './prune-check.mjs';
 import { withTextScaleKeys } from './naming-convention.mjs';
 import { buildStamp, mayWrite } from './stamp.mjs';
-import { shortStyleNames, textStyleKey } from './text-styles.mjs';
+import { shortStyleNames, componentStyleKey } from './text-styles.mjs';
 import { resolveStatus, parseStatusTags, lintStatusFields, statusFindings, statusLine } from './decision-status.mjs';
 import { buildCatalog, catalogTable } from './ui-catalog.mjs';
 import { loadLocator } from './component-locator.mjs';
@@ -203,9 +203,11 @@ function buildAnatomy(contract, structure, vars = {}) {
   const h = c.h ?? s.h;
   if (h != null) root.height = h;
 
+  // A size bound to a scale's variable records the scale ('s'): the token is that scale's style the weight names, else
+  // its regular one (text-styles.mjs componentStyleKey).
   const fontSize = c.fontSizeVar || s.fontSizeVar;
   const styleShort = new Map(shortStyleNames(vars.typography || {}));
-  if (fontSize) root.typographyToken = '{' + textStylePath(styleShort.get(textStyleKey(vars.typography, fontSize)) ?? fontSize, vars).join('.') + '}';
+  if (fontSize) root.typographyToken = '{' + textStylePath(styleShort.get(componentStyleKey(vars.typography, fontSize, c.fontWeightVar || s.fontWeightVar)) ?? fontSize, vars).join('.') + '}';
 
   const anatomy = { root };
 

@@ -13,7 +13,7 @@
 // A code fact the capture could not read reliably is "not comparable", never a difference.
 
 import { pathHash } from './icon-source.mjs';
-import { textStyle } from './text-styles.mjs';
+import { textStyle, componentStyle } from './text-styles.mjs';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -337,21 +337,24 @@ export function compareComponents(code, structure, vars, cfg, maps) {
       if (!f.gapVar && typeof rawDef.gapPx === 'number') raw(rawDef.gapPx, (c.parts?.gap?.props ?? c.props)?.[(f.layout ?? f.box?.layout) === 'VERTICAL' ? 'rowGap' : 'columnGap'], 'gap');
     }
     const ty = (k) => textStyle(vars.typography, k);
+    // The text style of the component's size: a size bound to a scale's variable records the scale ('s'), whose style is
+    // the one its weight names, else its regular one (they share the size and line height).
+    const tyFont = f.fontSizeVar ? componentStyle(vars.typography, f.fontSizeVar, f.fontWeightVar) : null;
     // Font: Figma's font fields describe the component's first TEXT node, so the code side is the
     // contract's fontSel part, else the first element holding text, else the root.
     const fp = c.parts?.font?.props ?? c.parts?.text?.props ?? c.props;
     // The project's own variable for a text-style field (design-system-engine-map TYPO), proposed in a hand-back patch.
     const typoVar = (scale, prop) => Object.entries(maps.TYPO ?? {}).find(([, [sc, pr]]) => sc === scale && pr === prop)?.[0];
-    if (f.fontSizeVar && ty(f.fontSizeVar)) push(name, 'font size', f.fontSizeVar, fp?.fontSize, { figmaValue: ty(f.fontSizeVar).size, suggestVar: typoVar(f.fontSizeVar, 'size') });
+    if (tyFont) push(name, 'font size', f.fontSizeVar, fp?.fontSize, { figmaValue: tyFont.size, suggestVar: typoVar(f.fontSizeVar, 'size') });
     if (f.fontWeightVar && ty(f.fontWeightVar)) push(name, 'font weight', f.fontWeightVar, fp?.fontWeight, { figmaValue: ty(f.fontWeightVar).weight });
     // Line height from the same text style (a unitless line height is a multiple of the font size).
     const lhText = f.text?.lineHeight;   // { unit: 'PIXELS' | 'PERCENT' | 'AUTO', value } from the extended capture
     // A share in % is of Figma's font size: a wrong font size in the code must not carry the expectation with it.
     // Figma's font size of the first text: the default variant's (the refresh records it per variant), else the text style's.
-    const figFs = toNum((f.variants?.[f.defaultVariant] ?? f).fontSize) || toNum(f.fontSizeVar ? ty(f.fontSizeVar)?.size : null) || toNum(fp?.fontSize?.value);
+    const figFs = toNum((f.variants?.[f.defaultVariant] ?? f).fontSize) || toNum(tyFont?.size) || toNum(fp?.fontSize?.value);
     const lhFig = lhText && lhText.unit !== 'AUTO'
       ? (lhText.unit === 'PERCENT' ? `${+((lhText.value / 100) * figFs).toFixed(2)}px` : `${lhText.value}px`)
-      : (f.fontSizeVar ? ty(f.fontSizeVar)?.lh : null);
+      : (tyFont?.lh ?? null);
     // A line height inherited from a page-level rule (html, body, :root, *) is the page's, not the
     // component's, so it is not compared.
     const pageLevel = pageLevelRule;

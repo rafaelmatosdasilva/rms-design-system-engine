@@ -130,7 +130,7 @@ Every run compares your code with Figma and reports in plain words. The 25 gates
 
 - **Data is up to date.** You are checking against today's Figma, not an old copy.
 - **Figma frame unchanged.** The design still looks like the version you approved.
-- **Token values match.** Colours, sizes and fonts, in every mode.
+- **Token values match.** Colours, sizes and fonts, in every mode. A colour in a collection that also holds sizes is compared as a colour, so `#0037fa`, `#0037FA` and `#0037faff` are the same.
 - **Tokens used in screens exist.** Nothing a screen uses is missing from the code.
 - **Every mode is covered.** Things that should change between modes really do. Gate [5] (Every mode is covered) finds where the theme sets each mode, in an `@media`, a `[data-…]` or a class block. A mode the code never implements fails with every value it owes.
 - **Exception lists are valid.** Your "ignore this" notes still point at real things.
@@ -412,6 +412,7 @@ The capture keeps Figma's values as Figma resolves them.
 - A colour with its own opacity keeps its alpha wherever it sits.
 - A duration is kept in ms. A number variable is read as seconds below 10 (0.3 is 300ms) and as ms from 10 up. A number that is not a duration (a scale, a spring's stiffness) stays a number.
 - Each text style is kept under its full name, so `xl/regular` and `m/regular` stay two styles.
+- A component whose size is bound to a scale's variable (`typography/s/font-size`) records the scale. Its contract uses that scale's style its weight names, else the regular one (`s/regular`).
 - A collection that holds both colours and sizes keeps its colour modes' names for its sizes.
 
 ### Large Figma files

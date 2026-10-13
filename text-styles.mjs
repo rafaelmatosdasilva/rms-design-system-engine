@@ -39,3 +39,27 @@ export function styleNames(typo = {}) {
 
 // Does a key a project wrote (a map entry's 'm') name this stored key ('body/m')?
 export const namesStyle = (typo, written, stored) => textStyleKey(typo, written) === stored;
+
+// The styles of a text scale ('s' → 's/regular', 's/strong'): each style whose name is the scale and one more segment.
+export function scaleStyles(typo, scale) {
+  const k = styleKey(scale);
+  if (!typo || !k) return [];
+  return Object.keys(typo).filter((n) => { const s = styleKey(n), i = s.lastIndexOf('/'); return i > 0 && s.slice(0, i) === k; });
+}
+
+// The key of the style a component's text uses. A component whose size is bound to a scale's variable
+// (typography/s/font-size) records the scale ('s'), not a style: a key that names a style is that style, else the
+// scale's style that matches the weight it recorded (a style's name or last segment, or its weight value), else the
+// scale's regular one, else its first. null when the key names neither.
+export function componentStyleKey(typo, key, weight = null) {
+  const own = textStyleKey(typo, key);
+  if (own) return own;
+  const list = scaleStyles(typo, key);
+  if (list.length <= 1) return list[0] ?? null;
+  const w = styleKey(weight);
+  const byWeight = w ? list.find((n) => styleKey(n) === w || last(n) === w || last(n) === last(w) || String(typo[n]?.weight ?? '').trim().toLowerCase() === w) : null;
+  return byWeight ?? list.find((n) => /^(regular|normal|default|book)$/.test(last(n))) ?? list[0];
+}
+
+// The style a component's text uses (componentStyleKey), or null.
+export const componentStyle = (typo, key, weight = null) => { const k = componentStyleKey(typo, key, weight); return k ? typo[k] : null; };
