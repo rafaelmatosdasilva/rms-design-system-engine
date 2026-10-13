@@ -20,6 +20,7 @@
 // Exit 0 = full parity. Exit 1 = at least one FAIL or NEW SKIP.
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { textStyle, namesStyle } from './text-styles.mjs';
 import { join } from 'path';
 import { loadTokensDict, tokenSource } from './fix-hint.mjs';
 import { loadCssSources, rootTokens, blankComments, neverAppliedRootSelectors } from './css-source.mjs';
@@ -546,7 +547,7 @@ for (const [token, figmaVal] of Object.entries(snap.sizing ?? {})) {
 // ── 3. TYPOGRAPHY ─────────────────────────────────────────────────────────────
 if (snap.typography && Object.keys(TYPO).length) {
   for (const [cssVar, [scale, prop]] of Object.entries(TYPO)) {
-    const figmaVal = snap.typography[scale]?.[prop];
+    const figmaVal = textStyle(snap.typography, scale)?.[prop];
     if (figmaVal === undefined || figmaVal === null) {
       SKIP.push({ dimension: 'typography', token: `${scale}/${prop}`, mode: '-', reason: 'no Figma value in snapshot' });
       continue;
@@ -594,7 +595,7 @@ if (snap.typography) {
   for (const [scale, entry] of Object.entries(snap.typography)) {
     for (const field of ['ls', 'textTransform']) {
       if (entry[field] === undefined) continue;
-      const alreadyCovered = Object.entries(TYPO).some(([, [s, p]]) => s === scale && p === field);
+      const alreadyCovered = Object.entries(TYPO).some(([, [s, p]]) => p === field && namesStyle(snap.typography, s, scale));
       if (!alreadyCovered) {
         const cssSuffix = field === 'ls' ? 'ls' : 'text-transform';
         TYPO_INFO.push({

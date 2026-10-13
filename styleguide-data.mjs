@@ -8,6 +8,7 @@
 //
 // Pure: agreedView takes what the generator read and returns { components, notAgreed, modes }.
 import { roleWord, roleMarkup, roleSheetLines, roleOf } from './role-markup.mjs';
+import { textStyle, textStyleKey } from './text-styles.mjs';
 import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs';
 import { requirementEntry } from './annotation-categories.mjs';
 import { WCAG22, WCAG21_KIND } from './wcag21.mjs';
@@ -566,13 +567,13 @@ export function agreedTokens(check = {}, figmaVars = {}) {
       const name = `typography/${t.scale}/${FIG_PROP[prop] ?? prop}`;
       // A value Figma keeps in the text style itself, with no variable of its own (a weight): named by that style.
       if (sized.has(name)) v.figma = name;
-      else if ((figmaVars.typography ?? {})[t.scale]) v.figma = `text style ${t.scale}`;
+      else if (textStyle(figmaVars.typography, t.scale)) v.figma = `text style ${t.scale}`;
     }
     const fam = Object.keys(figmaVars.strings ?? {}).find((k) => /(^|\/)font-?family$/i.test(k));
     if (fam && !t.family) t.family = { figma: fam, value: figmaVars.strings[fam] };
   }
   const typeOrder = Object.keys(figmaVars.typography ?? {});
-  const typeAt = (t) => { const i = typeOrder.indexOf(t.scale); return i < 0 ? typeOrder.length : i; };
+  const typeAt = (t) => { const i = typeOrder.indexOf(textStyleKey(figmaVars.typography, t.scale)); return i < 0 ? typeOrder.length : i; };
   const differences = (check.fail ?? []).length + (check.aliasFail ?? []).length;
   return {
     colors: [...groups].map(([group, items]) => ({ group, items })),

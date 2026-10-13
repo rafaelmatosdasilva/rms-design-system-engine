@@ -28,6 +28,7 @@
 // Skips gracefully (exit 0, ⏭ lines) when Chrome is not installed or assertions are empty.
 
 import { appDir } from './code-roots.mjs';
+import { textStyle } from './text-styles.mjs';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -143,7 +144,7 @@ try {
   const expanded = [];
   for (const a of ASSERTIONS) {
     if (!a.textStyle) { expanded.push(a); continue; }
-    const style = typo[a.textStyle];
+    const style = textStyle(typo, a.textStyle);
     if (!style) {
       console.log(`⚠️  [16] ${a.plugin} ${a.selector}: textStyle '${a.textStyle}' not in the typography snapshot - assertion skipped`);
       continue;
