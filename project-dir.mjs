@@ -71,7 +71,7 @@ async function fromGitlab(p, dir) {
 if (asked) {
   const gl = parseGitlabProject(asked, { ...process.env, GITLAB_HOST: hostEnvFrom(process.env, [PROJECT_FROM]) });
   const p = gl ? await fromGitlab(gl) : projectFor(asked, PROJECT_FROM);
-  if (!p.dir || !existsSync(p.dir)) { console.error(`❌ No project at ${asked}${p.error ? `: ${p.error}` : ''}.\nNEXT: ask the person where their code is (a folder on this computer or a git link), then run again with --project=<it>`); process.exit(2); }
+  if (!p.dir || !existsSync(p.dir)) { console.error(`❌ No project at ${asked}${p.error ? `: ${p.error}` : ''}.\nNEXT: ask the person where their code is (a folder on this computer or a link to its repository on GitHub or GitLab), then run again with --project=<it>`); process.exit(2); }
   if (p.cloned) console.log(`⬇  Cloned ${p.url} into ${p.dir}`);
   if (resolve(p.dir) !== resolve(PROJECT_FROM)) { try { writeFileSync(join(PROJECT_FROM, POINTER), resolve(p.dir) + '\n'); } catch { /* read-only: not remembered */ } }
   process.chdir(p.dir);

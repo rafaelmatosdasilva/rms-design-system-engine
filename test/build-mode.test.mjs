@@ -94,10 +94,10 @@ test('setup asks where the code is before it writes anything; told it starts her
   const init = (...more) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool', '--no-hooks', ...more], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   const asked = init();
   assert.equal(asked.status, 2, 'never set up by a guess');
-  assert.match(asked.stdout, /Setup needs to know where the code is first\. Nothing was written\.\n.*has no code\.\nNEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a git link\. Then run rms-design-system-engine --init --project='<\. for this folder, or the folder or git link>' --figma-url='https:\/\/www\.figma\.com\/design\/AbCdEf123456XyZ\/Tidepool'/s);
+  assert.match(asked.stdout, /Setup needs to know where the code is first\. Nothing was written\.\n.*has no code\.\nNEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a link to its repository on GitHub or GitLab\. Then run rms-design-system-engine --init --project='<\. for this folder, or the folder or repository link>' --figma-url='https:\/\/www\.figma\.com\/design\/AbCdEf123456XyZ\/Tidepool'/s);
   const here = init('--project=.');
   assert.equal(here.status, 2, 'told the code is in a folder with none: asked again');
-  assert.match(here.stdout, /This folder has no code: .*\nNEXT: ask the person one question: is the code somewhere else \(a folder on this computer or a git link\), or should it start here, built from Figma\?/s);
+  assert.match(here.stdout, /This folder has no code: .*\nNEXT: ask the person one question: is the code somewhere else \(a folder on this computer or a link to its repository on GitHub or GitLab\), or should it start here, built from Figma\?/s);
   assert.equal(init('--build').status, 2, '--build alone does not say where the code is');
   assert.ok(!existsSync(join(dir, 'ds-config.json')));
   const r = init('--project=.', '--build');

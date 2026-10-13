@@ -1591,13 +1591,13 @@ async function bootstrapConfig() {
   if (INIT_NONINTERACTIVE && !INIT_CODE_GIVEN) {
     console.log(C.yellow('  ⚠️  Setup needs to know where the code is first. Nothing was written.'));
     console.log(C.dim(`  This folder (${ROOT}) ${holds()}.`));
-    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a git link${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or git link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}${thenArg}.`);
+    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a link to its repository on GitHub or GitLab${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or repository link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}${thenArg}.`);
     process.exit(2);
   }
   // Told the code is in a folder that has none: the code is somewhere else, or it starts here from Figma. One question.
   if (INIT_NONINTERACTIVE && !INIT_BUILD && !INIT_THEME_CSS && !hasCode(ROOT)) {
     console.log(C.yellow(`  ⚠️  This folder has no code: ${ROOT}. Nothing was written.`));
-    console.log(`NEXT: ask the person one question: is the code somewhere else (a folder on this computer or a git link), or should it start here, built from Figma? Then run rms-design-system-engine --init --project='<their folder or link>'${figmaArg}${thenArg}, or add --build to start it in this folder from Figma${INIT_FIGMA_URL ? '' : ' (with --figma-url=<the Figma link>, which building needs)'}.`);
+    console.log(`NEXT: ask the person one question: is the code somewhere else (a folder on this computer or a link to its repository on GitHub or GitLab), or should it start here, built from Figma? Then run rms-design-system-engine --init --project='<their folder or link>'${figmaArg}${thenArg}, or add --build to start it in this folder from Figma${INIT_FIGMA_URL ? '' : ' (with --figma-url=<the Figma link>, which building needs)'}.`);
     process.exit(2);
   }
   if (INIT_BUILD && !INIT_FIGMA_URL) {
@@ -1661,7 +1661,7 @@ async function bootstrapConfig() {
     }
     if (!INIT_CODE_GIVEN) {
       console.log(C.dim(`  This folder (${ROOT}) ${holds()}.`));
-      const where = (await ask('Where is your code? Enter for this folder, or another folder or a git link: ')).trim();
+      const where = (await ask('Where is your code? Enter for this folder, or another folder or a link to its repository: ')).trim();
       if (where && resolve(ROOT, where.replace(/^~(?=\/|$)/, HOME)) !== ROOT) {
         // The code is elsewhere: setup runs there, with the answers already given.
         rl.close();
@@ -4135,7 +4135,8 @@ function reportFull(label, items, shown) {
             if (cap) whereOf = (t) => { const v = colorVarOf(t, spec, maps); return v && cap.tokens?.[v]?.declaredAt ? `${v} · ${cap.tokens[v].declaredAt}` : null; };
           } catch { /* locations are a convenience */ }
           console.log(C.yellow(`\n⚠️  Token contrast: ${all.length} pair(s) below WCAG AA (${provenance}, per mode).`));
-          const { codeReason, reasonLine } = await import('./change-reason.mjs');
+          const { codeReason, reasonLine, prefetchReasons } = await import('./change-reason.mjs');
+          prefetchReasons(ROOT, all.slice(0, 20).map((f) => whereOf(f.text)?.split(' · ')[1]));
           for (const f of all.slice(0, 20)) {
             const w = whereOf(f.text);
             console.log(C.yellow(`     [${f.mode}] ${f.name}: ${f.ratio}:1 (needs ${f.threshold}:1)  ${f.textHex} on ${f.bgHex}${w ? `  (${w})` : ''}`));
@@ -4179,7 +4180,8 @@ function reportFull(label, items, shown) {
           console.log(C.yellow(`\n⚠️  State contrast: ${findings.length} component state(s) below WCAG AA, as rendered (${checked} checked; disabled states exempt).`));
           const { colorHex } = await import('./css-values.mjs');
           const hex = (v, name) => `${colorHex(v) ?? v}${name ? ` (${name})` : ''}`;
-          const { codeReason, reasonLine } = await import('./change-reason.mjs');
+          const { codeReason, reasonLine, prefetchReasons } = await import('./change-reason.mjs');
+          prefetchReasons(ROOT, findings.slice(0, 20).map((f) => f.at));
           for (const f of findings.slice(0, 20)) {
             console.log(C.yellow(`     ${f.component} [${f.state} · ${f.mode}]: ${f.ratio}:1 (needs ${f.threshold}:1)  ${hex(f.fg, f.fgVar)} on ${hex(f.bg, f.bgVar)}${f.onSurface ? ` over the surface ${f.onSurface}` : ''}${f.at ? `  (${f.at})` : ''}`));
             const why = f.at ? reasonLine(codeReason(ROOT, f.at)) : null;
