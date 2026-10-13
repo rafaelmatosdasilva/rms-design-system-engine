@@ -110,5 +110,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `chunked-capture-stamps` | The 21 guide tasks on Haiku (engine c071b6d) | "Figma read in checked chunks by both readers, outputs stamped with what they were built from, parity by type, Mac-like runs" |
 | `p6-components` | The 21 guide tasks on Haiku (engine 99f052c) | "Components read in checked chunks" |
 | `kept-on-purpose` | The 21 guide tasks on Haiku (engine fee165b) | "Kept on purpose" |
+| `2026-10-13-guide-a-component-s-own` | The 21 guide tasks on Haiku (engine 89948cd) | "Read-only complete capture" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
