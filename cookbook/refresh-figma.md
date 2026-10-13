@@ -64,7 +64,7 @@ single dark read would have left light on the old, unrelated value.
 
 ### Step 1a - Probe (always run first)
 
-Fill in `COLOR_COLLECTION`, `SIZING_COLLECTION` (or `null`), and `PRIMITIVE_PREFIX` from `ds-config.json`.
+Fill in `COLOR_COLLECTION`, `SIZING_COLLECTION` (or `null`), and `PRIMITIVE_PREFIX` from `ds-config.json`. When the configured collection is not in the file (setup's guess before a first capture), each script finds the one that holds the colours and the collections that hold the sizes, and returns their names in `_collections`, which the snapshot keeps: the engine then fills `ds-config.json` from it.
 
 ```js
 const collections = await figma.variables.getLocalVariableCollectionsAsync();
@@ -77,12 +77,15 @@ for (const col of collections) {
 const COLOR_COLLECTION  = 'Theme';       // figma.colorCollection from ds-config.json
 const SIZING_COLLECTION = 'Sizing';      // figma.sizingCollection (or null)
 const PRIMITIVE_PREFIX  = 'primitives/'; // figma.primitivePrefix
-const col = collections.find(c => c.name === COLOR_COLLECTION);
+// The configured collection, else the one that holds the colours (a first capture, before setup knew its name).
+const col = collections.find(c => c.name === COLOR_COLLECTION)
+  ?? collections.find(c => c.modes.length > 1 && c.variableIds.some(id => idToVar[id]?.resolvedType === 'COLOR'))
+  ?? collections.find(c => c.variableIds.some(id => idToVar[id]?.resolvedType === 'COLOR'));
 const colorVarIds = col.variableIds.filter(id => {
   const v = idToVar[id];
   return v && v.resolvedType === 'COLOR' && !v.name.startsWith(PRIMITIVE_PREFIX);
 });
-const sizingCol = SIZING_COLLECTION ? collections.find(c => c.name === SIZING_COLLECTION) : null;
+const sizingCols = collections.some(c => c.name === SIZING_COLLECTION) ? collections.filter(c => c.name === SIZING_COLLECTION) : collections.filter(c => c !== col);
 // An alias to a variable this file does not hold: a library's resolves; one that was deleted is a broken alias.
 const modeName = {}; for (const c of collections) for (const m of c.modes) modeName[m.modeId] = m.name;
 const brokenAliases = [];
@@ -92,8 +95,9 @@ for (const v of Object.values(idToVar)) for (const [modeId, val] of Object.entri
   brokenAliases.push({ name: v.name, mode: modeName[modeId] ?? modeId, target: a.id });
 }
 return {
+  colorCollection: col.name,
   colorCount: colorVarIds.length,
-  sizingCount: sizingCol?.variableIds.length ?? 0,
+  sizingCount: sizingCols.reduce((n, c) => n + c.variableIds.length, 0),
   modes: col.modes.map(m => m.name),
   brokenAliases,
 };
@@ -135,9 +139,10 @@ function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if
 if(val.color){const base=val.color.type==='VARIABLE_ALIAS'?resolve(val.color.id,modeId,d+1):('r'in val.color?toHex(val.color):null);if(!base)return null;const op=(val.opacity??100)/100;const a0=base.length>7?parseInt(base.slice(7,9),16)/255:1;const a=Math.round(a0*op*255);return a>=255?base.slice(0,7):base.slice(0,7)+a.toString(16).padStart(2,'0');}return null;}
 function aliasChain(varId,modeId,d=0){if(d>10)return[];const v=idToVar[varId];if(!v)return[];const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val||typeof val!=='object'||val.type!=='VARIABLE_ALIAS')return[];const a=idToVar[val.id];if(!a)return[];return[a.name,...aliasChain(val.id,modeId,d+1)];}
 // Fill from ds-config.json:
-const COLOR_COLLECTION='Theme'; const SIZING_COLLECTION='Sizing'; const PRIMITIVE_PREFIX='primitives/';
-const MODES=[{name:'Light',snapshotKey:'light'},{name:'Dark',snapshotKey:'dark'}]; // from figma.modes
-const col=collections.find(c=>c.name===COLOR_COLLECTION);
+let COLOR_COLLECTION='Theme'; const SIZING_COLLECTION='Sizing'; const PRIMITIVE_PREFIX='primitives/';
+let MODES=[{name:'Light',snapshotKey:'light'},{name:'Dark',snapshotKey:'dark'}]; // from figma.modes
+const col=collections.find(c=>c.name===COLOR_COLLECTION)??collections.find(c=>c.modes.length>1&&c.variableIds.some(id=>idToVar[id]?.resolvedType==='COLOR'))??collections.find(c=>c.variableIds.some(id=>idToVar[id]?.resolvedType==='COLOR'));COLOR_COLLECTION=col.name; // the configured one, else the one that holds the colours (a first capture)
+if(!MODES.some(m=>col.modes.some(fm=>fm.name===m.name)))MODES=col.modes.map(fm=>({name:fm.name,snapshotKey:fm.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')})); // none configured is in the file: its own
 const colorOut={},aliasesOut={};
 for(const m of MODES){
   const modeId=col.modes.find(fm=>fm.name===m.name)?.modeId; if(!modeId)continue;
@@ -150,7 +155,9 @@ for(const m of MODES){
 }
 function resolveScalarVal(id,modeId,d=0){let v=idToVar[id];if(!v)return null;let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+'px';if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);return String(val);}
 const sizingOut={};
-if(SIZING_COLLECTION){const sc=collections.find(c=>c.name===SIZING_COLLECTION);if(sc){const mid=sc.modes[0].modeId;for(const id of sc.variableIds){const v=idToVar[id];if(!v)continue;sizingOut[v.name]=resolveScalarVal(id,mid)??'';}}}
+// The configured sizing collection, else the numbers of every collection but the colours' (a first capture).
+const sizingCols=collections.some(c=>c.name===SIZING_COLLECTION)?collections.filter(c=>c.name===SIZING_COLLECTION):collections.filter(c=>c!==col);const sizedBy=new Set();
+for(const sc of sizingCols){const mid=sc.modes[0].modeId;for(const id of sc.variableIds){const v=idToVar[id];if(!v||(sc.name!==SIZING_COLLECTION&&(v.resolvedType!=='FLOAT'||v.name.startsWith(PRIMITIVE_PREFIX))))continue;sizingOut[v.name]=resolveScalarVal(id,mid)??'';if(v.resolvedType==='FLOAT')sizedBy.add(sc.name);}}
 // modeVariants - DS-agnostic: for every collection in ds-config → figma.collections with ≥2 modes,
 // capture the vars that DIFFER across its modes, tagging EACH with its own kind (inferred from
 // resolvedType - a single collection may mix color/scalar/string/boolean). Colours of the colour
@@ -174,7 +181,8 @@ const WEIGHT={'Thin':100,'Extra Light':200,'Light':300,'Regular':400,'Medium':50
 const styles=await figma.getLocalTextStylesAsync(); const typo={};
 for(const st of styles){const key=st.name.trim().toLowerCase().split('/').pop();const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
 const _modeOrder={};for(const c of collections){if(c.modes.length<2)continue;const key=m=>(c.name===COLOR_COLLECTION?(MODES.find(x=>x.name===m.name)||{}).snapshotKey:null)||m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');_modeOrder[c.name===COLOR_COLLECTION?'color':c.name]=c.modes.map(key);} // Figma's own order of each collection's modes
-return {color:colorOut,aliases:aliasesOut,sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder};
+const _collections={color:col.name,colorModes:col.modes.map(m=>m.name),sizing:[...sizedBy]}; // the collections read, which the engine writes into ds-config.json
+return {color:colorOut,aliases:aliasesOut,sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder,_collections};
 ```
 
 ---
@@ -196,9 +204,10 @@ function resolve(varId,modeId,d=0){if(d>10)return null;const v=idToVar[varId];if
 // A colour with its own opacity ({ color: <alias or rgb>, opacity: 88 }): the colour, its alpha times that opacity.
 if(val.color){const base=val.color.type==='VARIABLE_ALIAS'?resolve(val.color.id,modeId,d+1):('r'in val.color?toHex(val.color):null);if(!base)return null;const op=(val.opacity??100)/100;const a0=base.length>7?parseInt(base.slice(7,9),16)/255:1;const a=Math.round(a0*op*255);return a>=255?base.slice(0,7):base.slice(0,7)+a.toString(16).padStart(2,'0');}return null;}
 // Fill from ds-config.json:
-const COLOR_COLLECTION='Theme'; const PRIMITIVE_PREFIX='primitives/';
-const MODES=[{name:'Light',snapshotKey:'light'},{name:'Dark',snapshotKey:'dark'}];
-const col=collections.find(c=>c.name===COLOR_COLLECTION);
+let COLOR_COLLECTION='Theme'; const PRIMITIVE_PREFIX='primitives/';
+let MODES=[{name:'Light',snapshotKey:'light'},{name:'Dark',snapshotKey:'dark'}];
+const col=collections.find(c=>c.name===COLOR_COLLECTION)??collections.find(c=>c.modes.length>1&&c.variableIds.some(id=>idToVar[id]?.resolvedType==='COLOR'))??collections.find(c=>c.variableIds.some(id=>idToVar[id]?.resolvedType==='COLOR'));COLOR_COLLECTION=col.name; // the configured one, else the one that holds the colours (a first capture)
+if(!MODES.some(m=>col.modes.some(fm=>fm.name===m.name)))MODES=col.modes.map(fm=>({name:fm.name,snapshotKey:fm.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')})); // none configured is in the file: its own
 const modeIds=Object.fromEntries(MODES.map(m=>[m.snapshotKey, col.modes.find(fm=>fm.name===m.name)?.modeId]));
 const vars=col.variableIds.map(id=>idToVar[id]).filter(v=>v&&v.resolvedType==='COLOR'&&!v.name.startsWith(PRIMITIVE_PREFIX));
 const BATCH_START=0, BATCH_END=190; // ← substitute per iteration
@@ -245,12 +254,15 @@ Then fetch **sizing and typography** in one separate call (these collections are
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={};
 for(const col of collections){for(const id of col.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v)idToVar[id]=v;}}
-const SIZING_COLLECTION='Sizing'; const COLOR_COLLECTION='Theme'; // fill from ds-config.json
+const SIZING_COLLECTION='Sizing'; let COLOR_COLLECTION='Theme'; const PRIMITIVE_PREFIX='primitives/'; // fill from ds-config.json
+const col=collections.find(c=>c.name===COLOR_COLLECTION)??collections.find(c=>c.modes.length>1&&c.variableIds.some(id=>idToVar[id]?.resolvedType==='COLOR'))??collections.find(c=>c.variableIds.some(id=>idToVar[id]?.resolvedType==='COLOR'));COLOR_COLLECTION=col.name; // the configured one, else the one that holds the colours (a first capture)
 function toHex(c){const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('');return '#'+h;}
 function resolve(id,modeId,d=0){if(d>10)return null;const v=idToVar[id];if(!v)return null;const val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];if(!val)return null;if(val?.type==='VARIABLE_ALIAS')return resolve(val.id,modeId,d+1);if('r'in val)return toHex(val);return null;}
 function resolveScalarVal(id,modeId,d=0){let v=idToVar[id];if(!v)return null;let val=v.valuesByMode[modeId]??Object.values(v.valuesByMode)[0];let n=0;while(typeof val==='object'&&val?.type==='VARIABLE_ALIAS'&&n++<10){const a=idToVar[val.id];val=a?.valuesByMode[modeId]??Object.values(a?.valuesByMode??{})[0];}if(val==null)return null;if(typeof val==='number')return (Math.round(val*1000)/1000)+'px';if(typeof val==='boolean')return String(val);if(typeof val==='object'&&'r'in val)return toHex(val);return String(val);}
 const sizingOut={};
-if(SIZING_COLLECTION){const sc=collections.find(c=>c.name===SIZING_COLLECTION);if(sc){const mid=sc.modes[0].modeId;for(const id of sc.variableIds){const v=idToVar[id];if(!v)continue;sizingOut[v.name]=resolveScalarVal(id,mid)??'';}}}
+// The configured sizing collection, else the numbers of every collection but the colours' (a first capture).
+const sizingCols=collections.some(c=>c.name===SIZING_COLLECTION)?collections.filter(c=>c.name===SIZING_COLLECTION):collections.filter(c=>c!==col);const sizedBy=new Set();
+for(const sc of sizingCols){const mid=sc.modes[0].modeId;for(const id of sc.variableIds){const v=idToVar[id];if(!v||(sc.name!==SIZING_COLLECTION&&(v.resolvedType!=='FLOAT'||v.name.startsWith(PRIMITIVE_PREFIX))))continue;sizingOut[v.name]=resolveScalarVal(id,mid)??'';if(v.resolvedType==='FLOAT')sizedBy.add(sc.name);}}
 // modeVariants - DS-agnostic: for every collection in ds-config → figma.collections with ≥2 modes,
 // capture the vars that DIFFER across its modes, tagging EACH with its own kind (inferred from
 // resolvedType - a single collection may mix color/scalar/string/boolean). Colours of the colour
@@ -274,7 +286,8 @@ const WEIGHT={'Thin':100,'Extra Light':200,'Light':300,'Regular':400,'Medium':50
 const styles=await figma.getLocalTextStylesAsync(); const typo={};
 for(const st of styles){const key=st.name.trim().toLowerCase().split('/').pop();const entry={size:Math.round(st.fontSize*10)/10+'px'};const w=WEIGHT[st.fontName.style];if(w)entry.weight=String(w);if(st.lineHeight?.unit==='PIXELS')entry.lh=Math.round(st.lineHeight.value*10)/10+'px';if(st.letterSpacing?.value)entry.ls=(st.letterSpacing.unit==='PERCENT'?Math.round(st.letterSpacing.value*100)/10000+'em':Math.round(st.letterSpacing.value*100)/100+'px');if(st.textCase&&st.textCase!=='ORIGINAL')entry.textTransform=(st.textCase==='UPPER'?'uppercase':st.textCase==='LOWER'?'lowercase':st.textCase.toLowerCase());typo[key]=entry;}
 const _modeOrder={};for(const c of collections){if(c.modes.length<2)continue;const key=m=>m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');_modeOrder[c.name===COLOR_COLLECTION?'color':c.name]=c.modes.map(key);} // Figma's own order of each collection's modes
-return {sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder};
+const _collections={color:col.name,colorModes:col.modes.map(m=>m.name),sizing:[...sizedBy]}; // the collections read, which the engine writes into ds-config.json
+return {sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder,_collections};
 ```
 
 **Final assembly** (after all calls complete):
@@ -285,6 +298,7 @@ return {sizing:sizingOut,typography:typo,modeVariants:modeVariantsOut,_modeOrder
   sizing: sizingOut,
   typography: typo,
   modeVariants: modeVariantsOut,   // per-collection, per-mode non-colour maps (optional)
+  _collections,                    // the collections read: the colour one, its modes, the sizing ones
   motion: motionOut,               // easing/duration tokens (optional - Gate: Motion parity)
   effects: effectsOut,             // shadow styles → box-shadow (optional - Gate: Effect parity)
   variableScopes: scopesOut,       // each variable's scopes, by id (Step 1f)
@@ -1129,7 +1143,7 @@ For every changed or new token:
 
 ## Phase 1 - Step 5: Update snapshots
 
-Write fresh live data to both files, with `_modeOrder` (each collection's modes in Figma's own order, which the style guide lists them in) and the probe's `brokenAliases` (a variable that points at one no longer in the file; `[]` when none) on the vars snapshot. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] (Data is up to date) the data is fresh.
+Write fresh live data to both files, with `_modeOrder` (each collection's modes in Figma's own order, which the style guide lists them in), `_collections` (the collections the capture read, from which the engine fills what setup could not know) and the probe's `brokenAliases` (a variable that points at one no longer in the file; `[]` when none) on the vars snapshot. **Always stamp `_updated` to today's date on both snapshots**, even when no changes were detected - this is what tells Gate [1] (Data is up to date) the data is fresh.
 
 > **Also stamp `_figmaVersion` on the vars snapshot.** Fetch it with
 > `GET /v1/files/{key}?depth=1` (the `version` field) and write it alongside `_updated`.

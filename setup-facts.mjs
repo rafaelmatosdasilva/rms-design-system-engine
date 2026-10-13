@@ -5,6 +5,8 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
+import { detectModes, baseModeKey } from './mode-resolver.mjs';
+import { collectionSwitches } from './mode-combos.mjs';
 
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const readText = (p) => { try { return readFileSync(p, 'utf8'); } catch { return ''; } };
@@ -26,11 +28,14 @@ export function figmaTokenNames(figmaVars) {
 }
 
 // The naming the token CSS follows. The engine's default turns a Figma `iconText` segment into `text` (one system's
-// early habit); a CSS that keeps `iconText`, or splits camelCase, is read as it is written: each way is tried on the
-// Figma tokens the snapshot has, and the one that finds the most of them declared wins, the default on a tie.
+// early habit) and drops a last `/color` and `/default`; a CSS that keeps `iconText`, splits camelCase, or keeps
+// `/color` or `/default` (`--x-background-default-color`) is read as it is written: each way is tried on the Figma
+// tokens the snapshot has, and the one that finds the most of them declared wins, the default on a tie.
 // base: the namingConvention setup already chose (the Tailwind preset). Returns { naming, found, of } where naming is
 // what to add to figma.namingConvention ({} when the default fits best).
-const WAYS = [{}, { iconTextAlias: false }, { case: 'kebab' }, { iconTextAlias: false, case: 'kebab' }];
+const KEEPS = [{}, { dropSegments: [] }, { dropSegments: ['color'] }, { dropSegments: ['default'] }];
+const WAYS = KEEPS.flatMap((keep) => [{}, { iconTextAlias: false }, { case: 'kebab' }, { iconTextAlias: false, case: 'kebab' }].map((w) => ({ ...w, ...keep })));
+export const NAMING_KEYS = ['iconTextAlias', 'case', 'dropSegments'];
 export function namingFromCode(themeText, figmaVars, base = {}) {
   const declared = new Set([...String(themeText).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
   const tokens = figmaTokenNames(figmaVars);
@@ -42,6 +47,72 @@ export function namingFromCode(themeText, figmaVars, base = {}) {
     if (!best || found > best.found) best = { naming: way, found };
   }
   return { ...best, of: tokens.length };
+}
+
+// What a naming does, in words: "keeps Figma's iconText and keeps /color and /default".
+export function namingWords(naming = {}) {
+  const drop = naming.dropSegments;
+  const kept = drop ? ['color', 'default'].filter((s) => !drop.includes(s)) : [];
+  return [naming.iconTextAlias === false ? 'keeps Figma\'s iconText' : null, naming.case === 'kebab' ? 'splits camelCase with hyphens' : null,
+    kept.length ? `keeps ${kept.map((k) => `/${k}`).join(' and ')}` : null].filter(Boolean).join(' and ');
+}
+
+// What setup could not read before Figma was captured, filled from the first capture that read it (E37, E38): the
+// colour collection's name, the sizing collection's, the colour modes (each with where the theme CSS sets it) and the
+// naming the token CSS follows. Setup lists them in figma.fromCapture; once a capture has colours, each is set from what
+// it read and the list goes. The other collections' modes are left to each run, which reads them from the capture and
+// the theme CSS (a breakpoint's block moved in the CSS is followed, never frozen here); they are said, not written.
+// Pure: → null while there is nothing to fill, else { figma, lines, unsure } with figma the new figma block.
+export const FROM_CAPTURE = ['colorCollection', 'sizingCollection', 'modes', 'namingConvention'];
+const slug = (n) => String(n).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+export function settleFromCapture(cfg = {}, vars = null, themeText = '') {
+  const owed = cfg.figma?.fromCapture;
+  if (!Array.isArray(owed)) return null;
+  const colourKeys = Object.keys(vars?.color ?? {}).filter((k) => !k.startsWith('_') && vars.color[k] && typeof vars.color[k] === 'object' && Object.keys(vars.color[k]).length);
+  if (!colourKeys.length) return null;
+  const was = cfg.figma ?? {};
+  const figma = { ...was };
+  delete figma.fromCapture;
+  const read = vars._collections ?? {};
+  const lines = [];
+  let unsure = [];
+  if (owed.includes('colorCollection') && read.color) {
+    figma.colorCollection = read.color;
+    lines.push(`the colour collection is ${read.color}`);
+  }
+  const sizing = [read.sizing ?? []].flat().filter(Boolean);
+  if (owed.includes('sizingCollection') && sizing.length === 1) {
+    figma.sizingCollection = sizing[0];
+    lines.push(`the sizing collection is ${sizing[0]}`);
+  }
+  if (owed.includes('modes')) {
+    const order = (vars._modeOrder?.color ?? []).filter((k) => colourKeys.includes(k));
+    const inFigma = [...order, ...colourKeys.filter((k) => !order.includes(k))];
+    const base = baseModeKey(themeText, inFigma);
+    const keys = [base, ...inFigma.filter((k) => k !== base)];
+    const d = detectModes(themeText, keys);
+    const nameOf = (k) => (was.modes ?? []).find((m) => m.snapshotKey === k)?.name ?? (read.colorModes ?? []).find((n) => slug(n) === k) ?? null;
+    figma.modes = d.modes.map((m, i) => ({ ...m, name: nameOf(keys[i]) ?? m.name }));
+    unsure = figma.modes.filter((m) => d.unsure.includes(m.snapshotKey)).map((m) => m.name);
+    lines.push(`the colour modes are ${figma.modes.map((m) => `${m.name} (${m.cssSelector === 'root' ? 'the base' : m.cssSelector})`).join(', ')}`);
+  }
+  if (owed.includes('namingConvention')) {
+    const base = Object.fromEntries(Object.entries(was.namingConvention ?? {}).filter(([k]) => !NAMING_KEYS.includes(k)));
+    const n = namingFromCode(themeText, vars, base);
+    const naming = { ...base, ...n.naming };
+    if (Object.keys(naming).length) figma.namingConvention = naming; else delete figma.namingConvention;
+    if (n.of) lines.push(`the token CSS ${namingWords(n.naming) || 'follows the engine\'s default naming'} (${n.found} of ${n.of} Figma tokens found that way)`);
+  }
+  const others = Object.entries(vars.modeVariants ?? {}).filter(([name, sec]) => name !== figma.colorCollection && Array.isArray(sec?.modes) && sec.modes.length > 1);
+  if (others.length) {
+    const spec = resolveNamingSpec({ figma });
+    for (const [name, sec] of others) {
+      const cssVars = Object.keys(sec.vars ?? {}).map((t) => tokenToVar(t, spec, { raw: true }));
+      const modes = collectionSwitches(sec, themeText, cssVars);
+      lines.push(`${name} has the modes ${modes.map((m) => `${m.name ?? m.snapshotKey} (${m.cssSelector === 'root' ? 'the base' : m.cssSelector ?? 'nothing in the CSS sets it yet'})`).join(', ')}`);
+    }
+  }
+  return { figma, lines, unsure };
 }
 
 // Every Figma snapshot the engine reads, beside the token CSS: captures write there and every check reads there, so a
