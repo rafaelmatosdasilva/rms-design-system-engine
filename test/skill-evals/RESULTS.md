@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Read-only complete capture (continuous evaluation)
+
+What changed since the entry below (engine fee165b): Router: a component named loosely is found, and a shared word is asked about; Docs: one Commands page, linked from every other page; One pairing of Figma components with their code files, no map needed; Capture components read-only and complete: raw values and states by component id; Guide: a component's own file comes from the one pairing, every sign named. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `cce6b42d302d` · Project measured: `13d811a9d668`
+
+| Haiku, engine 89948cd | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.061 |
+| Input a run | 97k | 120k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 120k a run against 97k. Records: `records/2026-10-13-guide-a-component-s-own`.
+
 ## 2026-10: Kept on purpose (continuous evaluation)
 
 What changed since the entry below (engine 99f052c): A difference the team decides to keep is recorded with --keep, with its reason, who and when, and never fails a run; the accept-debt recipe now asks whether to keep or to accept as debt. The guide changed in `cookbook/accept-debt.md`, `reference/usage.md`, `rms-design-system-engine.md`.
