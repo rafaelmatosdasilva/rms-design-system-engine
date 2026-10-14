@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Compact Figma capture (continuous evaluation)
+
+What changed since the entry below (engine 3f9b610): A run inside a GitLab mirror finds the token in the folder that holds it; A compact Figma capture: about a tenth of the calls for a large file. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `b704e94db02c` · Project measured: `13d811a9d668`
+
+| Haiku, engine e81a0ea | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.063 | $0.062 |
+| Input a run | 139k | 130k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 130k a run against 139k. Records: `records/2026-10-14-a-compact-figma-capture-about`.
+
 ## 2026-10: Text styles complete and accurate (continuous evaluation)
 
 What changed since the entry below (engine 89948cd): Style guide accuracy: full-name text styles, scale keys, chrome overrides, hex in sizes, Pinia; Text styles complete and accurate, from Figma to the style guide; Tests: a type style lists only its own fields, the family once; a capture records each style's family. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`.
