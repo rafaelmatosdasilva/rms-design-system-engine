@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: only Figma's components, code-only ones as tasks (continuous evaluation)
+
+What changed since the entry below (engine e81a0ea): Style guide: with Figma's components, a component only the code has is a task. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `09500f27764f` · Project measured: `13d811a9d668`
+
+| Haiku, engine 2ef7817 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.056 |
+| Input a run | 130k | 116k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 116k a run against 130k. Records: `records/2026-10-14-style-guide-with-figma-s`.
+
 ## 2026-10: Compact Figma capture (continuous evaluation)
 
 What changed since the entry below (engine 3f9b610): A run inside a GitLab mirror finds the token in the folder that holds it; A compact Figma capture: about a tenth of the calls for a large file. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/usage.md`.
