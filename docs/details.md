@@ -429,9 +429,15 @@ The capture keeps Figma's values as Figma resolves them.
 Nobody copies a value by hand. The engine writes a read-only script for one chunk at a time, small enough for the Figma tool's answer.
 
 - `--capture-script vars 0` reads the variables, text styles and effect styles.
-- `--capture-script components sums` reads the components. Each chunk is a group of components, put together in Figma with the recipes' own functions: sizes, padding, gaps, colours, every variant, the props, every raw value and the variables each state is bound to.
+- `--capture-script components sums` reads the components' checksums, then `--capture-script components next` reads the components, one call at a time. Each component is put together in Figma with the recipes' own functions: sizes, padding, gaps, colours, every variant, the props, every raw value and the variables each state is bound to.
+- Every answer passes through the agent twice, read and then saved, so each one is compact and near the Figma tool's cap of 20,480 bytes:
+  - A variable is a short record: an alias is the variable's id, a colour its hex, a number the shortest decimal that reads back to Figma's exact value.
+  - The components' facts travel compressed, since they repeat their token, layer and variant names. Each read takes as many as fit.
+  - On a file of about 1,900 variables and 200 components, that is about ten calls for the variables and twenty for the components, where it was over a hundred and over two hundred.
+- The engine reads each answer back into what Figma holds, so the snapshots are the ones the full answers gave, byte for byte.
 - Each answer carries a checksum Figma computed over what it holds. The components' checksums are one per component, so one added while the capture runs moves no other.
 - A large file's checksums come in several pages, each short enough for the Figma tool, and a component too large for one answer comes in several.
+- Answers saved before this compact form still read. When new checksums no longer match them, the import says which to read again.
 - `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the snapshots: the structure, the props, the raw values, and the state tokens and bindings.
 - A component's facts the capture does not read are kept. A component no longer in Figma is taken out, and the import names it.
 - On a refresh only the checksums are asked, and only the components that changed are read again.
