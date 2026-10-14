@@ -283,7 +283,7 @@ Also on each component.
 - **Code.** Exactly what the Playground shows, as a product writes it (`<Chip size="l" />`), or the HTML with only the classes your CSS styles.
 - **A token's panel.** Click any token to see its value in each mode, the components that use it, and a button to copy it.
 - **Not agreed yet.** A prop only one side has, a different default or a token that differs is left out and counted at the top, so you decide each one first.
-- **Only in the code.** A component your code has and Figma does not is shown too, marked as such.
+- **Only in the code.** Once Figma's components are captured, the pages show only the ones Figma has. A component only your code has is a task instead, with its file: add it to Figma, or remove it from the code. Before Figma's data is captured, your code's components are shown, marked as compared with nothing.
 - **Status and coverage.** Stable, beta or deprecated when your team says so, and how much of its file your tests cover.
 
 ### Foundations

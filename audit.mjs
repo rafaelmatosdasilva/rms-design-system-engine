@@ -860,15 +860,18 @@ if (process.argv.includes('--styleguide')) {
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
     const r = await generateStyleguide(ROOT, sgConfig, SCOPE_COMPONENTS.length ? { only: SCOPE_COMPONENTS } : {});
     if (r.kept) { console.log(`🖼  ${r.kept}`); process.exit(0); }
-    // What agrees with Figma and what only the code has (shown, compared with nothing), never one count called agreed.
+    // What agrees with Figma and what only the code has (shown and compared with nothing before Figma's data is
+    // captured, a task each once it is), never one count called agreed.
     const agreedN = r.components - (r.codeOnly ?? 0);
-    const counted = [agreedN || !r.codeOnly ? `${agreedN} component${agreedN === 1 ? '' : 's'} agreed` : null, r.codeOnly ? `${r.codeOnly} only in the code` : null].filter(Boolean).join(', ');
+    const counted = [agreedN || !r.codeOnly ? `${agreedN} component${agreedN === 1 ? '' : 's'} agreed` : null, r.codeOnly ? `${r.codeOnly} only in the code` : null,
+      r.notInFigma ? `${r.notInFigma} in the code and not in Figma, on the Tasks page` : null].filter(Boolean).join(', ');
     const tpl = r.template === 'engine' ? "the engine's template" : "the project's template";
     if (r.scope) {
       // A page for the components asked for: which they are, what they nest, and one asked for that the system lacks.
       const { asked, nested, missing } = r.scope;
       console.log(`🖼  Style guide of ${asked.join(', ') || SCOPE_COMPONENTS.join(', ')} → ${relative(ROOT, r.out)}  (${nested.length ? `and the ${nested.length === 1 ? 'component' : `${nested.length} components`} ${asked.length > 1 ? 'they nest' : 'it nests'}: ${nested.join(', ')}` : `${asked.length > 1 ? 'they nest' : 'it nests'} no other component`} · ${tpl})`);
       if (missing.length) console.log(`   ${missing.join(', ')}: not a component of this system (neither Figma's nor the code's), so not on the page.`);
+      if (r.scope.notInFigma?.length) console.log(`   ${r.scope.notInFigma.join(', ')}: in the code and not in Figma, so not on the page; a task on the whole system's Tasks page.`);
       console.log('   The whole system\'s style guide: rms-design-system-engine --styleguide');
     } else {
       console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${counted} · ${tpl})`);
