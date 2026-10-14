@@ -342,10 +342,10 @@ if (process.argv.includes('--figma-motion')) {
 
 // ── --capture-script / --capture-import: Figma read in checked chunks (P6) ──
 // --capture-script vars N writes the read-only script for chunk N of the variables, text styles and effect styles
-// ('sums' for the checksums alone); --capture-script components sums|N the same for the components (structure, props,
-// raw values and states), run in Figma with the recipes' own functions: sums gives each component's checksum, page by
-// page ('sums new' starts over), and N reads chunk N of the plan --capture-import names. The agent runs each with the
-// Figma tool and saves its answer as it came. --capture-import checks every saved answer against the checksum Figma
+// ('sums' for the checksums alone); --capture-script components sums|next the same for the components (structure,
+// props, raw values and states), run in Figma with the recipes' own functions: sums gives each component's checksum,
+// page by page ('sums new' starts over), and next reads as many of the components no answer holds yet as fit. The agent
+// runs each with the Figma tool and saves its answer as it came. --capture-import checks every saved answer against the checksum Figma
 // computed, says which chunks are missing or changed, and once all are there writes the snapshots. No value is copied
 // by hand, and no script switches Figma's page.
 if (process.argv.includes('--capture-script') || process.argv.includes('--capture-import')) {
@@ -358,14 +358,14 @@ if (process.argv.includes('--capture-script') || process.argv.includes('--captur
   if (process.argv.includes('--capture-script')) {
     const at = process.argv.indexOf('--capture-script');
     const kind = process.argv[at + 1], which = process.argv[at + 2] ?? (kind === 'components' ? 'sums' : '0');
-    if (!KINDS.includes(kind)) { console.log('rms-design-system-engine --capture-script vars <chunk|sums>: the variables, text styles and effect styles. rms-design-system-engine --capture-script components <chunk|sums|sums new>: the components, their structure, props, raw values and states.'); process.exit(2); }
-    const chunk = which === 'sums' ? 'sums' : Number.parseInt(which, 10);
-    if (chunk !== 'sums' && !(chunk >= 0)) { console.log(`❌ ${which}: a chunk number (0, 1, ...) or sums`); process.exit(2); }
+    if (!KINDS.includes(kind)) { console.log('rms-design-system-engine --capture-script vars <chunk|sums>: the variables, text styles and effect styles. rms-design-system-engine --capture-script components <sums|sums new|next>: the components, their structure, props, raw values and states.'); process.exit(2); }
+    const chunk = which === 'sums' ? 'sums' : kind === 'components' ? 'next' : Number.parseInt(which, 10);
+    if (chunk !== 'sums' && chunk !== 'next' && !(chunk >= 0)) { console.log(`❌ ${which}: a chunk number (0, 1, ...) or sums`); process.exit(2); }
     const call = kind === 'vars' ? { script: fc.captureScript(kind, chunk), save: `vars-${chunk}.json` } : fc.componentsCall(dir, chunk, { cfg: ccfg, fresh: process.argv[at + 3] === 'new' });
     if (call.error) { console.log(`❌ ${call.error}`); process.exit(2); }
     const file = join(dir, call.save.replace(/\.json$/, '.js'));
     writeFileSync(file, call.script);
-    console.log(`Capture script for ${chunk === 'sums' ? 'the checksums' : `chunk ${chunk}`} of the ${kind === 'vars' ? 'variables' : 'components'} → ${relative(ROOT, file)} (read only: it changes nothing in Figma).`);
+    console.log(`Capture script for ${chunk === 'sums' ? 'the checksums' : chunk === 'next' ? 'the next read' : `chunk ${chunk}`} of the ${kind === 'vars' ? 'variables' : 'components'} → ${relative(ROOT, file)} (read only: it changes nothing in Figma).`);
     const then = kind === 'vars' && chunk === 0 ? 'then do the same for each chunk up to the "of" it gives, ' : chunk === 'sums' ? 'then run rms-design-system-engine --capture-import: it names each chunk to read. ' : '';
     console.log(`NEXT: run it unchanged with the Figma tool (use_figma) on the design system's file, save its answer as it came to ${rel}/${call.save}, ${then}${chunk === 'sums' ? '' : 'then run rms-design-system-engine --capture-import.'}`.trim());
     process.exit(0);
