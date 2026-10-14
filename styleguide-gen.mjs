@@ -310,6 +310,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // Figma component is the shared pairing's answer (component-pairing.mjs), so a file paired with one, or proposed for
     // one, is not listed as the code's alone.
     const codeOnly = [];
+    const figmaHas = Object.keys(propsSnap).some((n) => !n.startsWith('_'));
     const pairing = locator.pairing?.() ?? null;
     try {
       const { componentSourceFiles, resolveComponentFile, textReader, codeComponents, textComponentApi } = await import('./component-source.mjs');
@@ -339,7 +340,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const props = Object.entries(api?.props ?? {}).map(([prop, d]) => ({ name: prop, ...(d.default != null ? { default: String(d.default) } : {}), ...(d.options ? { options: [...d.options] } : {}), ...(d.required ? { required: true } : {}) }));
         codeOnly.push({ ...k, props, markup: sourceMarkup(abs, k.cls), from: /\.vue$/.test(k.file) ? 'vue' : 'jsx' });
         fileOf[k.name] = abs;
-        if (/\.vue$/.test(k.file)) vueFiles[k.name] = abs;
+        // Once Figma's components are captured, one only the code has is a task, not drawn: nothing to render.
+        if (/\.vue$/.test(k.file) && (!figmaHas || cfg.styleguide?.showCodeOnly === true)) vueFiles[k.name] = abs;
       }
       // A Vue component drawn from what the project's own build renders (Vite, Nuxt, Vue CLI or webpack), its SCSS
       // compiled (vue-harness.mjs), once its packages are installed; the markup read from its template stays when it
@@ -409,6 +411,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       Object.defineProperty(view, 'allComponents', { value: view.components, enumerable: false });   // not written to the page
       const tags = Object.fromEntries(Object.entries(fileOf).map(([n, f]) => [n, [basename(f).replace(/\.\w+$/, '')]]));   // HbBadge.vue → <HbBadge>
       Object.assign(view, scopeView(view.components, opts.only, (c, names) => nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text: fileOf[c.name] ? readText(fileOf[c.name]) : '', names, tags })));
+      // One asked for that only the code has, once Figma's components are captured, is not on the page: a task on the
+      // whole system's Tasks page, said so apart from a name the system lacks.
+      const squash = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const codeAlone = (a) => (view.notInFigma ?? []).find((k) => squash(k.name) === squash(a));
+      const alone = view.scope.missing.filter(codeAlone).map((a) => codeAlone(a).name);
+      if (alone.length) Object.assign(view.scope, { missing: view.scope.missing.filter((a) => !codeAlone(a)), notInFigma: alone });
+      delete view.notInFigma;   // the whole system's tasks, on its own page
     }
     // "In use": the approved pictures of the system's own frames (Gate [2]'s references), embedded, six at most.
     const refsDir = resolve(ROOT, cfg.visualRefs ?? '.design-system-engine-refs');
@@ -963,7 +972,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       } catch { /* no pictures: the cards show the names */ }
     }
     lastView = view;
-    agreedSummary = { components: view.components.length, codeOnly: view.codeOnly ?? 0, line: view.notAgreed.line, ...(view.scope ? { scope: view.scope } : {}) };
+    agreedSummary = { components: view.components.length, codeOnly: view.codeOnly ?? 0, notInFigma: view.notInFigma?.length ?? 0, line: view.notAgreed.line, ...(view.scope ? { scope: view.scope } : {}) };
     return JSON.stringify(view).replace(/</g, '\\u003c');
   }
   // The component rules outside the theme files: compiled component CSS and each component's own stylesheet.
@@ -1042,5 +1051,5 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, (m) => `${stampMeta(built)}\n${m}`) : html.replace(/<head>/i, (m) => `${m}\n${stampMeta(built)}`);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html);
-  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
+  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, notInFigma: agreedSummary?.notInFigma ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
 }
