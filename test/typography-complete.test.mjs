@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { varsFromItems, standInFigma, varsScript, runRecipe } from '../figma-capture.mjs';
+import { varsFromItems, standInFigma, varsScript, runRecipe, varsItems } from '../figma-capture.mjs';
 import { typographyPairs, typoTargets, familyGroups, bodyFontFamily } from '../text-styles.mjs';
 import { agreedTokens, typographyTodos } from '../styleguide-data.mjs';
 import { runGate } from './helpers.mjs';
@@ -83,8 +83,10 @@ test('capture: the bindings travel through the checked chunks of the Figma tool\
   const getVar = figma.variables.getVariableByIdAsync;
   figma.variables.getVariableByIdAsync = async (id) => (id === 'lib' ? lib : getVar(id));
   const sums = await runRecipe(varsScript('sums'), figma);
-  const chunks = [];
-  for (let n = 0; n < sums.of; n++) chunks.push(...(await runRecipe(varsScript(n), figma)).items);
+  // Each answer compact, read back here into what Figma holds.
+  const ds = [];
+  for (let n = 0; n < sums.of; n++) ds.push((await runRecipe(varsScript(n), figma)).d);
+  const chunks = varsItems(ds);
   const text = chunks.filter((i) => i.k === 'text');
   assert.deepEqual(text.find((i) => i.v.name === 'L/Regular').v.boundVariables.fontSize, alias('ls'));
   assert.ok(chunks.some((i) => i.k === 'var' && i.id === 'lib'), 'the library variable a style binds is read');

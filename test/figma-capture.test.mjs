@@ -1,13 +1,15 @@
 // P6 and P7: Figma read in chunks the engine checks, by the Figma tool or by figma-cli, and built into the vars
-// snapshot with the capture recipe's own scripts. A stand-in Figma file large enough to need several chunks.
+// snapshot with the capture recipe's own scripts. A small stand-in Figma file, and a large one (test/figma-standin.mjs)
+// sized like a real design system's, read in compact answers that give the same snapshot as the full form before.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { varsScript, readCapture, importCapture, captureWithFigmaCli, parseAnswer, cyrb53, recipeScripts, importLines } from '../figma-capture.mjs';
+import { varsScript, readCapture, importCapture, captureWithFigmaCli, parseAnswer, cyrb53, recipeScripts, importLines, varsItems, encodeValue, decodeValue } from '../figma-capture.mjs';
 import { snapshotsFromDesign } from '../figma-cli-import.mjs';
+import { largeVarsFile, asFigma as asLargeFigma } from './figma-standin.mjs';
 
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 const rgb = (r, g, b, a = 1) => ({ r, g, b, a });
@@ -48,17 +50,23 @@ const runIn = (f) => async (code) => new AsyncFunction('figma', code)(asFigma(f)
 const cfg = { figma: { colorCollection: 'Theme', sizingCollection: 'Sizing', primitivePrefix: 'primitives/', modes: [{ name: 'Light', snapshotKey: 'light' }, { name: 'Dark', snapshotKey: 'dark' }] }, paths: { snapshotVars: 'src/figma-vars.snapshot.json' } };
 const project = () => { const d = mkdtempSync(join(tmpdir(), 'capture-')); writeFileSync(join(d, 'ds-config.json'), JSON.stringify(cfg)); return d; };
 
-test('P6: each answer fits the Figma tool, carries the checksums of every chunk, and is checked against its own', async () => {
-  const f = makeFile(), run = runIn(f);
+test('P6: a file of 1,900 variables reads in about ten answers, each near the cap, with the checksums of every chunk and checked against its own', async () => {
+  const f = largeVarsFile(), run = async (code) => new AsyncFunction('figma', code)(asLargeFigma(f));
   const sums = await run(varsScript('sums'));
-  assert.ok(sums.of >= 3, `several chunks (${sums.of})`);
+  assert.ok(sums.of >= 8 && sums.of <= 12, `about ten chunks (${sums.of})`);
+  let total = 0;
   for (let n = 0; n < sums.of; n++) {
-    const a = await run(varsScript(n));
-    assert.ok(Buffer.byteLength(JSON.stringify(a)) < 20480, `chunk ${n} fits in one answer`);
+    const a = await run(varsScript(n)), size = Buffer.byteLength(JSON.stringify(a));
+    assert.ok(size <= 19000, `chunk ${n}: ${size} bytes, within 19,000`);
+    total += size;
     assert.deepEqual(a.sums, sums.sums);
-    assert.equal(cyrb53(JSON.stringify(a.items)), a.sum, 'the checksum Figma computed is the one the engine computes');
+    assert.equal(cyrb53(JSON.stringify(a.d)), a.sum, 'the checksum Figma computed is the one the engine computes');
   }
+  assert.ok(total / sums.of > 14000, 'the answers are full');
   assert.equal((await run(varsScript(sums.of))).error, 'no such chunk');
+  // The script is short and only reads.
+  assert.ok(varsScript(0).length < 8000);
+  assert.doesNotMatch(varsScript(0), /setCurrentPage|\.set[A-Z]\w*\(|\.remove\(|create[A-Z]\w*\(/);
   // An answer the tool wrapped in words still reads.
   assert.deepEqual(parseAnswer(`Result:\n${JSON.stringify({ capture: 'vars', of: 1, sums: ['x'] })}\n`), { capture: 'vars', of: 1, sums: ['x'] });
 });
@@ -66,16 +74,19 @@ test('P6: each answer fits the Figma tool, carries the checksums of every chunk,
 test('P6: the snapshot is the one the recipe gives through the Figma tool; a chunk cut or changed while saved is read again', async () => {
   const f = makeFile(), run = runIn(f), root = project(), dir = join(root, 'cap');
   const { mkdirSync } = await import('node:fs'); mkdirSync(dir, { recursive: true });
-  const { of } = await run(varsScript('sums'));
-  for (let n = 0; n < of; n++) writeFileSync(join(dir, `vars-${n}.json`), n === 1 ? JSON.stringify(await run(varsScript(n)), null, 2) : JSON.stringify(await run(varsScript(n))));
+  // A small budget, so this small file needs several chunks.
+  const script = (n) => varsScript(n, 3000);
+  const { of } = await run(script('sums'));
+  assert.ok(of >= 4, `several chunks (${of})`);
+  for (let n = 0; n < of; n++) writeFileSync(join(dir, `vars-${n}.json`), n === 1 ? JSON.stringify(await run(script(n)), null, 2) : JSON.stringify(await run(script(n))));
   // One saved answer was changed by hand: it is refused, and its chunk is asked again.
-  const one = JSON.parse(readFileSync(join(dir, 'vars-2.json'), 'utf8')); one.items[0].v.name = 'edited'; writeFileSync(join(dir, 'vars-2.json'), JSON.stringify(one));
+  const one = JSON.parse(readFileSync(join(dir, 'vars-2.json'), 'utf8')); one.d.v[0][2] += 'edited'; writeFileSync(join(dir, 'vars-2.json'), JSON.stringify(one));
   let r = await importCapture(root, cfg, { dir });
   assert.equal(r.ok, false);
   assert.deepEqual(r.missing, [2]);
   assert.match(r.bad[0], /^vars-2\.json: its checksum does not match/);
   assert.match(importLines(r, 'cap').join('\n'), /1 of \d+ chunks still to read: 2\.\nNEXT: for each, run rms-design-system-engine --capture-script vars <chunk>/);
-  writeFileSync(join(dir, 'vars-2.json'), JSON.stringify(await run(varsScript(2))));
+  writeFileSync(join(dir, 'vars-2.json'), JSON.stringify(await run(script(2))));
   r = await importCapture(root, cfg, { dir });
   assert.equal(r.ok, true, JSON.stringify(r));
   const snap = JSON.parse(readFileSync(join(root, 'src/figma-vars.snapshot.json'), 'utf8'));
@@ -96,23 +107,29 @@ test('P6: the snapshot is the one the recipe gives through the Figma tool; a chu
 });
 
 test('P6: on a refresh only the checksums are asked, and only the chunk that changed is read again', async () => {
-  const f = makeFile(), root = project(), dir = join(root, 'cap');
-  const first = await captureWithFigmaCli(root, cfg, { run: async (code) => JSON.stringify(await runIn(f)(code)), dir });
+  const f = largeVarsFile(), root = project(), dir = join(root, 'cap');
+  const run = async (code) => JSON.stringify(await new AsyncFunction('figma', code)(asLargeFigma(f)));
+  const first = await captureWithFigmaCli(root, cfg, { run, dir });
   assert.equal(first.ok, true);
   // A designer changes one colour; a refresh asks for the checksums and that one chunk.
-  f.vars.c100.valuesByMode.L = rgb(1, 0, 0);
+  const theme = f.collections.find((c) => c.name === 'Theme'), token = f.vars[theme.variableIds[100]];
+  token.valuesByMode[theme.modes[0].modeId] = { r: 1, g: 0, b: 0, a: 1 };
   const asked = [];
-  const r = await captureWithFigmaCli(root, cfg, { run: async (code) => { asked.push(/CHUNK=('sums'|\d+)/.exec(code)[1]); return JSON.stringify(await runIn(f)(code)); }, dir });
+  const r = await captureWithFigmaCli(root, cfg, { run: async (code) => { asked.push(/CHUNK=('sums'|\d+)/.exec(code)[1]); return run(code); }, dir });
   assert.equal(r.ok, true);
   assert.equal(asked[0], "'sums'");
   assert.equal(asked.length, 2, `the checksums and one chunk (${asked.join(', ')})`);
-  assert.equal(JSON.parse(readFileSync(join(root, 'src/figma-vars.snapshot.json'), 'utf8')).color.light['group8/token100/color'], '#ff0000');
+  assert.equal(JSON.parse(readFileSync(join(root, 'src/figma-vars.snapshot.json'), 'utf8')).color.light[token.name], '#ff0000');
   assert.ok(readdirSync(dir).length <= first.counts.chunks + 2, 'the chunk replaced is dropped');
-  // A variable added moves only the chunk it lands in, not every chunk after it.
-  f.collections[0].variableIds.splice(5, 0, 'new'); f.vars.new = { id: 'new', name: 'group0/new/color', resolvedType: 'COLOR', variableCollectionId: 'theme', valuesByMode: { L: rgb(0, 0, 0), D: rgb(1, 1, 1) }, scopes: [], description: '', remote: false };
-  const before = readCapture(dir).sums;
-  const after = (await runIn(f)(varsScript('sums'))).sums;
-  assert.ok(after.filter((s) => !before.includes(s)).length <= 2, 'one chunk changes (two when the budget moves a boundary)');
+  // A variable added, or one taken out, moves only the chunk it is in (two when the budget moves a boundary), not
+  // every chunk after it.
+  const sums = async () => JSON.parse(await run(varsScript('sums'))).sums;
+  const before = await sums();
+  const at = theme.variableIds[40];
+  theme.variableIds.splice(41, 0, 'VariableID:1:1'); f.vars['VariableID:1:1'] = { ...f.vars[at], id: 'VariableID:1:1', name: `${f.vars[at].name}-new` };
+  assert.ok((await sums()).filter((s) => !before.includes(s)).length <= 2, 'a variable added');
+  theme.variableIds.splice(41, 1); theme.variableIds.splice(300, 1);
+  assert.ok((await sums()).filter((s) => !before.includes(s)).length <= 2, 'a variable taken out');
 });
 
 test('P7: figma-cli and the Figma tool give the same snapshot; the design.json import agrees on what design.json holds', async () => {
@@ -158,7 +175,7 @@ test('P6: the commands write the script for a chunk and import what was saved', 
   for (let n = 0; n < of; n++) writeFileSync(join(root, '.design-system-engine-out/figma-capture', `vars-${n}.json`), JSON.stringify(await run(varsScript(n))));
   r = cli('--capture-import');
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /✓ Figma's variables read in \d+ checked chunks: 484 colours in 2 modes, 2 sizes, 3 text styles, the scopes of 245 variables → src\/figma-vars\.snapshot\.json/);
+  assert.match(r.stdout, /✓ Figma's variables read in \d+ checked chunks?: 484 colours in 2 modes, 2 sizes, 3 text styles, the scopes of 245 variables → src\/figma-vars\.snapshot\.json/);
 });
 
 // On a real file: Tidepool's answer, saved as the Figma tool returned it (test/fixtures/tidepool-figma/figma-capture).
@@ -183,4 +200,97 @@ test('P6 and P7 on a real file: Figma\'s checksum holds, and the Figma tool, the
   const fromDesign = snapshotsFromDesign(tidepoolDesign(), tpCfg).vars;
   assert.deepEqual(fromDesign.color, built.color);
   assert.deepEqual(fromDesign.sizing, built.sizing);
+});
+
+// The capture in the form before the compact one: every variable, text style and effect style as Figma holds it (an
+// items list), in answers of 14,000 bytes of items (a boundary after an item whose id hashes to it), each with every
+// chunk's checksum.
+async function fullForm(f) {
+  const fig = asLargeFigma(f), collections = await fig.variables.getLocalVariableCollectionsAsync(), idToVar = {}, order = [];
+  for (const c of collections) for (const id of c.variableIds) { const v = await fig.variables.getVariableByIdAsync(id); if (v && !idToVar[id]) { idToVar[id] = v; order.push(id); } }
+  const texts = await fig.getLocalTextStylesAsync();
+  for (const st of texts) for (const a of Object.values(st.boundVariables || {})) for (const x of [].concat(a)) { if (!x?.id || idToVar[x.id]) continue; const t = await fig.variables.getVariableByIdAsync(x.id); if (t) { idToVar[x.id] = t; order.push(x.id); } }
+  const tried = {};
+  for (let added = 1; added;) { added = 0; for (const id of [...order]) for (const val of Object.values(idToVar[id].valuesByMode)) { const a = val?.type === 'VARIABLE_ALIAS' ? val : val?.color?.type === 'VARIABLE_ALIAS' ? val.color : null; if (!a || idToVar[a.id] || tried[a.id]) continue; tried[a.id] = 1; const t = await fig.variables.getVariableByIdAsync(a.id); if (t) { idToVar[a.id] = t; order.push(a.id); added++; } } }
+  const items = collections.map((c) => ({ k: 'collection', id: c.id, v: { id: c.id, name: c.name, modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })) } }));
+  for (const id of order) { const v = idToVar[id]; items.push({ k: 'var', id, v: { id: v.id, name: v.name, resolvedType: v.resolvedType, variableCollectionId: v.variableCollectionId, valuesByMode: v.valuesByMode, scopes: [...(v.scopes || [])], description: v.description || '', remote: !!v.remote } }); }
+  for (const st of texts) items.push({ k: 'text', id: st.id, v: { id: st.id, name: st.name, fontSize: st.fontSize, fontName: st.fontName, lineHeight: st.lineHeight, letterSpacing: st.letterSpacing, paragraphSpacing: st.paragraphSpacing, textCase: st.textCase, boundVariables: st.boundVariables || {}, description: st.description || '' } });
+  for (const st of await fig.getLocalEffectStylesAsync()) items.push({ k: 'effect', id: st.id, v: { id: st.id, name: st.name, effects: st.effects } });
+  const chunks = [];
+  let cur = [], size = 0;
+  for (const it of JSON.parse(JSON.stringify(items))) { const b = Buffer.byteLength(JSON.stringify(it)) + 1; if (cur.length && size + b > 14000) { chunks.push(cur); cur = []; size = 0; } cur.push(it); size += b; if (parseInt(cyrb53(it.id).slice(-2), 16) % 24 === 0) { chunks.push(cur); cur = []; size = 0; } }
+  if (cur.length) chunks.push(cur);
+  const sums = chunks.map((c) => cyrb53(JSON.stringify(c)));
+  return chunks.map((c, n) => ({ capture: 'vars', chunk: n, of: chunks.length, sums, sum: sums[n], items: c }));
+}
+const largeCfg = { ...cfg, figma: { ...cfg.figma, motionCollection: 'Primitives' } };
+const withoutRun = (snap) => { const { _source, _built: { at, ...built }, ...rest } = snap; return JSON.stringify({ ...rest, _built: built }, null, 2); };
+
+test('P6: the compact answers give, byte for byte, the snapshot the full form gives, in about a tenth of the answers and bytes', async () => {
+  const f = largeVarsFile(), run = async (code) => new AsyncFunction('figma', code)(asLargeFigma(f));
+  const now = '2026-10-14T00:00:00.000Z';
+  // The form before: about 110 answers.
+  const full = await fullForm(f), a = project();
+  mkdirSync(join(a, 'cap'), { recursive: true });
+  for (const x of full) writeFileSync(join(a, 'cap', `vars-${x.chunk}.json`), JSON.stringify(x));
+  const ra = await importCapture(a, largeCfg, { dir: join(a, 'cap'), now });
+  assert.equal(ra.ok, true, 'answers saved in the form before still read');
+  // The compact form.
+  const b = project(), { of } = await run(varsScript('sums'));
+  mkdirSync(join(b, 'cap'), { recursive: true });
+  const compact = [];
+  for (let n = 0; n < of; n++) { const x = await run(varsScript(n)); compact.push(x); writeFileSync(join(b, 'cap', `vars-${n}.json`), JSON.stringify(x)); }
+  const rb = await importCapture(b, largeCfg, { dir: join(b, 'cap'), now });
+  assert.equal(rb.ok, true);
+  const snapA = JSON.parse(readFileSync(join(a, 'src/figma-vars.snapshot.json'), 'utf8')), snapB = JSON.parse(readFileSync(join(b, 'src/figma-vars.snapshot.json'), 'utf8'));
+  assert.equal(withoutRun(snapB), withoutRun(snapA), 'the same snapshot, but for how many chunks it was read in');
+  assert.equal(Object.keys(snapA.color.light).length, 900);
+  assert.equal(Object.keys(snapA.typography).length, 17);
+  assert.equal(Object.keys(snapA.effects).length, 27);
+  assert.ok(Object.keys(snapA.motion).length > 100 && Object.keys(snapA.modeVariants.Sizing.vars).length > 50);
+  // The items the recipe's scripts read are Figma's own, but for what the recipe never reads finer than hex.
+  const items = varsItems(compact.map((x) => x.d)), held = full.flatMap((x) => x.items);
+  assert.equal(items.length, held.length);
+  for (const [i, it] of items.entries()) if (it.k !== 'var' || it.v.resolvedType !== 'COLOR') assert.deepEqual(it, held[i], it.id);
+  // About a tenth: the chunk count and the bytes the agent reads and writes.
+  const bytes = (xs) => xs.reduce((n, x) => n + Buffer.byteLength(JSON.stringify(x)), 0);
+  assert.ok(full.length >= 100 && of * 9 <= full.length, `${full.length} answers before, ${of} now`);
+  assert.ok(bytes(full) >= 5 * bytes(compact), `${bytes(full)} bytes before, ${bytes(compact)} now`);
+});
+
+test('P6: a value travels exactly: a 32-bit float as its shortest decimal, a string that looks like one as itself', () => {
+  for (const x of [Math.fround(1.2), Math.fround(0.08), Math.fround(-0.4), 0.1, 1.618033988749895, 12, -0, 1e-7, Math.fround(1e-7), '~1.2', '~', '#fff', 'plain', true, null])
+    assert.ok(Object.is(decodeValue(JSON.parse(JSON.stringify(encodeValue(x)))), x === -0 ? 0 : x), String(x));
+  assert.equal(encodeValue(Math.fround(1.2)), '~1.2');
+  assert.deepEqual(decodeValue(encodeValue({ a: [Math.fround(0.3), '~x'], b: { c: 'y' } })), { a: [Math.fround(0.3), '~x'], b: { c: 'y' } });
+});
+
+test('P6: answers saved in the form before still read; new checksums name every chunk to read again, and say why', async () => {
+  const f = largeVarsFile(), root = project(), dir = join(root, 'cap');
+  mkdirSync(dir, { recursive: true });
+  const full = await fullForm(f), past = new Date(Date.now() - 3600e3);
+  for (const x of full) { writeFileSync(join(dir, `vars-${x.chunk}.json`), JSON.stringify(x)); utimesSync(join(dir, `vars-${x.chunk}.json`), past, past); }
+  // The checksums asked again with this engine: compact, so none of the saved chunks matches.
+  const run = async (code) => new AsyncFunction('figma', code)(asLargeFigma(f));
+  const sums = await run(varsScript('sums'));
+  writeFileSync(join(dir, 'vars-sums.json'), JSON.stringify(sums));
+  let r = await importCapture(root, cfg, { dir });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.missing, [...Array(sums.of).keys()]);
+  assert.equal(r.older.length, full.length);
+  const said = importLines(r, 'cap').join('\n');
+  assert.match(said, new RegExp(`^${sums.of} of ${sums.of} chunks still to read: 0, 1, `));
+  assert.match(said, /\d+ answers were saved in the form before \(vars-\d+\.json, vars-\d+\.json, vars-\d+\.json, …\): the checksums now are of the compact form, so read the chunks named again; the import clears the old answers\./);
+  // A compact chunk cut while it was saved is refused like any other.
+  for (let n = 0; n < sums.of; n++) writeFileSync(join(dir, `vars-${n}.json`), JSON.stringify(await run(varsScript(n))));
+  const text = readFileSync(join(dir, 'vars-3.json'), 'utf8'), cut = JSON.parse(text);
+  cut.d.v[0][2] += ' (cut)';
+  writeFileSync(join(dir, 'vars-3.json'), JSON.stringify(cut));
+  r = await importCapture(root, cfg, { dir });
+  assert.deepEqual(r.missing, [3]);
+  assert.match(r.bad.join('\n'), /^vars-3\.json: its checksum does not match/m);
+  writeFileSync(join(dir, 'vars-3.json'), text);
+  r = await importCapture(root, cfg, { dir });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.ok(readdirSync(dir).every((x) => x === 'vars-sums.json' || Number(/\d+/.exec(x)?.[0]) < sums.of), 'the answers in the form before are cleared');
 });
