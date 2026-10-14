@@ -307,11 +307,15 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   element (an icon only Large has) shows it, not only its class; a combination never rendered starts from the nearest
   one. A page for one component (`--component X --styleguide`) renders only it and what it nests. The summary says how
   many Vue components were drawn as their build renders them, naming it, and why not when none was (no packages
-  installed, no build tool). The components the code has that Figma
-  does not list (each file whose first element carries a class of its own, in its `components` folder when it has
-  one) are shown too, with their file and the props their code declares, marked **Only in the code** and compared with
-  nothing in Figma; each is a task for Figma while Figma has components of its own. Before Figma's data is captured,
-  every component is listed that way, and the run says so (`3 only in the code`) instead of counting them agreed. Its controls are the props Gate [15] (Component props match Figma)
+  installed, no build tool). Once Figma's components are captured,
+  the components pages list only the ones Figma has: a component only the code has (each file whose first element
+  carries a class of its own, in its `components` folder when it has one, that no Figma component is paired with) is
+  left off the pages and the menu, and is a task on the Tasks page instead, with its file: add it to Figma, or remove
+  it from the code. The run counts them apart (`1 in the code and not in Figma, on the Tasks page`), and a page for
+  one of them (`--component X --styleguide`) says the same. `styleguide.showCodeOnly: true` in `ds-config.json` shows
+  them on the pages as well, marked **Only in the code**. Before Figma's data is captured, every component is the
+  code's: shown with its file and the props its code declares, marked **Only in the code** and compared with nothing
+  in Figma, and the run says so (`3 only in the code`) instead of counting them agreed. Its controls are the props Gate [15] (Component props match Figma)
   matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
   an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
   When an option's look is drawn on the component but a screen reader hears it on a part (a field's wrapper takes

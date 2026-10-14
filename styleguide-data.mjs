@@ -446,12 +446,18 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
       markup, markups: markups.length > 1 ? markups : undefined, markupFrom: chosen?.from ?? 'role', ...(renders[name] && chosen?.from === 'jsx' && chosen.markup === jsx[name] ? { renders: renders[name] } : {}),
       usage: usage[name] ?? [], tokens: componentTokens(cssText, cls), controls, ...(propsNotBuilt.length ? { unbuilt: propsNotBuilt } : {}) });
   }
-  // The components the code has that Figma does not list (every one, before Figma's data is captured): shown with
-  // their file and the props their code declares, each said to be compared with nothing in Figma. Drawn from an
-  // instance in the project's pages, else their own source (a Vue template, a React return), else a stand-in.
+  // The components the code has that Figma does not list. Once Figma's components are captured, the page is the
+  // system as Figma has it: each one the code alone has is left off and is a task instead (add it to Figma, or remove
+  // it from the code), with its file. Before Figma's data is captured, every component is the code's: shown with its
+  // file and the props its code declares, said to be compared with nothing in Figma. Drawn from an instance in the
+  // project's pages, else its own source (a Vue template, a React return), else a stand-in.
+  // ds-config.json → styleguide.showCodeOnly: true shows them with Figma's data too, as before.
   const figmaHas = Object.keys(propsSnap).some((n) => !n.startsWith('_'));
+  const showCodeOnly = !figmaHas || cfg.styleguide?.showCodeOnly === true;
+  const notInFigma = [];
   for (const k of codeOnly) {
-    if (components.some((c) => c.name === k.name)) continue;
+    if (components.some((c) => c.name === k.name) || notInFigma.some((n) => n.name === k.name)) continue;
+    if (!showCodeOnly) { notInFigma.push({ name: k.name, file: k.file }); continue; }
     const cls = k.cls ? String(k.cls).replace(/^\./, '') : null;
     const candidates = [...(cls ? pages.flatMap((h) => instanceMarkups(h, cls)).map((markup) => ({ markup, from: 'page' })) : []), ...(k.markup ? [{ markup: k.markup, from: k.from ?? 'source' }] : [])];
     const shown = candidates.filter((c) => !hiddenAtRest(c.markup, cls, cssText));
@@ -467,12 +473,14 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
   if (undecided) said.push(`${undecided} value${undecided === 1 ? '' : 's'} where Figma and the code differ`);
   if (unrealized) said.push(`${unrealized} Figma propert${unrealized === 1 ? 'y' : 'ies'} the code does not build yet`);
   if (waiting.length) said.push(`${waiting.length} component${waiting.length === 1 ? '' : 's'} the code does not have yet (${waiting.map((w) => w.replace(/ \(not built yet\)$/, '')).join(', ')})`);
+  if (notInFigma.length) said.push(`${notInFigma.length} component${notInFigma.length === 1 ? '' : 's'} the code has and Figma does not`);
   const line = said.length ? `Left off this page until Figma and the code agree: ${said.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Each one is on the Tasks page, with who does it and what to do.` : 'Figma and the code agree on everything this page shows.';
   const onlyCode = components.filter((c) => c.codeOnly).length;
   // Before Figma's data is captured, every component is the code's alone: said so, never "Figma and the code agree".
   const shownLine = !figmaHas && onlyCode ? `No Figma data yet: these are the ${onlyCode} component${onlyCode === 1 ? '' : 's'} the code has, compared with nothing in Figma. Capture Figma's data (rms-design-system-engine --recipe refresh-figma) to compare them.`
     : onlyCode ? `${line} ${onlyCode} component${onlyCode === 1 ? ' the code has is' : 's the code has are'} not in Figma: shown, marked as compared with nothing.` : line;
-  return { title, components, tokens, icons, notAgreed: { differences: undecided, unrealized, waiting, line: shownLine }, codeOnly: onlyCode, figmaComponents: figmaHas, modes: modeAxes(cfg, figmaVars, themeCss), widths: viewportWidths(figmaVars) };
+  return { title, components, tokens, icons, notAgreed: { differences: undecided, unrealized, waiting, line: shownLine }, codeOnly: onlyCode,
+    ...(notInFigma.length ? { notInFigma: notInFigma.sort((a, b) => a.name.localeCompare(b.name)) } : {}), figmaComponents: figmaHas, modes: modeAxes(cfg, figmaVars, themeCss), widths: viewportWidths(figmaVars) };
 }
 
 // The primitive colours (Figma's primitives/… ramp) the theme declares with Figma's value in every mode, for the ramp
