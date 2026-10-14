@@ -202,7 +202,7 @@ extraction with `figma.primitiveKeyRe` in `ds-config.json`.
 
 ## Phase 2 - State walk (auto, enables Gates [13] + [14])
 
-**No manual step needed.** The components capture writes two files from the same checked chunks as the structure and props snapshots (`rms-design-system-engine --capture-script components sums`, then each chunk `--capture-import` names; the refresh recipe's Steps, item 2): each chunk script runs the functions below in Figma for each component, and `--capture-import` merges them, keeps what a chunk did not read and takes out the components no longer in Figma. Every function walks every variant and every layer, hidden ones and the insides of nested instances included, and reads a property through a guard, since the Figma tool throws on one a layer type does not have.
+**No manual step needed.** The components capture writes two files from the same checked chunks as the structure and props snapshots (`rms-design-system-engine --capture-script components sums`, then `--capture-script components next` until `--capture-import` says every component is read; the refresh recipe's Steps, item 2): each script runs the functions below in Figma for each component, and `--capture-import` merges them, keeps what a chunk did not read and takes out the components no longer in Figma. Every function walks every variant and every layer, hidden ones and the insides of nested instances included, and reads a property through a guard, since the Figma tool throws on one a layer type does not have.
 
 ### `component-state-tokens.json` - flat count map (Gate [14] (All states are built))
 

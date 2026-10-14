@@ -13,34 +13,79 @@
 // only the chunks that changed are read again. figma-cli runs the same scripts itself (`figma-cli eval`), so both
 // readers give the same snapshots. No script switches Figma's page: each loads the pages it reads where they are.
 //
-// The variables' chunk boundaries follow their items (a boundary after an item whose id hashes to it, or when the next
-// item would pass the budget), so a variable added or changed moves only the chunk it is in. Chunks are matched by
-// checksum, not by number: a chunk saved before under another number is used as it is. The components are kept by
-// component id throughout (below).
+// Every answer passes through the agent twice (read from Figma, then saved as it came), so each one is compact and
+// near the cap: a variable is a short positional record, a colour its hex, a 32-bit float the shortest decimal that
+// reads back to it, and a component's facts carry each string once. Here they are decoded back into what Figma holds,
+// so the recipes' functions run on the same objects and the snapshots are the ones the full form gives. Answers saved
+// in the form before (an `items` list) still read.
+//
+// The variables' chunk boundaries follow their items (a boundary after an item whose id hashes to it, or, when the
+// next item would pass the budget, after the last item in the chunk whose id hashes to a weaker one), so a variable
+// added or changed moves only the chunk it is in. Chunks are matched by checksum, not by number: a chunk saved before
+// under another number is used as it is. The components are kept by component id throughout (below).
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
+import { inflateRawSync } from 'node:zlib';
 import { OUT_DIR } from './names.mjs';
 import { buildStamp, mayWrite } from './stamp.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
-export const BUDGET = 14000;   // bytes of items per answer: under the Figma tool's 20,480 and figma-cli's 20,000, with room for the rest
+// Bytes of one chunk's payload. With the answer's wrapper an answer stays near 19,000 bytes, under the Figma tool's
+// 20,480 and figma-cli's 20,000.
+export const BUDGET = 18600;
 export const captureDir = (ROOT) => join(ROOT, OUT_DIR, 'figma-capture');
+// The variables' boundaries: after an item whose id hashes to STRONG, or, when the chunk is full, after the last one
+// whose id hashes to WEAK (once the chunk is half full).
+export const STRONG = 1024, WEAK = 16;
 
 // cyrb53: the same 53-bit hash in Figma and here (a checksum, not a secret). → 14 hex digits.
 export const HASH_SRC = `function cyrb53(str){let h1=0xdeadbeef,h2=0x41c6ce57;for(let i=0;i<str.length;i++){const ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return (4294967296*(2097151&h2)+(h1>>>0)).toString(16).padStart(14,'0');}`;
 // eslint-disable-next-line no-new-func
 export const cyrb53 = new Function(`${HASH_SRC}; return cyrb53;`)();
+const BYTES_SRC = 'const bytes=(s)=>{let n=0;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);n+=c<0x80?1:c<0x800?2:(c>=0xd800&&c<0xdc00)?(i++,4):3;}return n;};';
+
+// The compact form, the same in Figma and here. N: a number Figma stores as a 32-bit float (1.2000000476837158) travels
+// as '~' and the shortest decimal that reads back to it ('~1.2'); E: N throughout a value, a string that starts with ~
+// given one more; sid: a variable's id without 'VariableID:' (one without it starts with =).
+export const CODEC_SRC = `const N=(x)=>{if(typeof x!=='number'||Number.isInteger(x)||Math.fround(x)!==x)return x;for(let p=1;p<10;p++){const y=+x.toPrecision(p);if(y===x)return x;if(Math.fround(y)===x)return '~'+y;}return x;};
+const E=(x)=>typeof x==='number'?N(x):typeof x==='string'?(x[0]==='~'?'~'+x:x):Array.isArray(x)?x.map(E):x&&typeof x==='object'?Object.fromEntries(Object.entries(x).map(([k,v])=>[k,E(v)])):x;
+const sid=(id)=>String(id).startsWith('VariableID:')?String(id).slice(11):'='+id;`;
+// eslint-disable-next-line no-new-func
+export const { E: encodeValue } = new Function(`${CODEC_SRC}; return { E };`)();
+// What E wrote, back.
+export function decodeValue(x) {
+  if (typeof x === 'string') return x[0] !== '~' ? x : x[1] === '~' ? x.slice(1) : Math.fround(Number(x.slice(1)));
+  if (Array.isArray(x)) return x.map(decodeValue);
+  if (x && typeof x === 'object') return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, decodeValue(v)]));
+  return x;
+}
+const fullId = (s) => (String(s).startsWith('=') ? String(s).slice(1) : `VariableID:${s}`);
+// A variable's scopes travel as their place here (0 alone: every scope).
+export const SCOPES = ['ALL_SCOPES', 'TEXT_CONTENT', 'CORNER_RADIUS', 'WIDTH_HEIGHT', 'GAP', 'ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL', 'STROKE_COLOR', 'STROKE_FLOAT',
+  'EFFECT_FLOAT', 'EFFECT_COLOR', 'OPACITY', 'FONT_FAMILY', 'FONT_STYLE', 'FONT_WEIGHT', 'FONT_SIZE', 'LINE_HEIGHT', 'LETTER_SPACING', 'PARAGRAPH_SPACING', 'PARAGRAPH_INDENT', 'FONT_VARIATIONS', 'TRANSFORM'];
+const TYPES = ['COLOR', 'FLOAT', 'STRING', 'BOOLEAN'];
 
 // The script for chunk N ('sums' for the checksums alone), to run unchanged in Figma. Read only.
+// A chunk is d = { c: collections, v: variables, t: text styles, e: effect styles } (a kind it has none of left out):
+// - collection: [id, name, [[modeId, name], …]]
+// - variable: [id (sid), characters its name shares with the variable before it in the chunk, the rest of its name,
+//   type (0 colour, 1 number, 2 string, 3 boolean; 4 more for a library's), its collection (its place, or its id when
+//   the file does not hold it), values, scopes (left out: every scope), description (left out: none)]. values: one
+//   value when every mode has it, else one per mode in the collection's order, else { m: [[mode (its place, or its
+//   id), value], …] }. A value: a colour's hex (#rrggbb, with alpha below 1), { a: sid } an alias, { c, o } a colour
+//   with its own opacity, { x } anything else, else the value (E).
+// - text style: [id, name, fontSize, fontName, lineHeight, letterSpacing, paragraphSpacing, textCase,
+//   boundVariables (each field's variable as a sid), description]; effect style: [id, name, effects].
 export function varsScript(chunk = 0, budget = BUDGET) {
   const which = chunk === 'sums' ? "'sums'" : String(Number(chunk) || 0);
   return `// rms-design-system-engine: Figma's variables, text styles and effect styles, chunk ${chunk === 'sums' ? 'checksums' : chunk}. Read only: it changes nothing in Figma.
-const CHUNK=${which}, BUDGET=${budget};
+const CHUNK=${which}, BUDGET=${budget}, STRONG=${STRONG}, WEAK=${WEAK}, SC=${JSON.stringify(SCOPES)};
 ${HASH_SRC}
-const bytes=(s)=>{let n=0;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);n+=c<0x80?1:c<0x800?2:(c>=0xd800&&c<0xdc00)?(i++,4):3;}return n;};
+${BYTES_SRC}
+${CODEC_SRC}
 const collections=await figma.variables.getLocalVariableCollectionsAsync();
 const idToVar={},order=[];
 for(const c of collections)for(const id of c.variableIds){const v=await figma.variables.getVariableByIdAsync(id);if(v&&!idToVar[id]){idToVar[id]=v;order.push(id);}}
@@ -49,21 +94,86 @@ const textStyles=await figma.getLocalTextStylesAsync();
 for(const st of textStyles)for(const a of Object.values(st.boundVariables||{}))for(const x of [].concat(a)){if(!x||!x.id||idToVar[x.id])continue;const t=await figma.variables.getVariableByIdAsync(x.id);if(t){idToVar[x.id]=t;order.push(x.id);}}
 // Every alias target the file does not hold (a library's variable), so a token that points at one resolves.
 const tried={};for(let added=1;added;){added=0;for(const id of [...order]){for(const val of Object.values(idToVar[id].valuesByMode)){const a=val&&val.type==='VARIABLE_ALIAS'?val:val&&val.color&&val.color.type==='VARIABLE_ALIAS'?val.color:null;if(!a||idToVar[a.id]||tried[a.id])continue;tried[a.id]=1;const t=await figma.variables.getVariableByIdAsync(a.id);if(t){idToVar[a.id]=t;order.push(a.id);added++;}}}}
+// Compact records (figma-capture.mjs reads them back).
+const T={COLOR:0,FLOAT:1,STRING:2,BOOLEAN:3},colAt=new Map(collections.map((c,i)=>[c.id,i]));
+const unit=(x)=>typeof x==='number'&&x>=0&&x<=1;
+const hex=(c)=>{const h=[c.r,c.g,c.b].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('');const a=c.a===undefined?1:c.a;return '#'+h+(a>=1?'':Math.round(a*255).toString(16).padStart(2,'0'));};
+const V=(x,t)=>{if(x==null)return null;if(typeof x!=='object')return E(x);const ks=Object.keys(x);
+if(x.type==='VARIABLE_ALIAS'&&ks.length===2)return {a:sid(x.id)};
+if(t==='COLOR'&&ks.every(k=>/^[rgba]$/.test(k)&&unit(x[k]))&&['r','g','b'].every(k=>k in x))return hex(x);
+if(t==='COLOR'&&'color' in x&&ks.every(k=>k==='color'||k==='opacity'))return 'opacity' in x?{c:V(x.color,t),o:E(x.opacity)}:{c:V(x.color,t)};
+return {x:E(x)};};
+const vals=(v)=>{const c=collections[colAt.get(v.variableCollectionId)],ms=c?c.modes.map(m=>m.modeId):[],ks=Object.keys(v.valuesByMode),t=v.resolvedType;
+if(c&&ks.length===ms.length&&ks.every((k,i)=>k===ms[i])){const e=ks.map(k=>V(v.valuesByMode[k],t)),j=e.map(x=>JSON.stringify(x));return j.every(x=>x===j[0])?e[0]:e;}
+return {m:ks.map(k=>[ms.includes(k)?ms.indexOf(k):k,V(v.valuesByMode[k],t)])};};
+const scopes=(s)=>s.length===1&&s[0]==='ALL_SCOPES'?0:s.map(x=>SC.includes(x)?SC.indexOf(x):x);
+const BV=(x)=>x&&x.type==='VARIABLE_ALIAS'?sid(x.id):Array.isArray(x)?x.map(BV):{x:E(x)};
 const items=[];
-for(const c of collections)items.push({k:'collection',id:c.id,v:{id:c.id,name:c.name,modes:c.modes.map(m=>({modeId:m.modeId,name:m.name}))}});
-for(const id of order){const v=idToVar[id];items.push({k:'var',id,v:{id:v.id,name:v.name,resolvedType:v.resolvedType,variableCollectionId:v.variableCollectionId,valuesByMode:v.valuesByMode,scopes:[...(v.scopes||[])],description:v.description||'',remote:!!v.remote}});}
-// A text style with the variables it binds (boundVariables: the field and the variable's id), its family in fontName.
-for(const st of textStyles)items.push({k:'text',id:st.id,v:{id:st.id,name:st.name,fontSize:st.fontSize,fontName:st.fontName,lineHeight:st.lineHeight,letterSpacing:st.letterSpacing,paragraphSpacing:st.paragraphSpacing,textCase:st.textCase,boundVariables:st.boundVariables||{},description:st.description||''}});
-for(const st of await figma.getLocalEffectStylesAsync())items.push({k:'effect',id:st.id,v:{id:st.id,name:st.name,effects:st.effects}});
-// Chunks: a boundary after an item whose id hashes to it, or before an item that would pass the budget.
-const chunks=[];let cur=[],size=0;
-for(const it of items){const s=JSON.stringify(it),b=bytes(s)+1;if(cur.length&&size+b>BUDGET){chunks.push(cur);cur=[];size=0;}cur.push(it);size+=b;if(parseInt(cyrb53(it.id).slice(-2),16)%24===0){chunks.push(cur);cur=[];size=0;}}
-if(cur.length)chunks.push(cur);
-const sums=chunks.map(c=>cyrb53(JSON.stringify(c)));
-if(CHUNK==='sums')return {capture:'vars',of:chunks.length,sums};
-if(CHUNK>=chunks.length)return {capture:'vars',chunk:CHUNK,of:chunks.length,sums,error:'no such chunk'};
-return {capture:'vars',chunk:CHUNK,of:chunks.length,sums,sum:sums[CHUNK],items:chunks[CHUNK]};
+for(const c of collections)items.push({k:'c',id:c.id,r:()=>[c.id,c.name,c.modes.map(m=>[m.modeId,m.name])]});
+for(const id of order){const v=idToVar[id];items.push({k:'v',id,name:v.name,r:(prev)=>{let s=0;const n=v.name;while(s<n.length&&s<prev.length&&n[s]===prev[s])s++;
+const t=v.resolvedType in T?T[v.resolvedType]+(v.remote?4:0):(v.remote?'!':'')+v.resolvedType,c=colAt.has(v.variableCollectionId)?colAt.get(v.variableCollectionId):v.variableCollectionId;
+const r=[sid(v.id),s,n.slice(s),t,c,vals(v)],sc=scopes([...(v.scopes||[])]),d=v.description||'';if(d)r.push(sc,d);else if(sc!==0)r.push(sc);return r;}});}
+// A text style with the variables it binds (boundVariables: the field and the variable), its family in fontName.
+for(const st of textStyles)items.push({k:'t',id:st.id,r:()=>{const r=[st.id,st.name,E(st.fontSize),E(st.fontName),E(st.lineHeight),E(st.letterSpacing),E(st.paragraphSpacing),E(st.textCase),Object.fromEntries(Object.entries(st.boundVariables||{}).map(([k,x])=>[k,BV(x)]))];if(st.description)r.push(st.description);return r;}});
+for(const st of await figma.getLocalEffectStylesAsync())items.push({k:'e',id:st.id,r:()=>[st.id,st.name,E(st.effects)]});
+// Chunks: a boundary after an item whose id hashes to STRONG; when the next item would pass the budget, after the last
+// one that hashes to WEAK (in the chunk's second half), else before that item.
+const hs=items.map(it=>parseInt(cyrb53(it.id).slice(-6),16)),chunks=[];
+for(let i=0;i<items.length;){const recs=[];let size=32,prev='',cut=0,full=false,j=i;
+for(;j<items.length;j++){const it=items[j],r=it.r(prev),b=bytes(JSON.stringify(r))+1;if(recs.length&&size+b>BUDGET){full=true;break;}
+recs.push([it.k,r]);size+=b;if(it.k==='v')prev=it.name;if(hs[j]%STRONG===0){j++;break;}if(hs[j]%WEAK===0&&size>=BUDGET/2)cut=recs.length;}
+if(full&&cut){recs.length=cut;j=i+cut;}
+const d={};for(const [k,r] of recs)(d[k]=d[k]||[]).push(r);chunks.push(d);i=j;}
+const sums=chunks.map(d=>cyrb53(JSON.stringify(d)));
+if(CHUNK==='sums')return {capture:'vars',v:2,of:chunks.length,sums};
+if(CHUNK>=chunks.length)return {capture:'vars',v:2,chunk:CHUNK,of:chunks.length,sums,error:'no such chunk'};
+return {capture:'vars',v:2,chunk:CHUNK,of:chunks.length,sums,sum:sums[CHUNK],d:chunks[CHUNK]};
 `;
+}
+
+// A value of a variable, back from its compact form. A hex colour is { r, g, b, a } (an alpha of ff below 1 reads
+// back as 0.999, which the recipe's toHex writes as ff again).
+function valueBack(x, type) {
+  if (x == null) return null;
+  if (typeof x === 'string' && type === 'COLOR') {
+    const b = (i) => parseInt(x.slice(i, i + 2), 16) / 255;
+    return { r: b(1), g: b(3), b: b(5), a: x.length > 7 ? (x.slice(7, 9) === 'ff' ? 0.999 : b(7)) : 1 };
+  }
+  if (typeof x === 'object' && !Array.isArray(x)) {
+    if ('a' in x) return { type: 'VARIABLE_ALIAS', id: fullId(x.a) };
+    if ('c' in x) return 'o' in x ? { color: valueBack(x.c, type), opacity: decodeValue(x.o) } : { color: valueBack(x.c, type) };
+    if ('x' in x) return decodeValue(x.x);
+  }
+  return decodeValue(x);
+}
+const boundBack = (x) => (typeof x === 'string' ? { type: 'VARIABLE_ALIAS', id: fullId(x) } : Array.isArray(x) ? x.map(boundBack) : decodeValue(x?.x));
+const defined = (o) => Object.fromEntries(Object.entries(o).filter(([, x]) => x != null));
+
+// The chunks' records (in the order of the checksums), back as the items the recipe's scripts read: { k: 'collection'
+// | 'var' | 'text' | 'effect', id, v } with v shaped as Figma's own (valuesByMode, boundVariables, effects).
+export function varsItems(ds) {
+  const cols = ds.flatMap((d) => d.c ?? []).map(([id, name, modes]) => ({ id, name, modes: modes.map(([modeId, n]) => ({ modeId, name: n })) }));
+  const items = cols.map((c) => ({ k: 'collection', id: c.id, v: c }));
+  for (const d of ds) {
+    let prev = '';
+    for (const [s, shared, rest, tc, cx, vals, sc = 0, description = ''] of d.v ?? []) {
+      const name = prev.slice(0, shared) + rest; prev = name;
+      const remote = typeof tc === 'number' ? tc >= 4 : String(tc).startsWith('!');
+      const resolvedType = typeof tc === 'number' ? TYPES[tc % 4] : String(tc).replace(/^!/, '');
+      const col = typeof cx === 'number' ? cols[cx] : null, ms = col ? col.modes.map((m) => m.modeId) : [];
+      const valuesByMode = vals && typeof vals === 'object' && !Array.isArray(vals) && 'm' in vals
+        ? Object.fromEntries(vals.m.map(([m, x]) => [typeof m === 'number' ? ms[m] : m, valueBack(x, resolvedType)]))
+        : Object.fromEntries(ms.map((m, i) => [m, valueBack(Array.isArray(vals) ? vals[i] : vals, resolvedType)]));
+      const id = fullId(s);
+      items.push({ k: 'var', id, v: { id, name, resolvedType, variableCollectionId: col ? col.id : cx, valuesByMode, scopes: sc === 0 ? ['ALL_SCOPES'] : sc.map((x) => (typeof x === 'number' ? SCOPES[x] : x)), description, remote } });
+    }
+  }
+  for (const d of ds) for (const [id, name, fontSize, fontName, lineHeight, letterSpacing, paragraphSpacing, textCase, bound, description = ''] of d.t ?? []) {
+    const v = defined({ id, name, fontSize: decodeValue(fontSize), fontName: decodeValue(fontName), lineHeight: decodeValue(lineHeight), letterSpacing: decodeValue(letterSpacing), paragraphSpacing: decodeValue(paragraphSpacing), textCase: decodeValue(textCase) });
+    items.push({ k: 'text', id, v: { ...v, boundVariables: Object.fromEntries(Object.entries(bound ?? {}).map(([k, x]) => [k, boundBack(x)])), description } });
+  }
+  for (const d of ds) for (const [id, name, effects] of d.e ?? []) items.push({ k: 'effect', id, v: { id, name, effects: decodeValue(effects) } });
+  return items;
 }
 
 // A saved answer: the tool's text as it came (a JSON object, or the JSON inside the text the tool wrapped it in).
@@ -75,27 +185,30 @@ export function parseAnswer(text) {
   return null;
 }
 
-// The saved answers of a capture in dir. → { sums (the latest list), of, chunks: Map(sum → items), bad: [file: why],
-// missing: [chunk numbers to read again], stale: [files no longer in the list] }
+// The saved answers of a capture in dir. → { sums (the latest list), of, chunks: Map(sum → the chunk's compact
+// records d, or its items in the form before), bad: [file: why], missing: [chunk numbers to read again], stale: [files
+// no longer in the list], older: [files in the form before that the latest checksums leave out] }
 export function readCapture(dir, kind = 'vars') {
-  const out = { sums: null, of: 0, plan: null, chunks: new Map(), bad: [], missing: [], stale: [], changed: [], files: new Map() };
+  const out = { sums: null, of: 0, v: 1, plan: null, chunks: new Map(), bad: [], missing: [], stale: [], changed: [], older: [], files: new Map() };
   if (!existsSync(dir)) return out;
   let latest = -Infinity;
-  const read = new Map();   // sum → { chunk, at }
+  const read = new Map();   // sum → { chunk, at, v }
   for (const f of readdirSync(dir).filter((x) => x.startsWith(`${kind}-`) && x.endsWith('.json'))) {
     const p = join(dir, f), a = parseAnswer(readFileSync(p, 'utf8'));
     if (!a || a.capture !== kind) { out.bad.push(`${f}: not an answer of the ${kind} capture script`); continue; }
     if (a.error) { out.bad.push(`${f}: ${a.error}`); continue; }
     const at = statSync(p).mtimeMs;
-    if (Array.isArray(a.sums) && at > latest) { latest = at; out.sums = a.sums; out.of = a.of; out.plan = a.plan ?? null; }
-    if (!Array.isArray(a.items)) continue;
-    const sum = cyrb53(JSON.stringify(a.items));
+    if (Array.isArray(a.sums) && at > latest) { latest = at; out.sums = a.sums; out.of = a.of; out.v = a.v ?? 1; out.plan = a.plan ?? null; }
+    const body = a.d ?? a.items;
+    if (!body || typeof body !== 'object') continue;
+    const sum = cyrb53(JSON.stringify(body));
     if (sum !== a.sum) { out.bad.push(`${f}: its checksum does not match what it holds (changed or cut while it was saved)`); continue; }
-    out.chunks.set(sum, a.items); out.files.set(sum, f); read.set(sum, { chunk: a.chunk, at });
+    out.chunks.set(sum, body); out.files.set(sum, f); read.set(sum, { chunk: a.chunk, at, v: a.v ?? 1 });
   }
   if (out.sums) {
     out.missing = out.sums.map((s, i) => (out.chunks.has(s) ? null : i)).filter((i) => i != null);
     out.stale = [...out.files].filter(([s]) => !out.sums.includes(s)).map(([, f]) => f);
+    out.older = [...out.files].filter(([s]) => !out.sums.includes(s) && read.get(s).v !== out.v).map(([, f]) => f);
     // A chunk read after the checksums that no longer matches them: Figma changed in between.
     out.changed = [...read].filter(([s, r]) => !out.sums.includes(s) && r.at >= latest && out.missing.includes(r.chunk)).map(([, r]) => r.chunk);
   }
@@ -185,10 +298,12 @@ export async function varsFromItems(items, cfg = {}, { engineDir = ENGINE } = {}
 // figmaVersion: the file's version, when the API gives it (FIGMA_TOKEN), read after the capture as Step 5 says.
 export async function importCapture(ROOT, cfg = {}, { dir = captureDir(ROOT), source = 'the Figma tool', now = new Date().toISOString(), engineDir = ENGINE, figmaVersion = null } = {}) {
   const c = readCapture(dir, 'vars');
-  const base = { kind: 'vars', missing: c.missing, bad: c.bad, stale: c.stale, changed: c.changed, of: c.of };
+  const base = { kind: 'vars', missing: c.missing, bad: c.bad, stale: c.stale, changed: c.changed, older: c.older, of: c.of };
   if (!c.sums) return { ok: false, ...base, missing: [0], why: 'no answer saved yet' };
   if (c.missing.length) return { ok: false, ...base };
-  const items = c.sums.flatMap((s) => c.chunks.get(s));
+  // The compact records decoded back into what Figma holds; answers in the form before hold the items themselves.
+  const parts = c.sums.map((s) => c.chunks.get(s));
+  const items = parts.every(Array.isArray) ? parts.flat() : varsItems(parts.filter((p) => !Array.isArray(p)));
   const built = await varsFromItems(items, cfg, { engineDir });
   const path = cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json';
   let prev = {}; try { prev = JSON.parse(readFileSync(join(ROOT, path), 'utf8')); } catch { /* first capture */ }
@@ -214,14 +329,15 @@ export async function importCapture(ROOT, cfg = {}, { dir = captureDir(ROOT), so
 // cookbook/full-audit.md, the raw-value sweep (component-values.snapshot.json) and the state walk
 // (component-state-tokens.json, component-state-bindings.json). A component's items: { k: 'component' | 'variant' |
 // 'props' | 'values' | 'states' | 'bindings', id, v }, its variants as items of their own; a part the Figma tool could
-// not read is an item { v: { name, error } }, and the import keeps what that part held before. An item larger than the
-// budget travels in parts of its JSON text ({ k: 'part', v: { of, k, j, n, s } }).
+// not read is an item { v: { name, error } }, and the import keeps what that part held before.
 //
 // Everything is kept by component id, never by position, so a component added to the file mid-capture shifts no other:
 // - the checksums: one per component, over its items, read in pages (--capture-script components sums), each one short
 //   enough for the Figma tool, in the order of the components' id hash; a page says where the next one starts.
-// - the chunks: the engine packs the components whose items it does not hold yet into chunks of at most BUDGET bytes, a
-//   larger component into slices of its own; a chunk script reads its components by id.
+// - the reads (--capture-script components next, one at a time): each takes, in the file's order, the components whose
+//   items no answer holds yet and answers as many as fit. Their items travel compressed: the JSON text, deflated (the
+//   format zlib reads) and in base64, about a tenth of its size, since a component's facts repeat its token, layer and
+//   variant names. A component larger than one answer comes in slices of that text.
 // - the import matches each component's items to its checksum, in whichever answer they were saved.
 // No script switches Figma's page (that is saved with the file and changes its version): each page is loaded where it is.
 export const COMPONENT_FUNCTIONS = ['prop', 'parseAxes', 'restingVariant', 'restingOf', 'deepHasStroke', 'getBoundPaddingVar', 'childFrames', 'deepFacts', 'paintFacts', 'componentFacts', 'propsFacts'];
@@ -231,9 +347,10 @@ export const STRUCTURE_KEYS = ['nodeId', 'h', 'paddingVar', 'gapVar', 'fontSizeV
   'sizingV', 'layout', 'slot', 'minH', 'iconSize', 'childFramePadding', 'childFrameGaps', 'variantStroke', 'variantHeight', 'restingState', 'restingStroke', 'variantOpacity',
   'box', 'paddingPx', 'radiusPx', 'gapPx', 'colors', 'inFlow', 'stroke', 'opacity', 'text', 'toggles', 'defaultVariant', 'variants', 'slots', 'fillOpacity', 'variantFillOpacity', 'drawnOn', 'fills'];
 export const PROPS_KEYS = ['nodeId', 'properties', 'annotations', 'layerAnnotations', 'description'];
-export const TIME = 20000;   // ms a checksums page spends in Figma before it answers, well within the Figma tool's wait
-export const HARD = 19500;   // bytes: an answer above this is refused in Figma rather than cut by the tool (20,480)
+export const TIME = 20000;   // ms a call spends reading components in Figma before it answers, well within the Figma tool's wait
+export const ANSWER = 19000;   // bytes of one answer of the components, all of it
 export const SCRIPT_MAX = 50000;   // characters the Figma tool takes in one script
+const READ_IDS = 400;   // the components a read is offered, at most (each answer holds far fewer)
 // The five files the components capture writes (the structure and props snapshots where ds-config.json puts them).
 export const componentFiles = (cfg = {}) => ({ structure: cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json', props: cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json',
   values: 'component-values.snapshot.json', states: 'component-state-tokens.json', bindings: 'component-state-bindings.json' });
@@ -251,20 +368,42 @@ export function recipeFunctions(engineDir = ENGINE, names = [...COMPONENT_FUNCTI
   });
 }
 
+// zip(text) → the text's UTF-8 bytes deflated (one block of fixed Huffman codes, LZ77 matches found through hash chains)
+// and in base64: what zlib's inflateRaw reads back here.
+export const ZIP_SRC = `const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+function zip(s){const a=[];for(let i=0;i<s.length;i++){let c=s.charCodeAt(i);if(c<128)a.push(c);else if(c<2048)a.push(192|c>>6,128|c&63);else if(c>=0xd800&&c<0xdc00&&i+1<s.length){c=0x10000+((c-0xd800)<<10)+(s.charCodeAt(++i)-0xdc00);a.push(240|c>>18,128|c>>12&63,128|c>>6&63,128|c&63);}else a.push(224|c>>12,128|c>>6&63,128|c&63);}
+const n=a.length,o=[],head=new Int32Array(32768).fill(-1),prev=new Int32Array(n);let bb=0,bn=0;
+const put=(v,k)=>{bb|=v<<bn;bn+=k;while(bn>=8){o.push(bb&255);bb>>>=8;bn-=8;}};
+const huff=(v,k)=>{let r=0;for(let i=0;i<k;i++){r=r<<1|v&1;v>>=1;}put(r,k);};
+const sym=(c)=>c<144?huff(48+c,8):c<256?huff(256+c,9):c<280?huff(c-256,7):huff(c-88,8);
+const hash=(i)=>(a[i]<<10^a[i+1]<<5^a[i+2])&32767,add=(i)=>{if(i+2<n){const k=hash(i);prev[i]=head[k];head[k]=i;}};
+put(3,3);
+for(let i=0;i<n;){let bl=0,bd=0;if(i+2<n)for(let j=head[hash(i)],c=0;j>=0&&i-j<=32768&&c<64;j=prev[j],c++){let l=0;while(l<258&&i+l<n&&a[j+l]===a[i+l])l++;if(l>bl){bl=l;bd=i-j;if(l===258)break;}}
+if(bl<3){sym(a[i]);add(i);i++;continue;}
+let c=0;while(LB[c+1]<=bl)c++;sym(257+c);put(bl-LB[c],c<8||c===28?0:(c-4)>>2);let d=0;while(DB[d+1]<=bd)d++;huff(d,5);put(bd-DB[d],d<4?0:(d-2)>>1);
+for(let t=0;t<bl;t++)add(i+t);i+=bl;}
+sym(256);if(bn)o.push(bb&255);
+const B='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';let z='';
+for(let i=0;i<o.length;i+=3){const v=o[i]<<16|(o[i+1]|0)<<8|(o[i+2]|0);z+=B[v>>18&63]+B[v>>12&63]+(i+1<o.length?B[v>>6&63]:'=')+(i+2<o.length?B[v&63]:'=');}
+return z;}`;
+// What zip wrote, back as text (whitespace the saving added is left out).
+export const unzip = (z) => inflateRawSync(Buffer.from(String(z).replace(/\s+/g, ''), 'base64')).toString('utf8');
+const zSum = (z) => cyrb53(String(z).replace(/\s+/g, ''));
+
 // The script for one call, to run unchanged in Figma. Read only. call: 'sums' (a page of the checksums, from the key
-// `after` on, in the pass `pass`) or 'read' (the components `ids`, or slice `slice` of the one component in it).
-// pages: the pages to read (ds-config.json figma.componentsPage), null for every page.
+// `after` on, in the pass `pass`) or 'read' (as many of the components `ids` as fit, in that order, or slice `slice` of
+// the first one). pages: the pages to read (ds-config.json figma.componentsPage), null for every page.
 export function componentsScript(call = 'sums', { budget = BUDGET, time = TIME, pages = null, pass = null, after = null, ids = [], slice = null, engineDir = ENGINE } = {}) {
   const pageIds = pages == null ? null : [pages].flat().filter(Boolean).map((id) => String(id).replace('-', ':'));
-  const what = call === 'sums' ? `the checksums${after ? ', continued' : ''}` : `${ids.length} component${ids.length === 1 ? '' : 's'}${slice != null ? `, slice ${slice}` : ''}`;
+  const what = call === 'sums' ? `the checksums${after ? ', continued' : ''}` : slice != null ? `slice ${slice} of one component` : 'the next components';
   return `// rms-design-system-engine: Figma's components, ${what}. Read only: it changes nothing in Figma and never switches its page.
 // Each component is read with the recipes' own functions (cookbook/refresh-figma.md Step 1c; cookbook/full-audit.md, the
 // state walk and the raw-value sweep).
-const CALL=${JSON.stringify(call)}, BUDGET=${budget}, TIME=${time}, HARD=${HARD}, PAGE_IDS=${JSON.stringify(pageIds && pageIds.length ? pageIds : null)};
+const CALL=${JSON.stringify(call)}, BUDGET=${budget}, ANSWER=${ANSWER}, TIME=${time}, PAGE_IDS=${JSON.stringify(pageIds && pageIds.length ? pageIds : null)};
 const PASS=${JSON.stringify(pass)}, AFTER=${JSON.stringify(after)}, IDS=${JSON.stringify(call === 'sums' ? null : ids)}, SLICE=${JSON.stringify(call === 'sums' ? null : slice)};
 const T0=Date.now();
 ${HASH_SRC}
-const bytes=(s)=>{let n=0;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);n+=c<0x80?1:c<0x800?2:(c>=0xd800&&c<0xdc00)?(i++,4):3;}return n;};
+${BYTES_SRC}
 ${recipeFunctions(engineDir).join('\n')}
 // The pages to read, each loaded where it is: switching the page is saved with the file and changes it.
 const PAGES=PAGE_IDS?(await Promise.all(PAGE_IDS.map((id)=>figma.getNodeByIdAsync(id)))).filter((p)=>p&&p.type==='PAGE'):[...figma.root.children];
@@ -277,11 +416,6 @@ const found=PAGES.flatMap((p)=>p.findAllWithCriteria({types:['COMPONENT_SET','CO
 deepFacts.byKey=new Map(found.filter((x)=>prop(x,'key')).map((x)=>[x.key,x.name]));
 // Each set, and each component outside a set; a name starting with _ or . is private to the file, not part of the system.
 const all=found.filter((x)=>(x.type==='COMPONENT_SET'||!x.parent||x.parent.type!=='COMPONENT_SET')&&!/^[_.]/.test(x.name));
-// An item larger than the budget travels in parts of its JSON text.
-const cut=(it)=>{if(bytes(JSON.stringify(it))<=BUDGET)return [it];const s=JSON.stringify(it.v),out=[];
-for(let a=0;a<s.length;){let n=Math.min(s.length-a,Math.floor(BUDGET/2));while(n>1&&bytes(JSON.stringify(s.slice(a,a+n)))>BUDGET-300)n=Math.floor(n/2);
-if(n>1&&a+n<s.length){const c=s.charCodeAt(a+n-1);if(c>=0xd800&&c<0xdc00)n--;}out.push(s.slice(a,a+n));a+=n;}
-return out.map((x,j)=>({k:'part',id:it.id+'~'+j,v:{of:it.id,k:it.k,j,n:out.length,s:x}}));};
 // One component's items: each part read on its own, so one the Figma tool cannot read leaves the others.
 async function itemsOf(r){
 const id=r.id,name=r.name,out=[];
@@ -294,58 +428,50 @@ if(values)out.push({k:'values',id:id+'#values',v:values});
 const states=await read('states',id+'#states',()=>stateTokensOf(r,NAMES));if(states)out.push({k:'states',id:id+'#states',v:states});
 if(r.type==='COMPONENT_SET'){const b=await read('bindings',id+'#bindings',()=>stateBindingsOf(r,LOCAL));if(b)out.push({k:'bindings',id:id+'#bindings',v:{variants:b}});}
 // What JSON keeps (no symbol such as figma.mixed, no undefined), so the checksum is over what the answer carries.
-return JSON.parse(JSON.stringify(out)).flatMap(cut);
+return JSON.parse(JSON.stringify(out));
 }
-// A component larger than the budget is read in slices, each one answer.
-const slicesOf=(its)=>{const out=[];let cur=[],size=0;for(const it of its){const b=bytes(JSON.stringify(it))+1;if(cur.length&&size+b>BUDGET){out.push(cur);cur=[];size=0;}cur.push(it);size+=b;}if(cur.length)out.push(cur);return out;};
 if(CALL==='sums'){
-// [id, checksum, bytes, slices, place in the file], in the order of the id hash from AFTER on, until TIME or BUDGET.
+// [id, checksum, place in the file], in the order of the id hash from AFTER on, until TIME or BUDGET.
 const key=(x)=>cyrb53(x.id)+' '+x.id,pos=new Map(all.map((x,i)=>[x.id,i]));
 const todo=all.filter((x)=>AFTER==null||key(x)>AFTER).sort((a,b)=>(key(a)<key(b)?-1:1));
 const sums=[];let size=0,last=null,after=null;
 for(const r of todo){
 if(sums.length&&(Date.now()-T0>=TIME||size>BUDGET)){after=last;break;}
-const its=await itemsOf(r),t=JSON.stringify(its),e=[r.id,cyrb53(t),bytes(t),slicesOf(its).length,pos.get(r.id)];
+const e=[r.id,cyrb53(JSON.stringify(await itemsOf(r))),pos.get(r.id)];
 sums.push(e);size+=bytes(JSON.stringify(e))+1;last=key(r);
 }
-return {capture:'components',v:2,kind:'sums',pass:PASS||Date.now().toString(36),from:AFTER,after,of:all.length,sums};
+return {capture:'components',v:3,kind:'sums',pass:PASS||Date.now().toString(36),from:AFTER,after,of:all.length,sums};
 }
-const byId=new Map(all.map((x)=>[x.id,x])),gone=IDS.filter((id)=>!byId.has(id)),sums={};
-let items=[],slices=null;
-for(const id of IDS){const r=byId.get(id);if(!r)continue;const its=await itemsOf(r);sums[id]=cyrb53(JSON.stringify(its));
-if(SLICE==null){items=items.concat(its);continue;}
-const sl=slicesOf(its);slices=sl.length;
-if(SLICE>=sl.length)return {capture:'components',v:2,kind:'read',pass:PASS,ids:IDS,error:'Figma changed after the checksums were read: read them again'};
-items=sl[SLICE];}
-const a={capture:'components',v:2,kind:'read',pass:PASS,ids:IDS,...(SLICE==null?{}:{slice:SLICE,slices}),of:all.length,...(gone.length?{gone}:{}),sums,sum:cyrb53(JSON.stringify(items)),items};
-if(bytes(JSON.stringify(a))>HARD)return {capture:'components',v:2,kind:'read',pass:PASS,ids:IDS,error:'this chunk no longer fits one answer (Figma changed after the checksums were read): read them again'};
-return a;
+${ZIP_SRC}
+const byId=new Map(all.map((x)=>[x.id,x])),gone=IDS.filter((id)=>!byId.has(id));
+const answer=(o)=>({capture:'components',v:3,kind:'read',pass:PASS,of:all.length,...(gone.length?{gone}:{}),...o});
+const fits=(o)=>bytes(JSON.stringify(o))<=ANSWER;
+// A component larger than one answer: slice SLICE of its compressed text.
+const sliced=async(r,k)=>{const its=await itemsOf(r),z=zip(JSON.stringify(its)),w=ANSWER-600,n=Math.ceil(z.length/w);
+if(k>=n)return answer({error:'Figma changed after the checksums were read: read them again'});
+const part=z.slice(k*w,(k+1)*w);return answer({sums:{[r.id]:cyrb53(JSON.stringify(its))},slice:k,slices:n,sum:cyrb53(part),z:part});};
+if(SLICE!=null){const r=byId.get(IDS[0]);return r?sliced(r,SLICE):answer({error:'no longer in the file: read the checksums again'});}
+// The components asked, in order, until TIME or far more than an answer holds; then as many as fit, compressed together.
+const got=[];let raw=0;
+for(const id of IDS){const r=byId.get(id);if(!r)continue;if(got.length&&(Date.now()-T0>=TIME||raw>ANSWER*24))break;const its=await itemsOf(r),t=JSON.stringify(its);got.push({r,its,sum:cyrb53(t)});raw+=t.length;}
+if(!got.length)return answer({sums:{},sum:cyrb53(''),z:''});
+const make=(k)=>{const g=got.slice(0,k),z=zip(JSON.stringify(g.flatMap((x)=>x.its)));return answer({sums:Object.fromEntries(g.map((x)=>[x.r.id,x.sum])),sum:cyrb53(z),z});};
+let lo=0,hi=got.length,best=null;
+while(lo<hi){const k=(lo+hi+1)>>1,o=make(k);if(fits(o)){lo=k;best=o;}else hi=k-1;}
+return best||sliced(got[0].r,0);
 `;
 }
 
 // The component an item belongs to: its id up to the first | # or ~ (a component's own id has none).
 export const rootOf = (id) => String(id).split(/[|#~]/)[0];
 
-// The engine's chunks: whole components up to the budget, a component with slices in chunks of its own.
-// entries: [{ id, bytes, slices }], in the file's order. → [{ ids, slice? }]
-export function planChunks(entries, budget = BUDGET) {
-  const chunks = [];
-  let cur = [], size = 0;
-  const flush = () => { if (cur.length) chunks.push({ ids: cur }); cur = []; size = 0; };
-  for (const e of entries) {
-    if (e.slices > 1) { flush(); for (let k = 0; k < e.slices; k++) chunks.push({ ids: [e.id], slice: k }); continue; }
-    if (cur.length && size + e.bytes > budget) flush();
-    cur.push(e.id); size += e.bytes + 1;
-  }
-  flush();
-  return chunks;
-}
-
-// The saved answers of the components capture in dir (format 2; an older capture's answers read as readCapture does).
-// → { v, pass, complete, next (the checksums page to read next), entries ([{ id, sum, bytes, slices, pos }]), of,
-//     chunks (the plan), missing (chunk numbers), changed, gone, added, have (id → items), used, bad, stale }
-export function readComponents(dir, { budget = BUDGET } = {}) {
-  const out = { v: 2, pass: null, pages: 0, complete: false, next: null, entries: [], of: 0, chunks: [], missing: [], changed: [], gone: [], added: 0, have: new Map(), used: new Set(), bad: [], stale: [] };
+// The saved answers of the components capture in dir (format 3; format 2's reads still serve, an older capture's
+// answers read as readCapture does).
+// → { v, pass, complete, next (the checksums page to read next), entries ([{ id, sum, pos }]), of, todo (the ids no
+//     answer holds yet, in the file's order), slice ({ id, slice, slices } when one is read in slices), slot (the
+//     number the next read is saved as), changed (ids), gone, added, have (id → items), used, bad, stale, older }
+export function readComponents(dir) {
+  const out = { v: 3, pass: null, pages: 0, complete: false, next: null, entries: [], of: 0, todo: [], slice: null, slot: 0, changed: [], gone: [], added: 0, have: new Map(), used: new Set(), bad: [], stale: [], older: [] };
   if (!existsSync(dir)) return out;
   const answers = [];
   for (const f of readdirSync(dir).filter((x) => x.startsWith('components-') && x.endsWith('.json')).sort()) {
@@ -354,9 +480,9 @@ export function readComponents(dir, { budget = BUDGET } = {}) {
     if (a.error) { out.bad.push(`${f}: ${a.error}`); continue; }
     answers.push({ f, a });
   }
-  if (answers.length && !answers.some(({ a }) => a.v === 2)) return { ...readCapture(dir, 'components'), v: 1 };
+  if (answers.length && !answers.some(({ a }) => a.v >= 2)) return { ...readCapture(dir, 'components'), v: 1 };
   // The checksums: components-sums.json starts the pass, each next page continues where the one before stopped.
-  const pages = answers.filter(({ a }) => a.v === 2 && a.kind === 'sums');
+  const pages = answers.filter(({ a }) => a.v === 3 && a.kind === 'sums');
   const first = pages.find(({ f }) => f === 'components-sums.json');
   const chain = first ? [first] : [];
   for (let cur = first?.a; cur && cur.after != null;) {
@@ -366,82 +492,89 @@ export function readComponents(dir, { budget = BUDGET } = {}) {
     chain.push(nx); cur = nx.a;
   }
   for (const p of pages) if (!chain.includes(p)) out.stale.push(p.f);
-  for (const { f, a } of answers) if (a.v !== 2) out.stale.push(f);   // read before this capture, in the older format
+  for (const { f, a } of answers) if (a.v !== 3 && !(a.v === 2 && a.kind === 'read' && !a.slices)) { out.stale.push(f); out.older.push(f); }   // read before, in a form this one does not use
   if (!first) return out;
   out.pass = first.a.pass; out.pages = chain.length; out.complete = !out.next; out.of = chain[chain.length - 1].a.of ?? 0;
   const seen = new Set();
-  for (const { a } of chain) for (const [id, sum, size, slices, pos] of a.sums ?? []) if (!seen.has(id)) { seen.add(id); out.entries.push({ id, sum, bytes: size, slices: slices || 1, pos: pos ?? Infinity }); }
-  out.entries.sort((x, y) => x.pos - y.pos);   // the file's order, for the chunks and the snapshots
+  for (const { a } of chain) for (const [id, sum, pos] of a.sums ?? []) if (!seen.has(id)) { seen.add(id); out.entries.push({ id, sum, pos: pos ?? Infinity }); }
+  out.entries.sort((x, y) => x.pos - y.pos);   // the file's order, for the reads and the snapshots
   // Each component's items, by checksum, from every answer that holds them whole (or every slice of them).
   const cand = new Map();
-  const add = (id, sum, items, files, passes) => {
+  const add = (id, sum, items, files) => {
     const by = cand.get(id) ?? cand.set(id, new Map()).get(id);
-    const c = by.get(sum) ?? by.set(sum, { items, files: new Set(), passes: new Set() }).get(sum);
+    const c = by.get(sum) ?? by.set(sum, { items, files: new Set() }).get(sum);
     for (const f of files) c.files.add(f);
-    for (const p of passes) c.passes.add(p);
   };
-  const sliced = new Map();
-  const reads = answers.filter(({ a }) => a.v === 2 && a.kind === 'read');
+  const sliced = new Map(), taken = new Set();
+  const reads = answers.filter(({ a }) => a.kind === 'read' && (a.v === 3 || (a.v === 2 && !a.slices)));
   for (const { f, a } of reads) {
-    if (!Array.isArray(a.items) || cyrb53(JSON.stringify(a.items)) !== a.sum) { out.bad.push(`${f}: its checksum does not match what it holds (changed or cut while it was saved)`); continue; }
+    const body = a.v === 3 ? a.z : a.items;
+    if (body == null || (a.v === 3 ? zSum(body) : cyrb53(JSON.stringify(body))) !== a.sum) { out.bad.push(`${f}: its checksum does not match what it holds (changed or cut while it was saved)`); continue; }
+    if (a.pass === out.pass) { const m = /-(\d+)\.json$/.exec(f); if (m) taken.add(Number(m[1])); }
     if (a.slice != null) {
-      const id = a.ids?.[0], sum = a.sums?.[id];
+      const [id, sum] = Object.entries(a.sums ?? {})[0] ?? [];
       if (!sum) continue;
-      const s = sliced.get(`${id} ${sum}`) ?? sliced.set(`${id} ${sum}`, { id, sum, n: a.slices, parts: [], files: new Set(), passes: new Set() }).get(`${id} ${sum}`);
-      s.parts[a.slice] = a.items; s.files.add(f); s.passes.add(a.pass);
+      const s = sliced.get(`${id} ${sum}`) ?? sliced.set(`${id} ${sum}`, { id, sum, n: a.slices, parts: [], files: new Set(), pass: a.pass }).get(`${id} ${sum}`);
+      s.parts[a.slice] = String(a.z).replace(/\s+/g, ''); s.files.add(f);
       continue;
     }
+    let items;
+    try { items = a.v === 3 ? (a.z ? JSON.parse(unzip(a.z)) : []) : a.items; } catch { out.bad.push(`${f}: what it holds does not read back`); continue; }
     const groups = new Map();
-    for (const it of a.items) { const r = rootOf(it.id); (groups.get(r) ?? groups.set(r, []).get(r)).push(it); }
+    for (const it of items) { const r = rootOf(it.id); (groups.get(r) ?? groups.set(r, []).get(r)).push(it); }
     for (const [id, sum] of Object.entries(a.sums ?? {})) {
-      const items = groups.get(id) ?? [];
-      if (cyrb53(JSON.stringify(items)) !== sum) { out.bad.push(`${f}: ${id} does not match its checksum`); continue; }
-      add(id, sum, items, [f], [a.pass]);
+      const its = groups.get(id) ?? [];
+      if (cyrb53(JSON.stringify(its)) !== sum) { out.bad.push(`${f}: ${id} does not match its checksum`); continue; }
+      add(id, sum, its, [f]);
     }
   }
   for (const s of sliced.values()) {
     if (![...Array(s.n).keys()].every((i) => s.parts[i])) continue;
-    const items = s.parts.flat();
-    if (cyrb53(JSON.stringify(items)) === s.sum) add(s.id, s.sum, items, s.files, s.passes);
+    let items = null;
+    try { items = JSON.parse(unzip(s.parts.join(''))); } catch { /* checked below */ }
+    if (items && cyrb53(JSON.stringify(items)) === s.sum) add(s.id, s.sum, items, s.files);
     else out.bad.push(`${[...s.files].join(', ')}: the slices of ${s.id} do not match its checksum`);
   }
   if (!out.complete) return out;
-  // The plan: the components whose items no earlier capture holds, so it stays the same while its chunks are read.
   const held = (e) => cand.get(e.id)?.has(e.sum);
-  const before = (e) => [...(cand.get(e.id)?.get(e.sum)?.passes ?? [])].some((p) => p !== out.pass);
-  out.chunks = planChunks(out.entries.filter((e) => !before(e)), budget);
   const byId = new Map(out.entries.map((e) => [e.id, e]));
-  const chunkOf = (id) => out.chunks.findIndex((c) => c.ids.includes(id));
-  out.missing = out.chunks.map((c, i) => (c.ids.some((id) => !held(byId.get(id))) ? i : null)).filter((i) => i != null);
+  out.todo = out.entries.filter((e) => !held(e)).map((e) => e.id);
+  // A component read in slices: the next read is its first slice not saved yet.
+  for (const s of sliced.values()) {
+    const e = byId.get(s.id);
+    if (e && e.sum === s.sum && !held(e)) { out.slice = { id: s.id, slice: [...Array(s.n).keys()].find((i) => !s.parts[i]), slices: s.n }; break; }
+  }
+  while (taken.has(out.slot)) out.slot++;
   // Read for this pass but no longer what the checksums say, or gone from the file: Figma changed in between.
   for (const { a } of reads) {
     if (a.pass !== out.pass) continue;
-    for (const [id, sum] of Object.entries(a.sums ?? {})) { const e = byId.get(id); if (e && sum !== e.sum && !held(e)) out.changed.push(chunkOf(id)); }
-    for (const id of a.gone ?? []) if (byId.has(id)) { out.gone.push(id); out.changed.push(chunkOf(id)); }
+    for (const [id, sum] of Object.entries(a.sums ?? {})) { const e = byId.get(id); if (e && sum !== e.sum && !held(e)) out.changed.push(id); }
+    for (const id of a.gone ?? []) if (byId.has(id)) out.gone.push(id);
     if (typeof a.of === 'number') out.added = Math.max(out.added, a.of - out.entries.length);
   }
   out.added = Math.max(out.added, out.of - out.entries.length, 0);
-  out.changed = [...new Set(out.changed)].filter((i) => i >= 0).sort((x, y) => x - y);
+  out.changed = [...new Set(out.changed)];
   out.gone = [...new Set(out.gone)];
   for (const e of out.entries) { const c = cand.get(e.id)?.get(e.sum); if (c) { out.have.set(e.id, c.items); for (const f of c.files) out.used.add(f); } }
-  for (const { f } of reads) if (!out.used.has(f) && !out.bad.some((b) => b.startsWith(`${f}:`))) out.stale.push(f);
+  for (const { f } of reads) if (!out.used.has(f) && !out.bad.some((b) => b.startsWith(`${f}:`)) && !(out.slice && [...(sliced.get(`${out.slice.id} ${byId.get(out.slice.id).sum}`)?.files ?? [])].includes(f))) out.stale.push(f);
   return out;
 }
 
 // The script for the next call and the file its answer is saved as. chunk: 'sums' (the next page of the checksums, or
-// a new pass when the last one is complete or fresh is set) or a chunk number of the plan. → { script, save } or { error }
+// a new pass when the last one is complete or fresh is set), or anything else for the next read. → { script, save } or
+// { error }
 export function componentsCall(dir, chunk, { cfg = {}, engineDir = ENGINE, fresh = false, time = TIME } = {}) {
   const pages = cfg.figma?.componentsPage ?? cfg.componentsPage ?? null;
-  const c = dir ? readComponents(dir) : { v: 2 };
+  const c = dir ? readComponents(dir) : { v: 3 };
   if (chunk === 'sums') {
-    const go = !fresh && c.v === 2 && c.next;
+    const go = !fresh && c.v === 3 && c.next;
     return { script: componentsScript('sums', { pages, pass: go ? c.next.pass : null, after: go ? c.next.after : null, time, engineDir }), save: go ? `components-sums-${c.next.page}.json` : 'components-sums.json' };
   }
-  if (c.v !== 2 || !c.complete) return { error: 'the checksums are not all read yet: run rms-design-system-engine --capture-script components sums first, and --capture-import names each chunk' };
-  const plan = c.chunks[chunk];
-  if (!plan) return { error: `no chunk ${chunk}: the plan has ${c.chunks.length} (rms-design-system-engine --capture-import names the ones to read)` };
-  // Named by the pass too, so a chunk of this plan never replaces one an earlier capture saved under the same number.
-  return { script: componentsScript('read', { pages, pass: c.pass, ids: plan.ids, slice: plan.slice ?? null, engineDir }), save: `components-${c.pass}-${chunk}.json` };
+  if (c.v !== 3 || !c.complete) return { error: 'the checksums are not all read yet: run rms-design-system-engine --capture-script components sums first, and --capture-import says what to read next' };
+  if (!c.todo.length) return { error: 'every component is read: run rms-design-system-engine --capture-import' };
+  const read = c.slice ? { ids: [c.slice.id], slice: c.slice.slice } : { ids: c.todo.slice(0, READ_IDS) };
+  // Named by the pass too, so a read of this pass never replaces one an earlier capture saved under the same number.
+  return { script: componentsScript('read', { pages, pass: c.pass, ...read, time, engineDir }), save: `components-${c.pass}-${c.slot}.json` };
 }
 
 // The script for a chunk: the variables' by number, the components' through componentsCall.
@@ -452,7 +585,7 @@ export function captureScript(kind, chunk, { dir, cfg = {}, engineDir = ENGINE, 
   return call.script;
 }
 
-// Items with their parts put back together.
+// Items with their parts put back together (answers of the form before carried an item larger than one answer in parts).
 export function partsBack(items) {
   const out = [], parts = new Map();
   for (const it of items) {
@@ -518,10 +651,10 @@ export async function importComponents(ROOT, cfg = {}, { dir = captureDir(ROOT),
     const items = c.sums.flatMap((s) => c.chunks.get(s));
     return writeComponents(ROOT, cfg, items, { base, chunks: c.sums.length, stale: c.stale, dir, source, now, engineDir, figmaVersion });
   }
-  const base = { kind: 'components', v: 2, pass: c.pass, missing: c.missing, bad: c.bad, stale: c.stale, changed: c.changed, gone: c.gone, of: c.chunks.length, read: c.entries.length, total: c.of };
-  if (!c.pass) return { ok: false, ...base, missing: ['sums'], why: 'no answer saved yet' };
+  const base = { kind: 'components', v: 3, pass: c.pass, todo: c.todo, slot: c.slot, slice: c.slice, bad: c.bad, stale: c.stale, older: c.older, changed: c.changed, gone: c.gone, read: c.entries.length, total: c.of };
+  if (!c.pass) return { ok: false, ...base, why: 'no answer saved yet' };
   if (!c.complete) return { ok: false, ...base, why: 'checksums', next: c.next };
-  if (c.changed.length || c.gone.length || c.missing.length) return { ok: false, ...base };
+  if (c.changed.length || c.gone.length || c.todo.length) return { ok: false, ...base };
   const items = c.entries.flatMap((e) => c.have.get(e.id) ?? []);
   return writeComponents(ROOT, cfg, items, { base, chunks: c.used.size, stale: c.stale, added: c.added, dir, source, now, engineDir, figmaVersion });
 }
@@ -611,11 +744,16 @@ export async function captureWithFigmaCli(ROOT, cfg = {}, { run = figmaCliEval(R
       writeFileSync(join(dir, call.save), String(text).trim() + '\n');
       if (a.after == null) break;
     }
-    for (const n of readComponents(dir).missing) {
-      const call = componentsCall(dir, n, { cfg, engineDir });
+    // The reads, one after the other, each taking the components the last left, until every one is read.
+    for (let last = null; ;) {
+      const c = readComponents(dir), now = JSON.stringify([c.todo.length, c.slice]);
+      if (!c.todo.length || c.changed.length || c.gone.length) break;
+      if (now === last) throw new Error('figma-cli read nothing new the last time: the import says why');
+      last = now;
+      const call = componentsCall(dir, 'next', { cfg, engineDir });
       if (call.error) throw new Error(call.error);
       const text = await run(call.script), a = parseAnswer(text);
-      if (!a?.items) throw new Error(`figma-cli did not return chunk ${n}: ${a?.error ?? String(text).trim().split('\n').slice(-1)[0]}`);
+      if (typeof a?.z !== 'string') throw new Error(`figma-cli did not return the components: ${a?.error ?? String(text).trim().split('\n').slice(-1)[0]}`);
       writeFileSync(join(dir, call.save), String(text).trim() + '\n');
     }
     return importComponents(ROOT, cfg, opts);
@@ -627,7 +765,7 @@ export async function captureWithFigmaCli(ROOT, cfg = {}, { run = figmaCliEval(R
   for (const n of readCapture(dir, kind).missing) {
     const text = await run(script(n));
     const a = parseAnswer(text);
-    if (!a?.items) throw new Error(`figma-cli did not return chunk ${n}: ${a?.error ?? String(text).trim().split('\n').slice(-1)[0]}`);
+    if (!a?.d && !a?.items) throw new Error(`figma-cli did not return chunk ${n}: ${a?.error ?? String(text).trim().split('\n').slice(-1)[0]}`);
     writeFileSync(join(dir, `${kind}-${n}.json`), text.trim() + '\n');
   }
   return importCapture(ROOT, cfg, opts);
@@ -651,16 +789,17 @@ export function importLines(r, rel) {
   for (const b of r.bad ?? []) lines.push(`❌ ${b}`);
   if (r.kept && !r.ok) { lines.push(r.kept); return lines; }
   const tool = 'run the script it writes unchanged with the Figma tool (use_figma)';
-  if (!r.ok && kind === 'components' && r.v === 2) {
+  if (!r.ok && kind === 'components' && r.v === 3) {
+    if (r.older?.length) lines.push(`${r.older.length} component answer${r.older.length === 1 ? ' was' : 's were'} saved in a form before this one (${r.older.slice(0, 3).join(', ')}${r.older.length > 3 ? ', …' : ''}): the checksums are read again in the compact form; a component those answers hold whole is not read again.`);
     if (r.why === 'no answer saved yet') lines.push(`No component answer saved in ${rel} yet.`, `NEXT: run rms-design-system-engine --capture-script components sums, ${tool}, save its answer as it came to ${rel}/components-sums.json, then run rms-design-system-engine --capture-import again.`);
     else if (r.why === 'checksums') lines.push(`The checksums of ${r.read} of ${r.total} components read so far.`, `NEXT: run rms-design-system-engine --capture-script components sums (it goes on where the last answer stopped), ${tool}, save its answer as it came to ${rel}/components-sums-${r.next.page}.json, then run rms-design-system-engine --capture-import again.`);
     else if (r.changed?.length || r.gone?.length) {
-      lines.push(`Figma changed after the checksums were read (${[r.changed?.length ? `chunk ${r.changed.join(', ')}` : '', r.gone?.length ? `no longer in the file: ${r.gone.join(', ')}` : ''].filter(Boolean).join('; ')}).`);
-      lines.push(`NEXT: run rms-design-system-engine --capture-script components sums new, ${tool}, save its answer as it came to ${rel}/components-sums.json, then read each chunk --capture-import names.`);
+      const some = (ids) => `${ids.slice(0, 5).join(', ')}${ids.length > 5 ? ', …' : ''}`;
+      lines.push(`Figma changed after the checksums were read (${[r.changed?.length ? `${r.changed.length} component${r.changed.length === 1 ? '' : 's'}: ${some(r.changed)}` : '', r.gone?.length ? `no longer in the file: ${some(r.gone)}` : ''].filter(Boolean).join('; ')}).`);
+      lines.push(`NEXT: run rms-design-system-engine --capture-script components sums new, ${tool}, save its answer as it came to ${rel}/components-sums.json, then read what --capture-import names.`);
     } else {
-      const left = r.missing ?? [];
-      lines.push(`${left.length} of ${r.of} component chunk${r.of === 1 ? '' : 's'} still to read: ${left.join(', ')}.`);
-      lines.push(`NEXT: for each, run rms-design-system-engine --capture-script components <chunk>, ${tool}, save its answer as it came to ${rel}/components-${r.pass}-<chunk>.json, then run rms-design-system-engine --capture-import again.`);
+      lines.push(`${r.todo.length} of ${r.read} components still to read${r.slice ? ` (one too large for an answer, read in ${r.slice.slices} slices: slice ${r.slice.slice} next)` : ''}.`);
+      lines.push(`NEXT: run rms-design-system-engine --capture-script components next, ${tool}, save its answer as it came to ${rel}/components-${r.pass}-${r.slot}.json, then run rms-design-system-engine --capture-import again. One at a time: each read takes the components the last one left, as many as fit.`);
     }
     return lines;
   }
@@ -669,8 +808,9 @@ export function importLines(r, rel) {
     if (r.changed?.length) lines.push(`Figma changed after the checksums were read (chunk ${r.changed.join(', ')}).`);
     const what = kind === 'components' ? 'component ' : '';
     lines.push(r.why === 'no answer saved yet' ? `No ${what}answer saved in ${rel} yet.` : `${left.length} of ${r.of} ${what}chunk${r.of === 1 ? '' : 's'} still to read: ${left.join(', ')}.`);
+    if (r.older?.length) lines.push(`${r.older.length} answer${r.older.length === 1 ? ' was' : 's were'} saved in the form before (${r.older.slice(0, 3).join(', ')}${r.older.length > 3 ? ', …' : ''}): the checksums now are of the compact form, so read the chunks named again; the import clears the old answers.`);
     if (r.changed?.length) lines.push(`NEXT: run rms-design-system-engine --capture-script ${kind} sums${kind === 'components' ? ' new' : ''}, ${tool}, save its answer as it came to ${rel}/${kind}-sums.json, then read each chunk --capture-import names.`);
-    else if (kind === 'components' && r.why === 'no answer saved yet') lines.push(`NEXT: run rms-design-system-engine --capture-script components sums, ${tool}, save its answer as it came to ${rel}/components-sums.json, then run rms-design-system-engine --capture-import again.`);
+    else if (kind === 'components') lines.push(`NEXT: run rms-design-system-engine --capture-script components sums${r.why === 'no answer saved yet' ? '' : ' new'}, ${tool}, save its answer as it came to ${rel}/components-sums.json, then run rms-design-system-engine --capture-import again.`);
     else lines.push(`NEXT: for each, run rms-design-system-engine --capture-script ${kind} <chunk>, ${tool}, save its answer as it came to ${rel}/${kind}-<chunk>.json, then run rms-design-system-engine --capture-import again.`);
     return lines;
   }
