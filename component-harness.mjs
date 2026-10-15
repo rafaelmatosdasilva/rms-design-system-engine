@@ -184,16 +184,52 @@ export function propsOf(figma) {
 }
 // entry: the component-props snapshot's entry. → [{ label, props }], the default first, then each other value of each
 // variant prop and each on/off prop flipped, at most `max` (ds-config.json → a11y.maxVariants, 16 by default).
+// A state a variant can be in (Disabled, Selected, Loading) starts off in the default case, wherever Figma's default
+// variant sits: the component is shown as it is first met, its states as cases of their own.
+export const STATE_PROP = /^(is)?(disabled|selected|checked|pressed|error|invalid|loading|readonly|read-?only|active|open|expanded|skeleton)$/i;
 export function harnessCases(entry = {}, max = 16) {
   const defs = Object.entries(entry.properties ?? {});
   const base = {};
   for (const [k, d] of defs) if (d.type !== 'INSTANCE_SWAP') base[k] = d.defaultValue;
+  for (const [k, d] of defs) {
+    const off = (d.variantOptions ?? []).find((o) => /^(false|off|no)$/i.test(String(o)));
+    if (d.type === 'VARIANT' && off !== undefined && STATE_PROP.test(clean(k).replace(/\s+/g, ''))) base[k] = off;
+  }
   const cases = [{ label: 'default', props: propsOf(base) }];
   for (const [k, d] of defs) {
-    if (d.type === 'VARIANT') for (const o of d.variantOptions ?? []) { if (String(o) !== String(d.defaultValue) && !INTERACTION.test(o)) cases.push({ label: `${clean(k)}=${o}`, props: propsOf({ ...base, [k]: o }) }); }
+    if (d.type === 'VARIANT') for (const o of d.variantOptions ?? []) { if (String(o) !== String(base[k]) && !INTERACTION.test(o)) cases.push({ label: `${clean(k)}=${o}`, props: propsOf({ ...base, [k]: o }) }); }
     else if (d.type === 'BOOLEAN') cases.push({ label: `${clean(k)}=${!d.defaultValue}`, props: propsOf({ ...base, [k]: !d.defaultValue }) });
   }
   return cases.slice(0, max);
+}
+
+// ── A code prop Figma has no prop for ─────────────────────────────────────────────────────────────────────────────
+// Which of Figma's props stands for a code prop: the same name, Figma's with what it holds after it (labelContent for
+// label, iconContent for icon), or the one Figma name a code name ends with (size for buttonSize). → its key, or null.
+const squashName = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+export function figmaPropFor(figmaKeys = [], codeName, codeNames = [codeName]) {
+  const c = squashName(codeName);
+  const same = figmaKeys.find((k) => squashName(k) === c) ?? figmaKeys.find((k) => squashName(k).replace(/(content|text|value|swap)$/, '') === c);
+  if (same) return same;
+  const tail = figmaKeys.filter((k) => squashName(k).length > 2 && c.endsWith(squashName(k)) && !codeNames.some((o) => squashName(o) === squashName(k)));
+  return new Set(tail.map(squashName)).size === 1 ? tail[0] : null;
+}
+// What a prop does to how it behaves, never to how it looks (allowEventPropagation, onClick): not a case of its own.
+export const TELEPORT_PROP = /disabl\w*teleport|teleport\w*(disabled|off)/i;
+export const BEHAVIOUR_PROP = /teleport|propagation|^focus|^on[A-Z]|handler|callback|^emit|event|^v-?model$|^model(value)?$/i;
+// The cases the code's own props add to Figma's, for each prop Figma has none for: an on/off one turned the other
+// way, each other value its code lists, each from Figma's default case. api: textComponentApi(). → [{ label, props }]
+export function codeCases(base = {}, api = {}, max = 8) {
+  const names = Object.keys(api.props ?? {}), out = [];
+  // A component that teleports itself away (a modal over the window), drawn in place by default: once as it opens,
+  // teleported, so the page can open it over the window as a product does.
+  for (const p of names) if (TELEPORT_PROP.test(p) && /^boolean$/.test(api.props[p].type ?? '')) out.push({ label: 'opened', props: { ...base, [p]: false } });
+  for (const [p, d] of Object.entries(api.props ?? {})) {
+    if (BEHAVIOUR_PROP.test(p) || figmaPropFor(Object.keys(base), p, names)) continue;
+    if (/^boolean$/.test(d.type ?? '')) { const v = String(d.default) !== 'true'; out.push({ label: `${p}=${v}`, props: { ...base, [p]: v } }); }
+    else if ((d.options ?? []).length > 1) for (const o of d.options) if (String(o) !== String(d.default ?? d.options[0])) out.push({ label: `${p}=${o}`, props: { ...base, [p]: o } });
+  }
+  return out.slice(0, max);
 }
 
 // ── What to render when Figma has no variants: the code's own props ─────────────────────────────────────────────────

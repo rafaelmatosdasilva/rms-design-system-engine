@@ -312,7 +312,7 @@ export function plainAction(what = '', component = '') {
   if ((m = /^([\w-]+)\.(.+?):\s*contract=(.+?)\s{1,}Figma=(.+)$/.exec(s))) {
     const f = unq(m[4]);
     if (/no longer bound/.test(f)) return { who: 'both', todo: `Decide which side is right: bind a token there again in Figma, or tell Claude to take it out of the code's contract (structure-contract.mjs).` };
-    return { who: 'code', todo: `Update the code's contract (structure-contract.mjs) for ${name} to say what Figma says. Tell Claude to do it.` };
+    return { who: 'code', todo: `Update the code's contract (structure-contract.mjs) for ${name} to say what Figma says. A developer does it, or Claude when asked.` };
   }
   // A measured value: the property it names ("actionBar min height"), the fix said for that property.
   const measured = /^([\w-]+) (.+?)(?: \([^)]*=[^)]*\))?: Figma .+?, rendered /.exec(s);
@@ -321,13 +321,13 @@ export function plainAction(what = '', component = '') {
   if ((m = /\[(code moved, Figma is behind|Figma moved, code is behind)\]/.exec(s))) {
     const fix = (/→\s+(.+?)\s+\[/.exec(s) ?? [])[1];
     if (/code moved/.test(m[1])) return { who: 'figma', todo: fix ? `In Figma, ${fixFor(fix)}.` : `In Figma, change ${what2} to match the code.` };
-    return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. Tell Claude to do it.` : `Make ${what2} in the code match Figma. Tell Claude to do it.` };
+    return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. A developer does it, or Claude when asked.` : `Make ${what2} in the code match Figma. A developer does it, or Claude when asked.` };
   }
   if (measured) {
     const fix = (/→\s+(.+?)(?:\s+\[|$)/.exec(s) ?? [])[1];
-    return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. Tell Claude to do it.` : `Make ${what2} in the code match Figma. Tell Claude to do it.` };
+    return { who: 'code', todo: fix ? `In the code, ${fixFor(fix)}. A developer does it, or Claude when asked.` : `Make ${what2} in the code match Figma. A developer does it, or Claude when asked.` };
   }
-  if ((m = /^[\w-]+: (.+?) draws its own instead of using it \(/.exec(s))) return { who: 'code', todo: `Use the system's ${name} in ${m[1]} in place of its own. Tell Claude to do it.` };
+  if ((m = /^[\w-]+: (.+?) draws its own instead of using it \(/.exec(s))) return { who: 'code', todo: `Use the system's ${name} in ${m[1]} in place of its own. A developer does it, or Claude when asked.` };
   if (/ has `[^`]+` - Figma has no stroke/.test(s)) return { who: 'both', todo: `Decide: tell Claude to remove the border from the code, or add it to ${name} in Figma.` };
   if (/: [\d.]+:1 \(needs [\d.]+:1\)/.test(s)) return { who: 'figma', todo: `Pick colours with more contrast for ${name}: change them in Figma, then tell Claude to update the code.` };
   if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return { who: 'figma', todo: `In Figma, point ${m[1].trim()} at another token instead of a raw colour.` };
