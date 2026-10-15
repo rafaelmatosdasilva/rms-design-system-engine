@@ -142,6 +142,42 @@ export function propSamples(ROOT) {
   return Object.fromEntries(Object.entries(count).map(([k, vs]) => [k, Object.entries(vs).sort((a, b) => b[1] - a[1])[0][0]]));
 }
 
+// For each list prop the template loops over (v-for="tab in tabs"), three items with the fields the template reads from
+// each (tab.label, tab.icon): each field the value the project's pages pass it most, else its own name and number, an
+// on/off one off but the first item's selected or active. So a list draws as a list. → { propName: [items] }
+export function listSamples(text, propNames = [], samples = {}) {
+  const tpl = /<template\b[\s\S]*<\/template>/.exec(String(text))?.[0] ?? '';
+  const out = {};
+  for (const m of tpl.matchAll(/v-for\s*=\s*["']\s*\(?\s*([A-Za-z_$][\w$]*)(?:\s*,\s*[A-Za-z_$][\w$]*)*\s*\)?\s+(?:in|of)\s+(?:props\.)?([A-Za-z_$][\w$]*)\s*["']/g)) {
+    const [, item, list] = m;
+    if (!propNames.includes(list) || out[list]) continue;
+    const fields = [...new Set([...tpl.matchAll(new RegExp(`\\b${item}\\.([A-Za-z_$][\\w$]*)`, 'g'))].map((x) => x[1]))];
+    const value = (f, i) => /^(is|has|show|with)[A-Z]|^(disabled|selected|active|checked|open|expanded|current)$/i.test(f) ? i === 0 && /selected|active|current/i.test(f)
+      : typeof samples[f] === 'string' ? (/icon|image|img|src|href|url|link|path|type|variant|size|color/i.test(f) ? samples[f] : `${samples[f]} ${i + 1}`)
+        : `${f.charAt(0).toUpperCase() + f.slice(1)} ${i + 1}`;
+    out[list] = [0, 1, 2].map((i) => (fields.length ? Object.fromEntries(fields.map((f) => [f, value(f, i)])) : `Item ${i + 1}`));
+  }
+  return out;
+}
+
+// The ids the project's components teleport to (<teleport to="#modals-overlay">), its App making them on its page.
+export function teleportTargets(ROOT) {
+  const out = new Set();
+  const walk = (d) => {
+    let names; try { names = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of names) {
+      if (e.name.startsWith('.') || /^(node_modules|figma|tests?)$/.test(e.name)) continue;
+      const p = join(d, e.name);
+      if (e.isDirectory()) { walk(p); continue; }
+      if (!/\.vue$/.test(e.name)) continue;
+      let src; try { src = readFileSync(p, 'utf8'); } catch { continue; }
+      for (const m of src.matchAll(/<teleport\b[^>]*?\bto\s*=\s*["']#([\w-]+)["']/gi)) out.add(m[1]);
+    }
+  };
+  walk(join(ROOT, 'src'));
+  return [...out].sort();
+}
+
 // What the project's own entry installs on its app (src/main.js: app.use(i18n), app.component('BaseIcon', BaseIcon),
 // app.directive('mask', mask)), each read from the import that names it, so each instance on the page gets the same:
 // a component that calls $t, renders <BaseIcon> or uses v-mask draws as it does in the product. The store and the router
@@ -193,7 +229,7 @@ export function appSetup(ROOT) {
 export function harnessModule(groups, styles = [], plugins = {}) {
   return `${styles.map((s) => `import ${JSON.stringify(s)};`).join('\n')}
 import { createApp, h, reactive } from 'vue';
-${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options }) => ({ name, role, cases, options: options ?? {} }))).replace(/</g, '\\u003c')};
+${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options, fill }) => ({ name, role, cases, options: options ?? {}, fill: fill ?? {} }))).replace(/</g, '\\u003c')};
 const LOAD = {
 ${groups.map((g) => `  ${JSON.stringify(g.name)}: () => import(${JSON.stringify(g.file)}),`).join('\n')}
 };
@@ -203,12 +239,17 @@ ${(plugins.setup ?? []).map((x) => `  { kind: ${JSON.stringify(x.kind)}, name: $
 ];
 const squash = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
 const SAMPLES = ${JSON.stringify(plugins.samples ?? {})};
+// Where the product's components teleport to (#modals-overlay, made by its App): made on the page, and what each case
+// sends there is put back in its own box, so a modal is read as it draws.
+const TELEPORTS = ${JSON.stringify(plugins.teleports ?? [])};
+for (const id of TELEPORTS) if (!document.getElementById(id)) { const t = document.createElement('div'); t.id = id; t.setAttribute('data-dse-teleport', ''); document.body.append(t); }
+const gather = (box) => { for (const id of TELEPORTS) { const t = document.getElementById(id); while (t && t.firstChild) box.append(t.firstChild); } };
 const STATE = ['pressed', 'selected', 'checked', 'expanded', 'open', 'on', 'modelvalue', 'value'];
 const BY_ROLE = { togglebutton: ['pressed'], toggle: ['pressed'], checkbox: ['checked'], switch: ['checked'], disclosure: ['expanded'], accordion: ['expanded'], tab: ['selected'] };
 // The props the component declares, each given the variant's value (Figma's names matched to the code's, a value
 // written as the code's own option writes it, Success as success; True and False as booleans for a Boolean prop); an
 // aria- attribute the page adds falls through to its root.
-function fit(C, props, role, options) {
+function fit(C, props, role, options, fill = {}) {
   const decl = Array.isArray(C.props) ? Object.fromEntries(C.props.map((k) => [k, {}])) : (C.props || {});
   const out = {};
   for (const [d, spec] of Object.entries(decl)) {
@@ -224,11 +265,14 @@ function fit(C, props, role, options) {
       out[d] = own !== undefined ? own : v;
     }
     else if ((BY_ROLE[role] || []).includes(squash(d))) out[d] = false;
+    // A switch that keeps it where it is drawn instead of teleporting it away (disabledTeleport): on, so it draws in place.
+    else if (types.length === 1 && types[0] === Boolean && /disabl\\w*teleport|teleport\\w*(disabled|off)/i.test(d)) out[d] = true;
     // A text the code takes with no default (an icon's name, a label): the one the project's own pages pass it most.
     else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && SAMPLES[d] != null) out[d] = SAMPLES[d];
     // An object or a list it reads into with no default: an empty one, as a page always passes one, so it draws.
     // (params: Object, or { type: Object } with no default)
-    else if (!(spec && typeof spec === 'object' && 'default' in spec) && types.length === 1 && (types[0] === Object || types[0] === Array)) out[d] = types[0] === Array ? [] : {};
+    // A list it loops over: the items its template reads (listSamples), else an empty one.
+    else if (!(spec && typeof spec === 'object' && 'default' in spec) && types.length === 1 && (types[0] === Object || types[0] === Array)) out[d] = types[0] === Array ? (fill[d] ? JSON.parse(JSON.stringify(fill[d])) : []) : {};
   }
   for (const [k, v] of Object.entries(props)) if (/^aria-/.test(k)) out[k] = v;
   // Figma's showLabel or hasIcon off, where the code shows the part whenever it is given: the part is not given.
@@ -292,13 +336,14 @@ for (const g of GROUPS) {
   if (!C) { failed.push({ name: g.name, why: 'no component exported' }); continue; }
   for (const c of g.cases) {
     const box = document.createElement('div'); box.className = 'dse-case'; box.setAttribute('data-dse-case', c.label); sec.append(box);
-    const state = reactive(fit(C, c.props, g.role, g.options));
+    const state = reactive(fit(C, c.props, g.role, g.options, g.fill));
     const app = createApp({ render: () => h(C, { ...state, ...listeners(C, state) }) });
     app.config.errorHandler = (e) => failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] });
     app.config.warnHandler = () => {};
     inherit(app);
     install(app);
 ${plugins.pinia ? "    if (!app.config.globalProperties.$pinia) app.use(createPinia());\n" : ''}${plugins.router ? "    if (!app.config.globalProperties.$router) app.use(createRouter({ history: createMemoryHistory(), routes: [{ path: '/:any(.*)*', component: { render: () => null } }] }));\n" : ''}    try { app.mount(box); } catch (e) { failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] }); }
+    gather(box);
   }
 }
 window.__dseHarnessFailed = failed;
@@ -322,7 +367,7 @@ const why1 = (e) => String(e?.message ?? e).split('\n')[0];
 // → { url, close (a promise once it has stopped), groups, missing: [why], build: 'Vite' | 'Nuxt' | 'Vue CLI' |
 // 'webpack' }, or { url: null, why } when nothing can be rendered.
 export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate, read = (f) => readFileSync(f, 'utf8'), max = cfg.a11y?.maxVariants ?? 16 } = {}) {
-  const groups = [], missing = [];
+  const groups = [], missing = [], samples = propSamples(ROOT);
   const { harnessCases, variantsFromCode, pageColours, codeCases } = await import('./component-harness.mjs');
   const { textComponentApi } = await import('./component-source.mjs');
   for (const name of names) {
@@ -340,7 +385,7 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     const figmaCases = fromFigma ? harnessCases(propsSnap[name], max) : null;
     const cases = (figmaCases ? [...figmaCases, ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
-    groups.push({ name, file: resolve(ROOT, file), role, cases, options, from: fromFigma ? 'figma' : 'code' });
+    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill: listSamples(text, Object.keys(api.props ?? {}), samples), from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };
   const pb = await projectBuild(ROOT);
@@ -351,7 +396,7 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
   const themes = [cfg.paths?.themeCSS].flat().filter((f) => f && !/^https?:/.test(f));
   const css = themes.map((f) => { try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; } }).join('\n');
   const colours = pageColours(css);
-  const plugins = { ...appPlugins(ROOT), samples: propSamples(ROOT) };
+  const plugins = { ...appPlugins(ROOT), samples, teleports: teleportTargets(ROOT) };
   const started = pb.kind === 'nuxt' ? await startNuxt(ROOT, pb, dir, groups, cfg, colours, plugins)
     : pb.kind === 'webpack' ? await startWebpack(ROOT, pb, dir, groups, cfg, colours, themes, plugins)
       : await startVite(ROOT, pb, dir, groups, cfg, colours, plugins);

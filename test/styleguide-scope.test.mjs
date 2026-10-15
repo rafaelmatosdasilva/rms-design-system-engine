@@ -54,3 +54,9 @@ withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | '
   assert.deepEqual(data.scope, { asked: ['button'], nested: ['badge'], missing: [] });
   assert.ok(!('allComponents' in data), 'the whole system\'s list stays off the page');
 });
+
+test('a Vue component is built with the components whose roots its markup holds, never one a shared class names', () => {
+  const m = '<div data-v-aa class="modal"><div data-v-aa class="title secondary">T</div><button data-v-bb data-v-aa class="button-positive m"><span data-v-bb class="label">Ok</span></button><button data-v-cc data-v-aa class="button-secondary">No</button></div>';
+  const names = [{ name: 'buttonPositive', cls: 'button-positive' }, { name: 'buttonSecondary', cls: 'button-secondary' }, { name: 'checkboxSecondary', cls: 'secondary' }, { name: 'textLabel', cls: 'label' }];
+  assert.deepEqual(nestedComponents({ name: 'modalPositive', cls: 'modal', markup: m, names }), ['buttonPositive', 'buttonSecondary']);
+});

@@ -215,11 +215,15 @@ export function figmaPropFor(figmaKeys = [], codeName, codeNames = [codeName]) {
   return new Set(tail.map(squashName)).size === 1 ? tail[0] : null;
 }
 // What a prop does to how it behaves, never to how it looks (allowEventPropagation, onClick): not a case of its own.
-export const BEHAVIOUR_PROP = /propagation|^focus|^on[A-Z]|handler|callback|^emit|event|^v-?model$|^model(value)?$/i;
+export const TELEPORT_PROP = /disabl\w*teleport|teleport\w*(disabled|off)/i;
+export const BEHAVIOUR_PROP = /teleport|propagation|^focus|^on[A-Z]|handler|callback|^emit|event|^v-?model$|^model(value)?$/i;
 // The cases the code's own props add to Figma's, for each prop Figma has none for: an on/off one turned the other
 // way, each other value its code lists, each from Figma's default case. api: textComponentApi(). → [{ label, props }]
 export function codeCases(base = {}, api = {}, max = 8) {
   const names = Object.keys(api.props ?? {}), out = [];
+  // A component that teleports itself away (a modal over the window), drawn in place by default: once as it opens,
+  // teleported, so the page can open it over the window as a product does.
+  for (const p of names) if (TELEPORT_PROP.test(p) && /^boolean$/.test(api.props[p].type ?? '')) out.push({ label: 'opened', props: { ...base, [p]: false } });
   for (const [p, d] of Object.entries(api.props ?? {})) {
     if (BEHAVIOUR_PROP.test(p) || figmaPropFor(Object.keys(base), p, names)) continue;
     if (/^boolean$/.test(d.type ?? '')) { const v = String(d.default) !== 'true'; out.push({ label: `${p}=${v}`, props: { ...base, [p]: v } }); }

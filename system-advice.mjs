@@ -284,7 +284,7 @@ export function tokenTodos({ vars = {}, users = null, dangling = [], brands = []
     todo: 'Point each one at the variable that replaced it in Figma, or give it its own value.' });
   if (dangling?.length) out.push({ kind: 'Broken alias', who: 'code',
     say: `${dangling.length} token${dangling.length === 1 ? ' in the code points' : 's in the code point'} at a token declared nowhere, so ${dangling.length === 1 ? 'it shows' : 'they show'} only ${dangling.length === 1 ? 'its' : 'their'} fallback (${some(dangling.map((d) => `${d.token ?? d.file + ':' + d.line} to ${d.target}${d.removed ? `, removed in ${d.removed.sha}` : ''}`))}).`,
-    todo: 'Point each one at the token that replaced it. Tell Claude to do it.' });
+    todo: 'Point each one at the token that replaced it. A developer does it, or Claude when asked.' });
   const single = [...(users ?? new Map())].filter(([, who]) => who.length === 1).map(([t, who]) => `${t.replace(/\./g, '/')} in ${who[0]}`).sort();
   if (single.length) out.push({ kind: 'Single use', who: 'both',
     say: `${single.length} token${single.length === 1 ? ' is' : 's are'} used by one component only (${some(single, 8)}).`,
