@@ -712,14 +712,14 @@ export function typographyTodos(check = {}, figmaVars = {}) {
       return f.issue ? `${FIELD_WORD[f.field] ?? f.field}${where}: the code has no ${f.cssVar} (Figma ${f.value ?? '?'})` : `${FIELD_WORD[f.field] ?? f.field}${where}: Figma ${f.figma}, the code ${f.css} (${f.cssVar})`;
     });
     out.push({ who: 'both', area: 'System', type: 'Tokens, text styles', kind: 'Text style', say: `Text style ${style} differs from the code: ${parts.join('; ')}. The Typography page leaves it off until both agree.`,
-      todo: 'Decide which side is right: change the text style (or the variable it binds) in Figma, or the code\'s variable. Ask Claude to change the code.' });
+      todo: 'Decide which side is right: change the text style (or the variable it binds) in Figma, or the code\'s variable. A developer changes the code, or Claude when asked.' });
   }
   const fam = (check.fail ?? []).find((f) => f.dimension === 'typography' && f.family);
   if (fam) {
     const n = (fam.styles ?? []).length;
     const said = fam.issue ? `the code does not declare ${fam.cssVar}` : `the code's ${fam.cssVar} is ${fam.css}`;
     out.push({ who: 'both', area: 'System', type: 'Tokens, text styles', kind: 'Font family', say: `The text styles' family differs: Figma ${fam.figma ?? fam.value}${fam.variable ? ` (${fam.variable})` : ''}, ${n} style${n === 1 ? '' : 's'}; ${said}. The Typography page draws the styles in the code's family meanwhile.`,
-      todo: 'Decide which family is right, then change it in Figma or ask Claude to change the code.' });
+      todo: 'Decide which family is right, then change it in Figma or a developer changes the code (Claude can, when asked).' });
   }
   const skipped = new Map();
   for (const sk of check.skip ?? []) {
@@ -1079,7 +1079,9 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
     const l = type[type.length - 1], m = near(TYPE_ROLES.find(([r]) => r === 'm')[1]) ?? type[Math.floor((type.length - 1) / 2)];
     if (roles.l) { roles.h1 = roles.h2 = roles.l; from.h1 = from.h2 = from.l; }
     if (l.weight?.var) roles['heading-weight'] = `var(${l.weight.var})`;
-    if (m.lh?.var) roles.lh = `var(${m.lh.var})`;
+    // The page's lines a little more open than the system's body text (its line height and 2px), so a list of names
+    // that wraps still reads as lines.
+    if (m.lh?.var) roles.lh = `calc(var(${m.lh.var}) + 2px)`;
     // A page's title: the system's own heading style when it has one clearly larger than its body text (at least 20px
     // and 1.6 times it), as it is; else the page scales the largest style up (--sg-title in the template).
     const lPx = parseFloat(l.size.value), mPx = parseFloat(m.size.value);
@@ -1215,7 +1217,7 @@ export function standInGaps(ui = {}) {
   if (!ui.segmented) gaps.push({ control: 'segmented control', uses: 'its default segmented control, drawn with its tokens' });
   if (!ui.field) gaps.push({ control: 'text field', uses: 'a plain text input drawn with its tokens' });
   else if (ui.field.standIn) gaps.push({ control: 'text field', uses: `its ${ui.field.standIn}` });
-  if (!ui.button) gaps.push({ control: 'text button', uses: 'plain links and buttons drawn with its tokens' });
+  if (!ui.button) gaps.push({ control: 'text button', uses: 'its default button, drawn with its tokens' });
   if (!ui.card) gaps.push({ control: 'card', uses: 'its default card, with the tables\' border and corners' });
   if (!ui.tip) gaps.push({ control: 'tooltip', uses: 'its default tooltip, drawn with its tokens' });
   if (!ui.iconButton) gaps.push({ control: 'icon button', uses: 'plain buttons drawn with its tokens' });
@@ -1744,14 +1746,32 @@ export function scriptUses({ text = '', cls = '', name = '' } = {}) {
 // The system's components a component is built with: those whose class its markup holds (HTML), or that its own file
 // uses (a tag, an import). Itself and its own parts never count. names: [{ name, cls }].
 // tags: { name: [the tag its own file gives it (HbBadge for a Figma badge)] }, so a prefixed tag is known as well.
-export function nestedComponents({ name, cls = null, markup = '', text = '', names = [], tags = {} } = {}) {
-  const classes = new Set([...String(markup).matchAll(/class\s*=\s*["']([^"']*)["']/g)].flatMap((m) => m[1].split(/\s+/)).filter(Boolean));
+export function nestedComponents({ name, cls = null, markup = '', text = '', names = [], tags = {}, files = {} } = {}) {
+  let classes = new Set([...String(markup).matchAll(/class\s*=\s*["']([^"']*)["']/g)].flatMap((m) => m[1].split(/\s+/)).filter(Boolean));
+  // Markup its Vue build drew (scoped: data-v-…): a component nested in it is an element that carries its own scope and
+  // the parent's, and the classes on that root name it; a class the parent's own elements have (secondary) names nothing.
+  const own = /^\s*<[a-z][^>]*?\s(data-v-[\w]+)/i.exec(String(markup))?.[1];
+  if (own) {
+    classes = new Set();
+    for (const m of String(markup).matchAll(/<[a-z][^>]*>/gi)) {
+      const scopes = [...m[0].matchAll(/\s(data-v-[\w]+)/g)].map((x) => x[1]);
+      if (!scopes.includes(own) || !scopes.some((x) => x !== own)) continue;
+      for (const k of (/class\s*=\s*["']([^"']*)["']/.exec(m[0])?.[1] ?? '').split(/\s+/)) if (k) classes.add(k);
+    }
+  }
   const out = [];
   for (const o of names) {
     if (o.name === name || (cls && o.cls === cls)) continue;
     const inMarkup = o.cls && classes.has(o.cls) && !(cls && o.cls.startsWith(cls + '-') || cls && o.cls.startsWith(cls + '__'));
     const tagNames = [o.name.replace(/(^|[-_/\s]+)(\w)/g, (m, s2, ch) => ch.toUpperCase()), ...(tags[o.name] ?? [])].filter((x) => /^[A-Za-z][\w-]*$/.test(x));
-    const inText = text && tagNames.some((tagName) => new RegExp(`<${tagName}\\b|import\\s+\\{?[^;]*\\b${tagName}\\b[^;]*from`).test(text));
+    // Its tag (<ButtonSecondary>, <button-secondary>), or an import that binds it by name or brings in its own file
+    // (…/buttons/Secondary), each on one import line: a file named Secondary.vue is never every Secondary in the code.
+    // Kebab only for a name of two words or more: <button> is the browser's own element, never the Button component.
+    const kebab = (x) => { const k = x.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(); return k.includes('-') ? k : x; };
+    const fileTail = files[o.name] ? String(files[o.name]).replace(/\\/g, '/').replace(/\.\w+$/, '').split('/').slice(-2).join('/') : null;
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const inText = text && (tagNames.some((tagName) => new RegExp(`<(${esc(tagName)}|${esc(kebab(tagName))})(?![\\w-])|import\\s+(\\{[^}\\n]*\\b${esc(tagName)}\\b[^}\\n]*\\}|${esc(tagName)})\\s+from`).test(text))
+      || (fileTail && new RegExp(`from\\s+['"][^'"\\n]*/${esc(fileTail)}(\\.\\w+)?['"]|import\\(\\s*['"\`][^'"\`\\n]*/${esc(fileTail)}(\\.\\w+)?['"\`]`).test(text)));
     if (inMarkup || inText) out.push(o.name);
   }
   return out;

@@ -386,10 +386,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         for (const [name, m] of Object.entries(r.markup)) {
           const own = codeOnly.find((k) => k.name === name);
           if (own) { if (holds(m, own.cls)) { own.markup = m; own.from = 'vue-build'; } }
-          else if (holds(m, locator.classFor(name))) {
+          // Its own file drawn by its own build is the component, whatever class its root carries (an input's wrapper);
+          // a file from the project's pages (src/views, a docs page that shows it) is the component only when its root
+          // carries the component's class.
+          else if (!/(^|[\\/])(views|pages|stories|docs|examples?|playground)[\\/]/i.test(vueFiles[name] ?? '') || holds(m, locator.classFor(name))) {
             jsx[name] = m;
-            const each = (r.cases[name] ?? []).filter((c) => holds(c.markup, locator.classFor(name)));
-            if (new Set(each.map((c) => c.markup)).size > 1) vueRenders[name] = each.map((c) => ({ props: c.props, markup: c.markup }));
+            const each = (r.cases[name] ?? []).filter((c) => /^<[a-z]/i.test(c.markup.trim()));
+            if (new Set(each.map((c) => c.markup)).size > 1) vueRenders[name] = each.map((c) => ({ label: c.label, props: c.props, markup: c.markup }));
           }
         }
         vueCss = r.css;
@@ -803,7 +806,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
         c.parity.rows = parityRows({ name: c.name, propsSnap, controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], codeProps: c.api?.props ?? {}, allTokens: c.allTokens ?? [], check, agreed: agreedRec, propsAt: propsSnap._updated ?? null, checkedAt, slotParts: (c.anatomy ?? []).filter((x) => x.slot) });
         const text = c.api?.file ? readText(c.api.file) : '';
-        const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names, tags: fileTags });
+        const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names, tags: fileTags, files: fileOf });
         if (uses.length) c.uses = uses;
         if (c.api?.tag) {
           const imp = importOf({ tag: c.api.tag, syntax: c.api.syntax, file: c.api.file, text, pkg: pkgOf(c.api.file), template: cfg.styleguide?.importFrom ?? null });
@@ -903,7 +906,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { prototypeTransitions } = await import('./motion-parity.mjs');
       const snapMotion = readJson(cfg.paths?.snapshotMotion ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-motion.snapshot.json'));
       const findings = motionFound;
-      const files = [...themeFiles, ...pluginCSS].filter((f) => f && !/^https?:/.test(f)).map((file) => ({ file, text: readText(file) })).filter((f) => f.text);
+      // The theme, the system's own stylesheets and its components' (each component sheet, and the CSS its Vue build
+      // compiles from each .vue file's <style>): a hover's transition or a modal's opening is in them.
+      const sheets = [...new Set([...themeFiles, ...pluginCSS, ...((await context()).componentSheets ?? [])])].filter((f) => f && !/^https?:/.test(f) && !/\.html?$/i.test(f));
+      const files = [...sheets.map((file) => ({ file, text: readText(file) })), ...(vueCss ? [{ file: 'its Vue components, as their build compiles them', text: vueCss }] : [])].filter((f) => f.text);
       let m = await motionTokens(allCss, { figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, cfg, files, transitions: snapMotion ? prototypeTransitions(snapMotion, findings) : [] });
       // How each component moves on its own (C7): its loop, its opening and its closing, the code's beside Figma's.
       const { componentMotionRows, motionSpec, motionOverview } = await import('./motion-components.mjs');

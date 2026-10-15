@@ -119,14 +119,14 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
       let mine = [];
       for (let n = 0; n < 100 && !mine.length; n++) { if (n) await new Promise((r) => setTimeout(r, 100)); mine = await run2(`[...document.querySelectorAll('#c-button .pg-area[data-area="motion"] tbody tr')].map((tr) => tr.textContent)`); }
       assert.equal(await run2(`[...document.querySelectorAll('#c-button .pg-area[data-area="motion"] thead th')].map((th) => th.textContent).join('|')`), 'Task nr|What happens|Code|Figma|What to do|Status');
-      assert.ok(mine.some((r) => /On hover.*250ms, ease-outIts prototype, State Default to Hover.*Claude in the code(Make it|Give it a transition of) 250ms, ease-out, as Figma has it \(its prototype, State Default to Hover\)\. Tell Claude to do it\./.test(r)), JSON.stringify(mine));
+      assert.ok(mine.some((r) => /On hover.*250ms, ease-outIts prototype, State Default to Hover.*A developer in the code(Make it|Give it a transition of) 250ms, ease-out, as Figma has it \(its prototype, State Default to Hover\)\. A developer does it, or Claude when asked\./.test(r)), JSON.stringify(mine));
       assert.ok(mine.some((r) => /Opensfades in\.button200ms, ease-out.*src\/components\/button\.css:\d+Keeps moving for less motionNoneYou in FigmaAnimate it in Figma as the code does \(fades in, 200ms, ease-out\), on its Motion timeline or in its prototype/.test(r)), JSON.stringify(mine));
       assert.match(await run2(`document.querySelector('#c-button .pg-areas [data-v="motion"]').textContent`), /^Motion, \d+ to fix$/, 'its tab says what is to do');
       assert.equal(await run2(`[...document.querySelectorAll('#c-button tr[data-area="Parity"]')].filter((tr) => /Motion/.test(tr.cells[1] && tr.cells[1].textContent)).length`), 0, 'motion is its own kind, not Parity');
       // On the Tasks page, a kind of its own with the same rows, only what is to do.
       await run2(`location.hash = '#tasks/motion'`); await new Promise((r) => setTimeout(r, 300));
       const tasks = await run2(`[...document.querySelectorAll('#tasks .sg-todo-kind[data-area="Motion"] tbody tr')].map((tr) => tr.textContent)`);
-      assert.deepEqual(tasks, mine.filter((r) => /You in Figma|Claude in the code/.test(r)), 'the same rows, only what is to do');
+      assert.deepEqual(tasks, mine.filter((r) => /You in Figma|A developer in the code/.test(r)), 'the same rows, only what is to do');
       // The foundations' motion page: the system's timings in one table, from the fastest, each with its variables, what
       // it is for, who moves so, Figma and what the system could do; the variables no component uses are rows too.
       await run2(`location.hash = '#motion'`); await new Promise((r) => setTimeout(r, 300));

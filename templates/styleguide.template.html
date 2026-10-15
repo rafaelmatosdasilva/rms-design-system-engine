@@ -26,10 +26,9 @@
   --sg-bg: light-dark(Canvas, #161618); --sg-bg-2: light-dark(Canvas, #1e1e21); --sg-surface: light-dark(Canvas, #161618); --sg-stage: var(--sg-bg);
   --sg-text: light-dark(CanvasText, #e6e6e8); --sg-text-2: light-dark(CanvasText, #d4d4d8); --sg-muted: light-dark(GrayText, #a1a1aa); --sg-border: light-dark(GrayText, #52525b); --sg-accent: AccentColor;
   --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-border);
-  /* The default type: each weight a step above the browser's (500 for text, 800 for headings), every line 2px taller
-     than the browser's normal one. */
+  /* The default type: its text a step above the browser's (500), its headings 800, its lines 1.4 apart. */
   --sg-xs: 0.6875rem; --sg-s: 0.75rem; --sg-s-weight: 500; --sg-m: 0.8125rem; --sg-m-weight: 500; --sg-l: 0.875rem; --sg-l-weight: 800;
-  --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: calc(1.2em + 2px);
+  --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: 1.4;
   /* A page's title: the system's largest text style, scaled up, so the guide has its own hierarchy above any system's
      text styles while every size still comes from the system ("title-scale" in styleguide.chrome, ds-config.json, changes it). */
   --sg-title-scale: 3.125; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
@@ -53,6 +52,9 @@ html, body.sg-page { background: var(--sg-bg); }
 html { overflow: visible; height: auto; }
 /* The page's text in the page's own colour: a system's body rule that sets one still wins (this one weighs nothing). */
 :where(html) { color: var(--sg-text); }
+/* The page's own words with room between their lines; a component drawn on it keeps the line height its system gives. */
+.sg-main, .sg-sidebar { line-height: var(--sg-lh); font-weight: var(--sg-m-weight); }   /* its words in the system's text weight, never the browser's thinner one */
+.pg-preview, .sg-thumb, .pg-variant-stage, .pg-example-stage { line-height: normal; }
 body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: block; padding: 0; }
 
 /* ── Page layout ─────────────────────────────────────────────────────────── */
@@ -74,7 +76,13 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* ── Every switch on the page is the system's segmented control. With none (or none read yet), the page's default one:
    its options in a track, the chosen one raised, all in the system's roles (or the template's defaults). ───────────── */
 .sg-seg { display: flex; flex-wrap: wrap; width: 100%; gap: var(--sg-space-xxs); }
-.sg-seg button { font: inherit; }
+.sg-seg button { font: inherit; font-weight: normal; }
+/* The page's default button, where the system has no text button of its own: a soft fill of the page's text colour
+   (lighter on a dark page, darker on a light one), the tables' line and corners, its words in the page's text colour. */
+.sg-btn { display: inline-flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius); background: color-mix(in srgb, var(--sg-text) 8%, transparent); color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-decoration: none; cursor: pointer; white-space: nowrap; }
+.sg-btn:hover { background: color-mix(in srgb, var(--sg-text) 14%, transparent); }
+.sg-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-btn[aria-pressed="true"] { background: color-mix(in srgb, var(--sg-text) 20%, transparent); }   /* a switch's words keep the browser's weight, whatever the text around it takes */
 .sg-seg-default { padding: var(--sg-space-xxs); border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-bg-2); }
 .sg-seg-default > button { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: var(--sg-space-xs); min-height: 1.5rem; margin: 0; padding: var(--sg-space-xs) var(--sg-space-m); border: 0; border-radius: calc(var(--sg-radius) - var(--sg-space-xxs)); background: transparent; color: var(--sg-text-2); font-size: var(--sg-s); line-height: var(--sg-lh); cursor: pointer; white-space: nowrap; }   /* each option at least 24px tall (WCAG 2.5.8) */
 .sg-seg-default > button:hover { color: var(--sg-text); }
@@ -182,9 +190,10 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
   .sg-card-grid.pg-usedin, .sg-main .sg-icon-grid, .sg-main .sg-screens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 /* Each overview link is the system's own card (DATA.ui.card); with none (or none read yet), the page's default card: the
-   tables' border, corners and shadow. Set at no specificity, so the system's card class wins on what it sets. */
+   tables' border, corners and shadow, on the page's own cards only (sg-card--own), so neither the system's card nor its
+   reset (div { border: 0 }) takes them away. */
 .sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
-:where(.sg-card) { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); }
+.sg-card.sg-card--own { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); overflow: hidden; }
 .sg-card[hidden], .sg-section[hidden], .sg-hr[hidden], .sg-nav a[hidden] { display: none; }
 .sg-hero > h1[tabindex="-1"]:focus, .pg-head > h2[tabindex="-1"]:focus, .sg-section > h2[tabindex="-1"]:focus { outline: none; }   /* the heading a new view moves focus to, for a screen reader */
 .sg-overview-group { margin-bottom: var(--sg-space-xl); }
@@ -235,7 +244,9 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-demo.sg-demo--col { flex-direction: column; align-items: stretch; gap: var(--sg-space-s); }
 /* Six colours a row, each as wide as the room allows, so its Figma name and variable have room to read. */
 .color-chip-value { font-size: var(--sg-xs); color: var(--sg-muted); word-break: normal; overflow-wrap: anywhere; }   /* a long variable breaks after a hyphen, never inside a word when it fits */
-.sg-uses-link { color: inherit; }   /* a link in the colour around it, underlined */
+/* Every link in the page's words and tables looks the same as a token's in the Playground: the colour around it,
+   underlined, whatever the system's reset does to links (a { text-decoration: none }). A card, a tab or the menu is not one. */
+.sg-uses-link, :is(.sg-todo, .sg-health, .pg-doc, .pg-par, .sg-uses, .sg-pending) :is(td, th, li, dd, dt) > a[href]:not(.sg-card) { color: inherit; text-decoration: underline; cursor: pointer; }
 /* A token's name opens a panel in place: underlined like a link, in the text around it, no box of its own. */
 .sg-token-link { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; text-align: inherit; }
 .sg-token-pop { position: absolute; z-index: 60; background: var(--sg-bg); border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); padding: var(--sg-space-m); font-size: var(--sg-m); color: var(--sg-text); }
@@ -552,7 +563,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-doc > .pg-from { margin-top: var(--sg-space-s); }
 .pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: var(--sg-space-m); align-items: start; }
 .pg-inspect-grid.pg-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* Parity: two columns */
-.sg-seg-icon { width: var(--sg-icon); height: var(--sg-icon); flex: none; color: var(--sg-warning); vertical-align: middle; margin-right: var(--sg-space-xxs); }
+.sg-seg-icon { width: 0.75em; height: 0.75em; flex: none; color: var(--sg-warning); vertical-align: middle; margin-right: var(--sg-space-xxs); }
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: clip; box-shadow: var(--sg-shadow); }
 .pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-inspect table { width: 100%; border-collapse: collapse; }
@@ -818,7 +829,10 @@ a.pg-usage-name { color: var(--sg-text); }
   document.addEventListener('mouseout', function (e) { var t = e.target.closest && e.target.closest('.sg-tip'); if (t && !t.contains(e.relatedTarget) && !t.contains(document.activeElement)) t.classList.remove('is-dismissed'); });
   document.addEventListener('focusout', function (e) { var t = e.target.closest && e.target.closest('.sg-tip'); if (t && !t.contains(e.relatedTarget) && !t.matches(':hover')) t.classList.remove('is-dismissed'); });
   // The system's own icon for a warning (its name says so), else none: the count is still said.
-  var ALERT_ICON = (DATA.icons || []).find(function (i) { return /warn|alert|caution|attention|exclam/i.test(i); }) || (DATA.icons || []).find(function (i) { return /error|danger/i.test(i); }) || null;
+  // A switch that needs attention (an area with something to do) carries the page's own small warning mark, never one
+  // of the system's icons: the page's sign, the same on every system.
+  var ALERT_ICON = 'warn';
+  var WARN_SVG = '<svg class="sg-seg-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1Zm-.9 3.5h1.8l-.3 5H7.4l-.3-5ZM8 10.6a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>';
   // name: what the switch chooses. The group says it (WCAG 1.3.1, 4.1.2): the page's own row is a named group, and the
   // system's control carries the name itself, so the role its script gives it (a radio group) has its name.
   function segHTML(items, name) {
@@ -828,7 +842,7 @@ a.pg-usage-name { color: var(--sg-text); }
     return open + items.map(function (o) {
       var text = SEG && SEG.item.label ? '<span class="' + esc(SEG.item.label) + '">' + esc(o.label) + '</span>' : esc(o.label);
       // A mark beside the words (the system's alert icon on Parity while something differs), with what it means said.
-      if (o.icon) text = '<svg class="sg-seg-icon" aria-hidden="true"><use href="#' + esc(o.icon) + '"/></svg>' + text;
+      if (o.icon) text = WARN_SVG + text;
       if (o.say) text += '<span class="sg-hidden-text">, ' + esc(o.say) + '</span>';
       // A radio: its input carries the choice and the label around it is what a click lands on.
       if (RADIO) text = '<input type="radio" name="' + group + '"' + (RADIO.length ? ' class="' + esc(RADIO.join(' ')) + '"' : '') + (o.off ? ' disabled' : '') + '>' + text;
@@ -866,7 +880,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var tag = TABS ? TABS.item.tag : 'button', cls = TABS ? TABS.item.classes.join(' ') : 'sg-tab';
     return (TABS ? TABS.open : '<div class="sg-tabs">') + items.map(function (o) {
       var text = TABS && TABS.item.label ? '<span class="' + esc(TABS.item.label) + '">' + esc(o.label) + '</span>' : esc(o.label);
-      if (o.icon) text = '<svg class="sg-seg-icon" aria-hidden="true"><use href="#' + esc(o.icon) + '"/></svg>' + text;
+      if (o.icon) text = WARN_SVG + text;
       if (o.say) text += '<span class="sg-hidden-text">, ' + esc(o.say) + '</span>';
       return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '">' + text + '</' + tag + '>';
     }).join('') + (TABS ? TABS.close : '</div>');
@@ -953,11 +967,11 @@ a.pg-usage-name { color: var(--sg-text); }
   var FLAT = []; (TOKENS.colors || []).forEach(function (g) { FLAT = FLAT.concat(g.items); });
 
   /* ── To do: every difference and everything not built yet, numbered, by who acts ──────────────────────────────
-     In Figma (the person), in the code (ask Claude), or a decision first. The numbers are the same in each component's
+     In Figma (the person), in the code (a developer, or Claude when asked), or a decision first. The numbers are the same in each component's
      own list, so "do 3 and 7" names them. */
-  // Who acts on an item: you in the Figma file, Claude in the code (tell Claude its number), you deciding which side is
+  // Who acts on an item: you in the Figma file, a developer in the code (or Claude, told its number), you deciding which side is
   // right when Figma and the code each have a case, or you checking by hand what only a person can judge.
-  var WHO = { figma: 'You in Figma', code: 'Claude in the code', both: 'You decide', person: 'You check by hand' };
+  var WHO = { figma: 'You in Figma', code: 'A developer in the code', both: 'You decide', person: 'You check by hand' };
   // Who acts on an accessibility row: Figma when what is missing is in Figma (a role not stated yet), never when the
   // code fails what a Figma note asks (the note is right, the code changes); a colour pair is a design decision; what
   // only a person can judge is checked by hand; the rest is the code's. its: the row's open items ({ st, from }).
@@ -974,7 +988,7 @@ a.pg-usage-name { color: var(--sg-text); }
   COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
     (c.differences || []).forEach(function (x) { TODO.push({ kind: 'parity', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
     (c.a11yFindings || []).forEach(function (x) { TODO.push({ kind: 'a11y', who: x.who || 'both', comp: c.name, key: c.name + '\u0000' + x.what, say: x.plain || x.what, todo: x.todo }); });
-    (c.unbuilt || []).forEach(function (u) { TODO.push({ kind: 'parity', who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. Tell Claude to do it.' }); });
+    (c.unbuilt || []).forEach(function (u) { TODO.push({ kind: 'parity', who: 'code', comp: c.name, say: 'Figma has the ' + u.label + ' property on ' + c.name + '; the code does not build it yet.', todo: 'Build the ' + u.label + ' property of ' + c.name + ' in the code. A developer does it, or Claude when asked.' }); });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
     if (c.codeOnly && c.codeOnly.figma) TODO.push({ kind: 'parity', who: 'figma', comp: c.name, say: 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it.', todo: 'Make ' + c.name + ' a component in Figma, or tell the code team it is not part of the system.' });
   });
@@ -986,7 +1000,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var PAIRING = {}; (DATA.systemTodo || []).forEach(function (t) { if (t.pairing) PAIRING[t.pairing] = true; });
   // A component only the code has, once Figma's components are captured: not on the page, a task each, with its file.
   (DATA.notInFigma || []).forEach(function (k) { TODO.push({ who: 'figma', comp: null, area: 'Parity', type: 'Component', codeFile: k.file, say: 'The code has ' + k.name + ' (' + k.file + '); Figma has no component for it.', todo: 'Add ' + k.name + ' to Figma, or remove it from the code.' }); });
-  ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); if (PAIRING[n]) return; TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. Tell Claude to do it.' }); });
+  ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); if (PAIRING[n]) return; TODO.push({ who: 'code', comp: null, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code. A developer does it, or Claude when asked.' }); });
   var ORDER = ['figma', 'code', 'both'];
   TODO.sort(function (a, b) { return ORDER.indexOf(a.who) - ORDER.indexOf(b.who); });
   TODO.forEach(function (t, i) { t.no = i + 1; });   // numbered again in the order the Tasks page shows (fillTodo)
@@ -1037,7 +1051,7 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   var THUMBS = {};
   function card(grid, id, label, title, sub, thumb, status, facts) {
-    var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ''); a.href = '#' + id; a.dataset.name = title.toLowerCase();
+    var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ' sg-card--own'); a.href = '#' + id; a.dataset.name = title.toLowerCase();
     // The thumbnail and the name, with how ready it is when the team said so: the group heading says what it is.
     a.innerHTML = '<div class="sg-thumb" aria-hidden="true">' + (thumb || '') + '</div><h3>' + esc(title) + (status ? ' ' + statusPill(status) : '') + '</h3>' + (facts || '');
     grid.appendChild(a); THUMBS[id] = a.querySelector('.sg-thumb'); return a;
@@ -1058,7 +1072,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var motTimings = MOT ? (MOT.overview || []).filter(function (r) { return !r.unused; }).length : 0;
   if (MOT && (MOT.overview || []).length) card(fGrid, 'motion', 'Foundations', 'motion', motTimings ? motTimings + (motTimings === 1 ? ' timing' : ' timings') + ' the components move with.' : motN + ' duration and easing tokens.', (MOT.easings || []).slice(0, 3).map(function (t) { return motionCurve(t.bezier); }).join(''));
   if ((DATA.icons || []).length) card(fGrid, 'icons', 'Foundations', 'icons', DATA.icons.length + ' icons from the system\'s sheet.', DATA.icons.slice(0, 5).map(function (id) { return '<svg width="24" height="24" aria-hidden="true"><use href="#' + esc(id) + '"/></svg>'; }).join(''));
-  var cGrid = COMPONENTS.length ? group('Components', GROUPS.components || 'Each one drawn from the code itself, with what Figma and the code agree on. Open one to try it, read how to use it and see where it is used.') : null;
+  var cGrid = COMPONENTS.length ? group('Components (' + COMPONENTS.length + ')', GROUPS.components || 'Each one drawn from the code itself, with what Figma and the code agree on. Open one to try it, read how to use it and see where it is used.') : null;
   // Its Figma description, else its note, else the props it offers.
   var about = function (c) {
     var d = (c.description || '').replace(/@\w+/g, '').trim() || (c.note || '').trim(); if (d) return d;
@@ -1106,7 +1120,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var hl = section('health', 'Health', 'How the system is doing', 'Each area\'s progress and the components with the most left. The tasks are on the Tasks page.');
   // The Tasks page: its place in the page here, its lists once the accessibility checks below are defined (fillTodo).
   hr(); navLink('tasks', 'tasks');
-  var td = section('tasks', 'Tasks', 'What to do', 'Everything still open, by component, with who does each one. Tell Claude which to do, for example do 3 and 7.');
+  var td = section('tasks', 'Tasks', 'What to do', 'Everything still open, by component, with who does each one. A developer takes those in the code, or tells Claude which to do, for example do 3 and 7.');
   // Changelog: every component's changes gathered by the release they shipped in, newest first, each a table of
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
@@ -1207,7 +1221,8 @@ a.pg-usage-name { color: var(--sg-text); }
   // The chosen size lives on a holder of its own. The samples a drawing makes take it (sized(el)), and their values are
   // read from them; the page around them (the switch, the cards, the tables) stays as it is.
   var DRAWERS = [];   // every foundation's drawing, re-read when the page's mode changes
-  function sizeSwitch(sec, draw) { return modeSwitch(sec, draw, function (a) { return a.scoped && a.attr !== 'data-color' && !a.classes; }); }
+  // A size is never a colour: spacing, radii and text change with the breakpoints only, never with Light and Dark.
+  function sizeSwitch(sec, draw) { return modeSwitch(sec, draw, function (a) { return a.scoped && !a.colour && a.attr !== 'data-color' && !a.classes; }); }
   // The same for the colour modes (Light and Dark) on the colours page.
   function colourSwitch(sec, draw) { return modeSwitch(sec, draw, function (a) { return a.scoped && !a.classes && a.attr !== 'data-size' && (a.colour || a.attr === 'data-color'); }); }
   function modeSwitch(sec, draw, pick) {
@@ -1343,9 +1358,9 @@ a.pg-usage-name { color: var(--sg-text); }
     var timing = function (m) { return motionTiming(m) + (m.delay ? ', after ' + m.delay + 'ms' : ''); };
     return (c.moves || []).map(function (r) {
       var anim = /^(Repeats|Opens|Closes)$/.test(r.when) ? 'an animation' : 'a transition';
-      var todo = r.status === 'differs' ? 'Make it ' + r.figma.ms + 'ms, ' + r.figma.easing + ', as Figma has it (' + r.figma.from + '). Tell Claude to do it.'
+      var todo = r.status === 'differs' ? 'Make it ' + r.figma.ms + 'ms, ' + r.figma.easing + ', as Figma has it (' + r.figma.from + '). A developer does it, or Claude when asked.'
         : r.status === 'figma-none' ? 'Animate it in Figma as the code does (' + r.what + ', ' + r.code.ms + 'ms, ' + r.code.easing + '), on its Motion timeline or in its prototype, or tell Claude to stop it in the code.'
-        : r.status === 'code-none' ? 'Give it ' + anim + ' of ' + r.figma.ms + 'ms, ' + r.figma.easing + ', as Figma has it (' + r.figma.from + '). Tell Claude to do it.' : '';
+        : r.status === 'code-none' ? 'Give it ' + anim + ' of ' + r.figma.ms + 'ms, ' + r.figma.easing + ', as Figma has it (' + r.figma.from + '). A developer does it, or Claude when asked.' : '';
       var st = r.status === 'same' ? 'done' : r.status === 'differs' || r.status === 'figma-none' || r.status === 'code-none' ? 'todo' : 'none';
       return { key: c.name + '\u0000motion:' + r.when + ':' + (r.part || '') + ':' + r.what, area: 'Motion', kind: r.when, kindHTML: esc(r.when) + val(r.what) + (r.part ? '<span class="pg-par-val"><code>' + esc(r.part) + '</code></span>' : ''),
         code: r.code ? '<code>' + esc(timing(r.code)) + '</code>' + val(r.code.vars.join(', ')) + val(r.code.at) + val(r.code.calm ? 'Stops for less motion' : 'Keeps moving for less motion') : '<span class="pg-par-none">None</span>',
@@ -1802,7 +1817,8 @@ a.pg-usage-name { color: var(--sg-text); }
   // icon: one of the system's icons after the words (a link that opens elsewhere).
   function sysButton(tag, label, attrs, plainClass, icon) {
     var b = DATA.ui && DATA.ui.button, ic = icon ? '<svg class="sg-link-icon" aria-hidden="true"><use href="#' + esc(icon) + '"/></svg>' : '';
-    if (!b) return '<' + tag + (plainClass ? ' class="' + plainClass + '"' : '') + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + esc(label) + ic + '</' + tag + '>';
+    // With none, the page's default button (sg-btn): every such action looks the same, as a button.
+    if (!b) return '<' + tag + ' class="' + (plainClass ? plainClass + ' ' : '') + 'sg-btn"' + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + esc(label) + ic + '</' + tag + '>';
     var text = b.label ? '<' + b.label.tag + (b.label.cls ? ' class="' + esc(b.label.cls) + '"' : '') + '>' + esc(label) + '</' + b.label.tag + '>' : esc(label);
     return '<' + tag + ' class="' + esc(b.cls) + '"' + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + text + ic + '</' + tag + '>';
   }
@@ -2172,7 +2188,7 @@ a.pg-usage-name { color: var(--sg-text); }
       else if (kx) { var kr = keptRow(kx); row.st = kr.st; row.who = kr.who; row.todo = kr.todo; row.rel = kr.rel; row.at = kr.at || row.at; }
       else if (r.status === 'match') row.st = 'done';
       else if (r.status === 'paired') { row.st = 'skip'; row.todo = r.why ? esc(capital(r.why) + '.') : ''; }
-      else if (nb) { row.st = 'todo'; row.who = WHO.code; row.todo = esc('Build the ' + nb + ' property of ' + c.name + ' in the code. Tell Claude to do it.'); }
+      else if (nb) { row.st = 'todo'; row.who = WHO.code; row.todo = esc('Build the ' + nb + ' property of ' + c.name + ' in the code. A developer does it, or Claude when asked.'); }
       else if (r.status === 'figma') { row.st = 'check'; row.who = WHO.both; row.todo = esc('Build it in the code, or remove it from Figma.'); }
       else if (r.status === 'code') { row.st = 'check'; row.who = WHO.both; row.todo = esc('Add it to Figma, or remove it from the code.'); }
       else if (r.why) { row.st = 'todo'; row.who = WHO.figma; row.todo = esc(capital(r.why) + '. Take the library update in this Figma file.'); }
@@ -2195,7 +2211,7 @@ a.pg-usage-name { color: var(--sg-text); }
     (c.unbuilt || []).forEach(function (u) {
       var label = u.label || String(u);
       if (out.some(function (r) { return r.type === 'Prop' && r.st === 'todo' && r.who === WHO.code && r.figma.indexOf('>' + esc(label) + '<') >= 0; })) return;
-      out.push({ key: c.name + '\u0000unbuilt:' + label, area: 'Parity', kind: 'Prop', type: 'Prop', figma: side({ name: label, value: '' }), code: side(null), todo: esc('Build the ' + label + ' property of ' + c.name + ' in the code. Tell Claude to do it.'), who: WHO.code, st: 'todo', rel: PAR_REL.figma, at: at0 });
+      out.push({ key: c.name + '\u0000unbuilt:' + label, area: 'Parity', kind: 'Prop', type: 'Prop', figma: side({ name: label, value: '' }), code: side(null), todo: esc('Build the ' + label + ' property of ' + c.name + ' in the code. A developer does it, or Claude when asked.'), who: WHO.code, st: 'todo', rel: PAR_REL.figma, at: at0 });
     });
     // Where it moves otherwise than Figma's prototype (C5): a change Figma animates and the code makes at once, another
     // duration, another curve. The prototype is the design: the code follows it.
@@ -2207,15 +2223,15 @@ a.pg-usage-name { color: var(--sg-text); }
       var code = m.code ? '<code>' + esc(m.code.ms + 'ms') + '</code><span class="pg-par-val">' + esc(m.code.easing + (m.code.what ? ', ' + m.code.what : '') + ' · ' + m.code.selector + ' · ' + m.code.file + ':' + m.code.line) + '</span>' : side(null);
       var anim = m.motion === 'loop' ? 'an animation that repeats' : m.motion ? 'an animation as it ' + (m.motion === 'open' ? 'opens' : 'closes') : 'a transition';
       var todo = m.kind === 'figma-none' ? 'Animate it in Figma as the code does (' + m.code.what + ', ' + m.code.ms + 'ms, ' + m.code.easing + '), on its Motion timeline or in its prototype, or tell the code team to stop it.'
-        : m.kind === 'none' ? 'Give it ' + anim + ' of ' + m.figma.ms + 'ms, ' + m.figma.easing + ', as Figma has it' + (m.motion ? ' (' + m.figma.what + ')' : '') + '. Tell Claude to do it.'
-        : m.kind === 'duration' ? 'Make ' + (m.motion ? 'its animation' : 'the transition') + ' ' + m.figma.ms + 'ms, as Figma has it. Tell Claude to do it.' : 'Ease it ' + m.figma.easing + ', as Figma does. Tell Claude to do it.';
+        : m.kind === 'none' ? 'Give it ' + anim + ' of ' + m.figma.ms + 'ms, ' + m.figma.easing + ', as Figma has it' + (m.motion ? ' (' + m.figma.what + ')' : '') + '. A developer does it, or Claude when asked.'
+        : m.kind === 'duration' ? 'Make ' + (m.motion ? 'its animation' : 'the transition') + ' ' + m.figma.ms + 'ms, as Figma has it. A developer does it, or Claude when asked.' : 'Ease it ' + m.figma.easing + ', as Figma does. A developer does it, or Claude when asked.';
       out.push({ key: c.name + '\u0000motion:' + m.kind + ':' + m.trigger + ':' + m.change, area: 'Parity', kind: 'Motion', type: 'Other', figma: fig, code: code, todo: esc(capital(m.change) + '. ' + todo), who: m.kind === 'figma-none' ? WHO.figma : WHO.code, st: 'todo', rel: m.kind === 'figma-none' ? PAR_REL.code : PAR_REL.differs, at: at0 });
     });
     // What it draws past its colours (A9): a shadow, a blur, a gradient or image fill, clipping, blending, opacity. One
     // Figma has is the code's to follow; one only the code has, or Figma's clipping, is a decision.
     (c.effectDiffs || []).forEach(function (e) {
       var fig = '<span class="pg-par-val">' + esc(capital(e.figma)) + '</span>', code = '<span class="pg-par-val">' + esc(capital(e.code)) + '</span><span class="pg-par-val">' + esc(e.at) + '</span>';
-      var todo = e.side === 'code' ? 'Draw it as Figma does. Tell Claude to do it.' : 'Decide which one is right: add it to Figma, or change the code.';
+      var todo = e.side === 'code' ? 'Draw it as Figma does. A developer does it, or Claude when asked.' : 'Decide which one is right: add it to Figma, or change the code.';
       out.push({ key: c.name + '\u0000effect:' + (e.part || '') + ':' + e.what, area: 'Parity', kind: 'Effect', type: 'Other', figma: fig, code: code, todo: esc(capital((e.part ? e.part + ' ' : '') + e.what) + '. ' + todo), who: e.side === 'code' ? WHO.code : WHO.both, st: e.side === 'code' ? 'todo' : 'check', rel: PAR_REL.differs, at: at0 });
     });
     // A component only the code has, while Figma has components of its own: Figma's to make, or the code's to retire.
@@ -2259,7 +2275,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // small, and its name), linked to its page ──────────────────────────────────────────────────────────────────────────
   function builtWithHTML(c) {
     return '<div class="sg-card-grid">' + (c.uses || []).map(function (n) {
-      return '<a class="sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : '') + '" href="#' + esc(cid(n)) + '"><div class="sg-thumb" aria-hidden="true" data-thumb="' + esc(n) + '"></div><h3>' + esc(n) + '</h3></a>';
+      return '<a class="sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : ' sg-card--own') + '" href="#' + esc(cid(n)) + '"><div class="sg-thumb" aria-hidden="true" data-thumb="' + esc(n) + '"></div><h3>' + esc(n) + '</h3></a>';
     }).join('') + '</div>';
   }
   // ── Links: where else it lives (Figma, its code, the team's documentation), each opening in a new tab ────────────
@@ -2368,7 +2384,7 @@ a.pg-usage-name { color: var(--sg-text); }
         (p.w ? boxes.map(function (b) { return '<span class="pg-mark" style="left:' + pct(b[0], p.w) + ';top:' + pct(b[1], p.h) + ';width:' + pct(b[2], p.w) + ';height:' + pct(b[3], p.h) + '"></span>'; }).join('') : '') + '</div>' : '';
       var where = k.ownInstead ? 'Draws its own instead (' + k.ownInstead + '); its Tasks say to use this one.' : k.figmaOnly ? 'Its screens use it in Figma; its code builds it by hand.' : k.places ? (k.places === 1 ? 'Once in its code.' : k.places + ' times in its code.') : '';
       var note = [where, !p || p.from === 'image' ? '' : boxes.length ? (boxes.length === 1 ? 'Marked where it shows when the product opens.' : 'Marked in the ' + boxes.length + ' places it shows when the product opens.') : 'Not on the screen it opens with.'].filter(Boolean).join(' ');
-      var tag = k.href ? 'a' : 'div', cls = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : '');
+      var tag = k.href ? 'a' : 'div', cls = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ' sg-card--own');
       return '<' + tag + ' class="' + cls + '"' + (k.href ? ' href="' + esc(k.href) + '" target="_blank" rel="noopener"' : '') + '>' + shot + '<h3>' + esc(k.name) + '</h3>' + (note ? '<p class="pg-selector">' + esc(note) + '</p>' : '') + '</' + tag + '>';
     }).join('') + '</div>';
   }
@@ -2488,7 +2504,7 @@ a.pg-usage-name { color: var(--sg-text); }
     return m.products.map(function (p) {
       return { key: c.name + '\u0000migration:' + p.name, area: 'Migration', kind: 'Retired', figma: '', code: '<code>' + esc(p.name) + '</code><span class="pg-par-val">' + esc(p.count + (p.count === 1 ? ' place' : ' places')) + '</span>',
         where: esc(p.name) + '<span class="pg-par-val">' + esc(p.count + (p.count === 1 ? ' place' : ' places') + ': ' + p.at.join(', ') + (p.count > p.at.length ? ', and ' + (p.count - p.at.length) + ' more' : '')) + '</span>',
-        todo: esc('Move ' + (p.name === 'This system' ? 'this system' : p.name) + ' off ' + c.name + ' (' + p.at.join(', ') + (p.count > p.at.length ? ', and ' + (p.count - p.at.length) + ' more' : '') + ').') + '<span class="pg-todo">' + esc((m.toName ? 'Use ' + m.toName + ' instead. ' : 'Decide what replaces it first. ') + 'Every place is in migrations.md. Tell Claude to do it.') + '</span>',
+        todo: esc('Move ' + (p.name === 'This system' ? 'this system' : p.name) + ' off ' + c.name + ' (' + p.at.join(', ') + (p.count > p.at.length ? ', and ' + (p.count - p.at.length) + ' more' : '') + ').') + '<span class="pg-todo">' + esc((m.toName ? 'Use ' + m.toName + ' instead. ' : 'Decide what replaces it first. ') + 'Every place is in migrations.md. A developer does it, or Claude when asked.') + '</span>',
         who: m.toName ? WHO.code : WHO.both, st: m.toName ? 'todo' : 'check', rel: '', at: DATA.builtAt || null };
     });
   }
@@ -2554,6 +2570,9 @@ a.pg-usage-name { color: var(--sg-text); }
     var no = 0;
     Object.keys(TODO_NO).forEach(function (k) { delete TODO_NO[k]; });
     byKind.forEach(function (k) { k.groups.forEach(function (g) { g.rows.forEach(function (r) { r.no = ++no; TODO_NO[r.key] = r.no; }); }); });
+    // While the rest is still being tried, what a component already tried has to fix is numbered too, after everything
+    // else: its own Accessibility area shows the number, and no other number moves when more come in.
+    if (wait) order.forEach(function (g) { if (!tried.some(function (c) { return c.name === g.name; })) return; byStatus(g.rows.filter(function (r) { return r.area === 'Accessibility'; })).forEach(function (r) { if (!TODO_NO[r.key]) TODO_NO[r.key] = ++no; }); });
     var all = byKind.reduce(function (n, k) { return n + k.groups.reduce(function (m, g) { return m + g.rows.length; }, 0); }, 0);
     Array.prototype.forEach.call(document.querySelectorAll('.sg-todo-no[data-todo-key]'), function (el) {
       var tr = el.closest('tr'), n = TODO_NO[decodeURIComponent(el.dataset.todoKey)];
@@ -2938,7 +2957,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (!btn) return;
     Array.prototype.forEach.call(btn.querySelectorAll('.sg-seg-icon, .sg-hidden-text'), function (n) { n.remove(); });
     if (!on) return;
-    if (ALERT_ICON) { var svg = '<svg class="sg-seg-icon" aria-hidden="true"><use href="#' + esc(ALERT_ICON) + '"/></svg>', inp = btn.querySelector('input'); if (inp) inp.insertAdjacentHTML('afterend', svg); else btn.insertAdjacentHTML('afterbegin', svg); }
+    if (ALERT_ICON) { var svg = WARN_SVG, inp = btn.querySelector('input'); if (inp) inp.insertAdjacentHTML('afterend', svg); else btn.insertAdjacentHTML('afterbegin', svg); }
     if (say) btn.insertAdjacentHTML('beforeend', '<span class="sg-hidden-text">, ' + esc(say) + '</span>');
   }
   // Its Accessibility rows, one per criterion, in the table every issue shares: the criterion (what it means opens from
@@ -4005,6 +4024,23 @@ a.pg-usage-name { color: var(--sg-text); }
       wrap.addEventListener('click', function (e) { if (e.target === wrap || o.layers.some(function (z) { return e.target.classList.contains(z); }) || e.target.closest('button, a')) close(); });
       document.addEventListener('keydown', key, true);
       var first = Array.prototype.find.call(card.querySelectorAll('button, a[href], input, select, textarea, [tabindex]'), function (k) { return !k.disabled && k.getClientRects().length && getComputedStyle(k).visibility !== 'hidden'; });
+      if (!first) { card.setAttribute('tabindex', '-1'); first = card; }
+      first.focus();
+    });
+    // A component its build draws teleported away (a modal, opened over the window by its own wrapper): opened over the
+    // page from that drawing, the system's own overlay and motion with it; closed by Escape, a click outside it or any of
+    // its buttons.
+    else if (!(mv && mv.overlay) && (c.renders || []).some(function (r) { return r.label === 'opened'; })) action('Open ' + c.name, function (trigger) {
+      var r = c.renders.filter(function (x) { return x.label === 'opened'; })[0], wrap = rootOf(r.markup); if (!wrap) return;
+      AXES.forEach(function (a) { if (a.attr && preview.hasAttribute(a.attr)) wrap.setAttribute(a.attr, preview.getAttribute(a.attr)); });
+      var card = wrap.querySelector('[class]:not(:empty)') || wrap; if (!card.getAttribute('role')) card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', c.name);
+      document.body.appendChild(wrap);
+      var closing = false;
+      function key(e) { if (e.key === 'Escape') close(); }
+      function close() { if (closing) return; closing = true; document.removeEventListener('keydown', key, true); setTimeout(function () { wrap.remove(); trigger.focus(); }, playTime(wrap) + 30); }
+      wrap.addEventListener('click', function (e) { if (!card.contains(e.target) || e.target.closest('button, a')) close(); });
+      document.addEventListener('keydown', key, true);
+      var first = Array.prototype.find.call(card.querySelectorAll('button, a[href], input, select, textarea, [tabindex]'), function (k) { return !k.disabled && k.getClientRects().length; });
       if (!first) { card.setAttribute('tabindex', '-1'); first = card; }
       first.focus();
     });

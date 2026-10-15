@@ -507,7 +507,7 @@ test('in the browser: no script error, a control changes the real component, the
     // One kind at a time, each in its own table, chosen with the filter; no list of every kind at once.
     const shownKind = () => run(`[...document.querySelectorAll('#tasks .sg-todo-kind')].filter((k) => k.getClientRects().length).map((k) => k.dataset.area)`);
     const shownHead = () => run(`document.querySelector('#tasks .sg-todo-kind:not([hidden]) thead').textContent`);
-    assert.match((await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^Parity \(\d+\)\|(Motion \(\d+\)\|)?Documentation \(\d+\)\|.*Accessibility \(\d+\)$/, 'Accessibility last, the kind that waits');
+    assert.match((await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].map((b) => b.textContent).join('|')`)), /^Parity \(\d+\)\|(Motion \(\d+\)\|)?Documentation \(\d+\)\|.*Accessibility \(\d+\)(\|Style guide \(\d+\))?$/, 'Accessibility after the rest, the kind that waits; the Style guide\'s own stand-ins last');
     assert.equal(await run(`[...document.querySelectorAll('#tasks .sg-todo-filter [data-v]')].some((b) => b.dataset.v === 'all')`), false, 'no All');
     assert.deepEqual(await shownKind(), ['Parity']);
     assert.equal(await run(`(() => { const h = document.querySelector('#tasks .sg-todo-head'); return [...h.children].map((e) => e.classList.contains('sg-todo-filter') ? 'filter' : e.classList.contains('sg-todo-sum') ? 'counts' : '?').join(','); })()`), 'filter,counts', 'the counts under the filter, since they are the chosen kind\'s');
@@ -551,7 +551,7 @@ test('in the browser: no script error, a control changes the real component, the
     // What the tokens owe is a row of The system: the descriptions to write, for whoever keeps Figma.
     assert.match(await run(`[...document.querySelectorAll('#tasks tr[data-area="System"]')].map((tr) => tr.textContent).join('|')`), /Tokens, description.*You in Figma.*semantic tokens have no description in Figma.*Write what each one is for/);
     // A retired component still in use: a row for each place it is used, under its name, with what replaces it.
-    assert.match(await run(`[...document.querySelectorAll('#tasks tr[data-area="Migration"]')].map((tr) => tr.textContent).join('|')`), /^\d+This system3 places: .*Claude in the code.*Move this system off button \(figma-mcp\/settings\.md:105, src\/components\/system\.js:1, src\/pages\/Home\.jsx:2\)\..*Use chip instead\. Every place is in migrations\.md\. Tell Claude to do it\./);
+    assert.match(await run(`[...document.querySelectorAll('#tasks tr[data-area="Migration"]')].map((tr) => tr.textContent).join('|')`), /^\d+This system3 places: .*A developer in the code.*Move this system off button \(figma-mcp\/settings\.md:105, src\/components\/system\.js:1, src\/pages\/Home\.jsx:2\)\..*Use chip instead\. Every place is in migrations\.md\. A developer does it, or Claude when asked\./);
     const nums = await run(`[...document.querySelectorAll('#tasks .sg-todo-no[data-todo-key]')].map((td) => [td.dataset.todoKey, td.textContent])`);
     assert.ok(nums.length > 0 && nums.every(([, n], i) => +n === i + 1), 'numbered 1, 2, 3 down the page');
     const byNo = (a) => a.slice().sort((p, q) => p[1] - q[1]);
@@ -814,22 +814,22 @@ test('parity per component: what agrees (since when), its props and tokens, what
   assert.equal(v.notCompared, null);
 });
 
-test('To do: a role the code fails or has still to be tried on is Claude\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
+test('To do: a role the code fails or has still to be tried on is the code\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('var WHO = {'), tpl.indexOf('function doWhat('));
   const a11yWho = new Function(src + 'return a11yWho;')();
   const audit = { st: 'todo', from: 'The last audit, in a browser, 5 Oct' };
   // The rendered role differs from the note: the note is right, the code changes.
-  assert.equal(a11yWho('4.1.2', 'audit', [audit, { st: 'todo', from: 'Figma annotation Role: button' }], ''), 'Claude in the code');
-  assert.equal(a11yWho('1.3.1', 'audit', [{ st: 'todo', from: 'Figma annotation on the "Label" layer' }], ''), 'Claude in the code');
+  assert.equal(a11yWho('4.1.2', 'audit', [audit, { st: 'todo', from: 'Figma annotation Role: button' }], ''), 'A developer in the code');
+  assert.equal(a11yWho('1.3.1', 'audit', [{ st: 'todo', from: 'Figma annotation on the "Label" layer' }], ''), 'A developer in the code');
   // Nothing failed and what is missing is in Figma: its role is not stated yet.
   assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma, once annotated' }], ''), 'You in Figma');
   // What a Figma note's role asks, not tried yet: the audit tries it on the code, so nothing is to do in Figma.
-  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'Claude in the code');
+  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'A developer in the code');
   // A colour pair is a design decision; what only a person judges is checked by hand; the code's own finding is Claude's.
   assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'You in Figma');
   assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'You check by hand');
-  assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Its code' }], ''), 'Claude in the code');
+  assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Its code' }], ''), 'A developer in the code');
 });
 
 test('To do: AAA advice is to check and to decide, never a must-fix; a component the audit could not try says why', async () => {
@@ -864,7 +864,7 @@ test('an accessibility finding goes to Accessibility, a difference from Figma to
   const html = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
   assert.match(html, /add\(x\.wcag \|\| \(contrast \? 'WCAG 1\.4\.3 Contrast \(Minimum\) \(AA\)' : ''\), 'todo'/, 'the Accessibility area lists what to fix, under its criterion');
   assert.match(html, /a\[0\] === 'a11y' \? a11yOpen\(c\)/, 'the Accessibility tab carries the alert icon while anything on it is to fix or to check');
-  assert.match(html, /if \(o\.icon\) text = '<svg class="sg-seg-icon"[^\n]*' \+ text;/, 'the icon before the label');
+  assert.match(html, /if \(o\.icon\) text = WARN_SVG \+ text;/, 'the page\'s own warning mark before the label');
   assert.match(html, /n \+= \(c\.a11yFindings \|\| \[\]\)\.length/, 'counting what the audit found with what the browser check found');
 });
 
@@ -1020,8 +1020,8 @@ test('a control the system lacks: the page draws its default (segmented control,
   assert.equal(run({ tip: { markup: '<button class="info" data-tip="{tip}" aria-label="{name}"></button>' } }).tipHTML('A & B', 'N'), '<button class="info" data-tip="A &amp; B" aria-label="N"></button>');
   assert.match(tpl, /\.sg-tip:hover > \.sg-tip-bubble, \.sg-tip:focus-within > \.sg-tip-bubble \{ visibility: visible; \}/);
   assert.match(tpl, /if \(e\.key === 'Escape'\)[^\n]*is-dismissed/, 'Escape closes it (WCAG 1.4.13)');
-  // The overview's cards: the tables' border, corners and shadow, at no specificity, so the system's card class wins.
-  assert.match(tpl, /:where\(\.sg-card\) \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); box-shadow: var\(--sg-shadow\); background: var\(--sg-bg\); \}/);
+  // The overview's cards: the tables' border, corners and shadow on the page's own cards, never taken away by a reset.
+  assert.match(tpl, /\.sg-card\.sg-card--own \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); box-shadow: var\(--sg-shadow\); background: var\(--sg-bg\);/);
   assert.match(tpl, /\.pg-par-card \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); box-shadow: var\(--sg-shadow\);/);
   assert.match(tpl, /\(\(DATA\.ui && DATA\.ui\.gaps\) \|\| \[\]\)\.forEach\(function \(g\) \{ TODO\.push\(\{ who: 'both', comp: null, say: g\.say, todo: g\.todo \}\); \}\);/);
   // Each stand-in is a task on the Tasks page's last tab, Style guide, never a note on the overview.
