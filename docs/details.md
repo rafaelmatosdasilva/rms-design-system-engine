@@ -73,6 +73,12 @@ cd my-project
 rms-design-system-engine --init
 ```
 
+### A Figma branch
+
+- A branch link (`figma.com/design/<file>/branch/<branch>/...`) names the branch. Every read then follows the branch, which stays as it is while the main file changes.
+- On a project already set up, `rms-design-system-engine --init --figma-url=<link>` changes only `figmaFileKey`. Refresh the Figma data next, so the snapshots come from the new file.
+- Branches need a Figma Organization or Enterprise plan. A duplicate of the file works the same way on any plan.
+
 ### Code on GitLab
 
 The code can be read straight from GitLab instead of a folder, on gitlab.com or a company-hosted GitLab.

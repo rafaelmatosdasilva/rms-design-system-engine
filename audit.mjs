@@ -44,6 +44,7 @@ import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-pa
 import { ZERO_FAIL }                                             from './run-diff.mjs';
 import { loadBaselineLabels, loadBaselineFindings, classifyBaseline, writeBaseline } from './baseline.mjs';
 import { readKept, keepInGates, matchKept, keptState, keptReport } from './kept.mjs';
+import { figmaFileKeyOf, figmaMainKeyOf } from './figma-link.mjs';
 import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, newPath, projectPath } from './names.mjs';
 import { buildFreshness, buildRecordPath }                    from './build-freshness.mjs';
 import { codeRoots } from './code-roots.mjs';
@@ -1726,10 +1727,7 @@ async function bootstrapConfig() {
   // ── Setup answers ─────────────────────────────────────────────────────────────
   // Answers come from flags (non-interactive) or interactive prompts. Both paths
   // produce: figmaRaw, themeCSS, figmaSourceKey.
-  const parseKey = raw => {
-    const m = (raw || '').match(/figma\.com\/(?:design|file)\/([a-zA-Z0-9]+)/);
-    return m ? m[1] : (raw || '').trim();
-  };
+  const parseKey = raw => figmaFileKeyOf(raw);   // a branch link names the branch
   const defaultHint = detectedCSS ?? (unique.length > 1 ? unique.join(', ') : null);
   // Resolve a token-CSS answer to a string / array / null. A blank answer falls
   // back to any auto-detected file(s); null means "nothing given and none found".
@@ -2036,6 +2034,18 @@ async function bootstrapConfig() {
   if (INIT_ONLY) {
     // A project already set up keeps its config: setup again replaces it only when asked to (--reconfigure).
     if (existsSync(join(ROOT, 'ds-config.json')) && !process.argv.includes('--reconfigure')) {
+      // Another Figma link for a project already set up (a branch of the file, or another file): only the file key
+      // changes, everything else in ds-config.json stays. The next refresh reads the new file.
+      const key = INIT_FIGMA_URL ? figmaFileKeyOf(INIT_FIGMA_URL) : '';
+      let had = null;
+      try { had = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* unreadable: said below */ }
+      if (key && had && had.figmaFileKey !== key) {
+        const main = figmaMainKeyOf(INIT_FIGMA_URL);
+        writeFileSync(join(ROOT, 'ds-config.json'), JSON.stringify({ ...had, figmaFileKey: key }, null, 2) + '\n');
+        console.log(`✓ The Figma file is now ${key}${main ? `, a branch of ${main}: it stays as it is while the main file changes` : ''} (it was ${had.figmaFileKey || 'none'}). Nothing else in ds-config.json changed.`);
+        console.log('NEXT: refresh the Figma data, so the snapshots are read from this file (the ones there now were read from the previous one), then run the audit.');
+        process.exit(0);
+      }
       console.log('This project is already set up (ds-config.json); nothing was written.');
       console.log('NEXT: run the audit (rms-design-system-engine), or answer a question with rms-design-system-engine --query <name>. To set it up again from scratch, replacing ds-config.json, add --reconfigure.');
       process.exit(0);
