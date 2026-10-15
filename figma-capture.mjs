@@ -417,7 +417,7 @@ deepFacts.byKey=new Map(found.filter((x)=>prop(x,'key')).map((x)=>[x.key,x.name]
 // Each set, and each component outside a set; a name starting with _ or . is private to the file, not part of the system.
 const all=found.filter((x)=>(x.type==='COMPONENT_SET'||!x.parent||x.parent.type!=='COMPONENT_SET')&&!/^[_.]/.test(x.name));
 // One component's items: each part read on its own, so one the Figma tool cannot read leaves the others.
-async function itemsOf(r){
+async function readOnce(r){
 const id=r.id,name=r.name,out=[];
 const read=async(k,at,f)=>{try{return await f();}catch(e){out.push({k,id:at,v:{name,error:String(e&&e.message||e).slice(0,200)}});return null;}};
 const s=await read('component',id,()=>componentFacts(r,{...LOCAL}));
@@ -429,6 +429,16 @@ const states=await read('states',id+'#states',()=>stateTokensOf(r,NAMES));if(sta
 if(r.type==='COMPONENT_SET'){const b=await read('bindings',id+'#bindings',()=>stateBindingsOf(r,LOCAL));if(b)out.push({k:'bindings',id:id+'#bindings',v:{variants:b}});}
 // What JSON keeps (no symbol such as figma.mixed, no undefined), so the checksum is over what the answer carries.
 return JSON.parse(JSON.stringify(out));
+}
+// Figma fills in the layers of a nested instance lazily: the first walk of a component can miss them (its label text in
+// a nested toggle), so a read depended on what the call had read before and the checksums said Figma changed when it had
+// not. The component is walked once first, then read until two reads agree, so every call reads it alike.
+async function itemsOf(r){
+try{r.findAll(()=>false);}catch(e){/* a node the walk cannot reach: the reads below say so */}
+await figma.getNodeByIdAsync(r.id);
+let a=await readOnce(r);
+for(let i=0;i<2;i++){const b=await readOnce(r);if(JSON.stringify(b)===JSON.stringify(a))return b;a=b;}
+return a;
 }
 if(CALL==='sums'){
 // [id, checksum, place in the file], in the order of the id hash from AFTER on, until TIME or BUDGET.
