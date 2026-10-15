@@ -1,7 +1,7 @@
 // figma-source.mjs - which way to read Figma, chosen automatically (idea I84).
 //
 // In order: a design.json in the project newer than the snapshots (the person ran `figma-cli snapshot`), then
-// figma-cli itself when Figma Desktop is connected to it (its debugging port answers: no API key, no rate limit,
+// figma-cli itself when Figma Desktop is connected to it (its debugging port answers, or in Safe Mode its FigCli plugin: no API key, no rate limit,
 // every mode and alias chain), then the Figma MCP of the agent's session (the refresh-figma recipe), then the REST API
 // with FIGMA_TOKEN. The engine reads design.json and runs figma-cli itself; the MCP is the agent's tool, so for it the
 // engine says what to run. Never writes to Figma: `figma-cli snapshot` only reads the open file.
@@ -28,15 +28,22 @@ export async function portAnswers(port, fetchImpl = globalThis.fetch, timeoutMs 
   } catch { return false; }
 }
 
+// figma-cli in Safe Mode: no debugging port, its daemon talks to the FigCli plugin open in Figma. Connected when a
+// one-line eval comes back through it.
+export function safeModeAnswers(run = (args) => spawnSync('figma-cli', args, { encoding: 'utf8', timeout: 15000 })) {
+  try { const r = run(['eval', 'return 1']); return r.status === 0 && String(r.stdout ?? '').trim().split('\n').pop().trim() === '1'; } catch { return false; }
+}
+
 const mtimeOf = (p) => { try { return statSync(p).mtimeMs; } catch { return null; } };
 
 // { route: 'design-json' | 'figma-cli' | 'mcp' | 'rest', why, file? }. deps make it testable.
-export async function chooseFigmaSource(ROOT, cfg = {}, { env = process.env, which = (c) => onPath(c, env), answers = (p) => portAnswers(p), mtime = mtimeOf } = {}) {
+export async function chooseFigmaSource(ROOT, cfg = {}, { env = process.env, which = (c) => onPath(c, env), answers = (p) => portAnswers(p), safe = () => safeModeAnswers(), mtime = mtimeOf } = {}) {
   const design = join(ROOT, designJsonPath(cfg));
   const snap = join(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
   const dj = mtime(design), sv = mtime(snap);
   if (dj != null && (sv == null || dj > sv)) return { route: 'design-json', file: designJsonPath(cfg), why: `${designJsonPath(cfg)} is newer than the snapshots` };
   if (which('figma-cli') && await answers(figmaCliPort(env))) return { route: 'figma-cli', why: `figma-cli is installed and Figma answers on port ${figmaCliPort(env)}` };
+  if (which('figma-cli') && await safe()) return { route: 'figma-cli', why: 'figma-cli is installed and Figma answers through its FigCli plugin (Safe Mode)' };
   if (env.FIGMA_TOKEN && cfg.figmaFileKey) return { route: 'rest', why: 'FIGMA_TOKEN is set: the audit refreshes from the Figma API on every run' };
   return { route: 'mcp', why: 'no figma-cli connection and no design.json: the Figma tool of this session reads it' };
 }
