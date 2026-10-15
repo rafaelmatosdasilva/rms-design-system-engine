@@ -12,6 +12,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine check the install` | Each problem with the install, and its fix |
 | `/rms-design-system-engine use these guidelines <link>` | Your written guidelines from Notion or GitLab, read on every run |
 | `/rms-design-system-engine refresh the Figma data` | Figma read again, the best way available |
+| `/rms-design-system-engine scan from this Figma branch <Figma link>` | The branch read instead of the main file, so edits on main do not restart a scan |
 
 ## Parity
 

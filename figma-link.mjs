@@ -6,6 +6,21 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// The file key a Figma link names. A branch link (figma.com/design/<file>/branch/<branch>/...) names the branch: the
+// engine then reads the branch, which stays as it is while the main file changes. A bare key is kept as it is.
+export function figmaFileKeyOf(raw) {
+  const s = String(raw ?? '').trim();
+  const branch = s.match(/figma\.com\/(?:design|file)\/[a-zA-Z0-9]+\/branch\/([a-zA-Z0-9]+)/);
+  if (branch) return branch[1];
+  const m = s.match(/figma\.com\/(?:design|file)\/([a-zA-Z0-9]+)/);
+  return m ? m[1] : s;
+}
+// The main file a branch link belongs to, or null when the link is not a branch's.
+export function figmaMainKeyOf(raw) {
+  const m = String(raw ?? '').match(/figma\.com\/(?:design|file)\/([a-zA-Z0-9]+)\/branch\/[a-zA-Z0-9]+/);
+  return m ? m[1] : null;
+}
+
 export function figmaLink(fileKey, nodeId) {
   if (!fileKey || !nodeId) return null;
   return `https://www.figma.com/design/${fileKey}?node-id=${String(nodeId).replace(/:/g, '-')}`;
