@@ -268,12 +268,14 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   has the look of the system's own card (`cardLook`: its border colour and width, its radius and shadow), as the
   overview's cards are that card. The page's text is the system's body rule, which the components inherit as in
   the product. Its switches are the system's own segmented control and its text inputs its own text field, read from
-  their markup (a row of the same element where one carries the selected class). A control the system lacks gets
-  its nearest stand-in from the system (a segmented control: its tabs, then its radio group, then its buttons side by
-  side, the selected one in its primary look or, with one button, in it and the others plain; a text field: its
-  search field), else a plain control drawn with its tokens, and each one is said on the overview and on the Tasks
-  page (`ui.gaps`: "This system has no segmented control, so the page uses its tabs."). A role the system has no
-  token for is left to the browser's own and listed, never given a value of the engine's.
+  their markup (a row of the same element where one carries the selected class). A control the system lacks (or that
+  is not read yet) gets the template's default, drawn with the system's tokens: a segmented control (options in a
+  track, the chosen one raised), a tooltip (a round trigger and a bubble, on the Health page's cards) and a card (the
+  tables' border, corners and shadow); a text field gets its search field as a stand-in, else a plain input. Each one
+  is said on the overview and on the Tasks page (`ui.gaps`: "This system has no segmented control, so the page uses its
+  default segmented control, drawn with its tokens."). Each text size takes the system's text style nearest to the
+  template's default for it (11, 12, 13 and 14px) when one is within 2px, else the default stays; a colour role the
+  system has no token for is left to the browser's own and listed.
 - **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
   when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; a size that
   changes with a mode shows the value of the mode its section's size switch picks (the switch, with no visible label

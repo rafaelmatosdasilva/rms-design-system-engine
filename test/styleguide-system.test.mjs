@@ -56,7 +56,11 @@ test('the page\'s look is the system\'s: its page colours, a shared token before
   assert.equal(roles.border, 'var(--border)', 'a shared group before a component\'s');
   assert.notEqual(roles.muted, 'var(--badge-text)', 'a component\'s own token is never the page\'s look');
   assert.equal(roles.font, undefined, 'no font of the page\'s own: its text inherits the system\'s page font and fallbacks');
-  assert.deepEqual([roles.s, roles.m, roles.l], ['var(--s-size)', 'var(--m-size)', 'var(--l-size)']);
+  // Each size the system's style nearest to the page's default (11, 12, 13 and 14px), within 2px.
+  assert.deepEqual([roles.xs, roles.s, roles.m, roles.l, roles.h1], ['var(--m-size)', 'var(--m-size)', 'var(--l-size)', 'var(--l-size)', 'var(--l-size)']);
+  const far = chromeRoles({ tokens: { typography: [{ scale: 'xxxs', size: { var: '--t8', value: '8px' } }, { scale: 'xl', size: { var: '--t24', value: '24px' } }] } }).roles;
+  assert.deepEqual([far.xs, far.s, far.m, far.l], [undefined, undefined, undefined, undefined], 'none near: the template\'s default sizes stay');
+  assert.deepEqual([chromeRoles({}).roles.s, chromeRoles({ tokens: { typography: [] } }).roles.m], [undefined, undefined], 'nothing read yet: the defaults');
   assert.equal(roles.radius, 'var(--radius-card)');
   assert.equal(roles['space-s'], 'var(--gap-m)');
   assert.equal(roles.icon, '16px', 'the size the system\'s icons are drawn at');
@@ -199,6 +203,9 @@ test('the style guide check: a button or link the page draws itself fails; a fon
   assert.deepEqual([...controlClasses(body)].sort(), ['chip-link', 'mine']);
   const bad = failures(checkStyleguidePage(page('.chip-link { background: var(--sg-bg-2); border-radius: var(--sg-radius); } .mine { border: var(--sg-line); } .sg-nav a.active { box-shadow: inset 2px 0 0 var(--sg-text); background: var(--sg-bg); } .sg-nav a { background: var(--sg-bg); } .x { font-family: var(--font); } .y { font-family: inherit; }', body)));
   assert.deepEqual(bad.map((f) => `${f.selector} ${f.property}`), ['.chip-link background', '.chip-link border-radius', '.mine border', '.sg-nav a background', '.x font-family'], 'the current link marked with an inset line and a system background is not a button; every link with one is');
+  // The page's default controls (for one the system lacks) are drawn with its roles only; a value of their own fails.
+  const defaults = failures(checkStyleguidePage(page(':where(.sg-card) { border: var(--sg-line); border-radius: var(--sg-radius); } .sg-tip-btn { border-radius: 50%; background: var(--sg-bg); } .sg-seg-default > button { border-radius: calc(var(--sg-radius) - var(--sg-space-xxs)); box-shadow: 0 0 0 var(--sg-line-width, 1px) var(--sg-border); } .sg-tip-btn { background: #fff; }', '<a class="sg-card" href="#">A</a><button class="sg-tip-btn">?</button>')));
+  assert.deepEqual(defaults.map((f) => `${f.selector} ${f.property}`), ['.sg-tip-btn background'], 'only the colour of its own');
 });
 
 test('the colour modes in Figma\'s own order (Dark before Light), and the page resting on the root mode when the device is not dark', () => {
