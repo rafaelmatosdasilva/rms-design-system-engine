@@ -37,7 +37,8 @@ test('only full stylesheet addresses are taken, never a template or a known CDN'
 });
 
 test('setup takes every hosted mode file it is given, writes them to one local file and finds each mode in it', async () => {
-  const server = createServer((req, res) => { const m = /\/(\w+)-(\w+)\.css$/.exec(req.url); if (!m) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'content-type': 'text/css' }); res.end(sheet(m[1], m[2])); });
+  // Only the six answer: the other modes setup tries (phone, mobile) are 404 here.
+  const server = createServer((req, res) => { const m = /\/(\w+)-(\w+)\.css$/.exec(req.url); if (!m || !SIX.some(([c, s]) => c === m[1] && s === m[2])) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'content-type': 'text/css' }); res.end(sheet(m[1], m[2])); });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}/ds`;
   const dir = mkdtempSync(join(tmpdir(), 'hosted-'));
@@ -61,4 +62,15 @@ test('setup takes every hosted mode file it is given, writes them to one local f
   assert.match(css, /:root\[data-theme="dark"\]/);
   const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
   assert.equal(cfg.paths.themeCSS, 'src/styles/tokens.hosted.css');
+});
+
+test('setup tries the same address in every other mode: a mode nobody listed (phone) is never left out', async () => {
+  const { siblingUrls } = await import('../hosted-tokens.mjs');
+  const B = 'https://cdn.example/ds/';
+  const given = ['light_desktop', 'dark_desktop', 'light_tablet', 'dark_tablet'].map((n) => `${B}${n}.css`);
+  const more = siblingUrls(given);
+  assert.ok(more.includes(`${B}light_phone.css`) && more.includes(`${B}dark_phone.css`) && more.includes(`${B}dark_laptop.css`));
+  assert.ok(!more.some((u) => given.includes(u)), 'only the ones not given');
+  assert.ok(siblingUrls([`${B}light-desktop.css?v=2`], ['Watch']).includes(`${B}dark-watch.css?v=2`), 'Figma\'s own breakpoint names, the address\'s query kept');
+  assert.deepEqual(siblingUrls(['https://cdn.example/theme.css']), [], 'no mode word: nothing to try');
 });
