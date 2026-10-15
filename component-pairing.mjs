@@ -191,6 +191,10 @@ const LABEL = {
   props: 'its props match Figma\'s',
 };
 const STRONG = new Set(['name', 'declares', 'class', 'folder', 'selector']);
+// A file in a folder named as it is (search/Search.vue, Button/index.vue), the way a component is kept on its own.
+const ownFolder = (f) => { const parts = String(f).split(/[\\/]/), base = (parts.at(-1) ?? '').replace(/\.\w+$/, '').toLowerCase(), dir = (parts.at(-2) ?? '').toLowerCase(); return base === dir || (base === 'index' && !!dir) ? 1 : 0; };
+// The folders a project keeps its own pages in, where a component is used rather than made.
+const PAGE_DIR = /(^|[\\/])(views|pages|stories|docs|examples?|playground|demo)[\\/]/i;
 const WEAK = new Set(['generic', 'prefix', 'tokens', 'state']);
 // The signs in plain words: "a generic file name in its folder and the tokens its CSS uses".
 export const signsSaid = (signals = []) => { const w = signals.map((s) => LABEL[s] ?? s); return w.length > 1 ? `${w.slice(0, -1).join(', ')} and ${w.at(-1)}` : w[0] ?? ''; };
@@ -248,7 +252,9 @@ export function createPairing({ ROOT, cfg = {}, files = null, read = textReader(
     const text = String(read(f) ?? '');
     const base = basename(f).replace(/\.[^.]+$/, '');
     const parts = rel(f).split('/');
-    const folder = parts.length > 1 ? parts.at(-2) : '';
+    // A file in a folder of its own name (inputs/search/Search.vue) takes its kind from the folder above (inputs).
+    const ownDir = parts.length > 2 && squash(parts.at(-2)) === squash(base);
+    const folder = parts.length > 1 ? parts.at(ownDir ? -3 : -2) : '';
     const like = isComponentFile(f);
     const x = {
       file: f, text, like, base, baseSq: squash(base), baseWords: words(base),
@@ -349,14 +355,17 @@ export function createPairing({ ROOT, cfg = {}, files = null, read = textReader(
     }
     const count = (r, kind) => r.signals.filter((v) => kind.has(v)).length;
     const BACK = new Set(['props']);
-    for (const r of rows) { r.strong = count(r, STRONG); r.weak = count(r, WEAK); r.back = count(r, BACK); r.score = 3 * r.strong + 2 * r.weak + r.back; }
+    for (const r of rows) { r.strong = count(r, STRONG); r.weak = count(r, WEAK); r.back = count(r, BACK); r.score = 3 * r.strong + 2 * r.weak + r.back; r.page = PAGE_DIR.test(rel(r.file)); r.own = ownFolder(r.file); }
     // Weak signs never take a file the name itself gives to another component.
     const fair = rows.filter((r) => r.strong || !takenByAnother(r.file, name));
-    const eligible = fair.filter((r) => r.strong || (r.weak >= 1 && r.weak + r.back >= 2)).sort((a, b) => b.score - a.score || b.strong - a.strong);
+    // A file of the project's own pages (src/views/…, a docs page that imports it and shows it) comes after the
+    // component's own file, whatever its signs: it uses the component, it is not it.
+    const eligible = fair.filter((r) => r.strong || (r.weak >= 1 && r.weak + r.back >= 2)).sort((a, b) => a.page - b.page || b.score - a.score || b.strong - a.strong || b.own - a.own);
     const said = (r) => ({ file: r.file, signals: r.signals });
     if (eligible.length) {
       const best = eligible[0], next = eligible[1];
-      if (!next || best.score > next.score || best.strong > next.strong) return done({ name, status: 'paired', file: best.file, how: best.signals.join(' + '), signals: best.signals, candidates: [] });
+      // Between two as good, the one in a folder of its own name (search/Search.vue) is the component's own.
+      if (!next || (next.page && !best.page) || best.score > next.score || best.strong > next.strong || (best.own && !next.own)) return done({ name, status: 'paired', file: best.file, how: best.signals.join(' + '), signals: best.signals, candidates: [] });
       const tied = eligible.filter((r) => r.score === best.score && r.strong === best.strong);
       return done({ name, status: 'ambiguous', file: null, how: `ambiguous (${tied.length} files: ${tied.slice(0, 3).map((r) => rel(r.file)).join(', ')})`, signals: [], candidates: tied.map(said) });
     }
