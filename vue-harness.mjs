@@ -323,7 +323,7 @@ const why1 = (e) => String(e?.message ?? e).split('\n')[0];
 // 'webpack' }, or { url: null, why } when nothing can be rendered.
 export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate, read = (f) => readFileSync(f, 'utf8'), max = cfg.a11y?.maxVariants ?? 16 } = {}) {
   const groups = [], missing = [];
-  const { harnessCases, variantsFromCode, pageColours } = await import('./component-harness.mjs');
+  const { harnessCases, variantsFromCode, pageColours, codeCases } = await import('./component-harness.mjs');
   const { textComponentApi } = await import('./component-source.mjs');
   for (const name of names) {
     const file = locate(name);
@@ -335,7 +335,10 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     let text = ''; try { text = read(file); } catch { /* unreadable: Figma's variants only */ }
     const fromFigma = Object.keys(propsSnap[name]?.properties ?? {}).length > 0;
     const api = textComponentApi(file, text);
-    const cases = (fromFigma ? harnessCases(propsSnap[name], max) : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
+    // Figma's variants, then a case for each prop only the code has (selected, an alignment it documents), so the
+    // Playground can show what its API takes.
+    const figmaCases = fromFigma ? harnessCases(propsSnap[name], max) : null;
+    const cases = (figmaCases ? [...figmaCases, ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
     groups.push({ name, file: resolve(ROOT, file), role, cases, options, from: fromFigma ? 'figma' : 'code' });
   }

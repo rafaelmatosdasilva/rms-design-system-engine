@@ -63,7 +63,8 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   assert.equal(tag.markup, '<span class="tag">New</span>');
   assert.deepEqual(data.components.find((c) => c.name === 'tag').controls.find((c) => c.label === 'Tone').options, [{ label: 'Neutral' }, { label: 'Positive', add: ['tag--positive'], attrs: {} }]);
   assert.deepEqual(data.tokens.radii.map((t) => t.var), ['--radii-button', '--radii-chip', '--radii-field']);
-  assert.deepEqual(data.modes, [{ label: 'Mode', colour: true, values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme' }]);
+  // Its theme sets [data-theme] on the root: the blocks nest (attrModeCSS), so each preview can be in either mode.
+  assert.deepEqual(data.modes, [{ label: 'Mode', colour: true, values: [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }], attr: 'data-theme', scoped: true }]);
   assert.match(html, /Living style guide/);
 });
 
@@ -332,7 +333,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
     assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
     // Another page mode: what was tried in every colour mode while the page was built stands, with its ratio.
-    await run(`document.querySelectorAll('#mode-controls button')[1].click()`);
+    await run(`document.querySelector('#mode-controls [data-v="dark"]').click()`);   // Auto comes first
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
@@ -1023,7 +1024,10 @@ test('a control the system lacks: the page draws its default (segmented control,
   assert.match(tpl, /:where\(\.sg-card\) \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); box-shadow: var\(--sg-shadow\); background: var\(--sg-bg\); \}/);
   assert.match(tpl, /\.pg-par-card \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); box-shadow: var\(--sg-shadow\);/);
   assert.match(tpl, /\(\(DATA\.ui && DATA\.ui\.gaps\) \|\| \[\]\)\.forEach\(function \(g\) \{ TODO\.push\(\{ who: 'both', comp: null, say: g\.say, todo: g\.todo \}\); \}\);/);
-  assert.match(tpl, /gp\.className = 'sg-pending sg-gap'; gp\.innerHTML = '<b>Stand-ins on this page<\/b><ul>' \+ GAPS\.map\(function \(g\) \{ return '<li>' \+ esc\(g\.say\) \+ '<\/li>'; \}\)/);
+  // Each stand-in is a task on the Tasks page's last tab, Style guide, never a note on the overview.
+  assert.doesNotMatch(tpl, /Stand-ins on this page/);
+  assert.match(tpl, /area: t\.area \|\| \(comp \? 'Parity' : 'Style guide'\)/);
+  assert.match(tpl, /var TODO_KINDS = \[[^\]]*'Accessibility', 'Style guide'\];/);
 });
 
 test('usage on every component, from Figma, the code or the authored contract; the page\'s own contrast in every mode', async () => {

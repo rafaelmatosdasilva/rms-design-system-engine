@@ -212,6 +212,38 @@ export function extractDefaults(text) {
     for (const p of m[1].matchAll(new RegExp(`([A-Za-z_$][\\w$]*)\\s*:\\s*${_LIT}`, 'g'))) put(p[1], p[2]);
   return out;
 }
+// A Vue prop's type as its definition writes it (label: String, size: { type: String }, value: [String, Number]):
+// code prop -> 'string' | 'boolean' | 'number' | 'object' | 'array' | 'function', joined with | when it takes several.
+const VUE_TYPES = { String: 'string', Boolean: 'boolean', Number: 'number', Object: 'object', Array: 'array', Function: 'function', Date: 'date' };
+export function extractTypes(text) {
+  const out = new Map(), names = Object.keys(VUE_TYPES).join('|');
+  const say = (list) => [...new Set(list.map((t) => VUE_TYPES[t]))].join(' | ');
+  for (const m of String(text).matchAll(new RegExp(`([A-Za-z_$][\\w$]*)\\s*:\\s*(?:\\{[^{}]*?\\btype\\s*:\\s*)?(\\[\\s*(?:${names})(?:\\s*,\\s*(?:${names}))*\\s*\\]|(?:${names}))(?![\\w$])`, 'g'))) {
+    if (!out.has(norm(m[1]))) out.set(norm(m[1]), say(m[2].match(new RegExp(names, 'g'))));
+  }
+  // A TypeScript prop (label?: string, size: 'm' | 'l'): its type as written, the plain ones only.
+  for (const m of String(text).matchAll(/([A-Za-z_$][\w$]*)\s*\??\s*:\s*(string|boolean|number)\b\s*[;,\n}]/g)) if (!out.has(norm(m[1]))) out.set(norm(m[1]), m[2]);
+  return out;
+}
+// What the component's own comment says of each prop (@size {String} the button's size, can be [s, m(default), l]):
+// its type, the values it lists and the one marked default. code prop -> { type?, options?, default? }.
+export function extractDocumented(text) {
+  const out = new Map();
+  for (const m of String(text).matchAll(/@([A-Za-z_$][\w$]*)\s*\{([A-Za-z|\s]+)\}([^\n]*)/g)) {
+    const e = {}, t = m[2].trim().toLowerCase().split(/\s*\|\s*/).filter((x) => /^(string|boolean|number|object|array|function)$/.test(x));
+    if (t.length) e.type = t.join(' | ');
+    const list = /\[([^\]]+)\]/.exec(m[3])?.[1];
+    if (list) {
+      const items = list.split(',').map((x) => x.trim()).filter(Boolean);
+      const opts = items.map((x) => x.replace(/\s*\(default\)\s*$/i, '').replace(/^['"`]|['"`]$/g, ''));
+      if (opts.length >= 2 && opts.every((o) => /^[\w.-]+$/.test(o))) e.options = opts;
+      const def = items.findIndex((x) => /\(default\)\s*$/i.test(x));
+      if (def >= 0 && e.options) e.default = e.options[def];
+    }
+    if (Object.keys(e).length && !out.has(norm(m[1]))) out.set(norm(m[1]), e);
+  }
+  return out;
+}
 // Best-effort: code prop -> the set of string-literal options it accepts, from a TS
 // union type (`size?: 'small' | 'medium' | 'large'`). Used to check variant coverage.
 export function extractOptions(text) {
@@ -269,12 +301,18 @@ export function extractEvents(file, text, propNames = []) {
 // The text reading of one component file, in the shape component-api.mjs merges.
 //   { props: { name: { default?, options?, required? } }, slots: { named: [...], default: bool }, events: [names] }
 export function textComponentApi(file, text) {
-  const defaults = extractDefaults(text), options = extractOptions(text), required = extractRequired(text);
+  // A Vue file's props are read from its scripts only: its template's bindings (:icon="icon") are never a default.
+  const code = /\.vue$/i.test(String(file)) ? [...String(text).matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n') || text : text;
+  const defaults = extractDefaults(code), options = extractOptions(code), required = extractRequired(code), types = extractTypes(code), documented = extractDocumented(code);
   const props = {};
   for (const p of extractProps(file, text)) {
-    const e = {};
+    const e = {}, doc = documented.get(norm(p));
     if (defaults.has(norm(p))) e.default = defaults.get(norm(p));
+    else if (doc?.default != null) e.default = doc.default;
     if (options.has(norm(p))) e.options = [...options.get(norm(p))];
+    else if (doc?.options) e.options = doc.options;
+    const type = types.get(norm(p)) ?? doc?.type;
+    if (type) e.type = type;
     if (required.has(norm(p))) e.required = required.get(norm(p));
     props[p] = e;
   }

@@ -155,6 +155,18 @@ export function appLabels(names) {
   return clash ? names.map((n) => [n, String(n)]) : short;
 }
 
+// A stylesheet the system's CSS imports by its address (its webfont: @import url('https://fonts.googleapis.com/…')) is
+// ignored by a browser anywhere but at the very top of a stylesheet, and the page puts the system's CSS after rules of
+// its own: each one is linked from the page's head instead, once, so its components are drawn in their own font.
+// Only inside the page's <style> blocks: the same words in the page's data (a component's source shown) stay.
+export function hoistImports(html) {
+  const urls = [];
+  const out = String(html).replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (all, open, body, close) => open + body.replace(/@import\s+(?:url\(\s*)?(['"]?)(https?:\/\/[^'")\s]+)\1\s*\)?[^;{}]*;/g, (m, q, url) => { if (!urls.includes(url)) urls.push(url); return ''; }) + close);
+  if (!urls.length) return out;
+  const links = urls.map((u) => `<link rel="stylesheet" href="${u.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`).join('\n');
+  return /<head[^>]*>/i.test(out) ? out.replace(/<head[^>]*>/i, (h) => `${h}\n${links}`) : links + out;
+}
+
 // The CSS inside an HTML page's <style> blocks.
 export function styleBlocks(html) {
   return [...String(html ?? '').matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join('\n');
@@ -515,13 +527,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     if (cfg.frameworkComponents !== false) {
       try {
         const { createApiReader } = await import('./component-api.mjs');
-        const { apiView } = await import('./styleguide-data.mjs');
+        const { apiView, codeControls } = await import('./styleguide-data.mjs');
         const nodeIds = Object.fromEntries(Object.entries(ctx?.propsSnap ?? {}).filter(([, e]) => e?.nodeId).map(([n, e]) => [n, e.nodeId]));
         const reader = createApiReader(ROOT, cfg, { classFor: (n) => locator.classFor(n), nodeIds });
         for (const c of view.components) {
           const api = reader.apiFor(c.name);
           const v = api.file && apiView(api, relative(ROOT, api.file));
           if (v) c.api = v;
+          // What only its API takes is a Playground control too, when its own build drew each case of it.
+          if (v && c.renders) c.controls = [...(c.controls ?? []), ...codeControls(c.controls ?? [], v, ctx?.propsSnap?.[c.name]?.properties ?? {})];
         }
       } catch { /* no component sources */ }
     }
@@ -1045,6 +1059,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   }
 
   html = html.split(VUE_CSS_MARK).join(vueCss);
+  html = hoistImports(html);
   // An older run never replaces a page built from newer inputs (P4). The code capture's own copy (opts.out) is always
   // the code as it is now.
   const built = buildStamp(ROOT, { vars: (() => { try { return JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { return null; } })() });

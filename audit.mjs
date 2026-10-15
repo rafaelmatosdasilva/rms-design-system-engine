@@ -31,7 +31,7 @@ import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassi
 import { readGateLabels, parseOnly, onlyWords, onlyHelp } from './only.mjs';
 import { styleNames }                                           from './text-styles.mjs';
 import { detectModes }                                          from './mode-resolver.mjs';
-import { takeableUrls, fetchHosted, mergeHosted }               from './hosted-tokens.mjs';
+import { takeableUrls, fetchHosted, mergeHosted, siblingUrls }               from './hosted-tokens.mjs';
 import { fileURLToPath, pathToFileURL }                         from 'url';
 import { makeFigmaFetch, byNodeId, budgetLine, unchangedSince }  from './figma-fetch.mjs';
 import { createHash }                                           from 'crypto';
@@ -1774,6 +1774,10 @@ async function bootstrapConfig() {
     if (!urls.length) return theme;
     const local = given.filter((t) => !/^https?:\/\//i.test(t));
     const files = await fetchHosted(urls, { log: (m) => console.log(C.yellow(`  ⚠️  Not taken: ${m}`)) });
+    // The same address in every other mode the product may have (the code builds it from parts, ${theme}_desktop.css):
+    // each one that answers is taken too, so a mode nobody listed (phone) is never left out.
+    const sizeNames = (() => { try { return Object.values(JSON.parse(readFileSync(join(ROOT, 'src/figma-vars.snapshot.json'), 'utf8')).modeVariants ?? {}).flatMap((d) => (d?.modes ?? []).map((m) => m.name ?? m.snapshotKey)); } catch { return []; } })();
+    if (files.length) files.push(...await fetchHosted(siblingUrls(urls, sizeNames), { log: () => {} }));
     if (!files.length) { console.log(C.yellow('  ⚠️  None of the hosted token stylesheets could be read.')); return local.length ? (local.length === 1 ? local[0] : local) : null; }
     const merged = mergeHosted(files);
     mkdirSync(dirname(join(ROOT, HOSTED_FILE)), { recursive: true });

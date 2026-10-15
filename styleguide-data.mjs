@@ -13,6 +13,7 @@ import { sameValue } from './css-values.mjs';
 import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs';
 import { requirementEntry } from './annotation-categories.mjs';
 import { WCAG22, WCAG21_KIND } from './wcag21.mjs';
+import { figmaPropFor, BEHAVIOUR_PROP, STATE_PROP as STATE_DEFAULT_OFF } from './component-harness.mjs';
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // A Figma prop name without its node suffix ("Label#3:4" → "Label").
@@ -55,23 +56,28 @@ export function colourAttrMode(cfg = {}) {
   return base ? { attr, base } : null;
 }
 
-// Its blocks again without :root, so they nest as a Figma mode does on a frame: each :root[data-theme="dark"] block as
-// [data-theme="dark"], and the root's own values of every variable they change under [data-theme="light"], so one
-// component on the page can be shown in either mode. '' when the theme has no such block.
+// The product's own mode blocks on its root (:root[data-theme="dark"], :root[data-size="phone"], and the two at once)
+// again without :root, so they nest as a Figma mode does on a frame: one component or one section of the page can be
+// shown in a mode of its own. For a colour mode set this way (colourAttrMode), the root's own values of every variable
+// its blocks change are written under its root mode's name too ([data-theme="light"]), so a preview can go back to it
+// inside a page in another mode. '' when the theme has no such block.
 export function attrModeCSS(css = '', mode = null) {
-  if (!mode) return '';
   const text = String(css ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
-  const at = mode.attr.replace(/[-]/g, '\\-');
-  const blocks = [...text.matchAll(new RegExp(`:root\\[${at}=["']?([\\w-]+)["']?\\]\\s*\\{([^{}]*)\\}`, 'g'))].map((m) => ({ value: m[1], body: m[2] }));
-  if (!blocks.length) return '';
   const decls = (body) => Object.fromEntries([...String(body).matchAll(/(--[\w-]+)\s*:\s*([^;]+);?/g)].map((d) => [d[1], d[2].trim()]));
-  const root = {};
-  for (const m of text.matchAll(/(?:^|[}\s,]):root\s*\{([^{}]*)\}/g)) Object.assign(root, decls(m[1]));
-  const changed = [...new Set(blocks.flatMap((b) => Object.keys(decls(b.body))))].filter((k) => root[k] != null);
   const lines = (o) => Object.entries(o).map(([k, v]) => `    ${k}: ${v};`).join('\n');
-  return `\n\n  /* == The product's ${mode.attr} modes on any element, each preview in its own (code values, nothing copied by hand) == */\n` +
-    `  [${mode.attr}="${mode.base}"] {\n${lines(Object.fromEntries(changed.map((k) => [k, root[k]])))}\n  }\n` +
-    blocks.filter((b) => b.value !== mode.base).map((b) => `  [${mode.attr}="${b.value}"] {\n${lines(decls(b.body))}\n  }\n`).join('');
+  const blocks = [...text.matchAll(/(?:^|[}\s;]):root((?:\[[\w-]+=["']?[\w-]+["']?\])+)\s*\{([^{}]*)\}/g)].map((m) => ({ attrs: m[1].match(/\[[^\]]+\]/g), body: m[2] }));
+  if (!blocks.length) return '';
+  // [a][b] on one element, and each under the other: a section in one mode inside a page in the other.
+  const nested = (attrs) => attrs.length === 1 ? attrs[0] : [attrs.join(''), attrs.join(' '), [...attrs].reverse().join(' ')].join(', ');
+  let base = '';
+  if (mode?.attr && mode.base) {
+    const root = {};
+    for (const m of text.matchAll(/(?:^|[}\s,;]):root\s*\{([^{}]*)\}/g)) Object.assign(root, decls(m[1]));
+    const changed = [...new Set(blocks.filter((b) => b.attrs.length === 1 && b.attrs[0].startsWith(`[${mode.attr}=`)).flatMap((b) => Object.keys(decls(b.body))))].filter((k) => root[k] != null);
+    if (changed.length) base = `  [${mode.attr}="${mode.base}"] {\n${lines(Object.fromEntries(changed.map((k) => [k, root[k]])))}\n  }\n`;
+  }
+  return `\n\n  /* == The product's own mode blocks on any element, each preview or section in its own (code values, nothing copied by hand) == */\n` + base +
+    blocks.map((b) => `  ${nested(b.attrs)} {\n${lines(decls(b.body))}\n  }\n`).join('');
 }
 
 // The lines of a component's own CSS rules (every rule whose selector names its class, or its id when the selector
@@ -446,7 +452,8 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
       const yesNo = d.type === 'VARIANT' && opts.length === 2 && opts.every((o) => /^(true|false)$/i.test(o));
       if (d.type === 'BOOLEAN' || yesNo) {
         control.type = 'BOOLEAN';
-        control.default = String(d.defaultValue).toLowerCase() === 'true';
+        // A state Figma's default variant has on (Disabled) starts off, as the component is first met.
+        control.default = STATE_DEFAULT_OFF.test(cleanName(r.figmaProp).replace(/\s+/g, '')) ? false : String(d.defaultValue).toLowerCase() === 'true';
         const onKey = opts.find((o) => /^true$/i.test(o)) ?? 'True';
         const on = pm ? optionEffect(base, pm[onKey] ?? pm.true ?? pm.True) : null;
         if (on && (on.add?.length || Object.keys(on.attrs ?? {}).length)) control.on = on;
@@ -1025,6 +1032,8 @@ export function cardLook(themeCss = '', cls = null) {
 // The template's default text sizes (its :root), each role's target when the page picks the system's nearest style.
 const TYPE_ROLES = [['xs', 11], ['s', 12], ['m', 13], ['l', 14]];
 
+const PURE_BLACK = /^(#000(000)?(ff)?|black|rgba?\(\s*0\s*,\s*0\s*,\s*0\s*(,\s*1(\.0*)?\s*)?\))$/i;
+const PURE_WHITE = /^(#fff(fff)?(ff)?|white|rgba?\(\s*255\s*,\s*255\s*,\s*255\s*(,\s*1(\.0*)?\s*)?\))$/i;
 export function chromeRoles({ tokens = null, themeCss = '', componentNames = [], icons = {}, override = {}, card = null, scopes = MODE_SCOPES } = {}) {
   const roles = {}, from = {};
   const comps = new Set(componentNames.map((n) => n.toLowerCase()));
@@ -1039,10 +1048,13 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   // What the system's own page uses: the background and text colour its html or body rule sets.
   const page = [...String(themeCss).matchAll(/(?:^|[}\s;])(?:html|body|:root)\b[^{]*\{([^}]*)\}/g)].map((m) => m[1]).join(';');
   const pageVar = (prop) => { const m = new RegExp(`(?:^|[;\\s])${prop}\\s*:\\s*var\\((--[\\w-]+)`).exec(page); return m && byVar.has(m[1]) ? byVar.get(m[1]) : null; };
-  for (const [role, t] of [['bg', pageVar('background(?:-color)?')], ['text', pageVar('color')]]) if (t) { roles[role] = `var(${t.var})`; from[role] = `${t.figma} (the system's page)`; used.add(t.var); }
+  // Never pure black behind the page in a dark mode, never pure white for its text or lines there: a token that is
+  // one in a dark mode is passed over for one that is not, and with none the template's own default stays.
+  const pure = (t, role) => Object.entries(t?.values ?? {}).some(([m, v]) => /dark|night|dim/i.test(m) && (/^(bg|bg-2|surface|stage)$/.test(role) ? PURE_BLACK.test(String(v).trim()) : /^(text|text-2|muted|border)$/.test(role) && PURE_WHITE.test(String(v).trim())));
+  for (const [role, t] of [['bg', pageVar('background(?:-color)?')], ['text', pageVar('color')]]) if (t && !pure(t, role)) { roles[role] = `var(${t.var})`; from[role] = `${t.figma} (the system's page)`; used.add(t.var); }
   for (const [role, [what, which]] of CHROME_COLOURS) {
     if (roles[role]) continue;
-    const pick = flat.filter((t) => !used.has(t.var) && rank(t) < 100 && words(t).some((w) => what.test(w)) && words(t).some((w) => which.test(w)))
+    const pick = flat.filter((t) => !used.has(t.var) && rank(t) < 100 && !pure(t, role) && words(t).some((w) => what.test(w)) && words(t).some((w) => which.test(w)))
       .sort((a, b) => rank(a) - rank(b) || a.figma.localeCompare(b.figma))[0];
     if (pick) { roles[role] = `var(${pick.var})`; from[role] = pick.figma; if (!['positive', 'negative', 'warning'].includes(role)) used.add(pick.var); }
   }
@@ -1411,6 +1423,31 @@ export function coverageOf(summary, file) {
   const key = Object.keys(summary).find((k) => k !== 'total' && (k === want || k.endsWith('/' + want)));
   const pct = key ? summary[key]?.lines?.pct : null;
   return typeof pct === 'number' ? { lines: pct } : null;
+}
+
+// ── The Playground's controls for what only the code's API takes ────────────────────────────────────────────────────
+// For a component its own build draws in each case (c.renders), each prop of its API that no Figma control stands for
+// (selected, an alignment its code documents) is a control too, after Figma's: an on/off one as false and true, one
+// with values as those values. What a prop does to behaviour only (allowEventPropagation) is not one.
+// A Figma prop that stands for it without being agreed yet (size for buttonSize) names it, as its drawings are named.
+// It starts where Figma's default has it. controls: Figma's, api: apiView(), figmaProps: every prop Figma gives it
+// ({ name: { defaultValue } }, or their names). → [control]
+export function codeControls(controls = [], api = null, figmaProps = []) {
+  const figmaDefs = Array.isArray(figmaProps) ? Object.fromEntries(figmaProps.map((n) => [cleanName(n), {}])) : Object.fromEntries(Object.entries(figmaProps ?? {}).map(([n, d]) => [cleanName(n), d ?? {}]));
+  if (!api?.props?.length) return [];
+  const names = api.props.map((p) => p.name), figma = controls.flatMap((k) => [k.label, k.prop].filter(Boolean));
+  const out = [];
+  for (const p of api.props) {
+    if (BEHAVIOUR_PROP.test(p.name) || figmaPropFor(figma, p.name, names)) continue;
+    const label = figmaPropFor(Object.keys(figmaDefs), p.name, names) ?? p.name;
+    const base = { label, prop: p.name, fromCode: true, at: 1000 + out.length };
+    const fig = figmaDefs[label]?.defaultValue;
+    if (/^boolean$/.test(p.type ?? '')) out.push({ ...base, type: 'BOOLEAN', default: String(fig ?? p.default) === 'true' });
+    else if ((p.values ?? []).length > 1) out.push({ ...base, type: 'VARIANT', default: fig != null && p.values.includes(String(fig)) ? String(fig) : p.default ?? p.values[0], options: p.values.map((v) => ({ label: v })) });
+    // A text Figma has as a text prop (labelContent for label): a field, its words written where its build drew Figma's.
+    else if (/^string$/.test(p.type ?? '') && figmaDefs[label]?.type === 'TEXT' && String(fig ?? '').trim()) out.push({ ...base, type: 'TEXT', default: String(fig) });
+  }
+  return out;
 }
 
 // ── A component's code API, as its page lists it ──────────────────────────────────────────────────────────────────────

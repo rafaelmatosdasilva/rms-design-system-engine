@@ -414,8 +414,9 @@ for(const v of await figma.variables.getLocalVariablesAsync()){LOCAL[v.id]=v;NAM
 const found=PAGES.flatMap((p)=>p.findAllWithCriteria({types:['COMPONENT_SET','COMPONENT']}));
 // The components a slot prefers, named from these pages alone, for the same reason.
 deepFacts.byKey=new Map(found.filter((x)=>prop(x,'key')).map((x)=>[x.key,x.name]));
-// Each set, and each component outside a set; a name starting with _ or . is private to the file, not part of the system.
-const all=found.filter((x)=>(x.type==='COMPONENT_SET'||!x.parent||x.parent.type!=='COMPONENT_SET')&&!/^[_.]/.test(x.name));
+// Each set, and each component outside a set; a name starting with _ or . is private to the file, not part of the system,
+// a status mark in front of it (🟡 .tableRow) or not.
+const all=found.filter((x)=>(x.type==='COMPONENT_SET'||!x.parent||x.parent.type!=='COMPONENT_SET')&&!/^[_.]/.test(x.name.replace(/^[^A-Za-z0-9_.]+/,'')));
 // One component's items: each part read on its own, so one the Figma tool cannot read leaves the others.
 async function readOnce(r){
 const id=r.id,name=r.name,out=[];
@@ -612,14 +613,20 @@ export function partsBack(items) {
   return out.filter(Boolean);
 }
 
-// What the items hold, by component name. → { names, structure, props, values, states, bindings, errors, variants, dupes }
+// A component Figma does not publish to its library: its name starts with a dot or an underscore (.tableRow, _base),
+// after any status mark in front of it (🟡 .tableRow). A building block of others, never a component of the system.
+export const unpublished = (name) => /^[._]/.test(String(name ?? '').replace(/^[^\p{L}\p{N}._]+/u, ''));
+
+// What the items hold, by component name. → { names, structure, props, values, states, bindings, errors, variants, dupes,
+// unpublished }
 export function componentsFromItems(items) {
   const all = partsBack(items);
-  const byId = new Map(), names = [], structure = {}, props = {}, values = {}, states = {}, bindings = {}, errors = [], dupes = [];
+  const byId = new Map(), names = [], structure = {}, props = {}, values = {}, states = {}, bindings = {}, errors = [], dupes = [], hidden = [];
   let variants = 0;
   for (const it of all) {
     if (it.k !== 'component' || byId.has(it.id)) continue;
     const { name, error, ...entry } = it.v;
+    if (unpublished(name)) { if (!hidden.includes(name)) hidden.push(name); continue; }
     if (names.includes(name)) { dupes.push(name); continue; }
     byId.set(it.id, name); names.push(name);
     if (error) errors.push({ name, kind: 'structure', error }); else structure[name] = entry;
@@ -634,7 +641,7 @@ export function componentsFromItems(items) {
     else if (it.k === 'states') states[name] = it.v;
     else if (it.k === 'bindings') bindings[name] = it.v.variants ?? {};
   }
-  return { names, structure, props, values, states, bindings, errors, variants, dupes: [...new Set(dupes)] };
+  return { names, structure, props, values, states, bindings, errors, variants, dupes: [...new Set(dupes)], unpublished: hidden };
 }
 
 // component-state-tokens.json from each component's own tokens: the counts summed, a token hidden-only when no
@@ -737,7 +744,7 @@ function writeComponents(ROOT, cfg, items, { base, chunks, stale = [], added = 0
   }
   if (!written.length) return { ok: false, ...base, kept: kept.join('\n') };
   for (const f of new Set(stale)) { try { unlinkSync(join(dir, f)); } catch { /* left */ } }
-  return { ok: true, ...base, paths, written, removed: [...removed], dupes: got.dupes, errors: got.errors, notRead, statesKept, added, ...(kept.length ? { kept: kept.join('\n') } : {}),
+  return { ok: true, ...base, paths, written, removed: [...removed].filter((n) => !unpublished(n)), unpublished: got.unpublished, dupes: got.dupes, errors: got.errors, notRead, statesKept, added, ...(kept.length ? { kept: kept.join('\n') } : {}),
     counts: { chunks, components: Object.keys(components).length, variants: got.variants, props: Object.keys(got.props).length, values: Object.keys(got.values).length, states: Object.keys(got.states).length } };
 }
 
@@ -833,6 +840,7 @@ export function importLines(r, rel) {
   for (const [k, names] of Object.entries(r.notRead ?? {})) lines.push(`ℹ️  ${names.length} component${names.length === 1 ? '' : 's'} not read for ${k === 'values' ? 'the raw values' : 'the states'} in this capture, and none before: ${names.slice(0, 8).join(', ')}${names.length > 8 ? ', …' : ''}.`);
   if (r.statesKept) lines.push(`${componentFiles().states} kept as it was: it was not written per component, and ${r.statesKept.length} component${r.statesKept.length === 1 ? ' was' : 's were'} not read with their states. Read them all once: rms-design-system-engine --capture-script components sums new.`);
   if (r.added) lines.push(`ℹ️  Figma has ${r.added} more component${r.added === 1 ? '' : 's'} than when the checksums were read: rms-design-system-engine --capture-script components sums new reads ${r.added === 1 ? 'it' : 'them'} next time.`);
+  if (r.unpublished?.length) lines.push(`Left out, not published in Figma's library (a name that starts with . or _): ${r.unpublished.join(', ')}.`);
   if (r.dupes?.length) lines.push(`⚠️  Two components share a name, the first one is kept: ${r.dupes.join(', ')}. Rename one in Figma.`);
   if (r.kept) lines.push(r.kept);
   return lines;
