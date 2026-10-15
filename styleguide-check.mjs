@@ -94,8 +94,13 @@ export function checkStyleguidePage(html, { missing = missingRoles(html) } = {})
     else if (p === 'font' && !/^(VAR|inherit)$/i.test(v)) add(d, 'a font shorthand of its own');
   }
   // The page is held to the accessibility rules it checks others by: what the static check finds in its own markup.
+  // The system's own icon sheet (#ds-icon-sheet) is the system's, not the page's: what the check finds in an icon there
+  // (one that paints itself white) is listed for the system, never a failure of the page.
   const markup = String(html).replace(/<script\b[\s\S]*?<\/script>/gi, '').replace(/<style\b[\s\S]*?<\/style>/gi, '');
-  for (const f of markupFindings(markup)) found.push({ selector: `line ${f.line ?? '?'}`, property: 'accessibility', value: f.kind ?? '', why: f.desc ?? 'an accessibility problem in the page itself' });
+  const sheet = /<svg\b[^>]*\bid\s*=\s*["']ds-icon-sheet["'][^>]*>[\s\S]*?<\/svg>/i.exec(markup)?.[0] ?? '';
+  const own = sheet ? markup.replace(sheet, (m) => m.replace(/[^\n]/g, ' ')) : markup;
+  for (const f of markupFindings(own)) found.push({ selector: `line ${f.line ?? '?'}`, property: 'accessibility', value: f.kind ?? '', why: f.desc ?? 'an accessibility problem in the page itself' });
+  if (sheet) for (const f of markupFindings(sheet)) found.push({ selector: 'the system\'s icons', property: 'accessibility', value: f.kind ?? '', why: f.desc ?? 'an accessibility problem in one of the system\'s icons', warning: true });
   // Its own text on its own backgrounds, in every mode (the build writes what falls short: styleguide-data pageContrast).
   const low = /\/\*sg-contrast:(\[[\s\S]*?\])\*\//.exec(String(html));
   if (low) { try { for (const c of JSON.parse(low[1])) found.push({ selector: `--sg-${c.text} on --sg-${c.on}`, property: 'contrast', value: `${c.ratio}:1 in ${c.mode}`, why: `the page's ${c.text} text on its ${c.on} background is ${c.ratio}:1 in ${c.mode}, below 4.5:1 (WCAG 1.4.3): pick a darker or lighter token for that role (styleguide.chrome)` }); } catch { /* unreadable: nothing to add */ } }
@@ -107,7 +112,9 @@ export function checkStyleguidePage(html, { missing = missingRoles(html) } = {})
 export const failures = (found) => found.filter((f) => !f.warning);
 export function checkLines(found) {
   const bad = failures(found), warn = found.filter((f) => f.warning);
-  const warnLines = warn.length ? [`   ⚠️  the system has no token for ${warn.map((f) => f.property.replace(/^--sg-/, '')).join(', ')}: the page's default is shown there`] : [];
+  const roles = warn.filter((f) => f.property.startsWith('--sg-')), icons = warn.filter((f) => f.property === 'accessibility');
+  const warnLines = [...(roles.length ? [`   ⚠️  the system has no token for ${roles.map((f) => f.property.replace(/^--sg-/, '')).join(', ')}: the page's default is shown there`] : []),
+    ...icons.map((f) => `   ⚠️  ${f.why}`)];
   if (!bad.length) return ['✅ Style guide check: the page uses only the system (its colours, fonts, text styles, radii and spacing).', ...warnLines];
   return [`❌ Style guide check: ${bad.length} thing${bad.length === 1 ? '' : 's'} on the page not from the system`,
     ...bad.slice(0, 40).map((f) => `   • ${f.selector} { ${f.property}: ${f.value} }: ${f.why}`),

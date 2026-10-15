@@ -166,7 +166,7 @@ export function migrationView(steps, { dir = '.design-system-engine-out/handback
   const list = (xs) => xs.slice(0, 4).map((s) => `${s.from}${s.to ? ` for ${s.to}` : ''} in ${placed(s)}`).join(', ') + (xs.length > 4 ? `, and ${xs.length - 4} more` : '');
   if (swap.length) tokens.push({ kind: 'Retired', who: 'code',
     say: `${swap.length} retired token${swap.length === 1 ? ' is' : 's are'} still used (${list(swap)}).`,
-    todo: `Swap each for the token that replaces it. The patches are ready in ${dir}, and migrations.md there lists every place. Tell Claude to do it.` });
+    todo: `Swap each for the token that replaces it. The patches are ready in ${dir}, and migrations.md there lists every place. A developer does it, or Claude when asked.` });
   if (open.length) tokens.push({ kind: 'Retired', who: 'both',
     say: `${open.length} retired token${open.length === 1 ? ' is' : 's are'} still used with nothing named to replace ${open.length === 1 ? 'it' : 'them'} (${list(open)}).`,
     todo: 'Decide what replaces each one and write it in the token\'s Figma description (@use-instead). Then tell Claude to swap them.' });

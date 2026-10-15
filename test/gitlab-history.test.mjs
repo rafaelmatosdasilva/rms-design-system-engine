@@ -136,3 +136,23 @@ test('P2: a project that is not a GitLab mirror is never asked', () => {
   assert.equal(commitsOf(dir, ['a.css']), null);
   assert.equal(missing(dir, { blame: ['a.css'] }), null);
 });
+
+test('P2: a release that could not be read is asked again on the next run, never left to read as unreleased', async () => {
+  const gl = standIn();
+  let down = true;
+  const fetchImpl = async (url, init) => {
+    if (down && url.includes(`/repository/commits/${B}/refs`)) return { ok: false, status: 500, json: async () => ({}) };
+    const r = gl.answer(url, init.headers?.['PRIVATE-TOKEN'] ?? null); return { ok: r.status === 200, status: r.status, json: async () => r.body };
+  };
+  const env = { GITLAB_TOKEN: 'secret', GITLAB_HOST: 'code.acme.example' };
+  const dir = mirror('https://code.acme.example', 'code.acme.example');
+  const req = { paths: [{ path: 'src/theme.css' }] };
+  await fillHistory(dir, req, { fetchImpl, env });
+  assert.equal(commitsOf(dir, ['src/theme.css'])?.find((r) => r.sha === B)?.release ?? null, null, 'the request failed');
+  assert.deepEqual(missing(dir, req)?.paths.map((x) => x.path), ['src/theme.css'], 'its release is still to read');
+  down = false; gl.calls.length = 0;
+  await fillHistory(dir, req, { fetchImpl, env });
+  assert.ok(!gl.calls.some((c) => c.path === '/repository/commits?path=src/theme.css'), 'its commits are not listed again');
+  assert.equal(commitsOf(dir, ['src/theme.css']).find((r) => r.sha === B).release, 'v1.2.0');
+  assert.equal(missing(dir, req), null);
+});

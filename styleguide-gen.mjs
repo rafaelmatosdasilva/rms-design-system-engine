@@ -24,8 +24,9 @@
 import { buildStamp, mayWrite, stampMeta } from './stamp.mjs';
 import { usedClasses } from './class-use.mjs';
 import { appDir } from './code-roots.mjs';
-import { codeSizeCSS, modeRootCSS, scopeView } from './styleguide-data.mjs';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
+import { codeSizeCSS, modeRootCSS, scopeView, attrModeCSS, colourAttrMode, modeScopes } from './styleguide-data.mjs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync } from 'fs';
+import { findIconFolder, folderSymbols } from './icon-folder.mjs';
 import { join, dirname, resolve, relative, basename } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
@@ -155,6 +156,18 @@ export function appLabels(names) {
   return clash ? names.map((n) => [n, String(n)]) : short;
 }
 
+// A stylesheet the system's CSS imports by its address (its webfont: @import url('https://fonts.googleapis.com/…')) is
+// ignored by a browser anywhere but at the very top of a stylesheet, and the page puts the system's CSS after rules of
+// its own: each one is linked from the page's head instead, once, so its components are drawn in their own font.
+// Only inside the page's <style> blocks: the same words in the page's data (a component's source shown) stay.
+export function hoistImports(html) {
+  const urls = [];
+  const out = String(html).replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (all, open, body, close) => open + body.replace(/@import\s+(?:url\(\s*)?(['"]?)(https?:\/\/[^'")\s]+)\1\s*\)?[^;{}]*;/g, (m, q, url) => { if (!urls.includes(url)) urls.push(url); return ''; }) + close);
+  if (!urls.length) return out;
+  const links = urls.map((u) => `<link rel="stylesheet" href="${u.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">`).join('\n');
+  return /<head[^>]*>/i.test(out) ? out.replace(/<head[^>]*>/i, (h) => `${h}\n${links}`) : links + out;
+}
+
 // The CSS inside an HTML page's <style> blocks.
 export function styleBlocks(html) {
   return [...String(html ?? '').matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join('\n');
@@ -196,17 +209,24 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const snapPath = cfg.paths?.snapshotVars ? resolve(ROOT, cfg.paths.snapshotVars) : null;
       if (snapPath && existsSync(snapPath)) sizeCSS = codeSizeCSS(JSON.parse(readFileSync(snapPath, 'utf8')).modeVariants, css);
     } catch {}
-    return deriveModeCSS(css) + sizeCSS + modeRootCSS(css);
+    return deriveModeCSS(css) + sizeCSS + attrModeCSS(css, colourAttrMode(cfg)) + modeRootCSS(css, modeScopes(cfg));
   }
 
   // ── ICON_SHEET ───────────────────────────────────────────────────────────────
+  // The system's icons as one <symbol> sheet: a built page's own sheet (styleguide.iconSource, else the first app's
+  // page), or a folder of SVG files, one icon each (styleguide.iconSource naming a folder, else the one named icon or
+  // icons the code keeps them in: icon-folder.mjs), each icon named by its path in it (m/alert-m.svg → m-alert-m).
+  let iconSheetCache = null;
   function iconSheet() {
-    const src = sh.iconSource ? resolve(ROOT, sh.iconSource) : (pluginHTML[0] ? resolve(ROOT, pluginHTML[0]) : null);
-    if (!src || !existsSync(src)) return '';
-    const doc = readFileSync(src, 'utf8');
-    const syms = doc.match(/<symbol\b[\s\S]*?<\/symbol>/g) || [];
-    if (!syms.length) return '';
-    return '<svg id="ds-icon-sheet" width="0" height="0" style="position:absolute" aria-hidden="true">' + syms.join('') + '</svg>';
+    if (iconSheetCache != null) return iconSheetCache;
+    const wrap = (syms) => (syms.length ? '<svg id="ds-icon-sheet" width="0" height="0" style="position:absolute" aria-hidden="true">' + syms.join('') + '</svg>' : '');
+    const named = sh.iconSource ? resolve(ROOT, sh.iconSource) : null;
+    if (named && existsSync(named) && statSync(named).isDirectory()) return (iconSheetCache = wrap(folderSymbols(ROOT, relative(ROOT, named)).map((x) => x.symbol)));
+    const src = named ?? (pluginHTML[0] ? resolve(ROOT, pluginHTML[0]) : null);
+    const syms = src && existsSync(src) ? readFileSync(src, 'utf8').match(/<symbol\b[\s\S]*?<\/symbol>/g) || [] : [];
+    if (syms.length || named) return (iconSheetCache = wrap(syms));
+    const folder = findIconFolder(ROOT);
+    return (iconSheetCache = folder ? wrap(folderSymbols(ROOT, folder).map((x) => x.symbol)) : '');
   }
 
   // ── design-intent (notes) ──────────────────────────────────────────────────────
@@ -366,10 +386,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         for (const [name, m] of Object.entries(r.markup)) {
           const own = codeOnly.find((k) => k.name === name);
           if (own) { if (holds(m, own.cls)) { own.markup = m; own.from = 'vue-build'; } }
-          else if (holds(m, locator.classFor(name))) {
+          // Its own file drawn by its own build is the component, whatever class its root carries (an input's wrapper);
+          // a file from the project's pages (src/views, a docs page that shows it) is the component only when its root
+          // carries the component's class.
+          else if (!/(^|[\\/])(views|pages|stories|docs|examples?|playground)[\\/]/i.test(vueFiles[name] ?? '') || holds(m, locator.classFor(name))) {
             jsx[name] = m;
-            const each = (r.cases[name] ?? []).filter((c) => holds(c.markup, locator.classFor(name)));
-            if (new Set(each.map((c) => c.markup)).size > 1) vueRenders[name] = each.map((c) => ({ props: c.props, markup: c.markup }));
+            const each = (r.cases[name] ?? []).filter((c) => /^<[a-z]/i.test(c.markup.trim()));
+            if (new Set(each.map((c) => c.markup)).size > 1) vueRenders[name] = each.map((c) => ({ label: c.label, props: c.props, markup: c.markup }));
           }
         }
         vueCss = r.css;
@@ -515,13 +538,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     if (cfg.frameworkComponents !== false) {
       try {
         const { createApiReader } = await import('./component-api.mjs');
-        const { apiView } = await import('./styleguide-data.mjs');
+        const { apiView, codeControls } = await import('./styleguide-data.mjs');
         const nodeIds = Object.fromEntries(Object.entries(ctx?.propsSnap ?? {}).filter(([, e]) => e?.nodeId).map(([n, e]) => [n, e.nodeId]));
         const reader = createApiReader(ROOT, cfg, { classFor: (n) => locator.classFor(n), nodeIds });
         for (const c of view.components) {
           const api = reader.apiFor(c.name);
           const v = api.file && apiView(api, relative(ROOT, api.file));
           if (v) c.api = v;
+          // What only its API takes is a Playground control too, when its own build drew each case of it.
+          if (v && c.renders) c.controls = [...(c.controls ?? []), ...codeControls(c.controls ?? [], v, ctx?.propsSnap?.[c.name]?.properties ?? {})];
         }
       } catch { /* no component sources */ }
     }
@@ -781,7 +806,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
         c.parity.rows = parityRows({ name: c.name, propsSnap, controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], codeProps: c.api?.props ?? {}, allTokens: c.allTokens ?? [], check, agreed: agreedRec, propsAt: propsSnap._updated ?? null, checkedAt, slotParts: (c.anatomy ?? []).filter((x) => x.slot) });
         const text = c.api?.file ? readText(c.api.file) : '';
-        const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names, tags: fileTags });
+        const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names, tags: fileTags, files: fileOf });
         if (uses.length) c.uses = uses;
         if (c.api?.tag) {
           const imp = importOf({ tag: c.api.tag, syntax: c.api.syntax, file: c.api.file, text, pkg: pkgOf(c.api.file), template: cfg.styleguide?.importFrom ?? null });
@@ -881,7 +906,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { prototypeTransitions } = await import('./motion-parity.mjs');
       const snapMotion = readJson(cfg.paths?.snapshotMotion ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-motion.snapshot.json'));
       const findings = motionFound;
-      const files = [...themeFiles, ...pluginCSS].filter((f) => f && !/^https?:/.test(f)).map((file) => ({ file, text: readText(file) })).filter((f) => f.text);
+      // The theme, the system's own stylesheets and its components' (each component sheet, and the CSS its Vue build
+      // compiles from each .vue file's <style>): a hover's transition or a modal's opening is in them.
+      const sheets = [...new Set([...themeFiles, ...pluginCSS, ...((await context()).componentSheets ?? [])])].filter((f) => f && !/^https?:/.test(f) && !/\.html?$/i.test(f));
+      const files = [...sheets.map((file) => ({ file, text: readText(file) })), ...(vueCss ? [{ file: 'its Vue components, as their build compiles them', text: vueCss }] : [])].filter((f) => f.text);
       let m = await motionTokens(allCss, { figmaVars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, cfg, files, transitions: snapMotion ? prototypeTransitions(snapMotion, findings) : [] });
       // How each component moves on its own (C7): its loop, its opening and its closing, the code's beside Figma's.
       const { componentMotionRows, motionSpec, motionOverview } = await import('./motion-components.mjs');
@@ -993,7 +1021,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   // ── CHROME — the page's own look, from the system's tokens (styleguide-data.mjs chromeRoles) ──────────────────────
   async function chromeCSS() {
     if (!lastView) lastView = JSON.parse(await agreed());
-    const { chromeRoles, cardUi } = await import('./styleguide-data.mjs');
+    const { chromeRoles, cardUi, modeScopes } = await import('./styleguide-data.mjs');
     const { propsSnap } = await context();
     // The system's icon size: the width most of its icons are drawn at in Figma (their viewBox), else in its icon sheet.
     const boxes = [...Object.values(readJson(cfg.paths?.snapshotIcons ?? '') ?? {}).map((i) => i?.viewBox), ...(iconSheet().match(/viewBox="[^"]+"/g) ?? []).map((v) => v.slice(9, -1))]
@@ -1001,7 +1029,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const count = {}; for (const b of boxes) count[b] = (count[b] ?? 0) + 1;
     const size = Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0];
     const sysCss = themeFiles.map(readText).join('\n');
-    chrome = chromeRoles({ tokens: lastView.tokens, themeCss: sysCss, componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome, card: cardUi(lastView.allComponents ?? lastView.components ?? [], sysCss) });
+    chrome = chromeRoles({ tokens: lastView.tokens, themeCss: sysCss, componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome, scopes: modeScopes(cfg), card: cardUi(lastView.allComponents ?? lastView.components ?? [], sysCss) });
     // The page's own contrast in every mode, for the style guide check to read from the page.
     return chrome.css + (chrome.contrast?.length ? `\n/*sg-contrast:${JSON.stringify(chrome.contrast)}*/` : '');
   }
@@ -1045,6 +1073,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   }
 
   html = html.split(VUE_CSS_MARK).join(vueCss);
+  html = hoistImports(html);
   // An older run never replaces a page built from newer inputs (P4). The code capture's own copy (opts.out) is always
   // the code as it is now.
   const built = buildStamp(ROOT, { vars: (() => { try { return JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { return null; } })() });
