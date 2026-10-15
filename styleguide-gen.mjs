@@ -25,7 +25,8 @@ import { buildStamp, mayWrite, stampMeta } from './stamp.mjs';
 import { usedClasses } from './class-use.mjs';
 import { appDir } from './code-roots.mjs';
 import { codeSizeCSS, modeRootCSS, scopeView } from './styleguide-data.mjs';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync } from 'fs';
+import { findIconFolder, folderSymbols } from './icon-folder.mjs';
 import { join, dirname, resolve, relative, basename } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
@@ -200,13 +201,20 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   }
 
   // ── ICON_SHEET ───────────────────────────────────────────────────────────────
+  // The system's icons as one <symbol> sheet: a built page's own sheet (styleguide.iconSource, else the first app's
+  // page), or a folder of SVG files, one icon each (styleguide.iconSource naming a folder, else the one named icon or
+  // icons the code keeps them in: icon-folder.mjs), each icon named by its path in it (m/alert-m.svg → m-alert-m).
+  let iconSheetCache = null;
   function iconSheet() {
-    const src = sh.iconSource ? resolve(ROOT, sh.iconSource) : (pluginHTML[0] ? resolve(ROOT, pluginHTML[0]) : null);
-    if (!src || !existsSync(src)) return '';
-    const doc = readFileSync(src, 'utf8');
-    const syms = doc.match(/<symbol\b[\s\S]*?<\/symbol>/g) || [];
-    if (!syms.length) return '';
-    return '<svg id="ds-icon-sheet" width="0" height="0" style="position:absolute" aria-hidden="true">' + syms.join('') + '</svg>';
+    if (iconSheetCache != null) return iconSheetCache;
+    const wrap = (syms) => (syms.length ? '<svg id="ds-icon-sheet" width="0" height="0" style="position:absolute" aria-hidden="true">' + syms.join('') + '</svg>' : '');
+    const named = sh.iconSource ? resolve(ROOT, sh.iconSource) : null;
+    if (named && existsSync(named) && statSync(named).isDirectory()) return (iconSheetCache = wrap(folderSymbols(ROOT, relative(ROOT, named)).map((x) => x.symbol)));
+    const src = named ?? (pluginHTML[0] ? resolve(ROOT, pluginHTML[0]) : null);
+    const syms = src && existsSync(src) ? readFileSync(src, 'utf8').match(/<symbol\b[\s\S]*?<\/symbol>/g) || [] : [];
+    if (syms.length || named) return (iconSheetCache = wrap(syms));
+    const folder = findIconFolder(ROOT);
+    return (iconSheetCache = folder ? wrap(folderSymbols(ROOT, folder).map((x) => x.symbol)) : '');
   }
 
   // ── design-intent (notes) ──────────────────────────────────────────────────────
