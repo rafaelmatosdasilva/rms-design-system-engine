@@ -184,13 +184,20 @@ export function propsOf(figma) {
 }
 // entry: the component-props snapshot's entry. → [{ label, props }], the default first, then each other value of each
 // variant prop and each on/off prop flipped, at most `max` (ds-config.json → a11y.maxVariants, 16 by default).
+// A state a variant can be in (Disabled, Selected, Loading) starts off in the default case, wherever Figma's default
+// variant sits: the component is shown as it is first met, its states as cases of their own.
+const STATE_PROP = /^(is)?(disabled|selected|checked|pressed|error|invalid|loading|readonly|read-?only|active|open|expanded|skeleton)$/i;
 export function harnessCases(entry = {}, max = 16) {
   const defs = Object.entries(entry.properties ?? {});
   const base = {};
   for (const [k, d] of defs) if (d.type !== 'INSTANCE_SWAP') base[k] = d.defaultValue;
+  for (const [k, d] of defs) {
+    const off = (d.variantOptions ?? []).find((o) => /^(false|off|no)$/i.test(String(o)));
+    if (d.type === 'VARIANT' && off !== undefined && STATE_PROP.test(clean(k).replace(/\s+/g, ''))) base[k] = off;
+  }
   const cases = [{ label: 'default', props: propsOf(base) }];
   for (const [k, d] of defs) {
-    if (d.type === 'VARIANT') for (const o of d.variantOptions ?? []) { if (String(o) !== String(d.defaultValue) && !INTERACTION.test(o)) cases.push({ label: `${clean(k)}=${o}`, props: propsOf({ ...base, [k]: o }) }); }
+    if (d.type === 'VARIANT') for (const o of d.variantOptions ?? []) { if (String(o) !== String(base[k]) && !INTERACTION.test(o)) cases.push({ label: `${clean(k)}=${o}`, props: propsOf({ ...base, [k]: o }) }); }
     else if (d.type === 'BOOLEAN') cases.push({ label: `${clean(k)}=${!d.defaultValue}`, props: propsOf({ ...base, [k]: !d.defaultValue }) });
   }
   return cases.slice(0, max);

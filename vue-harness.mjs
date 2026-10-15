@@ -8,7 +8,7 @@
 // webpack.config). A project with no Vite config but Vite and @vitejs/plugin-vue installed gets that plugin, as a new
 // Vue project has it. What it lacks is said, never worked around with a build of the engine's.
 // The variants are Figma's when it has the component, else the code's own props (component-harness.mjs variantsFromCode).
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, dirname, resolve, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -89,7 +89,100 @@ export function appPlugins(ROOT) {
   let deps = {};
   try { const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')); deps = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.peerDependencies }; } catch { /* no package.json */ }
   const has = (name) => Boolean(deps[name]) && Boolean(projectModule(ROOT, name));
-  return { pinia: has('pinia'), router: has('vue-router') };
+  return { pinia: has('pinia'), router: has('vue-router'), setup: appSetup(ROOT) };
+}
+
+// The packages the project's own code imports (every script under src/ but its tests and its Figma Code Connect files),
+// as it imports them ('prismjs', 'prismjs/plugins/line-numbers/prism-line-numbers.js'): only those the project has
+// installed, never a stylesheet, never Vue's own (the list above has them). A tool the project only runs from its
+// scripts (a CLI in its dependencies) is never bundled into the page.
+export function runtimeDeps(ROOT) {
+  const out = new Set();
+  const walk = (d) => {
+    let names; try { names = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of names) {
+      if (e.name.startsWith('.') || /^(node_modules|figma|__tests__|tests?)$/.test(e.name)) continue;
+      const p = join(d, e.name);
+      if (e.isDirectory()) { walk(p); continue; }
+      if (!/\.(vue|m?js|ts)$/.test(e.name) || /\.(test|spec|figma)\.\w+$/.test(e.name)) continue;
+      let src; try { src = readFileSync(p, 'utf8'); } catch { continue; }
+      for (const m of src.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)['"]((?:@[\w.-]+\/)?[\w-][^'"]*)['"]/g)) out.add(m[1]);
+    }
+  };
+  walk(join(ROOT, 'src'));
+  return [...out].filter((spec) => {
+    if (/\.(css|scss|sass|less|json|svg|png|jpe?g|gif|webp)(\?.*)?$/i.test(spec)) return false;
+    const name = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
+    return !/^(vue|pinia|vue-router)$/.test(name) && !!projectModule(ROOT, name);
+  }).sort();
+}
+
+// The value the project's own templates pass most to each attribute written as plain text (icon="m/home-m",
+// label="Save"), so a component whose text or icon has no default draws with one the product really uses. Only names
+// a component's props can take; a bound one (:label="x") or one with a template in it is never taken.
+export function propSamples(ROOT) {
+  const count = {};
+  const walk = (d) => {
+    let names; try { names = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of names) {
+      if (e.name.startsWith('.') || /^(node_modules|figma|tests?)$/.test(e.name)) continue;
+      const p = join(d, e.name);
+      if (e.isDirectory()) { walk(p); continue; }
+      if (!/\.vue$/.test(e.name)) continue;
+      let src; try { src = readFileSync(p, 'utf8'); } catch { continue; }
+      const tpl = /<template\b[\s\S]*<\/template>/.exec(src)?.[0] ?? '';
+      for (const m of tpl.matchAll(/\s([a-z][\w-]*)="([^"{}<>]{1,60})"/g)) {
+        if (/^(class|style|id|key|ref|type|role|href|src|alt|for|name|slot|v-[\w-]+|aria-[\w-]+|data-[\w-]+|xmlns.*|viewBox|fill|stroke.*|d|width|height|target|rel|tabindex)$/.test(m[1])) continue;
+        const k = m[1].replace(/-(\w)/g, (_, c) => c.toUpperCase());
+        ((count[k] ??= {})[m[2]] = (count[k][m[2]] ?? 0) + 1);
+      }
+    }
+  };
+  walk(join(ROOT, 'src'));
+  return Object.fromEntries(Object.entries(count).map(([k, vs]) => [k, Object.entries(vs).sort((a, b) => b[1] - a[1])[0][0]]));
+}
+
+// What the project's own entry installs on its app (src/main.js: app.use(i18n), app.component('BaseIcon', BaseIcon),
+// app.directive('mask', mask)), each read from the import that names it, so each instance on the page gets the same:
+// a component that calls $t, renders <BaseIcon> or uses v-mask draws as it does in the product. The store and the router
+// are left to the page's own (appPlugins), and an option passed with a plugin is not, as it may name what the entry
+// builds around it. → [{ kind: 'use' | 'component' | 'directive', name?, spec, named? }]
+export function appSetup(ROOT) {
+  for (const entry of ['src/main.ts', 'src/main.js', 'src/main.mts', 'main.ts', 'main.js']) {
+    let text = ''; try { text = readFileSync(join(ROOT, entry), 'utf8'); } catch { continue; }
+    text = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    const app = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*createApp\s*\(/.exec(text)?.[1];
+    if (!app) return [];
+    const imports = new Map(), own = [];
+    for (const m of text.matchAll(/^\s*import\s+([^'"]+?)\s+from\s+['"]([^'"]+)['"]/gm)) {
+      const [, what, from] = m;
+      const spec = from.startsWith('.') ? '/' + relative(ROOT, join(ROOT, dirname(entry), from)).split(sep).join('/') : from;
+      if (/^(\/|@\/|~\/)/.test(spec) && !own.includes(spec)) own.push(spec);
+      const def = /^([A-Za-z_$][\w$]*)/.exec(what.trim())?.[1];
+      if (def && !what.trim().startsWith('{') && !what.trim().startsWith('*')) imports.set(def, { spec });
+      for (const n of (/\{([^}]*)\}/.exec(what)?.[1] ?? '').split(',')) {
+        const [a, b] = n.trim().split(/\s+as\s+/);
+        if (a) imports.set((b ?? a).trim(), { spec, named: a.trim() });
+      }
+    }
+    // The project's own modules the entry imports, first and in its order (its App, router, stores): loaded before any
+    // component, so modules that import each other start in the order the product starts them, never halfway.
+    const out = own.map((spec) => ({ kind: 'import', spec }));
+    const skip = (id, src) => /^(createPinia|router)$/i.test(id) || /(^|\/)router(\/|$)|^vue-router$|^pinia$/i.test(src.spec);
+    const call = new RegExp(`\\b${app}\\s*\\.\\s*(use|component|directive)\\s*\\(([^)]*)\\)`, 'g');
+    for (const m of text.matchAll(call)) {
+      const args = m[2].split(',').map((x) => x.trim());
+      if (m[1] === 'use') {
+        const id = /^[A-Za-z_$][\w$]*$/.test(args[0]) ? args[0] : null, src = id && imports.get(id);
+        if (src && !skip(id, src)) out.push({ kind: 'use', ...src });
+      } else {
+        const name = /^['"]([^'"]+)['"]$/.exec(args[0] ?? '')?.[1], src = imports.get(args[1] ?? '');
+        if (name && src) out.push({ kind: m[1], name, ...src });
+      }
+    }
+    return out;
+  }
+  return [];
 }
 
 // The page's module: each component imported by its own path, mounted once per variant in a box that names it
@@ -104,7 +197,12 @@ ${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router
 const LOAD = {
 ${groups.map((g) => `  ${JSON.stringify(g.name)}: () => import(${JSON.stringify(g.file)}),`).join('\n')}
 };
+// What the project's entry installs on its app (appSetup), each loaded once; one that does not load is said, the rest kept.
+const SETUP = [
+${(plugins.setup ?? []).map((x) => `  { kind: ${JSON.stringify(x.kind)}, name: ${JSON.stringify(x.name ?? null)}, named: ${JSON.stringify(x.named ?? null)}, load: () => import(${JSON.stringify(x.spec)}) },`).join('\n')}
+];
 const squash = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+const SAMPLES = ${JSON.stringify(plugins.samples ?? {})};
 const STATE = ['pressed', 'selected', 'checked', 'expanded', 'open', 'on', 'modelvalue', 'value'];
 const BY_ROLE = { togglebutton: ['pressed'], toggle: ['pressed'], checkbox: ['checked'], switch: ['checked'], disclosure: ['expanded'], accordion: ['expanded'], tab: ['selected'] };
 // The props the component declares, each given the variant's value (Figma's names matched to the code's, a value
@@ -114,7 +212,10 @@ function fit(C, props, role, options) {
   const decl = Array.isArray(C.props) ? Object.fromEntries(C.props.map((k) => [k, {}])) : (C.props || {});
   const out = {};
   for (const [d, spec] of Object.entries(decl)) {
-    const hit = Object.keys(props).find((k) => squash(k) === squash(d));
+    // Figma's name for it, or the name with what it holds after it (labelContent, iconContent for label, icon).
+    // A code name that ends with Figma's (buttonSize for size) when no other prop does.
+    const tail = Object.keys(props).filter((k) => squash(k).length > 2 && squash(d).endsWith(squash(k)) && !Object.keys(decl).some((o) => squash(o) === squash(k)));
+    const hit = Object.keys(props).find((k) => squash(k) === squash(d)) ?? Object.keys(props).find((k) => squash(k).replace(/(content|text|value|swap)$/, '') === squash(d)) ?? (tail.length === 1 ? tail[0] : undefined);
     const types = [].concat(spec && spec.type || spec || []);
     if (hit !== undefined) {
       let v = props[hit];
@@ -123,8 +224,20 @@ function fit(C, props, role, options) {
       out[d] = own !== undefined ? own : v;
     }
     else if ((BY_ROLE[role] || []).includes(squash(d))) out[d] = false;
+    // A text the code takes with no default (an icon's name, a label): the one the project's own pages pass it most.
+    else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && SAMPLES[d] != null) out[d] = SAMPLES[d];
+    // An object or a list it reads into with no default: an empty one, as a page always passes one, so it draws.
+    // (params: Object, or { type: Object } with no default)
+    else if (!(spec && typeof spec === 'object' && 'default' in spec) && types.length === 1 && (types[0] === Object || types[0] === Array)) out[d] = types[0] === Array ? [] : {};
   }
   for (const [k, v] of Object.entries(props)) if (/^aria-/.test(k)) out[k] = v;
+  // Figma's showLabel or hasIcon off, where the code shows the part whenever it is given: the part is not given.
+  for (const [k, v] of Object.entries(props)) {
+    const part = /^(show|has|with)(.+)$/i.exec(k)?.[2];
+    if (!part || (v !== false && v !== 'false') || Object.keys(decl).some((d) => squash(d) === squash(k))) continue;
+    const d = Object.keys(decl).find((x) => squash(x) === squash(part));
+    if (d) delete out[d];
+  }
   return out;
 }
 function listeners(C, state) {
@@ -158,6 +271,20 @@ const inherit = (app) => {
 const main = document.getElementById('dse-harness');
 const failed = [];
 (async () => {
+const setup = [];
+for (const x of SETUP) {
+  try { const m = await x.load(); const v = x.named ? m[x.named] : (m.default ?? m); if (v && x.kind !== 'import') setup.push({ ...x, v }); }
+  catch (e) { if (x.kind !== 'import') failed.push({ name: 'the app\\'s ' + (x.name || x.kind), why: String(e && e.message || e).split('\\n')[0] }); }
+}
+const install = (app) => {
+  for (const x of setup) {
+    try {
+      if (x.kind === 'use') app.use(x.v);
+      else if (x.kind === 'component' && !app._context.components[x.name]) app.component(x.name, x.v);
+      else if (x.kind === 'directive' && !app._context.directives[x.name]) app.directive(x.name, x.v);
+    } catch (e) { /* one the app already has, or that cannot be installed twice: the rest still installed */ }
+  }
+};
 for (const g of GROUPS) {
   const sec = document.createElement('section'); sec.setAttribute('data-dse-component', g.name); sec.setAttribute('aria-label', g.name); main.append(sec);
   let C = null;
@@ -170,6 +297,7 @@ for (const g of GROUPS) {
     app.config.errorHandler = (e) => failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] });
     app.config.warnHandler = () => {};
     inherit(app);
+    install(app);
 ${plugins.pinia ? "    if (!app.config.globalProperties.$pinia) app.use(createPinia());\n" : ''}${plugins.router ? "    if (!app.config.globalProperties.$router) app.use(createRouter({ history: createMemoryHistory(), routes: [{ path: '/:any(.*)*', component: { render: () => null } }] }));\n" : ''}    try { app.mount(box); } catch (e) { failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] }); }
   }
 }
@@ -220,7 +348,7 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
   const themes = [cfg.paths?.themeCSS].flat().filter((f) => f && !/^https?:/.test(f));
   const css = themes.map((f) => { try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; } }).join('\n');
   const colours = pageColours(css);
-  const plugins = appPlugins(ROOT);
+  const plugins = { ...appPlugins(ROOT), samples: propSamples(ROOT) };
   const started = pb.kind === 'nuxt' ? await startNuxt(ROOT, pb, dir, groups, cfg, colours, plugins)
     : pb.kind === 'webpack' ? await startWebpack(ROOT, pb, dir, groups, cfg, colours, themes, plugins)
       : await startVite(ROOT, pb, dir, groups, cfg, colours, plugins);
@@ -237,9 +365,10 @@ async function startVite(ROOT, pv, dir, groups, cfg, { surface, ink }, plugins =
       root: ROOT, configFile: pv.config ? join(ROOT, pv.config) : false, plugins: pv.plugins, logLevel: 'silent', clearScreen: false, appType: 'custom',
       cacheDir: join(ROOT, OUT_DIR, 'vite-cache'),
       server: { middlewareMode: true, hmr: false, watch: null, fs: { strict: false } },
-      // Only Vue itself (and the Pinia and router the page gives each instance) is bundled ahead, so the page never
-      // reloads halfway for a dependency found late, and they share the one Vue.
-      optimizeDeps: { noDiscovery: true, include: ['vue', ...(plugins.pinia ? ['pinia'] : []), ...(plugins.router ? ['vue-router'] : [])] },
+      // Vue, and every package the project's own code imports, is bundled before the page loads: a CommonJS one
+      // (moment-timezone) is converted so its default import works, the page never reloads halfway for one found late,
+      // and they all share the one Vue.
+      optimizeDeps: { noDiscovery: true, include: ['vue', ...(plugins.pinia ? ['pinia'] : []), ...(plugins.router ? ['vue-router'] : []), ...runtimeDeps(ROOT)] },
     });
   } catch (e) { return { why: `the project's Vite did not start (${why1(e)})` }; }
   const page = PAGE(surface, ink);
@@ -394,8 +523,15 @@ export async function renderedVue(ROOT, cfg, names, { propsSnap = {}, locate, re
   try {
     browser = await launchChrome(chrome, { tmpPrefix: 'dse-vue-' });
     cdp = await connectCDP(browser.wsUrl);
+    // What the page throws while it loads, so a page that never finishes says why.
+    const thrown = [];
+    cdp.on('Runtime.exceptionThrown', (p) => thrown.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text ?? ''));
+    cdp.on('Runtime.consoleAPICalled', (p) => { if (p.type === 'error') thrown.push(p.args.map((a) => a.value ?? a.description ?? '').join(' ')); });
     const { sessionId } = await openPage(cdp.send, h.url);
-    if (!(await waitForTrue(cdp.send, sessionId, 'window.__dseHarnessReady === true', { attempts: 1200, intervalMs: 50, tolerateErrors: true }))) return none('the page of its components did not finish within a minute');
+    if (!(await waitForTrue(cdp.send, sessionId, 'window.__dseHarnessReady === true', { attempts: 1200, intervalMs: 50, tolerateErrors: true }))) {
+      const first = thrown.map((t) => String(t).split('\n')[0]).filter(Boolean)[0];
+      return none(`the page of its components did not finish within a minute${first ? ` (it threw: ${first.slice(0, 200)})` : ''}`);
+    }
     // The build's own stylesheets: Vite's and Nuxt's carry the file they come from; webpack's are every one the page
     // did not bring itself.
     const expr = `(() => {
