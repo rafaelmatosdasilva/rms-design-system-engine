@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide defaults (continuous evaluation)
+
+What changed since the entry below (engine 7a1484a): The page's own defaults where the system has none: segmented control, tooltip, card border, type scale. The guide changed in `reference/usage.md`.
+
+Guide set measured: `b11823942aea` · Project measured: `13d811a9d668`
+
+| Haiku, engine 4fe0912 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.060 |
+| Input a run | 103k | 115k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 115k a run against 103k. Records: `records/2026-10-15-style-guide-the-page-s`.
+
 ## 2026-10: Figma branch links (continuous evaluation)
 
 What changed since the entry below (engine 2ef7817): A Figma branch link names the branch: setup and a link given later read the branch, which stays as it is while the main file changes; on a project already set up, --init --figma-url changes only figmaFileKey. The guide changed in `reference/config.md`, `reference/usage.md`.
