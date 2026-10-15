@@ -15,11 +15,14 @@ const TP = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
 test('the route, in order: a newer design.json, figma-cli connected, the API with a token, else the session\'s Figma tool', async () => {
   const at = (times) => (p) => times[Object.keys(times).find((k) => p.endsWith(k))] ?? null;
   const cfg = { paths: { snapshotVars: 'src/figma-vars.snapshot.json' }, figmaFileKey: 'abc' };
-  const none = { which: () => null, answers: async () => false, env: {} };
+  const none = { which: () => null, answers: async () => false, safe: async () => false, env: {} };
   assert.equal((await chooseFigmaSource('/p', cfg, { ...none, mtime: at({ 'design.json': 2, 'figma-vars.snapshot.json': 1 }) })).route, 'design-json');
   assert.equal((await chooseFigmaSource('/p', cfg, { ...none, mtime: at({ 'design.json': 1, 'figma-vars.snapshot.json': 2 }) })).route, 'mcp', 'an older design.json is not read again');
   assert.equal((await chooseFigmaSource('/p', cfg, { ...none, mtime: at({}), which: () => '/bin/figma-cli', answers: async (port) => port === 9222 })).route, 'figma-cli');
   assert.equal((await chooseFigmaSource('/p', cfg, { ...none, mtime: at({}), which: () => '/bin/figma-cli' })).route, 'mcp', 'installed but Figma not connected');
+  const safe = await chooseFigmaSource('/p', cfg, { ...none, mtime: at({}), which: () => '/bin/figma-cli', safe: async () => true });
+  assert.deepEqual([safe.route, /Safe Mode/.test(safe.why)], ['figma-cli', true], 'Safe Mode: no debugging port, the FigCli plugin answers');
+  assert.equal((await chooseFigmaSource('/p', cfg, { ...none, mtime: at({}), which: () => null, safe: async () => true })).route, 'mcp', 'not installed: never asked');
   assert.equal((await chooseFigmaSource('/p', cfg, { ...none, mtime: at({}), env: { FIGMA_TOKEN: 't' } })).route, 'rest');
   assert.equal(figmaCliPort({ FIGMA_PORT: '9333' }), 9333);
   assert.equal(figmaCliPort({ FIGMA_PORT: 'x' }), 9222);
