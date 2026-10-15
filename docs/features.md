@@ -302,7 +302,8 @@ A token shows only when the token check finds it equal to Figma in every mode. A
 
 The template is only the layout. Every colour, text style, radius and space on the page is one of your tokens, and every button, switch, field and card is your own component.
 
-- When your system lacks a control, the page uses its nearest stand-in from your system (no segmented control, so your tabs) and says so on the Tasks page, for your team to decide whether the system needs one.
+- When your system lacks a control, or it is not read yet, the page uses its own default, drawn with your tokens: a segmented control, a tooltip and a card with the tables' border and corners. The Tasks page says so, for your team to decide whether the system needs one.
+- Each text size uses your nearest text style when one is within 2px of the page's default (11, 12, 13 and 14px). Otherwise the default stays.
 - The engine fails the page when anything on it is not from your system, or when its own text falls below 4.5:1 in any colour mode.
 - Page titles use your own heading style. `"title-scale"` in `styleguide.chrome` changes their size.
 - A colour you set in `styleguide.chrome` carries to the ones that follow it. A new `bg` is also the stage behind each component, unless you set `stage` too.

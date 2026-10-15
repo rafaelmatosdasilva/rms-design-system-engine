@@ -600,7 +600,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const seenIn = (c) => (c.differences ?? []).filter((d) => PRODUCT_MISUSE.test(d.check ?? '') || / laid over it /.test(d.what ?? '')).map((d) => d.plain ?? d.what);
       for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c) });
     } catch { /* no guidance */ }
-    const { segmentedUi, tabsUi, radioGroupUi, buttonsAsSegmentedUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } = await import('./styleguide-data.mjs');
+    const { segmentedUi, tabsUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
     // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
     // every mode), the semantic roles, then each component's own.
@@ -681,10 +681,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     view.iconFigma = Object.fromEntries(Object.entries(readJson(cfg.paths?.snapshotIcons ?? '') ?? {})
       .filter(([, i]) => i && typeof i === 'object' && (i.name || i.viewBox))
       .map(([id, i]) => [id, { name: i.name ?? '', size: Number(String(i.viewBox ?? '').split(/[\s,]+/)[2]) || null }]));
-    // Each control the page needs is the system's own; where it has none, its nearest stand-in (a segmented control:
-    // tabs, then a radio group, then its buttons side by side), and the page says so (view.ui.gaps).
+    // Each control the page needs is the system's own; where it has none (or none read yet), the page's default one
+    // (a segmented control, a tooltip, a card), and the page says so (view.ui.gaps). The switch is only the system's
+    // segmented control: anything that only stands in for one (its tabs) gives way to the default.
     const every = view.allComponents ?? view.components;
-    view.ui = { segmented: segmentedUi(every) ?? radioGroupUi(every, systemCss) ?? buttonsAsSegmentedUi(every, systemCss), tabs: tabsUi(every), field: fieldUi(every, systemCss), button: buttonUi(every, systemCss, sh.ui?.button ?? null), card: cardUi(every, systemCss), iconButton: iconButtonUi(every, systemCss), tip: tipUi(every, systemCss), overlay: every.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
+    const seg = segmentedUi(every);
+    view.ui = { segmented: seg && !seg.standIn ? seg : null, tabs: tabsUi(every), field: fieldUi(every, systemCss), button: buttonUi(every, systemCss, sh.ui?.button ?? null), card: cardUi(every, systemCss), iconButton: iconButtonUi(every, systemCss), tip: tipUi(every, systemCss), overlay: every.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
     view.ui.gaps = standInGaps(view.ui);
     // What the tokens owe (F8, L9), rows of the Tasks page under The system: descriptions to write in Figma, tokens equal
     // in every mode and tokens one component uses, a decision each. The single-use ones come from the contracts the last

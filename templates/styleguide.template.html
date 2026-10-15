@@ -17,14 +17,14 @@
 <style>
 /* ── Style guide chrome: the template is the layout only. Every colour, font, text size, radius, space and shadow
    is a role variable the engine fills with the design system's own tokens (CHROME below); what the system has no
-   token for falls back to the browser's own (Canvas, CanvasText, its default font and sizes), never a value of the
-   template's, and the style guide check lists it. ─────────────────────────────────────────────────────────────── */
+   token for falls back to the template's defaults: the browser's own colours (Canvas, CanvasText) and font, and a small
+   type scale of its own (11, 12, 13 and 14px); the style guide check lists it. ──────────────────────────────────── */
 :root {
   color-scheme: light dark;
   --sg-bg: Canvas; --sg-bg-2: Canvas; --sg-surface: Canvas; --sg-stage: var(--sg-bg);
   --sg-text: CanvasText; --sg-text-2: CanvasText; --sg-muted: GrayText; --sg-border: GrayText; --sg-accent: AccentColor;
   --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-border);
-  --sg-xs: smaller; --sg-s: small; --sg-s-weight: normal; --sg-m: medium; --sg-m-weight: normal; --sg-l: large; --sg-l-weight: bold;
+  --sg-xs: 0.6875rem; --sg-s: 0.75rem; --sg-s-weight: normal; --sg-m: 0.8125rem; --sg-m-weight: normal; --sg-l: 0.875rem; --sg-l-weight: bold;
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: bold; --sg-lh: normal;
   /* A page's title: the system's largest text style, scaled up, so the guide has its own hierarchy above any system's
      text styles while every size still comes from the system ("title-scale" in styleguide.chrome, ds-config.json, changes it). */
@@ -65,10 +65,16 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-nav-label:first-child { margin-top: 0; }   /* the first group starts at the menu's top */
 .sg-main { flex: 1; min-width: 0; padding: var(--sg-space-xxl); }   /* the whole width a screen gives */
 
-/* ── Every switch on the page is the system's segmented control. With none, the browser's own buttons in a row: the page
-   never draws a control of its own (only layout here). ─────────────────────────────────────────────────────────────── */
+/* ── Every switch on the page is the system's segmented control. With none (or none read yet), the page's default one:
+   its options in a track, the chosen one raised, all in the system's roles (or the template's defaults). ───────────── */
 .sg-seg { display: flex; flex-wrap: wrap; width: 100%; gap: var(--sg-space-xxs); }
 .sg-seg button { font: inherit; }
+.sg-seg-default { padding: var(--sg-space-xxs); border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-bg-2); }
+.sg-seg-default > button { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: var(--sg-space-xs); min-height: 1.5rem; margin: 0; padding: var(--sg-space-xs) var(--sg-space-m); border: 0; border-radius: calc(var(--sg-radius) - var(--sg-space-xxs)); background: transparent; color: var(--sg-text-2); font-size: var(--sg-s); line-height: var(--sg-lh); cursor: pointer; white-space: nowrap; }   /* each option at least 24px tall (WCAG 2.5.8) */
+.sg-seg-default > button:hover { color: var(--sg-text); }
+.sg-seg-default > button[aria-pressed="true"] { background: var(--sg-bg); color: var(--sg-text); box-shadow: 0 0 0 var(--sg-line-width, 1px) var(--sg-border); }
+.sg-seg-default > button:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-seg-default > button:disabled { cursor: not-allowed; opacity: 0.5; }
 /* The page's own tabs, when the system has none: words in a row, the chosen one in the text colour with a line under it. */
 .sg-tabs { display: flex; gap: var(--sg-space-xl); border-bottom: var(--sg-line); }
 .sg-tab { display: inline-flex; align-items: center; background: none; border: 0; margin: 0; padding: var(--sg-space-s) 0 calc(var(--sg-space-s) * 2); font: inherit; font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-muted); white-space: nowrap; cursor: pointer; }
@@ -112,7 +118,17 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 :where(.sg-health-tile, .sg-health-top, .sg-health-card, .sg-health-list > li, .sg-health) > :where(p, h3, ol) { margin: 0; }
 /* Each card's label, and at its top right the system's own tip trigger saying how its number is counted. */
 .sg-health-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); }
-.sg-health-how { font-size: var(--sg-s); color: var(--sg-text-2); }
+.sg-health-top > :last-child:not(:first-child) { flex-shrink: 0; }
+/* The page's default tooltip, where the system has none (or none read yet): a round trigger and its words in a bubble,
+   shown on hover and focus, kept while the pointer is on it and closed with Escape (WCAG 1.4.13). */
+.sg-tip { position: relative; display: inline-flex; }
+.sg-tip-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; margin: 0; padding: 0; border: var(--sg-line); border-radius: 50%; background: var(--sg-bg); color: var(--sg-text-2); font: inherit; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); line-height: normal; cursor: help; }
+.sg-tip-btn:hover, .sg-tip-btn:focus-visible { color: var(--sg-text); }
+.sg-tip-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-tip-bubble { position: absolute; top: calc(100% + var(--sg-space-xs)); right: 0; z-index: 20; width: max-content; max-width: min(18rem, 70vw); padding: var(--sg-space-s) var(--sg-space-m); border-radius: var(--sg-radius-s); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-s); font-weight: var(--sg-s-weight); line-height: var(--sg-lh); text-align: left; box-shadow: var(--sg-shadow-lift); visibility: hidden; }
+.sg-tip-bubble::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: var(--sg-space-xs); }   /* the gap to the trigger: the pointer crosses it without closing the bubble */
+.sg-tip:hover > .sg-tip-bubble, .sg-tip:focus-within > .sg-tip-bubble { visibility: visible; }
+.sg-tip.is-dismissed > .sg-tip-bubble { visibility: hidden; }
 .sg-health-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sg-space-l); margin-bottom: var(--sg-space-l); }
 @media (max-width: 640px) { .sg-health-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .sg-health-tile, .sg-health-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); padding: var(--sg-space-l); display: flex; flex-direction: column; gap: var(--sg-space-s); min-width: 0; }
@@ -159,8 +175,10 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
   /* The other grids of cards two side by side too: the icons, the products a component is used in, its pictures in use. */
   .sg-card-grid.pg-usedin, .sg-main .sg-icon-grid, .sg-main .sg-screens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-/* Each overview link is the system's own card (DATA.ui.card); with none, a plain block link. Never a box of the page's. */
+/* Each overview link is the system's own card (DATA.ui.card); with none (or none read yet), the page's default card: the
+   tables' border, corners and shadow. Set at no specificity, so the system's card class wins on what it sets. */
 .sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
+:where(.sg-card) { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); }
 .sg-card[hidden], .sg-section[hidden], .sg-hr[hidden], .sg-nav a[hidden] { display: none; }
 .sg-hero > h1[tabindex="-1"]:focus, .pg-head > h2[tabindex="-1"]:focus, .sg-section > h2[tabindex="-1"]:focus { outline: none; }   /* the heading a new view moves focus to, for a screen reader */
 .sg-overview-group { margin-bottom: var(--sg-space-xl); }
@@ -778,16 +796,28 @@ a.pg-usage-name { color: var(--sg-text); }
      is the base: choosing it clears the attribute so the :root defaults apply. */
   var AXES = DATA.modes || [];
   /* ── Every switch on the page is the system's own segmented control (DATA.ui.segmented, read from its markup). With
-     none, its stand-in (tabs, a radio group, its buttons side by side), else a plain row of buttons the browser draws;
-     DATA.ui.gaps says which, on the overview and in the Tasks page. ─────────────────────────────────────────────── */
+     none (or none read yet), the page's default one (.sg-seg-default); DATA.ui.gaps says so, on the overview and in the
+     Tasks page. ─────────────────────────────────────────────── */
   var SEG = DATA.ui && DATA.ui.segmented, RADIO = SEG && SEG.item.radio, RADIO_NO = 0;
+  /* ── A tip: the system's own tooltip trigger (DATA.ui.tip, read from its markup); with none (or none read yet), the
+     page's default one (.sg-tip), its words in a bubble the trigger describes. ─────────────────────────────────── */
+  var TIP = DATA.ui && DATA.ui.tip, TIP_NO = 0;
+  function tipHTML(words, name) {
+    if (TIP) return TIP.markup.replace('{tip}', function () { return esc(words); }).replace('{name}', function () { return esc(name); });
+    var id = 'sg-tip-' + (++TIP_NO);
+    return '<span class="sg-tip"><button type="button" class="sg-tip-btn" aria-label="' + esc(name) + '" aria-describedby="' + id + '">?</button><span class="sg-tip-bubble" role="tooltip" id="' + id + '">' + esc(words) + '</span></span>';
+  }
+  // Escape closes the default tip under the pointer or the focus; it shows again once both leave it.
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') Array.prototype.forEach.call(document.querySelectorAll('.sg-tip:hover, .sg-tip:focus-within'), function (t) { t.classList.add('is-dismissed'); }); });
+  document.addEventListener('mouseout', function (e) { var t = e.target.closest && e.target.closest('.sg-tip'); if (t && !t.contains(e.relatedTarget) && !t.contains(document.activeElement)) t.classList.remove('is-dismissed'); });
+  document.addEventListener('focusout', function (e) { var t = e.target.closest && e.target.closest('.sg-tip'); if (t && !t.contains(e.relatedTarget) && !t.matches(':hover')) t.classList.remove('is-dismissed'); });
   // The system's own icon for a warning (its name says so), else none: the count is still said.
   var ALERT_ICON = (DATA.icons || []).find(function (i) { return /warn|alert|caution|attention|exclam/i.test(i); }) || (DATA.icons || []).find(function (i) { return /error|danger/i.test(i); }) || null;
   // name: what the switch chooses. The group says it (WCAG 1.3.1, 4.1.2): the page's own row is a named group, and the
   // system's control carries the name itself, so the role its script gives it (a radio group) has its name.
   function segHTML(items, name) {
     var tag = SEG ? SEG.item.tag : 'button', cls = SEG ? SEG.item.classes.join(' ') : '', group = 'sg-r' + (++RADIO_NO);
-    var open = SEG ? SEG.open : '<div class="sg-seg" role="group">';
+    var open = SEG ? SEG.open : '<div class="sg-seg sg-seg-default" role="group">';
     if (name && !/\saria-label(ledby)?=/.test(open.slice(0, open.indexOf('>')))) open = open.replace(/^<([\w-]+)/, '<$1 aria-label="' + esc(name) + '"');
     return open + items.map(function (o) {
       var text = SEG && SEG.item.label ? '<span class="' + esc(SEG.item.label) + '">' + esc(o.label) + '</span>' : esc(o.label);
@@ -2513,13 +2543,10 @@ a.pg-usage-name { color: var(--sg-text); }
       readyGot += got; readyAll += READY_KINDS.length + 1; if (got === READY_KINDS.length + 1) readyN++;
     });
     var bar = function (x) { return '<span class="sg-health-bar" aria-hidden="true"><span style="width:' + Math.max(0, Math.min(100, x)) + '%"></span></span>'; };
-    // How the card's number is counted, in the system's own tip at its top right; a system with no tip trigger shows
-    // the words on the card.
-    var TIP = DATA.ui && DATA.ui.tip;
+    // How the card's number is counted, in a tip at its top right: the system's own, else the page's default one.
     var tile = function (label, num, of, sub, how) {
-      var tip = TIP && how ? TIP.markup.replace('{tip}', function () { return esc(how); }).replace('{name}', function () { return esc('How ' + label + ' is counted'); }) : '';
-      return '<div class="sg-health-tile"><div class="sg-health-top"><p class="sg-health-label">' + esc(label) + '</p>' + tip + '</div><p class="sg-health-num">' + (num == null ? '–' : num) + '<small>' + esc(of) + '</small></p>' + bar(num || 0) + '<p class="sg-health-sub">' + esc(sub) + '</p>' +
-        (how && !TIP ? '<p class="sg-health-how">' + esc(how) + '</p>' : '') + '</div>';
+      var tip = how ? tipHTML(how, 'How ' + label + ' is counted') : '';
+      return '<div class="sg-health-tile"><div class="sg-health-top"><p class="sg-health-label">' + esc(label) + '</p>' + tip + '</div><p class="sg-health-num">' + (num == null ? '–' : num) + '<small>' + esc(of) + '</small></p>' + bar(num || 0) + '<p class="sg-health-sub">' + esc(sub) + '</p></div>';
     };
     var kindsOf = function (area) { var k = []; per.forEach(function (p) { p.rows.forEach(function (r) { if (r.area === area && k.indexOf(r.kind) < 0) k.push(r.kind); }); }); return k; };
     var lower = function (xs) { return xs.map(function (x) { return x.charAt(0).toLowerCase() + x.slice(1); }); };
