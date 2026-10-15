@@ -974,6 +974,9 @@ export function cardLook(themeCss = '', cls = null) {
   return out;
 }
 
+// The template's default text sizes (its :root), each role's target when the page picks the system's nearest style.
+const TYPE_ROLES = [['xs', 11], ['s', 12], ['m', 13], ['l', 14]];
+
 export function chromeRoles({ tokens = null, themeCss = '', componentNames = [], icons = {}, override = {}, card = null } = {}) {
   const roles = {}, from = {};
   const comps = new Set(componentNames.map((n) => n.toLowerCase()));
@@ -1005,12 +1008,16 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   };
   follow();
   if (roles.warning) from.warning = from.warning ?? '';
-  // Type: the system's text styles, smallest to largest; headings take the largest.
-  const type = (tokens?.typography ?? []).filter((t) => t.size?.var).sort((a, b) => parseFloat(a.size.value) - parseFloat(b.size.value));
+  // Type: each text size the page uses takes the system's text style nearest to the template's default for it (TYPE_ROLES),
+  // when one is within 2px; with none that close (or none read yet), the template's default stays. Headings take the
+  // l size; the heading weight is the system's largest style's.
+  const type = (tokens?.typography ?? []).filter((t) => t.size?.var && Number.isFinite(parseFloat(t.size.value))).sort((a, b) => parseFloat(a.size.value) - parseFloat(b.size.value));
   if (type.length) {
-    const s = type[0], l = type[type.length - 1], m = type[Math.floor((type.length - 1) / 2)] === s && type.length > 1 ? type[1] : type[Math.floor((type.length - 1) / 2)];
-    const put = (role, t) => { roles[role] = `var(${t.size.var})`; from[role] = `type/${t.scale}`; if (t.weight?.var) { roles[`${role}-weight`] = `var(${t.weight.var})`; } };
-    put('xs', s); put('s', s); put('m', m); put('l', l); put('h1', l); put('h2', l);
+    const near = (want) => type.map((t) => [t, Math.abs(parseFloat(t.size.value) - want)]).filter(([, d]) => d <= 2).sort((a, b) => a[1] - b[1] || parseFloat(a[0].size.value) - parseFloat(b[0].size.value))[0]?.[0] ?? null;
+    const put = (role, t) => { if (!t) return; roles[role] = `var(${t.size.var})`; from[role] = `type/${t.scale}`; if (t.weight?.var) { roles[`${role}-weight`] = `var(${t.weight.var})`; } };
+    for (const [role, want] of TYPE_ROLES) put(role, near(want));
+    const l = type[type.length - 1], m = near(TYPE_ROLES.find(([r]) => r === 'm')[1]) ?? type[Math.floor((type.length - 1) / 2)];
+    if (roles.l) { roles.h1 = roles.h2 = roles.l; from.h1 = from.h2 = from.l; }
     if (l.weight?.var) roles['heading-weight'] = `var(${l.weight.var})`;
     if (m.lh?.var) roles.lh = `var(${m.lh.var})`;
     // A page's title: the system's own heading style when it has one clearly larger than its body text (at least 20px
@@ -1141,47 +1148,16 @@ function choiceGroups(components) {
   return found;
 }
 
-// With no segmented control and no tabs: the system's radio group, one radio per choice (a component whose markup holds
-// a radio input, its label part kept), then its buttons side by side, the selected one in its strongest look (primary)
-// and the others in its quietest, or, with a single button, the selected one in it and the others plain. Same shape as
-// segmentedUi, with standIn saying what stands in. → object | null (the page then draws plain buttons with its tokens).
-export function radioGroupUi(components = [], systemCss = '') {
-  const defined = (c) => new RegExp(`\\.${c.replace(/[-]/g, '\\-')}(?![\\w-])`).test(systemCss);
-  const keep = (attrs) => (/\bclass\s*=\s*["']([^"']*)["']/i.exec(attrs ?? '')?.[1] ?? '').split(/\s+/).filter((k) => k && defined(k));
-  for (const c of components) {
-    const m = /^\s*<(label|div|span)\b([^>]*)>([\s\S]*)<\/\1>\s*$/i.exec(c.markup ?? '');
-    const input = m && /<input\b([^>]*\btype\s*=\s*["']?radio\b[^>]*)>/i.exec(m[3]);
-    if (!input) continue;
-    const lab = /<(span|strong|em|b)\b([^>]*)>[^<]*<\/\1>/i.exec(m[3].replace(/<svg[\s\S]*?<\/svg>/gi, ''));
-    return { from: c.name, open: '<div class="sg-seg" role="radiogroup">', close: '</div>', item: { tag: m[1].toLowerCase(), classes: keep(m[2]), label: lab ? keep(lab[2]).join(' ') || null : null, radio: keep(input[1]) }, selected: { add: [], attrs: {} }, standIn: 'radio group' };
-  }
-  return null;
-}
-
-export function buttonsAsSegmentedUi(components = [], systemCss = '') {
-  const all = [];
-  for (const c of components) { const b = buttonUi([c], systemCss); if (b && !all.some((x) => x.cls === b.cls)) all.push({ ...b, name: c.name }); }
-  if (!all.length) return null;
-  const strong = all.find((b) => /(primary|cta)/i.test(b.name)) ?? null;
-  const quiet = [...all].filter((b) => b !== strong).sort((a, b) => (/(secondary|outline)/i.test(a.name) ? 0 : 1) - (/(secondary|outline)/i.test(b.name) ? 0 : 1))[0] ?? strong;
-  const on = strong && quiet && strong !== quiet ? strong : null;
-  // One look only: the selected choice wears it and the others are plain, so which one is chosen still shows.
-  if (!on) return { from: quiet.from, open: '<div class="sg-seg">', close: '</div>', item: { tag: 'button', classes: [], label: null }, selected: { add: [quiet.cls], attrs: {} }, standIn: 'buttons' };
-  return { from: `${on.from} and ${quiet.from}`, open: '<div class="sg-seg">', close: '</div>', item: { tag: 'button', classes: [quiet.cls], label: quiet.label?.cls || null },
-    selected: { add: [on.cls], remove: [quiet.cls], attrs: {} }, standIn: 'buttons' };
-}
-
 // What the page could not take from the system, and what it used instead: one line each, for the overview and the To
 // do list. ui: the picks above (segmented, field, button, card, iconButton, overlay).
 export function standInGaps(ui = {}) {
   const gaps = [];
-  const seg = ui.segmented;
-  if (!seg) gaps.push({ control: 'segmented control', uses: 'plain buttons drawn with its tokens' });
-  else if (seg.standIn) gaps.push({ control: 'segmented control', uses: seg.standIn === 'tabs' ? 'its tabs' : seg.standIn === 'radio group' ? 'its radio group' : seg.standIn === 'buttons' ? 'its buttons side by side' : `its ${seg.standIn}` });
+  if (!ui.segmented) gaps.push({ control: 'segmented control', uses: 'its default segmented control, drawn with its tokens' });
   if (!ui.field) gaps.push({ control: 'text field', uses: 'a plain text input drawn with its tokens' });
   else if (ui.field.standIn) gaps.push({ control: 'text field', uses: `its ${ui.field.standIn}` });
   if (!ui.button) gaps.push({ control: 'text button', uses: 'plain links and buttons drawn with its tokens' });
-  if (!ui.card) gaps.push({ control: 'card', uses: 'plain blocks drawn with its tokens' });
+  if (!ui.card) gaps.push({ control: 'card', uses: 'its default card, with the tables\' border and corners' });
+  if (!ui.tip) gaps.push({ control: 'tooltip', uses: 'its default tooltip, drawn with its tokens' });
   if (!ui.iconButton) gaps.push({ control: 'icon button', uses: 'plain buttons drawn with its tokens' });
   return gaps.map((g) => ({ ...g, say: `This system has no ${g.control}, so the page uses ${g.uses}.`, todo: `Design ${/^[aeiou]/i.test(g.control) ? 'an' : 'a'} ${g.control} in Figma and build it, and the page uses it; or keep the stand-in.` }));
 }

@@ -966,56 +966,59 @@ test('product pictures: a product\'s own picture first, its window from its code
   assert.match(r.A.shot, /^data:image\/png;base64,/);
 });
 
-test('a control the system lacks: its stand-in draws the switch, and the page says so on the overview and in the To do list', async () => {
-  const { segmentedUi, radioGroupUi, buttonsAsSegmentedUi, fieldUi, standInGaps } = await import('../styleguide-data.mjs');
-  const css = '.tabs{} .radio{} .radio-input{} .radio-label{} .bPrimary{} .bSecondary{} .label{} .search{} .search-input{}';
+test('a control the system lacks: the page draws its default (segmented control, tooltip, card), and says so on the overview and in the To do list', async () => {
+  const { segmentedUi, fieldUi, standInGaps } = await import('../styleguide-data.mjs');
+  const css = '.tabs{} .seg{} .radio{} .radio-input{} .radio-label{} .search{} .search-input{}';
   const tabs = { name: 'tabs', markup: '<div class="tabs"><button class="active">A</button><button>B</button></div>' };
-  const radio = { name: 'radio', markup: '<label class="radio"><input type="radio" class="radio-input"><span class="radio-label">One</span></label>' };
-  const primary = { name: 'bPrimary', role: 'button', markup: '<button class="bPrimary"><span class="label">Go</span></button>' };
-  const secondary = { name: 'bSecondary', role: 'button', markup: '<button class="bSecondary"><span class="label">Back</span></button>' };
-  const pick = (comps) => segmentedUi(comps) ?? radioGroupUi(comps, css) ?? buttonsAsSegmentedUi(comps, css);
-  // Tabs first, then a radio group, then the system's buttons: the selected one in its strongest look.
-  assert.equal(pick([tabs, radio, primary]).standIn, 'tabs');
-  assert.deepEqual(pick([radio, primary]).item, { tag: 'label', classes: ['radio'], label: 'radio-label', radio: ['radio-input'] });
-  const btn = pick([primary, secondary]);
-  assert.deepEqual([btn.standIn, btn.item.classes, btn.selected], ['buttons', ['bSecondary'], { add: ['bPrimary'], remove: ['bSecondary'], attrs: {} }]);
-  assert.deepEqual([pick([primary]).item.classes, pick([primary]).selected.add], [[], ['bPrimary']], 'one button: the selected choice wears it, the others are plain');
-  assert.equal(pick([]), null);
+  const seg = { name: 'segmentedControl', markup: '<div class="seg"><button class="selected">A</button><button>B</button></div>' };
+  // The system's segmented control is the switch; its tabs only stand in, and give way to the page's default.
+  assert.equal(segmentedUi([tabs, seg]).standIn, null);
+  assert.equal(segmentedUi([tabs]).standIn, 'tabs');
+  const gen = readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8');
+  assert.match(gen, /view\.ui = \{ segmented: seg && !seg\.standIn \? seg : null,/);
+  assert.doesNotMatch(gen, /radioGroupUi|buttonsAsSegmentedUi/, 'no radio group or buttons stand in for a segmented control');
   assert.equal(fieldUi([{ name: 'search', markup: '<div class="search"><input type="search" class="search-input"></div>' }], css).standIn, 'search field');
-  const gaps = standInGaps({ segmented: btn, field: null, button: { cls: 'bSecondary' }, card: null, iconButton: { cls: 'x' } });
+  const gaps = standInGaps({ segmented: null, field: null, button: { cls: 'b' }, card: null, iconButton: { cls: 'x' }, tip: null });
   assert.deepEqual(gaps.map((g) => g.say), [
-    'This system has no segmented control, so the page uses its buttons side by side.',
+    'This system has no segmented control, so the page uses its default segmented control, drawn with its tokens.',
     'This system has no text field, so the page uses a plain text input drawn with its tokens.',
-    'This system has no card, so the page uses plain blocks drawn with its tokens.',
+    'This system has no card, so the page uses its default card, with the tables\' border and corners.',
+    'This system has no tooltip, so the page uses its default tooltip, drawn with its tokens.',
   ]);
-  assert.deepEqual(standInGaps({ segmented: { standIn: null }, field: {}, button: {}, card: {}, iconButton: {} }), [], 'a system with them all: no note');
-  // In the page: the stand-in's markup, its selected look swapped in, and each gap on the overview and in the To do list.
+  assert.deepEqual(standInGaps({ segmented: {}, field: {}, button: {}, card: {}, iconButton: {}, tip: {} }), [], 'a system with them all: no note');
+  // In the page: the default switch, a named group of plain buttons in the page's own track.
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('var SEG = DATA.ui'), tpl.indexOf('function segItems'));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  const run = (ui) => new Function('DATA', 'esc', 'nudge', src + 'return { segHTML: segHTML, segSelect: segSelect };')({ ui }, esc, () => {});
-  const b = run({ segmented: btn });
-  assert.equal(b.segHTML([{ v: 'a', label: 'A' }]), '<div class="sg-seg"><button type="button" class="bSecondary" data-v="a"><span class="label">A</span></button></div>');
-  // A switch says what it chooses, on the control itself (WCAG 1.3.1): the role a script gives it then has its name.
-  assert.match(b.segHTML([{ v: 'a', label: 'A' }], 'Width'), /^<div aria-label="Width" class="sg-seg">/);
+  const doc = { addEventListener() {}, querySelectorAll: () => [] };
+  const run = (ui) => new Function('DATA', 'esc', 'nudge', 'document', src + 'return { segHTML: segHTML, segSelect: segSelect, tipHTML: tipHTML };')({ ui }, esc, () => {}, doc);
+  const d = run({});
+  assert.equal(d.segHTML([{ v: 'a', label: 'A' }], 'Mode'), '<div aria-label="Mode" class="sg-seg sg-seg-default" role="group"><button type="button" data-v="a">A</button></div>');
+  assert.match(tpl, /\.sg-seg-default > button\[aria-pressed="true"\] \{ background: var\(--sg-bg\);/);
+  assert.match(tpl, /\.sg-seg-default > button \{[^}]*min-height: 1\.5rem;/, 'each option at least 24px tall (WCAG 2.5.8)');
   assert.doesNotMatch(tpl, /segHTML\((?:[^;]*?)\)\s*\+\s*'<\/div>'\s*:\s*''|segHTML\(\[\{ v: '', label: 'Not in the code yet'[^;]*\]\);/, 'every switch on the page is named');
-  const cls = new Set(['bSecondary']), attrs = {};
+  const cls = new Set(), attrs = {};
   const el = { classList: { toggle: (k, on) => (on ? cls.add(k) : cls.delete(k)) }, getAttribute: (a) => attrs[a] ?? null, setAttribute: (a, v) => { attrs[a] = v; }, removeAttribute: (a) => { delete attrs[a]; }, querySelector: () => null, dataset: {} };
-  b.segSelect(el, true);
-  assert.deepEqual([[...cls], attrs['aria-pressed']], [['bPrimary'], 'true']);
+  d.segSelect(el, true);
+  assert.deepEqual([[...cls], attrs['aria-pressed']], [['selected'], 'true']);
   // An option the system's script made a radio says checked, never pressed (WCAG 4.1.2: a radio cannot be pressed).
   attrs.role = 'radio';
-  b.segSelect(el, false);
+  d.segSelect(el, false);
   assert.deepEqual([attrs['aria-pressed'], attrs['aria-checked']], [undefined, 'false']);
   attrs.role = 'tab';
-  b.segSelect(el, true);
+  d.segSelect(el, true);
   assert.equal(attrs['aria-selected'], 'true');
-  const r = run({ segmented: pick([radio]) });
-  assert.match(r.segHTML([{ v: 'a', label: 'A' }, { v: 'b', label: 'B', off: true }]), /^<div class="sg-seg" role="radiogroup"><label class="radio" data-v="a"><input type="radio" name="sg-r1" class="radio-input"><span class="radio-label">A<\/span><\/label><label class="radio" data-v="b" aria-disabled="true" title=""><input type="radio" name="sg-r1" class="radio-input" disabled>/);
-  const input = { checked: false }, lab = { classList: { toggle() {} }, setAttribute: (a) => { throw new Error('no aria-pressed on a radio label: ' + a); }, removeAttribute() {}, querySelector: () => input, dataset: {} };
-  r.segSelect(lab, true);
-  assert.match(r.segHTML([{ v: 'a', label: 'A' }], 'Mode'), /^<div aria-label="Mode" class="sg-seg" role="radiogroup">/);
-  assert.deepEqual([input.checked, lab.dataset.on], [true, '1']);
+  // The system's own control, when it has one: its markup and its selected look.
+  const s = run({ segmented: segmentedUi([seg]) });
+  assert.match(s.segHTML([{ v: 'a', label: 'A' }], 'Mode'), /^<div aria-label="Mode" class="seg"><button type="button" data-v="a">A<\/button><\/div>$/);
+  // The tip: the system's own trigger, else the page's default one, its words in a bubble the trigger describes.
+  assert.equal(d.tipHTML('Counted so', 'How X is counted'), '<span class="sg-tip"><button type="button" class="sg-tip-btn" aria-label="How X is counted" aria-describedby="sg-tip-1">?</button><span class="sg-tip-bubble" role="tooltip" id="sg-tip-1">Counted so</span></span>');
+  assert.equal(run({ tip: { markup: '<button class="info" data-tip="{tip}" aria-label="{name}"></button>' } }).tipHTML('A & B', 'N'), '<button class="info" data-tip="A &amp; B" aria-label="N"></button>');
+  assert.match(tpl, /\.sg-tip:hover > \.sg-tip-bubble, \.sg-tip:focus-within > \.sg-tip-bubble \{ visibility: visible; \}/);
+  assert.match(tpl, /if \(e\.key === 'Escape'\)[^\n]*is-dismissed/, 'Escape closes it (WCAG 1.4.13)');
+  // The overview's cards: the tables' border, corners and shadow, at no specificity, so the system's card class wins.
+  assert.match(tpl, /:where\(\.sg-card\) \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); box-shadow: var\(--sg-shadow\); background: var\(--sg-bg\); \}/);
+  assert.match(tpl, /\.pg-par-card \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); box-shadow: var\(--sg-shadow\);/);
   assert.match(tpl, /\(\(DATA\.ui && DATA\.ui\.gaps\) \|\| \[\]\)\.forEach\(function \(g\) \{ TODO\.push\(\{ who: 'both', comp: null, say: g\.say, todo: g\.todo \}\); \}\);/);
   assert.match(tpl, /gp\.className = 'sg-pending sg-gap'; gp\.innerHTML = '<b>Stand-ins on this page<\/b><ul>' \+ GAPS\.map\(function \(g\) \{ return '<li>' \+ esc\(g\.say\) \+ '<\/li>'; \}\)/);
 });
@@ -1327,9 +1330,10 @@ test('Health: each area counted by component, weighted into one number once acce
     assert.match(tiles[0][2], /^Weighted as Parity 35, Accessibility 30, Documentation 20, Motion 0$/, 'the team\'s weight replaces the page\'s');
     assert.match(tiles[1][2], /^\d+ of 2 components done(, \d+ to check)?$/, 'parity counts components');
     assert.match(tiles[3][2], /^\d+ of \d+ done$/, 'documentation counts items');
-    // How each card's number is counted: the system's tip at its top right, or with none (this fixture) its words on the card.
-    const how = await run(`[...document.querySelectorAll('#health .sg-health-tile')].map((t) => [!!t.querySelector('[data-tip]'), (t.querySelector('.sg-health-how') || {}).textContent || ''])`);
-    for (const [hasTip, words] of how) { assert.equal(hasTip, false); assert.match(words, /counts|counted|share/); }
+    // How each card's number is counted: the system's tip at its top right, or with none (this fixture) the page's default
+    // tip, its words in a bubble the trigger describes.
+    const how = await run(`[...document.querySelectorAll('#health .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
+    for (const [hasTip, words] of how) { assert.equal(hasTip, true); assert.match(words, /counts|counted|share/); }
     assert.match(how[1][1], /^Each component counts the same\. One counts 100 when every prop, variable and value it has matches Figma, 50 when only rows to check are left, and 0 while one difference is still to fix, however many others match\. The number is the average over the 2 components compared\.$/);
     assert.match(how[0][1], /\(Parity 35, Accessibility 30, Documentation 20, Motion 0\)/);
     assert.match(tiles[5][2], /^\d of 2 components ready$/);

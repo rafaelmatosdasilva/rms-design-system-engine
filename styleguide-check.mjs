@@ -35,8 +35,8 @@ function declarations(css) {
   return out;
 }
 
-// The look roles the page still leaves to the browser: the last value each --sg-* role gets is one of the template's
-// fallbacks (Canvas, CanvasText, GrayText, AccentColor, inherit, the browser's text sizes, rem spaces, 0 radii).
+// The look roles the page still leaves to its defaults: the last value each --sg-* role gets is one of the template's
+// fallbacks (Canvas, CanvasText, GrayText, AccentColor, inherit, its default text sizes and rem spaces, 0 radii).
 const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 's', 'm', 'l', 'radius', 'space-s', 'space-l'];
 const FALLBACK = /^(Canvas|CanvasText|GrayText|AccentColor|inherit|smaller|small|medium|large|0|[\d.]+rem)$/i;
 export function missingRoles(html) {
@@ -54,10 +54,15 @@ export function controlClasses(html) {
 }
 
 // A button or link the page draws itself: a rule of its own that gives one a box (a fill, a border, a corner radius
-// or a raised shadow). The system's own button draws it, or the browser's plain one.
+// or a raised shadow). The system's own button draws it, or the browser's plain one. The page's defaults for a control
+// the system lacks (its segmented control, tooltip and card) are drawn only with the page's roles (--sg-*), so they
+// pass when every value is one of those roles, a keyword or a round corner.
 const BOX = /^(background(-color)?|border(-(top|right|bottom|left))?(-(width|style|color))?|border-radius|box-shadow)$/;
+const DEFAULT_CONTROL = /\.(sg-seg-default|sg-tip-btn|sg-tip-bubble|sg-card)(?![\w-])/;
+const ROLES_ONLY = (v) => !v.replace(/var\(--sg-[\w-]+(?:,\s*[^()]*)?\)|calc|max|min|(?<![\w.%-])(?:solid|transparent|none|50%|0px|1px|0)(?![\w.%-])|[\s(),*+-]/g, '');
 function drawsControl(d, classes) {
   if (!BOX.test(d.property) || /^(none|0|0px|transparent|inherit|initial|unset)$/i.test(d.value) || /\.pg-preview\b/.test(d.selector)) return false;
+  if (DEFAULT_CONTROL.test(d.selector) && ROLES_ONLY(d.value)) return false;
   if (d.property === 'box-shadow' && /\binset\b/.test(d.value)) return false;   // a line marking the current item
   // The current item of the page's own menu, on one of the system's backgrounds: marked, not drawn as a control.
   if (/^background(-color)?$/.test(d.property) && /\.active\b|\[aria-current/.test(d.selector) && /^var\(--sg-[\w-]+\)$/.test(d.value.trim())) return false;
@@ -94,15 +99,15 @@ export function checkStyleguidePage(html, { missing = missingRoles(html) } = {})
   // Its own text on its own backgrounds, in every mode (the build writes what falls short: styleguide-data pageContrast).
   const low = /\/\*sg-contrast:(\[[\s\S]*?\])\*\//.exec(String(html));
   if (low) { try { for (const c of JSON.parse(low[1])) found.push({ selector: `--sg-${c.text} on --sg-${c.on}`, property: 'contrast', value: `${c.ratio}:1 in ${c.mode}`, why: `the page's ${c.text} text on its ${c.on} background is ${c.ratio}:1 in ${c.mode}, below 4.5:1 (WCAG 1.4.3): pick a darker or lighter token for that role (styleguide.chrome)` }); } catch { /* unreadable: nothing to add */ } }
-  for (const role of missing) found.push({ selector: ':root', property: `--sg-${role}`, value: 'the browser\'s own', why: `the system has no token the page could use for ${role}`, warning: true });
+  for (const role of missing) found.push({ selector: ':root', property: `--sg-${role}`, value: 'the page\'s default', why: `the system has no token the page could use for ${role}`, warning: true });
   return found;
 }
 
-// A look role the system has no token for is shown with the browser's own: listed, never a failure.
+// A look role the system has no token for is shown with the page's default: listed, never a failure.
 export const failures = (found) => found.filter((f) => !f.warning);
 export function checkLines(found) {
   const bad = failures(found), warn = found.filter((f) => f.warning);
-  const warnLines = warn.length ? [`   ⚠️  the system has no token for ${warn.map((f) => f.property.replace(/^--sg-/, '')).join(', ')}: the browser's own is shown there`] : [];
+  const warnLines = warn.length ? [`   ⚠️  the system has no token for ${warn.map((f) => f.property.replace(/^--sg-/, '')).join(', ')}: the page's default is shown there`] : [];
   if (!bad.length) return ['✅ Style guide check: the page uses only the system (its colours, fonts, text styles, radii and spacing).', ...warnLines];
   return [`❌ Style guide check: ${bad.length} thing${bad.length === 1 ? '' : 's'} on the page not from the system`,
     ...bad.slice(0, 40).map((f) => `   • ${f.selector} { ${f.property}: ${f.value} }: ${f.why}`),
