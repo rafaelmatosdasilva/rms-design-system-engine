@@ -333,7 +333,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l')`), true, 'the variant is as set after the tries');
     assert.equal(await run(`document.querySelector('#c-chip [data-area="play"]').hidden`), true, 'the Playground stays out of sight');
     // Another page mode: what was tried in every colour mode while the page was built stands, with its ratio.
-    await run(`document.querySelector('#mode-controls [data-v="dark"]').click()`);   // Auto comes first
+    await run(`document.querySelector('#mode-controls [data-v="dark"]').click()`);   // Light and Dark only, the device's mode chosen first
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
@@ -746,11 +746,12 @@ test('a text style named in full (s/regular) keeps its name: each value is after
   assert.equal(t[1].weight.figma, 'text style s/strong', 'a value the scale\'s variable does not hold is named by its style');
 });
 
-test('the search covers every part of the page and, while it has words, only its results show below the field', () => {
+test('the search covers every part of the page and, while it has words, shows what matches in a flyout under the field, by kind', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   for (const kind of ['Component', 'Colour', 'Type style', 'Icon', 'Section']) assert.match(tpl, new RegExp("add\\('" + kind));
-  assert.match(tpl, /nav\.hidden = !!words\.length; results\.hidden = !words\.length;/);
-  assert.match(tpl, /sMount\.parentNode\.insertBefore\(results, sMount\.nextSibling\);/);
+  assert.match(tpl, /fly\.hidden = !words\.length; results\.hidden = !words\.length;/);
+  assert.match(tpl, /\['components', 'Components'\], \['tokens', 'Tokens'\]/);
+  assert.match(tpl, /fly\.appendChild\(results\); sMount\.appendChild\(fly\);/);
 });
 
 test('a component\'s API: a * on each prop the code says must be given, callbacks listed as events, nothing guessed', async () => {
@@ -998,7 +999,7 @@ test('a control the system lacks: the page draws its default (segmented control,
   const run = (ui) => new Function('DATA', 'esc', 'nudge', 'document', src + 'return { segHTML: segHTML, segSelect: segSelect, tipHTML: tipHTML };')({ ui }, esc, () => {}, doc);
   const d = run({});
   assert.equal(d.segHTML([{ v: 'a', label: 'A' }], 'Mode'), '<div aria-label="Mode" class="sg-seg sg-seg-default" role="group"><button type="button" data-v="a">A</button></div>');
-  assert.match(tpl, /\.sg-seg-default > button\[aria-pressed="true"\] \{ background: var\(--sg-bg\);/);
+  assert.match(tpl, /\.sg-seg-default > button\[aria-pressed="true"\], \.sg-seg-default > button\.selected \{ background: var\(--sg-seg-on\);/);
   assert.match(tpl, /\.sg-seg-default > button \{[^}]*min-height: 1\.5rem;/, 'each option at least 24px tall (WCAG 2.5.8)');
   assert.doesNotMatch(tpl, /segHTML\((?:[^;]*?)\)\s*\+\s*'<\/div>'\s*:\s*''|segHTML\(\[\{ v: '', label: 'Not in the code yet'[^;]*\]\);/, 'every switch on the page is named');
   const cls = new Set(), attrs = {};
@@ -1153,8 +1154,8 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.match(tpl, /@container \(max-width: 560px\) \{\s*\.pg-inspect\.sg-token-card table \{ table-layout: auto; \}/);
   // On a phone a card's line under its name starts where the name does.
   assert.match(phone, /\.sg-card-grid \.sg-card > h3 \{[^}]*padding: var\(--sg-space-s\) var\(--sg-space-m\); \}\s*\.sg-card-grid \.sg-card > h3 \+ p \{ padding: 0 var\(--sg-space-m\)/);
-  // The Tasks page keeps its filter and counts at the top as it scrolls, in the title's place; the head rows under them.
-  assert.match(tpl, /#tasks > h2 \{ position: static; \}/);
+  // The Tasks page keeps its title at the top as every page does, its filter and counts under it; the head rows under them.
+  assert.doesNotMatch(tpl, /#tasks > h2 \{ position: static; \}/);
   assert.match(tpl, /\.pg-areas, \.sg-section:not\(\.pg-card-section\) > h2, \.sg-size-switch, \.sg-todo-head \{ position: sticky;/);
   assert.match(tpl, /function todoHeadHeight\(\) \{ stickHeight\(document\.getElementById\('tasks'\)\); \}/);
   // Every table's head sticks under what sticks at the top of its page, a card's head first: one measure for every page.
@@ -1258,7 +1259,8 @@ test('a foundation\'s size switch: only its samples take the size, no label, roo
   const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
   assert.match(tpl, /var sized = function \(el\) \{ axes\.forEach/);
   assert.match(tpl, /SGModes\.controls\(holder, function \(\) \{ draw\(sized\); \}/, 'the switch acts on a holder, never on the section');
-  assert.match(tpl, /\.sg-size-switch \{ margin-bottom: var\(--sg-space-xxl\);/);
+  assert.match(tpl, /\.sg-size-switch \{ margin-bottom: calc\(var\(--sg-space-xxl\) - var\(--sg-space-s\)\);/);   // its 16px padding below gives the rest
+  assert.match(tpl, /\.pg-areas, \.sg-size-switch, \.sg-todo-head \{ padding-bottom: calc\(var\(--sg-space-s\) \* 2\); \}/);
   assert.match(tpl, /\.sg-size-switch \.sg-mode-label \{ position: absolute; width: 1px/);
   assert.doesNotMatch(tpl, /sec\.classList\.add\('sg-scope'\)/);
 });
@@ -1390,9 +1392,97 @@ test('room around the Playground\'s component, what follows each title as close 
   assert.match(tpl, /@media \(max-width: 1100px\) \{ \.pg-preview-card \{ --pg-stage-room: 64px; \} \}/);
   assert.match(tpl, /@media \(max-width: 720px\) \{ \.pg-preview-card \{ --pg-stage-room: 40px; \} \}/);
   assert.match(tpl, /\.pg-preview-col > \.pg-preview, \.pg-preview-col > \.pg-anatomy, \.pg-preview-col > \.pg-frame \{ padding-top: var\(--pg-stage-room\); padding-bottom: var\(--pg-stage-room\); \}/);
-  // The overview's links as a page's text under its title, a foundation's size switch too.
-  assert.match(tpl, /\.sg-hero \{ margin-bottom: var\(--sg-space-s\); \}/);
-  assert.match(tpl, /#overview > \.pg-links \{ margin: 0 0 var\(--sg-space-xl\); \}/);
+  // What follows the overview's title as close as under every page's title (its title sticks, its links at its right),
+  // a foundation's size switch too.
+  assert.match(tpl, /\.sg-hero > :last-child \{ margin-bottom: var\(--sg-space-s\); \}/);
+  assert.match(tpl, /ovActs\.className = 'sg-section-actions'/);
   assert.match(tpl, /\.sg-section > h2 ~ \.sg-size-switch \{ padding-top: 0; \}/);
   assert.doesNotMatch(readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8'), /Send feedback/);
+});
+
+test("the guide's spacing roles come from the system's spacing only, never an opacity that has the same number", async () => {
+  const { chromeRoles } = await import('../styleguide-data.mjs');
+  const tokens = { spacing: [
+    { figma: 'semantic/imagePlaceholder/border/appearance', var: '--semantic-imagePlaceholder-border-appearance', value: '12' },
+    { figma: 'spacing/gap/m', var: '--spacing-gap-m', value: '8px' }, { figma: 'spacing/gap/l', var: '--spacing-gap-l', value: '16px' } ] };
+  const r = chromeRoles({ tokens });
+  assert.notEqual(r.roles['space-m'], 'var(--semantic-imagePlaceholder-border-appearance)');
+  assert.match(r.roles['space-m'], /--spacing-gap-(m|l)/);
+});
+
+test('the Showroom lists its screens as a grid of cards, each opening on a page of its own (#showroom/<Screen>)', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  // One card a screen, linking to the screen's own address, its thumbnail the screen's own drawing kept out of reach.
+  assert.match(tpl, /a\.href = '#showroom\/' \+ encodeURIComponent\(s\.key\)/);
+  assert.match(tpl, /small\.setAttribute\('inert', ''\)/);
+  // The address names the screen: the router opens it, and a new screen is a new page (scrolled to its top).
+  assert.match(tpl, /if \(target\._screen\) target\._screen\(at\.slug\)/);
+  assert.match(tpl, /var page = target\.id \+ \(target\._screen \?/);
+  // A screen's page heads like a component's: Showroom beside the group's tag, a back button (the system's own)
+  // before the screen's name as the title, its actions at the section's right; the measurement opens each in turn.
+  assert.match(tpl, /srCrumb\.href = '#showroom'; srCrumb\.textContent = 'Showroom'/);
+  assert.match(tpl, /sysButton\('a', '', ' href="#showroom" aria-label="All screens"'/);
+  assert.match(tpl, /srActions\.className = 'sg-section-actions'/);
+  const cmp = readFileSync(join(ENGINE, 'showroom-compare.mjs'), 'utf8');
+  assert.match(cmp, /location\.hash = '#showroom\/' \+ encodeURIComponent\(key\)/);
+});
+
+test('a Showroom screen opens clean: its differences, pinned over it and listed beside it, only when asked for', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  // The button opens the panel and shows the pins; both start hidden.
+  assert.match(tpl, /sysButton\('button', 'Differences ' \+ notes\.length, ' data-differences aria-pressed="false"/);
+  assert.match(tpl, /<div class="sg-pins" aria-hidden="true" hidden><\/div>/);
+  assert.match(tpl, /class="sg-showroom-notes" id="sg-notes-' \+ esc\(s\.key\) \+ '" hidden>/);
+  // A note is pinned where its selector (at) or its name (data-figma, data-stand-in) points; its short line is said.
+  assert.match(tpl, /if \(n\.at\) \{ try \{ var hit = screen\.querySelector\(n\.at\)/);
+  assert.match(tpl, /esc\(x\.n\.say \|\| x\.sub\)/);
+  // A pin clicked opens its note in a card on the screen, in the page's colours turned round.
+  assert.match(tpl, /\.sg-pin-card \{[^}]*background: var\(--sg-text\); color: var\(--sg-bg\)/);
+});
+
+test('a Showroom screen is liquid: laid out to its breakpoint\'s width (Auto, Desktop, Laptop), full browser on request', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /segHTML\(\[\{ v: 'auto', label: 'Auto' \}, \{ v: 'desktop', label: 'Desktop' \}, \{ v: 'laptop', label: 'Laptop' \}\], 'Breakpoint'\)/);
+  // Auto takes the room there is (Desktop from 1440px, never under 1024px); the build's measurement asks for Laptop.
+  assert.match(tpl, /Math\.max\(1024, Math\.round\(room\)\)/);
+  assert.match(tpl, /w >= 1440 \? 'desktop' : 'laptop'/);
+  assert.match(readFileSync(join(ENGINE, 'showroom-compare.mjs'), 'utf8'), /window\.__dseShowroomFrame = 'laptop'/);
+  assert.match(tpl, /sysButton\('button', 'Full browser', ' data-full'\)/);
+  // The harness draws a screen in a frame of Figma's size, so its components settle to that room.
+  assert.match(readFileSync(join(ENGINE, 'vue-harness.mjs'), 'utf8'), /if \(g\.frame\) \{ box\.style\.width = g\.frame\[0\] \+ 'px'/);
+});
+
+test('the page\'s switches hug their choices (a component\'s properties keep the panel\'s width); bars stick as they are', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /\.sg-seg \{ display: inline-flex; flex-wrap: nowrap; width: auto;/);
+  assert.match(tpl, /\.pg-ctl \.sg-seg \{ display: flex; flex-wrap: wrap; width: 100%; \}/);
+  // A component's title row sticks with its links, the areas under it; nothing is revealed (no bar grows) on scroll.
+  assert.match(tpl, /\.pg-header > \.pg-head \{ position: sticky;/);
+  assert.match(tpl, /\.pg-areas \{[^}]*top: calc\(var\(--sg-sticky-top, 0px\) \+ var\(--pg-head-h, 0px\)\)/);
+  assert.doesNotMatch(tpl, /is-stuck/);
+  // The line under the lowest stuck bar across the content's whole width.
+  assert.match(tpl, /\.sg-sticky-edge::after \{[^}]*left: calc\(-1 \* var\(--sg-main-pad, 0px\)\)/);
+  // The Showroom's breakpoint switch under the title, on a screen's page only.
+  assert.match(tpl, /srSwitch\.className = 'sg-size-switch sg-showroom-frames'/);
+});
+
+test('a Showroom screen: Full browser and Differences beside the breakpoint; Differences turns the breakpoint off', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /srSwitch\.querySelector\('\.sg-showroom-tools'\)\.innerHTML = \(s\.markup \? sysButton\('button', 'Full browser'/);
+  // While the differences show: Figma's Laptop frame, fitted to the room left; the switch disabled.
+  assert.match(tpl, /frameOf\(s, diffOn \? 'laptop' : choice, room\)/);
+  assert.match(tpl, /segItems\(frames\)\.forEach\(function \(b\) \{ b\.disabled = on;/);
+  // Full browser: the window sizes the screen, never its place on the page.
+  assert.match(tpl, /if \(screen\.closest\('\.sg-showroom-full'\)\) return;/);
+});
+
+test('Variants open with a component\'s combinations: every mix of the parts it shows or hides, as its code draws them', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  // The props that show or hide a part (an icon, a label), the ones read from the code (showsPart) too.
+  assert.match(tpl, /p\.type === 'BOOLEAN' && !!\(p\.on \|\| p\.off \|\| p\.part \|\| p\.showsPart\) && \/\^\(show\|has\)\/i\.test\(p\.label\)/);
+  // A mix the code draws the same as another, or draws empty, is left out: the code's own logic decides.
+  assert.match(tpl, /if \(!drawn \|\| seenMix\[mkey\]\) continue;/);
+  assert.match(tpl, /<h3>Combinations<\/h3>/);
+  // Inspect finds a variable a brand writes with color-mix, by the colour the browser draws.
+  assert.match(tpl, /var drawn = probeColor\(str\); return drawn && drawn !== str \? toRGBA\(drawn\) : null;/);
 });

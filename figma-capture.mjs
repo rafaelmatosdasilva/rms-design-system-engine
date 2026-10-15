@@ -283,14 +283,44 @@ export async function varsFromItems(items, cfg = {}, { engineDir = ENGINE } = {}
   // Each variable's own description (tokenMeta), as the recipe asks: @deprecated in it marks the token deprecated.
   const tokenMeta = {};
   for (const i of items) if (i.k === 'var' && !i.v.remote && String(i.v.description ?? '').trim()) tokenMeta[i.v.name] = { description: i.v.description.trim(), deprecated: /@deprecated/i.test(i.v.description) };
+  // The primitives as Figma has them in each colour mode (the ramp the tokens point at), each link followed.
+  const primitives = primitivesFromItems(items, cfg);
   return {
     ...single,
+    ...(Object.values(primitives).some((m) => Object.keys(m).length) ? { primitives } : {}),
     brokenAliases: probe.brokenAliases ?? [],
     ...(Object.keys(motion.motion ?? {}).length ? { motion: motion.motion } : {}),
     ...(Object.keys(motion.effects ?? {}).length ? { effects: motion.effects } : {}),
     variableScopes: scopes.scopes ?? {},
     ...(Object.keys(tokenMeta).length ? { tokenMeta } : {}),
   };
+}
+
+// items (the capture's variables and collections) → { snapshotKey: { 'primitives/…': '#rrggbb' } } for the colour
+// collection's modes (ds-config.json figma.modes, by name), each primitive's value in that mode, its links followed (a
+// link into a collection of one mode reads that mode).
+export function primitivesFromItems(items = [], cfg = {}) {
+  const prefix = cfg.figma?.primitivePrefix ?? 'primitives/';
+  const cols = items.filter((i) => i.k === 'collection').map((i) => i.v), vars = new Map(items.filter((i) => i.k === 'var').map((i) => [i.v.id, i.v]));
+  const colour = cols.find((c) => c.name === cfg.figma?.colorCollection) ?? cols.find((c) => (c.modes ?? []).length > 1 && [...vars.values()].some((v) => v.variableCollectionId === c.id && v.resolvedType === 'COLOR'));
+  if (!colour) return {};
+  const hex = (c) => '#' + [c.r, c.g, c.b].map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('') + (c.a != null && c.a < 1 ? Math.round(c.a * 255).toString(16).padStart(2, '0') : '');
+  const modes = (cfg.figma?.modes ?? []).length ? cfg.figma.modes : (colour.modes ?? []).map((m) => ({ name: m.name, snapshotKey: String(m.name).toLowerCase().replace(/[^a-z0-9]+/g, '-') }));
+  const valueIn = (v, modeName, d = 0) => {
+    if (!v || d > 10) return null;
+    const col = cols.find((c) => c.id === v.variableCollectionId);
+    const m = (col?.modes ?? []).find((x) => x.name === modeName) ?? (col?.modes ?? [])[0];
+    const x = m ? v.valuesByMode?.[m.modeId] : Object.values(v.valuesByMode ?? {})[0];
+    if (x && typeof x === 'object' && x.type === 'VARIABLE_ALIAS') return valueIn(vars.get(x.id), modeName, d + 1);
+    return x && typeof x === 'object' && 'r' in x ? hex(x) : null;
+  };
+  const out = {};
+  for (const m of modes) {
+    if (!(colour.modes ?? []).some((x) => x.name === m.name)) continue;
+    out[m.snapshotKey] = {};
+    for (const v of vars.values()) if (v.variableCollectionId === colour.id && v.resolvedType === 'COLOR' && String(v.name).startsWith(prefix)) { const h = valueIn(v, m.name); if (h) out[m.snapshotKey][v.name] = h; }
+  }
+  return out;
 }
 
 // --capture-import: verify the saved answers; when every chunk is there, write the vars snapshot.

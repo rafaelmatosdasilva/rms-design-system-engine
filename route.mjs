@@ -228,7 +228,7 @@ export const SAY = {
 };
 
 // route(text, { hasConfig, components, cmd, snapshotDate }) → { recipe, question, run: [commands], notes: [lines], say: [lines], sayIf }
-// A design system the request names that is not this folder's ("the style guide for Innova DS" where another system is
+// A design system the request names that is not this folder's ("the style guide for Northwind DS" where another system is
 // set up): its name, or null. A name is the word before DS or design system (or after "design system of/for"), never
 // a word such as the, our or whole; it is this folder's system when its config, package or folder name holds it.
 const NAMED_DS = /\b([A-Za-z][\w-]*)[\s-]+(?:DS(?![\w.-])|[Dd]esign[ -]?[Ss]ystem\b)|\b(?:DS|[Dd]esign[ -]?[Ss]ystem)\s+(?:of|for|called|named|do|da|de)\s+([A-Za-z][\w-]*)/g;   // DS as a word of its own, never ds-config

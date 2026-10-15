@@ -149,3 +149,16 @@ test('the capture reads every page, Motion keyframes and overlays too, and chang
   assert.deepEqual([snap.version, Object.keys(snap.motion), snap.overlays.length], [2, ['loader', 'toast'], 1]);
   assert.equal(motionSnapshot(JSON.stringify({ components: {} })).motion, undefined, 'an older capture stays as it was');
 });
+
+test('a Vue component\'s scoped rules are its own by their mark: a loader with no class of its name keeps its loop, and another component\'s class prefix never takes it', () => {
+  const css = `.loader-wrapper .circles:nth-of-type(1)[data-v-dfd388cb] { animation: spin 1840ms cubic-bezier(0.7, -0.4, 0.4, 1.4) infinite; }
+.login-loader-wrapper .text-wrapper[data-v-0a67d2d6] { animation: rise 2600ms ease-out; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`;
+  const sources = [{ file: 'loaders.css', text: css }];
+  const known = new Set(['dfd388cb', '0a67d2d6']);
+  const loader = componentTransitions(sources, 'loaderGeneral', { scope: { own: 'dfd388cb', known } });
+  assert.deepEqual(loader.map((t) => [t.via, t.ms, t.infinite]), [['animation', 1840, true]]);
+  assert.equal(codeMotions(sources, 'loaderGeneral', { scope: 'dfd388cb' })[0]?.motion, 'loop');
+  assert.deepEqual(componentTransitions(sources, 'text', { scope: { own: null, known } }), [], 'the text component, its own mark unknown, leaves the loader\'s .text-wrapper alone');
+  assert.equal(componentTransitions(sources, 'text').length, 1, 'with no marks known, the classes still decide');
+});

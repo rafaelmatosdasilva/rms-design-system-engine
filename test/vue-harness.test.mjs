@@ -166,7 +166,7 @@ test('a Vue component that reads a Pinia store and links with the router renders
   assert.match(JSON.stringify(b.failed), /getActivePinia\(\)\\" was called but there was no active Pinia/, JSON.stringify(b));
 });
 
-// A project like Innova DS: its entry installs plugins and a global icon component, its modules import each other
+// A project like Northwind DS: its entry installs plugins and a global icon component, its modules import each other
 // through the router, a CommonJS package is imported by default, and its components take Figma's names in code's words.
 const APP = (dir) => {
   mkdirSync(join(dir, 'src', 'components'), { recursive: true }); mkdirSync(join(dir, 'src', 'router'), { recursive: true }); mkdirSync(join(dir, 'src', 'views'), { recursive: true });

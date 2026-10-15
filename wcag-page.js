@@ -386,6 +386,12 @@
     var seenOn = function (el) { return vis(el) || !!(el.labels && el.labels[0] && vis(el.labels[0])); };
     var controls = scope(root).filter(function (el) { return el.nodeType === 1 && el.matches(CONTROL) && seenOn(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true'; }).slice(0, 24);
     var keep = document.activeElement;
+    // A person who takes the focus somewhere else on the page while this runs (a click on a filter, the Brand choice)
+    // stops it: what it was trying is left untried, never half-measured, and the focus stays where they put it.
+    var hurt = null, INTERRUPTED = { interrupted: true };
+    var watch = function (e) { if (e.target && e.target !== document.body && !root.contains(e.target) && !(e.target.closest && e.target.closest('.pg-offstage'))) hurt = e.target; };
+    document.addEventListener('focusin', watch, true);
+    var nap = function (ms) { return sleep(ms).then(function () { if (hurt) throw INTERRUPTED; }); };
     var stopSubmit = function (e) { e.preventDefault(); submitted = true; };
     var realOpen = window.open, realPush = history.pushState;
     window.open = function () { nav.opened++; return null; };
@@ -410,7 +416,7 @@
           before = showing(); var until = Date.now() + (patient ? Math.max(wait, 1600) : wait), found = null;
           on();
           while (!found && Date.now() < until) {
-            await sleep(50);
+            await nap(50);
             // The trigger drawn again (the page redrew itself on the hover or the focus): nothing popped up from it.
             if (!el.isConnected) return null;
             // What a page draws for itself and hides from assistive technology (a guide's overlay) is not content shown.
@@ -419,7 +425,7 @@
           }
           return found;
         };
-        var leave = async function () { offEl(null); if (document.activeElement === el) el.blur(); await sleep(wait); };
+        var leave = async function () { offEl(null); if (document.activeElement === el) el.blur(); await nap(wait); };
         var pop = await appear();
         if (pop) {
           ran.hovercontent = 1;
@@ -429,20 +435,20 @@
           // transition never moves on, and a tip that closed would read as one still shown.
           for (var tEsc = 0; tEsc < 12 && pop.isConnected && vis(pop); tEsc++) {
             if (pop.getAnimations) pop.getAnimations().forEach(function (a) { try { a.finish(); } catch (e) { /* an endless one is left */ } });
-            if (vis(pop)) await sleep(50);
+            if (vis(pop)) await nap(50);
           }
           if (pop.isConnected && vis(pop) && covers(pop, before)) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') does not close with Escape');
           await leave();
           pop = await appear();
           if (pop) {
             offEl(pop); fire(pop, 'pointerover'); fire(pop, 'pointerenter'); fire(pop, 'mouseover'); fire(pop, 'mouseenter');
-            await sleep(Math.max(150, wait));
+            await nap(Math.max(150, wait));
             if (!(pop.isConnected && vis(pop))) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') goes away when the pointer moves onto it');
             fire(pop, 'mouseleave'); fire(pop, 'pointerleave');
           }
           await leave();
           pop = await appear();
-          if (pop) { await sleep(1500); if (!(pop.isConnected && vis(pop))) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') goes away on its own'); }
+          if (pop) { await nap(1500); if (!(pop.isConnected && vis(pop))) push('hovercontent', '1.4.13', el, 'what it shows (' + desc(pop) + ') goes away on its own'); }
         }
         await leave();
       }
@@ -450,7 +456,7 @@
       for (var i = 0; i < controls.length; i++) {
         var c = controls[i]; ran.onfocus = 1;
         var href = page(), dialogs = document.querySelectorAll('dialog[open],[role=dialog],[aria-modal=true]').length;
-        c.focus({ preventScroll: true }); await sleep(40);
+        c.focus({ preventScroll: true }); await nap(40);
         var moved = document.activeElement !== c && !c.contains(document.activeElement) && document.activeElement !== document.body;
         if (page() !== href || moved || document.querySelectorAll('dialog[open],[role=dialog],[aria-modal=true]').length > dialogs)
           push('onfocus', '3.2.1', c, page() !== href ? 'taking the focus opens another page' : moved ? 'taking the focus moves it to ' + desc(document.activeElement) : 'taking the focus opens a dialog');
@@ -466,7 +472,7 @@
         if (x.type === 'checkbox' || x.type === 'radio') x.checked = !x.checked;
         else if (x.tagName === 'SELECT') { if (x.options.length < 2) continue; x.selectedIndex = (x.selectedIndex + 1) % x.options.length; }
         else x.value = String(x.value || '') + '1';
-        fire(x, 'input'); fire(x, 'change'); await sleep(60);
+        fire(x, 'input'); fire(x, 'change'); await nap(60);
         var gone = document.activeElement !== x && document.activeElement !== document.body && !x.contains(document.activeElement);
         if (page() !== href2 || submitted || gone) push('oninput', '3.2.2', x, page() !== href2 ? 'changing it opens another page' : submitted ? 'changing it sends the form' : 'changing it moves the focus to ' + desc(document.activeElement));
         if (x.type === 'checkbox' || x.type === 'radio') x.checked = was; else if (x.tagName === 'SELECT') x.selectedIndex = was; else x.value = was;
@@ -490,16 +496,17 @@
         // outside it), and a page still changing by itself is let settle: only what the press itself changes counts.
         fire(document.body, 'pointerdown'); fire(document.body, 'mousedown'); fire(document.body, 'pointerup'); fire(document.body, 'mouseup');
         var s0 = state(root), was0 = desc(b);
-        for (var settle = 0; settle < 6; settle++) { await sleep(50); var s1 = state(root); if (s1 === s0) break; s0 = s1; }
-        fire(b, 'pointerdown'); fire(b, 'mousedown'); await sleep(50);
+        for (var settle = 0; settle < 6; settle++) { await nap(50); var s1 = state(root); if (s1 === s0) break; s0 = s1; }
+        fire(b, 'pointerdown'); fire(b, 'mousedown'); await nap(50);
         var changed = state(root) !== s0;
         fire(document.body, 'pointerup'); fire(document.body, 'mouseup');
         if (changed) out.push({ kind: 'pointerdown', sc: '2.5.2', desc: was0 + ' (it acts when pressed, before the pointer is released)' });
         if (!root.isConnected) break;
       }
+      if (hurt) throw INTERRUPTED;
       if (keep && keep.focus && keep !== document.body) keep.focus({ preventScroll: true }); else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       return { findings: out, ran: Object.keys(ran) };
-    })().finally(function () { window.open = realOpen; history.pushState = realPush; document.removeEventListener('submit', stopSubmit, true); });
+    })().finally(function () { window.open = realOpen; history.pushState = realPush; document.removeEventListener('submit', stopSubmit, true); document.removeEventListener('focusin', watch, true); if (hurt && hurt.isConnected && document.activeElement !== hurt) hurt.focus({ preventScroll: true }); });
   }
 
   // Only the control edges (1.4.11), for the passes that read them again in another mode or state: fast on a big page.

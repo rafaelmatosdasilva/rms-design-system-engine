@@ -564,6 +564,19 @@ export function primitiveColours(figmaVars = {}, themeCss = '', cfg = {}) {
   };
   const names = [...new Set(Object.values(prim).flatMap((m) => Object.keys(m ?? {})))];
   const items = [];
+  // Figma's capture holds no primitives (only the semantic layer): the ramp as the code declares it in each mode, its
+  // variables named with the prefix (--primitives-neutral000), so the foundation still shows the layer the rest points at.
+  if (!names.length) {
+    const pre = '--' + prefix.replace(/\/+$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-';
+    const vars = Object.keys(root).filter((k) => k.toLowerCase().startsWith(pre) && /^(#|rgb|hsl|oklch|color\()/i.test(root[k]));
+    for (const v of vars) {
+      const values = {};
+      for (const m of modes) { const have = of(m)[v]; if (have) values[m.snapshotKey ?? 'light'] = have; }
+      items.push({ figma: prefix + v.slice(pre.length), var: v, values, primitive: true, fromCode: true });
+    }
+    items.sort((x, y) => x.figma.localeCompare(y.figma, undefined, { numeric: true }));
+    return items.length ? { group: 'primitives', items } : null;
+  }
   for (const name of names) {
     const v = `--${name.slice(name.startsWith(prefix) ? prefix.length : 0).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
     const values = {};
@@ -1098,7 +1111,11 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
     const pick = t ?? nearest(radii, want);
     if (pick) { roles[role] = `var(${pick.var})`; from[role] = pick.figma; }
   }
-  const spaces = tokens?.spacing ?? [];
+  // Only the system's spacing (its gaps, paddings, margins): a size the foundations list with them (an opacity, an
+  // appearance, a weight) is never a space, whatever its number. With none named so, any size it has.
+  const NOT_SPACE = /(appearance|opacity|alpha|weight|display|z-?index|ratio|scale|duration|delay)$/i, IS_SPACE = /(spacing|gap|padding|margin|space|inset)/i;
+  const sized = (tokens?.spacing ?? []).filter((t) => !NOT_SPACE.test(String(t.figma ?? t.var ?? '')));
+  const spaces = sized.some((t) => IS_SPACE.test(String(t.figma ?? t.var ?? ''))) ? sized.filter((t) => IS_SPACE.test(String(t.figma ?? t.var ?? ''))) : sized;
   for (const [role, want] of [['space-xxs', 2], ['space-xs', 4], ['space-s', 8], ['space-m', 12], ['space-l', 16], ['space-xl', 24], ['space-xxl', 32]]) {
     const pick = nearest(spaces, want);
     if (pick) { roles[role] = `var(${pick.var})`; from[role] = pick.figma; }

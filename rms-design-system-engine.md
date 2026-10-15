@@ -222,7 +222,7 @@ Route by intent:
   system's page (`styleguide/<name>.html`), never in its place. Accessibility asked for alone stays
   in the chat (`--only accessibility`) and builds no page.
 - **Another design system than this folder's:** when the request names a system this folder is not
-  set up for ("the style guide for Innova DS"), the router asks for that system's code (a folder or
+  set up for ("the style guide for Northwind DS"), the router asks for that system's code (a folder or
   a link to its repository) and its Figma link at once, in one message, and the request runs there with
   `--project`. Never run this folder's system in its place. A cloud session cannot read a folder on
   the person's computer: ask for the repository link, and say that to work on a local folder they run

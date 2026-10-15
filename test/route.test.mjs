@@ -177,17 +177,17 @@ test('a request for the style guide builds it, scoped to the component it names'
 // git link) and its Figma file are asked for at once, and the request runs there; this folder's system never stands in.
 test('another design system than the one set up here: its code and Figma link are asked for, then it runs there', () => {
   const names = ['Harbor Design System', '@harbor/ui', 'harbor-ds'];
-  const ask = route('build the style guide for buttonPrimary of the Innova DS', { names, components: ['buttonPrimary'] });
-  assert.equal(ask.run[0], "rms-design-system-engine --project='<Innova's folder or repository link>' --component buttonPrimary --styleguide", 'its component, named as one, is scoped there too');
-  assert.match(ask.ask, /^where Innova's code is \(this folder, another folder on this computer, or a link to its repository on GitHub or GitLab\), and the link to Innova's Figma file/);
+  const ask = route('build the style guide for buttonPrimary of the Northwind DS', { names, components: ['buttonPrimary'] });
+  assert.equal(ask.run[0], "rms-design-system-engine --project='<Northwind's folder or repository link>' --component buttonPrimary --styleguide", 'its component, named as one, is scoped there too');
+  assert.match(ask.ask, /^where Northwind's code is \(this folder, another folder on this computer, or a link to its repository on GitHub or GitLab\), and the link to Northwind's Figma file/);
   assert.match(ask.notes[0], /never run this folder's system in its place/);
-  const given = route("build the style guide for innova DS: the code is in '/Users/me/Work/innova ds', Figma https://www.figma.com/design/AbC123/Innova", { names });
-  assert.deepEqual(given.run, ["rms-design-system-engine --project='/Users/me/Work/innova ds' --figma-url='https://www.figma.com/design/AbC123/Innova' --styleguide"]);
+  const given = route("build the style guide for northwind DS: the code is in '/Users/me/Work/northwind ds', Figma https://www.figma.com/design/AbC123/Northwind", { names });
+  assert.deepEqual(given.run, ["rms-design-system-engine --project='/Users/me/Work/northwind ds' --figma-url='https://www.figma.com/design/AbC123/Northwind' --styleguide"]);
   assert.equal(given.ask, undefined);
   assert.match(routeText(given, ''), /NEXT: run the command above/);
   // In a cloud session a folder on the person's computer cannot be read: the git link is asked for, and how to work on
   // a local folder is said.
-  const cloud = route('check the innova design system', { names, cloud: true });
+  const cloud = route('check the northwind design system', { names, cloud: true });
   assert.match(cloud.ask, /the link to its repository \(a private GitHub repository works once it is attached to this session, a private GitLab project once GITLAB_TOKEN is set\)\. This session runs in the cloud and cannot read a folder on the person's computer: to work on a local folder, they run `claude remote-control` in it/);
   // This folder's own system, however it is named, and words that are no name, are not another system.
   assert.equal(otherSystem('build the tag from our Figma design system as a React component', names), null, 'Figma is a tool, not a system');

@@ -324,6 +324,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // component returns, a Vue component's template).
     const jsx = {};
     const vueRenders = {};   // a Vue component's every variant as its build renders it: [{ props, markup }] (E35)
+    const vueLists = {};   // the lists its build was given (a bar's tabs), for its code
+    const showroom = [];   // the Showroom's screens, each as the project's build draws it
+    let showroomLive = null, showroomLiveWhy = null;   // the same screens built to run on the page
     const fileOf = {};   // each component's own file, read for the components it nests (a scoped page, E27)
     // The components the code has that Figma does not list (every one, before Figma's data is captured): each with its
     // file, the props its code declares and the markup its source renders (codeComponents, E26). Which file is which
@@ -378,10 +381,30 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const kept = new Set(scopeView(all, opts.only, (c, names) => nestedComponents({ name: c.name, cls: c.cls, markup: c.markup, text: fileOf[c.name] ? read(resolve(ROOT, fileOf[c.name])) : '', names, tags })).components.map((c) => c.name));
         toRender = toRender.filter((n) => kept.has(n));
       }
-      if (toRender.length && cfg.styleguide?.renderVue !== false) {
+      // The Showroom's screens (paths.showroom, else showroom/): whole pages written with the system's own components,
+      // each drawn by the project's build beside them, with what it lacks listed in its <Screen>.json.
+      const showroomDir = resolve(ROOT, cfg.paths?.showroom ?? 'showroom');
+      const screenFiles = {};
+      if (!opts.only?.length) { try { for (const f of readdirSync(showroomDir)) if (/\.vue$/.test(f)) screenFiles[`showroom:${f.replace(/\.vue$/, '')}`] = relative(ROOT, join(showroomDir, f)); } catch { /* no showroom */ } }
+      if ((toRender.length || Object.keys(screenFiles).length) && cfg.styleguide?.renderVue !== false) {
         const { renderedVue } = await import('./vue-harness.mjs');
         // Every variant it has (Figma's, else its own props'), so the Playground draws each as it renders (E35).
-        const r = await renderedVue(ROOT, cfg, toRender, { propsSnap, read, locate: (n) => vueFiles[n] ?? null, max: cfg.a11y?.maxVariants ?? 16 });
+        const r = await renderedVue(ROOT, cfg, [...toRender, ...Object.keys(screenFiles)], { propsSnap, read, locate: (n) => vueFiles[n] ?? screenFiles[n] ?? null, max: cfg.a11y?.maxVariants ?? 16 });
+        for (const [key, file] of Object.entries(screenFiles)) {
+          const drawn = r.cases?.[key]?.[0]?.markup;
+          let meta = {}; try { meta = JSON.parse(readFileSync(join(ROOT, file.replace(/\.vue$/, '.json')), 'utf8')); } catch { /* none */ }
+          showroom.push({ key: key.slice(9), file, markup: drawn ?? null, why: drawn ? null : (r.failed ?? []).find((x) => x.name.startsWith(key))?.why ?? r.why ?? 'not drawn', ...meta });
+          delete r.markup[key]; delete r.cases[key];
+        }
+        // The screens built to run on the page (showroom-bundle.mjs): mounted where their drawing is, so they work.
+        // Off unless asked (styleguide.showroomLive): it carries the whole app's code (some 3MB), so the page draws the screens.
+        if (Object.keys(screenFiles).length && cfg.styleguide?.showroomLive === true) {
+          try {
+            const { showroomBundle } = await import('./showroom-bundle.mjs');
+            const b = await showroomBundle(ROOT, Object.fromEntries(Object.entries(screenFiles).map(([k, f]) => [k.slice(9), f])), cfg);
+            if (b.js) showroomLive = { js: b.js, css: b.css }; else showroomLiveWhy = b.why;
+          } catch (e) { showroomLiveWhy = String(e.message).split('\n')[0]; }
+        }
         const holds = (m, cls) => !cls || new RegExp(`class="[^"]*(?<![\\w-])${String(cls).replace(/^\./, '').replace(/[^\w-]/g, '')}(?![\\w-])`).test(m.slice(0, m.indexOf('>') + 1));
         for (const [name, m] of Object.entries(r.markup)) {
           const own = codeOnly.find((k) => k.name === name);
@@ -392,6 +415,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           else if (!/(^|[\\/])(views|pages|stories|docs|examples?|playground)[\\/]/i.test(vueFiles[name] ?? '') || holds(m, locator.classFor(name))) {
             jsx[name] = m;
             const each = (r.cases[name] ?? []).filter((c) => /^<[a-z]/i.test(c.markup.trim()));
+            if (r.lists?.[name]) vueLists[name] = r.lists[name];
             if (new Set(each.map((c) => c.markup)).size > 1) vueRenders[name] = each.map((c) => ({ label: c.label, props: c.props, markup: c.markup }));
           }
         }
@@ -544,6 +568,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         // The project's own Code Connect: which Figma property each code prop is, and a badge on each it connects.
         const { codeConnectMaps, codeConnectFor } = await import('./code-connect-map.mjs');
         const ccMaps = codeConnectMaps(ROOT, { include: readJson('figma.config.json')?.codeConnect?.include ?? null });
+        const { bestExample } = await import('./figma-examples.mjs');
+        const examples = readJson(cfg.paths?.snapshotExamples ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-examples.snapshot.json'));
         for (const c of view.components) {
           const cc = codeConnectFor(ccMaps, c.name, nodeIds[c.name]);
           if (cc) c.codeConnect = { file: cc.file, props: cc.props };
@@ -552,8 +578,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           // The Vue transition it enters and leaves with (<transition name="slide">), so its Playground can play both.
           if (api.file) { const t = /<transition\b[^>]*?\bname\s*=\s*["']([\w-]+)["']/i.exec(readText(api.file)) ?? (/<transition\b/i.test(readText(api.file)) ? [null, 'v'] : null); if (t) c.vueTransition = t[1]; }
           if (v) c.api = v;
+          if (vueLists[c.name]) c.codeLists = vueLists[c.name];
           // What only its API takes is a Playground control too, when its own build drew each case of it.
           if (v && c.renders) c.controls = [...(c.controls ?? []), ...codeControls(c.controls ?? [], v, ctx?.propsSnap?.[c.name]?.properties ?? {}, c.codeConnect?.props ?? [])];
+          // Its text controls open on the words of the example its build drew (figma-examples.mjs), as the drawing does.
+          const ex = bestExample(examples, c.name, ctx?.propsSnap?.[c.name]);
+          if (ex && c.renders) for (const k of c.controls ?? []) if (k.type === 'TEXT' && typeof ex.props?.[k.label] === 'string' && ex.props[k.label].trim()) k.default = ex.props[k.label];
         }
       } catch { /* no component sources */ }
     }
@@ -696,8 +726,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     }
     if (view.tokens?.colors) {
       const prim = primitiveColours(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, systemCss, cfg);
-      const rest = view.tokens.colors.filter((g) => g.group !== 'primitives');
-      view.tokens.colors = [...(prim ? [prim] : []), ...rest.filter((g) => /^semantic/i.test(g.group)), ...rest.filter((g) => !/^semantic/i.test(g.group))];
+      // The ramp read from Figma's values when the snapshot carries them; else the primitives the token check agreed.
+      const agreedPrim = view.tokens.colors.find((g) => /^primitives?$/i.test(g.group)) ?? null;
+      const rest = view.tokens.colors.filter((g) => !/^primitives?$/i.test(g.group));
+      const ramp = prim ?? agreedPrim;
+      view.tokens.colors = [...(ramp ? [ramp] : []), ...rest.filter((g) => /^semantic/i.test(g.group)), ...rest.filter((g) => !/^semantic/i.test(g.group))];
     }
     // How each component moves (an entry, an exit, an overlay it opens in), so its preview can play it.
     const allCss = [systemCss, ...(ctx?.componentSheets ?? []).map(readText)].join('\n');
@@ -724,6 +757,21 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         for (const t of [...(c.ownTokens?.colors ?? []), ...(c.ownTokens?.sizes ?? [])]) if (!own.some((e) => e.var === t.var)) own.push({ var: t.var, props: [] });
         if (own.length) c.allTokens = own.map((e) => ({ var: e.var, figma: named.get(e.var) ?? null, props: e.props }));
       }
+      // What each component's tokens say they are for (Figma's variable descriptions), for its Documentation: an agent
+      // reads them to pick the right token, so a token with none is a line to write.
+      const meta = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.tokenMeta ?? {};
+      const said = (n) => String(meta[n]?.description ?? meta[`${n}/color`]?.description ?? meta[String(n).replace(/\/colou?r$/, '')]?.description ?? '').trim();
+      // Every Figma variable named after a component (advanced/buttonAdvertising/shadow/X) is that component's too, the
+      // code using it or not.
+      const vsnap = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
+      const allNames = [...new Set([...Object.values(vsnap.color ?? {}).flatMap((m) => Object.keys(m ?? {})), ...Object.keys(vsnap.sizing ?? {})])];
+      const sqz = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+      for (const c of view.components) {
+        const mine = allNames.filter((n) => { const seg = n.split('/'); return seg.slice(0, 2).some((x) => sqz(x) === sqz(c.name)); }).map((n) => n.replace(/\/colou?r$/, ''));
+        const names = [...new Set([...(c.allTokens ?? []).map((t) => t.figma), ...[...(c.ownTokens?.colors ?? []), ...(c.ownTokens?.sizes ?? [])].map((t) => t.figma), ...mine].filter(Boolean))].sort();
+        if (!names.length) continue;
+        c.tokenDocs = { total: names.length, described: names.filter(said).map((n) => ({ figma: n, description: said(n) })), missing: names.filter((n) => !said(n)) };
+      }
     } catch { /* none listed */ }
     for (const c of view.components) { const m = motionUi(c.cls, allCss); if (m) c.motion = m; }
     // Each icon as Figma has it (the icon snapshot, keyed by the code's symbol id): its Figma name and its size.
@@ -737,6 +785,97 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const seg = segmentedUi(every);
     view.ui = { segmented: seg && !seg.standIn ? seg : null, tabs: tabsUi(every), field: fieldUi(every, systemCss), button: buttonUi(every, systemCss, sh.ui?.button ?? null), card: cardUi(every, systemCss), iconButton: iconButtonUi(every, systemCss), tip: tipUi(every, systemCss), overlay: every.find((c) => /^overlay$|scrim|backdrop/i.test(c.name) && c.cls && !/^#/.test(c.cls))?.cls ?? null };
     view.ui.gaps = standInGaps(view.ui);
+    if (showroom.length) view.showroom = showroom;
+    // The system's logo at the top of the menu (styleguide.logo, an SVG in the project), in place of its name: its white
+    // or black drawn in the page's text colour, so it follows the page's light and dark; its other colours kept.
+    if (cfg.styleguide?.version) view.version = String(cfg.styleguide.version);   // the system's version, when the team sets it (else its changelog's newest release)
+    if (cfg.styleguide?.logo) {
+      try {
+        const raw = readFileSync(resolve(ROOT, cfg.styleguide.logo), 'utf8');
+        const svg = raw.replace(/<\?xml[\s\S]*?\?>|<!DOCTYPE[\s\S]*?>|<script[\s\S]*?<\/script>|\son\w+="[^"]*"/gi, '')
+          .replace(/(fill|stroke)="(white|#fff|#ffffff|black|#000|#000000)"/gi, '$1="currentColor"').trim();
+        if (/^<svg[\s>]/i.test(svg)) view.logo = { svg };
+      } catch { /* no logo: the system's name stays */ }
+    }
+    if (showroomLive) view.showroomLive = showroomLive; else if (showroomLiveWhy) view.showroomLiveWhy = showroomLiveWhy;
+    // The system's brands (Figma's extended collections, --figma-brands): each a skin the page puts on what it shows of
+    // the system (every preview, the Showroom), never on the page around them. The code is the same; only the variables
+    // differ, declared again on the previews for the brand chosen, with every variable that points at one of them.
+    try {
+      const brandSnap = readJson(cfg.paths?.snapshotBrands ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-brands.snapshot.json'));
+      if (brandSnap?.collections?.length) {
+        const { brandList, brandCss } = await import('./figma-brands.mjs');
+        const { tokenToVar, resolveNamingSpec } = await import('./naming-convention.mjs');
+        const spec = resolveNamingSpec(cfg), toVar = (n) => (String(n).startsWith('--') ? n : tokenToVar(n, spec));
+        const varsSnap = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
+        // The code's own value of each variable in each mode (its :root block, then the mode's own block), so a brand is
+        // drawn on the library's values where they differ from the code's (onLibrary).
+        const { onLibrary } = await import('./figma-brands.mjs');
+        const blocks = [...systemCss.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}@;]+)\{([^{}]*)\}/g)].map((m) => [m[1].trim(), Object.fromEntries([...m[2].matchAll(/(--[\w-]+)\s*:\s*([^;]+)/g)].map((d) => [d[1], d[2].trim()]))]);
+        const allModes = [...(cfg.figma?.modes ?? []), ...(cfg.figma?.collections ?? []).flatMap((c) => c.modes ?? [])];
+        const modeDecls = (name) => {
+          const m = allModes.find((x) => String(x.name).toLowerCase() === String(name).toLowerCase());
+          const root = Object.assign({}, ...blocks.filter(([sel]) => /^:root$/.test(sel)).map(([, d]) => d));
+          if (!m || (m.cssSelector ?? 'root') === 'root') return root;
+          const at = /^data:([\w-]+)=(.+)$/.exec(m.cssSelector ?? '');
+          if (!at) return root;
+          const attr = `[${at[1].startsWith('data-') ? at[1] : 'data-' + at[1]}="${at[2]}"]`;
+          return Object.assign(root, ...blocks.filter(([sel]) => sel.split(',').some((x) => x.trim().replace(/^:root/, '') === attr)).map(([, d]) => d));
+        };
+        const declsOf = {};
+        const codeValue = (n, mode) => {
+          const d = (declsOf[mode] ??= modeDecls(mode));
+          let v = d[toVar(n)], hops = 0;
+          while (v && /^var\((--[\w-]+)\)$/.test(v) && hops++ < 12) v = d[/^var\((--[\w-]+)\)$/.exec(v)[1]];
+          return v ?? null;
+        };
+        const list = brandList(onLibrary(brandSnap, codeValue));
+        // Each attribute axis of the page (colour, size), its modes by Figma's names: the root one where no attribute is
+        // set (or set to it on purpose), each other one where its attribute is.
+        const rootLabels = new Set([...(cfg.figma?.modes ?? []), ...(cfg.figma?.collections ?? []).flatMap((c) => c.modes ?? [])].filter((m) => (m.cssSelector ?? 'root') === 'root').map((m) => String(m.name).toLowerCase()));
+        const keyOfMode = (label) => [...(cfg.figma?.modes ?? []), ...(cfg.figma?.collections ?? []).flatMap((c) => c.modes ?? [])].find((m) => String(m.name).toLowerCase() === String(label).toLowerCase())?.snapshotKey ?? String(label).toLowerCase();
+        const axes = (view.modes ?? []).filter((a) => a.attr && !a.classes).map((a) => {
+          const root = a.values.find((v) => v.value === '') ?? a.values.find((v) => rootLabels.has(String(v.label).toLowerCase())) ?? a.values[0];
+          return { attr: a.attr, baseValue: root.value || null, modes: a.values.map((v) => ({ name: v.label, key: keyOfMode(v.label), attr: v === root ? null : a.attr, value: v.value })) };
+        });
+        // A number Figma keeps without a unit is a size in pixels, unless it is a weight, an opacity or a ratio.
+        const unit = (v, name) => (typeof v === 'number' ? (/^(\w*weight|opacity|appearance|alpha|ratio|z-?index|scale|flex\w*|order|count|display|allDisplay)$/i.test(String(name).split('/').pop()) ? String(v) : `${v}px`) : typeof v === 'boolean' ? String(v) : v);
+        const scope = '.sg-layout, .pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom, .type-list, .sg-type-family, .sg-overlay-host';   // .sg-layout: the guide around them takes the brand's colours, corners and family too (the page re-maps those roles)
+        // The system's own variables (each group's parts) and its value of one in a mode, so a layer a brand switches off
+        // (a border's or a shadow's display set to false) draws nothing.
+        const names = [...new Set([...Object.values(varsSnap.color ?? {}).flatMap((m) => Object.keys(m ?? {})), ...Object.keys(varsSnap.sizing ?? {}), ...list.flatMap((b) => Object.keys(b.overrides))])];
+        const standard = (v, key) => varsSnap.color?.[key]?.[v] ?? varsSnap.sizing?.[v] ?? null;
+        // Brands kept as stylesheets name each variable as the code does (--primitives-green): back to Figma's name where
+        // the system has one, so what points at it is written again too.
+        const fromCss = new Map(names.map((n) => [toVar(n), n]));
+        const named = (k) => (String(k).startsWith('--') ? fromCss.get(k) ?? k : k);
+        const rename = (o) => Object.fromEntries(Object.entries(o ?? {}).map(([k, by]) => [named(k), Object.fromEntries(Object.entries(by ?? {}).map(([m, v]) => [m, v && typeof v === 'object' && 'alias' in v ? { ...v, alias: named(v.alias) } : v]))]));
+        for (const b of list) { b.overrides = rename(b.overrides); b.ownOverrides = rename(b.ownOverrides); }
+        // The links between variables as the library has them (base/border/top points at base/border/left), over the
+        // system's own, so a brand that changes one changes what points at it, as Figma does.
+        const links = JSON.parse(JSON.stringify(varsSnap.aliases ?? {}));
+        for (const c of brandSnap.collections ?? []) for (const [n, by] of Object.entries(c.library ?? {})) for (const [m, x] of Object.entries(by ?? {})) {
+          const key = keyOfMode(m);
+          if (x && typeof x === 'object' && x.alias) (links[key] ??= {})[n] = [x.alias];
+        }
+        const declared = new Set([...systemCss.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+        const css = brandCss(list, { axes, aliases: links, toVar, scope, unit, names, standard, exists: (n) => declared.has(toVar(n)) });
+        // What a brand overrides that the code has no variable for: said, so a name that differs is found.
+        const known = new Set([...systemCss.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+        const unknown = [...new Set(list.flatMap((b) => Object.keys(b.overrides)))].filter((n) => !known.has(toVar(n)));
+        // The families a brand draws in (a fontFamily it overrides, in any mode), so the page can load or name them.
+        const fontsOf = (b) => [...new Set(Object.entries(b.overrides).filter(([n]) => /font-?family$/i.test(n)).flatMap(([, by]) => Object.values(by ?? {})).filter((v) => typeof v === 'string').map((v) => v.split(',')[0].trim().replace(/^["']|["']$/g, '')))];
+        // Each brand's family the project keeps the files of (paths.fonts, else fonts/), embedded so the page draws it on
+        // any computer; one it does not keep is loaded from Google Fonts, or named, by the page.
+        const { fontFaces } = await import('./figma-brands.mjs');
+        const fontDir = resolve(ROOT, cfg.paths?.fonts ?? 'fonts');
+        const fontFiles = []; const walkFonts = (d) => { let ns = []; try { ns = readdirSync(d); } catch { return; } for (const n of ns) { const p = join(d, n); try { if (statSync(p).isDirectory()) walkFonts(p); else if (/\.(woff2?|otf|ttf)$/i.test(n)) fontFiles.push({ name: n, data: readFileSync(p) }); } catch {} } };
+        walkFonts(fontDir);
+        const families = [...new Set(list.flatMap((b) => fontsOf(b)))];
+        const faces = families.flatMap((f) => fontFaces(f, fontFiles));
+        view.brands = { file: brandSnap._file ?? null, embedded: families.filter((f) => fontFaces(f, fontFiles).length), faces: faces.join('\n'), read: brandSnap._read ?? null, list: list.map((b) => ({ key: b.key, name: b.name, parent: b.parent, own: b.own, overrides: Object.keys(b.overrides).length, fonts: fontsOf(b) })), css, unknown };
+      }
+    } catch (e) { view.brandsError = String(e.message).split('\n')[0]; }
     // What the tokens owe (F8, L9), rows of the Tasks page under The system: descriptions to write in Figma, tokens equal
     // in every mode and tokens one component uses, a decision each. The single-use ones come from the contracts the last
     // audit wrote, so the page and the audit count the same; with none written, that row waits for an audit.
@@ -761,7 +900,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       };
       const dangling = danglingCodeAliases(sourceFiles(ROOT, cfg), { removed });
       const { brandNames } = await import('./code-roots.mjs');
-      view.systemTodo = tokenTodos({ vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, users, dangling, brands: brandNames(ROOT, cfg), components: (view.allComponents ?? view.components).map((c) => c.name), primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
+      view.handFonts = (await import('./system-advice.mjs')).handWrittenFamilies(systemCss).filter((h) => !/monospace|mono\b/i.test(h.value));
+      view.systemTodo = tokenTodos({ vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, users, dangling, css: systemCss, componentTokens: new Set((view.allComponents ?? view.components).flatMap((c) => [...(c.tokenDocs?.missing ?? []), ...(c.tokenDocs?.described ?? []).map((d) => d.figma)])), brands: brandNames(ROOT, cfg), components: (view.allComponents ?? view.components).map((c) => c.name), primitivePrefix: cfg.figma?.primitivePrefix ?? 'primitives/' });
       // What goes wrong only when two modes are on together (L6), from the last audit's reading in the browser.
       const { comboTodos } = await import('./mode-combos.mjs');
       view.systemTodo.push(...comboTodos(readJson(join(OUT_DIR, 'mode-combinations.json'))));
@@ -917,6 +1057,18 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const fx = readJson(join(OUT_DIR, 'effects.json'));
       for (const c of new Set([...(view.allComponents ?? []), ...view.components])) { const own = (fx?.findings ?? []).filter((f) => f.component === c.name); if (own.length) c.effectDiffs = own; }
     } catch { /* no effects read */ }
+    // Each Showroom screen's components: the system's own ones its file imports (@/… is the project's src/), so a
+    // component's Used in names the screens built with it, and each screen the components it is built with.
+    if (showroom.length) {
+      const strip = (f) => String(f ?? '').replace(/\\/g, '/').replace(/\.(vue|jsx?|tsx?)$/, '');
+      const byFile = new Map();
+      for (const c of new Set([...(view.allComponents ?? []), ...view.components])) { const f = strip(c.source?.file ?? c.api?.file); if (f) byFile.set(f, c.name); }
+      for (const s of showroom) {
+        let text = ''; try { text = readFileSync(join(ROOT, s.file), 'utf8'); } catch { /* not read */ }
+        const specs = [...text.matchAll(/import\s+[\w${}\s,*]+\s+from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]).filter((x) => x.startsWith('@/') || x.startsWith('src/'));
+        s.uses = [...new Set(specs.map((x) => byFile.get(strip(x.replace(/^@\//, 'src/')))).filter(Boolean))].sort();
+      }
+    }
     // Where the code moves otherwise than Figma's prototype (C5), read again from the code as it is now (the last audit's
     // when it cannot be): rows of its Parity area, and what the motion page and each Motion area say the code does.
     let motionFound = [];
@@ -938,11 +1090,14 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // How each component moves on its own (C7): its loop, its opening and its closing, the code's beside Figma's.
       const { componentMotionRows, motionSpec, motionOverview } = await import('./motion-components.mjs');
       const every = view.allComponents ?? view.components, clsOf = new Map(every.map((c) => [c.name, c.cls]));
+      // A Vue component's own scope mark, from its drawn markup's first element: its scoped rules are its own.
+      const scopeOf = (c) => (String(c?.markup ?? '').match(/data-v-([0-9a-f]{6,})/i) ?? [])[1] ?? null;
+      const known = new Set(every.map(scopeOf).filter(Boolean).map((x) => x.toLowerCase())), scopes = new Map(every.map((c) => [c.name, { own: scopeOf(c), known }]));
       // Its Motion area: everything that moves in it, in one table, the code's beside Figma's, with where each comes from;
       // a component shown in an overlay read with the overlay it opens in (.modal for .modal-card, its backdrop too).
       const moves = [];
-      for (const c of new Set([...every, ...view.components])) { const t = motionSpec(snapMotion, files, c.motion?.overlay?.container ?? c.cls, c.name); if (t.length) { c.moves = t; for (const r of t) moves.push({ component: c.name, ...r }); } }
-      const rows = componentMotionRows(snapMotion, files, (n) => clsOf.get(n) ?? null, every.map((c) => c.name));
+      for (const c of new Set([...every, ...view.components])) { const t = motionSpec(snapMotion, files, c.motion?.overlay?.container ?? c.cls, c.name, scopes.get(c.name) ?? { own: scopeOf(c), known }); if (t.length) { c.moves = t; for (const r of t) moves.push({ component: c.name, ...r }); } }
+      const rows = componentMotionRows(snapMotion, files, (n) => clsOf.get(n) ?? null, every.map((c) => c.name), (n) => scopes.get(n) ?? null);
       if (rows.length || moves.length) m = { ...(m ?? { durations: [], easings: [], reduced: null, transitions: [], figmaHas: false }), components: rows, moves: moves.sort((a, b) => a.component.localeCompare(b.component)) };
       // The motion page's one table: every motion grouped by what it is for and its timing, with the components using it.
       if (m) m.overview = motionOverview(m.moves ?? [], m);
@@ -1097,6 +1252,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   }
 
   html = html.split(VUE_CSS_MARK).join(vueCss);
+  // The page's own title is the system's name (ds-config.json name, else package.json's), in the file itself, so a tab,
+  // a bookmark or a link preview names the system before any script runs.
+  const sysName = cfg.name || (() => { try { return JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { return ''; } })();
+  if (sysName) html = html.replace(/<title>Living style guide<\/title>/i, `<title>${String(sysName).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')} · Living style guide</title>`);
   html = hoistImports(html);
   // An older run never replaces a page built from newer inputs (P4). The code capture's own copy (opts.out) is always
   // the code as it is now.

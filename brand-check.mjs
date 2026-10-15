@@ -2,7 +2,7 @@
 //
 // Opt-in and project-declared (never imposed): runs only when ds-config.json declares which snapshot
 // modes are brands — "brands": ["brandA","brandB", …] (keys in figma-vars.snapshot.json → color). For a
-// multi-brand DS (like INNOVA), every brand should define the SAME set of semantic tokens; a token that
+// multi-brand DS (like NORTHWIND), every brand should define the SAME set of semantic tokens; a token that
 // exists in some brands but is MISSING in others is a coverage hole (an agent building for the missing
 // brand has no token to use). Advisory - it surfaces the holes; it never fails. Pure + testable.
 

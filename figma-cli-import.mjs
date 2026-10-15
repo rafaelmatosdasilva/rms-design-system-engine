@@ -53,12 +53,14 @@ export function varsFromDesign(design, cfg = {}) {
   // The configured colour modes, else (none of them in the file: setup's guess before a first capture) the file's own.
   const modes = cfg.figma?.modes?.some((m) => (colourCol?.modes ?? []).includes(m.name)) ? cfg.figma.modes
     : (colourCol?.modes ?? []).map((name) => ({ name, snapshotKey: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') }));
-  const color = {}, aliases = {}, sizing = {}, strings = {}, booleans = {};
+  const color = {}, aliases = {}, sizing = {}, strings = {}, booleans = {}, primitives = {};
   if (colourCol) {
     for (const m of modes) {
       if (!(colourCol.modes ?? []).includes(m.name)) continue;
-      color[m.snapshotKey] = {}; aliases[m.snapshotKey] = {};
+      color[m.snapshotKey] = {}; aliases[m.snapshotKey] = {}; primitives[m.snapshotKey] = {};
       for (const v of colourCol.variables ?? []) {
+        // The primitives as Figma has them in each mode (the ramp the rest points at), kept apart from the tokens.
+        if (v.type === 'COLOR' && v.name.startsWith(prefix)) { const { value } = resolveVar(byKey, colourCol.name, v.name, m.name); if (typeof value === 'string') primitives[m.snapshotKey][v.name] = value.toLowerCase(); continue; }
         if (v.type !== 'COLOR' || v.name.startsWith(prefix)) continue;
         const { value, chain } = resolveVar(byKey, colourCol.name, v.name, m.name);
         color[m.snapshotKey][v.name] = typeof value === 'string' ? value.toLowerCase() : null;
@@ -116,7 +118,7 @@ export function varsFromDesign(design, cfg = {}) {
     }
     if (Object.keys(vars).length) modeVariants[c.name] = { modes: keyed, vars };
   }
-  return { color, aliases, sizing, strings, booleans, modeOrder, brokenAliases, collections, modeVariants };
+  return { color, aliases, sizing, strings, booleans, primitives, modeOrder, brokenAliases, collections, modeVariants };
 }
 
 // Every component set (and lone component) in design.json's page trees.
@@ -187,7 +189,9 @@ export function snapshotsFromDesign(design, cfg = {}, existing = {}, now = new D
   const prevVars = existing.vars ?? {};
   const vars = { ...prevVars, _updated: now, _source: source, _modeOrder: t.modeOrder, _collections: t.collections, color: t.color, aliases: t.aliases, brokenAliases: t.brokenAliases, sizing: t.sizing, modeVariants: t.modeVariants,
     strings: { ...(prevVars.strings ?? {}), ...t.strings }, booleans: { ...(prevVars.booleans ?? {}), ...t.booleans } };
-  for (const k of ['typography', 'breakpoints', 'animation', 'primitives']) vars[k] = prevVars[k] ?? {};
+  for (const k of ['typography', 'breakpoints', 'animation']) vars[k] = prevVars[k] ?? {};
+  // The primitives Figma gives now, else those an earlier capture kept.
+  vars.primitives = Object.values(t.primitives ?? {}).some((m) => Object.keys(m).length) ? t.primitives : prevVars.primitives ?? {};
   const props = { ...(existing.props ?? {}), _updated: now, _source: source };
   const prevStruct = existing.structure ?? {};
   const components = { ...(prevStruct.components ?? {}) };
