@@ -58,7 +58,7 @@ test('each prop only the code\'s API takes is a Playground control and a case dr
   const api = apiView({ file: 'Button.vue', props: { buttonSize: { options: ['s', 'm', 'l'], default: 'm', type: 'string' }, selected: { type: 'boolean' }, disabled: { type: 'boolean' }, allowEventPropagation: { type: 'boolean' }, label: { type: 'string' } } });
   const figmaControls = [{ label: 'disabled', prop: 'disabled', type: 'BOOLEAN' }];
   const ctl = codeControls(figmaControls, api, { 'size#1:2': { defaultValue: 's' }, disabled: { defaultValue: 'true' } });
-  assert.deepEqual(ctl.map((k) => [k.label, k.prop, k.type, k.default]), [['size', 'buttonSize', 'VARIANT', 's'], ['selected', 'selected', 'BOOLEAN', false]], 'size starts on Figma\'s default; disabled is Figma\'s; a behaviour and a text are no control');
+  assert.deepEqual(ctl.map((k) => [k.label, k.prop, k.type, k.default]), [['size', 'buttonSize', 'VARIANT', 's'], ['selected', 'selected', 'BOOLEAN', false], ['label', 'label', 'TEXT', 'Label']], 'size starts on Figma\'s default; disabled is Figma\'s; a behaviour is no control; a text only the code has is a field');
   assert.equal(codeControls(figmaControls, api, ['size'])[0].default, 'm', 'with no Figma default, the code\'s');
   const text = codeControls(figmaControls, api, { 'labelContent#1:3': { type: 'TEXT', defaultValue: 'Label' } }).find((k) => k.prop === 'label');
   assert.deepEqual([text.label, text.type, text.default], ['labelContent', 'TEXT', 'Label'], 'Figma\'s text prop: a field');
