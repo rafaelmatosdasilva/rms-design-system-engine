@@ -24,7 +24,7 @@
 import { buildStamp, mayWrite, stampMeta } from './stamp.mjs';
 import { usedClasses } from './class-use.mjs';
 import { appDir } from './code-roots.mjs';
-import { codeSizeCSS, modeRootCSS, scopeView } from './styleguide-data.mjs';
+import { codeSizeCSS, modeRootCSS, scopeView, attrModeCSS, colourAttrMode, modeScopes } from './styleguide-data.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
 import { join, dirname, resolve, relative, basename } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
@@ -196,7 +196,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const snapPath = cfg.paths?.snapshotVars ? resolve(ROOT, cfg.paths.snapshotVars) : null;
       if (snapPath && existsSync(snapPath)) sizeCSS = codeSizeCSS(JSON.parse(readFileSync(snapPath, 'utf8')).modeVariants, css);
     } catch {}
-    return deriveModeCSS(css) + sizeCSS + modeRootCSS(css);
+    return deriveModeCSS(css) + sizeCSS + attrModeCSS(css, colourAttrMode(cfg)) + modeRootCSS(css, modeScopes(cfg));
   }
 
   // ── ICON_SHEET ───────────────────────────────────────────────────────────────
@@ -993,7 +993,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   // ── CHROME — the page's own look, from the system's tokens (styleguide-data.mjs chromeRoles) ──────────────────────
   async function chromeCSS() {
     if (!lastView) lastView = JSON.parse(await agreed());
-    const { chromeRoles, cardUi } = await import('./styleguide-data.mjs');
+    const { chromeRoles, cardUi, modeScopes } = await import('./styleguide-data.mjs');
     const { propsSnap } = await context();
     // The system's icon size: the width most of its icons are drawn at in Figma (their viewBox), else in its icon sheet.
     const boxes = [...Object.values(readJson(cfg.paths?.snapshotIcons ?? '') ?? {}).map((i) => i?.viewBox), ...(iconSheet().match(/viewBox="[^"]+"/g) ?? []).map((v) => v.slice(9, -1))]
@@ -1001,7 +1001,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const count = {}; for (const b of boxes) count[b] = (count[b] ?? 0) + 1;
     const size = Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0];
     const sysCss = themeFiles.map(readText).join('\n');
-    chrome = chromeRoles({ tokens: lastView.tokens, themeCss: sysCss, componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome, card: cardUi(lastView.allComponents ?? lastView.components ?? [], sysCss) });
+    chrome = chromeRoles({ tokens: lastView.tokens, themeCss: sysCss, componentNames: Object.keys(propsSnap), icons: { size: size ? Number(size) : null }, override: cfg.styleguide?.chrome, scopes: modeScopes(cfg), card: cardUi(lastView.allComponents ?? lastView.components ?? [], sysCss) });
     // The page's own contrast in every mode, for the style guide check to read from the page.
     return chrome.css + (chrome.contrast?.length ? `\n/*sg-contrast:${JSON.stringify(chrome.contrast)}*/` : '');
   }
