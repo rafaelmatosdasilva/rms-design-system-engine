@@ -32,8 +32,9 @@
      two weights only: the text weight (--sg-m-weight) for every word, the heading weight for titles, tabs and names. */
   --sg-xs: 0.6875rem; --sg-s: 0.75rem; --sg-s-weight: 500; --sg-m: 0.8125rem; --sg-m-weight: 500; --sg-l: 0.875rem; --sg-l-weight: 800;
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: 1.4;
-  /* The page's two weights: every word in the system's text weight, titles, tabs and names in its heading weight. */
-  --sg-text-weight: var(--sg-m-weight);
+  /* The page's two weights: every word a step above the system's text weight (readable on a screen), titles, tabs and
+     names in its heading weight. */
+  --sg-text-weight: calc(var(--sg-m-weight) + 100);
   /* A page's title: the system's largest text style, scaled up, so the guide has its own hierarchy above any system's
      text styles while every size still comes from the system ("title-scale" in styleguide.chrome, ds-config.json, changes it). */
   --sg-title-scale: 3.125; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
