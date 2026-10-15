@@ -3943,7 +3943,8 @@ a.pg-usage-name { color: var(--sg-text); }
   // product, so the system's own script finds it.
   COMPONENTS.forEach(function (c) { if (/^#[\w-]+$/.test(c.cls || '') && !document.getElementById(c.cls.slice(1))) { var one = document.createElement('div'); one.id = c.cls.slice(1); document.body.appendChild(one); } });
   var refreshers = [];
-  if (COMPONENTS.length) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'Components'; nav.appendChild(lab); }
+  // The components' group says how many there are: Components (117).
+  if (COMPONENTS.length) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.dataset.group = 'Components'; lab.textContent = 'Components (' + COMPONENTS.length + ')'; nav.appendChild(lab); }
   // Each component is its own view, drawn the first time it is opened (every view at once with ?all, as the engine's
   // own checks open the page). Its card's thumbnail is its markup at first, then its drawn preview.
   var ALL = /[?&]all\b/.test(location.search), BUILDERS = {};
@@ -4119,7 +4120,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // Its tag says the menu group it sits under (System, Foundations, Components), whatever that label says.
     var tLink = nav.querySelector('a[href="#' + target.id + '"]'), tGroup = tLink && tLink.previousElementSibling;
     while (tGroup && !tGroup.classList.contains('sg-nav-label')) tGroup = tGroup.previousElementSibling;
-    var tTag = target.querySelector('.sg-section-badge'); if (tTag && tGroup) tTag.textContent = tGroup.textContent;
+    var tTag = target.querySelector('.sg-section-badge'); if (tTag && tGroup) tTag.textContent = tGroup.dataset.group || tGroup.textContent;
     if (target.id === 'tasks') { openTodoKind(at.slug); setTimeout(a11ySweep, 300); }
     if (target.id === 'health') setTimeout(a11ySweep, 300);   // its accessibility number waits on the same try
     // A foundation's size switch stays in view under its title as the page scrolls.
