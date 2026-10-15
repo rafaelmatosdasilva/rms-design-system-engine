@@ -114,5 +114,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-13-tests-a-type-style-lists` | The 21 guide tasks on Haiku (engine 3f9b610) | "Text styles complete and accurate" |
 | `2026-10-14-a-compact-figma-capture-about` | The 21 guide tasks on Haiku (engine e81a0ea) | "Compact Figma capture" |
 | `2026-10-14-style-guide-with-figma-s` | The 21 guide tasks on Haiku (engine 2ef7817) | "Style guide: only Figma's components, code-only ones as tasks" |
+| `figma-branch` | The 21 guide tasks on Haiku (engine 7a1484a) | "Figma branch links" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
