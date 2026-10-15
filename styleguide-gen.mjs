@@ -324,6 +324,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // component returns, a Vue component's template).
     const jsx = {};
     const vueRenders = {};   // a Vue component's every variant as its build renders it: [{ props, markup }] (E35)
+    const vueLists = {};   // the lists its build was given (a bar's tabs), for its code
     const fileOf = {};   // each component's own file, read for the components it nests (a scoped page, E27)
     // The components the code has that Figma does not list (every one, before Figma's data is captured): each with its
     // file, the props its code declares and the markup its source renders (codeComponents, E26). Which file is which
@@ -392,6 +393,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           else if (!/(^|[\\/])(views|pages|stories|docs|examples?|playground)[\\/]/i.test(vueFiles[name] ?? '') || holds(m, locator.classFor(name))) {
             jsx[name] = m;
             const each = (r.cases[name] ?? []).filter((c) => /^<[a-z]/i.test(c.markup.trim()));
+            if (r.lists?.[name]) vueLists[name] = r.lists[name];
             if (new Set(each.map((c) => c.markup)).size > 1) vueRenders[name] = each.map((c) => ({ label: c.label, props: c.props, markup: c.markup }));
           }
         }
@@ -544,6 +546,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         // The project's own Code Connect: which Figma property each code prop is, and a badge on each it connects.
         const { codeConnectMaps, codeConnectFor } = await import('./code-connect-map.mjs');
         const ccMaps = codeConnectMaps(ROOT, { include: readJson('figma.config.json')?.codeConnect?.include ?? null });
+        const { bestExample } = await import('./figma-examples.mjs');
+        const examples = readJson(cfg.paths?.snapshotExamples ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-examples.snapshot.json'));
         for (const c of view.components) {
           const cc = codeConnectFor(ccMaps, c.name, nodeIds[c.name]);
           if (cc) c.codeConnect = { file: cc.file, props: cc.props };
@@ -552,8 +556,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           // The Vue transition it enters and leaves with (<transition name="slide">), so its Playground can play both.
           if (api.file) { const t = /<transition\b[^>]*?\bname\s*=\s*["']([\w-]+)["']/i.exec(readText(api.file)) ?? (/<transition\b/i.test(readText(api.file)) ? [null, 'v'] : null); if (t) c.vueTransition = t[1]; }
           if (v) c.api = v;
+          if (vueLists[c.name]) c.codeLists = vueLists[c.name];
           // What only its API takes is a Playground control too, when its own build drew each case of it.
           if (v && c.renders) c.controls = [...(c.controls ?? []), ...codeControls(c.controls ?? [], v, ctx?.propsSnap?.[c.name]?.properties ?? {}, c.codeConnect?.props ?? [])];
+          // Its text controls open on the words of the example its build drew (figma-examples.mjs), as the drawing does.
+          const ex = bestExample(examples, c.name, ctx?.propsSnap?.[c.name]);
+          if (ex && c.renders) for (const k of c.controls ?? []) if (k.type === 'TEXT' && typeof ex.props?.[k.label] === 'string' && ex.props[k.label].trim()) k.default = ex.props[k.label];
         }
       } catch { /* no component sources */ }
     }

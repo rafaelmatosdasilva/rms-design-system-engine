@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { unpublished, componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
   COMPONENT_FUNCTIONS, AUDIT_FUNCTIONS, STRUCTURE_KEYS, SCRIPT_MAX, ANSWER, varsScript, partsBack, unzip } from '../figma-capture.mjs';
 import * as standin from './figma-standin.mjs';
+import { examplesCaptureScript } from '../figma-examples.mjs';
 import { effectsCaptureScript } from '../effects-parity.mjs';
 import { motionCaptureScript } from '../motion-parity.mjs';
 import { screenCaptureScript } from '../screen-layout.mjs';
@@ -140,6 +141,7 @@ test('P6 components: no capture script the engine writes switches Figma\'s page;
     'vars sums': varsScript('sums'), 'vars 0': varsScript(0),
     'components sums': componentsScript('sums'), 'components sums, continued': componentsScript('sums', { pass: 'p', after: 'k' }), 'components read': componentsScript('read', { ids: ['1:0'] }), 'components slice': componentsScript('read', { ids: ['1:0'], slice: 1 }),
     '--figma-effects': effectsCaptureScript(), '--figma-motion': motionCaptureScript(), '--figma-screens': screenCaptureScript(['1:2']), '--figma-a11y': screenA11yCaptureScript(['1:2']), '--annotation-categories': annotationScript(),
+    '--figma-examples': examplesCaptureScript(),
   };
   for (const [name, s] of Object.entries(scripts)) assert.doesNotMatch(s, /setCurrentPage/, `${name} never switches the page`);
   for (const name of ['components sums', 'components read', '--figma-effects', '--figma-motion', '--annotation-categories']) assert.match(scripts[name], /\.loadAsync\(\)/, `${name} loads each page where it is`);

@@ -14,6 +14,8 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
 import { OUT_DIR } from './names.mjs';
+import { findIconFolder, svgFiles } from './icon-folder.mjs';
+import { bestExample } from './figma-examples.mjs';
 
 // A package of the project, as an ES module it exports for import (its "exports" import entry, else "module" or "main").
 function projectModule(ROOT, name) {
@@ -145,18 +147,51 @@ export function propSamples(ROOT) {
 // For each list prop the template loops over (v-for="tab in tabs"), three items with the fields the template reads from
 // each (tab.label, tab.icon): each field the value the project's pages pass it most, else its own name and number, an
 // on/off one off but the first item's selected or active. So a list draws as a list. → { propName: [items] }
-export function listSamples(text, propNames = [], samples = {}) {
+// With an example from Figma whose instances are the list's items (a bar's tabs): one item a tab, each field from the
+// tab's own property (label from LabelContent, icon from mainIcon, its icon as the code names its file), else its words.
+export function listSamples(text, propNames = [], samples = {}, example = null, icons = {}) {
   const tpl = /<template\b[\s\S]*<\/template>/.exec(String(text))?.[0] ?? '';
   const out = {};
+  const sq = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const figmaItems = (() => {
+    const list = (example?.items ?? []).filter((x) => x && x.component && !/^[._]/.test(String(x.component).replace(/^[^A-Za-z0-9_.]+/, '')));
+    const count = {}; for (const x of list) count[x.component] = (count[x.component] ?? 0) + 1;
+    const top = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
+    return top && top[1] >= 2 ? list.filter((x) => x.component === top[0]) : null;
+  })();
+  const fromFigma = (item, f, i) => {
+    const keys = Object.keys(item.props ?? {});
+    const k = keys.find((x) => sq(x) === sq(f)) ?? keys.find((x) => sq(x).replace(/(content|text|value|swap)$/, '') === sq(f)) ?? keys.find((x) => sq(f).length > 2 && sq(x).endsWith(sq(f)));
+    let v = k !== undefined ? item.props[k] : undefined;
+    if (/^(selected|active|current|checked|on|pressed)$/i.test(f) && v === undefined) v = /^(selected|active|current|checked|on|pressed)$/i.test(String(item.props?.state ?? ''));
+    if (v === undefined && /^(id|key|value)$/i.test(f)) v = i + 1;
+    if (v === undefined && /(label|title|text|name|content)$/i.test(f)) v = (item.texts ?? [])[0];
+    if (typeof v === 'string' && icons[v] && /icon/i.test(f + (k ?? ''))) v = icons[v];
+    if (v === 'true' || v === 'false') v = v === 'true';
+    return v;
+  };
   for (const m of tpl.matchAll(/v-for\s*=\s*["']\s*\(?\s*([A-Za-z_$][\w$]*)(?:\s*,\s*[A-Za-z_$][\w$]*)*\s*\)?\s+(?:in|of)\s+(?:props\.)?([A-Za-z_$][\w$]*)\s*["']/g)) {
     const [, item, list] = m;
     if (!propNames.includes(list) || out[list]) continue;
     const fields = [...new Set([...tpl.matchAll(new RegExp(`\\b${item}\\.([A-Za-z_$][\\w$]*)`, 'g'))].map((x) => x[1]))];
+    if (figmaItems && fields.length) {
+      out[list] = figmaItems.map((it, i) => Object.fromEntries(fields.map((f) => [f, fromFigma(it, f, i)]).filter(([, v]) => v !== undefined)));
+      continue;
+    }
     const value = (f, i) => /^(is|has|show|with)[A-Z]|^(disabled|selected|active|checked|open|expanded|current)$/i.test(f) ? i === 0 && /selected|active|current/i.test(f)
       : typeof samples[f] === 'string' ? (/icon|image|img|src|href|url|link|path|type|variant|size|color/i.test(f) ? samples[f] : `${samples[f]} ${i + 1}`)
         : `${f.charAt(0).toUpperCase() + f.slice(1)} ${i + 1}`;
     out[list] = [0, 1, 2].map((i) => (fields.length ? Object.fromEntries(fields.map((f) => [f, value(f, i)])) : `Item ${i + 1}`));
   }
+  return out;
+}
+
+// Every icon of the project's icon folder by its file's name (home-m), as the code names it (m/home-m).
+export function iconPaths(ROOT) {
+  const folder = findIconFolder(ROOT);
+  if (!folder) return {};
+  const out = {};
+  for (const rel of svgFiles(join(ROOT, folder))) { const name = rel.replace(/\.svg$/i, ''); const base = name.split('/').pop(); if (!(base in out)) out[base] = name; }
   return out;
 }
 
@@ -239,6 +274,8 @@ ${(plugins.setup ?? []).map((x) => `  { kind: ${JSON.stringify(x.kind)}, name: $
 ];
 const squash = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
 const SAMPLES = ${JSON.stringify(plugins.samples ?? {})};
+// Each icon by the name Figma gives it (home-m), as the code names its file (m/home-m).
+const ICONS = ${JSON.stringify(plugins.icons ?? {})};
 const TEXTY = /(label|title|text|description|caption|heading|subtitle|message|hint|placeholder|content)$/i;
 const HUMAN = (d) => { const w = String(d).replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase(); return w.charAt(0).toUpperCase() + w.slice(1); };
 // Where the product's components teleport to (#modals-overlay, made by its App): made on the page, and what each case
@@ -266,6 +303,7 @@ function fit(C, props, role, options, fill = {}, connect = []) {
     if (hit !== undefined) {
       let v = props[hit];
       if (cc && cc.values && cc.values[v] != null) v = cc.values[v];
+      if (typeof v === 'string' && ICONS[v] && /icon/i.test(hit + d)) v = ICONS[v];
       if (types.includes(Boolean) && typeof v === 'string') v = /^(true|yes|on)$/i.test(v);
       const own = (options[d] || []).find((o) => squash(o) === squash(v));
       out[d] = own !== undefined ? own : v;
@@ -384,7 +422,9 @@ const why1 = (e) => String(e?.message ?? e).split('\n')[0];
 // → { url, close (a promise once it has stopped), groups, missing: [why], build: 'Vite' | 'Nuxt' | 'Vue CLI' |
 // 'webpack' }, or { url: null, why } when nothing can be rendered.
 export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate, read = (f) => readFileSync(f, 'utf8'), max = cfg.a11y?.maxVariants ?? 16 } = {}) {
-  const groups = [], missing = [], samples = propSamples(ROOT);
+  const groups = [], missing = [], samples = propSamples(ROOT), icons = iconPaths(ROOT);
+  // The examples the design team placed in Figma (--figma-examples), each component opened as one of them.
+  let examples = null; try { examples = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotExamples ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-examples.snapshot.json')), 'utf8')); } catch { /* not read yet */ }
   // The project's own Code Connect files, pairing each Figma property with the code's prop (code-connect-map.mjs).
   const { codeConnectMaps, codeConnectFor } = await import('./code-connect-map.mjs');
   let ccInclude = null; try { ccInclude = JSON.parse(readFileSync(join(ROOT, 'figma.config.json'), 'utf8'))?.codeConnect?.include ?? null; } catch { /* none */ }
@@ -403,10 +443,11 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     const api = textComponentApi(file, text);
     // Figma's variants, then a case for each prop only the code has (selected, an alignment it documents), so the
     // Playground can show what its API takes.
-    const figmaCases = fromFigma ? harnessCases(propsSnap[name], max) : null;
+    const example = bestExample(examples, name, propsSnap[name]);
+    const figmaCases = fromFigma ? harnessCases(propsSnap[name], max, example) : null;
     const cases = (figmaCases ? [...figmaCases, ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
-    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill: listSamples(text, Object.keys(api.props ?? {}), samples), connect: codeConnectFor(ccMaps, name, propsSnap[name]?.nodeId)?.props ?? [], from: fromFigma ? 'figma' : 'code' });
+    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill: listSamples(text, Object.keys(api.props ?? {}), samples, example, icons), connect: codeConnectFor(ccMaps, name, propsSnap[name]?.nodeId)?.props ?? [], from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };
   const pb = await projectBuild(ROOT);
@@ -417,7 +458,7 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
   const themes = [cfg.paths?.themeCSS].flat().filter((f) => f && !/^https?:/.test(f));
   const css = themes.map((f) => { try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; } }).join('\n');
   const colours = pageColours(css);
-  const plugins = { ...appPlugins(ROOT), samples, teleports: teleportTargets(ROOT) };
+  const plugins = { ...appPlugins(ROOT), samples, icons, teleports: teleportTargets(ROOT) };
   const started = pb.kind === 'nuxt' ? await startNuxt(ROOT, pb, dir, groups, cfg, colours, plugins)
     : pb.kind === 'webpack' ? await startWebpack(ROOT, pb, dir, groups, cfg, colours, themes, plugins)
       : await startVite(ROOT, pb, dir, groups, cfg, colours, plugins);
@@ -621,7 +662,9 @@ export async function renderedVue(ROOT, cfg, names, { propsSnap = {}, locate, re
     const cases = Object.fromEntries(Object.entries(r.cases ?? {}).filter(([, l]) => l.length).map(([n, l]) => [n, l.map((c) => ({ ...c, props: props[n]?.[c.label] ?? {} }))]));
     // The first case is the default: what the component renders with nothing set.
     const markup = Object.fromEntries(Object.entries(cases).filter(([n, l]) => l[0].label === h.groups.find((g) => g.name === n)?.cases[0]?.label).map(([n, l]) => [n, l[0].markup]));
-    return { markup, cases, css: String(r.css ?? '').replace(/\/\*# sourceMappingURL=[^*]*\*\/\s*/g, ''), failed: r.failed ?? [], build: h.build };
+    // The lists each one was given (a bar's tabs, from Figma's example), so its code says them as its drawing has them.
+    const lists = Object.fromEntries((h.groups ?? []).filter((g) => g.fill && Object.keys(g.fill).length).map((g) => [g.name, g.fill]));
+    return { markup, cases, lists, css: String(r.css ?? '').replace(/\/\*# sourceMappingURL=[^*]*\*\/\s*/g, ''), failed: r.failed ?? [], build: h.build };
   } catch (e) { return none(why1(e)); }
   finally { try { cdp?.close(); } catch { /* closed */ } try { browser?.kill(); } catch { /* gone */ } await h.close(); }
 }

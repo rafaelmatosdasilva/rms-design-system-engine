@@ -341,6 +341,41 @@ if (process.argv.includes('--figma-motion')) {
   process.exit(0);
 }
 
+// ── --figma-examples: the examples the design team placed in Figma, each component opened as one of them ────────
+// Through figma-cli when it answers (read in parts, figma-examples.mjs); else the script for the Figma tool of the
+// session, run part by part (--from N). With the files its answers were saved to: keeps them as the examples snapshot.
+if (process.argv.includes('--figma-examples')) {
+  let ecfg = {};
+  try { ecfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const fe = await import('./figma-examples.mjs');
+  const at = process.argv.indexOf('--figma-examples');
+  const files = []; for (let k = at + 1; k < process.argv.length && !process.argv[k].startsWith('--'); k++) files.push(process.argv[k]);
+  const target = ecfg.paths?.snapshotExamples ?? join(dirname(ecfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-examples.snapshot.json');
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  let snap = null;
+  if (files.length) {
+    try { snap = fe.examplesSnapshot(files.map((f) => readFileSync(resolve(ROOT, f), 'utf8'))); } catch (e) { console.log(`❌ ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  } else {
+    const cli = (script) => spawnSync('figma-cli', ['eval', script], { encoding: 'utf8', maxBuffer: 1e8, timeout: 600000 }).stdout ?? '';
+    if (/^\s*1\s*$/m.test(cli('return 1'))) {
+      console.log(C.dim('  Reading the examples in Figma through figma-cli, in parts…'));
+      try { snap = await fe.readExamplesWith(cli, { log: (m) => console.log(C.dim(`  ${m}`)) }); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+    } else {
+      const fromAt = process.argv.indexOf('--from'), from = fromAt > 0 ? Number(process.argv[fromAt + 1]) || 0 : 0;
+      mkdirSync(capDir, { recursive: true });
+      const file = join(capDir, `examples-${from}.js`);
+      writeFileSync(file, fe.examplesCaptureScript({ from, count: 20 }));
+      console.log(`Examples capture script → ${relative(ROOT, file)} (read-only: it changes nothing in Figma).`);
+      console.log(`NEXT: run it unchanged with the Figma tool of this session (use_figma), save what it returns as ${relative(ROOT, join(capDir, `examples-${from}.json`))}; while its answer says a next part, run rms-design-system-engine --figma-examples --from <next> for that part's script; then rms-design-system-engine --figma-examples ${relative(ROOT, join(capDir, 'examples-*.json'))} keeps them all.`);
+      process.exit(0);
+    }
+  }
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  console.log(`✓ Figma's examples of ${Object.keys(snap.components).length} components → ${target}. The style guide's Playground opens each one as its best example.`);
+  process.exit(0);
+}
+
 // ── --capture-script / --capture-import: Figma read in checked chunks (P6) ──
 // --capture-script vars N writes the read-only script for chunk N of the variables, text styles and effect styles
 // ('sums' for the checksums alone); --capture-script components sums|next the same for the components (structure,

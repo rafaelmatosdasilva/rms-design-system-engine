@@ -28,9 +28,13 @@
   --sg-bg: light-dark(Canvas, #161618); --sg-bg-2: light-dark(Canvas, #1e1e21); --sg-surface: light-dark(Canvas, #161618); --sg-stage: var(--sg-bg);
   --sg-text: light-dark(CanvasText, #e6e6e8); --sg-text-2: light-dark(CanvasText, #d4d4d8); --sg-muted: light-dark(GrayText, #a1a1aa); --sg-border: light-dark(GrayText, #52525b); --sg-accent: AccentColor;
   --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-border);
-  /* The default type: its text a step above the browser's (500), its headings 800, its lines 1.4 apart. */
+  /* The default type: its text a step above the browser's (500), its headings 800, its lines 1.4 apart. The page has
+     two weights only: the text weight (--sg-m-weight) for every word, the heading weight for titles, tabs and names. */
   --sg-xs: 0.6875rem; --sg-s: 0.75rem; --sg-s-weight: 500; --sg-m: 0.8125rem; --sg-m-weight: 500; --sg-l: 0.875rem; --sg-l-weight: 800;
   --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: 1.4;
+  /* The page's two weights: every word a step above the system's text weight (readable on a screen), titles, tabs and
+     names in its heading weight. */
+  --sg-text-weight: calc(var(--sg-m-weight) + 100);
   /* A page's title: the system's largest text style, scaled up, so the guide has its own hierarchy above any system's
      text styles while every size still comes from the system ("title-scale" in styleguide.chrome, ds-config.json, changes it). */
   --sg-title-scale: 3.125; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
@@ -55,7 +59,9 @@ html { overflow: visible; height: auto; }
 /* The page's text in the page's own colour: a system's body rule that sets one still wins (this one weighs nothing). */
 :where(html) { color: var(--sg-text); }
 /* The page's own words with room between their lines; a component drawn on it keeps the line height its system gives. */
-.sg-main, .sg-sidebar { line-height: var(--sg-lh); font-weight: var(--sg-m-weight); }   /* its words in the system's text weight, never the browser's thinner one */
+.sg-main, .sg-sidebar { line-height: var(--sg-lh); font-weight: var(--sg-text-weight); }   /* its words in the system's text weight, never the browser's thinner one */
+.sg-skip { position: absolute; left: var(--sg-space-s); top: var(--sg-space-s); z-index: 100; transform: translateY(-200%); }
+.sg-skip:focus-visible { transform: none; }
 .pg-preview, .sg-thumb, .pg-variant-stage, .pg-example-stage { line-height: normal; }
 .pg-preview--usable > * { cursor: pointer; }   /* a component a click changes, as it does in a product */
 body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: block; padding: 0; }
@@ -65,12 +71,13 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-sidebar { width: 280px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: var(--sg-line); background: var(--sg-bg-2); display: flex; flex-direction: column; scrollbar-gutter: stable; }
 .sg-sidebar-header { padding: var(--sg-space-l) var(--sg-space-l) var(--sg-space-m); border-bottom: var(--sg-line); }
 .sg-sidebar-header .sg-title { font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); }   /* the system's name in the h2 style */
-.sg-sidebar-header > p { font-size: var(--sg-s); font-weight: var(--sg-m-weight); color: var(--sg-muted); margin-top: var(--sg-space-xxs); }
+.sg-sidebar-header > p { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); margin-top: var(--sg-space-xxs); }
 .sg-nav { padding: var(--sg-space-s) 0; flex: 1; }
-.sg-nav a { display: flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-l); font-size: var(--sg-l); font-weight: var(--sg-s-weight);   /* the system's l text size, about 13px */ color: var(--sg-text-2); text-decoration: none; transition: background 0.1s, color 0.1s; line-height: var(--sg-lh); }
+.sg-nav a { display: flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-l); font-size: var(--sg-l); font-weight: var(--sg-heading-weight);   /* the system's l text size, about 13px, in its strong weight as the tabs are */ color: var(--sg-text-2); text-decoration: none; transition: background 0.1s, color 0.1s; line-height: var(--sg-lh); }
 .sg-nav a:hover { color: var(--sg-text); }
 .sg-nav a + a { margin-top: var(--sg-space-s); }   /* room between the items of the list */
 .sg-nav a.active { color: var(--sg-text); box-shadow: inset 2px 0 0 var(--sg-text); background: var(--sg-bg); }   /* the page shown, on the system's page background: easy to find in the list */
+.sg-nav-mark { width: 1.1em; height: 1.1em; flex: none; color: var(--sg-muted); }   /* dimmer than the words beside it */
 .sg-nav a span.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--sg-muted); flex-shrink: 0; }
 .sg-nav-label { font-size: var(--sg-xs); color: var(--sg-muted); padding: var(--sg-space-m) var(--sg-space-l) var(--sg-space-xs); margin-top: var(--sg-space-xl); }   /* each group of the menu 24px apart from the one before */
 .sg-nav-label:first-child { margin-top: 0; }   /* the first group starts at the menu's top */
@@ -79,7 +86,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* ── Every switch on the page is the system's segmented control. With none (or none read yet), the page's default one:
    its options in a track, the chosen one raised, all in the system's roles (or the template's defaults). ───────────── */
 .sg-seg { display: flex; flex-wrap: wrap; width: 100%; gap: var(--sg-space-xxs); }
-.sg-seg button { font: inherit; font-weight: normal; }
+.sg-seg button { font: inherit; font-weight: var(--sg-text-weight); }   /* a switch's words in the page's text weight, chosen or not */
 /* The page's default button, where the system has no text button of its own: a soft fill of the page's text colour
    (lighter on a dark page, darker on a light one), the tables' line and corners, its words in the page's text colour. */
 .sg-btn { display: inline-flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius); background: color-mix(in srgb, var(--sg-text) 8%, transparent); color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-decoration: none; cursor: pointer; white-space: nowrap; }
@@ -106,7 +113,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-modes { display: flex; flex-direction: column; gap: var(--sg-space-l); }
 .sg-mode-ctl { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sg-space-xs); }
 .sg-sidebar .sg-mode-ctl { align-items: stretch; }   /* the page's own switch fills the sidebar; a section's is as wide as its options */
-.sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+.sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
 .sg-size-switch { margin-bottom: var(--sg-space-xxl); position: sticky; top: 0; z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; }   /* a foundation's size switch, well apart from what it changes, kept in view as the page scrolls */
 .sg-size-switch .sg-mode-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* named for a screen reader only */
 .pg-footer { display: flex; flex-direction: column; gap: var(--sg-space-m); margin-top: var(--sg-space-xl); }
@@ -119,17 +126,18 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-updated dd > p { margin: 0 0 var(--sg-space-xxs); }
 .pg-doc > h3 { margin: 0 0 var(--sg-space-xs); color: var(--sg-text); font-weight: var(--sg-heading-weight); }
 /* One font on the page, the system's: names of props, variables and classes are set in it too, never the browser's monospace. */
+/* Bold words in the heading weight, never a third one (the browser's bolder would give 900). */
+:where(.sg-main, .sg-sidebar, .sg-token-pop) :where(b, strong):not(.pg-preview *, .pg-frame *, .sg-thumb *) { font-weight: var(--sg-heading-weight); }
 :where(.sg-main, .sg-sidebar, .sg-token-pop) :where(code, pre, kbd, samp):not(.pg-preview *, .pg-frame *, .pg-variants .pg-preview *) { font-family: inherit; font-size: inherit; }
 .sg-mode-diff { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); margin: 0; }
 #mode-controls { margin-top: var(--sg-space-m); }
 
 /* ── Section headings ────────────────────────────────────────────────────── */
 .sg-section { margin-bottom: var(--sg-space-xxl); scroll-margin-top: var(--sg-space-xxl); }   /* as far from the top as the page's own padding: opening one never scrolls the page */
-.sg-section-badge { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-s); font-weight: var(--sg-s-weight); background: color-mix(in srgb, var(--sg-muted) 12%, transparent); color: var(--sg-muted); margin-bottom: var(--sg-space-s);   /* 8px to the title on every page */ }
+.sg-section-badge { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-s); font-weight: var(--sg-text-weight); background: color-mix(in srgb, var(--sg-muted) 12%, transparent); color: var(--sg-muted); margin-bottom: var(--sg-space-s);   /* 8px to the title on every page */ }
 .sg-section > h2, .pg-head > h2 { font-size: var(--sg-title); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; margin-bottom: var(--sg-space-xs); }
 .sg-section { position: relative; }
-.sg-section-actions { position: absolute; top: 0; right: 0; }   /* a section's own action, at its top right */
-.sg-section > p.sg-foundation-lead { font-size: var(--sg-xs); color: var(--sg-muted); margin: 0 0 var(--sg-space-m); max-width: none; }   /* a foundation's one short line under its title */
+.sg-section-actions { position: absolute; right: 0; z-index: 16; }   /* a section's own action at its right, level with its title (placed when shown) */
 .sg-section > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xl); max-width: 560px; }
 .sg-subsection { margin-bottom: var(--sg-space-xxl); }
 .sg-subsection > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-s); }   /* a title with no line under it */
@@ -148,7 +156,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-tip-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; margin: 0; padding: 0; border: var(--sg-line); border-radius: 50%; background: var(--sg-bg); color: var(--sg-text-2); font: inherit; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); line-height: normal; cursor: help; }
 .sg-tip-btn:hover, .sg-tip-btn:focus-visible { color: var(--sg-text); }
 .sg-tip-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
-.sg-tip-bubble { position: absolute; top: calc(100% + var(--sg-space-xs)); right: 0; z-index: 20; width: max-content; max-width: min(18rem, 70vw); padding: var(--sg-space-s) var(--sg-space-m); border-radius: var(--sg-radius-s); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-s); font-weight: var(--sg-s-weight); line-height: var(--sg-lh); text-align: left; box-shadow: var(--sg-shadow-lift); visibility: hidden; }
+.sg-tip-bubble { position: absolute; top: calc(100% + var(--sg-space-xs)); right: 0; z-index: 20; width: max-content; max-width: min(18rem, 70vw); padding: var(--sg-space-s) var(--sg-space-m); border-radius: var(--sg-radius-s); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-s); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); text-align: left; box-shadow: var(--sg-shadow-lift); visibility: hidden; }
 .sg-tip-bubble::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: var(--sg-space-xs); }   /* the gap to the trigger: the pointer crosses it without closing the bubble */
 .sg-tip:hover > .sg-tip-bubble, .sg-tip:focus-within > .sg-tip-bubble { visibility: visible; }
 .sg-tip.is-dismissed > .sg-tip-bubble { visibility: hidden; }
@@ -159,7 +167,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-health-card + .sg-health-card { margin-top: var(--sg-space-l); }
 .sg-health-label { font-size: var(--sg-s); color: var(--sg-muted); }
 .sg-health-num { font-size: calc(var(--sg-h1) * 2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); font-variant-numeric: tabular-nums; }
-.sg-health-num small { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); margin-left: var(--sg-space-xs); }
+.sg-health-num small { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); margin-left: var(--sg-space-xs); }
 .sg-health-sub { font-size: var(--sg-s); color: var(--sg-text-2); }
 .sg-health-bar { display: flex; height: calc(var(--sg-space-xs) * 2); border-radius: var(--sg-radius-pill); background: color-mix(in srgb, var(--sg-border) 30%, transparent); overflow: hidden; }
 .sg-health-bar > span { display: block; height: 100%; background: var(--sg-text); }
@@ -203,10 +211,18 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
    reset (div { border: 0 }) takes them away. */
 .sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
 .sg-card.sg-card--own { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); overflow: hidden; }
+/* A card that opens a page answers the pointer: it rises on hover and settles back, a step smaller, while pressed;
+   still for a person who asks for less motion, the border alone answering. */
+a.sg-card { transition: transform 0.15s ease, border-color 0.15s ease; }
+a.sg-card:hover { transform: translateY(-2px); }
+a.sg-card.sg-card--own:hover { border-color: var(--sg-text-2); }
+a.sg-card:active { transform: translateY(0) scale(0.98); }
+a.sg-card:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { a.sg-card, a.sg-card:hover, a.sg-card:active { transform: none; transition: border-color 0.15s ease; } }
 .sg-card[hidden], .sg-section[hidden], .sg-hr[hidden], .sg-nav a[hidden] { display: none; }
 .sg-hero > h1[tabindex="-1"]:focus, .pg-head > h2[tabindex="-1"]:focus, .sg-section > h2[tabindex="-1"]:focus { outline: none; }   /* the heading a new view moves focus to, for a screen reader */
 .sg-overview-group { margin-bottom: var(--sg-space-xl); }
-.sg-status { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-s-weight); color: var(--sg-text); background: color-mix(in srgb, var(--sg-muted) 14%, transparent); vertical-align: middle; }
+.sg-status { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-text-weight); color: var(--sg-text); background: color-mix(in srgb, var(--sg-muted) 14%, transparent); vertical-align: middle; }
 .sg-status--beta { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }
 .sg-status--deprecated { background: color-mix(in srgb, var(--sg-warning) 24%, transparent); }
 .sg-status--code-only { background: color-mix(in srgb, var(--sg-text-2) 16%, transparent); }
@@ -222,14 +238,17 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-fact-todo::before { content: "! "; }
 .sg-overview-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }
 /* Each card's thumbnail: a few of the real tokens, or the component itself, drawn small on the system's own surface. */
-.sg-thumb { position: relative; height: 180px; overflow: hidden; contain: layout paint; display: flex; align-items: center; justify-content: center; gap: var(--sg-space-s); background: var(--sg-stage, var(--sg-bg)); border-radius: var(--sg-radius); pointer-events: none; }
+.sg-thumb { position: relative; height: 180px; overflow: hidden; contain: layout paint; display: flex; align-items: center; justify-content: center; gap: var(--sg-space-s); background: color-mix(in srgb, var(--sg-text) 7%, var(--sg-stage, var(--sg-bg))); border-radius: var(--sg-radius); pointer-events: none; }
 .sg-thumb-dot { width: 32px; height: 32px; border: var(--sg-line); flex-shrink: 0; }   /* square, as each colour is on its page */
 .sg-thumb-bar { height: var(--sg-space-s); background: var(--sg-text-2); border-radius: var(--sg-radius-s); }
 .sg-thumb-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sg-space-xs); }
-.sg-thumb-box { width: 36px; height: 36px; border: var(--sg-line); background: var(--sg-bg-2); flex-shrink: 0; }
+.sg-thumb-box { width: 36px; height: 36px; border: var(--sg-line); background: var(--sg-bg); flex-shrink: 0; }
 .sg-thumb-live { transform-origin: center; flex-shrink: 0; align-self: center; margin: 0; }   /* centred in its card, whatever its own rule says of where it sits in a row */
 #sg-search { margin-top: var(--sg-space-m); }
 #sg-search > input { font: inherit; width: 100%; }
+#sg-search { position: relative; }   /* the search mark inside the field, before its words */
+.sg-search-mark { position: absolute; left: var(--sg-space-m); top: 50%; transform: translateY(-50%); width: 1.1em; height: 1.1em; color: var(--sg-muted); pointer-events: none; }
+#sg-search input.sg-input, #sg-search input { padding-inline-start: calc(var(--sg-space-m) * 2 + 1.1em); }
 .sg-search-none { font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-xs) var(--sg-space-l); }
 .sg-results { margin: var(--sg-space-s) calc(-1 * var(--sg-space-l)) 0; padding-bottom: 0; }   /* just below the field, the width of the sidebar */
 .sg-result { display: flex; flex-direction: column; min-width: 0; }
@@ -246,7 +265,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--sg-space-l); }
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
 .sg-screen img { display: block; width: 100%; height: auto; }
-.sg-screen figcaption { padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); border-top: var(--sg-line); }
+.sg-screen figcaption { padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); border-top: var(--sg-line); }
 
 /* ── Foundations ─────────────────────────────────────────────────────────── */
 /* Every box on the page is drawn alike: the system card's border and corners, no fill of its own. */
@@ -325,7 +344,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .pg-head-links { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-left: auto; }
 .sg-link-icon { width: var(--sg-icon, 1em); height: var(--sg-icon, 1em); flex-shrink: 0; vertical-align: middle; margin-left: var(--sg-space-xs); }   /* after the words, the system's own icon size */
 .pg-usage { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); align-items: center; }
-.pg-usage-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+.pg-usage-label { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
 .pg-usage-name { font-size: var(--sg-s); color: var(--sg-text-2); }
 a.pg-usage-name { color: var(--sg-text); }
 .pg-selector { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xxs) 0 var(--sg-space-s); }
@@ -367,12 +386,14 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); overflow: clip; background: var(--sg-bg); }
 .pg-par-card + .pg-par-card { margin-top: var(--sg-space-xl); }
 .pg-par-card[hidden], .pg-par-table tr[hidden] { display: none; }
-.pg-par-card .pg-par-table th { background: var(--sg-bg-2); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
+.pg-par-card .pg-par-table th { background: var(--sg-bg-2); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
 .pg-par-card .pg-par-table tr:last-child td { border-bottom: none; }
 .pg-wcag-tip { text-align: left; }
 .pg-par-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--sg-m); }
 /* Its head stays in view under the component's areas as the rows scroll by (the line under it moves with it). */
 .sg-no-tasks .sg-todo-no, .sg-no-tasks .sg-todo-no-head { display: none; }
+/* Every column wide enough that a short value keeps to one or two lines; the long ones take the rest. */
+@media (min-width: 721px) { .pg-par-table th, .pg-par-table td { min-width: calc(var(--sg-space-xxl) * 3.5); } .pg-par-table .sg-todo-no, .pg-par-table .sg-todo-no-head { min-width: 0; } }
 .pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
 .pg-par-table td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; }
 /* Every table on the page: rows of one height at least, taller only for what they hold, their content centred in it. */
@@ -411,7 +432,7 @@ a.pg-usage-name { color: var(--sg-text); }
   .pg-par-card .pg-par-table tr:last-child { border-bottom: none; }
   .pg-par-table td, .pg-par-table .pg-par-type, .pg-par-table .pg-par-at { border-bottom: none; padding: var(--sg-space-xs) 0; white-space: normal; overflow-wrap: break-word; min-width: 0; }
   .pg-par-table td:first-child { font-weight: var(--sg-heading-weight); color: var(--sg-text); padding-bottom: var(--sg-space-xs); }
-  .pg-par-table td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+  .pg-par-table td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
   .pg-par-table td:empty { display: none; }
   .pg-a11y .pg-par-type { min-width: 0; }
 }
@@ -424,7 +445,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-code-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--sg-space-m); align-items: start; }
 .pg-code { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; min-width: 0; display: flex; flex-direction: column; box-shadow: var(--sg-shadow); }
 .pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
-.pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
+.pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
 .pg-code pre { flex: 1; min-height: 0; margin: 0; padding: var(--sg-space-m); overflow: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
 .sg-main .pg-code pre, .sg-main .pg-code code { font-size: var(--sg-xs); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; font-variant-ligatures: none; }
 /* Its words coloured as code is read: the tag, each attribute, each value and each binding in a role of the page's
@@ -492,8 +513,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-controls { display: flex; flex-direction: column; gap: var(--sg-space-l); }
 .pg-controls:empty { display: none; }
 .pg-ctl { display: flex; flex-direction: column; gap: var(--sg-space-xs); }
-.pg-ctl-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
-.pg-ctl-label code { font-weight: var(--sg-m-weight); margin-left: var(--sg-space-xs); }
+.pg-ctl-label { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
+.pg-ctl-label code { font-weight: var(--sg-text-weight); margin-left: var(--sg-space-xs); }
 /* With no text field in the system, the browser's own (never styled here, so it cannot sit inside the system's field). */
 .pg-ctl > input[type="text"]:not(.sg-input) { font: inherit; }
 /* The page's default text field, where the system has none of its own (the Playground's text props, the search): it
@@ -548,6 +569,13 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Width: the component in a frame of that width, scaled to fit when wider than the room. */
 .pg-preview[hidden], .pg-frame[hidden] { display: none; }
 .pg-preview-col { min-width: 0; display: flex; flex-direction: column; position: relative; }
+/* The stage never taller than the window can show beside its controls: 600px on a desktop, less on each smaller
+   breakpoint; a taller component scrolls inside it. */
+.pg-preview-card { --pg-stage-max: 600px; }
+.pg-preview-card .pg-preview { max-height: var(--pg-stage-max); }
+@media (max-width: 1100px) { .pg-preview-card { --pg-stage-max: 520px; } }
+@media (max-width: 720px) { .pg-preview-card { --pg-stage-max: 440px; } }
+@media (max-width: 480px) { .pg-preview-card { --pg-stage-max: 360px; } }
 /* A slot in the component: the area it takes, dashed and named Slot inside, in place of the placeholder its markup
    holds (kept, unseen, so the component keeps its size). Only the Playground marks it; the code shown never has it. */
 .pg-slot-area { position: relative; min-height: 40px; min-width: 96px; box-sizing: border-box; outline: 1px dashed var(--sg-text-2); outline-offset: -1px; background: color-mix(in srgb, var(--sg-text-2) 6%, transparent); }
@@ -583,7 +611,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-frame-box > iframe { display: block; border: 0; transform-origin: 0 0; background: transparent; }
 .pg-frame-stage { padding: var(--sg-space-xl); display: flex; flex-wrap: wrap; gap: var(--sg-space-m); justify-content: center; align-items: flex-start; }
 .pg-from, .pg-missing { color: var(--sg-muted); }
-.pg-log-date { color: var(--sg-muted); font-weight: var(--sg-s-weight); }
+.pg-log-date { color: var(--sg-muted); font-weight: var(--sg-text-weight); }
 .pg-inspect .pg-par-val { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-size: var(--sg-s); }   /* what a change did, under it */
 .pg-missing { font-style: italic; }
 .pg-doc > .pg-from { margin-top: var(--sg-space-s); }
@@ -591,7 +619,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect-grid.pg-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* Parity: two columns */
 .sg-seg-icon { width: calc(0.75em + 4px); height: calc(0.75em + 4px); flex: none; color: var(--sg-warning); vertical-align: middle; margin-right: var(--sg-space-xxs); }
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: clip; box-shadow: var(--sg-shadow); }
-.pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
+.pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-inspect table { width: 100%; border-collapse: collapse; }
 .pg-inspect td { font-size: var(--sg-m); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); }
 .pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
@@ -646,6 +674,8 @@ a.pg-usage-name { color: var(--sg-text); }
 </style>
 </head>
 <body class="sg-page">
+<!-- The first Tab stop: straight to the page shown, past the menu. -->
+<a class="sg-skip" href="#" data-skip>Skip to content</a>
 <!--{{ICON_SHEET}}-->
 <div class="sg-layout">
   <header class="sg-topbar" id="sg-topbar"><p class="sg-title" id="sg-topbar-title">Design system</p></header>
@@ -700,7 +730,23 @@ a.pg-usage-name { color: var(--sg-text); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   // A component's place on the page: its name, any character an address reads (a slash, a space) as a dash.
   function cid(n) { return 'c-' + String(n).replace(/[^\w-]+/g, '-'); }
-  function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; a.innerHTML = '<span class="dot"></span>' + esc(label); (parent || nav).appendChild(a); }
+  // Each item of the menu with the page's own mark before it: one for each page of the system and each foundation, one
+  // shared by every component. Drawn with lines in the text's colour, never one of the system's icons.
+  var NAV_MARK = {
+    overview: '<rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/>',
+    health: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
+    tasks: '<path d="M2 4l1.2 1.2L5.5 3M2 10.5l1.2 1.2L5.5 9.5M8 4.5h6M8 11h6"/>',
+    changelog: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
+    colors: '<circle cx="8" cy="8" r="6"/><path d="M8 2v12M2.8 5h10.4M2.8 11h10.4"/>',
+    typography: '<path d="M3 4V3h10v1M8 3v10M6 13h4"/>',
+    spacing: '<path d="M2 3v10M14 3v10M5 8h6M5 8l1.5-1.5M5 8l1.5 1.5M11 8l-1.5-1.5M11 8l-1.5 1.5"/>',
+    radii: '<path d="M3 13V8a5 5 0 0 1 5-5h5"/>',
+    motion: '<path d="M2 11c3 0 3-6 6-6s3 6 6 6"/><circle cx="8" cy="5" r="1.2"/>',
+    icons: '<path d="M8 2l1.8 3.7 4 .6-2.9 2.8.7 4L8 11.2 4.4 13.1l.7-4L2.2 6.3l4-.6z"/>',
+    component: '<path d="M8 1.8l5.5 3.1v6.2L8 14.2l-5.5-3.1V4.9z"/><path d="M2.5 4.9L8 8l5.5-3.1M8 8v6.2"/>',
+  };
+  function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }
+  function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; a.innerHTML = navMark(id) + esc(label); (parent || nav).appendChild(a); }
   // The foundations in the menu under their own label, as the components are under theirs.
   function foundationLink(id, label) {
     if (!foundationLink.labelled) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'Foundations'; nav.appendChild(lab); foundationLink.labelled = true; }
@@ -712,8 +758,13 @@ a.pg-usage-name { color: var(--sg-text); }
     main.appendChild(s); return s;
   }
   // A foundation's own line under its title: what it lists, from the system, in one short sentence of about the same
-  // length on every foundation page.
-  function foundationLead(sec, text) { var h = sec.querySelector('h2'), p = document.createElement('p'); p.className = 'sg-foundation-lead'; p.textContent = text; h.insertAdjacentElement('afterend', p); }
+  // length on every foundation page; with what its section already says after it, one description in the page's own
+  // paragraph style.
+  function foundationLead(sec, text) {
+    var h = sec.querySelector('h2'), next = h.nextElementSibling;
+    if (next && next.tagName === 'P') { next.textContent = text + ' ' + next.textContent; return; }
+    var p = document.createElement('p'); p.textContent = text; h.insertAdjacentElement('afterend', p);
+  }
   var plural = function (n, one, many) { return n + ' ' + (n === 1 ? one : many); };
   function hr() { var h = document.createElement('hr'); h.className = 'sg-hr'; main.appendChild(h); }
   // How far down what sticks at the top of a page reaches (its title and size switch, a component's areas, the Tasks
@@ -864,6 +915,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var ALERT_ICON = 'warn';
   // The page's own marks for a link to Figma and to the code, the same on every system.
   var FIGMA_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 24" aria-hidden="true"><path fill="currentColor" d="M4 24a4 4 0 0 0 4-4v-4H4a4 4 0 1 0 0 8Zm-4-12a4 4 0 0 1 4-4h4v8H4a4 4 0 0 1-4-4Zm0-8a4 4 0 0 1 4-4h4v8H4a4 4 0 0 1-4-4Zm8-4h4a4 4 0 1 1 0 8H8V0Zm8 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>';
+  var DOWNLOAD_SVG = '<svg class="sg-link-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M4 19h16"/></svg>';
   var CODE_SVG = '<svg class="sg-link-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m8 6-6 6 6 6m8-12 6 6-6 6M14 4l-4 16"/></svg>';
   var WARN_SVG = '<svg class="sg-seg-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1Zm-.9 3.5h1.8l-.3 5H7.4l-.3-5ZM8 10.6a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>';
   // name: what the switch chooses. The group says it (WCAG 1.3.1, 4.1.2): the page's own row is a named group, and the
@@ -911,11 +963,12 @@ a.pg-usage-name { color: var(--sg-text); }
   var TABS = DATA.ui && DATA.ui.tabs;
   function tabsHTML(items) {
     var tag = TABS ? TABS.item.tag : 'button', cls = TABS ? TABS.item.classes.join(' ') : 'sg-tab';
-    return (TABS ? TABS.open : '<div class="sg-tabs">') + items.map(function (o) {
+    // The page's own tabs are a tab list: one Tab stop (the chosen tab), the arrow keys move between them.
+    return (TABS ? TABS.open : '<div class="sg-tabs" role="tablist">') + items.map(function (o) {
       var text = TABS && TABS.item.label ? '<span class="' + esc(TABS.item.label) + '">' + esc(o.label) + '</span>' : esc(o.label);
       if (o.icon) text = WARN_SVG + text;
       if (o.say) text += '<span class="sg-hidden-text">, ' + esc(o.say) + '</span>';
-      return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '">' + text + '</' + tag + '>';
+      return '<' + tag + (tag === 'button' ? ' type="button"' : '') + (TABS ? '' : ' role="tab"') + (cls ? ' class="' + esc(cls) + '"' : '') + ' data-v="' + esc(o.v) + '">' + text + '</' + tag + '>';
     }).join('') + (TABS ? TABS.close : '</div>');
   }
   function tabSelect(el, on) {
@@ -925,8 +978,17 @@ a.pg-usage-name { color: var(--sg-text); }
       Object.keys(TABS.selected.attrs || {}).forEach(function (a) { if (on) el.setAttribute(a, TABS.selected.attrs[a]); else el.removeAttribute(a); });
     } else el.classList.toggle('is-on', on);
     sayChoice(el, on);
+    if (el.getAttribute('role') === 'tab') el.tabIndex = on ? 0 : -1;
     if (on) nudge();
   }
+  // In a tab list, the arrow keys (and Home and End) move to the next tab and choose it, as a tab list does.
+  document.addEventListener('keydown', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[role="tab"]'), list = t && t.closest('[role="tablist"]');
+    if (!list || !/^(ArrowRight|ArrowLeft|ArrowDown|ArrowUp|Home|End)$/.test(e.key)) return;
+    var tabs = Array.prototype.filter.call(list.querySelectorAll('[role="tab"]'), function (k) { return !k.disabled && k.getClientRects().length; }), i = tabs.indexOf(t);
+    var j = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : /Right|Down/.test(e.key) ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length;
+    e.preventDefault(); tabs[j].focus(); tabs[j].click();
+  });
   function segItems(box) { return Array.prototype.slice.call(box.querySelectorAll('[data-v]')); }
 
   var SGModes = (function () {
@@ -1468,7 +1530,7 @@ a.pg-usage-name { color: var(--sg-text); }
     var is = section('icons', 'Foundations', 'Icons', null);
     foundationLead(is, plural(DATA.icons.length, 'icon', 'icons') + ' of the system, each at the size Figma gives it.');
     // Every icon in one file at the top right: the system's sheet as an SVG sprite, each icon a <symbol> by its id.
-    var dl = document.createElement('div'); dl.className = 'sg-section-actions'; dl.innerHTML = sysButton('button', 'Download all icons'); is.appendChild(dl);
+    var dl = document.createElement('div'); dl.className = 'sg-section-actions'; dl.innerHTML = sysButton('button', 'Download all icons', null, null, null, DOWNLOAD_SVG); is.appendChild(dl);
     dl.querySelector('button').addEventListener('click', function () {
       var sheet = document.getElementById('ds-icon-sheet'); if (!sheet) return;
       var body = DATA.icons.map(function (id) { var sym = document.getElementById(id); return sym ? sym.outerHTML : ''; }).join('\n');
@@ -1925,6 +1987,12 @@ a.pg-usage-name { color: var(--sg-text); }
     });
     (api.props || []).forEach(function (q) {
       if (q.required && !attrs.some(function (a) { return a && low(a.replace(/^:/, '').split(/[=\s]/)[0]) === low(q.name); })) attrs.push(q.name + (syn === 'vue' || syn === 'html' ? '="…"' : '={…}'));
+    });
+    // Each list it was drawn with (a bar's tabs), written as the code takes it.
+    Object.keys(c.codeLists || {}).forEach(function (k) {
+      var lit = function (v) { return typeof v === 'string' ? "'" + v.replace(/'/g, "\\'") + "'" : String(v); };
+      var list = '[' + c.codeLists[k].map(function (it) { return it && typeof it === 'object' ? '{ ' + Object.keys(it).map(function (f) { return f + ': ' + lit(it[f]); }).join(', ') + ' }' : lit(it); }).join(', ') + ']';
+      attrs.push(syn === 'vue' ? ':' + k + '="' + list.replace(/"/g, '&quot;') + '"' : syn === 'html' ? null : k + '={' + list + '}');
     });
     attrs = attrs.filter(Boolean);
     var one = attrs.length ? ' ' + attrs.join(' ') : '';
@@ -4272,6 +4340,7 @@ a.pg-usage-name { color: var(--sg-text); }
   var sMount = document.getElementById('sg-search');
   if (sMount) {
     sMount.innerHTML = DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text" class="sg-input">';
+    sMount.insertAdjacentHTML('afterbegin', '<svg class="sg-search-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Zm4.6-1.9L20 20"/></svg>');
     var q = sMount.querySelector('input'); q.type = 'search'; q.placeholder = 'Search'; q.setAttribute('aria-label', 'Search the style guide'); q.removeAttribute('value');
     var results = document.createElement('div'); results.className = 'sg-nav sg-results'; results.id = 'sg-results'; results.hidden = true; results.setAttribute('role', 'region'); results.setAttribute('aria-label', 'Search results');
     sMount.parentNode.insertBefore(results, sMount.nextSibling);
@@ -4404,6 +4473,11 @@ a.pg-usage-name { color: var(--sg-text); }
     var tTitle = target.querySelector(':scope > h2'), tSwitch = target.querySelector('.sg-size-switch');
     if (tTitle && tSwitch) tSwitch.style.top = 'calc(var(--sg-sticky-top, 0px) + ' + tTitle.offsetHeight + 'px)';
     stickHeight(target);
+    // A section's own action level with its title, as a component's Figma and Code links are.
+    Array.prototype.forEach.call(target.querySelectorAll(':scope > .sg-section-actions'), function (box) { var t = target.querySelector(':scope > h2'); if (t) box.style.top = (t.offsetTop + (t.offsetHeight - box.offsetHeight) / 2) + 'px'; });
+    // Each switch on the page shown says the mode its part is really in: a component's own was set before its page was
+    // in the document, when it could not see the page's mode.
+    SGModes.syncAll();
     if (!ALL) {
       window.scrollTo(0, 0); requestAnimationFrame(function () { window.scrollTo(0, 0); });   // every page opens at its top, the browser's own jump to the address's section undone
       var h = target.querySelector('h1, h2'); document.title = (h && target.id !== 'overview' ? h.textContent + ' · ' : '') + (DATA.title || 'Design system') + ' · Living style guide';
@@ -4431,6 +4505,9 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   window.addEventListener('scroll', function () { if (!stickQueued) { stickQueued = true; requestAnimationFrame(markStuck); } }, { passive: true });
   window.addEventListener('hashchange', route);
+  // Skip to content: the title of the page shown, so the next Tab is inside it.
+  var skip = document.querySelector('[data-skip]');
+  if (skip) { skip.className += ' sg-btn'; skip.addEventListener('click', function (e) { e.preventDefault(); var h = document.getElementById(hashParts().id || 'overview'); h = h && h.querySelector('h1, h2'); if (h) { h.setAttribute('tabindex', '-1'); h.focus(); } }); }
   window.addEventListener('resize', function () { stickHeight(document.getElementById(hashParts().id || 'overview')); });
   route();
 })();

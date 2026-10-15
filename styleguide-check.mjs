@@ -89,7 +89,8 @@ export function checkStyleguidePage(html, { missing = missingRoles(html) } = {})
     const codeFace = p === 'font-family' && /(^|,)\s*monospace\s*$/i.test(v) && /(code|pre|kbd|samp)(?![\w-])/i.test(d.selector);
     if (p === 'font-family' && !/^inherit$/i.test(v) && !codeFace) add(d, 'a font of the page\'s own: its text inherits the font the system sets on its page, with its fallbacks');
     else if (p === 'font-size' && LENGTH.test(v)) add(d, 'a text size that is not one of the system\'s text styles');
-    else if (p === 'font-weight' && /\d/.test(v)) add(d, 'a weight that is not one of the system\'s text styles');
+    // A step above the system's own weight (calc(var(--sg-m-weight) + 100)) is still its weight, a step heavier.
+    else if (p === 'font-weight' && /\d/.test(v) && !/^calc\(VAR\s*[+-]\s*\d{3}\)$/.test(v)) add(d, 'a weight that is not one of the system\'s text styles');
     else if (p === 'line-height' && /\d/.test(v) && v !== '0') add(d, 'a line height that is not one of the system\'s text styles');
     else if (/^border(-[a-z]+)*-radius$/.test(p) && LENGTH.test(v) && !/^0(px)?$/.test(v)) add(d, 'a corner radius that is not one of the system\'s radii');
     else if (/^(padding|margin|gap|row-gap|column-gap)(-[a-z]+)*$/.test(p) && v.split(/\s+/).some((x) => LENGTH.test(x) && Math.abs(parseFloat(x)) > 2 && !OK_WORD.test(x))) add(d, 'a space that is not one of the system\'s spacing tokens');

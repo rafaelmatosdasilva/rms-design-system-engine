@@ -187,10 +187,17 @@ export function propsOf(figma) {
 // A state a variant can be in (Disabled, Selected, Loading) starts off in the default case, wherever Figma's default
 // variant sits: the component is shown as it is first met, its states as cases of their own.
 export const STATE_PROP = /^(is)?(disabled|selected|checked|pressed|error|invalid|loading|readonly|read-?only|active|open|expanded|skeleton)$/i;
-export function harnessCases(entry = {}, max = 16) {
+// example: the one the design team placed in Figma (figma-examples.mjs): its words and icons (its text properties and
+// its instance swaps, by the name of what they show) open every case in place of Figma's placeholders.
+export function harnessCases(entry = {}, max = 16, example = null) {
   const defs = Object.entries(entry.properties ?? {});
   const base = {};
   for (const [k, d] of defs) if (d.type !== 'INSTANCE_SWAP') base[k] = d.defaultValue;
+  const said = example?.props ?? {};
+  for (const [k, d] of defs) {
+    const v = said[clean(k)];
+    if ((d.type === 'TEXT' || d.type === 'INSTANCE_SWAP') && typeof v === 'string' && v.trim()) base[k] = v;
+  }
   for (const [k, d] of defs) {
     const off = (d.variantOptions ?? []).find((o) => /^(false|off|no)$/i.test(String(o)));
     if (d.type === 'VARIANT' && off !== undefined && STATE_PROP.test(clean(k).replace(/\s+/g, ''))) base[k] = off;
