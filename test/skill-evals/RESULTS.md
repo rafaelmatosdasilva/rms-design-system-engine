@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Icons from a folder of SVG files (continuous evaluation)
+
+What changed since the entry below (engine 4fe0912): The engine reads a system's icons kept as one SVG file each (src/assets/icons) as its icon sheet; usage.md names the option. The guide changed in `reference/usage.md`.
+
+Guide set measured: `cab27ef35232` · Project measured: `13d811a9d668`
+
+| Haiku, engine 1663d15 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.060 |
+| Input a run | 115k | 111k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 111k a run against 115k. Records: `records/2026-10-15-style-guide-the-menu-s`.
+
 ## 2026-10: Style guide defaults (continuous evaluation)
 
 What changed since the entry below (engine 7a1484a): The page's own defaults where the system has none: segmented control, tooltip, card border, type scale. The guide changed in `reference/usage.md`.
