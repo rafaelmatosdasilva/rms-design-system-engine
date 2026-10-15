@@ -130,7 +130,7 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
       // The foundations' motion page: the system's timings in one table, from the fastest, each with its variables, what
       // it is for, who moves so, Figma and what the system could do; the variables no component uses are rows too.
       await run2(`location.hash = '#motion'`); await new Promise((r) => setTimeout(r, 300));
-      const page = JSON.parse(await run2(`JSON.stringify({ heads: [...document.querySelectorAll('#motion thead th')].map((th) => th.textContent).join('|'), rows: [...document.querySelectorAll('#motion tbody tr')].map((tr) => tr.textContent), tables: document.querySelectorAll('#motion table').length, lead: document.querySelector('#motion > p').textContent, card: !!document.querySelector('#overview a[href="#motion"]') })`));
+      const page = JSON.parse(await run2(`JSON.stringify({ heads: [...document.querySelectorAll('#motion thead th')].map((th) => th.textContent).join('|'), rows: [...document.querySelectorAll('#motion tbody tr')].map((tr) => tr.textContent), tables: document.querySelectorAll('#motion table').length, lead: document.querySelector('#motion > p:not(.sg-foundation-lead)').textContent, card: !!document.querySelector('#overview a[href="#motion"]') })`));
       assert.equal(page.heads, 'Timing|Variables|For|Used by|Figma|For the system');
       assert.equal(page.tables, 1, 'one table');
       assert.ok(page.rows.some((r) => /^200ms, ease-outWritten as valuesOpensbuttonNone in Figma.*Written as values: make it a variable\.$/.test(r)), JSON.stringify(page.rows));

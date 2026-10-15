@@ -229,7 +229,7 @@ export function appSetup(ROOT) {
 export function harnessModule(groups, styles = [], plugins = {}) {
   return `${styles.map((s) => `import ${JSON.stringify(s)};`).join('\n')}
 import { createApp, h, reactive } from 'vue';
-${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options, fill }) => ({ name, role, cases, options: options ?? {}, fill: fill ?? {} }))).replace(/</g, '\\u003c')};
+${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options, fill, connect }) => ({ name, role, cases, options: options ?? {}, fill: fill ?? {}, connect: connect ?? [] }))).replace(/</g, '\\u003c')};
 const LOAD = {
 ${groups.map((g) => `  ${JSON.stringify(g.name)}: () => import(${JSON.stringify(g.file)}),`).join('\n')}
 };
@@ -239,6 +239,8 @@ ${(plugins.setup ?? []).map((x) => `  { kind: ${JSON.stringify(x.kind)}, name: $
 ];
 const squash = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
 const SAMPLES = ${JSON.stringify(plugins.samples ?? {})};
+const TEXTY = /(label|title|text|description|caption|heading|subtitle|message|hint|placeholder|content)$/i;
+const HUMAN = (d) => { const w = String(d).replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase(); return w.charAt(0).toUpperCase() + w.slice(1); };
 // Where the product's components teleport to (#modals-overlay, made by its App): made on the page, and what each case
 // sends there is put back in its own box, so a modal is read as it draws.
 const TELEPORTS = ${JSON.stringify(plugins.teleports ?? [])};
@@ -249,17 +251,21 @@ const BY_ROLE = { togglebutton: ['pressed'], toggle: ['pressed'], checkbox: ['ch
 // The props the component declares, each given the variant's value (Figma's names matched to the code's, a value
 // written as the code's own option writes it, Success as success; True and False as booleans for a Boolean prop); an
 // aria- attribute the page adds falls through to its root.
-function fit(C, props, role, options, fill = {}) {
+function fit(C, props, role, options, fill = {}, connect = []) {
   const decl = Array.isArray(C.props) ? Object.fromEntries(C.props.map((k) => [k, {}])) : (C.props || {});
   const out = {};
   for (const [d, spec] of Object.entries(decl)) {
     // Figma's name for it, or the name with what it holds after it (labelContent, iconContent for label, icon).
     // A code name that ends with Figma's (buttonSize for size) when no other prop does.
     const tail = Object.keys(props).filter((k) => squash(k).length > 2 && squash(d).endsWith(squash(k)) && !Object.keys(decl).some((o) => squash(o) === squash(k)));
-    const hit = Object.keys(props).find((k) => squash(k) === squash(d)) ?? Object.keys(props).find((k) => squash(k).replace(/(content|text|value|swap)$/, '') === squash(d)) ?? (tail.length === 1 ? tail[0] : undefined);
     const types = [].concat(spec && spec.type || spec || []);
+    // The project's own Code Connect says which Figma property this prop is (size for buttonSize), first.
+    const cc = types.some((t) => t === Array || t === Object) ? null : connect.find((x) => x.code === d && x.kind !== 'instance' && (x.kind !== 'boolean' || types.includes(Boolean)));
+    const ccHit = cc ? Object.keys(props).find((k) => squash(k) === squash(cc.figma)) : undefined;
+    const hit = ccHit ?? Object.keys(props).find((k) => squash(k) === squash(d)) ?? Object.keys(props).find((k) => squash(k).replace(/(content|text|value|swap)$/, '') === squash(d)) ?? (tail.length === 1 ? tail[0] : undefined);
     if (hit !== undefined) {
       let v = props[hit];
+      if (cc && cc.values && cc.values[v] != null) v = cc.values[v];
       if (types.includes(Boolean) && typeof v === 'string') v = /^(true|yes|on)$/i.test(v);
       const own = (options[d] || []).find((o) => squash(o) === squash(v));
       out[d] = own !== undefined ? own : v;
@@ -269,18 +275,29 @@ function fit(C, props, role, options, fill = {}) {
     else if (types.length === 1 && types[0] === Boolean && /disabl\\w*teleport|teleport\\w*(disabled|off)/i.test(d)) out[d] = true;
     // A text the code takes with no default (an icon's name, a label): the one the project's own pages pass it most.
     else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && SAMPLES[d] != null) out[d] = SAMPLES[d];
+    // A text or an icon with no default and none the pages pass (buttonLabel, buttonIcon): its own name as its words, the
+    // icon the pages use most, so the part it draws is there to see, show and hide.
+    else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && /icon$/i.test(d) && SAMPLES.icon != null) out[d] = SAMPLES.icon;
+    else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && TEXTY.test(d)) out[d] = HUMAN(d);
     // An object or a list it reads into with no default: an empty one, as a page always passes one, so it draws.
     // (params: Object, or { type: Object } with no default)
     // A list it loops over: the items its template reads (listSamples), else an empty one.
     else if (!(spec && typeof spec === 'object' && 'default' in spec) && types.length === 1 && (types[0] === Object || types[0] === Array)) out[d] = types[0] === Array ? (fill[d] ? JSON.parse(JSON.stringify(fill[d])) : []) : {};
   }
   for (const [k, v] of Object.entries(props)) if (/^aria-/.test(k)) out[k] = v;
+  // Code Connect's own switches for a part (showIcon gives icon): off, the part is not given.
+  for (const x of connect) {
+    if (x.kind !== 'boolean' || !x.code || !(x.code in out)) continue;
+    const at = Object.keys(props).find((k) => squash(k) === squash(x.figma));
+    const t = [].concat(decl[x.code] && decl[x.code].type || decl[x.code] || []);
+    if (at !== undefined && !t.includes(Boolean) && (props[at] === false || props[at] === 'false')) delete out[x.code];
+  }
   // Figma's showLabel or hasIcon off, where the code shows the part whenever it is given: the part is not given.
   for (const [k, v] of Object.entries(props)) {
     const part = /^(show|has|with)(.+)$/i.exec(k)?.[2];
     if (!part || (v !== false && v !== 'false') || Object.keys(decl).some((d) => squash(d) === squash(k))) continue;
-    const d = Object.keys(decl).find((x) => squash(x) === squash(part));
-    if (d) delete out[d];
+    // The part's own prop (label for showLabel), or every prop of that part (buttonLabel, buttonIcon for showButton).
+    for (const d of Object.keys(decl).filter((x) => squash(x) === squash(part) || squash(x).startsWith(squash(part)))) delete out[d];
   }
   return out;
 }
@@ -336,7 +353,7 @@ for (const g of GROUPS) {
   if (!C) { failed.push({ name: g.name, why: 'no component exported' }); continue; }
   for (const c of g.cases) {
     const box = document.createElement('div'); box.className = 'dse-case'; box.setAttribute('data-dse-case', c.label); sec.append(box);
-    const state = reactive(fit(C, c.props, g.role, g.options, g.fill));
+    const state = reactive(fit(C, c.props, g.role, g.options, g.fill, g.connect));
     const app = createApp({ render: () => h(C, { ...state, ...listeners(C, state) }) });
     app.config.errorHandler = (e) => failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] });
     app.config.warnHandler = () => {};
@@ -368,6 +385,10 @@ const why1 = (e) => String(e?.message ?? e).split('\n')[0];
 // 'webpack' }, or { url: null, why } when nothing can be rendered.
 export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate, read = (f) => readFileSync(f, 'utf8'), max = cfg.a11y?.maxVariants ?? 16 } = {}) {
   const groups = [], missing = [], samples = propSamples(ROOT);
+  // The project's own Code Connect files, pairing each Figma property with the code's prop (code-connect-map.mjs).
+  const { codeConnectMaps, codeConnectFor } = await import('./code-connect-map.mjs');
+  let ccInclude = null; try { ccInclude = JSON.parse(readFileSync(join(ROOT, 'figma.config.json'), 'utf8'))?.codeConnect?.include ?? null; } catch { /* none */ }
+  const ccMaps = codeConnectMaps(ROOT, { include: ccInclude });
   const { harnessCases, variantsFromCode, pageColours, codeCases } = await import('./component-harness.mjs');
   const { textComponentApi } = await import('./component-source.mjs');
   for (const name of names) {
@@ -385,7 +406,7 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     const figmaCases = fromFigma ? harnessCases(propsSnap[name], max) : null;
     const cases = (figmaCases ? [...figmaCases, ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
-    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill: listSamples(text, Object.keys(api.props ?? {}), samples), from: fromFigma ? 'figma' : 'code' });
+    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill: listSamples(text, Object.keys(api.props ?? {}), samples), connect: codeConnectFor(ccMaps, name, propsSnap[name]?.nodeId)?.props ?? [], from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };
   const pb = await projectBuild(ROOT);

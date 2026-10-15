@@ -231,7 +231,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelectorAll('#c-chip [data-area="play"] .pg-own').length`), 0, 'no Its tokens table');
     // The code a product writes for what is shown: its own tag, the prop just set, a default left out; copied by the
     // system's own button.
-    assert.equal(await run(`document.querySelector('#c-chip .pg-code code').textContent`), '<Chip Size="L" />');
+    assert.equal(await run(`document.querySelector('#c-chip .pg-code code').textContent`), '<Chip Size="L" Icon={false} Label="Filter" />');
     assert.equal(await run(`document.querySelector('#c-chip .pg-code [data-copy]').tagName`), 'BUTTON');
     // Inspect sits in the bar above the stage, not with the props.
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].map((b) => b.textContent).filter((x) => /Inspect|specs/i.test(x)).join()`), '');
@@ -287,9 +287,9 @@ test('in the browser: no script error, a control changes the real component, the
     await until(`document.getElementById('uses').textContent`, (v) => /Used by/.test(v));
     assert.match(await run(`document.getElementById('uses').textContent`), /--chip-background.*One component uses it.*Used by.*chip/s);
     await run(`location.hash = '#c-chip?Size=L'`); await shownIs('c-chip');
-    // Its API read from Chip.jsx, and its accessibility: the role's obligations with their WCAG criterion, the text
+    // Its API read from Chip.jsx (its own API area), and its accessibility: the role's obligations with their WCAG criterion, the text
     // contrast measured as drawn, and no browser check yet.
-    assert.match(await run(`document.querySelector('#c-chip [data-area="docs"] .pg-footer').textContent`), /Props.*Label.*default Filter.*Read from src\/components\/Chip\.jsx/s);
+    assert.match(await run(`document.querySelector('#c-chip [data-area="api"] .pg-footer').textContent`), /Props.*Label.*default Filter.*Read from src\/components\/Chip\.jsx/s, 'its API in an area of its own');
     // Every variant tried in the browser when the Accessibility area shows, whatever the Playground has set, as Parity
     // lists everything: the chip's Size, Icon and pressed sides, each check said once with the variants it holds in.
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
@@ -344,7 +344,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || (c.offsetHeight <= t.offsetHeight + 1 && c.offsetHeight < t.offsetHeight - 2); })()`), true, 'one line of code is not stretched to the tokens');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Documentation,Motion,Accessibility,Parity,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Documentation,Code,Motion,Accessibility,Parity,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
@@ -763,15 +763,15 @@ test('a component\'s API: a * on each prop the code says must be given, callback
   assert.equal(apiView({ file: null }), null);
 });
 
-test('the code shown: the tag with the props set, in its framework\'s syntax; a required prop never left out', () => {
+test('the code shown: the tag with every prop the Playground sets, in its framework\'s syntax; a required prop never left out', () => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('var low = function'), tpl.indexOf('// The classes and data attributes the system'));
   const callCode = new Function(src + 'return callCode;')();
   const props = [{ label: 'Size', prop: 'size', type: 'VARIANT', default: 'Medium' }, { label: 'Disabled', prop: 'disabled', type: 'BOOLEAN', default: false }, { label: 'Label', prop: 'label', type: 'TEXT', default: 'Save' }];
   const api = (syntax) => ({ tag: syntax === 'html' ? 'ds-button' : 'Button', syntax, props: [{ name: 'size', values: ['sm', 'md'], default: 'md' }, { name: 'label', required: true }, { name: 'icon', required: true }] });
-  // the Figma option written as the code spells it (Small → sm); the default size left out
+  // the Figma option written as the code spells it (Small → sm); every prop the Playground sets, defaults too
   assert.equal(callCode({ api: api('jsx') }, props, { Size: 'SM', Disabled: true, Label: 'Send' }), '<Button size="sm" disabled label="Send" icon={…} />');
-  assert.equal(callCode({ api: api('jsx') }, props, { Size: 'md', Disabled: false, Label: 'Save' }), '<Button label={…} icon={…} />', 'a required prop the playground leaves at its default is still written');
+  assert.equal(callCode({ api: api('jsx') }, props, { Size: 'md', Disabled: false, Label: 'Save' }), '<Button size="md" disabled={false} label="Save" icon={…} />', 'the code draws what the preview shows, defaults included; a required prop never left out');
   assert.equal(callCode({ api: api('vue') }, [{ label: 'On', prop: 'on', type: 'BOOLEAN', default: true }], { On: false }), '<Button :on="false" label="…" icon="…" />');
   assert.equal(callCode({ api: { tag: 'ds-tag', syntax: 'html', props: [] } }, [{ label: 'Tone', prop: 'tone', type: 'VARIANT', default: 'a' }], { Tone: 'b' }), '<ds-tag tone="b"></ds-tag>');
 });
@@ -985,7 +985,7 @@ test('a control the system lacks: the page draws its default (segmented control,
   const gaps = standInGaps({ segmented: null, field: null, button: { cls: 'b' }, card: null, iconButton: { cls: 'x' }, tip: null });
   assert.deepEqual(gaps.map((g) => g.say), [
     'This system has no segmented control, so the page uses its default segmented control, drawn with its tokens.',
-    'This system has no text field, so the page uses a plain text input drawn with its tokens.',
+    'This system has no text field, so the page uses its default text field, drawn with its tokens.',
     'This system has no card, so the page uses its default card, with the tables\' border and corners.',
     'This system has no tooltip, so the page uses its default tooltip, drawn with its tokens.',
   ]);
