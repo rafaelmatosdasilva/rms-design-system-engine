@@ -107,6 +107,13 @@ test('the style guide check: only the system\'s tokens on the page; a role with 
   assert.ok(missingRoles(clean).includes('text'), 'a role never filled is left to the browser');
   assert.ok(checkStyleguidePage(clean).some((f) => f.warning && f.property === '--sg-text'));
   assert.ok(failures(checkStyleguidePage(page('', '<main><img src="a.png"></main>'))).some((f) => f.property === 'accessibility'));
+  // An icon of the system's own sheet that paints itself white is the system's to fix: listed, never the page failing.
+  const white = '<svg id="ds-icon-sheet" width="0" height="0" aria-hidden="true"><symbol id="m-spin" viewBox="0 0 24 24"><path fill="#FFFFFF" d="M0 0h24v24H0z"/></symbol></svg>';
+  const sheetOnly = checkStyleguidePage(page('', `<main><h1>System</h1>${white}</main>`), { missing: [] });
+  const markupOnly = checkStyleguidePage(page('', `<main><h1>System</h1>${white.replace('id="ds-icon-sheet" ', '')}</main>`), { missing: [] });
+  assert.ok(failures(markupOnly).some((f) => f.property === 'accessibility'), 'the same icon drawn by the page fails');
+  assert.deepEqual(failures(sheetOnly), [], 'the system\'s icon is not the page failing');
+  assert.ok(sheetOnly.some((f) => f.warning && f.selector === 'the system\'s icons'), 'and it is still listed');
 });
 
 test('one list of differences: grouped by component, marked new, the data\'s freshness, accessibility and pointer lines left out', () => {
