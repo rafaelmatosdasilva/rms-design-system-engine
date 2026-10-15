@@ -116,5 +116,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-14-style-guide-with-figma-s` | The 21 guide tasks on Haiku (engine 2ef7817) | "Style guide: only Figma's components, code-only ones as tasks" |
 | `figma-branch` | The 21 guide tasks on Haiku (engine 7a1484a) | "Figma branch links" |
 | `2026-10-15-style-guide-the-page-s` | The 21 guide tasks on Haiku (engine 4fe0912) | "Style guide defaults" |
+| `2026-10-15-style-guide-the-menu-s` | The 21 guide tasks on Haiku (engine 1663d15) | "Icons from a folder of SVG files" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
