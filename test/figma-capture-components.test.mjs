@@ -468,3 +468,33 @@ test('P6 components on a real file: Figma\'s checksums hold, the import gives wh
     assert.deepEqual((props[name].layerAnnotations ?? []).map((l) => l.layer), (h.layerAnnotations ?? []).map((l) => l.layer), `${name} layer notes`);
   }
 });
+
+test('P6 components: a nested instance Figma fills in lazily reads alike whatever the call read before, so its checksum holds', async () => {
+  // Two components hold an instance of the same toggle; Figma fills the toggle's layers in only once one walk has passed
+  // them (shared by every instance of it). Read alone, the header met them empty on its first walk; read after the menu,
+  // full: its checksum then said Figma changed when it had not.
+  const make = () => {
+    let filled = false;
+    const toggle = (id) => {
+      const inst = standin.node({ type: 'INSTANCE', id, name: 'mainMenuToggle', width: 40, height: 40 }, []);
+      const kids = [standin.label({ name: 'label', characters: 'Collapse', textStyleId: 'S:m' })];
+      for (const k of kids) k.parent = inst;
+      Object.defineProperty(inst, 'children', { get() { if (!filled) { filled = true; return []; } return kids; } });
+      return inst;
+    };
+    const set = (id, name, inst) => standin.node({ type: 'COMPONENT_SET', id: `${id}:0`, name, componentPropertyDefinitions: {} }, [standin.frame({ type: 'COMPONENT', id: `${id}:1`, name: 'collapsed=false' }, [inst])]);
+    const menu = set(1, 'mainMenu', toggle('1:9')), header = set(2, 'mainMenuHeader', toggle('2:9'));
+    const page = standin.node({ type: 'PAGE', id: '0:1', name: 'Components', loadAsync: async () => {} }, [menu, header]);
+    page.findAllWithCriteria = () => [menu, header];
+    return { page, vars: { 'v-text': { id: 'v-text', name: 'text/color' } } };
+  };
+  const head = componentsScript('read', { ids: [] }).split("if(CALL==='sums'){")[0];
+  const read = async (body) => new AsyncFunction('figma', `${head}const byName=(n)=>all.find((x)=>x.name===n);${body}`)(standin.asComponentsFigma(make()));
+  const alone = await read(`return JSON.stringify(await itemsOf(byName('mainMenuHeader')));`);
+  const after = await read(`await itemsOf(byName('mainMenu'));return JSON.stringify(await itemsOf(byName('mainMenuHeader')));`);
+  assert.equal(alone, after, 'the same component reads the same, first in the call or after another');
+  assert.match(alone, /"fontSizeVar":"m"/, 'its label is read, though Figma filled it in late');
+  // The stand-in shows the trouble: one read, first in the call, misses the label the read after another finds.
+  const once = await read(`return JSON.stringify(await readOnce(byName('mainMenuHeader')));`);
+  assert.notEqual(once, after);
+});
