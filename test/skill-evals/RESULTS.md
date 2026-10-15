@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Figma branch links (continuous evaluation)
+
+What changed since the entry below (engine 2ef7817): A Figma branch link names the branch: setup and a link given later read the branch, which stays as it is while the main file changes; on a project already set up, --init --figma-url changes only figmaFileKey. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `ea506393b47a` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7a1484a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.059 |
+| Input a run | 116k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 116k. Records: `records/figma-branch`.
+
 ## 2026-10: Style guide: only Figma's components, code-only ones as tasks (continuous evaluation)
 
 What changed since the entry below (engine e81a0ea): Style guide: with Figma's components, a component only the code has is a task. The guide changed in `reference/config.md`, `reference/usage.md`.

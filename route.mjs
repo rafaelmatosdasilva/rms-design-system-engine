@@ -182,7 +182,11 @@ const SC = /\b[1-4]\.\d{1,2}\.\d{1,2}\b/;
 export const KEEP_SAYS = /\b(keep|kept|keeping)\b[^.\n]{0,60}\b(differences?|on purpose|intentional\w*|deliberate\w*|as (it|they) (is|are))\b|\b(on purpose|intentional(ly)?|deliberately|by design)\b|\b(mant[eé]m|manter|mantemos|mantenha|de prop[oó]sito|intencional\w*)\b/i;
 // The reason the person gives, in their words: what follows "because", "since", "porque".
 const KEEP_WHY = /\b(because|since|porque|pois|j[aá] que)\b\s+([^.!?\n]{4,200})/i;
+// A Figma link given to use from now on (a branch of the file, or another file): only the file key changes.
+const USE_FIGMA_FILE = /\b(use|using|switch\w*|point\w*|scan\w*|read\w*|change\w*|move\w*|instead|branch\w*|usa\w*|muda\w*|troca\w*|l[eê]r?)\b/i;
+const FIGMA_BRANCH = /\bfigma\b[\s\S]{0,30}\b(branch|ramo)\b|\b(branch|ramo)\b[\s\S]{0,30}\bfigma\b/i;
 const RULES = [
+  ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
   ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
   ['guidelines-links', (t) => LINK.test(t)],
   // A token renamed in Figma (L11): one change renames it everywhere, the old name kept pointing at the new one.
@@ -337,6 +341,11 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
     if (kind === 'figma') {
       notes.push('Nothing is changed in Figma for this request, and never offer to: a value in Figma is the person\'s change in the Figma editor (the skill writes to Figma only what the code already states, through --figma-edits). Run the audit, then tell the person what to change in Figma.');
       return { recipe, question, run: [scoped], notes, kind };
+    }
+    if (kind === 'figma-file') {
+      const { figma } = codeAndFigma(t);
+      notes.push('Only the Figma file the engine reads changes (a branch link names the branch, which stays as it is while the main file changes); everything else in ds-config.json stays. Then refresh the Figma data from that file with the recipe below, and run the audit.');
+      return { recipe, question: false, run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link>'}'`], notes, kind, ...(figma ? {} : { ask: 'the link to the Figma branch or file to read (in Figma, open the branch and copy its link)', askHow: 'the link in --figma-url' }) };
     }
     if (kind === 'checked') {
       // Each criterion they named, on each component they named: recorded as theirs, then the page rebuilt.
