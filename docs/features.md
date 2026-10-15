@@ -295,6 +295,7 @@ Also on each component.
 - **Spacing and radii.** One card per family, smallest first.
 - **Motion.** The durations and easings, each played when you press Play, each easing's curve drawn, and what the system does for someone who asks for less motion.
 - **Icons.** Grouped by size, shown at the size Figma gives them, with their stroke widths.
+  - From your sprite, or from a folder of SVG files, one icon each (such as `src/assets/icons`), found on its own. `styleguide.iconSource` names either one.
 
 A token shows only when the token check finds it equal to Figma in every mode. Anything named after a component, its colours or sizes, is shown in that component instead.
 

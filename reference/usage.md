@@ -554,7 +554,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 A project's own template is filled through markers:
 
 - `{{AGREED}}` ← the agreed view above, as JSON.
-- `{{ICON_SHEET}}` ← the DS icon `<symbol>` set, lifted from a built plugin `ui.html` (`styleguide.iconSource`).
+- `{{ICON_SHEET}}` ← the DS icon `<symbol>` set, lifted from a built plugin `ui.html` (`styleguide.iconSource`), or built from a folder of SVG files, one icon each (`styleguide.iconSource` naming a folder, else the folder named `icon` or `icons` the code keeps five or more in, the one under `src/` first: `icon-folder.mjs`). Each icon is named by its path in the folder (`m/alert-m.svg` → `m-alert-m`), and the ids inside each file are kept apart from the other files'. An icon of that sheet that paints itself white is listed by the style guide check, never a failure of the page.
 - `{{USAGE}}` ← which plugins reference each component's class (scanned from plugin source).
 - `{{DOCS}}` / `{{DOCS_CODE}}` ← Figma descriptions and code notes, from the design-intent JSON (hardcoded pixel dimensions are stripped — docs describe with tokens).
 - `{{THEME_CSS}}` ← the token CSS inlined verbatim, with its `@media (prefers-color-scheme: dark)` guarded to `:root:not([data-color])` so the manual light/dark toggle wins; `{{COMPONENT_CSS}}` ← the component stylesheets outside the theme.

@@ -66,6 +66,31 @@ export function mergeHosted(files) {
   return { css, base, colours, sizes };
 }
 
+// The same address with every other mode word a product names its stylesheets with: a colour word (light, dark) and a
+// size word (desktop, laptop, tablet, phone, mobile, and the breakpoint names Figma gives, names), each where the given
+// addresses have one, in every combination. Only the ones not given; setup keeps each one that answers.
+// light_desktop.css, dark_desktop.css → light_laptop.css, …, dark_phone.css.
+const SIZE_WORDS = ['desktop', 'laptop', 'tablet', 'phone', 'mobile'], COLOUR_WORDS = ['light', 'dark'];
+export function siblingUrls(urls = [], names = []) {
+  if (!urls.length) return [];
+  const split = (u) => stemOf(u).split(/([-_.]+)/);
+  const first = urls[0], parts = split(first);
+  const sizes = [...new Set([...SIZE_WORDS, ...names.map((n) => String(n).toLowerCase()).filter((n) => /^[a-z][\w]*$/.test(n))])];
+  const choices = parts.map((w, i) => {
+    if (i % 2) return [w];
+    const seen = [...new Set(urls.map((u) => split(u)[i]).filter(Boolean))];
+    const lw = w.toLowerCase();
+    if (COLOUR.test(lw)) return [...new Set([...seen, ...COLOUR_WORDS])];
+    if (sizes.includes(lw) || BASE_SIZE.test(lw)) return [...new Set([...seen, ...sizes.filter((s) => !seen.map((x) => x.toLowerCase()).includes(s))])];
+    return seen.length > 1 ? seen : [w];
+  });
+  let stems = [''];
+  for (const c of choices) { stems = stems.flatMap((s) => c.map((w) => s + w)); if (stems.length > 64) return []; }
+  const at = first.lastIndexOf(stemOf(first));
+  const given = new Set(urls);
+  return stems.map((st) => first.slice(0, at) + st + first.slice(at + stemOf(first).length)).filter((u) => !given.has(u));
+}
+
 // The hosted stylesheets setup can take: full URLs to .css files (a template with ${…} in it is not one), never a
 // known CDN's (fonts, highlighters).
 export function takeableUrls(hints) {

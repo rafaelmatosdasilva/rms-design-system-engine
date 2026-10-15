@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
+import { unpublished, componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
   COMPONENT_FUNCTIONS, AUDIT_FUNCTIONS, STRUCTURE_KEYS, SCRIPT_MAX, ANSWER, varsScript, partsBack, unzip } from '../figma-capture.mjs';
 import * as standin from './figma-standin.mjs';
 import { effectsCaptureScript } from '../effects-parity.mjs';
@@ -72,8 +72,9 @@ function makeFile(count = 30) {
     node({ type: 'GROUP', name: 'Decor', width: 24, height: 24 }, [node({ type: 'RECTANGLE', name: 'Corner', width: 24, height: 24, cornerRadius: MIXED, topLeftRadius: 6, topRightRadius: 0, bottomRightRadius: 6, bottomLeftRadius: 0, fills: [solid(rgb(0.2, 0.2, 0.2))] })]),
   ]);
   const hidden = frame({ type: 'COMPONENT', id: '901:1', name: '_private', description: 'Not part of the system.' }, []);
+  const marked = frame({ type: 'COMPONENT', id: '902:1', name: '🟡 .tableRow (deprecated)', description: 'Not published either.' }, []);
   const loaded = [];
-  const page = node({ type: 'PAGE', id: '0:1', name: 'Components', loadAsync: async () => { loaded.push('0:1'); } }, [...sets, stateLayerSet(), card, hidden]);
+  const page = node({ type: 'PAGE', id: '0:1', name: 'Components', loadAsync: async () => { loaded.push('0:1'); } }, [...sets, stateLayerSet(), card, hidden, marked]);
   const vars = Object.fromEntries([['v-pad-s', 'padding/s'], ['v-pad-m', 'padding/m'], ['v-gap', 'gap/s'], ['v-radius', 'radii/button'], ['v-bg', 'button/background/color'], ['v-text', 'button/text/color'],
     ['v-surface', 'surface/color'], ['v-border', 'border/color'], ['v-hover', 'state/hover/color'], ['v-rest', 'state/rest/color'], ['v-badge', 'badge/color'], ['v-flag', 'show/badge']].map(([id, name]) => [id, { id, name }]));
   return { page, vars, sets, card, loaded };
@@ -160,7 +161,7 @@ test('P6 components: every answer fits the Figma tool, each component is checked
   for (const s of sizes) assert.ok(s <= ANSWER, `${s} bytes fit one answer`);
   const c = readComponents(dir);
   assert.equal(c.complete, true);
-  assert.equal(c.entries.length, 33, 'the sets and the card; the private one left out');
+  assert.equal(c.entries.length, 33, 'the sets and the card; the private ones left out, a status mark in front or not');
   assert.deepEqual(c.todo, []);
   const slices = readdirSync(dir).map((x) => json(dir, x)).filter((a) => a.slice != null);
   assert.ok(slices.length > 1 && slices.every((a) => a.slices === slices.length && Object.keys(a.sums)[0] === '700:0'), `the chart is read in ${slices.length} slices`);
@@ -497,4 +498,8 @@ test('P6 components: a nested instance Figma fills in lazily reads alike whateve
   // The stand-in shows the trouble: one read, first in the call, misses the label the read after another finds.
   const once = await read(`return JSON.stringify(await readOnce(byName('mainMenuHeader')));`);
   assert.notEqual(once, after);
+});
+
+test('a component Figma does not publish (a name starting with . or _, a status mark in front or not) is no component of the system', () => {
+  assert.deepEqual(['🟡 .tableRowBackground. (deprecated)', '.cell', '_base', '🟡  tableHeader', 'buttonPrimary', 'Layout/Header'].map(unpublished), [true, true, true, false, false, false]);
 });
