@@ -52,7 +52,9 @@ export function missing(root, { blame = [], paths = [] } = {}, h = readHistory(r
   const fresh = h.sha === st.sha;
   const b = [...new Set(blame.map((f) => rel(root, f)))].filter((f) => !fresh || !(f in h.blame));
   const p = paths.map((x) => (typeof x === 'string' ? { path: x } : x)).map((x) => ({ ...x, path: rel(root, x.path) }))
-    .filter((x) => !fresh || !(x.path in h.commits) || (x.pattern && (h.commits[x.path] ?? []).some((id) => !(h.diffs[id] && x.path in h.diffs[id]))));
+    .filter((x) => !fresh || !(x.path in h.commits) || (x.pattern && (h.commits[x.path] ?? []).some((id) => !(h.diffs[id] && x.path in h.diffs[id])))
+      // A commit whose release was not read (its request failed) is asked again, never left to read as unreleased.
+      || (h.commits[x.path] ?? []).some((id) => !(id in h.refs)));
   return b.length || p.length || !fresh ? { blame: b, paths: p } : null;
 }
 

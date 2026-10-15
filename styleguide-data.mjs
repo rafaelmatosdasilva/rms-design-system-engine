@@ -26,14 +26,52 @@ const cleanName = (k) => String(k).replace(/#[\d:]+$/, '');
 // again on every element that carries its own mode: an inherited value is resolved on the page, so without this a
 // component switched to Light on a Dark page would still inherit the Dark page's text colour.
 const INHERITED = /^(color|font|font-family|font-size|font-weight|line-height|letter-spacing)$/;
-export function modeRootCSS(css = '') {
+export function modeRootCSS(css = '', scopes = MODE_SCOPES) {
   const text = String(css ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
   const decls = {};
   for (const m of text.matchAll(/(?:^|[}\s,])(html|body)\s*\{([^{}]*)\}/g)) {
     for (const d of m[2].matchAll(/([\w-]+)\s*:\s*([^;]+);/g)) if (INHERITED.test(d[1]) && /var\(/.test(d[2])) decls[d[1]] = d[2].trim();
   }
   const body = Object.entries(decls).map(([k, v]) => `${k}: ${v};`).join(' ');
-  return body ? `\n\n  /* == The page's text styles on each element with its own mode (inherited values follow that mode) == */\n  [data-color], [data-size] { ${body} }\n` : '';
+  return body ? `\n\n  /* == The page's text styles on each element with its own mode (inherited values follow that mode) == */\n  ${scopes.map((a) => `[${a}]`).join(', ')} { ${body} }\n` : '';
+}
+
+// The attributes an element carries its own mode with: the page's colour and size switches, and a colour mode the
+// product sets with an attribute of its own ([data-theme="dark"]).
+export const MODE_SCOPES = ['data-color', 'data-size'];
+export const modeScopes = (cfg = {}) => { const m = colourAttrMode(cfg); return m ? [...MODE_SCOPES, m.attr] : MODE_SCOPES; };
+
+// A colour mode the product sets with an attribute on its root ([data-theme="dark"] on <html>): the attribute, and the
+// value its root mode takes on the page (Light → light), so a preview can go back to it inside a page in another mode.
+// → { attr, base } or null.
+export function colourAttrMode(cfg = {}) {
+  const modes = cfg.figma?.modes ?? [];
+  const data = modes.map((m) => String(m.cssSelector ?? 'root')).find((x) => x.startsWith('data:'));
+  if (!data) return null;
+  const a = data.slice(5).split('=')[0], attr = a.startsWith('data-') ? a : `data-${a}`;
+  if (attr === 'data-color' || attr === 'data-size') return null;
+  const root = modes.find((m) => String(m.cssSelector ?? 'root') === 'root');
+  const base = root ? String(root.name ?? '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '') : '';
+  return base ? { attr, base } : null;
+}
+
+// Its blocks again without :root, so they nest as a Figma mode does on a frame: each :root[data-theme="dark"] block as
+// [data-theme="dark"], and the root's own values of every variable they change under [data-theme="light"], so one
+// component on the page can be shown in either mode. '' when the theme has no such block.
+export function attrModeCSS(css = '', mode = null) {
+  if (!mode) return '';
+  const text = String(css ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = mode.attr.replace(/[-]/g, '\\-');
+  const blocks = [...text.matchAll(new RegExp(`:root\\[${at}=["']?([\\w-]+)["']?\\]\\s*\\{([^{}]*)\\}`, 'g'))].map((m) => ({ value: m[1], body: m[2] }));
+  if (!blocks.length) return '';
+  const decls = (body) => Object.fromEntries([...String(body).matchAll(/(--[\w-]+)\s*:\s*([^;]+);?/g)].map((d) => [d[1], d[2].trim()]));
+  const root = {};
+  for (const m of text.matchAll(/(?:^|[}\s,]):root\s*\{([^{}]*)\}/g)) Object.assign(root, decls(m[1]));
+  const changed = [...new Set(blocks.flatMap((b) => Object.keys(decls(b.body))))].filter((k) => root[k] != null);
+  const lines = (o) => Object.entries(o).map(([k, v]) => `    ${k}: ${v};`).join('\n');
+  return `\n\n  /* == The product's ${mode.attr} modes on any element, each preview in its own (code values, nothing copied by hand) == */\n` +
+    `  [${mode.attr}="${mode.base}"] {\n${lines(Object.fromEntries(changed.map((k) => [k, root[k]])))}\n  }\n` +
+    blocks.filter((b) => b.value !== mode.base).map((b) => `  [${mode.attr}="${b.value}"] {\n${lines(decls(b.body))}\n  }\n`).join('');
 }
 
 // The lines of a component's own CSS rules (every rule whose selector names its class, or its id when the selector
@@ -153,6 +191,13 @@ export function modeAxes(cfg = {}, figmaVars = {}, themeCss = '') {
   }
   // The derived [data-color] blocks name the light mode too, so a scoped preview can go back to light inside a dark page.
   if (colour.attr === 'data-color') colour.values = colour.values.map((v) => (v.value === '' ? { ...v, value: 'light' } : v));
+  // A colour mode the product sets with an attribute of its own nests too (attrModeCSS): its root mode is named, so a
+  // preview can go back to it inside a page in another mode.
+  const am = colourAttrMode(cfg);
+  if (am && colour.attr === am.attr && new RegExp(`:root\\[${am.attr}=`).test(String(themeCss))) {
+    colour.scoped = true;
+    colour.values = colour.values.map((v) => (v.value === '' ? { ...v, value: am.base } : v));
+  }
   // The mode the page rests on when the device's media query does not match: the root one, wherever Figma lists it.
   if (colour.media) colour.restValue = colour.values.find((v) => v.value !== colour.mediaValue)?.value ?? '';
   if (colour.values.length > 1) axes.push(colour);
@@ -558,7 +603,10 @@ export function agreedTokens(check = {}, figmaVars = {}) {
     }
     return null;
   };
-  const sizes = pass.filter((x) => x.dimension === 'sizing').map((p) => ({ figma: p.token, var: p.cssVar, value: p.value, ...(byMode(p.token) ? { modes: byMode(p.token) } : {}), ...describe(p.token) }));
+  // A size is a length (16px, 1.5rem, 0): a value the sizes' collection holds that is not one (a colour, a family, a
+  // weight, a count) is never shown as a space, a radius or a size.
+  const isLength = (v) => /^-?(\d+\.?\d*|\.\d+)(px|rem|em)$|^0$/.test(String(v ?? '').trim());
+  const sizes = pass.filter((x) => x.dimension === 'sizing' && isLength(x.value)).map((p) => ({ figma: p.token, var: p.cssVar, value: p.value, ...(byMode(p.token) ? { modes: byMode(p.token) } : {}), ...describe(p.token) }));
   const isRadius = (t) => /radi(i|us)|corner/i.test(t.figma), isSpace = (t) => /\b(gap|padding|margin|space|spacing|inset)\b/i.test(t.figma.replace(/\//g, ' '));
   // Text styles. A style is shown only when every field Figma gives it was compared and agrees, in every mode when a
   // field changes with a mode: a field the check did not compare, or one that differs, keeps the whole style off the
@@ -977,7 +1025,7 @@ export function cardLook(themeCss = '', cls = null) {
 // The template's default text sizes (its :root), each role's target when the page picks the system's nearest style.
 const TYPE_ROLES = [['xs', 11], ['s', 12], ['m', 13], ['l', 14]];
 
-export function chromeRoles({ tokens = null, themeCss = '', componentNames = [], icons = {}, override = {}, card = null } = {}) {
+export function chromeRoles({ tokens = null, themeCss = '', componentNames = [], icons = {}, override = {}, card = null, scopes = MODE_SCOPES } = {}) {
   const roles = {}, from = {};
   const comps = new Set(componentNames.map((n) => n.toLowerCase()));
   const flat = (tokens?.colors ?? []).flatMap((g) => g.items).filter((t) => t?.var);
@@ -1059,7 +1107,7 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   const missing = NEEDED.filter((r) => !roles[r]);
   // Declared again on every element that carries its own mode, so a preview in Light on a Dark page resolves the
   // page's roles with its own values (a variable is resolved where it is declared, then inherited as it is).
-  const css = Object.keys(roles).length ? `:root, [data-color], [data-size] { ${Object.entries(roles).map(([k, v]) => `--sg-${k}: ${v};`).join(' ')} }` : '';
+  const css = Object.keys(roles).length ? `:root, ${scopes.map((a) => `[${a}]`).join(', ')} { ${Object.entries(roles).map(([k, v]) => `--sg-${k}: ${v};`).join(' ')} }` : '';
   return { roles, from, missing, css, contrast: pageContrast(roles, byVar) };
 }
 

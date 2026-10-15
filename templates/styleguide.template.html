@@ -24,8 +24,10 @@
   --sg-bg: Canvas; --sg-bg-2: Canvas; --sg-surface: Canvas; --sg-stage: var(--sg-bg);
   --sg-text: CanvasText; --sg-text-2: CanvasText; --sg-muted: GrayText; --sg-border: GrayText; --sg-accent: AccentColor;
   --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-border);
-  --sg-xs: 0.6875rem; --sg-s: 0.75rem; --sg-s-weight: normal; --sg-m: 0.8125rem; --sg-m-weight: normal; --sg-l: 0.875rem; --sg-l-weight: bold;
-  --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: bold; --sg-lh: normal;
+  /* The default type: each weight a step above the browser's (500 for text, 800 for headings), every line 2px taller
+     than the browser's normal one. */
+  --sg-xs: 0.6875rem; --sg-s: 0.75rem; --sg-s-weight: 500; --sg-m: 0.8125rem; --sg-m-weight: 500; --sg-l: 0.875rem; --sg-l-weight: 800;
+  --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: calc(1.2em + 2px);
   /* A page's title: the system's largest text style, scaled up, so the guide has its own hierarchy above any system's
      text styles while every size still comes from the system ("title-scale" in styleguide.chrome, ds-config.json, changes it). */
   --sg-title-scale: 3.125; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
@@ -90,14 +92,14 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-size-switch { margin-bottom: var(--sg-space-xxl); position: sticky; top: 0; z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; }   /* a foundation's size switch, well apart from what it changes, kept in view as the page scrolls */
 .sg-size-switch .sg-mode-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* named for a screen reader only */
 .pg-footer { display: flex; flex-direction: column; gap: var(--sg-space-m); margin-top: var(--sg-space-xl); }
-.pg-area-title { margin: var(--sg-space-xl) 0 var(--sg-space-l); }   /* each area's name, its content 16px below */
+.pg-area-title { margin: var(--sg-space-xl) 0 var(--sg-space-l); font-size: var(--sg-l); font-weight: var(--sg-heading-weight); line-height: var(--sg-lh); color: var(--sg-text); }   /* each area's name, its content 16px below, in the page's own text colour in every mode */
 .pg-area-title + .pg-footer { margin-top: 0; }
 .pg-updated { display: grid; gap: var(--sg-space-l); margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }   /* each section of the documentation clearly apart */
 .pg-updated > div { display: grid; grid-template-columns: 140px 1fr; gap: var(--sg-space-s); }
 .pg-updated dt { font-weight: var(--sg-heading-weight); color: var(--sg-text-2); }
 .pg-updated dd { margin: 0; }
 .pg-updated dd > p { margin: 0 0 var(--sg-space-xxs); }
-.pg-doc > h3 { margin: 0 0 var(--sg-space-xs); }
+.pg-doc > h3 { margin: 0 0 var(--sg-space-xs); color: var(--sg-text); font-weight: var(--sg-heading-weight); }
 /* One font on the page, the system's: names of props, variables and classes are set in it too, never the browser's monospace. */
 :where(.sg-main, .sg-sidebar, .sg-token-pop) :where(code, pre, kbd, samp):not(.pg-preview *, .pg-frame *, .pg-variants .pg-preview *) { font-family: inherit; font-size: inherit; }
 .sg-mode-diff { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); margin: 0; }
@@ -879,6 +881,17 @@ a.pg-usage-name { color: var(--sg-text); }
   var SGModes = (function () {
     // The mode the page starts in: the one the code's own media query draws on this device or window, else the first.
     function base(axis) { return axis.media && window.matchMedia && window.matchMedia(axis.media).matches ? axis.mediaValue : (axis.restValue != null ? axis.restValue : axis.values[0].value); }
+    // A colour switch with a dark mode starts on Auto, following this device's setting, even when the code has no media
+    // query of its own (a data-theme the product sets): then the page sets the mode the device asks for, and follows it
+    // when it changes, until a mode is picked by hand.
+    var PREFERS = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null, AUTO = {};
+    function darkOf(axis) { return axis.colour && !axis.media && !axis.classes && axis.attr ? axis.values.filter(function (v) { return v.value && /dark|night/i.test(v.label + ' ' + v.value); })[0] || null : null; }
+    function deviceValue(axis) {
+      var d = darkOf(axis); if (d && PREFERS && PREFERS.matches) return d.value;
+      return axis.restValue != null ? axis.restValue : (axis.values.filter(function (v) { return v !== d; })[0] || axis.values[0]).value;
+    }
+    function follow() { var moved = false; AXES.forEach(function (a) { if (AUTO[a.attr] && darkOf(a)) { var v = deviceValue(a); if ((html.getAttribute(a.attr) || '') !== v) { apply(html, a, v); moved = true; } } }); return moved; }
+    AXES.forEach(function (a) { if (darkOf(a) && !html.hasAttribute(a.attr)) AUTO[a.attr] = true; });
     function apply(scope, axis, value) {
       if (axis.classes) { axis.values.forEach(function (v) { if (v.value) scope.classList.remove(v.value); }); if (value) scope.classList.add(value); }
       else if (!value) scope.removeAttribute(axis.attr); else scope.setAttribute(axis.attr, value);
@@ -892,7 +905,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var wrap = document.createElement('div'); wrap.className = 'sg-mode-ctl';
       // On the page's own switch, a mode the device's setting decides comes first as Auto: it follows the device and names
       // the mode it found (Auto (Dark)). Each component's switch shows the mode it is in.
-      var auto = scope === html && !!axis.media && !axis.classes;
+      var auto = scope === html && !axis.classes && (!!axis.media || !!darkOf(axis));
       var items = axis.values.map(function (v) { return { v: v.value, label: v.label, off: !!v.notInCode, title: v.notInCode ? v.label + ' is in Figma, not in the code yet' : '' }; });
       if (auto) items.unshift({ v: '__auto', label: 'Auto', title: 'Follows this device\'s setting' });
       // The page's own switch in the menu has no word over it (the switch is still named for a screen reader).
@@ -901,7 +914,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var diff = null;
       if (scope === html && axis.changes) { diff = document.createElement('p'); diff.className = 'sg-mode-diff'; diff.setAttribute('aria-live', 'polite'); wrap.appendChild(diff); }
       wrap._sync = function () {
-        var c = effective(axis, scope), on = auto && !scope.hasAttribute(axis.attr) ? '__auto' : c;
+        var c = effective(axis, scope), on = auto && (darkOf(axis) ? AUTO[axis.attr] : !scope.hasAttribute(axis.attr)) ? '__auto' : c;
         segItems(wrap).forEach(function (b) {
           segSelect(b, b.dataset.v === on);
         });
@@ -913,7 +926,9 @@ a.pg-usage-name { color: var(--sg-text); }
       };
       wrap._sync();
       segItems(wrap).forEach(function (b) { b.addEventListener('click', function () { if (b.disabled || b.getAttribute('aria-disabled') === 'true') return; if (/true/.test(b.getAttribute('aria-pressed') || b.getAttribute('aria-checked') || b.getAttribute('aria-selected') || '') || b.dataset.on === '1') return;   // the choice already set changes nothing
-      if (b.dataset.v === '__auto') scope.removeAttribute(axis.attr); else apply(scope, axis, b.dataset.v); wrap._sync(); if (onChange) onChange(axis); }); });
+      if (b.dataset.v === '__auto') { if (darkOf(axis)) { AUTO[axis.attr] = true; follow(); } else scope.removeAttribute(axis.attr); }
+      else { if (scope === html) AUTO[axis.attr] = false; apply(scope, axis, b.dataset.v); }
+      wrap._sync(); if (onChange) onChange(axis); }); });
       return wrap;
     }
     function controls(scope, onChange, which) {
@@ -923,7 +938,8 @@ a.pg-usage-name { color: var(--sg-text); }
       return box;
     }
     var boxes = [];
-    return { controls: controls, effective: effective, register: function (b) { boxes.push(b); }, syncAll: function () { boxes.forEach(function (b) { b._sync(); }); } };
+    follow();   // the page starts in the mode this device asks for
+    return { controls: controls, effective: effective, follow: follow, prefers: PREFERS, register: function (b) { boxes.push(b); }, syncAll: function () { boxes.forEach(function (b) { b._sync(); }); } };
   })();
 
   // The stage behind each preview is the system's own page surface, so a dark mode reads as dark.
@@ -1004,7 +1020,7 @@ a.pg-usage-name { color: var(--sg-text); }
     n += (c.a11yFindings || []).length;   // what the audit found (a text's contrast) counts too
     var a11y = n ? { say: n === 1 ? '1 problem' : n + ' problems', todo: true } : !ch || ch.notRead ? { say: 'Not checked in a browser yet', todo: false } : { say: 'No problem found', todo: false };
     var used = (c.usage || []).length;
-    return { version: rel ? rel.release : log.length ? 'Not released yet' : null, changed: log.length ? String(log[0].date).slice(0, 10) : null, changedAt: log.length ? log[0].date : null, parity: parity, a11y: a11y, used: used };
+    return { version: rel ? rel.release : log.length ? 'Merged, no release tag yet' : null, changed: log.length ? String(log[0].date).slice(0, 10) : null, changedAt: log.length ? log[0].date : null, parity: parity, a11y: a11y, used: used };
   }
   function factsHTML(c) {
     var f = factsOf(c), item = function (k, v, todo) { return '<div><dt>' + esc(k) + '</dt><dd' + (todo ? ' class="sg-fact-todo"' : '') + '>' + esc(v) + '</dd></div>'; };
@@ -1100,7 +1116,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var by = {}, commits = [];
       g.rows.forEach(function (x) { var k = x.r.sha || x.r.subject; if (!by[k]) { by[k] = { r: x.r, comps: [] }; commits.push(by[k]); } if (by[k].comps.indexOf(x.comp) < 0) by[k].comps.push(x.comp); });
       commits.sort(function (a, b) { return String(b.r.date) > String(a.r.date) ? 1 : String(b.r.date) < String(a.r.date) ? -1 : 0; });
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + esc(g.k || 'Not released yet') + '  ·  ' + esc(g.at.slice(0, 10)) + '</div><table>' + commits.map(function (x) {
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + esc(g.k || 'Merged, no release tag yet') + '  ·  ' + esc(g.at.slice(0, 10)) + '</div><table>' + commits.map(function (x) {
         var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short) + '</code>';
         var says = String(x.r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
         return '<tr><td>' + x.comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + esc(says) + ' ' + sha + '</td></tr>';
@@ -2183,7 +2199,7 @@ a.pg-usage-name { color: var(--sg-text); }
     log.forEach(function (r) { var k = r.release || ''; if (!by[k]) { by[k] = []; groups.push(k); } by[k].push(r); });
     return '<div class="pg-cards">' + out + groups.map(function (k) {
       var rows = by[k], first = rows[0], rel = k && first.url ? first.url.replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(k)) : null;
-      return card((k ? (rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : esc(k)) : 'Not released yet') + '  ·  ' + esc(String(first.date).slice(0, 10)), rows.map(function (r) {
+      return card((k ? (rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : esc(k)) : 'Merged, no release tag yet') + '  ·  ' + esc(String(first.date).slice(0, 10)), rows.map(function (r) {
         var pr = r.pr ? (r.prUrl ? ' <a class="sg-uses-link" href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
         return '<tr><td>' + link(r) + pr + '</td><td>' + esc(String(r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '')) + ' ' + day(r.date) + what(r.changed) + '</td></tr>';
       }).join(''));
@@ -2458,7 +2474,8 @@ a.pg-usage-name { color: var(--sg-text); }
     // One kind shown at a time, chosen with the filter (no list of every kind at once); kept as the list is drawn again.
     var count = function (k) { return k.groups.reduce(function (n, g) { return n + g.rows.length; }, 0); };
     if (!byKind.some(function (k) { return k.area === todoArea; })) todoArea = byKind[0].area;
-    var filter = '<div class="pg-par-filter sg-todo-filter">' + segHTML(byKind.map(function (k) { return { label: k.wait ? k.area : k.area + ' (' + count(k) + ')', v: k.area }; }), 'Show') + '</div>';
+    // The areas as tabs, as a component's own areas are: one shown at a time.
+    var filter = '<div class="pg-par-filter sg-todo-filter"><div class="pg-areas-scroll">' + tabsHTML(byKind.map(function (k) { return { label: k.wait ? k.area : k.area + ' (' + count(k) + ')', v: k.area }; })) + '</div></div>';
     var waitLine = 'Trying the components for accessibility in this browser, ' + tried.length + ' of ' + COMPONENTS.length + '. Its tasks show once every one is tried, and what is tried is kept for the next visit.';
     var html = '<div class="sg-todo-head">' + filter + '<p class="pg-par-sum sg-todo-sum"></p></div>' + byKind.map(function (k) {
       var link = function (g) { return g.name ? '<a class="sg-uses-link" href="#' + esc(cid(g.name)) + '">' + esc(g.name) + '</a>' : 'The system'; };
@@ -2664,7 +2681,7 @@ a.pg-usage-name { color: var(--sg-text); }
   }
   function showTodoArea(box) {
     var seg = box.querySelector('.sg-todo-filter');
-    if (seg) segItems(seg).forEach(function (b) { segSelect(b, b.dataset.v === todoArea); });
+    if (seg) segItems(seg).forEach(function (b) { tabSelect(b, b.dataset.v === todoArea); });
     var shown = null;
     Array.prototype.forEach.call(box.querySelectorAll('.sg-todo-kind'), function (k) { k.hidden = k.dataset.area !== todoArea; if (!k.hidden) shown = k; });
     var rows = shown ? shown.querySelectorAll('tbody tr') : [];
@@ -4070,6 +4087,8 @@ a.pg-usage-name { color: var(--sg-text); }
     // switches the scheme while it reads them, and a redraw would replace the very elements it is reading.
     if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (!ALL) refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); });
   });
+  // The same for a colour mode the page follows the device on itself (the code has no media query for it).
+  if (SGModes.prefers && SGModes.prefers.addEventListener) SGModes.prefers.addEventListener('change', function () { if (!ALL && SGModes.follow()) { refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); SGModes.syncAll(); } });
 
   // What uses a token (#uses?t=--name): the components that use it in their own rules, then those that use it through
   // another token, each linked to its page. Built the first time it is opened, written again for each token.

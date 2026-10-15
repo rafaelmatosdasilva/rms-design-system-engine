@@ -119,6 +119,9 @@ test('tokens are shown only when equal to Figma in every mode, grouped like the 
     { dimension: 'color', token: 'text/primary/color', cssVar: '--text-primary', mode: 'light', value: '#111' },
     { dimension: 'sizing', token: 'gap/s', cssVar: '--gap-s', value: '4px' }, { dimension: 'sizing', token: 'radii/card', cssVar: '--radii-card', value: '8px' },
     { dimension: 'sizing', token: 'stroke/default', cssVar: '--stroke-default', value: '1px' },
+    // What a sizes collection holds that is not a length: never a space, a radius or a size.
+    { dimension: 'sizing', token: 'base/gap/color', cssVar: '--base-gap-color', value: '#0037FA' }, { dimension: 'sizing', token: 'base/padding/fontFamily', cssVar: '--base-padding-fontFamily', value: 'inter' },
+    { dimension: 'sizing', token: 'base/spacing/weight', cssVar: '--base-spacing-weight', value: '500' },
     { dimension: 'typography', token: 'm/size', cssVar: '--m-size', value: '14px' }], fail: [{ token: 'x' }] };
   const vars = { color: { light: { 'surface/page/color': '#fff', 'text/primary/color': '#111' }, dark: { 'surface/page/color': '#000', 'text/primary/color': '#eee' } } };
   const t = agreedTokens(check, vars);
