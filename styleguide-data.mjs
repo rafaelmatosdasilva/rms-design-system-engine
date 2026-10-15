@@ -1215,7 +1215,7 @@ function choiceGroups(components) {
 export function standInGaps(ui = {}) {
   const gaps = [];
   if (!ui.segmented) gaps.push({ control: 'segmented control', uses: 'its default segmented control, drawn with its tokens' });
-  if (!ui.field) gaps.push({ control: 'text field', uses: 'a plain text input drawn with its tokens' });
+  if (!ui.field) gaps.push({ control: 'text field', uses: 'its default text field, drawn with its tokens' });
   else if (ui.field.standIn) gaps.push({ control: 'text field', uses: `its ${ui.field.standIn}` });
   if (!ui.button) gaps.push({ control: 'text button', uses: 'its default button, drawn with its tokens' });
   if (!ui.card) gaps.push({ control: 'card', uses: 'its default card, with the tables\' border and corners' });
@@ -1351,6 +1351,8 @@ export function fieldUi(components = [], systemCss = '') {
     const markup = root[1].toLowerCase() === 'input' ? inputTag : `<${root[1]}${rc.length ? ` class="${rc.join(' ')}"` : ''}>${inputTag}</${root[1]}>`;
     const field = c.role === 'textbox' || /input|field|text/i.test(c.name);
     const score = (field ? 0 : 10) + (ic.length || rc.length ? 0 : 5);
+    // A field none of whose classes the system styles is no field of its own: the page's default one reads better.
+    if (!ic.length && !rc.length) continue;
     found.push({ score, from: c.name, markup, standIn: field ? null : /search/i.test(c.name) || type === 'search' ? 'search field' : c.name });
   }
   const best = found.sort((a, b) => a.score - b.score)[0];
@@ -1434,23 +1436,42 @@ export function coverageOf(summary, file) {
 // A Figma prop that stands for it without being agreed yet (size for buttonSize) names it, as its drawings are named.
 // It starts where Figma's default has it. controls: Figma's, api: apiView(), figmaProps: every prop Figma gives it
 // ({ name: { defaultValue } }, or their names). → [control]
-export function codeControls(controls = [], api = null, figmaProps = []) {
+export function codeControls(controls = [], api = null, figmaProps = [], connect = []) {
   const figmaDefs = Array.isArray(figmaProps) ? Object.fromEntries(figmaProps.map((n) => [cleanName(n), {}])) : Object.fromEntries(Object.entries(figmaProps ?? {}).map(([n, d]) => [cleanName(n), d ?? {}]));
   if (!api?.props?.length) return [];
   const names = api.props.map((p) => p.name), figma = controls.flatMap((k) => [k.label, k.prop].filter(Boolean));
   const out = [];
   for (const p of api.props) {
     if (BEHAVIOUR_PROP.test(p.name) || figmaPropFor(figma, p.name, names)) continue;
-    const label = figmaPropFor(Object.keys(figmaDefs), p.name, names) ?? p.name;
+    // The Figma property the project's Code Connect pairs it with (size for buttonSize), else the one its name gives.
+    const cc = connect.find((x) => x.code === p.name && x.kind !== 'instance' && !(x.kind === 'boolean' && !/^boolean$/.test(p.type ?? '')));
+    const ccLabel = cc ? Object.keys(figmaDefs).find((k) => k.toLowerCase() === String(cc.figma).toLowerCase()) : null;
+    if (cc && figma.some((f) => f.toLowerCase() === String(cc.figma).toLowerCase())) continue;   // already a Figma control
+    const label = ccLabel ?? figmaPropFor(Object.keys(figmaDefs), p.name, names) ?? p.name;
     const base = { label, prop: p.name, fromCode: true, at: 1000 + out.length };
     const fig = figmaDefs[label]?.defaultValue;
     if (/^boolean$/.test(p.type ?? '')) out.push({ ...base, type: 'BOOLEAN', default: String(fig ?? p.default) === 'true' });
     else if ((p.values ?? []).length > 1) out.push({ ...base, type: 'VARIANT', default: fig != null && p.values.includes(String(fig)) ? String(fig) : p.default ?? p.values[0], options: p.values.map((v) => ({ label: v })) });
     // A text Figma has as a text prop (labelContent for label): a field, its words written where its build drew Figma's.
     else if (/^string$/.test(p.type ?? '') && figmaDefs[label]?.type === 'TEXT' && String(fig ?? '').trim()) out.push({ ...base, type: 'TEXT', default: String(fig) });
+    // A text only the code has (buttonLabel): a field, its build drawing its own name as its words.
+    else if (/^string$/.test(p.type ?? '') && !figmaDefs[label] && CODE_TEXT.test(p.name) && !/icon|url|src|href|image/i.test(p.name)) out.push({ ...base, type: 'TEXT', default: humanName(p.name) });
+  }
+  // Figma's switch that shows a part (showButton, showIcon), where the code shows it whenever its props are given
+  // (buttonLabel, icon): a switch, drawn as its build draws Figma's case. Never in the code shown: giving the part's
+  // props is what shows it there.
+  const taken = new Set([...controls, ...out].map((k) => k.label));
+  for (const [n, d] of Object.entries(figmaDefs)) {
+    const part = /^(show|has|with)(.+)$/i.exec(n)?.[2];
+    if (!part || d?.type !== 'BOOLEAN' || taken.has(n)) continue;
+    const sq = part.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!names.some((x) => { const k = x.toLowerCase().replace(/[^a-z0-9]/g, ''); return k === sq || k.startsWith(sq); })) continue;
+    out.push({ label: n, prop: n, fromCode: true, showsPart: true, at: 1000 + out.length, type: 'BOOLEAN', default: String(d.defaultValue) !== 'false' });
   }
   return out;
 }
+const CODE_TEXT = /(label|title|text|description|caption|heading|subtitle|message|hint|placeholder|content)$/i;
+const humanName = (d) => { const w = String(d).replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase(); return w.charAt(0).toUpperCase() + w.slice(1); };
 
 // ── A component's code API, as its page lists it ──────────────────────────────────────────────────────────────────────
 // api: component-api.mjs apiFor(). → { file, tag?, syntax?, props: [{ name, values?, type?, default?, required? }],
