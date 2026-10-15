@@ -12,7 +12,8 @@ import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { variantsFromCode, startHarness, loadTypeScript } from '../component-harness.mjs';
-import { globalStyles, renderedVue, appPlugins } from '../vue-harness.mjs';
+import { globalStyles, renderedVue, appPlugins, appSetup, runtimeDeps, propSamples } from '../vue-harness.mjs';
+import { harnessCases } from '../component-harness.mjs';
 import { textComponentApi } from '../component-source.mjs';
 import { findChrome } from '../cdp.mjs';
 
@@ -154,13 +155,91 @@ test('a Vue component that reads a Pinia store and links with the router renders
   };
   const draw = (dir) => renderedVue(dir, {}, ['cart'], { locate: () => join(dir, 'components', 'HbCart.vue'), chromePath: CHROME });
   const dir = project({ pinia: '^3.0.0', 'vue-router': '^4.0.0' });
-  assert.deepEqual(appPlugins(dir), { pinia: true, router: true });
+  assert.deepEqual(appPlugins(dir), { pinia: true, router: true, setup: [] });
   const r = await draw(dir);
   assert.deepEqual(r.failed, [], JSON.stringify(r));
   assert.equal(r.markup.cart, '<a href="/cart" class="hb-cart">3 items</a>', 'the store\'s count, in the router\'s link');
   // A project that does not list pinia gets none: the component cannot render, and says why.
   const bare = project({ 'vue-router': '^4.0.0' });
-  assert.deepEqual(appPlugins(bare), { pinia: false, router: true });
+  assert.deepEqual(appPlugins(bare), { pinia: false, router: true, setup: [] });
   const b = await draw(bare);
   assert.match(JSON.stringify(b.failed), /getActivePinia\(\)\\" was called but there was no active Pinia/, JSON.stringify(b));
+});
+
+// A project like Northwind DS: its entry installs plugins and a global icon component, its modules import each other
+// through the router, a CommonJS package is imported by default, and its components take Figma's names in code's words.
+const APP = (dir) => {
+  mkdirSync(join(dir, 'src', 'components'), { recursive: true }); mkdirSync(join(dir, 'src', 'router'), { recursive: true }); mkdirSync(join(dir, 'src', 'views'), { recursive: true });
+  writeFileSync(join(dir, 'src', 'main.js'), `import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router/router'
+import shout from '@/shout'
+import BaseIcon from '@/components/BaseIcon.vue'
+const app = createApp(App)
+app.use(router)
+app.use(shout)
+app.component('BaseIcon', BaseIcon)
+app.mount('#app')`);
+  writeFileSync(join(dir, 'src', 'App.vue'), '<template><div /></template>');
+  writeFileSync(join(dir, 'src', 'shout.js'), "export default { install (app) { app.config.globalProperties.$shout = (t) => String(t).toUpperCase() } }");
+  writeFileSync(join(dir, 'src', 'components', 'BaseIcon.vue'), '<script setup>defineProps({ icon: String })</script><template><i class="icon" :data-icon="icon"></i></template>');
+  // The router reaches a view that reaches the button: loaded after the button, the two would meet halfway.
+  writeFileSync(join(dir, 'src', 'router', 'router.js'), "import ButtonView from '@/views/ButtonView.vue'\nexport const ROUTES = [{ path: '/', component: ButtonView }]\nexport default { install () {} }");
+  writeFileSync(join(dir, 'src', 'views', 'ButtonView.vue'), "<script setup>import Button from '@/components/Button.vue'</script><template><Button label=\"Save\" icon=\"m/home-m\" /></template>");
+  writeFileSync(join(dir, 'src', 'components', 'Button.vue'), `<script setup>
+import { ROUTES } from '@/router/router'
+const ready = ROUTES.length
+defineProps({ label: String, icon: String, buttonSize: { type: String, default: 'm' }, disabled: Boolean, params: Object })
+</script>
+<template><button :class="['btn', buttonSize]" :disabled="disabled" :data-ready="ready" :data-hint="params.hint || ''"><span v-if="label" class="label">{{ $shout(label) }}</span><base-icon v-if="icon" :icon="icon" /></button></template>`);
+};
+
+test('the app\'s own modules load first, in its entry\'s order; its plugins and global components are installed', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'vue-app-')); APP(dir);
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'app', dependencies: { vue: '^3.5.0' } }));
+  assert.deepEqual(appSetup(dir).map((x) => `${x.kind} ${x.spec}`), [
+    'import /src/App.vue', 'import /src/router/router', 'import @/shout', 'import @/components/BaseIcon.vue',
+    'use @/shout', 'component @/components/BaseIcon.vue',
+  ], 'the router is loaded, never installed: the page gives each instance its own');
+});
+
+test('the packages the code imports are bundled before the page loads, never a tool only its scripts run', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'vue-deps-'));
+  mkdirSync(join(dir, 'src', 'figma'), { recursive: true });
+  writeFileSync(join(dir, 'src', 'a.vue'), "<script setup>import moment from 'moment-timezone'\nimport './local.js'\nimport '@/b'\nimport 'prismjs/themes/prism.css'\nimport Prism from 'prismjs'</script>");
+  writeFileSync(join(dir, 'src', 'figma', 'a.figma.js'), "import figma from '@figma/code-connect'");
+  for (const n of ['moment-timezone', 'prismjs', '@figma/code-connect']) { mkdirSync(join(dir, 'node_modules', n), { recursive: true }); writeFileSync(join(dir, 'node_modules', n, 'package.json'), JSON.stringify({ name: n, main: 'index.js' })); }
+  assert.deepEqual(runtimeDeps(dir), ['moment-timezone', 'prismjs']);
+});
+
+test('a text with no default takes the value the project\'s own pages pass it most', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'vue-samples-')); mkdirSync(join(dir, 'src'));
+  writeFileSync(join(dir, 'src', 'A.vue'), '<template><X icon="m/home-m" label="Save" class="a" :title="t" /><X icon="m/home-m" /><X icon="s/x" button-size="l" /></template>');
+  const s = propSamples(dir);
+  assert.equal(s.icon, 'm/home-m'); assert.equal(s.label, 'Save'); assert.equal(s.buttonSize, 'l');
+  assert.equal(s.class, undefined); assert.equal(s.title, undefined, 'a bound value is never taken');
+});
+
+test('a state Figma\'s default variant has on (Disabled) starts off; its on is a case of its own', () => {
+  const cases = harnessCases({ properties: { disabled: { type: 'VARIANT', defaultValue: 'true', variantOptions: ['false', 'true'] }, size: { type: 'VARIANT', defaultValue: 's', variantOptions: ['s', 'm'] } } });
+  assert.equal(cases[0].props.disabled, 'false');
+  assert.equal(cases[0].props.size, 's', 'any other variant keeps Figma\'s default');
+  assert.ok(cases.some((c) => c.label === 'disabled=true'));
+});
+
+test('a Vue component drawn as the product draws it: Figma\'s names in the code\'s words, its icon, its app\'s plugins', { skip: READY, timeout: 300000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'vue-figma-names-')); APP(dir);
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'app', private: true, dependencies: { vue: '^3.5.0' } }));
+  writeFileSync(join(dir, 'vite.config.js'), "import vue from '@vitejs/plugin-vue'\nimport { fileURLToPath } from 'node:url'\nexport default { plugins: [vue()], resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } } }");
+  symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
+  const propsSnap = { button: { properties: {
+    'labelContent#1:2': { type: 'TEXT', defaultValue: 'Label' }, 'iconContent#1:3': { type: 'INSTANCE_SWAP', defaultValue: '9:9' },
+    'showLabel#1:4': { type: 'BOOLEAN', defaultValue: true }, size: { type: 'VARIANT', defaultValue: 's', variantOptions: ['s', 'l'] },
+    disabled: { type: 'VARIANT', defaultValue: 'true', variantOptions: ['false', 'true'] } } } };
+  const r = await renderedVue(dir, {}, ['button'], { propsSnap, locate: () => join(dir, 'src', 'components', 'Button.vue'), chromePath: CHROME, max: 4 });
+  assert.deepEqual(r.failed, [], JSON.stringify(r));
+  const at = (label) => r.cases.button.find((c) => c.label === label)?.markup ?? '';
+  assert.match(at('default'), /class="btn s" data-ready="1" data-hint=""><span class="label">LABEL<\/span><i class="icon" data-icon="m\/home-m">/, 'labelContent as label through the app\'s plugin, size as buttonSize, the icon its pages use, an object it reads given, not disabled');
+  assert.doesNotMatch(at('showLabel=false'), /class="label"/, 'its label off: none given');
+  assert.match(at('disabled=true'), /disabled=""/);
 });
