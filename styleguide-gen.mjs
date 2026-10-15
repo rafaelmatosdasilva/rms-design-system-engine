@@ -541,12 +541,19 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const { apiView, codeControls } = await import('./styleguide-data.mjs');
         const nodeIds = Object.fromEntries(Object.entries(ctx?.propsSnap ?? {}).filter(([, e]) => e?.nodeId).map(([n, e]) => [n, e.nodeId]));
         const reader = createApiReader(ROOT, cfg, { classFor: (n) => locator.classFor(n), nodeIds });
+        // The project's own Code Connect: which Figma property each code prop is, and a badge on each it connects.
+        const { codeConnectMaps, codeConnectFor } = await import('./code-connect-map.mjs');
+        const ccMaps = codeConnectMaps(ROOT, { include: readJson('figma.config.json')?.codeConnect?.include ?? null });
         for (const c of view.components) {
+          const cc = codeConnectFor(ccMaps, c.name, nodeIds[c.name]);
+          if (cc) c.codeConnect = { file: cc.file, props: cc.props };
           const api = reader.apiFor(c.name);
           const v = api.file && apiView(api, relative(ROOT, api.file));
+          // The Vue transition it enters and leaves with (<transition name="slide">), so its Playground can play both.
+          if (api.file) { const t = /<transition\b[^>]*?\bname\s*=\s*["']([\w-]+)["']/i.exec(readText(api.file)) ?? (/<transition\b/i.test(readText(api.file)) ? [null, 'v'] : null); if (t) c.vueTransition = t[1]; }
           if (v) c.api = v;
           // What only its API takes is a Playground control too, when its own build drew each case of it.
-          if (v && c.renders) c.controls = [...(c.controls ?? []), ...codeControls(c.controls ?? [], v, ctx?.propsSnap?.[c.name]?.properties ?? {})];
+          if (v && c.renders) c.controls = [...(c.controls ?? []), ...codeControls(c.controls ?? [], v, ctx?.propsSnap?.[c.name]?.properties ?? {}, c.codeConnect?.props ?? [])];
         }
       } catch { /* no component sources */ }
     }
@@ -643,27 +650,44 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         if (!by.length) continue;
         for (const to of [].concat(chain ?? [])) { const k = String(to).replace(/\/color$/, ''); (pointers.get(k) ?? pointers.set(k, new Set()).get(k)); by.forEach((n) => pointers.get(k).add(n)); }
       }
+      // A token named after a component anywhere in its name (advanced/buttonPrimary/…) is that component's.
+      const sq = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const named = (name) => { const parts = String(name).split('/').slice(1).map(sq); return view.components.filter((c) => parts.includes(sq(c.name))); };
+      // The foundations are the system's shared layers (primitives, semantic, base); everything else is a component's.
+      const FOUNDATION = /^(primitives?|semantics?|base|core|global|foundations?)$/i;
+      const layered = (view.tokens.colors ?? []).some((g) => FOUNDATION.test(g.group));
       const keepColours = [];
       for (const g of view.tokens.colors ?? []) {
-        if (/^(primitives|semantic)$/i.test(g.group)) { keepColours.push(g); continue; }
+        if (FOUNDATION.test(g.group) || /^(primitives|semantic)$/i.test(g.group)) { keepColours.push(g); continue; }
         const stay = [];
         for (const t of g.items) {
           const name = String(t.figma ?? '');
           let own = owners(/^color$/i.test(g.group) ? name.split('/')[0] : g.group);
+          if (!own.length) own = named(name);
           if (!own.length) { const users = [...(pointers.get(name) ?? [])]; own = view.components.filter((c) => users.includes(c.name)); }
           if (!own.length) { stay.push(t); continue; }
           for (const c of own) (c.ownTokens ??= { colors: [], sizes: [] }).colors.push(t);
         }
-        if (stay.length) keepColours.push({ ...g, items: stay });
+        if (stay.length && !layered) keepColours.push({ ...g, items: stay });
       }
       view.tokens.colors = keepColours;
+      // The same for the spacing and the radii: a component's own size goes to it, the shared ones stay.
+      // With the system in layers, a foundation lists its shared ones only (spacing/…, radius/…, base/…, semantic/…).
+      const SHARED = /^(primitives?|semantics?|base|core|global|foundations?|spacing|space|radius|radii|corner|sizes?|sizing)$/i;
+      for (const k of ['spacing', 'radii']) view.tokens[k] = (view.tokens[k] ?? []).filter((t) => {
+        const own = named(t.figma);
+        if (!layered) return true;   // a system not in layers keeps every size in its foundations, as before
+        if (own.length) { for (const c of own) (c.ownTokens ??= { colors: [], sizes: [] }).sizes.push(t); return false; }
+        return SHARED.test(String(t.figma).split('/')[0]);
+      });
       const iconStrokes = [], general = [];
       for (const t of view.tokens.sizing ?? []) {
         const prefix = t.figma.split('/')[0];
         if (/^typography$/i.test(prefix)) continue;
         if (/^icons?$/i.test(prefix)) { iconStrokes.push(t); continue; }
-        const own = owners(prefix);
+        const own = owners(prefix).length ? owners(prefix) : named(t.figma);
         if (own.length) { for (const c of own) (c.ownTokens ??= { colors: [], sizes: [] }).sizes.push(t); continue; }
+        if (layered && !SHARED.test(prefix)) continue;   // a component's own size, named for no component on the page
         general.push(t);
       }
       view.tokens.spacing = [...(view.tokens.spacing ?? []), ...general];

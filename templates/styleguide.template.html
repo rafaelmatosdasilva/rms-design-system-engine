@@ -8,6 +8,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- The code blocks' own monospace face, the one font the page brings itself (its words are the system's). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&amp;display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Living style guide</title>
 <style data-system>
@@ -55,6 +57,7 @@ html { overflow: visible; height: auto; }
 /* The page's own words with room between their lines; a component drawn on it keeps the line height its system gives. */
 .sg-main, .sg-sidebar { line-height: var(--sg-lh); font-weight: var(--sg-m-weight); }   /* its words in the system's text weight, never the browser's thinner one */
 .pg-preview, .sg-thumb, .pg-variant-stage, .pg-example-stage { line-height: normal; }
+.pg-preview--usable > * { cursor: pointer; }   /* a component a click changes, as it does in a product */
 body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: block; padding: 0; }
 
 /* ── Page layout ─────────────────────────────────────────────────────────── */
@@ -80,6 +83,9 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* The page's default button, where the system has no text button of its own: a soft fill of the page's text colour
    (lighter on a dark page, darker on a light one), the tables' line and corners, its words in the page's text colour. */
 .sg-btn { display: inline-flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) var(--sg-space-m); border: var(--sg-line); border-radius: var(--sg-radius); background: color-mix(in srgb, var(--sg-text) 8%, transparent); color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-decoration: none; cursor: pointer; white-space: nowrap; }
+.sg-link-mark { width: 1em; height: 1em; flex: none; }
+.pg-code-import { display: flex; flex-direction: column; gap: var(--sg-space-s); }   /* its import and file, first in its Code area */
+.sg-overlay-host { position: fixed; inset: 0; z-index: 1000; }   /* a dialog opened over the whole window, as its app's own layer holds it */
 .sg-btn:hover { background: color-mix(in srgb, var(--sg-text) 14%, transparent); }
 .sg-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-btn[aria-pressed="true"] { background: color-mix(in srgb, var(--sg-text) 20%, transparent); }   /* a switch's words keep the browser's weight, whatever the text around it takes */
@@ -94,7 +100,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-tab { display: inline-flex; align-items: center; background: none; border: 0; margin: 0; padding: var(--sg-space-s) 0 calc(var(--sg-space-s) * 2); font: inherit; font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-muted); white-space: nowrap; cursor: pointer; }
 .sg-tab:hover, .sg-tab.is-on { color: var(--sg-text); }
 .sg-tab.is-on { box-shadow: inset 0 -2px 0 var(--sg-text); }
-.sg-seg button[aria-pressed="true"] { font-weight: var(--sg-heading-weight); }
+/* The chosen one is shown by its fill and line, never a heavier weight: the words of a switch never change weight. */
 
 /* ── Modes ───────────────────────────────────────────────────────────────── */
 .sg-modes { display: flex; flex-direction: column; gap: var(--sg-space-l); }
@@ -121,6 +127,9 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-section { margin-bottom: var(--sg-space-xxl); scroll-margin-top: var(--sg-space-xxl); }   /* as far from the top as the page's own padding: opening one never scrolls the page */
 .sg-section-badge { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-s); font-weight: var(--sg-s-weight); background: color-mix(in srgb, var(--sg-muted) 12%, transparent); color: var(--sg-muted); margin-bottom: var(--sg-space-s);   /* 8px to the title on every page */ }
 .sg-section > h2, .pg-head > h2 { font-size: var(--sg-title); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; margin-bottom: var(--sg-space-xs); }
+.sg-section { position: relative; }
+.sg-section-actions { position: absolute; top: 0; right: 0; }   /* a section's own action, at its top right */
+.sg-section > p.sg-foundation-lead { font-size: var(--sg-xs); color: var(--sg-muted); margin: 0 0 var(--sg-space-m); max-width: none; }   /* a foundation's one short line under its title */
 .sg-section > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); margin-bottom: var(--sg-space-xl); max-width: 560px; }
 .sg-subsection { margin-bottom: var(--sg-space-xxl); }
 .sg-subsection > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-s); }   /* a title with no line under it */
@@ -201,6 +210,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-status--beta { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }
 .sg-status--deprecated { background: color-mix(in srgb, var(--sg-warning) 24%, transparent); }
 .sg-status--code-only { background: color-mix(in srgb, var(--sg-text-2) 16%, transparent); }
+.sg-status--connected { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }   /* the project's Code Connect pairs it with Figma */
 .pg-status { display: flex; align-items: center; gap: var(--sg-space-s); flex-wrap: wrap; margin: var(--sg-space-xs) 0 0; font-size: var(--sg-s); color: var(--sg-text-2); }
 /* What a component's page says first, and its overview card under its name: its version, when it last changed, how it
    stands with Figma and with accessibility, and where it is used. A fact that needs work is marked, never coloured alone. */
@@ -255,7 +265,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-token-pop .pg-updated { margin: var(--sg-space-s) 0; }
 .sg-token-pop .pg-updated > div { grid-template-columns: minmax(max-content, 30%) 1fr; }   /* the names as wide as their words, the values the rest */
 .sg-token-pop-actions { display: flex; gap: var(--sg-space-s); }
-.type-list { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-m); }
+.type-list { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-xl); }   /* tables one under another: twice a card's own spacing */
 .type-specimen-preview { color: var(--sg-text); padding: var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* the sample on one row, under the style's name */
 .type-specimen.pg-inspect td:last-child { word-break: normal; overflow-wrap: break-word; }   /* a name and its value wrap between words, never inside one */
 .spacing-row { display: flex; align-items: center; gap: var(--sg-space-m); padding: var(--sg-space-xs) 0; border-bottom: var(--sg-line); }
@@ -265,7 +275,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .spacing-meta { font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted); flex: 1; }
 .spacing-name { color: var(--sg-text-2); font-size: var(--sg-xs); }
 /* Colours, spacing and radii as lists: one card per group, its name as the head, the columns lined up from card to card. */
-.sg-token-cards { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-m); }
+.sg-token-cards { display: grid; grid-template-columns: 1fr; gap: var(--sg-space-xl); }
 .pg-inspect.sg-token-card table { table-layout: fixed; }
 .pg-inspect.sg-token-card td, .pg-inspect.sg-token-card td:first-child, .pg-inspect.sg-token-card td:last-child { color: var(--sg-text); width: auto; word-break: normal; overflow-wrap: anywhere; }
 .pg-inspect.sg-token-card td.sg-token-sample { width: calc(var(--sg-space-xxl) * 3); }
@@ -281,6 +291,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 }
 .sg-token-sample > span { display: block; }
 .sg-token-swatch { width: var(--sg-space-xxl); height: var(--sg-space-xxl); border: var(--sg-line); border-radius: var(--sg-radius-s); }
+.sg-type-family-sample { font-size: var(--sg-title); line-height: normal; }
 .sg-token-sample > .spacing-bar { height: var(--sg-space-xxl); border-radius: 0; }   /* every sample as tall as the others, so a space reads as its width */
 .sg-token-radius { width: var(--sg-space-xxl); height: var(--sg-space-xxl); background: var(--sg-bg-2); border: var(--sg-line); }
 /* Motion: a track a dot crosses when played, an easing's curve drawn before it in the text colour. */
@@ -354,13 +365,14 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Parity's and Accessibility's tables in the Playground's card: the system card's border, corners and shadow, the head
    row as the card's head. overflow: clip keeps the corners and the head row sticky. */
 .pg-par-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); overflow: clip; background: var(--sg-bg); }
-.pg-par-card + .pg-par-card { margin-top: var(--sg-space-m); }
+.pg-par-card + .pg-par-card { margin-top: var(--sg-space-xl); }
 .pg-par-card[hidden], .pg-par-table tr[hidden] { display: none; }
 .pg-par-card .pg-par-table th { background: var(--sg-bg-2); font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
 .pg-par-card .pg-par-table tr:last-child td { border-bottom: none; }
 .pg-wcag-tip { text-align: left; }
 .pg-par-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--sg-m); }
 /* Its head stays in view under the component's areas as the rows scroll by (the line under it moves with it). */
+.sg-no-tasks .sg-todo-no, .sg-no-tasks .sg-todo-no-head { display: none; }
 .pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
 .pg-par-table td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; }
 /* Every table on the page: rows of one height at least, taller only for what they hold, their content centred in it. */
@@ -414,7 +426,14 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-code-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-code-title { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-code pre { flex: 1; min-height: 0; margin: 0; padding: var(--sg-space-m); overflow: auto; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); }
-.pg-code pre, .pg-code code { font-family: inherit; white-space: pre; }
+.sg-main .pg-code pre, .sg-main .pg-code code { font-size: var(--sg-xs); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; font-variant-ligatures: none; }
+/* Its words coloured as code is read: the tag, each attribute, each value and each binding in a role of the page's
+   own, so they follow its modes. */
+.pg-code .tk-tag { color: var(--sg-accent); }
+.pg-code .tk-attr { color: color-mix(in srgb, var(--sg-accent) 55%, var(--sg-text)); }
+.pg-code .tk-str { color: color-mix(in srgb, var(--sg-positive) 70%, var(--sg-text)); }
+.pg-code .tk-bind { color: color-mix(in srgb, var(--sg-warning) 75%, var(--sg-text)); }
+.pg-code .tk-punct { color: var(--sg-muted); }
 /* Words for a screen reader only (a mark's meaning, a copy confirmed). */
 /* A title that is one long word (segmentedControl) breaks where it must on a narrow screen, never widens the page. */
 .sg-hero > h1, .sg-section > h2, .pg-head > h2, .sg-section > h3, .sg-overview-group > h3 { overflow-wrap: anywhere; min-width: 0; }
@@ -430,7 +449,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-diff-list b { white-space: normal; }
 .pg-todo { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-text-2); }
 .sg-todo { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one card table per component */
-.sg-todo-kind { display: flex; flex-direction: column; gap: var(--sg-space-l); }   /* one kind at a time, its cards spaced as the list's */
+.sg-todo-kind { display: flex; flex-direction: column; gap: var(--sg-space-xxl); }   /* one kind at a time, its cards spaced as the list's */
 .sg-todo-kind[hidden] { display: none; }
 /* One table for every issue, on the Tasks page and in a component's Parity and Accessibility areas: the same columns at
    the same widths everywhere, so they line up down the page and read the same in each place. */
@@ -476,7 +495,14 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-ctl-label { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); }
 .pg-ctl-label code { font-weight: var(--sg-m-weight); margin-left: var(--sg-space-xs); }
 /* With no text field in the system, the browser's own (never styled here, so it cannot sit inside the system's field). */
-.pg-ctl > input[type="text"] { font: inherit; }
+.pg-ctl > input[type="text"]:not(.sg-input) { font: inherit; }
+/* The page's default text field, where the system has none of its own (the Playground's text props, the search): it
+   reads as a field in every mode, in the system's colours, line, corners and spacing. */
+.sg-input, .pg-ctl > .sg-input, #sg-search .sg-input { display: block; width: 100%; box-sizing: border-box; margin: 0; padding: var(--sg-space-s) var(--sg-space-m); font: inherit; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text); background: var(--sg-bg); border: var(--sg-line); border-radius: var(--sg-radius); }
+.sg-input::placeholder { color: var(--sg-muted); }
+.sg-input:hover { border-color: var(--sg-text-2); }
+.sg-input:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-input:disabled { cursor: not-allowed; opacity: 0.5; }
 .pg-empty { font-size: var(--sg-s); color: var(--sg-muted); }
 /* Anatomy: the component as set in the Playground, drawn larger, each part, padding and gap outlined and numbered. */
 .pg-anat-stage { position: relative; flex: none; }
@@ -561,9 +587,9 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-inspect .pg-par-val { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-size: var(--sg-s); }   /* what a change did, under it */
 .pg-missing { font-style: italic; }
 .pg-doc > .pg-from { margin-top: var(--sg-space-s); }
-.pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: var(--sg-space-m); align-items: start; }
+.pg-inspect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: var(--sg-space-xl); align-items: start; }
 .pg-inspect-grid.pg-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* Parity: two columns */
-.sg-seg-icon { width: 0.75em; height: 0.75em; flex: none; color: var(--sg-warning); vertical-align: middle; margin-right: var(--sg-space-xxs); }
+.sg-seg-icon { width: calc(0.75em + 4px); height: calc(0.75em + 4px); flex: none; color: var(--sg-warning); vertical-align: middle; margin-right: var(--sg-space-xxs); }
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: clip; box-shadow: var(--sg-shadow); }
 .pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-s-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 .pg-inspect table { width: 100%; border-collapse: collapse; }
@@ -581,7 +607,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* What the team wrote, in the Documentation table: its paragraphs as tight as a cell's one line. */
 .pg-written > p { margin: 0; }
 .pg-written > p + p { margin-top: var(--sg-space-xs); }
-.pg-cards { display: flex; flex-direction: column; gap: var(--sg-space-m); }
+.pg-cards { display: flex; flex-direction: column; gap: var(--sg-space-xl); }
 .pg-cards .pg-inspect td:last-child { word-break: normal; overflow-wrap: anywhere; }   /* a commit's words wrap between words */
 .pg-doc-card > .pg-updated { gap: 0; margin: 0; font-size: var(--sg-m); color: var(--sg-text); }
 .pg-doc-card > .pg-updated > div { grid-template-columns: 38% 1fr; align-items: center; min-height: var(--sg-row-h); box-sizing: border-box; padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); }   /* rows as every other table's: as tall, as padded, centred */
@@ -685,6 +711,10 @@ a.pg-usage-name { color: var(--sg-text); }
     s.innerHTML = (badge ? '<div class="sg-section-badge">' + esc(badge) + '</div>' : '') + '<h2>' + esc(title) + '</h2>' + (lead ? '<p>' + esc(lead) + '</p>' : '');
     main.appendChild(s); return s;
   }
+  // A foundation's own line under its title: what it lists, from the system, in one short sentence of about the same
+  // length on every foundation page.
+  function foundationLead(sec, text) { var h = sec.querySelector('h2'), p = document.createElement('p'); p.className = 'sg-foundation-lead'; p.textContent = text; h.insertAdjacentElement('afterend', p); }
+  var plural = function (n, one, many) { return n + ' ' + (n === 1 ? one : many); };
   function hr() { var h = document.createElement('hr'); h.className = 'sg-hr'; main.appendChild(h); }
   // How far down what sticks at the top of a page reaches (its title and size switch, a component's areas, the Tasks
   // page's filter and counts), for every table's head to stick under it (--pg-areas-h); and how tall a card's head is,
@@ -832,6 +862,9 @@ a.pg-usage-name { color: var(--sg-text); }
   // A switch that needs attention (an area with something to do) carries the page's own small warning mark, never one
   // of the system's icons: the page's sign, the same on every system.
   var ALERT_ICON = 'warn';
+  // The page's own marks for a link to Figma and to the code, the same on every system.
+  var FIGMA_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 24" aria-hidden="true"><path fill="currentColor" d="M4 24a4 4 0 0 0 4-4v-4H4a4 4 0 1 0 0 8Zm-4-12a4 4 0 0 1 4-4h4v8H4a4 4 0 0 1-4-4Zm0-8a4 4 0 0 1 4-4h4v8H4a4 4 0 0 1-4-4Zm8-4h4a4 4 0 1 1 0 8H8V0Zm8 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>';
+  var CODE_SVG = '<svg class="sg-link-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m8 6-6 6 6 6m8-12 6 6-6 6M14 4l-4 16"/></svg>';
   var WARN_SVG = '<svg class="sg-seg-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1Zm-.9 3.5h1.8l-.3 5H7.4l-.3-5ZM8 10.6a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>';
   // name: what the switch chooses. The group says it (WCAG 1.3.1, 4.1.2): the page's own row is a named group, and the
   // system's control carries the name itself, so the role its script gives it (a radio group) has its name.
@@ -1259,6 +1292,7 @@ a.pg-usage-name { color: var(--sg-text); }
   if (FLAT.length) {
     hr(); foundationLink('colors', 'colors');
     var cs = section('colors', 'Foundations', 'Colors', null);
+    foundationLead(cs, plural(FLAT.length, 'colour token', 'colour tokens') + ' of the system, each in every colour mode.');
     var cd = document.createElement('div'); cd.className = 'sg-token-cards';
     var drawColors = function (moded) {
       cd.innerHTML = TOKENS.colors.map(function (g) {
@@ -1278,13 +1312,15 @@ a.pg-usage-name { color: var(--sg-text); }
   if ((TOKENS.typography || []).length || TYPE_FAMILY || TYPE_OFF.length) {
     hr(); foundationLink('typography', 'typography');
     var ts = section('typography', 'Foundations', 'Typography', null);
+    foundationLead(ts, plural((TOKENS.typography || []).length, 'text style', 'text styles') + ' of the system, each at every breakpoint.');
     if (TYPE_FAMILY && TYPE_FAMILY.differs) {
       var fd = document.createElement('div'); fd.className = 'sg-pending sg-type-family';
       fd.innerHTML = '<b>The family differs.</b> Figma\'s text styles use ' + esc(TYPE_FAMILY.figma || '') + (TYPE_FAMILY.variable ? ' (' + esc(TYPE_FAMILY.variable) + ')' : '') + ', the code ' + esc(TYPE_FAMILY.code || 'none') + (TYPE_FAMILY.var && /^--/.test(TYPE_FAMILY.var) ? ' (' + esc(TYPE_FAMILY.var) + ')' : '') + '. It is on the Tasks page; the styles below are drawn in the code\'s family.';
       ts.appendChild(fd);
     } else if (TYPE_FAMILY) {
       var fc = document.createElement('div'); fc.className = 'sg-token-cards sg-type-family';
-      fc.innerHTML = tokenCard('family', [{ sample: '<span style="font-family:inherit">Aa</span>', t: { figma: TYPE_FAMILY.figma, var: TYPE_FAMILY.var || '' }, value: TYPE_FAMILY.value }]);
+      // Drawn in the family itself (its variable), never the page's own font.
+      fc.innerHTML = tokenCard('family', [{ sample: '<span class="sg-type-family-sample" style="font-family:' + (TYPE_FAMILY.var ? 'var(' + esc(TYPE_FAMILY.var) + ')' : 'inherit') + '">Aa</span>', t: { figma: TYPE_FAMILY.figma, var: TYPE_FAMILY.var || '' }, value: TYPE_FAMILY.value }]);
       ts.appendChild(fc);
     }
     if (TYPE_OFF.length) {
@@ -1298,8 +1334,9 @@ a.pg-usage-name { color: var(--sg-text); }
       demo.innerHTML = '';
       TOKENS.typography.forEach(function (t) {
         var style = [];
-        // The family is the system's page font, which every text inherits (with its fallbacks): shown once above, never set again here.
         TYPE_PROPS.forEach(function (k) { if (t[k[0]] && t[k[0]].var) style.push(k[1] + ':var(' + t[k[0]].var + ')'); });
+        // In the system's family (its variable) when it agrees with Figma: its text styles' own font, not the page's.
+        if (TYPE_FAMILY && !TYPE_FAMILY.differs && TYPE_FAMILY.var) style.push('font-family:var(' + TYPE_FAMILY.var + ')');
         var row = document.createElement('div'); row.className = 'type-specimen pg-inspect';
         row.innerHTML = '<div class="pg-inspect-head"></div><div class="type-specimen-preview" style="' + esc(style.join(';')) + '">The quick brown fox jumps over the lazy dog</div><table></table>';
         demo.appendChild(row);
@@ -1325,6 +1362,7 @@ a.pg-usage-name { color: var(--sg-text); }
     if (!(list || []).length) return;
     hr(); foundationLink(id, title.toLowerCase());
     var s = section(id, 'Foundations', title, null);
+    foundationLead(s, plural(list.length, id === 'radii' ? 'radius token' : 'spacing token', id === 'radii' ? 'radius tokens' : 'spacing tokens') + ' of the system, each at every breakpoint.');
     var fams = [], byFam = {};
     list.forEach(function (t) { var f = t.figma.indexOf('/') > 0 ? t.figma.split('/')[0] : title.toLowerCase(); if (!byFam[f]) { byFam[f] = []; fams.push(f); } byFam[f].push(t); });
     var d = document.createElement('div'); d.className = 'sg-token-cards';
@@ -1387,6 +1425,7 @@ a.pg-usage-name { color: var(--sg-text); }
       ? 'When a person asks for less motion, the system ends every ' + MOTION.reduced.ends.join(' and ') + ' at once (' + MOTION.reduced.at + ').'
       : 'The system does not stop its motion yet when a person asks for less (prefers-reduced-motion); the accessibility check lists where it moves.';
     var mo = section('motion', 'Foundations', 'Motion', less);
+    foundationLead(mo, plural(MOTION.overview.length, 'motion', 'motions') + ' of the system, each with its timing and curve.');
     var longest = MOTION.overview.reduce(function (m, r) { return Math.max(m, r.ms || 0); }, 0), baseMs = Math.max(longest, 200);
     var track = function (attrs) { return '<span class="sg-motion-sample"><span class="sg-motion-track"><span class="sg-motion-dot"' + attrs + '></span></span></span>'; };
     var known = function (n) { return COMPONENTS.some(function (c) { return c.name === n; }); };
@@ -1427,6 +1466,16 @@ a.pg-usage-name { color: var(--sg-text); }
   if ((DATA.icons || []).length) {
     hr(); foundationLink('icons', 'icons');
     var is = section('icons', 'Foundations', 'Icons', null);
+    foundationLead(is, plural(DATA.icons.length, 'icon', 'icons') + ' of the system, each at the size Figma gives it.');
+    // Every icon in one file at the top right: the system's sheet as an SVG sprite, each icon a <symbol> by its id.
+    var dl = document.createElement('div'); dl.className = 'sg-section-actions'; dl.innerHTML = sysButton('button', 'Download all icons'); is.appendChild(dl);
+    dl.querySelector('button').addEventListener('click', function () {
+      var sheet = document.getElementById('ds-icon-sheet'); if (!sheet) return;
+      var body = DATA.icons.map(function (id) { var sym = document.getElementById(id); return sym ? sym.outerHTML : ''; }).join('\n');
+      var text = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">\n' + body + '\n</svg>\n';
+      var url = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' })), a = document.createElement('a');
+      a.href = url; a.download = String(DATA.title || 'design-system').replace(/[^\w-]+/g, '-').toLowerCase() + '-icons.svg'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    });
     // Each icon at the size Figma gives it, named as in Figma; the symbol's own viewBox when Figma does not list it.
     var FIG = DATA.iconFigma || {};
     var own = function (id) { if (FIG[id] && FIG[id].size) return FIG[id].size; var sym = document.getElementById(id), vb = sym && sym.getAttribute('viewBox'); return vb ? Number(vb.split(/[\s,]+/)[2]) || null : null; };
@@ -1815,11 +1864,14 @@ a.pg-usage-name { color: var(--sg-text); }
   var nudgeQueued = false;
   function nudge() { if (nudgeQueued) return; nudgeQueued = true; requestAnimationFrame(function () { nudgeQueued = false; try { window.dispatchEvent(new Event('resize')); } catch (e) {} }); }
   // icon: one of the system's icons after the words (a link that opens elsewhere).
-  function sysButton(tag, label, attrs, plainClass, icon) {
+  // lead: a mark of the page's own before the words (Figma, Code).
+  function sysButton(tag, label, attrs, plainClass, icon, lead) {
     var b = DATA.ui && DATA.ui.button, ic = icon ? '<svg class="sg-link-icon" aria-hidden="true"><use href="#' + esc(icon) + '"/></svg>' : '';
+    if (lead) label = { lead: lead, text: label };
     // With none, the page's default button (sg-btn): every such action looks the same, as a button.
-    if (!b) return '<' + tag + ' class="' + (plainClass ? plainClass + ' ' : '') + 'sg-btn"' + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + esc(label) + ic + '</' + tag + '>';
-    var text = b.label ? '<' + b.label.tag + (b.label.cls ? ' class="' + esc(b.label.cls) + '"' : '') + '>' + esc(label) + '</' + b.label.tag + '>' : esc(label);
+    var words = label && label.lead ? label.lead + esc(label.text) : esc(label);
+    if (!b) return '<' + tag + ' class="' + (plainClass ? plainClass + ' ' : '') + 'sg-btn"' + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + words + ic + '</' + tag + '>';
+    var text = b.label ? '<' + b.label.tag + (b.label.cls ? ' class="' + esc(b.label.cls) + '"' : '') + '>' + words + '</' + b.label.tag + '>' : words;
     return '<' + tag + ' class="' + esc(b.cls) + '"' + (tag === 'button' ? ' type="button"' : '') + (attrs || '') + '>' + text + ic + '</' + tag + '>';
   }
   // The system's icon for a link that opens elsewhere: one named for it, else an arrow.
@@ -1841,23 +1893,34 @@ a.pg-usage-name { color: var(--sg-text); }
   var attrText = function (x) { return String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); };
   // The component's own tag with the props set in the playground, in its framework's syntax. A value equal to the
   // code's default (else Figma's) is left out, as a product leaves it out.
+  // A tag's code coloured: its punctuation, tag name, attributes, values and bindings each in its own span, the words as
+  // they are (copied as text, they are the code itself).
+  function codeColours(text) {
+    var e = function (x) { return String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+    var re = /(<\/?)([A-Za-z][\w.-]*)|([:@]?[A-Za-z_][\w:.-]*)(=)("[^"]*"|\{[^}]*\})|(\/?>)/g, out = '', at = 0, m;
+    text = String(text);
+    while ((m = re.exec(text))) {
+      out += e(text.slice(at, m.index)); at = re.lastIndex;
+      if (m[2]) out += '<span class="tk-punct">' + e(m[1]) + '</span><span class="tk-tag">' + e(m[2]) + '</span>';
+      else if (m[3]) out += '<span class="tk-attr">' + e(m[3]) + '</span><span class="tk-punct">=</span><span class="' + (/^\{/.test(m[5]) || /^:/.test(m[3]) ? 'tk-bind' : 'tk-str') + '">' + e(m[5]) + '</span>';
+      else out += '<span class="tk-punct">' + e(m[6]) + '</span>';
+    }
+    return out + e(text.slice(at));
+  }
   function callCode(c, props, state) {
     var api = c.api, syn = api.syntax, attrs = [];
     var codeProp = function (n) { return (api.props || []).find(function (q) { return low(q.name) === low(n); }); };
     props.forEach(function (p) {
+      if (p.showsPart) return;   // Figma's switch for a part: the code shows it by giving the part's props
       var name = p.prop || p.label, q = codeProp(name), v = state[p.label];
+      // Every prop the Playground sets, at its value now, the defaults too: the code draws what the preview shows.
       if (p.type === 'BOOLEAN') {
-        var def = q && q.default != null ? /^true$/i.test(q.default) : !!p.default;
-        if (!!v === def) return;
         attrs.push(v ? name : syn === 'vue' ? ':' + name + '="false"' : syn === 'html' ? null : name + '={false}');
       } else if (p.type === 'VARIANT') {
         var val = q && q.values ? (q.values.find(function (x) { return low(x) === low(v); }) || v) : v;
-        var dv = q && q.default != null ? q.default : p.default;
-        if (dv != null && low(val) === low(dv)) return;
-        attrs.push(name + '="' + attrText(val) + '"');
+        if (val != null && val !== '') attrs.push(name + '="' + attrText(val) + '"');
       } else if (p.type === 'TEXT' && v) {
-        var tv = q && q.default != null ? q.default : p.default;
-        if (tv == null || String(v) !== String(tv)) attrs.push(name + '="' + attrText(v) + '"');
+        attrs.push(name + '="' + attrText(v) + '"');
       }
     });
     (api.props || []).forEach(function (q) {
@@ -2137,9 +2200,16 @@ a.pg-usage-name { color: var(--sg-text); }
     return '<tr data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
       colsOf(area || r.area).map(function (col) { return ISSUE_CELL[col[1]](r); }).join('') + '</tr>';
   }
+  // A table where nothing is open (everything done or not needed) has no Task nr column: there is no task in it.
+  function markTaskCols(root) {
+    Array.prototype.forEach.call(root.querySelectorAll('table.sg-issues'), function (t) {
+      var cells = t.querySelectorAll('td.sg-todo-no');
+      t.classList.toggle('sg-no-tasks', !!cells.length && !Array.prototype.some.call(cells, function (k) { return k.textContent.trim(); }));
+    });
+  }
   function issueTableHTML(rows, bodyCls, head, area) {
     var cols = colsOf(area || ((rows || [])[0] || {}).area);
-    return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + '"><thead><tr>' + cols.map(function (col) { return '<th>' + esc(col[0]) + '</th>'; }).join('') + '</tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
+    return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + '"><thead><tr>' + cols.map(function (col) { return '<th' + (col[1] === 'no' ? ' class="sg-todo-no-head"' : '') + '>' + esc(col[0]) + '</th>'; }).join('') + '</tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
   }
   // A count of each status above a table, as the Tasks page counts them.
   function statusSum(rows) {
@@ -2262,6 +2332,8 @@ a.pg-usage-name { color: var(--sg-text); }
     });
   }
   // ── How a product brings it in: its import line (copied), its file (downloaded), and what it is built with ────────
+  // Its import and file, first in its Code area.
+  function codeImportHTML(c) { var h = importHTML(c); return h ? '<div class="pg-doc pg-code-import">' + h + '</div>' : ''; }
   function importHTML(c) {
     var out = '';
     if (c.import) out += '<div class="pg-import"><span class="pg-usage-label">Import</span><code>' + esc(c.import.line) + '</code>' + sysButton('button', 'Copy import', ' data-copy-text="' + esc(c.import.line) + '"') + (c.source ? sysButton('button', 'Download file', ' data-download="' + esc(c.name) + '"') : '') + '<span class="sg-hidden-text" role="status"></span></div>';
@@ -2281,9 +2353,9 @@ a.pg-usage-name { color: var(--sg-text); }
   // ── Links: where else it lives (Figma, its code, the team's documentation), each opening in a new tab ────────────
   function headLinksHTML(list) {
     if (!(list || []).length) return '';
-    // Said as where it takes you (See in Figma, See in code), with the system's icon for a link that opens elsewhere.
-    var say = function (label) { return /^figma$/i.test(label) ? 'See in Figma' : /^code$/i.test(label) ? 'See in code' : label; };
-    return '<div class="pg-head-links">' + list.map(function (l) { return sysButton('a', say(l.label), ' href="' + esc(l.url) + '" target="_blank" rel="noopener"', null, LINK_ICON); }).join('') + '</div>';
+    // Named for where it takes you (Figma, Code), each with the page's own mark for it, never one of the system's icons.
+    var mark = function (label) { return /^figma$/i.test(label) ? FIGMA_SVG : /^code$/i.test(label) ? CODE_SVG : ''; };
+    return '<div class="pg-head-links">' + list.map(function (l) { return sysButton('a', /^code$/i.test(l.label) ? 'Code' : /^figma$/i.test(l.label) ? 'Figma' : l.label, ' href="' + esc(l.url) + '" target="_blank" rel="noopener"', null, null, mark(l.label)); }).join('') + '</div>';
   }
   function linksHTML(list) {
     if (!(list || []).length) return '';
@@ -2335,7 +2407,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // A text copied, the button says so for a moment and a screen reader hears it.
   // The address of a view, the area of a component after a / (#c-chip/accessibility), and after a ? the props of the
   // variant it shows (#c-chip?Size=L&Label=Save): each area has its own link to send someone to.
-  var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', used: 'used-in', log: 'changelog' };
+  var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', api: 'code', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', used: 'used-in', log: 'changelog' };
   function hashParts() {
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
@@ -2362,7 +2434,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // width, where the system's own media queries apply. The one chosen stays for the next component.
   // The widths Figma sets for each breakpoint mode (a viewport width variable), else the common phone, tablet and desktop.
   var WIDTHS = [['fit', 'Fit']].concat((DATA.widths || []).length ? DATA.widths.map(function (w) { return [w.value, w.label, w.px]; }) : [['phone', 'Phone', 375], ['tablet', 'Tablet', 768], ['desktop', 'Desktop', 1280]]), WIDTH = 'fit';
-  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['docs', 'Documentation'], ['motion', 'Motion'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['built', 'Built with'], ['used', 'Used in'], ['log', 'Changelog']], AREA = 'play';
+  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['docs', 'Documentation'], ['api', 'Code'], ['motion', 'Motion'], ['a11y', 'Accessibility'], ['parity', 'Parity'], ['built', 'Built with'], ['used', 'Used in'], ['log', 'Changelog']], AREA = 'play';
   // The props whose options are its variants (two or more built), in Figma's order.
   function variantProps(c) { return (c.controls || []).filter(function (p) { return p.type === 'VARIANT' && (p.options || []).filter(function (o) { return !o.unbuilt; }).length > 1; }); }
   // What the Variants area shows: each variant prop's options, and each on/off prop the code builds as off and on.
@@ -2578,6 +2650,7 @@ a.pg-usage-name { color: var(--sg-text); }
       var tr = el.closest('tr'), n = TODO_NO[decodeURIComponent(el.dataset.todoKey)];
       el.textContent = n && tr && (tr.dataset.status === 'todo' || tr.dataset.status === 'check') ? n : '';
     });
+    markTaskCols(document);
     var link = nav.querySelector('a[href="#tasks"]');
     var box = td.querySelector('.sg-todo') || td.appendChild(document.createElement('div')); box.className = 'sg-todo';
     var last = tried.reduce(function (m, c) { var at = c.__a11y.live && c.__a11y.live.at; return at && (!m || at > m) ? at : m; }, null);
@@ -3091,17 +3164,18 @@ a.pg-usage-name { color: var(--sg-text); }
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2>' + headLinksHTML(c.links) + '</div>' +
         // A component only the code has: said at its top, so nothing on its page reads as agreed with Figma.
         (c.codeOnly ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">Only in the code</span><span>' + (c.codeOnly.figma ? 'Figma has no component for it: compared with nothing in Figma.' : 'No Figma data yet: compared with nothing in Figma.') + '</span></p>' : '') +
-        (c.status || c.coverage ? '<p class="pg-status">' + statusPill(c.status) + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
+        // Connected by the project's own Code Connect: a badge, its file named on hover.
+        (c.status || c.coverage || c.codeConnect ? '<p class="pg-status">' + statusPill(c.status) + (c.codeConnect ? '<span class="sg-status sg-status--connected" title="' + esc('Code Connect: ' + c.codeConnect.file) + '">Code Connect</span>' : '') + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') +
         // Retired and still in use: what replaces it and how much still moves, each place a row of the Tasks page.
         (c.migration ? '<p class="pg-status pg-migration">' + (c.status ? '' : statusPill({ kind: 'deprecated', status: 'Deprecated' })) + '<span>' + esc((c.migration.toName ? 'Use ' + c.migration.toName + ' instead. ' : 'Nothing replaces it yet. ') + 'Still used in ' + c.migration.count + (c.migration.count === 1 ? ' place' : ' places') + ' (' + c.migration.products.map(function (p) { return p.name + ' ' + p.count; }).join(', ') + '), each on the ') + '<a href="#tasks">Tasks</a> page.</span></p>' : '') +
         // Its class, its version, when it last changed and how to import it: one line, wrapping only when the room runs out.
-        '<div class="pg-meta">' + (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') + (ALL ? '' : factsHTML(c)) + importHTML(c) + '</div>' +
+        '<div class="pg-meta">' + (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') + (ALL ? '' : factsHTML(c)) + '</div>' +
       '</div>' +
       // What is left to do is marked on its area, the system's alert icon before the label and what it is said to a
       // screen reader: Parity while something differs from Figma or is not built, Accessibility while a problem stands
       // (the last browser check's and the audit's), the same counts as its overview card, Documentation while a kind
       // is not written yet, and Motion while something moves otherwise than Figma.
-      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)); }).map(function (a) {
+      '<div class="pg-areas"><span class="pg-areas-name" aria-hidden="true">' + esc(c.name) + '</span><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
         var f = a[0] === 'parity' ? facts.parity : a[0] === 'a11y' ? a11yOpen(c) : a[0] === 'docs' ? docOpen(c) : a[0] === 'motion' ? motionOpen(c) : null, warn = !!(f && f.todo);
         return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
       })) + '</div></div>' +
@@ -3119,11 +3193,15 @@ a.pg-usage-name { color: var(--sg-text); }
       '</div>' +
       // Variants: every option of each variant prop and both sides of each on/off prop, one per row, the other props as the Playground sets them.
       (ALL || !variantRows(c).length ? '' : '<div class="pg-area" data-area="variants"><div class="pg-footer"><div class="pg-variants"></div></div></div>') +
-      // Documentation: its API, Figma's and the code's own words, and when each side last changed.
+      // Documentation: Figma's and the code's own words, and when each side last changed.
       '<div class="pg-area" data-area="docs"><div class="pg-footer">' +
-        knowledgeHTML(c) + apiHTML(c) +
-        (docRows ? '<div class="pg-doc"><h3>Details</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') +
+        knowledgeHTML(c) +
         '</div></div>' +
+      // API: its props (each one the code says must be given marked), the events it sends and its slots, as the code has them.
+      // with its Details (its slots and what each takes), how it is built rather than how it is used.
+      // Code: how a product brings it in (its import, its file), then its API and its Details.
+      (apiHTML(c) || docRows || importHTML(c) ? '<div class="pg-area" data-area="api"><div class="pg-footer">' + codeImportHTML(c) + apiHTML(c) +
+        (docRows ? '<div class="pg-doc"><h3>Details</h3><dl class="pg-updated">' + docRows + '</dl></div>' : '') + '</div></div>' : '') +
       // Motion: how it moves, as a spec, the code's beside Figma's.
       '<div class="pg-area" data-area="motion"><div class="pg-footer">' + motionHTML(c) + '</div></div>' +
       '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + a11yHTML(c) + '</div></div>' +
@@ -3212,7 +3290,7 @@ a.pg-usage-name { color: var(--sg-text); }
     // each value as the code spells it; a prop the code requires and the playground does not set is written with …),
     // else the HTML the preview draws. Copied by the system's own button.
     var codeEl = sec.querySelector('.pg-code code'), copyBtn = sec.querySelector('.pg-code [data-copy]'), copySaid = sec.querySelector('.pg-code [role="status"]');
-    function showCode(e) { codeEl.textContent = c.api && c.api.tag ? callCode(c, props, state) : htmlCode(e); }
+    function showCode(e) { codeEl.innerHTML = codeColours(c.api && c.api.tag ? callCode(c, props, state) : htmlCode(e)); }
     copyBtn.addEventListener('click', function () { copyText(codeEl.textContent, copyBtn, copySaid); });
     Array.prototype.forEach.call(sec.querySelectorAll('[data-copy-text]'), function (b) { b.addEventListener('click', function () { copyText(b.getAttribute('data-copy-text'), b, b.parentNode.querySelector('[role="status"]')); }); });
     Array.prototype.forEach.call(sec.querySelectorAll('[data-download]'), function (b) { b.addEventListener('click', function () { download(b.getAttribute('data-download')); }); });
@@ -3240,6 +3318,7 @@ a.pg-usage-name { color: var(--sg-text); }
       if (v === 'a11y') checkLive();
       if (v === 'built') requestAnimationFrame(function () { builtThumbs(sec); });
       if (!kept) writeLink();   // the address names the area, to send someone straight to it
+      markTaskCols(sec);
       stickHeight(sec);   // its cards' heads, now in view, measured for the table heads under them
     }
     segItems(areaBar).forEach(function (b) { b.addEventListener('click', function () { showArea(b.dataset.v); }); });
@@ -3971,6 +4050,24 @@ a.pg-usage-name { color: var(--sg-text); }
       if (changed) inspect(cur);
     }
     ['click', 'change', 'input'].forEach(function (t) { preview.addEventListener(t, function () { setTimeout(readBack, 0); }); });
+    // A component its build draws (no script of its own runs on the page): a click on it flips the state it is in (a
+    // switch on, a box ticked, a tab chosen), as using it in a product does, and the controls follow. Not while it is
+    // disabled, nor while Inspect picks its parts; a radio or a tab is chosen, never unchosen, by a click.
+    var STATE_RE = /^(is)?(active|checked|selected|pressed|on|toggled|open|expanded|modelvalue|value)$/;
+    var stateProp = c.renders ? props.filter(function (p) { return p.type === 'BOOLEAN' && STATE_RE.test(squashKey(p.label)) && renderedWith(c, p, !(p.type === 'BOOLEAN' ? !!p.default : p.default)); })[0] : null;
+    if (stateProp) {
+      preview.classList.add('pg-preview--usable');
+      preview.addEventListener('click', function (e) {
+        if (inspecting || !cur || !cur.contains(e.target)) return;
+        var off = props.filter(function (p) { return p.type === 'BOOLEAN' && /^(is)?disabled$/.test(squashKey(p.label)); })[0];
+        if (off && state[off.label]) return;
+        var picks = /^(radio|tab|option|menuitemradio)$/i.test(c.role || '') || /^(radio|tab)/i.test(c.name);
+        var next = picks ? true : !state[stateProp.label];
+        if (next === state[stateProp.label]) return;
+        e.preventDefault();
+        state[stateProp.label] = next; if (syncs[stateProp.label]) syncs[stateProp.label](); refresh();
+      });
+    }
     // How it moves (DATA, read from the system's CSS): its entry and exit replayed, an overlay opened with its own
     // container, layers and open and closing classes. Each button is the system's own.
     var actions = sec.querySelector('.pg-actions'), mv = c.motion;
@@ -4034,16 +4131,33 @@ a.pg-usage-name { color: var(--sg-text); }
       var r = c.renders.filter(function (x) { return x.label === 'opened'; })[0], wrap = rootOf(r.markup); if (!wrap) return;
       AXES.forEach(function (a) { if (a.attr && preview.hasAttribute(a.attr)) wrap.setAttribute(a.attr, preview.getAttribute(a.attr)); });
       var card = wrap.querySelector('[class]:not(:empty)') || wrap; if (!card.getAttribute('role')) card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', c.name);
-      document.body.appendChild(wrap);
+      // In a layer of its own over the whole window, as the product's app gives it one: its overlay fills it, centred.
+      var host = document.createElement('div'); host.className = 'sg-overlay-host'; host.appendChild(wrap); document.body.appendChild(host);
       var closing = false;
       function key(e) { if (e.key === 'Escape') close(); }
-      function close() { if (closing) return; closing = true; document.removeEventListener('keydown', key, true); setTimeout(function () { wrap.remove(); trigger.focus(); }, playTime(wrap) + 30); }
+      function close() { if (closing) return; closing = true; document.removeEventListener('keydown', key, true); setTimeout(function () { host.remove(); trigger.focus(); }, playTime(wrap) + 30); }
       wrap.addEventListener('click', function (e) { if (!card.contains(e.target) || e.target.closest('button, a')) close(); });
       document.addEventListener('keydown', key, true);
       var first = Array.prototype.find.call(card.querySelectorAll('button, a[href], input, select, textarea, [tabindex]'), function (k) { return !k.disabled && k.getClientRects().length; });
       if (!first) { card.setAttribute('tabindex', '-1'); first = card; }
       first.focus();
     });
+    // A component that enters and leaves with a Vue transition (a toast sliding up): Hide and Show play its own leave and
+    // enter classes on the drawing, as Vue sets them, so it moves with its own timing and curve.
+    else if (c.vueTransition && !(mv && mv.entry)) (function () {
+      var tn = c.vueTransition, shown = true;
+      var span = function (el) { var cs = getComputedStyle(el), d = (cs.transitionDuration + ',' + cs.animationDuration).split(',').map(parseFloat).filter(isFinite); return Math.max.apply(null, d.concat([0])) * 1000 + 50; };
+      var play = function (el, phase, done) {
+        el.classList.add(tn + '-' + phase + '-from', tn + '-' + phase + '-active'); void el.offsetWidth;
+        requestAnimationFrame(function () { el.classList.remove(tn + '-' + phase + '-from'); el.classList.add(tn + '-' + phase + '-to');
+          setTimeout(function () { el.classList.remove(tn + '-' + phase + '-active', tn + '-' + phase + '-to'); if (done) done(); }, span(el)); });
+      };
+      action('Hide ' + c.name, function (trigger) {
+        var el = preview.firstElementChild; if (!el) return;
+        if (shown) { play(el, 'leave', function () { el.style.visibility = 'hidden'; }); shown = false; trigger.textContent = 'Show ' + c.name; }
+        else { el.style.visibility = ''; play(el, 'enter'); shown = true; trigger.textContent = 'Hide ' + c.name; }
+      });
+    })();
     else if (mv && mv.entry) action('Play entry', function () { var src = preview.firstElementChild; if (src) src.replaceWith(src.cloneNode(true)); });
     if (mv && !mv.overlay) (mv.exits || []).forEach(function (x) { action('Play exit', function () {
       var src = preview.firstElementChild; if (!src) return; src.classList.add(x);
@@ -4058,7 +4172,7 @@ a.pg-usage-name { color: var(--sg-text); }
       // A prop only the code's API takes says so: Figma has no prop for it.
       var label = '<div class="pg-ctl-label"' + (p.fromCode ? ' title="From the code\'s API: Figma has no prop for it"' : '') + '>' + esc(p.label) + (p.prop !== p.label ? '<code>' + esc(p.prop) + '</code>' : '') + (p.fromCode ? '<span class="sg-hidden-text"> (from the code)</span>' : '') + '</div>';
       if (p.type === 'TEXT') {
-        ctl.innerHTML = label + (DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text">');
+        ctl.innerHTML = label + (DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text" class="sg-input">');
         var field = ctl.querySelector('input'); field.value = state[p.label]; field.setAttribute('aria-label', p.label);
         // Only its words change: written into its part as drawn, so whatever else is set, in the controls or by using the
         // component in the preview (a radio picked, a box ticked), stays as it is. Emptied, or with no part yet, it is
@@ -4157,7 +4271,7 @@ a.pg-usage-name { color: var(--sg-text); }
   // sections). While it has words, only the results show, just below it, in place of the navigation. Escape clears it.
   var sMount = document.getElementById('sg-search');
   if (sMount) {
-    sMount.innerHTML = DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text">';
+    sMount.innerHTML = DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text" class="sg-input">';
     var q = sMount.querySelector('input'); q.type = 'search'; q.placeholder = 'Search'; q.setAttribute('aria-label', 'Search the style guide'); q.removeAttribute('value');
     var results = document.createElement('div'); results.className = 'sg-nav sg-results'; results.id = 'sg-results'; results.hidden = true; results.setAttribute('role', 'region'); results.setAttribute('aria-label', 'Search results');
     sMount.parentNode.insertBefore(results, sMount.nextSibling);

@@ -85,7 +85,9 @@ export function checkStyleguidePage(html, { missing = missingRoles(html) } = {})
     if (p.startsWith('--')) continue;
     const v = d.value.replace(/var\([^()]*(?:\([^()]*\)[^()]*)*\)/g, 'VAR');
     if (COLOUR.test(v)) { add(d, 'a colour that is not one of the system\'s tokens'); continue; }
-    if (p === 'font-family' && !/^inherit$/i.test(v)) add(d, 'a font of the page\'s own: its text inherits the font the system sets on its page, with its fallbacks');
+    // A code block's own monospace face is the page's on purpose: code is read in one, whatever the system's text is.
+    const codeFace = p === 'font-family' && /(^|,)\s*monospace\s*$/i.test(v) && /(code|pre|kbd|samp)(?![\w-])/i.test(d.selector);
+    if (p === 'font-family' && !/^inherit$/i.test(v) && !codeFace) add(d, 'a font of the page\'s own: its text inherits the font the system sets on its page, with its fallbacks');
     else if (p === 'font-size' && LENGTH.test(v)) add(d, 'a text size that is not one of the system\'s text styles');
     else if (p === 'font-weight' && /\d/.test(v)) add(d, 'a weight that is not one of the system\'s text styles');
     else if (p === 'line-height' && /\d/.test(v) && v !== '0') add(d, 'a line height that is not one of the system\'s text styles');
