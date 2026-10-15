@@ -80,12 +80,17 @@ test('the browser check tries every variant of a Vue component, rendered by the 
 
 test('the style guide draws a Vue component as the project\'s own Vite renders it, its SCSS compiled', { skip: READY, timeout: 300000 }, () => {
   const dir = harbor('vue-sg-');
+  // Figma has the chip too here, so its page is drawn (a component only the code has is a task, not a page).
+  const edit = (f, fn) => { const p = join(dir, f); const j = JSON.parse(readFileSync(p, 'utf8')); fn(j.components ?? j); writeFileSync(p, JSON.stringify(j)); };
+  edit('figma/structure.snapshot.json', (c) => { c.chip = { h: 24, defaultVariant: 'Tone=Quiet', variants: { 'Tone=Quiet': { h: 24 } } }; });
+  edit('figma/props.snapshot.json', (c) => { c.chip = { nodeId: '9:1', properties: { Tone: { type: 'VARIANT', defaultValue: 'Quiet', variantOptions: ['Quiet', 'Loud'] }, 'label#9:0': { type: 'TEXT', defaultValue: 'Filter' } }, annotations: [] }; });
+  edit('ds-config.json', (c) => { c.componentFiles.chip = 'components/HbChip.vue'; });
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /4 of 4 Vue components drawn as the project's own Vite renders them\./);
   const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
   // What it renders, its bound classes included (a template read cannot know hb-chip--quiet), from its own build.
-  assert.match(page, /"name":"HbChip","cls":"hb-chip"[^}]*"markup":"\\u003cbutton data-v-[a-f0-9]+=\\"\\" class=\\"hb-chip hb-chip--quiet\\" type=\\"button\\" aria-pressed=\\"false\\">Filter\\u003c\/button>","markupFrom":"vue-build"/);
+  assert.match(page, /"name":"chip","cls":"hb-chip"[^}]*"markup":"\\u003cbutton data-v-[a-f0-9]+=\\"\\" class=\\"hb-chip hb-chip--quiet\\" type=\\"button\\" aria-pressed=\\"false\\">Filter\\u003c\/button>"/);
   assert.match(page, /\.hb-chip\[data-v-[a-f0-9]+\] \{\n {2}padding: 4px 8px;\n\}/, 'its scoped SCSS, compiled');
   // Without the packages, its template is read as before, and the summary says why.
   const bare = mkdtempSync(join(tmpdir(), 'vue-sg-bare-'));
