@@ -356,6 +356,7 @@ Then it says which source decides when two disagree. The goal of the people who 
 - **Stale names.** A name in backticks that is no token, property or component of the system is listed to rename or take out.
 - **The extraction test.** `--extract` asks a model, through `guidelines.extract.cmd` (`claude -p` by default), the options of each property from the guidance alone, and scores the answers. It uses your model tokens.
 - **The guidance evaluation.** `guidelines` is a level of `eval-run.mjs --levels`, so you see whether agents build better with your guidelines.
+- **In the style guide.** Each component's rating sits in its Documentation area, and the whole document's on the Health page beside AI readiness.
 
 ### Figma quota
 

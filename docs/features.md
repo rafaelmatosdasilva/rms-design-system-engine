@@ -230,6 +230,7 @@ Every rule the check applies is in the [technical documentation](details.md#acce
 One number for the whole system, weighted across four areas. Parity counts 35, Accessibility 30, Documentation 20 and Motion 15, or your own weights in `styleguide.health.weights`.
 
 - **AI readiness.** How much of what an agent needs to pick each component right is there, what it is, when to use it and when not, its role, and nothing open with Figma.
+- **Guidance for agents.** The share of components your guidance makes ready for an agent, with how many are partial and thin. See [Guidance for agents](#guidance-for-agents).
 - **How it counts.** Parity and accessibility count components. A component counts whole when nothing is left, half when only checks are left, and nothing while something is to fix, so the many values that match never hide the few that do not. Documentation and motion count each item the same way. Each card has a tip that explains its number.
 - **Where to start.** The five components with the most left. Parity by type, every open difference counted by what it is about (props, variables, values, effects, modes) and where it comes from (Figma and the code differ, only Figma has it, only the code has it). Accessibility by WCAG criterion, the one failing in most components first, so a fix that clears many comes first.
 - **Each component.** Its own number, its standing in each area, its AI readiness and how much of it was really checked, weakest first. A component whose number rests on fewer than half its checks says so.
@@ -298,7 +299,7 @@ Agents read your guidelines and Figma's descriptions to pick and use each compon
 
 - **What it looks for.** A section headed with the component's exact name, what it is, when to use it, when not to, its role, an example, and its properties by name.
 - **Names that mislead.** A token, property or component named in the text that the system does not have is listed first, to rename or take out.
-- **Where you see it.** In each component's Documentation area as For agents, and on the Tasks page under Documentation while something is missing.
+- **Where you see it.** In each component's Documentation area as For agents, on the Tasks page under Documentation while something is missing, and on the Health page beside AI readiness.
 - **A test with a model, when you ask.** A model answers questions from your guidance alone, such as the options of each property, and the engine scores the answers against the real ones. It uses your model tokens.
 - **The whole document** gets a class too, from how many of its components are ready.
 

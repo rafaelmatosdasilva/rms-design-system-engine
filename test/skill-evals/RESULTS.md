@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Guidance rating for agents (continuous evaluation)
+
+What changed since the entry below (engine 8015c10, merged as 16d1a6d): K17, the team's guidance rated for what an agent can take from it (`--guidance-rating`, `--extract`). The guide changed in `cookbook/guidelines-links.md` and `reference/usage.md`.
+
+Guide set measured: `9e1632c7aed3` · Project measured: `13d811a9d668`
+
+| Haiku, engine c7ee2d0 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 20 runs) | 70/70 | 79/80 |
+| Mean cost a run | $0.063 | $0.063 |
+| Input a run | 128k | 134k |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 80 runs failed, fewer passes than the entry below, 1 rule violation. Failed: new-ui-saved #7: reports in the chat, not in a file (no reply). That run made the right edit and passed the edit check by turn 33, then loaded the `run` skill the command line bundles since 2.1.301 to serve the page, and hit the 40-turn limit before it replied. The guide change does not reach this task, so it was run 10 more times on the same engine: 10/10, 19/20 in all. Records: `records/guidance-rating`.
+
 ## 2026-10: Style guide: brands, Showroom, property sheet (continuous evaluation)
 
 What changed since the entry below (engine 1663d15): Guide notes for brands (config) and the Showroom (usage); a neutral example name in the skill file. The guide changed in `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.

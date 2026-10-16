@@ -534,12 +534,19 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`document.querySelector('#tasks .sg-todo-filter [data-v="Parity"]').click()`);
     assert.deepEqual(await shownKind(), ['Parity'], 'Documentation\'s cards go when another kind is chosen');
     // Every table's head stays in view as its rows scroll by: the card's head under what sticks at the top of the page,
-    // the table's own head row under the card's head.
+    // the table's own head row under the card's head (or under the page's bars, for a card with no head of its own).
     const headsStick = async (sel) => {
-      const pick = `[...document.querySelectorAll('${sel} .pg-par-card, ${sel} .pg-inspect')].filter((c) => c.getClientRects().length && c.querySelector('table') && c.querySelector(':scope > .pg-inspect-head')).sort((a, b) => b.offsetHeight - a.offsetHeight)[0]`;
-      await run(`(() => { document.body.style.paddingBottom = '3000px'; const card = ${pick}; window.scrollTo(0, scrollY + card.getBoundingClientRect().top + card.offsetHeight / 2 - 60); })()`);
+      const pick = `[...document.querySelectorAll('${sel} .pg-par-card, ${sel} .pg-inspect')].filter((c) => c.getClientRects().length && c.querySelector('table')).sort((a, b) => b.offsetHeight - a.offsetHeight)[0]`;
+      // The card's top just past the bars' bottom once they stick, so its head has the rest of the card to stick in,
+      // however short the card is: the bars' bottom read where they stand, the page moved by the difference until it settles.
+      const bars = `[...document.querySelectorAll('${sel} .pg-areas, ${sel} > h2, ${sel} .sg-size-switch, ${sel} .sg-todo-head')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'sticky')`;
+      await run(`(() => { document.body.style.paddingBottom = '3000px'; const card = ${pick}; window.scrollTo({ top: scrollY + card.getBoundingClientRect().top - 200, behavior: 'instant' }); })()`);
+      for (let k = 0; k < 4; k++) {
+        await new Promise((r) => setTimeout(r, 400));
+        await run(`(() => { const card = ${pick}; const low = Math.max(0, ...${bars}.map((e) => e.getBoundingClientRect().bottom)); window.scrollBy({ top: card.getBoundingClientRect().top - low + 10, behavior: 'instant' }); })()`);
+      }
       await new Promise((r) => setTimeout(r, 400));
-      const at = await run(`(() => { const card = ${pick}; const bars = [...document.querySelectorAll('${sel} .pg-areas, ${sel} > h2, ${sel} .sg-size-switch, ${sel} .sg-todo-head')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'sticky'); const low = Math.max(0, ...bars.map((e) => e.getBoundingClientRect().bottom)); const head = card.querySelector(':scope > .pg-inspect-head').getBoundingClientRect(), th = card.querySelector('thead th'); const r = { card: card.getBoundingClientRect().top < low, head: Math.round(head.top - low), th: th ? Math.round(th.getBoundingClientRect().top - head.bottom) : 0 }; document.body.style.paddingBottom = ''; window.scrollTo(0, 0); return r; })()`);
+      const at = await run(`(() => { const card = ${pick}; const bars = [...document.querySelectorAll('${sel} .pg-areas, ${sel} > h2, ${sel} .sg-size-switch, ${sel} .sg-todo-head')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'sticky'); const low = Math.max(0, ...bars.map((e) => e.getBoundingClientRect().bottom)); const own = card.querySelector(':scope > .pg-inspect-head'), head = own ? own.getBoundingClientRect() : { top: low, bottom: low }, th = card.querySelector('thead th'); const r = { card: card.getBoundingClientRect().top < low, head: Math.round(head.top - low), th: th ? Math.round(th.getBoundingClientRect().top - head.bottom) : 0 }; document.body.style.paddingBottom = ''; window.scrollTo(0, 0); return r; })()`);
       assert.deepEqual(at, { card: true, head: 0, th: 0 }, `${sel}: the card scrolled past the top, its head under the page's bars, the table's head under it`);
     };
     await headsStick('#tasks');
@@ -1335,7 +1342,7 @@ test('Health: each area counted by component, weighted into one number once acce
     // Accessibility waits until every component is tried in this browser, and the system's number with it.
     await waitForTrue(send, sessionId, `!/joins once/.test((document.querySelector('#health .sg-health-note') || {}).textContent || 'joins once')`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#health .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').firstChild.textContent, t.querySelector('.sg-health-sub').textContent])`);
-    assert.deepEqual(tiles.map((x) => x[0]), ['Health', 'Parity', 'Accessibility', 'Documentation', 'Motion', 'AI readiness'], errors.join('\n'));
+    assert.deepEqual(tiles.map((x) => x[0]), ['Health', 'Parity', 'Accessibility', 'Documentation', 'Motion', 'AI readiness', 'Guidance for agents'], errors.join('\n'));
     for (const [label, num] of [...tiles.slice(0, 4), tiles[5]]) assert.match(num, /^\d{1,3}$/, `${label} has a number`);
     assert.match(tiles[0][2], /^Weighted as Parity 35, Accessibility 30, Documentation 20, Motion 0$/, 'the team\'s weight replaces the page\'s');
     assert.match(tiles[1][2], /^\d+ of 2 components done(, \d+ to check)?$/, 'parity counts components');
@@ -1347,6 +1354,8 @@ test('Health: each area counted by component, weighted into one number once acce
     assert.match(how[1][1], /^Each component counts the same\. One counts 100 when every prop, variable and value it has matches Figma, 50 when only rows to check are left, and 0 while one difference is still to fix, however many others match\. The number is the average over the 2 components compared\.$/);
     assert.match(how[0][1], /\(Parity 35, Accessibility 30, Documentation 20, Motion 0\)/);
     assert.match(tiles[5][2], /^\d of 2 components ready$/);
+    assert.match(tiles[6][1], /^\d{1,3}$/);
+    assert.match(tiles[6][2], /^\d+ of \d+ ready, \d+ partial, \d+ thin$/, 'the guidance rated for agents, beside AI readiness (K17)');
     // The five components with the most left, at most; then each WCAG criterion that fails or waits on a person, the
     // one that fails in most components first (G10).
     assert.deepEqual(await run(`[...document.querySelectorAll('#health .sg-health-card > h3')].map((h) => h.textContent)`), ['Components with the most left', 'Parity by type', 'Accessibility by WCAG criterion']);
