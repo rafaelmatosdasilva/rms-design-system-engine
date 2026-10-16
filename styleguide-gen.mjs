@@ -662,6 +662,25 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const seenIn = (c) => (c.differences ?? []).filter((d) => PRODUCT_MISUSE.test(d.check ?? '') || / laid over it /.test(d.what ?? '')).map((d) => d.plain ?? d.what);
       for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c) });
     } catch { /* no guidance */ }
+    // For agents (K17): what an agent can take from the team's guidance for each component, its guidelines section and
+    // Figma's words, rated ready, partial or thin, with what to add; the last extraction test's share when one ran.
+    try {
+      const gr = await import('./guidance-rating.mjs');
+      const { ingestGuidelines } = await import('./intent-gen.mjs');
+      const { facts, props } = gr.readFacts(ROOT, cfg);
+      if (Object.keys(facts.components).length) {
+        const gl = ingestGuidelines(ROOT, cfg);
+        const rating = gr.rateGuidance(gr.sectionsFrom(gl, facts, gr.figmaWords(props)), facts);
+        const last = readJson(join(OUT_DIR, 'guidance-rating.json'));
+        const extracted = Object.fromEntries((last?.components ?? []).filter((x) => typeof x.extracted === 'number').map((x) => [x.name, x.extracted]));
+        const byName = new Map(rating.components.map((r) => [r.name, r]));
+        for (const c of view.components) {
+          const r = byName.get(c.name); if (!r) continue;
+          c.agentRating = { cls: r.cls, pieces: r.pieces, props: { named: r.props.named, total: r.props.total }, unknown: r.unknown, add: r.add, from: gl.sources.length ? gl.sources : ['Figma'], ...(c.name in extracted ? { extracted: extracted[c.name] } : {}) };
+        }
+        view.agentRating = { cls: rating.cls, ready: rating.ready, partial: rating.partial, thin: rating.thin, total: rating.total };
+      }
+    } catch { /* no rating */ }
     const { segmentedUi, tabsUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
     // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in

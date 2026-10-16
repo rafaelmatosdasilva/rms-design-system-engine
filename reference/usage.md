@@ -79,6 +79,7 @@ rms-design-system-engine --census                        # every value written b
 rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
 rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
 rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
+rms-design-system-engine --guidance-rating [--extract]   # how much an agent can take from the guidance: ready, partial or thin per component; --extract asks a model (your tokens)
 rms-design-system-engine --no-docs                       # skip the design-intent layer this run (emitted by default; local, gitignored)
 rms-design-system-engine --refresh-figma                 # read Figma the best way there is: design.json, figma-cli, else says how
 rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
@@ -211,6 +212,16 @@ copy its secret; (2) **share the page** with that integration; (3) put the secre
 `ds-config.json` is not secret and is committed; the **token** stays in each person's `.env`. No token,
 page not shared, or offline → the audit keeps the committed `guidelines.md` and never fails. A prototype's catalog refreshes a link whose file is missing or older than `guidelines.maxAgeHours` (24) the same way. The fetch
 reads one page and does not follow links inside it.
+
+**How much an agent can take from it** (`--guidance-rating`). Rates each component's guidance (its section in
+these files and Figma's description and annotations) for what an agent needs: a section headed with its exact name,
+what it is, when to use it, when not to, its role, an example, its properties by name, and no name the system does
+not have. Each component is ready, partial or thin; the document gets the same class from how many are ready. It
+prints what to add, writes `.design-system-engine-out/guidance-rating.json`, and the style guide shows the rating in
+each component's Documentation area (For agents). `--extract` also runs the extraction test, which spends the
+person's model tokens: a question for each property with options, answered by a model that sees only the guidance
+through `guidelines.extract.cmd` (the prompt on stdin, the answers on stdout; `claude -p` by default), scored against
+Figma's options. `guidelines` is also a level of `eval-run.mjs --levels`.
 
 **The easy way: paste the link into the chat.** The agent runs `rms-design-system-engine --guidelines <link>`,
 which works for GitLab and Notion alike, one or several links: it adds the link below for you, reads the page

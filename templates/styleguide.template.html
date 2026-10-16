@@ -900,6 +900,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
    the table's own head row under it (--pg-card-head-h). Its card clips, never hides, its overflow, so it can stick. */
 .pg-inspect-head { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 6; border-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)) calc(var(--sg-radius) - var(--sg-line-width, 1px)) 0 0; }   /* stuck, it keeps its card's top corners */
 .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--pg-card-head-h, 0px)); }
+.pg-inspect-head ~ table > thead th { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--pg-card-head-h, 0px)); z-index: 5; }   /* a card's own table (a group of tokens) keeps its head row too */
 /* What the team wrote, in the Documentation table: its paragraphs as tight as a cell's one line. */
 .pg-written > p { margin: 0; }
 .pg-written > p + p { margin-top: var(--sg-space-xs); }
@@ -1959,14 +1960,28 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
     return { key: c.name + '\u0000doc:tokens', area: 'Documentation', kind: 'Its tokens', written: head + miss + said,
       todo: all ? '' : esc('Write what each token is for in its variable\'s description in Figma. Agents read it to pick the right token.'), who: all ? '' : WHO.figma, st: all ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: n ? ['Figma, its variables\' descriptions'] : [] };
   };
+  // For agents (K17): what an agent can take from the team's guidance for it (its guidelines section and Figma's words),
+  // rated ready, partial or thin, with each piece still to add. Ready is done, partial is to check, thin is to write.
+  var AGENT_CLS = { ready: ['done', 'Ready'], partial: ['check', 'Partial'], thin: ['todo', 'Thin'] };
+  var agentRow = function (c) {
+    var a = c.agentRating; if (!a || !AGENT_CLS[a.cls]) return null;
+    var got = [['what', 'what it is'], ['whenToUse', 'when to use it'], ['whenNotToUse', 'when not to'], ['role', 'its role'], ['example', 'an example']].filter(function (p) { return (a.pieces || {})[p[0]]; }).map(function (p) { return p[1]; });
+    var written = '<p>' + esc(AGENT_CLS[a.cls][1]) + '. ' + (got.length ? 'An agent can read ' + esc(got.join(', ')) + '.' : 'An agent finds nothing about it yet.') +
+      (a.props && a.props.total ? ' ' + a.props.named + ' of ' + a.props.total + ' properties named.' : '') +
+      (typeof a.extracted === 'number' ? ' The extraction test named ' + Math.round(a.extracted * 100) + '% of its options right.' : '') + '</p>' +
+      ((a.add || []).length ? '<p class="pg-missing">Add ' + esc(a.add.join('; ')) + '.</p>' : '');
+    return { key: c.name + '\u0000doc:agents', area: 'Documentation', kind: 'For agents', written: written,
+      todo: a.cls === 'ready' ? '' : esc('Write it in the component\'s section of your guidelines, headed with its exact name, or in its description in Figma.'), who: a.cls === 'ready' ? '' : WHO.figma,
+      st: AGENT_CLS[a.cls][0], rel: '', at: DATA.builtAt || null, src: (a.from || []).slice(0, 3) };
+  };
   function docIssueRows(c) {
     if (c.codeOnly) return [];
-    var tok = tokenDocRow(c);
-    return KNOW.map(function (k) {
+    var tok = tokenDocRow(c), ag = agentRow(c);
+    return (ag ? [ag] : []).concat(KNOW.map(function (k) {
       var has = !!k[1](c);
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? k[2](c) : '<p class="pg-missing">' + esc(k[4]) + '</p>',
         todo: has ? '' : esc(WRITE_HOW[k[0]] || GUIDE_HINT), who: has ? '' : WHO.figma, st: has ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: has ? [k[3](c)] : [] };
-    }).concat(tok ? [tok] : []);
+    })).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
   function knowledgeHTML(c) {
@@ -3587,15 +3602,19 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
       Accessibility: 'Each component counts the same. One counts 100 when every WCAG 2.2 A and AA criterion it is tried on passes, 50 when only criteria a person has to check are left, and 0 while one criterion fails. The number is the average over the ' + areaOf('Accessibility').comps + ' components tried in the browser.',
       Documentation: 'Each component counts the same, by the share of its documentation written (' + listed(lower(kindsOf('Documentation'))) + '). An item written counts whole, one to check half, one missing nothing. The number is the average over the ' + areaOf('Documentation').comps + ' components.',
       Motion: 'Each component that moves counts the same, by the share of its motions that move as Figma has them (the same duration and easing, in both). One to check counts half, one that differs or is only on one side nothing. The number is the average over the ' + areaOf('Motion').comps + ' components that move; one that does not move is left out.',
-      'AI readiness': 'What an agent needs to pick a component right, ' + (READY_KINDS.length + 1) + ' items each (' + listed(lower(READY_KINDS)) + ' written, and nothing open with Figma). The number is the share of those items present over the ' + built.length + ' components; a component is ready when it has them all.'
+      'AI readiness': 'What an agent needs to pick a component right, ' + (READY_KINDS.length + 1) + ' items each (' + listed(lower(READY_KINDS)) + ' written, and nothing open with Figma). The number is the share of those items present over the ' + built.length + ' components; a component is ready when it has them all.',
+      'Guidance for agents': 'Your guidelines and the words in Figma, read as an agent reads them. A component is ready when they say what it is, when to use it and when not, its role, give an example and name its properties exactly, partial with at least two of the first four, thin with less. The number is the share of components ready; each one\'s rating is in its Documentation area. Not counted in Health.'
     };
+    var guide = DATA.agentRating && DATA.agentRating.total ? DATA.agentRating : null;
     var tiles = tile('Health', overall, 'of 100', overall == null ? 'Once every component is tried for accessibility' : 'Weighted as ' + weights, HOW.Health) +
       areas.map(function (a) {
         if (a.wait) return tile(a.name, null, '%', 'Trying the components in this browser, ' + tried.length + ' of ' + COMPONENTS.length, HOW[a.name]);
         if (!a.comps) return tile(a.name, null, '%', 'Nothing to measure yet', HOW[a.name]);
         return tile(a.name, a.score, '%', a.whole ? a.clean + ' of ' + a.comps + (a.comps === 1 ? ' component' : ' components') + ' done' + (a.checking ? ', ' + a.checking + ' to check' : '') : a.done + ' of ' + a.n + ' done', HOW[a.name]);
       }).join('') +
-      tile('AI readiness', readyAll ? pct(readyGot / readyAll) : null, '%', built.length ? readyN + ' of ' + built.length + (built.length === 1 ? ' component ready' : ' components ready') : 'Nothing to measure yet', HOW['AI readiness']);
+      tile('AI readiness', readyAll ? pct(readyGot / readyAll) : null, '%', built.length ? readyN + ' of ' + built.length + (built.length === 1 ? ' component ready' : ' components ready') : 'Nothing to measure yet', HOW['AI readiness']) +
+      // K17: the guidance rated for what an agent can take from it, beside AI readiness.
+      (guide ? tile('Guidance for agents', pct(guide.ready / guide.total), '%', guide.ready + ' of ' + guide.total + ' ready, ' + guide.partial + ' partial, ' + guide.thin + ' thin', HOW['Guidance for agents']) : '');
     // The components with the most left, weighed as the system's number weighs it: a row to fix in an area counts that
     // area's weight, one to check half of it.
     var weightOf = {}; HEALTH_AREAS.forEach(function (a) { weightOf[a[0]] = a[1]; });
