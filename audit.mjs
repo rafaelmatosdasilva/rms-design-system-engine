@@ -341,6 +341,126 @@ if (process.argv.includes('--figma-motion')) {
   process.exit(0);
 }
 
+// ── --figma-examples: the examples the design team placed in Figma, each component opened as one of them ────────
+// Through figma-cli when it answers (read in parts, figma-examples.mjs); else the script for the Figma tool of the
+// session, run part by part (--from N). With the files its answers were saved to: keeps them as the examples snapshot.
+if (process.argv.includes('--figma-examples')) {
+  let ecfg = {};
+  try { ecfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const fe = await import('./figma-examples.mjs');
+  const at = process.argv.indexOf('--figma-examples');
+  const files = []; for (let k = at + 1; k < process.argv.length && !process.argv[k].startsWith('--'); k++) files.push(process.argv[k]);
+  const target = ecfg.paths?.snapshotExamples ?? join(dirname(ecfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-examples.snapshot.json');
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  let snap = null;
+  if (files.length) {
+    try { snap = fe.examplesSnapshot(files.map((f) => readFileSync(resolve(ROOT, f), 'utf8'))); } catch (e) { console.log(`❌ ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  } else {
+    const cli = (script) => spawnSync('figma-cli', ['eval', script], { encoding: 'utf8', maxBuffer: 1e8, timeout: 600000 }).stdout ?? '';
+    if (/^\s*1\s*$/m.test(cli('return 1'))) {
+      console.log('  Reading the examples in Figma through figma-cli, in parts…');
+      try { snap = await fe.readExamplesWith(cli, { log: (m) => console.log(`  ${m}`) }); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+    } else {
+      const fromAt = process.argv.indexOf('--from'), from = fromAt > 0 ? Number(process.argv[fromAt + 1]) || 0 : 0;
+      mkdirSync(capDir, { recursive: true });
+      const file = join(capDir, `examples-${from}.js`);
+      writeFileSync(file, fe.examplesCaptureScript({ from, count: 20 }));
+      console.log(`Examples capture script → ${relative(ROOT, file)} (read-only: it changes nothing in Figma).`);
+      console.log(`NEXT: run it unchanged with the Figma tool of this session (use_figma), save what it returns as ${relative(ROOT, join(capDir, `examples-${from}.json`))}; while its answer says a next part, run rms-design-system-engine --figma-examples --from <next> for that part's script; then rms-design-system-engine --figma-examples ${relative(ROOT, join(capDir, 'examples-*.json'))} keeps them all.`);
+      process.exit(0);
+    }
+  }
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  console.log(`✓ Figma's examples of ${Object.keys(snap.components).length} components → ${target}. The style guide's Playground opens each one as its best example.`);
+  process.exit(0);
+}
+
+// ── --brands-css: the system's brands kept as stylesheets (one file a brand, a path or an address), the same snapshot
+// --figma-brands writes, so the Brand switch reads brands wherever they live: Figma today, the repository later.
+if (process.argv.includes('--brands-css')) {
+  let bcfg = {};
+  try { bcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const fb = await import('./figma-brands.mjs');
+  const at = process.argv.indexOf('--brands-css');
+  const given = []; for (let k = at + 1; k < process.argv.length && !process.argv[k].startsWith('--'); k++) given.push(process.argv[k]);
+  const list = given.length ? given : [].concat(bcfg.brands?.css ?? []);
+  if (!list.length) { console.log('❌ no brand stylesheets: name them (--brands-css a.css b.css, or addresses), or list them in ds-config.json brands.css.'); process.exit(2); }
+  const files = [];
+  for (const f of list) {
+    try {
+      const css = /^https?:\/\//.test(f) ? await (await fetch(f)).text() : readFileSync(resolve(ROOT, f), 'utf8');
+      files.push({ name: basename(String(f).split('?')[0]), css, source: f });
+    } catch (e) { console.log(`❌ ${f}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  }
+  const modes = [...(bcfg.figma?.modes ?? []), ...(bcfg.figma?.collections ?? []).flatMap((c) => c.modes ?? [])];
+  const snap = fb.brandsFromCss(files, { modes });
+  const target = bcfg.paths?.snapshotBrands ?? join(dirname(bcfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-brands.snapshot.json');
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  const brands = fb.brandList(snap);
+  console.log(`✓ ${brands.length} brand${brands.length === 1 ? '' : 's'} from ${files.length} stylesheet${files.length === 1 ? '' : 's'} (${brands.map((b) => b.name).join(', ')}) → ${target}. The style guide shows every component in each of them.`);
+  process.exit(0);
+}
+
+// ── --showroom-compare: each Showroom screen measured against the Figma screen it was written from ───────────────────
+// Figma's boxes for the screen (showroom/<Screen>.figma-layout.json: read through figma-cli when it answers, else the
+// script for the Figma tool of the session), the built page measured in Chrome, every text and named part compared.
+if (process.argv.includes('--showroom-compare')) {
+  let scfg = {};
+  try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { compareShowroom } = await import('./showroom-compare.mjs');
+  const page = resolve(ROOT, scfg.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html');
+  const tol = Number((process.argv.find((a) => a.startsWith('--tolerance=')) ?? '').split('=')[1]) || 2;
+  const { results, next, why } = await compareShowroom(ROOT, scfg, page, { refresh: process.argv.includes('--refresh'), tol });
+  if (why) { console.log(`❌ ${why}`); process.exit(2); }
+  for (const r of Object.values(results)) {
+    console.log(`\n📏 ${r.title} against Figma: ${r.off ? `${r.off} off by more than ${r.tol}px` : `every text and part within ${r.tol}px`}`);
+    for (const l of r.lines.slice(0, 40)) console.log(`   • ${l}`);
+    if (r.lines.length > 40) console.log(`   … ${r.lines.length - 40} more`);
+  }
+  for (const n of next) console.log(`NEXT: ${n}`);
+  process.exit(0);
+}
+
+// ── --figma-brands: the system's brands, Figma's extended collections (each a skin over the system's own collections) ──
+// Read from the file that holds them (the FigCli plugin open on it), through figma-cli when it answers; else the
+// script for the Figma tool of the session, a collection at a time (--collection "<name>" --from N). With the files its
+// answers were saved to: keeps them as the brands snapshot, which the style guide's brand switch reads.
+if (process.argv.includes('--figma-brands')) {
+  let bcfg = {};
+  try { bcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const fb = await import('./figma-brands.mjs');
+  const at = process.argv.indexOf('--figma-brands');
+  const files = []; for (let k = at + 1; k < process.argv.length && !process.argv[k].startsWith('--'); k++) files.push(process.argv[k]);
+  const target = bcfg.paths?.snapshotBrands ?? join(dirname(bcfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-brands.snapshot.json');
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  let snap = null;
+  if (files.length) {
+    try { snap = fb.brandsSnapshot(files.map((f) => readFileSync(resolve(ROOT, f), 'utf8'))); } catch (e) { console.log(`❌ ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  } else {
+    const cli = (script) => spawnSync('figma-cli', ['eval', script], { encoding: 'utf8', maxBuffer: 1e8, timeout: 600000 }).stdout ?? '';
+    if (/^\s*1\s*$/m.test(cli('return 1'))) {
+      console.log('  Reading the brands in Figma through figma-cli, a collection at a time…');
+      try { snap = await fb.readBrandsWith(cli, { log: (m) => console.log(`  ${m}`) }); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+    } else {
+      const val = (f) => { const i = process.argv.indexOf(f); return i > 0 ? process.argv[i + 1] : null; };
+      const collection = val('--collection'), from = Number(val('--from')) || 0;
+      mkdirSync(capDir, { recursive: true });
+      const file = join(capDir, collection ? `brands-${collection.replace(/[^\w-]+/g, '-')}-${from}.js` : 'brands.js');
+      writeFileSync(file, fb.brandsCaptureScript({ collection, from }));
+      console.log(`Brands capture script → ${relative(ROOT, file)} (read-only: it changes nothing in Figma).`);
+      console.log(`NEXT: run it unchanged with the Figma tool of this session (use_figma) on the file that holds the brands, and save what it returns beside it as .json; ${collection ? 'while its answer says a next part, run rms-design-system-engine --figma-brands --collection "<name>" --from <next>' : 'then, for each collection it lists, run rms-design-system-engine --figma-brands --collection "<name>"'}; then rms-design-system-engine --figma-brands ${relative(ROOT, join(capDir, 'brands*.json'))} keeps them all.`);
+      process.exit(0);
+    }
+  }
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  const list = fb.brandList(snap);
+  console.log(`✓ ${list.length} brand${list.length === 1 ? '' : 's'} from ${snap._file ?? 'Figma'} (${list.map((b) => b.name + (b.parent ? ` under ${list.find((x) => x.key === b.parent)?.name ?? b.parent}` : '')).join(', ')}) → ${target}. The style guide shows every component in each of them.`);
+  process.exit(0);
+}
+
 // ── --capture-script / --capture-import: Figma read in checked chunks (P6) ──
 // --capture-script vars N writes the read-only script for chunk N of the variables, text styles and effect styles
 // ('sums' for the checksums alone); --capture-script components sums|next the same for the components (structure,
@@ -877,6 +997,21 @@ if (process.argv.includes('--styleguide')) {
     } else {
       console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${counted} · ${tpl})`);
       if (r.notAgreed) console.log(`   ${r.notAgreed}`);
+    }
+    // The Showroom's screens measured against the Figma screens they were written from, every build (a screen built
+    // from Figma is only right when it is measured): said here and written beside each screen on the page.
+    if (!r.scope && existsSync(r.out)) {
+      try {
+        const { compareShowroom } = await import('./showroom-compare.mjs');
+        const m = await compareShowroom(ROOT, sgConfig, r.out);
+        for (const x of Object.values(m.results)) console.log(`   📏 Showroom, ${x.title}: ${x.off ? `${x.off} texts or parts more than ${x.tol}px off Figma (${x.lines.slice(0, 2).join('; ')}${x.lines.length > 2 ? '…' : ''})` : `every text and part within ${x.tol}px of Figma`}`);
+        for (const n of m.next) console.log(`   📏 NEXT: ${n}`);
+        if (Object.keys(m.results).length) {
+          const html = readFileSync(r.out, 'utf8');
+          const data = JSON.stringify(m.results).replace(/</g, '\\u003c');
+          writeFileSync(r.out, html.replace(/<\/body>(?![\s\S]*<\/body>)/, () => `<script>window.__dseShowroomMeasured = ${data}; if (window.__dseShowroomMeasure) window.__dseShowroomMeasure(window.__dseShowroomMeasured);</script></body>`));
+        }
+      } catch (e) { console.log(`   📏 Showroom not measured: ${String(e.message).split('\n')[0]}`); }
     }
     // Its Vue components: drawn from what the project's own Vite renders, or from their templates, and why (E28).
     if (r.vue) console.log(r.vue.rendered ? `   ${r.vue.rendered} of ${r.vue.of} Vue component${r.vue.of === 1 ? '' : 's'} drawn as the project's own ${r.vue.build ?? 'build'} renders ${r.vue.of === 1 ? 'it' : 'them'}${r.vue.rendered < r.vue.of ? `; the rest from their templates${r.vue.failed?.length ? ` (${r.vue.failed.map((f) => `${f.name}: ${f.why}`).join('; ')})` : ''}` : ''}.` : `   Vue components drawn from their templates: ${r.vue.why ?? 'none rendered'}.`);

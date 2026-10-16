@@ -264,11 +264,35 @@ const some = (list, n = 4, more = 'more') => list.slice(0, n).join(list.some((x)
 const group = (g) => (g.length > 3 ? `${g.slice(0, 2).join(', ')}, and ${g.length - 2} more` : g.length === 3 ? `${g[0]}, ${g[1]}, and ${g[2]}` : g.join(' and '));
 // Every token name in the vars snapshot: colours in every mode, sizing, primitives.
 export const tokenNames = (vars) => [...new Set([...Object.values(vars?.color ?? {}).flatMap((m) => Object.keys(m ?? {})), ...Object.keys(vars?.sizing ?? {}), ...Object.values(vars?.primitives ?? {}).flatMap((m) => Object.keys(m ?? {}))])];
-export function tokenTodos({ vars = {}, users = null, dangling = [], brands = [], components = [], primitivePrefix = 'primitives/' } = {}) {
+// A font family the code writes by hand (font-family: "Open Sans") rather than with the system's family variable: what
+// is drawn there (and what inherits it) keeps that font in every brand. css: the system's stylesheets.
+// → [{ selector, value }]
+export function handWrittenFamilies(css = '') {
   const out = [];
-  const ud = undescribedTokens(vars, { primitivePrefix });
+  const text = String(css).replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const d of m[2].matchAll(/(?:^|;)\s*font-family\s*:\s*([^;]+)/g)) {
+      const v = d[1].trim();
+      if (/^var\(|^(inherit|initial|unset|revert|revert-layer)$/i.test(v)) continue;
+      // The page's own shell (html, body, :root, every element) is the app's, not a component's: a product sets its own.
+      const sel = m[1].split(/[;}]/).pop().trim();
+      if (sel.split(',').every((x) => /^(html|body|:root|\*|\*::before|\*::after)$/i.test(x.trim()))) continue;
+      out.push({ selector: m[1].split(/[;}]/).pop().trim().replace(/\s+/g, ' '), value: v });
+    }
+  }
+  return out;
+}
+
+export function tokenTodos({ vars = {}, users = null, dangling = [], brands = [], components = [], primitivePrefix = 'primitives/', css = '', componentTokens = null } = {}) {
+  const out = [];
+  // A component's own tokens are written in its Documentation (each component's row); the system's row keeps the rest,
+  // the shared ones no component lists as its own.
+  const all = undescribedTokens(vars, { primitivePrefix });
+  const own = componentTokens instanceof Set ? componentTokens : new Set();
+  const isOwn = (n) => own.has(n) || own.has(String(n).replace(/\/colou?r$/, ''));
+  const ud = { missing: all.missing.filter((n) => !isOwn(n)) };
   if (ud.missing.length) out.push({ kind: 'Description', who: 'figma',
-    say: `${ud.missing.length} of ${ud.total} semantic tokens have no description in Figma (${some(ud.missing)}).`,
+    say: `${ud.missing.length} shared token${ud.missing.length === 1 ? '' : 's'} (no component holds ${ud.missing.length === 1 ? 'it' : 'them'} as its own) ${ud.missing.length === 1 ? 'has' : 'have'} no description in Figma (${some(ud.missing)}). Each component's own tokens are in its Documentation.`,
     todo: 'Write what each one is for in its variable\'s description in Figma. Agents read it to pick the right token. Each token\'s panel on this page shows it, or says Not written yet.' });
   const same = sameInEveryMode(vars);
   if (same.length) out.push({ kind: 'Same value', who: 'both',
@@ -285,6 +309,10 @@ export function tokenTodos({ vars = {}, users = null, dangling = [], brands = []
   if (dangling?.length) out.push({ kind: 'Broken alias', who: 'code',
     say: `${dangling.length} token${dangling.length === 1 ? ' in the code points' : 's in the code point'} at a token declared nowhere, so ${dangling.length === 1 ? 'it shows' : 'they show'} only ${dangling.length === 1 ? 'its' : 'their'} fallback (${some(dangling.map((d) => `${d.token ?? d.file + ':' + d.line} to ${d.target}${d.removed ? `, removed in ${d.removed.sha}` : ''}`))}).`,
     todo: 'Point each one at the token that replaced it. A developer does it, or Claude when asked.' });
+  const hand = handWrittenFamilies(css).filter((h) => !/monospace|mono\b/i.test(h.value));
+  if (hand.length) out.push({ kind: 'Font written by hand', who: 'code',
+    say: `The code writes ${hand.length === 1 ? 'a font family' : `${hand.length} font families`} by hand instead of the system's family variable (${some(hand.map((h) => `${h.value} on ${h.selector}`), 3)}). What is drawn there, and every component that inherits it, keeps that font whatever the brand or Figma says.`,
+    todo: 'Write font-family with the system\'s family variable. A developer does it in the code.' });
   const single = [...(users ?? new Map())].filter(([, who]) => who.length === 1).map(([t, who]) => `${t.replace(/\./g, '/')} in ${who[0]}`).sort();
   if (single.length) out.push({ kind: 'Single use', who: 'both',
     say: `${single.length} token${single.length === 1 ? ' is' : 's are'} used by one component only (${some(single, 8)}).`,

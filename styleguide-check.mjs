@@ -55,17 +55,19 @@ export function controlClasses(html) {
 
 // A button or link the page draws itself: a rule of its own that gives one a box (a fill, a border, a corner radius
 // or a raised shadow). The system's own button draws it, or the browser's plain one. The page's defaults for a control
-// the system lacks (its segmented control, tooltip and card) are drawn only with the page's roles (--sg-*), so they
+// the system lacks (its segmented control, a property's switch, tooltip and card) are drawn only with the page's roles (--sg-*), so they
 // pass when every value is one of those roles, a keyword or a round corner.
 const BOX = /^(background(-color)?|border(-(top|right|bottom|left))?(-(width|style|color))?|border-radius|box-shadow)$/;
-const DEFAULT_CONTROL = /\.(sg-seg-default|sg-tip-btn|sg-tip-bubble|sg-card)(?![\w-])/;
+const DEFAULT_CONTROL = /\.(sg-seg-default|pg-switch|sg-tip-btn|sg-tip-bubble|sg-card)(?![\w-])/;
 const ROLES_ONLY = (v) => !v.replace(/var\(--sg-[\w-]+(?:,\s*[^()]*)?\)|calc|max|min|(?<![\w.%-])(?:solid|transparent|none|50%|0px|1px|0)(?![\w.%-])|[\s(),*+-]/g, '');
 function drawsControl(d, classes) {
   if (!BOX.test(d.property) || /^(none|0|0px|transparent|inherit|initial|unset)$/i.test(d.value) || /\.pg-preview\b/.test(d.selector)) return false;
   if (DEFAULT_CONTROL.test(d.selector) && ROLES_ONLY(d.value)) return false;
   if (d.property === 'box-shadow' && /\binset\b/.test(d.value)) return false;   // a line marking the current item
-  // The current item of the page's own menu, on one of the system's backgrounds: marked, not drawn as a control.
-  if (/^background(-color)?$/.test(d.property) && /\.active\b|\[aria-current/.test(d.selector) && /^var\(--sg-[\w-]+\)$/.test(d.value.trim())) return false;
+  if (/^border-(top|bottom)$/.test(d.property) && ROLES_ONLY(d.value)) return false;   // a line between a list's items, in the page's own line: a divider, not a box
+  // The current item of the page's own menu, or the one under the pointer, on one of the page's backgrounds: marked,
+  // not drawn as a control.
+  if (/^background(-color)?$/.test(d.property) && (/\.active\b|\[aria-current/.test(d.selector) || /\.sg-nav a:hover\b/.test(d.selector)) && /^var\(--sg-[\w-]+\)$/.test(d.value.trim())) return false;
   return d.selector.split(',').some((part) => {
     const subject = part.trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
     const tag = /^(a|button)(?![\w-])/i.test(subject);
@@ -89,7 +91,8 @@ export function checkStyleguidePage(html, { missing = missingRoles(html) } = {})
     const codeFace = p === 'font-family' && /(^|,)\s*monospace\s*$/i.test(v) && /(code|pre|kbd|samp)(?![\w-])/i.test(d.selector);
     if (p === 'font-family' && !/^inherit$/i.test(v) && !codeFace) add(d, 'a font of the page\'s own: its text inherits the font the system sets on its page, with its fallbacks');
     else if (p === 'font-size' && LENGTH.test(v)) add(d, 'a text size that is not one of the system\'s text styles');
-    else if (p === 'font-weight' && /\d/.test(v)) add(d, 'a weight that is not one of the system\'s text styles');
+    // A step above the system's own weight (calc(var(--sg-m-weight) + 100)) is still its weight, a step heavier.
+    else if (p === 'font-weight' && /\d/.test(v) && !/^calc\(VAR\s*[+-]\s*\d{3}\)$/.test(v)) add(d, 'a weight that is not one of the system\'s text styles');
     else if (p === 'line-height' && /\d/.test(v) && v !== '0') add(d, 'a line height that is not one of the system\'s text styles');
     else if (/^border(-[a-z]+)*-radius$/.test(p) && LENGTH.test(v) && !/^0(px)?$/.test(v)) add(d, 'a corner radius that is not one of the system\'s radii');
     else if (/^(padding|margin|gap|row-gap|column-gap)(-[a-z]+)*$/.test(p) && v.split(/\s+/).some((x) => LENGTH.test(x) && Math.abs(parseFloat(x)) > 2 && !OK_WORD.test(x))) add(d, 'a space that is not one of the system\'s spacing tokens');

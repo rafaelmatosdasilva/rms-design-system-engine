@@ -26,10 +26,11 @@ test('a colour mode set by an attribute on the root nests: each preview in its o
   assert.equal(modeAxes(cfg, {}, ':root { --bg: #fff; }')[0].scoped, undefined, 'no block on the root: a switch for the page only');
 });
 
-test('the page\'s colour switch starts on Auto and follows the device even with no media query of the code\'s', () => {
+test('the page\'s colour switch has Light and Dark only, starts in the device\'s mode and follows it, even with no media query of the code\'s', () => {
   const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
-  assert.match(tpl, /var auto = scope === html && !axis\.classes && \(!!axis\.media \|\| !!darkOf\(axis\)\);/);
-  assert.match(tpl, /AXES\.forEach\(function \(a\) \{ if \(darkOf\(a\) && !html\.hasAttribute\(a\.attr\)\) AUTO\[a\.attr\] = true; \}\);/);
+  assert.doesNotMatch(tpl, /label: 'Auto', title: 'Follows this device/);
+  assert.match(tpl, /var c = effective\(axis, scope\), on = c;/);
+  assert.match(tpl, /AXES\.forEach\(function \(a\) \{ if \(darkOf\(a\) && !html\.hasAttribute\(a\.attr\) && !fixed\[a\.attr\]\) AUTO\[a\.attr\] = true; \}\);/);
   assert.match(tpl, /SGModes\.prefers\.addEventListener\('change'/);
 });
 

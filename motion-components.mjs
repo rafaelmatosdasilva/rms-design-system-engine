@@ -120,10 +120,26 @@ export function keyframesWhat(frames) {
 
 const classesOf = (sel) => [...sel.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)].map((m) => m[1]);
 const partOf = (c, k) => k === c || k.startsWith(c + '-') || k.startsWith(c + '__');
+// Whether a rule is the component's. A Vue component's scoped rules carry its own [data-v-…] mark: such a rule is the
+// component's when the mark is its own and never when it is another's, whatever its classes say (a loader's
+// .text-wrapper is not the text component's; a loader named loaderGeneral, with no class of that name, still has its
+// own rules). A rule with no mark, or a component whose mark is not known, goes by its classes.
+const marksOf = (s) => [...s.matchAll(/\[data-v-([0-9a-f]+)\]/gi)].map((m) => m[1].toLowerCase());
+// scope: the component's own mark, or { own, known } with every mark the project's components are known by, so a
+// component whose own mark is not known still leaves another's scoped rules alone.
+const ownMark = (scope) => { const o = scope && typeof scope === 'object' ? scope.own : scope; return o ? String(o).toLowerCase() : null; };
+const ruleOf = (s, c, scope) => {
+  const m = marksOf(s), own = ownMark(scope), known = scope && typeof scope === 'object' ? scope.known : null;
+  if (m.length && own) return m.includes(own);
+  if (m.length && known && m.some((x) => known.has(x))) return false;
+  return classesOf(s).some((k) => partOf(c, k));
+};
+// The part a rule moves: the component's own part named in its last step, else (a scoped rule) that step's class.
+const partFor = (s, c, scope) => { const ks = classesOf(s.split(' ').at(-1) ?? ''); const k = ks.find((x) => partOf(c, x)); if (k) return k !== c ? k : null; const own = ownMark(scope); return own && marksOf(s).includes(own) ? ks[0] ?? null : null; };
 
 // How the code moves a component: [{ motion: 'loop'|'open'|'close', what, ms, easing, part, selector, file, line,
 // via: 'animation'|'transition', name }]. sources: [{ file, text }] (the theme and the component sheets). cls: its class.
-export function codeMotions(sources = [], cls, { resolve = null } = {}) {
+export function codeMotions(sources = [], cls, { resolve = null, scope = null } = {}) {
   const c = String(cls ?? '').replace(/^\./, '');
   if (!c || /[^\w-]/.test(c)) return [];
   resolve ??= customProps(sources);
@@ -133,12 +149,12 @@ export function codeMotions(sources = [], cls, { resolve = null } = {}) {
     if (skipped(r)) continue;
     for (const sel of r.selectors) {
       const s = sel.trim().replace(/\s+/g, ' ');
-      if (!INTERACTION.test(s) && classesOf(s).some((k) => partOf(c, k))) rules.push({ s, r, file: src.file });
+      if (!INTERACTION.test(s) && ruleOf(s, c, scope)) rules.push({ s, r, file: src.file });
     }
   }
   // What a selector says beyond the component and its parts: its state (.is-closing, [data-state="open"]).
   const stateOf = (s) => s.replace(/\.(-?[A-Za-z_][\w-]*)/g, (m, k) => (partOf(c, k) ? ' ' : m));
-  const partIn = (s) => { const k = classesOf(s.split(' ').at(-1) ?? '').find((x) => partOf(c, x)); return k && k !== c ? k : null; };
+  const partIn = (s) => partFor(s, c, scope);
   const out = [], seen = new Set();
   const add = (m) => { const key = `${m.motion}|${m.via}|${m.name ?? ''}|${m.ms}|${m.part ?? ''}`; if (!seen.has(key)) { seen.add(key); out.push(m); } };
   for (const { s, r, file } of rules) {
@@ -255,7 +271,7 @@ const said = (m) => `${m.ms}ms, ${m.easing}`;
 // Each component's loop, opening and closing, Figma's against the code's: one it animates that the other does not, or
 // another duration or curve. figmaRead: the snapshot has Figma's Motion read (a capture made since C7), so the code's
 // motion with none in Figma is said too. → [{ component, change, trigger, motion, kind, message, figma, code }]
-export function componentMotionFindings(snap, sources, classFor = () => null, names = []) {
+export function componentMotionFindings(snap, sources, classFor = () => null, names = [], scopeFor = () => null) {
   const resolve = customProps(sources);
   const figmaRead = !!(snap?.motion || snap?.overlays);
   const comps = new Set([...Object.keys(snap?.motion ?? {}), ...(snap?.overlays ?? []).map((o) => o.component), ...Object.keys(snap?.components ?? {}), ...names]);
@@ -263,7 +279,7 @@ export function componentMotionFindings(snap, sources, classFor = () => null, na
   for (const component of comps) {
     const cls = classFor(component);
     if (!cls) continue;
-    const code = codeMotions(sources, cls, { resolve }), fig = figmaMotions(snap, component);
+    const code = codeMotions(sources, cls, { resolve, scope: scopeFor(component) }), fig = figmaMotions(snap, component);
     for (const motion of MOTIONS) {
       const f = pick(fig.filter((m) => m.motion === motion)), k = pick(code.filter((m) => m.motion === motion));
       if (!f && !k) continue;
@@ -283,13 +299,13 @@ export function componentMotionFindings(snap, sources, classFor = () => null, na
 
 // Each component's motion for the style guide's motion page, the code's beside Figma's: [{ component, motion, what, code:
 // { ms, easing, selector }, figma: { ms, easing, what } | null, status: 'same'|'differs'|'figma-none'|'code-none'|'unread' }].
-export function componentMotionRows(snap, sources, classFor = () => null, names = []) {
+export function componentMotionRows(snap, sources, classFor = () => null, names = [], scopeFor = () => null) {
   const resolve = customProps(sources);
   const figmaRead = !!(snap?.motion || snap?.overlays);
   const rows = [];
   for (const component of new Set([...names, ...Object.keys(snap?.motion ?? {}), ...(snap?.overlays ?? []).map((o) => o.component)])) {
     const cls = classFor(component);
-    const code = cls ? codeMotions(sources, cls, { resolve }) : [], fig = figmaMotions(snap, component);
+    const code = cls ? codeMotions(sources, cls, { resolve, scope: scopeFor(component) }) : [], fig = figmaMotions(snap, component);
     for (const motion of MOTIONS) {
       const f = pick(fig.filter((m) => m.motion === motion)), k = pick(code.filter((m) => m.motion === motion));
       if (!f && !k) continue;
@@ -305,7 +321,7 @@ export function componentMotionRows(snap, sources, classFor = () => null, names 
 // and whether it stops for a person who asks for less motion (a prefers-reduced-motion rule that sets it to none or to
 // no time, on it or on everything). sources: [{ file, text }].
 // → [{ via: 'transition'|'animation', selector, prop, name, ms, delay, easing, infinite, vars: ['--…'], calm, at }]
-export function componentTransitions(sources = [], cls, { resolve = null } = {}) {
+export function componentTransitions(sources = [], cls, { resolve = null, scope = null } = {}) {
   const c = String(cls ?? '').replace(/^\./, '');
   if (!c || /[^\w-]/.test(c)) return [];
   resolve ??= customProps(sources);
@@ -326,7 +342,7 @@ export function componentTransitions(sources = [], cls, { resolve = null } = {})
     if (!decls.length) continue;
     for (const sel of r.selectors) {
       const s = sel.trim().replace(/\s+/g, ' ');
-      if (!classesOf(s).some((k) => partOf(c, k))) continue;
+      if (!ruleOf(s, c, scope)) continue;
       const vars = [...new Set(decls.flatMap((d) => varsIn(d.value)))], at = `${file}:${r.line}`, calm = calmFor(s);
       for (const t of transitionsOf(decls.map((d) => ({ ...d, value: resolve(d.value) })))) if (t.ms > 0) out.push({ via: 'transition', selector: s, prop: t.prop, name: null, ms: t.ms, delay: t.delay, easing: t.easing, infinite: false, vars, calm, at });
       for (const a of animationsOf(decls, resolve)) if (a.ms > 0) out.push({ via: 'animation', selector: s, prop: null, name: a.name, ms: a.ms, delay: a.delay, easing: a.easing, infinite: a.infinite, vars, calm, at });
@@ -345,10 +361,10 @@ export function componentTransitions(sources = [], cls, { resolve = null } = {})
 const PSEUDO = { hover: 'hover', active: 'press', focus: 'focus', 'focus-visible': 'focus', 'focus-within': 'focus', checked: 'checked', disabled: 'disabled' };
 const WHEN_OF = { loop: 'Repeats', open: 'Opens', close: 'Closes' };
 const ORDER = ['Repeats', 'Opens', 'Closes', 'On hover', 'On press', 'On focus'];
-export function motionSpec(snap, sources = [], cls, component) {
+export function motionSpec(snap, sources = [], cls, component, scope = null) {
   const c = String(cls ?? '').replace(/^\./, '');
   const resolve = customProps(sources);
-  const all = c ? componentTransitions(sources, c, { resolve }) : [], used = new Set(), rows = [], frames = keyframesIn(sources, resolve);
+  const all = c ? componentTransitions(sources, c, { resolve, scope }) : [], used = new Set(), rows = [], frames = keyframesIn(sources, resolve);
   const read = !!(snap?.motion || snap?.overlays);
   const codeOf = (t, k) => ({ ms: k?.ms ?? t.ms, easing: k?.easing ?? t.easing, delay: t?.delay ?? 0, vars: t?.vars ?? [], at: t?.at ?? (k ? `${k.file}:${k.line}` : null), calm: t?.calm ?? null });
   const compare = (k, f) => (Math.abs(k.ms - f.ms) > 10 || (bezierOf(f.easing) && sameEasing(k.easing, f.easing) === false) ? 'differs' : 'same');
@@ -361,7 +377,7 @@ export function motionSpec(snap, sources = [], cls, component) {
       if (!r.decls.some((d) => t.prop === 'all' || d.prop === t.prop || d.prop.startsWith(t.prop + '-') || t.prop.startsWith(d.prop + '-'))) continue;
       for (const sel of r.selectors) {
         const s = sel.trim().replace(/\s+/g, ' ');
-        if (s === t.selector || !classesOf(s).some((k) => partOf(c, k))) continue;
+        if (s === t.selector || !ruleOf(s, c, scope)) continue;
         for (const m of s.matchAll(/:([\w-]+)/g)) if (PSEUDO[m[1]]) out.add(PSEUDO[m[1]]);
         const rest = s.replace(/\.(-?[A-Za-z_][\w-]*)/g, (m, k) => (partOf(c, k) ? ' ' : m)).replace(/:[\w-]+(\([^)]*\))?/g, ' ');
         if (OPEN_WORD.test(rest)) out.add('open'); else if (CLOSE_WORD.test(rest)) out.add('close');
@@ -372,7 +388,7 @@ export function motionSpec(snap, sources = [], cls, component) {
   };
   const whenWords = (states) => { const on = states.filter((s) => ['hover', 'press', 'focus'].includes(s)); return on.length ? `On ${on.join(' and ')}` : states.length ? `When ${states.join(' or ')}` : 'When it changes'; };
   // Its loop, opening and closing, the code's beside Figma's.
-  for (const r of componentMotionRows(snap, sources, () => cls, [component]).filter((x) => x.component === component)) {
+  for (const r of componentMotionRows(snap, sources, () => cls, [component], () => scope).filter((x) => x.component === component)) {
     const t = r.code ? all.find((x) => x.selector === r.code.selector && x.ms === r.code.ms) ?? all.find((x) => x.selector === r.code.selector) : null;
     if (t) used.add(t);
     rows.push({ when: WHEN_OF[r.motion], what: r.what, part: r.code?.selector ?? null, code: r.code ? codeOf(t, r.code) : null, figma: r.figma ? { ms: r.figma.ms, easing: r.figma.easing, from: r.figma.from } : null, status: r.status });

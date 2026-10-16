@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 import { unpublished, componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
   COMPONENT_FUNCTIONS, AUDIT_FUNCTIONS, STRUCTURE_KEYS, SCRIPT_MAX, ANSWER, varsScript, partsBack, unzip } from '../figma-capture.mjs';
 import * as standin from './figma-standin.mjs';
+import { examplesCaptureScript } from '../figma-examples.mjs';
+import { brandsCaptureScript } from '../figma-brands.mjs';
 import { effectsCaptureScript } from '../effects-parity.mjs';
 import { motionCaptureScript } from '../motion-parity.mjs';
 import { screenCaptureScript } from '../screen-layout.mjs';
@@ -140,6 +142,9 @@ test('P6 components: no capture script the engine writes switches Figma\'s page;
     'vars sums': varsScript('sums'), 'vars 0': varsScript(0),
     'components sums': componentsScript('sums'), 'components sums, continued': componentsScript('sums', { pass: 'p', after: 'k' }), 'components read': componentsScript('read', { ids: ['1:0'] }), 'components slice': componentsScript('read', { ids: ['1:0'], slice: 1 }),
     '--figma-effects': effectsCaptureScript(), '--figma-motion': motionCaptureScript(), '--figma-screens': screenCaptureScript(['1:2']), '--figma-a11y': screenA11yCaptureScript(['1:2']), '--annotation-categories': annotationScript(),
+    '--figma-examples': examplesCaptureScript(),
+    '--figma-brands': brandsCaptureScript(),
+    '--figma-brands --collection': brandsCaptureScript({ collection: 'Acme' }),
   };
   for (const [name, s] of Object.entries(scripts)) assert.doesNotMatch(s, /setCurrentPage/, `${name} never switches the page`);
   for (const name of ['components sums', 'components read', '--figma-effects', '--figma-motion', '--annotation-categories']) assert.match(scripts[name], /\.loadAsync\(\)/, `${name} loads each page where it is`);
@@ -502,4 +507,16 @@ test('P6 components: a nested instance Figma fills in lazily reads alike whateve
 
 test('a component Figma does not publish (a name starting with . or _, a status mark in front or not) is no component of the system', () => {
   assert.deepEqual(['🟡 .tableRowBackground. (deprecated)', '.cell', '_base', '🟡  tableHeader', 'buttonPrimary', 'Layout/Header'].map(unpublished), [true, true, true, false, false, false]);
+});
+
+test('the capture keeps the primitives as Figma has them in each colour mode, their links followed', async () => {
+  const { primitivesFromItems } = await import('../figma-capture.mjs');
+  const items = [
+    { k: 'collection', v: { id: 'C', name: 'Theme', modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }] } },
+    { k: 'var', v: { id: 'a', name: 'primitives/neutral000', variableCollectionId: 'C', resolvedType: 'COLOR', valuesByMode: { l: { r: 1, g: 1, b: 1, a: 1 }, d: { r: 0, g: 0, b: 0, a: 1 } } } },
+    { k: 'var', v: { id: 'b', name: 'primitives/paper', variableCollectionId: 'C', resolvedType: 'COLOR', valuesByMode: { l: { type: 'VARIABLE_ALIAS', id: 'a' }, d: { type: 'VARIABLE_ALIAS', id: 'a' } } } },
+    { k: 'var', v: { id: 'c', name: 'semantic/text', variableCollectionId: 'C', resolvedType: 'COLOR', valuesByMode: { l: { r: 0, g: 0, b: 0, a: 1 }, d: { r: 1, g: 1, b: 1, a: 1 } } } },
+  ];
+  const p = primitivesFromItems(items, { figma: { colorCollection: 'Theme', modes: [{ name: 'Light', snapshotKey: 'light' }, { name: 'Dark', snapshotKey: 'dark' }] } });
+  assert.deepEqual(p, { light: { 'primitives/neutral000': '#ffffff', 'primitives/paper': '#ffffff' }, dark: { 'primitives/neutral000': '#000000', 'primitives/paper': '#000000' } });
 });
