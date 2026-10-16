@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: brands, Showroom, property sheet (continuous evaluation)
+
+What changed since the entry below (engine 1663d15): Guide notes for brands (config) and the Showroom (usage); a neutral example name in the skill file. The guide changed in `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `c6656ff2e141` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8015c10 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.063 |
+| Input a run | 111k | 128k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 128k a run against 111k. Records: `records/2026-10-16-tests-the-token-description-row`.
+
 ## 2026-10: Icons from a folder of SVG files (continuous evaluation)
 
 What changed since the entry below (engine 4fe0912): The engine reads a system's icons kept as one SVG file each (src/assets/icons) as its icon sheet; usage.md names the option. The guide changed in `reference/usage.md`.
