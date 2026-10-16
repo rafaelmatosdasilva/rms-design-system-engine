@@ -36,6 +36,8 @@ Name a component the way your system does (button primary, Button Primary and pr
 | Ask in Claude Code | What you get |
 |---|---|
 | `/rms-design-system-engine which props does the badge take?` | A component's props and where it is used, or a token's values |
+| `/rms-design-system-engine rate our guidelines for agents` | How much an agent can take from your guidance: ready, partial or thin, for each component, with what to add |
+| `/rms-design-system-engine rate our guidelines and test extraction with a model` | The same, plus a test where a model answers questions from your guidance alone (uses your model tokens) |
 
 ## Style guide
 

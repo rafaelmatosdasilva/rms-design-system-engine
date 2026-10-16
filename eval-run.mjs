@@ -28,6 +28,7 @@ import { evalConformance } from './eval-check.mjs';
 import { createLocator, loadLocator } from './component-locator.mjs';
 import { markupFindings } from './a11y-static.mjs';
 import { findSteeringFiles } from './steering-check.mjs';
+import { guidelineFiles } from './intent-gen.mjs';
 import { typeErrors, typeErrorLine, compileTarget, findTsc } from './compile-check.mjs';
 import { ENGINE_DIRS } from './names.mjs';
 
@@ -198,10 +199,11 @@ export function loadGuidance(ROOT, cfg, component) {
 // checks):
 //   bare      the prompt alone;
 //   steering  the project's own instruction files (AGENTS.md, CLAUDE.md, Cursor and Copilot rules, skills), joined;
-//   parity    what the parity writes for agents (contracts/llms.txt).
+//   parity    what the parity writes for agents (contracts/llms.txt);
+//   guidelines the team's guidelines files (guidelines.sources and the fetched Notion and GitLab pages), joined (K17).
 // The generate command gets the level in $EVAL_LEVEL and the context file in $EVAL_CONTEXT (empty for bare).
 // Scored by the same mechanical checks: DS conformance and the accessibility read from the code.
-export const LEVELS = ['bare', 'steering', 'parity'];
+export const LEVELS = ['bare', 'steering', 'parity', 'guidelines'];
 
 // The context file for a level, or '' (bare, or nothing to give). `why` says why a level has nothing.
 export function levelContext(ROOT, cfg, level, { outDir = 'evals', llmsPath = null } = {}) {
@@ -217,6 +219,14 @@ export function levelContext(ROOT, cfg, level, { outDir = 'evals', llmsPath = nu
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, files.map((f) => `# ${f.file}\n\n${f.text.trim()}\n`).join('\n'));
     return { path: p, files: files.map((f) => f.file) };
+  }
+  if (level === 'guidelines') {
+    const files = guidelineFiles(cfg).filter((f) => existsSync(resolve(ROOT, f)));
+    if (!files.length) return { path: '', why: 'no guidelines file (guidelines.sources, or a Notion or GitLab link fetched once)' };
+    const p = resolve(ROOT, outDir, '.context', 'guidelines.md');
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, files.map((f) => `# ${f}\n\n${readFileSync(resolve(ROOT, f), 'utf8').trim()}\n`).join('\n'));
+    return { path: p, files };
   }
   return { path: '', why: `unknown level "${level}"` };
 }

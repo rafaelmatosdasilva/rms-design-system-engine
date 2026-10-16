@@ -649,6 +649,40 @@ if (process.argv.includes('--rename-sweep')) {
   process.exit(0);
 }
 
+// ── --guidance-rating: how much an agent can take from the team's guidance (guidance-rating.mjs, K17) ──
+// Rates each component's guidance (its guidelines section and Figma's words) for what an agent needs, and the whole
+// document from that: ready, partial or thin, with what to add. --extract also runs the extraction test, which spends
+// the person's model tokens: questions from the system's facts, answered by a model that sees only the guidance
+// (guidelines.extract.cmd, default claude -p). Writes .design-system-engine-out/guidance-rating.json.
+if (process.argv.includes('--guidance-rating')) {
+  const gr = await import('./guidance-rating.mjs');
+  const { ingestGuidelines } = await import('./intent-gen.mjs');
+  let gcfg = {}; try { gcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* no setup: Figma's snapshots by their default names */ }
+  const { facts, props } = gr.readFacts(ROOT, gcfg);
+  if (!Object.keys(facts.components).length) { console.log('No Figma components read yet: refresh the Figma data first, then rate the guidance against them.'); process.exit(0); }
+  const gl = ingestGuidelines(ROOT, gcfg);
+  const view = gr.sectionsFrom(gl, facts, gr.figmaWords(props));
+  const rating = gr.rateGuidance(view, facts);
+  let extraction = null;
+  if (process.argv.includes('--extract')) {
+    const qs = gr.extractionQuestions(facts);
+    const text = [gl.general, ...gl.sections.map((x) => `## ${x.heading}\n${x.body}`), ...Object.entries(gr.figmaWords(props)).map(([n, t]) => `## ${n} (Figma)\n${t}`)].filter(Boolean).join('\n\n');
+    if (!qs.length) console.log('No property with options to ask about: the extraction test has nothing to measure.');
+    else {
+      const asked = gr.askModel(gr.extractionPrompt(text, qs), gcfg.guidelines?.extract?.cmd ?? 'claude -p');
+      if (!asked.ok) console.log(`The extraction test did not run: ${asked.why}. Set guidelines.extract.cmd in ds-config.json to the command that answers a prompt on stdin.`);
+      else extraction = gr.scoreExtraction(qs, asked.out);
+    }
+  }
+  if (extraction) for (const c of rating.components) if (c.name in extraction.byComponent) c.extracted = Math.round(extraction.byComponent[c.name] * 100) / 100;
+  mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+  writeFileSync(join(ROOT, OUT_DIR, 'guidance-rating.json'), JSON.stringify({ at: new Date().toISOString(), sources: gl.sources, ...rating, ...(extraction ? { extraction: { score: extraction.score, answers: extraction.answers } } : {}) }, null, 1) + '\n');
+  for (const l of gr.ratingLines(rating, { extraction })) console.log(l);
+  if (!gl.sources.length) console.log('   No guidelines file yet: only Figma\'s descriptions were read. Add one with rms-design-system-engine --guidelines <link>, or list files in guidelines.sources.');
+  console.log(`NEXT: tell the person the class and the components that need the most, from the lines above; the style guide shows each component's rating in its Documentation area.`);
+  process.exit(0);
+}
+
 // ── --keep / --unkeep: a difference the team decided to keep (kept.mjs) ──
 // --keep --match <words> [--component <name>] --reason "<why>" [--by "<name>"] [--truth figma|code] [--review <date|90d>]
 // keeps the open differences of the last full audit that match, each with why, who and when; they never fail a run

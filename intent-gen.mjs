@@ -103,7 +103,7 @@ export function guidelineFiles(cfg) {
   return [...new Set([...sources, ...notionTargets(cfg).map((t) => t.file), ...gitlabTargets(cfg).map((t) => t.file)])];
 }
 
-function ingestGuidelines(ROOT, cfg) {
+export function ingestGuidelines(ROOT, cfg) {
   const files = guidelineFiles(cfg);
   const sections = [];          // { heading, body } - matched to a component by heading, else global
   const generalParts = [];      // pre-heading text and JSON _general

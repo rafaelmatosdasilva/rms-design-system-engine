@@ -1959,14 +1959,28 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
     return { key: c.name + '\u0000doc:tokens', area: 'Documentation', kind: 'Its tokens', written: head + miss + said,
       todo: all ? '' : esc('Write what each token is for in its variable\'s description in Figma. Agents read it to pick the right token.'), who: all ? '' : WHO.figma, st: all ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: n ? ['Figma, its variables\' descriptions'] : [] };
   };
+  // For agents (K17): what an agent can take from the team's guidance for it (its guidelines section and Figma's words),
+  // rated ready, partial or thin, with each piece still to add. Ready is done, partial is to check, thin is to write.
+  var AGENT_CLS = { ready: ['done', 'Ready'], partial: ['check', 'Partial'], thin: ['todo', 'Thin'] };
+  var agentRow = function (c) {
+    var a = c.agentRating; if (!a || !AGENT_CLS[a.cls]) return null;
+    var got = [['what', 'what it is'], ['whenToUse', 'when to use it'], ['whenNotToUse', 'when not to'], ['role', 'its role'], ['example', 'an example']].filter(function (p) { return (a.pieces || {})[p[0]]; }).map(function (p) { return p[1]; });
+    var written = '<p>' + esc(AGENT_CLS[a.cls][1]) + '. ' + (got.length ? 'An agent can read ' + esc(got.join(', ')) + '.' : 'An agent finds nothing about it yet.') +
+      (a.props && a.props.total ? ' ' + a.props.named + ' of ' + a.props.total + ' properties named.' : '') +
+      (typeof a.extracted === 'number' ? ' The extraction test named ' + Math.round(a.extracted * 100) + '% of its options right.' : '') + '</p>' +
+      ((a.add || []).length ? '<p class="pg-missing">Add ' + esc(a.add.join('; ')) + '.</p>' : '');
+    return { key: c.name + '\u0000doc:agents', area: 'Documentation', kind: 'For agents', written: written,
+      todo: a.cls === 'ready' ? '' : esc('Write it in the component\'s section of your guidelines, headed with its exact name, or in its description in Figma.'), who: a.cls === 'ready' ? '' : WHO.figma,
+      st: AGENT_CLS[a.cls][0], rel: '', at: DATA.builtAt || null, src: (a.from || []).slice(0, 3) };
+  };
   function docIssueRows(c) {
     if (c.codeOnly) return [];
-    var tok = tokenDocRow(c);
-    return KNOW.map(function (k) {
+    var tok = tokenDocRow(c), ag = agentRow(c);
+    return (ag ? [ag] : []).concat(KNOW.map(function (k) {
       var has = !!k[1](c);
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? k[2](c) : '<p class="pg-missing">' + esc(k[4]) + '</p>',
         todo: has ? '' : esc(WRITE_HOW[k[0]] || GUIDE_HINT), who: has ? '' : WHO.figma, st: has ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: has ? [k[3](c)] : [] };
-    }).concat(tok ? [tok] : []);
+    })).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
   function knowledgeHTML(c) {

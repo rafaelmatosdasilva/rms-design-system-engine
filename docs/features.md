@@ -260,7 +260,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Playground | The component drawn from your own markup and CSS, with Figma's props as controls, every state, your modes and a Width switch. Below it, the tokens behind what is drawn and the code to copy |
 | Specs | Its parts, paddings and gaps |
 | Variants | Every option of each prop, one per row, with Try it to set it in the Playground |
-| Documentation | What it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures and its role, with what is still to write |
+| Documentation | For agents (how much an agent can take from your guidance for it), what it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures and its role, with what is still to write |
 | Accessibility | One table by WCAG 2.2 criterion, with what Figma states, what was found, what to do and who acts |
 | Parity | Every prop, variable and value compared with Figma, each marked Done, To fix, To check or Not compared |
 | Motion | Everything that moves in it, the code's timing beside Figma's |
@@ -285,6 +285,22 @@ Also on each component.
 - **Not agreed yet.** A prop only one side has, a different default or a token that differs is left out and counted at the top, so you decide each one first.
 - **Only in the code.** Once Figma's components are captured, the pages show only the ones Figma has. A component only your code has is a task instead, with its file: add it to Figma, or remove it from the code. Before Figma's data is captured, your code's components are shown, marked as compared with nothing.
 - **Status and coverage.** Stable, beta or deprecated when your team says so, and how much of its file your tests cover.
+
+### Guidance for agents
+
+Agents read your guidelines and Figma's descriptions to pick and use each component. [Ask Claude](commands.md#ask-the-system) to rate them, and each component gets a class.
+
+| Class | What it means |
+|---|---|
+| Ready | An agent can pick it and use it from what you wrote |
+| Partial | Some of it is there |
+| Thin | Little or nothing is there |
+
+- **What it looks for.** A section headed with the component's exact name, what it is, when to use it, when not to, its role, an example, and its properties by name.
+- **Names that mislead.** A token, property or component named in the text that the system does not have is listed first, to rename or take out.
+- **Where you see it.** In each component's Documentation area as For agents, and on the Tasks page under Documentation while something is missing.
+- **A test with a model, when you ask.** A model answers questions from your guidance alone, such as the options of each property, and the engine scores the answers against the real ones. It uses your model tokens.
+- **The whole document** gets a class too, from how many of its components are ready.
 
 ### Foundations
 

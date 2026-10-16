@@ -152,4 +152,5 @@ export async function waitForTrue(send, sessionId, expression, { attempts = 100,
 
 // The load guard for a file:// page. The target's initial about:blank already reports
 // readyState "complete", so readyState alone races the navigation.
-export const FILE_PAGE_LOADED = 'location.protocol === "file:" && document.readyState === "complete"';
+// A style guide page is loaded once it has drawn itself (it marks <html> sg-ready), not only once the file is read.
+export const FILE_PAGE_LOADED = 'location.protocol === "file:" && document.readyState === "complete" && (!document.body.classList.contains("sg-page") || document.documentElement.classList.contains("sg-ready"))';

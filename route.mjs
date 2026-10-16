@@ -185,7 +185,11 @@ const KEEP_WHY = /\b(because|since|porque|pois|j[aá] que)\b\s+([^.!?\n]{4,200})
 // A Figma link given to use from now on (a branch of the file, or another file): only the file key changes.
 const USE_FIGMA_FILE = /\b(use|using|switch\w*|point\w*|scan\w*|read\w*|change\w*|move\w*|instead|branch\w*|usa\w*|muda\w*|troca\w*|l[eê]r?)\b/i;
 const FIGMA_BRANCH = /\bfigma\b[\s\S]{0,30}\b(branch|ramo)\b|\b(branch|ramo)\b[\s\S]{0,30}\bfigma\b/i;
+// The team's guidance rated for what agents can take from it (K17); the extraction test only when they ask for it.
+const RATE_GUIDANCE = /\b(rate|grade|score|classif\w*|evaluate|assess|review|avalia\w*|classifica\w*)\b[\s\S]{0,60}\b(guidance|guidelines?|documentation|docs|intent|diretrizes|documenta[çc][ãa]o)\b|\b(guidance|guidelines?|documentation|docs)\b[\s\S]{0,40}\b(for|para)\s+(agents?|ai|llms?|agentes)\b/i;
+const EXTRACT_ASKED = /\bextract\w*|\bwith a model\b|\bmodel test\b|\bteste?\b[\s\S]{0,20}\bmodelo\b/i;
 const RULES = [
+  ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
   ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
   ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
   ['guidelines-links', (t) => LINK.test(t)],
@@ -329,7 +333,7 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
       notes.push('The engine lists every Figma edit and writes the script for it; show the person the list and ask. Only when they say yes, run .design-system-engine-out/handback/figma-apply.js with the Figma MCP\'s use_figma, unchanged, and report what it returns. Never write a Figma script of your own; what needs a person (descriptions, missing components, layout) is listed for the design team.');
       return { recipe, question: false, run: [`${cmd} --figma-edits`], notes };
     }
-    if (recipe === 'guidelines-links') return { recipe, question, run: [`${cmd} --guidelines ${links(t).join(' ')}`], notes };
+    if (recipe === 'guidelines-links' && !kind) return { recipe, question, run: [`${cmd} --guidelines ${links(t).join(' ')}`], notes };
     if (recipe === 'prototype') {
       notes.push('A prototype is made only of the design system\'s components with their own options, and the engine\'s layout pieces; never write HTML, CSS or a component for it, and never change the system\'s files. Write it as a composition in prototypes/<name>.json, run --prototype on it, and fix each ❌ line until it is drawn. A need nothing fits is a Missing box; tell the person every gap it lists, as written.');
       // "What can a prototype use?" is answered by the catalog itself; only a how-to is answered from the recipe alone.
@@ -346,6 +350,10 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
       const { figma } = codeAndFigma(t);
       notes.push('Only the Figma file the engine reads changes (a branch link names the branch, which stays as it is while the main file changes); everything else in ds-config.json stays. Then refresh the Figma data from that file with the recipe below, and run the audit.');
       return { recipe, question: false, run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link>'}'`], notes, kind, ...(figma ? {} : { ask: 'the link to the Figma branch or file to read (in Figma, open the branch and copy its link)', askHow: 'the link in --figma-url' }) };
+    }
+    if (kind === 'guidance-rating') {
+      notes.push('Rates the guidance for what an agent can take from it: a class for the whole and for each component (ready, partial, thin) and what to add. --extract also asks a model questions answered from the guidance alone, which spends the person\'s model tokens: only when they ask for it. Each component\'s rating is also in its Documentation area of the style guide.');
+      return { recipe, question: false, run: [`${cmd} --guidance-rating${EXTRACT_ASKED.test(t) ? ' --extract' : ''}`], notes, kind };
     }
     if (kind === 'checked') {
       // Each criterion they named, on each component they named: recorded as theirs, then the page rebuilt.
